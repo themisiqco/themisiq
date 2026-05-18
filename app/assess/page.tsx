@@ -614,7 +614,7 @@ export default function AssessPage() {
       {/* Header */}
       <div style={{ background: '#0d0d0d', padding: '0 2rem', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <a href="/" style={{ textDecoration: 'none' }}>
-          <img src="/logo.png" alt="ThemisIQ" height={28} style={{ display: 'block', filter: 'brightness(0) invert(1)', maxHeight: '28px', width: 'auto' }} />
+          <img src="/logo.png" alt="ThemisIQ" height={28} style={{ display: 'block', maxHeight: '28px', width: 'auto' }} />
         </a>
         <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.05em' }}>Compliance Assessment</span>
       </div>
