@@ -80,7 +80,9 @@ export default function AssessPage() {
   const [email, setEmail] = useState({ first: '', last: '', emailAddr: '', company: '', role: '' })
 
   const goNext = () => setStep(s => s + 1)
-  const goBack = () => setStep(s => s - 1)const submitToAPI = async () => {
+  const goBack = () => setStep(s => s - 1)
+
+  const submitToAPI = async () => {
     try {
       await fetch('/api/assessment/submit', {
         method: 'POST',
