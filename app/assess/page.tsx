@@ -80,7 +80,17 @@ export default function AssessPage() {
   const [email, setEmail] = useState({ first: '', last: '', emailAddr: '', company: '', role: '' })
 
   const goNext = () => setStep(s => s + 1)
-  const goBack = () => setStep(s => s - 1)
+  const goBack = () => setStep(s => s - 1)const submitToAPI = async () => {
+    try {
+      await fetch('/api/assessment/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead: { first: email.first, last: email.last, email: email.emailAddr, company: email.company, role: email.role }, obligations }),
+      })
+    } catch (e) {
+      console.error('Email send failed:', e)
+    }
+  }
   const toggleExpand = (id: string) => setExpanded(e => ({ ...e, [id]: !e[id] }))
 
   const obligations = computeObligations(answers)
