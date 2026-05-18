@@ -9,7 +9,7 @@ export default function ClimateGHGPage() {
         <a href="/" style={{ textDecoration: 'none' }}>
           <img src="/logo.png" alt="ThemisIQ" style={{ height: 36, width: 'auto', mixBlendMode: 'multiply' }} />
         </a>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <a href="/climate-ghg" style={navLink}>Climate · GHG</a>
           <a href="/supply-chain" style={navLink}>Supply Chain</a>
           <a href="/deals" style={navLink}>Deals</a>

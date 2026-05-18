@@ -9,7 +9,7 @@ export default function SupplyChainPage() {
         <a href="/" style={{ textDecoration: 'none' }}>
           <img src="/logo.png" alt="ThemisIQ" style={{ height: 36, width: 'auto', mixBlendMode: 'multiply' }} />
         </a>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <a href="/climate-ghg" style={navLink}>Climate · GHG</a>
           <a href="/supply-chain" style={navLink}>Supply Chain</a>
           <a href="/deals" style={navLink}>Deals</a>
@@ -141,7 +141,7 @@ export default function SupplyChainPage() {
             <div style={eyebrow}>How it works</div>
             <h2 style={sectionTitle}>From supplier list to disclosure.</h2>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '2rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '1rem' }}>
             {[
               ['01', 'Map your supply base', 'Upload your supplier list. ThemisIQ risk-scores each supplier by country, sector, and spend — prioritising who needs deep assessment first.'],
               ['02', 'Collect supplier data', 'Send branded data collection requests via the ThemisIQ supplier portal. Track completion status and chase non-responders automatically.'],
