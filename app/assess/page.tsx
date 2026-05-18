@@ -103,7 +103,7 @@ export default function AssessPage() {
     // Results
     if (step === 8) return (
       <div>
-        <div style={{ textAlign: "center", marginBottom: "2rem", display: "flex", justifyContent: "center" }}>
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, background: '#f8f7f5', border: '0.5px solid #e8e7e4', padding: '4px 14px', borderRadius: 99, marginBottom: 12, color: '#888784' }}>Your Compliance Obligation Map</div>
           <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, marginBottom: 8, lineHeight: 1.2, color: '#0d0d0d' }}>
             We identified <span style={{ background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', fontStyle: 'italic' }}>{obligations.length} regulations</span> that apply to your company.
@@ -278,15 +278,15 @@ export default function AssessPage() {
         <div style={{ maxWidth: 680, margin: '0 auto' }}>
 
           {/* Logo — always visible at top */}
-          <div style={{ textAlign: "center", marginBottom: "2rem", display: "flex", justifyContent: "center" }}>
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <a href="/">
-              <img src="/logo.png" alt="ThemisIQ" style={{ height: 200, width: "auto", mixBlendMode: "multiply" }} />
+              <img src="/logo.png" alt="ThemisIQ" style={{ height: 48, width: 'auto', display: 'inline-block' }} />
             </a>
           </div>
 
           {/* Intro text — only on step 0 */}
           {step === 0 && (
-            <div style={{ textAlign: "center", marginBottom: "2rem", display: "flex", justifyContent: "center" }}>
+            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
               <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 12 }}>Free · 3 minutes · Instant results</div>
               <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '0.75rem', color: '#0d0d0d' }}>
                 Which compliance regulations<br />apply to <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>your company?</span>
