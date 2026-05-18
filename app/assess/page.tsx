@@ -291,7 +291,7 @@ export default function AssessPage() {
               <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '0.75rem', color: '#0d0d0d' }}>
                 Which compliance regulations<br />apply to <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>your company?</span>
               </h1>
-              <p style={{ fontSize: 15, color: '#555553', fontWeight: 300, lineHeight: 1.7, maxWidth: 520, margin: '0 auto' }}>
+              <p style={{ fontSize: 15, color: '#555553', fontWeight: 300, lineHeight: 1.7, maxWidth: 600, margin: "0 auto", textAlign: "center" }}>
                 Answer 7 questions. Get a personalised Compliance Obligation Map — with specific deadlines, penalties, and the ThemisIQ module that addresses each regulation.
               </p>
             </div>
