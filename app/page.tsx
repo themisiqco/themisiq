@@ -204,23 +204,15 @@ export default function Home() {
 
 // ── LOGO COMPONENT ──────────────────────────────────────────────────
 function Logo({ size = 130 }: { size?: number }) {
-  const scale = size / 260
-  const h = Math.round(76 * scale)
+  const height = Math.round(size * 0.29)
   return (
-    <svg width={size} height={h} viewBox="0 0 260 76" fill="none" aria-label="ThemisIQ">
-      <defs>
-        <linearGradient id="tiq" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#7425e3" />
-          <stop offset="50%" stopColor="#1fb1ff" />
-          <stop offset="100%" stopColor="#64fe3e" />
-        </linearGradient>
-      </defs>
-      <text x="0" y="54" fontFamily="-apple-system,sans-serif" fontSize="52" fontWeight="700" letterSpacing="-1.5" fill="#0d0d0d">Themis</text>
-      <rect x="186" y="6" width="7" height="50" rx="3.5" fill="url(#tiq)" />
-      <circle cx="224" cy="31" r="22" fill="none" stroke="url(#tiq)" strokeWidth="7" />
-      <line x1="237" y1="44" x2="249" y2="58" stroke="url(#tiq)" strokeWidth="7" strokeLinecap="round" />
-      <path d="M219 36 C219 27 229 22 234 24 C228 24 222 29 222 36 C222 39.5 224 41.5 226 41.5 C223 41.5 219 39.5 219 36Z" fill="url(#tiq)" />
-    </svg>
+    <img
+      src="/logo.png"
+      alt="ThemisIQ"
+      width={size}
+      height={height}
+      style={{ display: 'block' }}
+    />
   )
 }
 
