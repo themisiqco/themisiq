@@ -279,7 +279,7 @@ export default function AssessPage() {
 
           {/* Logo — always visible at top */}
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-            <a href="/">
+            <a href="/" style={{ display: "block", textAlign: "center" }}>
               <img src="/logo.png" alt="ThemisIQ" style={{ height: 180, width: "auto", mixBlendMode: "multiply" }} />
             </a>
           </div>
