@@ -10,8 +10,14 @@ export default function TermsPage() {
           <img src="/logo.png" alt="ThemisIQ" style={{ height: 36, width: 'auto', mixBlendMode: 'multiply' }} />
         </a>
         <div style={{ display: 'flex', gap: '1.5rem' }}>
-          <a href="/privacy" style={navLink}>Privacy Policy</a>
-          <a href="/security" style={navLink}>Security</a>
+          <a href="/climate-ghg" style={navLink}>Climate · GHG</a>
+          <a href="/supply-chain" style={navLink}>Supply Chain</a>
+          <a href="/deals" style={navLink}>Deals</a>
+          <a href="/people" style={navLink}>People</a>
+          <a href="/ai-governance" style={navLink}>AI Governance</a>
+          <a href="/cyber" style={navLink}>Cyber</a>
+          <a href="/advisory" style={navLink}>Advisory</a>
+          <a href="/assess" style={navLink}>Free Assessment</a>
         </div>
         <a href="/assess" style={btnGrad}>Start free trial</a>
       </nav>

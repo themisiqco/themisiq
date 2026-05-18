@@ -10,7 +10,12 @@ export default function ClimateGHGPage() {
           <img src="/logo.png" alt="ThemisIQ" style={{ height: 36, width: 'auto', mixBlendMode: 'multiply' }} />
         </a>
         <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-          <a href="/climate-risk" style={navLink}>Climate · Risk</a>
+          <a href="/climate-ghg" style={navLink}>Climate · GHG</a>
+          <a href="/supply-chain" style={navLink}>Supply Chain</a>
+          <a href="/deals" style={navLink}>Deals</a>
+          <a href="/people" style={navLink}>People</a>
+          <a href="/ai-governance" style={navLink}>AI Governance</a>
+          <a href="/cyber" style={navLink}>Cyber</a>
           <a href="/advisory" style={navLink}>Advisory</a>
           <a href="/assess" style={navLink}>Free Assessment</a>
         </div>
