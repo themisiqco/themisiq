@@ -178,7 +178,7 @@ export default function AssessPage() {
           <input value={email.emailAddr} onChange={e => setEmail(v => ({...v, emailAddr: e.target.value}))} placeholder="Work email address" type="email" style={inputStyle} />
           <input value={email.company} onChange={e => setEmail(v => ({...v, company: e.target.value}))} placeholder="Company name" style={inputStyle} />
           <input value={email.role} onChange={e => setEmail(v => ({...v, role: e.target.value}))} placeholder="Your role (e.g. CFO, Head of Sustainability)" style={inputStyle} />
-          <button onClick={() => { if (email.emailAddr.includes('@')) setStep(8) }} style={{ fontSize: 14, fontWeight: 500, padding: 12, borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', border: 'none', cursor: 'pointer', marginTop: 4 }}>
+          <button onClick={() => { if (email.emailAddr.includes("@")) { submitToAPI(); setStep(8) } }} style={{ fontSize: 14, fontWeight: 500, padding: 12, borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', border: 'none', cursor: 'pointer', marginTop: 4 }}>
             Show my Compliance Obligation Map →
           </button>
           <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', textAlign: 'center' as const }}>No spam. No sales calls unless you ask.</p>
