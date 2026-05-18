@@ -181,7 +181,7 @@ export default function Home() {
             <div key={col.heading}>
               <div style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#888784', marginBottom: '1rem' }}>{col.heading}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {col.links.map(l => <a key={l} href="#" style={{ fontSize: 13, color: '#555553', textDecoration: 'none' }}>{l}</a>)}
+                {col.links.map(l => <a key={l} href={l === "Privacy Policy" ? "/privacy" : l === "Terms of Service" ? "/terms" : l === "Security" ? "/security" : "#"} style={{ fontSize: 13, color: '#555553', textDecoration: 'none' }}>{l}</a>)}
               </div>
             </div>
           ))}
