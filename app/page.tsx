@@ -9,6 +9,7 @@ export default function Home() {
         <Logo size={120} />
         <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
           <a href="/climate-ghg" style={navLink}>Climate · GHG</a>
+          <a href="/supply-chain" style={navLink}>Supply Chain</a>
           <a href="/advisory" style={navLink}>Advisory</a>
           <a href="/pricing" style={navLink}>Pricing</a>
           <a href="/assess" style={navLink}>Free Assessment</a>
