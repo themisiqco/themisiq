@@ -320,7 +320,7 @@ export default function PrivacyPage() {
 }
 
 // ── STYLES ──────────────────────────────────────────────────────────
-const navLink: React.CSSProperties = { fontSize: 13, color: '#555553', textDecoration: 'none' }
+const navLink: React.CSSProperties = { fontSize: 11, color: '#555553', textDecoration: 'none' }
 const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#fff', textDecoration: 'none', display: 'inline-block' }
 const sectionStyle: React.CSSProperties = { marginBottom: '2.5rem', scrollMarginTop: 80 }
 const eyebrow: React.CSSProperties = { fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 5 }
