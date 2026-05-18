@@ -18,6 +18,7 @@ export default function AdvisoryPage() {
           <a href="/cyber" style={navLink}>Cyber</a>
           <a href="/advisory" style={navLink}>Advisory</a>
           <a href="/assess" style={navLink}>Free Assessment</a>
+        </div>
         <a href="/assess" style={btnGrad}>Start free trial</a>
       </nav>
 

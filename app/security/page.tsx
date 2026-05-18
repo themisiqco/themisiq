@@ -19,6 +19,7 @@ export default function SecurityPage() {
           <a href="/advisory" style={navLink}>Advisory</a>
           <a href="/assess" style={navLink}>Free Assessment</a>
         <a href="/assess" style={btnGrad}>Start free trial</a>
+        </div>
       </nav>
 
       {/* DARK HERO */}
