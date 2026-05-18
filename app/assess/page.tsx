@@ -609,7 +609,7 @@ export default function AssessPage() {
   const pct = Math.round((step / TOTAL_STEPS) * 100)
 
   return (
-    <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#0d0d0d', minHeight: '100vh', color: '#0d0d0d' }}>
+    <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh', color: '#0d0d0d' }}>
 
       {/* Header */}
       <div style={{ background: '#0d0d0d', padding: '0 2rem', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
