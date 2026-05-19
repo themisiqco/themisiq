@@ -5,6 +5,7 @@ export default function Page() {
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d' }}>
       <Nav />
+      <div style={{ background: '#0d0d0d', padding: '5rem 2.5rem 4rem', borderBottom: '0.5px solid #1a1a1a' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>ThemisIQ Compliance Inc.</div>
           <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2.4rem, 5vw, 3.6rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#fff', maxWidth: 700 }}>
