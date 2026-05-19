@@ -30,7 +30,7 @@ export default function Nav() {
       }}>
         {/* LOGO */}
         <a href="/" style={{ textDecoration: 'none', flexShrink: 0 }}>
-          <img src="/logo.png" alt="ThemisIQ" style={{ height: 120, width: "auto", mixBlendMode: "multiply", display: 'block' }} />
+          <img src="/logo.png" alt="ThemisIQ" style={{ height: 32, width: "auto", display: "block" }} />
         </a>
 
         {/* DESKTOP NAV */}
