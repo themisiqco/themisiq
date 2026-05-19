@@ -122,7 +122,6 @@ export default function DashboardPage() {
               { icon: '👥', name: 'People', desc: 'ESRS S1 · Pay equity', status: 'coming', href: '#' },
               { icon: '🤖', name: 'AI Governance', desc: 'EU AI Act · NIST', status: 'coming', href: '#' },
               { icon: '🔒', name: 'Cyber', desc: 'NIS2 · DORA · SEC', status: 'coming', href: '#' },
-              { icon: '🎯', name: 'Advisory', desc: 'Expert guidance', status: 'coming', href: '/advisory' },
             ].map(({ icon, name, desc, status, href }) => (
               <a key={name} href={href} style={{ background: status === 'active' ? '#fff' : '#f8f7f5', border: `0.5px solid ${status === 'active' ? '#7425e3' : '#e8e7e4'}`, borderRadius: 10, padding: '1.25rem', textDecoration: 'none', display: 'block', opacity: status === 'coming' ? 0.6 : 1 }}>
                 <div style={{ fontSize: 20, marginBottom: 8 }}>{icon}</div>
