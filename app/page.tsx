@@ -28,7 +28,7 @@ export default function Home() {
           </div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#555553', background: '#f8f7f5', border: '0.5px solid #e8e7e4', padding: '8px 16px', borderRadius: 99 }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#B91C1C', display: 'inline-block', animation: 'pulse 1.8s infinite' }} />
-            SB 253 first-year deadline: August 10, 2026 — 86 days away
+            SB 253 first-year deadline: August 10, 2026 —  83 days away
           </div>
         </div>
       </section>
@@ -140,7 +140,7 @@ export default function Home() {
       {/* ── CTA ── */}
       <section style={{ padding: '6rem 2.5rem', textAlign: 'center', borderTop: '0.5px solid #e8e7e4' }}>
         <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
-          The SB 253 deadline is <em style={gradText}>86 days away.</em>
+          The SB 253 deadline is <em style={gradText}> 83 days away.</em>
         </h2>
         <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
           ThemisIQ can have your Scope 1 and 2 inventory complete and the CARB template pre-filled in days — not months.
