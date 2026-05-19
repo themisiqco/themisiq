@@ -1,27 +1,10 @@
 'use client'
+import Nav from './components/Nav'
 
 export default function Home() {
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d', margin: 0, padding: 0 }}>
-
-      {/* ── NAV ── */}
-      <nav style={{ position: 'sticky', top: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2.5rem', height: 64, background: 'rgba(255,255,255,0.97)', borderBottom: '0.5px solid #e8e7e4', backdropFilter: 'blur(8px)' }}>
-        <Logo size={120} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-          <a href="/climate-ghg" style={navLink}>Climate · GHG</a>
-          <a href="/supply-chain" style={navLink}>Supply Chain</a>
-          <a href="/deals" style={navLink}>Deals</a>
-          <a href="/people" style={navLink}>People</a>
-          <a href="/ai-governance" style={navLink}>AI Governance</a>
-          <a href="/cyber" style={navLink}>Cyber</a>
-          <a href="/advisory" style={navLink}>Advisory</a>
-          <a href="/assess" style={navLink}>Free Assessment</a>
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button style={btnOutline}>Sign in</button>
-          <a href="/assess" style={btnGrad}>Start free trial</a>
-        </div>
-      </nav>
+      <Nav />
 
       {/* ── HERO ── */}
       <section style={{ padding: '7rem 2.5rem 5rem', borderBottom: '0.5px solid #e8e7e4', textAlign: 'center' }}>

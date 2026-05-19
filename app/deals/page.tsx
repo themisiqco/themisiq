@@ -1,29 +1,10 @@
 'use client'
+import Nav from '../components/Nav'
 
-export default function DealsPage() {
+export default function Page() {
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d' }}>
-
-      {/* NAV */}
-      <nav style={{ position: 'sticky', top: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2.5rem', height: 64, background: 'rgba(255,255,255,0.97)', borderBottom: '0.5px solid #e8e7e4', backdropFilter: 'blur(8px)' }}>
-        <a href="/" style={{ textDecoration: 'none' }}>
-          <img src="/logo.png" alt="ThemisIQ" style={{ height: 36, width: 'auto', mixBlendMode: 'multiply' }} />
-        </a>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <a href="/climate-ghg" style={navLink}>Climate · GHG</a>
-          <a href="/supply-chain" style={navLink}>Supply Chain</a>
-          <a href="/deals" style={navLink}>Deals</a>
-          <a href="/people" style={navLink}>People</a>
-          <a href="/ai-governance" style={navLink}>AI Governance</a>
-          <a href="/cyber" style={navLink}>Cyber</a>
-          <a href="/advisory" style={navLink}>Advisory</a>
-          <a href="/assess" style={navLink}>Free Assessment</a>
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <a href="/assess" style={btnOutline}>Start free trial</a>
-          <a href="/advisory" style={btnGrad}>Talk to an advisor</a>
-        </div>
-      </nav>
+      <Nav />
 
       {/* HERO */}
       <section style={{ padding: '5rem 2.5rem 4rem', borderBottom: '0.5px solid #e8e7e4' }}>

@@ -1,29 +1,10 @@
 'use client'
+import Nav from '../components/Nav'
 
-export default function SecurityPage() {
+export default function Page() {
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d' }}>
-
-      {/* NAV */}
-      <nav style={{ position: 'sticky', top: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2.5rem', height: 64, background: 'rgba(255,255,255,0.97)', borderBottom: '0.5px solid #e8e7e4', backdropFilter: 'blur(8px)' }}>
-        <a href="/" style={{ textDecoration: 'none' }}>
-          <img src="/logo.png" alt="ThemisIQ" style={{ height: 36, width: 'auto', mixBlendMode: 'multiply' }} />
-        </a>
-        <div style={{ display: 'flex', gap: '1.5rem' }}>
-          <a href="/climate-ghg" style={navLink}>Climate · GHG</a>
-          <a href="/supply-chain" style={navLink}>Supply Chain</a>
-          <a href="/deals" style={navLink}>Deals</a>
-          <a href="/people" style={navLink}>People</a>
-          <a href="/ai-governance" style={navLink}>AI Governance</a>
-          <a href="/cyber" style={navLink}>Cyber</a>
-          <a href="/advisory" style={navLink}>Advisory</a>
-          <a href="/assess" style={navLink}>Free Assessment</a>
-        <a href="/assess" style={btnGrad}>Start free trial</a>
-        </div>
-      </nav>
-
-      {/* DARK HERO */}
-      <div style={{ background: '#0d0d0d', padding: '5rem 2.5rem 4rem', borderBottom: '0.5px solid #1a1a1a' }}>
+      <Nav />
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>ThemisIQ Compliance Inc.</div>
           <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2.4rem, 5vw, 3.6rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#fff', maxWidth: 700 }}>

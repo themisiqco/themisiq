@@ -1,29 +1,10 @@
 'use client'
+import Nav from '../components/Nav'
 
-import { useState } from 'react'
-
-const sections = [
-  { id: 's1', num: '01', title: 'Who we are' },
-  { id: 's2', num: '02', title: 'What we collect' },
-  { id: 's3', num: '03', title: 'How we use your data' },
-  { id: 's4', num: '04', title: 'Legal basis' },
-  { id: 's5', num: '05', title: 'Data sharing' },
-  { id: 's6', num: '06', title: 'International transfers' },
-  { id: 's7', num: '07', title: 'Data retention' },
-  { id: 's8', num: '08', title: 'Your rights' },
-  { id: 's9', num: '09', title: 'US residents', highlight: true },
-  { id: 's10', num: '10', title: 'Cookies' },
-  { id: 's11', num: '11', title: 'Contact & complaints' },
-]
-
-export default function PrivacyPage() {
-  const [active, setActive] = useState('s1')
-
+export default function Page() {
   return (
-    <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d', margin: 0, padding: 0 }}>
-
-      {/* NAV */}
-      <nav style={{ position: 'sticky', top: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2.5rem', height: 64, background: 'rgba(255,255,255,0.97)', borderBottom: '0.5px solid #e8e7e4', backdropFilter: 'blur(8px)' }}>
+    <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d' }}>
+      <Nav />
         <a href="/" style={{ textDecoration: 'none' }}>
           <img src="/logo.png" alt="ThemisIQ" style={{ height: 36, width: 'auto', mixBlendMode: 'multiply' }} />
         </a>
