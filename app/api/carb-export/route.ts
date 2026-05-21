@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     const inv = await request.json()
     const templatePath = join(process.cwd(), 'public', 'SB253_Draft_Scope1_2_GHG_Template.xlsx')
     const templateBuffer = await readFile(templatePath)
-    const wb = XLSX.read(templateBuffer, { type: 'buffer' })
+    const wb = XLSX.read(templateBuffer, { type: 'buffer', cellStyles: true, cellNF: true, cellDates: true })
     const ws = wb.Sheets['Form']
     const set = (cell: string, value: any) => {
       if (value === null || value === undefined || value === '') return
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     set('B66', 'IPCC Fourth Assessment Report (AR4, 2007)')
     set('B67', 'Activity data x emission factor = GHG emissions (mtCO2e)')
     set('B68', 'Standard EPA calculation methodology')
-    const out = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+   const out = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx', cellStyles: true })
     const name = (inv.company_name || 'Company').replace(/\s+/g, '_')
     const filename = 'CARB_SB253_' + name + '_' + yr + '.xlsx'
     return new NextResponse(out, {
