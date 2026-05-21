@@ -268,6 +268,17 @@ useEffect(() => {
     })
   }, [])
 
+ }, [])
+
+  const updateLocation = (idx: number, field: keyof Location, value: any) => {
+    setInventory(inv => {
+      const locs = [...inv.locations]
+      locs[idx] = { ...locs[idx], [field]: value }
+      if (field === 'state') locs[idx].grid_region = detectGridRegion(value)
+      return { ...inv, locations: locs }
+    })
+  }
+
   const addLocation = () => {
     const id = String(inventory.locations.length + 1)
     setInventory(inv => ({ ...inv, locations: [...inv.locations, emptyLocation(id, `Location ${id}`)] }))
