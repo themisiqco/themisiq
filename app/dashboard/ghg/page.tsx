@@ -3,15 +3,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../../lib/supabase'
 
-// ── EMISSION FACTORS ──────────────────────────────────────────────────
-// Both AR4 (CARB/CDP default) and AR5 (ESRS/GRI) GWP values
 const GWP = {
   AR4: { CO2: 1, CH4: 25, N2O: 298 },
   AR5: { CO2: 1, CH4: 28, N2O: 265 },
 }
 
 const EF = {
-  // Stationary — kg CO2e per unit (AR4 basis, EPA 2024)
   natural_gas_mcf: { co2: 52.91, ch4: 0.10, n2o: 0.10 },
   natural_gas_therms: { co2: 5.291, ch4: 0.010, n2o: 0.010 },
   natural_gas_mmbtu: { co2: 52.87, ch4: 0.10, n2o: 0.09 },
@@ -24,9 +21,7 @@ const EF = {
   gasoline_litre: { co2: 2.301, ch4: 0.001, n2o: 0.015 },
   diesel_mobile_gallon: { co2: 10.15, ch4: 0.003, n2o: 0.06 },
   diesel_mobile_litre: { co2: 2.681, ch4: 0.001, n2o: 0.016 },
-  // Refrigerants — GWP values (AR4)
   r22: 1810, r134a: 1430, r404a: 3922, r410a: 2088, r507: 3985, ammonia: 0,
-  // Electricity — kg CO2e per kWh location-based (eGRID 2023)
   us_average: 0.3866, mro: 0.4891, serc: 0.3629, wecc: 0.2877,
   npcc: 0.1967, spp: 0.4652, frcc: 0.4051, hicc: 0.6389, ascc: 0.5893,
   steam_mmbtu: 66.4,
@@ -62,7 +57,6 @@ function detectGridRegion(state: string): string {
   return map[s] || 'us_average'
 }
 
-// ── FRAMEWORK DEFINITIONS ─────────────────────────────────────────────
 const FRAMEWORKS = [
   {
     id: 'sb253', name: 'SB 253', full: 'California SB 253 — CARB', color: '#B91C1C', bg: '#FCEBEB',
@@ -108,7 +102,6 @@ const FRAMEWORKS = [
   },
 ]
 
-// ── TYPES ─────────────────────────────────────────────────────────────
 interface SourceDoc { id: string; file_name: string; document_type: string; uploaded_at: string; file_path: string }
 
 interface Location {
@@ -148,7 +141,6 @@ const emptyLocation = (id: string, name: string, state = ''): Location => ({
   source_docs: [],
 })
 
-// ── CALCULATION ENGINE ─────────────────────────────────────────────────
 function calcGas(ef: { co2: number; ch4: number; n2o: number }, amount: number, gwpVersion: 'AR4' | 'AR5') {
   const gwp = GWP[gwpVersion]
   return {
@@ -162,7 +154,6 @@ function calcGas(ef: { co2: number; ch4: number; n2o: number }, amount: number, 
 function calcLocation(loc: Location, gwpVersion: 'AR4' | 'AR5' = 'AR4') {
   let s1_stationary = 0, s1_mobile = 0
   const gases = { co2: 0, ch4: 0, n2o: 0 }
-
   if (loc.has_natural_gas && loc.natural_gas_amount > 0) {
     const ef = EF[`natural_gas_${loc.natural_gas_unit}` as keyof typeof EF] as { co2: number; ch4: number; n2o: number }
     const g = calcGas(ef, loc.natural_gas_amount, gwpVersion)
@@ -194,17 +185,12 @@ function calcLocation(loc: Location, gwpVersion: 'AR4' | 'AR5' = 'AR4') {
       s1_mobile += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
     }
   }
-
   const ref_gwp = EF[loc.refrigerant_type as keyof typeof EF] as number || 0
-  const s1_fugitive = (!loc.uses_ammonia && loc.has_hfc_refrigerants)
-    ? loc.refrigerant_purchased_kg * ref_gwp / 1000 : 0
+  const s1_fugitive = (!loc.uses_ammonia && loc.has_hfc_refrigerants) ? loc.refrigerant_purchased_kg * ref_gwp / 1000 : 0
   const s1_total = s1_stationary + s1_mobile + s1_fugitive
-
   const grid_ef = EF[loc.grid_region as keyof typeof EF] as number || EF.us_average
   const s2_location = (loc.electricity_kwh * grid_ef + (loc.has_purchased_steam ? loc.purchased_steam_mmbtu * EF.steam_mmbtu : 0)) / 1000
-  // Market-based: subtract renewable electricity
   const s2_market = ((loc.electricity_kwh - loc.renewable_electricity_kwh) * grid_ef + (loc.has_purchased_steam ? loc.purchased_steam_mmbtu * EF.steam_mmbtu : 0)) / 1000
-
   return { s1_stationary, s1_mobile, s1_fugitive, s1_total, s2_location, s2_market, gases, biogenic: loc.biogenic_co2_mt }
 }
 
@@ -223,7 +209,130 @@ function calcInventory(locations: Location[], gwpVersion: 'AR4' | 'AR5' = 'AR4')
   }, { s1_total: 0, s2_location: 0, s2_market: 0, co2: 0, ch4: 0, n2o: 0, biogenic: 0 })
 }
 
-// ── MAIN COMPONENT ────────────────────────────────────────────────────
+// ── AI GUIDE BOT ──────────────────────────────────────────────────────
+interface BotMessage { role: 'user' | 'assistant'; content: string }
+
+function GHGBot({ currentStep }: { currentStep: number }) {
+  const [open, setOpen] = useState(false)
+  const [messages, setMessages] = useState<BotMessage[]>([])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const stepNames = ['framework selection', 'company setup', 'energy & fuel data', 'additional data', 'review & workings', 'export']
+
+  useEffect(() => {
+    if (open && messages.length === 0) {
+      setMessages([{
+        role: 'assistant',
+        content: `Hi! I'm your GHG inventory guide. You're on step ${currentStep + 1}: ${stepNames[currentStep]}. Ask me anything — "What is an Mcf?", "Where do I find my kWh?", "What's Scope 2?"`
+      }])
+    }
+  }, [open])
+
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+
+  const sendMessage = async () => {
+    if (!input.trim() || loading) return
+    const userMsg = input.trim()
+    setInput('')
+    setMessages(m => [...m, { role: 'user', content: userMsg }])
+    setLoading(true)
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          system: `You are a friendly GHG inventory expert assistant built into the ThemisIQ platform. The user is on step ${currentStep + 1} of 6: ${stepNames[currentStep]}. Help them complete their GHG inventory with confidence. Key facts: Scope 1 = direct emissions (fuel, refrigerants). Scope 2 = purchased electricity/steam. Mcf = thousand cubic feet of natural gas. MMBtu = million British thermal units. eGRID = US electricity grid regions. AR4/AR5 = IPCC GWP versions. Keep answers concise and practical.`,
+          messages: [...messages, { role: 'user', content: userMsg }].map(m => ({ role: m.role, content: m.content }))
+        })
+      })
+      const data = await res.json()
+      const reply = data.content?.map((c: any) => c.text || '').join('') || 'Sorry, try again.'
+      setMessages(m => [...m, { role: 'assistant', content: reply }])
+    } catch {
+      setMessages(m => [...m, { role: 'assistant', content: 'Something went wrong. Please try again.' }])
+    }
+    setLoading(false)
+  }
+
+  return (
+    <>
+      <button onClick={() => setOpen(o => !o)} style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1000, width: 56, height: 56, borderRadius: '50%', background: 'linear-gradient(135deg,#7425e3,#1fb1ff)', border: 'none', cursor: 'pointer', boxShadow: '0 4px 20px rgba(116,37,227,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }} title="Ask your GHG guide">
+        {open ? '✕' : '💬'}
+      </button>
+      {open && (
+        <div style={{ position: 'fixed', bottom: 92, right: 24, zIndex: 1000, width: 360, height: 480, background: '#fff', borderRadius: 16, boxShadow: '0 8px 40px rgba(0,0,0,0.15)', border: '0.5px solid #e8e7e4', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '1rem 1.25rem', borderBottom: '0.5px solid #e8e7e4', background: 'linear-gradient(135deg,#7425e3,#1fb1ff)', borderRadius: '16px 16px 0 0' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>ThemisIQ Guide</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>Step {currentStep + 1}: {stepNames[currentStep]}</div>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {messages.map((msg, i) => (
+              <div key={i} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%', background: msg.role === 'user' ? '#7425e3' : '#f8f7f5', color: msg.role === 'user' ? '#fff' : '#0d0d0d', borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px', padding: '8px 12px', fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                {msg.content}
+              </div>
+            ))}
+            {loading && <div style={{ alignSelf: 'flex-start', background: '#f8f7f5', borderRadius: '12px 12px 12px 2px', padding: '8px 12px', fontSize: 12, color: '#888784' }}>Thinking...</div>}
+            <div ref={messagesEndRef} />
+          </div>
+          <div style={{ padding: '0.75rem', borderTop: '0.5px solid #e8e7e4', display: 'flex', gap: 8 }}>
+            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendMessage()} placeholder="Ask anything about your GHG inventory..." style={{ flex: 1, fontSize: 12, padding: '8px 12px', border: '0.5px solid #e8e7e4', borderRadius: 8, outline: 'none' }} />
+            <button onClick={sendMessage} disabled={loading || !input.trim()} style={{ fontSize: 12, padding: '8px 14px', borderRadius: 8, background: '#7425e3', color: '#fff', border: 'none', cursor: 'pointer', opacity: loading || !input.trim() ? 0.5 : 1 }}>→</button>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+// ── PAYWALL OVERLAY ───────────────────────────────────────────────────
+function PaywallOverlay({ frameworks }: { frameworks: string[] }) {
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 10, backdropFilter: 'blur(8px)', background: 'rgba(248,247,245,0.85)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ background: '#fff', borderRadius: 16, padding: '2.5rem', boxShadow: '0 8px 40px rgba(0,0,0,0.12)', border: '0.5px solid #e8e7e4', maxWidth: 480, textAlign: 'center' }}>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>🔒</div>
+        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 8 }}>Your GHG inventory is complete.</div>
+        <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 300 }}>
+          Your Scope 1 and Scope 2 emissions have been calculated to {frameworks.join(', ')} standards, with full calculation workings ready for third-party assurance. Unlock your submission-ready reports with one click.
+        </div>
+        <div style={{ background: '#f8f7f5', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', textAlign: 'left' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', marginBottom: 10, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>What you unlock</div>
+          {[
+            ['📄', 'Submission-ready reports for all selected frameworks'],
+            ['🔒', 'Assurance-ready evidence uploads per emission source'],
+            ['📊', 'Full calculation workings export (ISO 14064-3)'],
+            ['🔄', 'Unlimited updates throughout your reporting year'],
+            ['✅', 'Priority support through your filing deadline'],
+          ].map(([icon, text]) => (
+            <div key={text as string} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 8 }}>
+              <span style={{ fontSize: 14, flexShrink: 0 }}>{icon}</span>
+              <span style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>{text}</span>
+            </div>
+          ))}
+        </div>
+        <button onClick={() => window.location.href = '/signup?upgrade=true'} style={{ width: '100%', fontSize: 14, fontWeight: 600, padding: '14px 28px', borderRadius: 10, border: 'none', cursor: 'pointer', marginBottom: 10, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d' }}>
+          Unlock My Reports →
+        </button>
+        <div style={{ fontSize: 11, color: '#888784' }}>Secure payment · Instant access · Cancel anytime</div>
+      </div>
+    </div>
+  )
+}
+
+// ── LOCKED UPLOAD ─────────────────────────────────────────────────────
+function LockedDocUpload({ label }: { label: string }) {
+  return (
+    <div style={{ background: '#f8f7f5', border: '0.5px dashed #e8e7e4', borderRadius: 8, padding: '10px 14px', opacity: 0.7 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>📎 {label}</span>
+        <span style={{ fontSize: 11, padding: '4px 12px', borderRadius: 6, background: '#fff', border: '0.5px solid #e8e7e4', color: '#888784' }}>🔒 Paid plan</span>
+      </div>
+      <div style={{ fontSize: 11, color: '#888784', marginTop: 6, fontWeight: 300 }}>Evidence uploads are available on paid plans — keeping your inventory assurance-ready for third-party verification.</div>
+    </div>
+  )
+}// ── MAIN COMPONENT ────────────────────────────────────────────────────
 export default function GHGPage() {
   const [step, setStep] = useState(0)
   const [inventory, setInventory] = useState<Inventory>({
@@ -235,12 +344,13 @@ export default function GHGPage() {
   })
   const [activeLocation, setActiveLocation] = useState(0)
   const [saved, setSaved] = useState(false)
-const [inventoryId, setInventoryId] = useState<string | null>(null)
+  const [inventoryId, setInventoryId] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [showWorkings, setShowWorkings] = useState<Record<string, boolean>>({})
   const [activeExport, setActiveExport] = useState('sb253')
+  const isPaid = false // TODO: wire to Stripe
 
-useEffect(() => {
+  useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) { window.location.href = '/login'; return }
       const { data } = await supabase
@@ -266,9 +376,7 @@ useEffect(() => {
         setSaved(true)
       }
     })
-
-
- }, [])
+  }, [])
 
   const updateLocation = (idx: number, field: keyof Location, value: any) => {
     setInventory(inv => {
@@ -326,7 +434,6 @@ useEffect(() => {
   const STEPS = ['Reporting frameworks', 'Company setup', 'Energy & fuel data', 'Additional data', 'Review & workings', 'Export reports']
   const activeFrameworks = FRAMEWORKS.filter(f => inventory.selected_frameworks.includes(f.id))
 
-  // ── STEP 0 — FRAMEWORK SELECTION ──────────────────────────────────
   const renderStep0 = () => (
     <div>
       <h2 style={sectionHead}>Which reporting frameworks do you need?</h2>
@@ -355,7 +462,7 @@ useEffect(() => {
         <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginBottom: 8 }}>Selected: {activeFrameworks.map(f => f.name).join(' · ')}</div>
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontWeight: 300, lineHeight: 1.6 }}>
-            ThemisIQ will collect your data once and produce {inventory.selected_frameworks.length} report{inventory.selected_frameworks.length > 1 ? 's' : ''}. 
+            ThemisIQ will collect your data once and produce {inventory.selected_frameworks.length} report{inventory.selected_frameworks.length > 1 ? 's' : ''}.
             {needsMarketBased && ' ESRS/GRI requires market-based Scope 2 — we\'ll ask about renewable energy contracts.'}
             {needsPriorYear && ' CDP requires prior year comparison figures.'}
             {needsBiogenic && ' ESRS/GRI requires biogenic CO₂ to be reported separately.'}
@@ -365,7 +472,6 @@ useEffect(() => {
     </div>
   )
 
-  // ── STEP 1 — COMPANY SETUP ────────────────────────────────────────
   const renderStep1 = () => (
     <div>
       <h2 style={sectionHead}>Company & inventory setup</h2>
@@ -436,31 +542,25 @@ useEffect(() => {
     </div>
   )
 
-  // ── STEP 2 — ENERGY DATA ─────────────────────────────────────────
   const renderStep2 = () => {
     const loc = inventory.locations[activeLocation]
     const calc = calcLocation(loc, 'AR4')
     const detectedRegion = GRID_REGIONS.find(r => r.value === loc.grid_region)
-
     return (
       <div>
         <h2 style={sectionHead}>Energy & fuel data</h2>
         <p style={sectionSub}>Enter what appears on your utility bills and fuel records. All calculations happen automatically — you never need to look up emission factors.</p>
-
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
           {inventory.locations.map((l, i) => (
             <button key={l.id} onClick={() => setActiveLocation(i)} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: activeLocation === i ? '#0d0d0d' : '#f8f7f5', color: activeLocation === i ? '#fff' : '#555553', border: `0.5px solid ${activeLocation === i ? '#0d0d0d' : '#e8e7e4'}`, cursor: 'pointer', fontWeight: activeLocation === i ? 500 : 400 }}>
               {l.name || `Location ${i+1}`}
-              {l.source_docs.length > 0 && <span style={{ marginLeft: 6, fontSize: 10, background: '#0F6E56', color: '#fff', borderRadius: 99, padding: '1px 6px' }}>{l.source_docs.length}</span>}
             </button>
           ))}
           <button onClick={addLocation} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: 'none', border: '0.5px solid #7425e3', color: '#7425e3', cursor: 'pointer' }}>+ Add location</button>
         </div>
-
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '2rem', alignItems: 'start' }}>
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 20 }}>
-
-            <QuestionCard question="Does this location use natural gas?" hint="For heating, grain drying, boilers, furnaces — check your gas utility bills" checked={loc.has_natural_gas} onToggle={v => updateLocation(activeLocation, 'has_natural_gas', v)}>
+            <QuestionCard question="Does this location use natural gas?" hint="For heating, boilers, furnaces — check your gas utility bills" checked={loc.has_natural_gas} onToggle={v => updateLocation(activeLocation, 'has_natural_gas', v)}>
               {loc.has_natural_gas && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <p style={qHint}>What unit does your gas supplier show on bills?</p>
@@ -472,12 +572,11 @@ useEffect(() => {
                   <Field label={`Total natural gas — ${inventory.reporting_year} (${loc.natural_gas_unit})`} hint="Sum of all 12 monthly bills for this location">
                     <input type="number" value={loc.natural_gas_amount || ''} onChange={e => updateLocation(activeLocation, 'natural_gas_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  <DocUpload label="Upload gas bills" locIdx={activeLocation} docType="utility_bill_gas" docs={loc.source_docs.filter(d => d.document_type === 'utility_bill_gas')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} />
+                  {isPaid ? <DocUpload label="Upload gas bills" locIdx={activeLocation} docType="utility_bill_gas" docs={loc.source_docs.filter(d => d.document_type === 'utility_bill_gas')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} /> : <LockedDocUpload label="Upload gas bills" />}
                 </div>
               )}
             </QuestionCard>
-
-            <QuestionCard question="Does this location use propane or LPG?" hint="For grain dryers, forklifts, and heating — check delivery records" checked={loc.has_propane} onToggle={v => updateLocation(activeLocation, 'has_propane', v)}>
+            <QuestionCard question="Does this location use propane or LPG?" hint="For forklifts and heating — check delivery records" checked={loc.has_propane} onToggle={v => updateLocation(activeLocation, 'has_propane', v)}>
               {loc.has_propane && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
@@ -488,12 +587,11 @@ useEffect(() => {
                   <Field label={`Total propane purchased — ${inventory.reporting_year} (${loc.propane_unit})`}>
                     <input type="number" value={loc.propane_amount || ''} onChange={e => updateLocation(activeLocation, 'propane_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  <DocUpload label="Upload propane delivery records" locIdx={activeLocation} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} />
+                  {isPaid ? <DocUpload label="Upload propane delivery records" locIdx={activeLocation} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} /> : <LockedDocUpload label="Upload propane delivery records" />}
                 </div>
               )}
             </QuestionCard>
-
-            <QuestionCard question="Does this location use diesel in stationary equipment?" hint="Backup generators, boilers, heating — not vehicles" checked={loc.has_diesel_stationary} onToggle={v => updateLocation(activeLocation, 'has_diesel_stationary', v)}>
+            <QuestionCard question="Does this location use diesel in stationary equipment?" hint="Backup generators, boilers — not vehicles" checked={loc.has_diesel_stationary} onToggle={v => updateLocation(activeLocation, 'has_diesel_stationary', v)}>
               {loc.has_diesel_stationary && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
@@ -504,12 +602,11 @@ useEffect(() => {
                   <Field label={`Total diesel in stationary equipment — ${inventory.reporting_year}`}>
                     <input type="number" value={loc.diesel_stationary_amount || ''} onChange={e => updateLocation(activeLocation, 'diesel_stationary_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  <DocUpload label="Upload diesel purchase records" locIdx={activeLocation} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} />
+                  {isPaid ? <DocUpload label="Upload diesel purchase records" locIdx={activeLocation} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} /> : <LockedDocUpload label="Upload diesel purchase records" />}
                 </div>
               )}
             </QuestionCard>
-
-            <QuestionCard question="Does this location have company-owned vehicles or mobile equipment?" hint="Delivery trucks, forklifts, company cars — check fleet fuel cards or expense reports" checked={loc.has_mobile} onToggle={v => updateLocation(activeLocation, 'has_mobile', v)}>
+            <QuestionCard question="Does this location have company-owned vehicles or mobile equipment?" hint="Delivery trucks, forklifts, company cars — check fleet fuel cards" checked={loc.has_mobile} onToggle={v => updateLocation(activeLocation, 'has_mobile', v)}>
               {loc.has_mobile && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 14 }}>
                   <Field label={`Gasoline for company vehicles — ${inventory.reporting_year}`} hint="Cars, light trucks, vans">
@@ -530,15 +627,13 @@ useEffect(() => {
                       </select>
                     </div>
                   </Field>
-                  <DocUpload label="Upload fleet fuel records" locIdx={activeLocation} docType="fleet_fuel" docs={loc.source_docs.filter(d => d.document_type === 'fleet_fuel')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} />
+                  {isPaid ? <DocUpload label="Upload fleet fuel records" locIdx={activeLocation} docType="fleet_fuel" docs={loc.source_docs.filter(d => d.document_type === 'fleet_fuel')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} /> : <LockedDocUpload label="Upload fleet fuel records" />}
                 </div>
               )}
             </QuestionCard>
-
-            {/* REFRIGERATION */}
             <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.25rem' }}>
               <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>Does this location have refrigeration or cooling?</div>
-              <p style={qHint}>Grain storage and food processing commonly use refrigeration.</p>
+              <p style={qHint}>Large commercial refrigeration systems are common emission sources.</p>
               <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
                 <button onClick={() => { updateLocation(activeLocation, 'uses_ammonia', true); updateLocation(activeLocation, 'has_hfc_refrigerants', false) }} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: loc.uses_ammonia ? '#0F6E56' : '#f8f7f5', color: loc.uses_ammonia ? '#fff' : '#555553', border: `0.5px solid ${loc.uses_ammonia ? '#0F6E56' : '#e8e7e4'}`, cursor: 'pointer' }}>Ammonia (NH₃)</button>
                 <button onClick={() => { updateLocation(activeLocation, 'has_hfc_refrigerants', true); updateLocation(activeLocation, 'uses_ammonia', false) }} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: loc.has_hfc_refrigerants ? '#7425e3' : '#f8f7f5', color: loc.has_hfc_refrigerants ? '#fff' : '#555553', border: `0.5px solid ${loc.has_hfc_refrigerants ? '#7425e3' : '#e8e7e4'}`, cursor: 'pointer' }}>HFC refrigerants</button>
@@ -552,12 +647,10 @@ useEffect(() => {
                   <Field label="Refrigerant purchased for top-up this year (kg)" hint="From service records or supplier invoices">
                     <input type="number" value={loc.refrigerant_purchased_kg || ''} onChange={e => updateLocation(activeLocation, 'refrigerant_purchased_kg', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  <DocUpload label="Upload service records" locIdx={activeLocation} docType="service_record" docs={loc.source_docs.filter(d => d.document_type === 'service_record')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} />
+                  {isPaid ? <DocUpload label="Upload service records" locIdx={activeLocation} docType="service_record" docs={loc.source_docs.filter(d => d.document_type === 'service_record')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} /> : <LockedDocUpload label="Upload service records" />}
                 </div>
               )}
             </div>
-
-            {/* ELECTRICITY */}
             <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.25rem' }}>
               <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>Purchased electricity</div>
               <p style={qHint}>Check your electricity utility bills — kWh is always shown.</p>
@@ -569,13 +662,10 @@ useEffect(() => {
                   ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region auto-detected: <strong>{detectedRegion?.label}</strong> — {detectedRegion?.ef} kg CO₂e/kWh (eGRID 2023)</div>
                   : <Field label="Grid region"><select value={loc.grid_region} onChange={e => updateLocation(activeLocation, 'grid_region', e.target.value)} style={inputStyle}>{GRID_REGIONS.map(r => <option key={r.value} value={r.value}>{r.label} — {r.ef} kg CO₂e/kWh</option>)}</select></Field>
                 }
-                <DocUpload label="Upload electricity bills" locIdx={activeLocation} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} />
+                {isPaid ? <DocUpload label="Upload electricity bills" locIdx={activeLocation} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} /> : <LockedDocUpload label="Upload electricity bills" />}
               </div>
             </div>
-
           </div>
-
-          {/* LIVE PANEL */}
           <div style={{ position: 'sticky', top: 80 }}>
             <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '1.5rem', marginBottom: 12 }}>
               <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 12 }}>{loc.name} — live results</div>
@@ -597,7 +687,6 @@ useEffect(() => {
               <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>All locations</div>
               <div style={{ fontSize: 14, fontWeight: 600, color: '#7425e3' }}>{totals_ar4.s1_total.toFixed(2)} mt Scope 1</div>
               <div style={{ fontSize: 14, fontWeight: 600, color: '#0F6E56', marginTop: 4 }}>{totals_ar4.s2_location.toFixed(2)} mt Scope 2</div>
-              <div style={{ fontSize: 11, color: '#888784', marginTop: 4 }}>{inventory.locations.reduce((a,l) => a+l.source_docs.length,0)} source documents</div>
             </div>
           </div>
         </div>
@@ -605,7 +694,6 @@ useEffect(() => {
     )
   }
 
-  // ── STEP 3 — ADDITIONAL DATA ──────────────────────────────────────
   const renderStep3 = () => {
     const needsExtra = needsMarketBased || needsBiogenic
     if (!needsExtra) return (
@@ -617,13 +705,11 @@ useEffect(() => {
         </div>
       </div>
     )
-
     return (
       <div>
         <h2 style={sectionHead}>Additional data</h2>
         <p style={sectionSub}>Your selected frameworks require some additional information beyond standard energy data.</p>
         <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 20, maxWidth: 700 }}>
-
           {needsMarketBased && (
             <div style={{ background: '#fff', border: '0.5px solid #7425e3', borderRadius: 12, padding: '1.5rem' }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: '#7425e3', marginBottom: 4, letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>ESRS E1 / GRI 305 — Market-based Scope 2</div>
@@ -635,14 +721,13 @@ useEffect(() => {
                   </Field>
                 </div>
               ))}
-              <DocUpload label="Upload renewable energy certificates or PPA contracts" locIdx={0} docType="renewable_cert" docs={inventory.locations[0].source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} />
+              {isPaid ? <DocUpload label="Upload renewable energy certificates or PPA contracts" locIdx={0} docType="renewable_cert" docs={inventory.locations[0].source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} /> : <LockedDocUpload label="Upload renewable energy certificates or PPA contracts" />}
             </div>
           )}
-
           {needsBiogenic && (
             <div style={{ background: '#fff', border: '0.5px solid #0F6E56', borderRadius: 12, padding: '1.5rem' }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: '#0F6E56', marginBottom: 4, letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>ESRS E1 / GRI 305 — Biogenic CO₂</div>
-              <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '1rem' }}>ESRS E1 and GRI 305 require biogenic CO₂ emissions to be reported separately from fossil fuel emissions. Biogenic CO₂ comes from burning biomass, wood waste, or agricultural residues. For most wheat processors this is zero.</p>
+              <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '1rem' }}>ESRS E1 and GRI 305 require biogenic CO₂ emissions to be reported separately from fossil fuel emissions. Biogenic CO₂ comes from burning biomass, wood waste, or agricultural residues.</p>
               {inventory.locations.map((loc, i) => (
                 <div key={loc.id} style={{ marginBottom: 14 }}>
                   <Field label={`${loc.name} — Biogenic CO₂ (mtCO₂)`} hint="From burning biomass, wood waste, or agricultural residues — 0 if none">
@@ -652,220 +737,161 @@ useEffect(() => {
               ))}
             </div>
           )}
-
         </div>
       </div>
     )
   }
 
-  // ── STEP 4 — REVIEW & WORKINGS ────────────────────────────────────
   const renderStep4 = () => {
     const ar4 = totals_ar4
     const ar5 = totals_ar5
     const rev = inventory.revenue_millions
     const emp = inventory.employee_count
-
     return (
       <div>
         <h2 style={sectionHead}>Review, results & calculation workings</h2>
-        <p style={sectionSub}>Your complete GHG inventory for {inventory.company_name}, {inventory.reporting_year}. Results shown under each framework's required GWP version.</p>
-
-        {/* FRAMEWORK RESULTS COMPARISON */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: '2rem' }}>
-          {activeFrameworks.map(fw => {
-            const totals = fw.gwp === 'AR4' ? ar4 : ar5
-            return (
-              <div key={fw.id} style={{ background: fw.bg, border: `0.5px solid ${fw.color}33`, borderRadius: 10, padding: '1.25rem' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: fw.color, letterSpacing: '0.06em', textTransform: 'uppercase' as const, marginBottom: 8 }}>{fw.name} — GWP {fw.gwp}</div>
-                <div style={{ marginBottom: 6 }}>
-                  <div style={{ fontSize: 11, color: '#888784' }}>Scope 1</div>
-                  <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: fw.color }}>{totals.s1_total.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
-                </div>
-                <div style={{ marginBottom: 6 }}>
-                  <div style={{ fontSize: 11, color: '#888784' }}>Scope 2 (location)</div>
-                  <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: fw.color }}>{totals.s2_location.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
-                </div>
-                {(fw.id === 'esrs' || fw.id === 'gri') && (
-                  <div style={{ marginBottom: 6 }}>
-                    <div style={{ fontSize: 11, color: '#888784' }}>Scope 2 (market)</div>
-                    <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: fw.color }}>{totals.s2_market.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+        <p style={sectionSub}>Your complete GHG inventory for {inventory.company_name || 'your company'}, {inventory.reporting_year}.</p>
+        <div style={{ position: 'relative' }}>
+          {!isPaid && <PaywallOverlay frameworks={activeFrameworks.map(f => f.name)} />}
+          <div style={{ filter: isPaid ? 'none' : 'blur(4px)', pointerEvents: isPaid ? 'auto' : 'none' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: '2rem' }}>
+              {activeFrameworks.map(fw => {
+                const totals = fw.gwp === 'AR4' ? ar4 : ar5
+                return (
+                  <div key={fw.id} style={{ background: fw.bg, border: `0.5px solid ${fw.color}33`, borderRadius: 10, padding: '1.25rem' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: fw.color, letterSpacing: '0.06em', textTransform: 'uppercase' as const, marginBottom: 8 }}>{fw.name} — GWP {fw.gwp}</div>
+                    <div style={{ marginBottom: 6 }}>
+                      <div style={{ fontSize: 11, color: '#888784' }}>Scope 1</div>
+                      <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: fw.color }}>{totals.s1_total.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                    </div>
+                    <div style={{ marginBottom: 6 }}>
+                      <div style={{ fontSize: 11, color: '#888784' }}>Scope 2 (location)</div>
+                      <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: fw.color }}>{totals.s2_location.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                    </div>
+                    {rev > 0 && <div style={{ fontSize: 11, color: '#888784', marginTop: 4 }}>Intensity: {(totals.s1_total / rev).toFixed(4)} mt/$M</div>}
+                    {emp > 0 && fw.id === 'ecovadis' && <div style={{ fontSize: 11, color: '#888784' }}>Per employee: {(totals.s1_total / emp * 1000).toFixed(2)} kgCO₂e</div>}
                   </div>
-                )}
-                {rev > 0 && <div style={{ fontSize: 11, color: '#888784', marginTop: 4 }}>Intensity: {(totals.s1_total / rev).toFixed(4)} mt/$M</div>}
-                {emp > 0 && fw.id === 'ecovadis' && <div style={{ fontSize: 11, color: '#888784' }}>Per employee: {(totals.s1_total / emp * 1000).toFixed(2)} kgCO₂e</div>}
-              </div>
-            )
-          })}
-        </div>
-
-        {/* BY GAS BREAKDOWN */}
-        {(inventory.selected_frameworks.includes('esrs') || inventory.selected_frameworks.includes('gri')) && (
-          <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.5rem', marginBottom: '1.5rem' }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#888784', marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>Scope 1 by gas (AR5 GWP — ESRS E1 / GRI 305)</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                )
+              })}
+            </div>
+            {inventory.locations.map((loc, i) => {
+              const c = calcLocation(loc, 'AR4')
+              const key = `loc_${i}`
+              return (
+                <div key={loc.id} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, marginBottom: 12, overflow: 'hidden' }}>
+                  <div onClick={() => setShowWorkings(w => ({...w, [key]: !w[key]}))} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', cursor: 'pointer' }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>{loc.name}{loc.state && ` — ${loc.state}`}</div>
+                      <div style={{ fontSize: 12, color: '#888784', marginTop: 2 }}>S1: {c.s1_total.toFixed(2)} mt · S2: {c.s2_location.toFixed(2)} mt · Total: {(c.s1_total + c.s2_location).toFixed(2)} mt</div>
+                    </div>
+                    <span style={{ fontSize: 12, color: '#888784' }}>{showWorkings[key] ? '▲ Hide' : '▼ Show workings'}</span>
+                  </div>
+                  {showWorkings[key] && (
+                    <div style={{ padding: '0 1.25rem 1.25rem', borderTop: '0.5px solid #e8e7e4' }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', margin: '1rem 0 0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase' as const }}>Calculation workings — ISO 14064-3 / ISAE 3410 transparency</div>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                        <thead><tr>{['Source', 'Activity data', 'Emission factor', 'Factor source', 'GWP basis', 'Result (mtCO₂e)'].map(h => <th key={h} style={{ background: '#f8f7f5', padding: '6px 10px', textAlign: 'left', fontSize: 10, fontWeight: 600, color: '#888784', borderBottom: '0.5px solid #e8e7e4' }}>{h}</th>)}</tr></thead>
+                        <tbody>
+                          {loc.has_natural_gas && loc.natural_gas_amount > 0 && (() => {
+                            const efKey = `natural_gas_${loc.natural_gas_unit}` as keyof typeof EF
+                            const ef = EF[efKey] as { co2: number; ch4: number; n2o: number }
+                            const total = (ef.co2 + ef.ch4 * GWP.AR4.CH4 + ef.n2o * GWP.AR4.N2O) * loc.natural_gas_amount / 1000
+                            return <tr><td style={wTd}>Natural gas</td><td style={wTd}>{loc.natural_gas_amount} {loc.natural_gas_unit}</td><td style={wTd}>{(ef.co2 + ef.ch4 * GWP.AR4.CH4 + ef.n2o * GWP.AR4.N2O).toFixed(3)} kg CO₂e/{loc.natural_gas_unit}</td><td style={wTd}>{EF_SOURCES.combustion}</td><td style={wTd}>AR4</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
+                          })()}
+                          {loc.has_propane && loc.propane_amount > 0 && (() => {
+                            const efKey = `propane_${loc.propane_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF
+                            const ef = EF[efKey] as { co2: number; ch4: number; n2o: number }
+                            const total = (ef.co2 + ef.ch4 * GWP.AR4.CH4 + ef.n2o * GWP.AR4.N2O) * loc.propane_amount / 1000
+                            return <tr><td style={wTd}>Propane</td><td style={wTd}>{loc.propane_amount} {loc.propane_unit}</td><td style={wTd}>{(ef.co2 + ef.ch4 * GWP.AR4.CH4 + ef.n2o * GWP.AR4.N2O).toFixed(3)} kg CO₂e/{loc.propane_unit === 'gallons' ? 'gal' : 'L'}</td><td style={wTd}>{EF_SOURCES.combustion}</td><td style={wTd}>AR4</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
+                          })()}
+                          {loc.electricity_kwh > 0 && (() => {
+                            const ef = EF[loc.grid_region as keyof typeof EF] as number || EF.us_average
+                            return <tr style={{ background: '#f8f7f5' }}><td style={wTd}>Electricity (S2 location)</td><td style={wTd}>{loc.electricity_kwh.toLocaleString()} kWh</td><td style={wTd}>{ef.toFixed(4)} kg CO₂e/kWh</td><td style={wTd}>{EF_SOURCES.electricity} — {loc.grid_region}</td><td style={wTd}>N/A</td><td style={{ ...wTd, fontWeight: 600, color: '#0F6E56' }}>{(loc.electricity_kwh * ef / 1000).toFixed(4)}</td></tr>
+                          })()}
+                          <tr style={{ background: '#0d0d0d' }}><td colSpan={5} style={{ ...wTd, color: '#fff', fontWeight: 700, background: '#0d0d0d' }}>TOTAL — {loc.name}</td><td style={{ ...wTd, color: '#fff', fontWeight: 700, background: '#0d0d0d' }}>{(c.s1_total + c.s2_location).toFixed(4)}</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '1.5rem', marginTop: '1.5rem' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginBottom: 12 }}>Assurance readiness — ISO 14064-3 / ISAE 3410</div>
               {[
-                { gas: 'CO₂', val: ar5.co2, color: '#7425e3' },
-                { gas: 'CH₄ (as CO₂e)', val: ar5.ch4, color: '#1fb1ff' },
-                { gas: 'N₂O (as CO₂e)', val: ar5.n2o, color: '#ba7517' },
-                { gas: 'Biogenic CO₂', val: ar5.biogenic, color: '#0F6E56' },
-              ].map(({ gas, val, color }) => (
-                <div key={gas} style={{ background: '#f8f7f5', borderRadius: 8, padding: '1rem' }}>
-                  <div style={{ fontSize: 11, color: '#888784', marginBottom: 4 }}>{gas}</div>
-                  <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color }}>{val.toFixed(4)}</div>
-                  <div style={{ fontSize: 10, color: '#888784' }}>mtCO₂e</div>
+                { label: 'Emission factors cited with source and year', done: true, note: 'EPA 2024 · eGRID 2023 · IPCC AR4 + AR5 GWP' },
+                { label: 'Calculation workings documented per source', done: true, note: 'Full formula shown for every emission source' },
+                { label: 'Organizational boundary documented', done: !!inventory.boundary_approach, note: inventory.boundary_approach.replace(/_/g, ' ') },
+                { label: 'Source documents uploaded', done: isPaid && inventory.locations.some(l => l.source_docs.length > 0), note: isPaid ? `${inventory.locations.reduce((a, l) => a + l.source_docs.length, 0)} documents` : 'Available on paid plan' },
+                { label: 'All locations included in boundary', done: inventory.locations.length > 0, note: `${inventory.locations.length} location(s)` },
+              ].map(({ label, done, note }) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
+                  <span style={{ fontSize: 14, flexShrink: 0 }}>{done ? '✅' : '⬜'}</span>
+                  <div>
+                    <div style={{ fontSize: 12, color: done ? '#fff' : 'rgba(255,255,255,0.4)', fontWeight: done ? 500 : 300 }}>{label}</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{note}</div>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
-        )}
-
-        {/* LOCATION WORKINGS */}
-        {inventory.locations.map((loc, i) => {
-          const c = calcLocation(loc, 'AR4')
-          const key = `loc_${i}`
-          return (
-            <div key={loc.id} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, marginBottom: 12, overflow: 'hidden' }}>
-              <div onClick={() => setShowWorkings(w => ({...w, [key]: !w[key]}))} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', cursor: 'pointer' }}>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>{loc.name}{loc.state && ` — ${loc.state}`}</div>
-                  <div style={{ fontSize: 12, color: '#888784', marginTop: 2 }}>S1: {c.s1_total.toFixed(2)} mt · S2: {c.s2_location.toFixed(2)} mt · Total: {(c.s1_total + c.s2_location).toFixed(2)} mt</div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  {loc.source_docs.length > 0 && <span style={{ fontSize: 11, background: '#E1F5EE', color: '#0F6E56', borderRadius: 99, padding: '2px 8px', fontWeight: 500 }}>✓ {loc.source_docs.length} docs</span>}
-                  <span style={{ fontSize: 12, color: '#888784' }}>{showWorkings[key] ? '▲ Hide' : '▼ Show workings'}</span>
-                </div>
-              </div>
-              {showWorkings[key] && (
-                <div style={{ padding: '0 1.25rem 1.25rem', borderTop: '0.5px solid #e8e7e4' }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', margin: '1rem 0 0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase' as const }}>Calculation workings — ISO 14064-3 / ISAE 3410 transparency</div>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-                    <thead><tr>{['Source', 'Activity data', 'Emission factor', 'Factor source', 'GWP basis', 'Result (mtCO₂e)'].map(h => <th key={h} style={{ background: '#f8f7f5', padding: '6px 10px', textAlign: 'left', fontSize: 10, fontWeight: 600, color: '#888784', borderBottom: '0.5px solid #e8e7e4' }}>{h}</th>)}</tr></thead>
-                    <tbody>
-                      {loc.has_natural_gas && loc.natural_gas_amount > 0 && (() => {
-                        const efKey = `natural_gas_${loc.natural_gas_unit}` as keyof typeof EF
-                        const ef = EF[efKey] as { co2: number; ch4: number; n2o: number }
-                        const total = (ef.co2 + ef.ch4 * GWP.AR4.CH4 + ef.n2o * GWP.AR4.N2O) * loc.natural_gas_amount / 1000
-                        return <tr><td style={wTd}>Natural gas</td><td style={wTd}>{loc.natural_gas_amount} {loc.natural_gas_unit}</td><td style={wTd}>{(ef.co2 + ef.ch4 * GWP.AR4.CH4 + ef.n2o * GWP.AR4.N2O).toFixed(3)} kg CO₂e/{loc.natural_gas_unit}</td><td style={wTd}>{EF_SOURCES.combustion}</td><td style={wTd}>AR4</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
-                      })()}
-                      {loc.has_propane && loc.propane_amount > 0 && (() => {
-                        const efKey = `propane_${loc.propane_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF
-                        const ef = EF[efKey] as { co2: number; ch4: number; n2o: number }
-                        const total = (ef.co2 + ef.ch4 * GWP.AR4.CH4 + ef.n2o * GWP.AR4.N2O) * loc.propane_amount / 1000
-                        return <tr><td style={wTd}>Propane</td><td style={wTd}>{loc.propane_amount} {loc.propane_unit}</td><td style={wTd}>{(ef.co2 + ef.ch4 * GWP.AR4.CH4 + ef.n2o * GWP.AR4.N2O).toFixed(3)} kg CO₂e/{loc.propane_unit === 'gallons' ? 'gal' : 'L'}</td><td style={wTd}>{EF_SOURCES.combustion}</td><td style={wTd}>AR4</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
-                      })()}
-                      {loc.has_mobile && loc.gasoline_amount > 0 && (() => {
-                        const efKey = `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF
-                        const ef = EF[efKey] as { co2: number; ch4: number; n2o: number }
-                        const total = (ef.co2 + ef.ch4 * GWP.AR4.CH4 + ef.n2o * GWP.AR4.N2O) * loc.gasoline_amount / 1000
-                        return <tr><td style={wTd}>Gasoline (mobile)</td><td style={wTd}>{loc.gasoline_amount} {loc.gasoline_unit}</td><td style={wTd}>{(ef.co2 + ef.ch4 * GWP.AR4.CH4 + ef.n2o * GWP.AR4.N2O).toFixed(3)} kg CO₂e/{loc.gasoline_unit === 'gallons' ? 'gal' : 'L'}</td><td style={wTd}>{EF_SOURCES.combustion}</td><td style={wTd}>AR4</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
-                      })()}
-                      {loc.has_hfc_refrigerants && loc.refrigerant_purchased_kg > 0 && (() => {
-                        const gwp = EF[loc.refrigerant_type as keyof typeof EF] as number
-                        const total = loc.refrigerant_purchased_kg * gwp / 1000
-                        return <tr><td style={wTd}>{loc.refrigerant_type.toUpperCase()} (fugitive)</td><td style={wTd}>{loc.refrigerant_purchased_kg} kg leaked</td><td style={wTd}>GWP {gwp}</td><td style={wTd}>{EF_SOURCES.combustion}</td><td style={wTd}>AR4</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
-                      })()}
-                      {loc.electricity_kwh > 0 && (() => {
-                        const ef = EF[loc.grid_region as keyof typeof EF] as number || EF.us_average
-                        return <tr style={{ background: '#f8f7f5' }}><td style={wTd}>Electricity (S2 location)</td><td style={wTd}>{loc.electricity_kwh.toLocaleString()} kWh</td><td style={wTd}>{ef.toFixed(4)} kg CO₂e/kWh</td><td style={wTd}>{EF_SOURCES.electricity} — {loc.grid_region}</td><td style={wTd}>N/A</td><td style={{ ...wTd, fontWeight: 600, color: '#0F6E56' }}>{(loc.electricity_kwh * ef / 1000).toFixed(4)}</td></tr>
-                      })()}
-                      <tr style={{ background: '#0d0d0d' }}><td colSpan={5} style={{ ...wTd, color: '#fff', fontWeight: 700, background: '#0d0d0d' }}>TOTAL — {loc.name}</td><td style={{ ...wTd, color: '#fff', fontWeight: 700, background: '#0d0d0d' }}>{(c.s1_total + c.s2_location).toFixed(4)}</td></tr>
-                    </tbody>
-                  </table>
-                  {loc.source_docs.length > 0 && (
-                    <div style={{ marginTop: 12 }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', marginBottom: 8, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>Source documents</div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
-                        {loc.source_docs.map(doc => (
-                          <div key={doc.id} style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 8, padding: '6px 12px', fontSize: 12, color: '#0d0d0d' }}>📄 {doc.file_name}</div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )
-        })}
-
-        {/* ASSURANCE READINESS */}
-        <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '1.5rem', marginTop: '1.5rem' }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginBottom: 12 }}>Assurance readiness — ISO 14064-3 / ISAE 3410</div>
-          {[
-            { label: 'Emission factors cited with source and year', done: true, note: 'EPA 2024 · eGRID 2023 · IPCC AR4 + AR5 GWP' },
-            { label: 'Calculation workings documented per source', done: true, note: 'Full formula shown for every emission source' },
-            { label: 'Organizational boundary documented', done: !!inventory.boundary_approach, note: inventory.boundary_approach.replace(/_/g, ' ') },
-            { label: 'Source documents uploaded', done: inventory.locations.some(l => l.source_docs.length > 0), note: `${inventory.locations.reduce((a, l) => a + l.source_docs.length, 0)} documents` },
-            { label: 'All locations included in boundary', done: inventory.locations.length > 0, note: `${inventory.locations.length} location(s)` },
-            { label: 'Both GWP versions calculated', done: activeFrameworks.some(f => f.gwp === 'AR4') && activeFrameworks.some(f => f.gwp === 'AR5'), note: needsMarketBased ? 'AR4 + AR5 ✓' : 'AR4 calculated' },
-          ].map(({ label, done, note }) => (
-            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
-              <span style={{ fontSize: 14, flexShrink: 0 }}>{done ? '✅' : '⬜'}</span>
-              <div>
-                <div style={{ fontSize: 12, color: done ? '#fff' : 'rgba(255,255,255,0.4)', fontWeight: done ? 500 : 300 }}>{label}</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{note}</div>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
     )
-  }
-
-  // ── STEP 5 — EXPORT ───────────────────────────────────────────────
-  const renderStep5 = () => {
+  }const renderStep5 = () => {
     return (
       <div>
         <h2 style={sectionHead}>Export your reports</h2>
-        <p style={sectionSub}>One inventory — {activeFrameworks.length} report{activeFrameworks.length > 1 ? 's' : ''}. Select a framework below to download its pre-formatted report.</p>
-
-        <div style={{ display: 'flex', gap: 8, marginBottom: '1.5rem', flexWrap: 'wrap' as const }}>
-          {activeFrameworks.map(fw => (
-            <button key={fw.id} onClick={() => setActiveExport(fw.id)} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: activeExport === fw.id ? fw.color : '#f8f7f5', color: activeExport === fw.id ? '#fff' : '#555553', border: `0.5px solid ${activeExport === fw.id ? fw.color : '#e8e7e4'}`, cursor: 'pointer', fontWeight: activeExport === fw.id ? 500 : 400 }}>
-              {fw.name}
-            </button>
-          ))}
-        </div>
-
-        {activeFrameworks.map(fw => {
-          if (fw.id !== activeExport) return null
-          const totals = fw.gwp === 'AR4' ? totals_ar4 : totals_ar5
-          const rev = inventory.revenue_millions
-          const emp = inventory.employee_count
-
-          return (
-            <div key={fw.id}>
-              <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '2rem', marginBottom: '1rem' }}>
-                <div style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, color: fw.color, background: fw.bg, borderRadius: 6, padding: '3px 10px', marginBottom: 12 }}>{fw.name} — {fw.full}</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: '1.5rem' }}>
-                  {[
-                    ['Company', inventory.company_name || '—'],
-                    ['Reporting year', String(inventory.reporting_year)],
-                    ['GWP basis', `IPCC ${fw.gwp}`],
-                    ['Scope 1 total', `${totals.s1_total.toFixed(4)} mtCO₂e`],
-                    ['Scope 2 (location)', `${totals.s2_location.toFixed(4)} mtCO₂e`],
-                    ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Scope 2 (market)', `${totals.s2_market.toFixed(4)} mtCO₂e`]] : []),
-                    ...(rev > 0 ? [['S1 intensity', `${(totals.s1_total/rev).toFixed(6)} mtCO₂e/$M`]] : []),
-                    ...(emp > 0 && fw.id === 'ecovadis' ? [['S1 per employee', `${(totals.s1_total/emp*1000).toFixed(2)} kgCO₂e`]] : []),
-                    ['Emission factors', `EPA 2024 · eGRID 2023 · IPCC ${fw.gwp}`],
-                    ['Deadline', fw.deadline],
-                  ].map(([label, val]) => (
-                    <div key={label}>
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 3 }}>{label}</div>
-                      <div style={{ fontSize: 13, color: '#fff', fontWeight: 500 }}>{val}</div>
-                    </div>
-                  ))}
-                </div>
-                <button onClick={() => generateExport(fw.id)} style={{ fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>
-                  `⬇ Download ${fw.name} Report (CSV)`
+        <p style={sectionSub}>One inventory — {activeFrameworks.length} report{activeFrameworks.length > 1 ? 's' : ''}. Unlock your paid plan to download.</p>
+        <div style={{ position: 'relative' }}>
+          {!isPaid && <PaywallOverlay frameworks={activeFrameworks.map(f => f.name)} />}
+          <div style={{ filter: isPaid ? 'none' : 'blur(4px)', pointerEvents: isPaid ? 'auto' : 'none' }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: '1.5rem', flexWrap: 'wrap' as const }}>
+              {activeFrameworks.map(fw => (
+                <button key={fw.id} onClick={() => setActiveExport(fw.id)} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: activeExport === fw.id ? fw.color : '#f8f7f5', color: activeExport === fw.id ? '#fff' : '#555553', border: `0.5px solid ${activeExport === fw.id ? fw.color : '#e8e7e4'}`, cursor: 'pointer', fontWeight: activeExport === fw.id ? 500 : 400 }}>
+                  {fw.name}
                 </button>
-              </div>
-
-              <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem', fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
-                <strong>Disclaimer:</strong> This report was generated by the ThemisIQ platform and is provided for informational and planning purposes only. It does not constitute legal advice, regulatory assurance, or a professional opinion. All emissions data requires third-party verification before formal submission. ThemisIQ is not an accredited assurance provider under GHG Protocol, CARB, ESRS, CDP, or any other framework.
-              </div>
+              ))}
             </div>
-          )
-        })}
+            {activeFrameworks.map(fw => {
+              if (fw.id !== activeExport) return null
+              const totals = fw.gwp === 'AR4' ? totals_ar4 : totals_ar5
+              const rev = inventory.revenue_millions
+              const emp = inventory.employee_count
+              return (
+                <div key={fw.id}>
+                  <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '2rem', marginBottom: '1rem' }}>
+                    <div style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, color: fw.color, background: fw.bg, borderRadius: 6, padding: '3px 10px', marginBottom: 12 }}>{fw.name} — {fw.full}</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: '1.5rem' }}>
+                      {[
+                        ['Company', inventory.company_name || '—'],
+                        ['Reporting year', String(inventory.reporting_year)],
+                        ['GWP basis', `IPCC ${fw.gwp}`],
+                        ['Scope 1 total', `${totals.s1_total.toFixed(4)} mtCO₂e`],
+                        ['Scope 2 (location)', `${totals.s2_location.toFixed(4)} mtCO₂e`],
+                        ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Scope 2 (market)', `${totals.s2_market.toFixed(4)} mtCO₂e`]] : []),
+                        ...(rev > 0 ? [['S1 intensity', `${(totals.s1_total/rev).toFixed(6)} mtCO₂e/$M`]] : []),
+                        ...(emp > 0 && fw.id === 'ecovadis' ? [['S1 per employee', `${(totals.s1_total/emp*1000).toFixed(2)} kgCO₂e`]] : []),
+                        ['Deadline', fw.deadline],
+                      ].map(([label, val]) => (
+                        <div key={label}>
+                          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 3 }}>{label}</div>
+                          <div style={{ fontSize: 13, color: '#fff', fontWeight: 500 }}>{val}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <button onClick={() => generateExport(fw.id)} style={{ fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>
+                      ⬇ Download {fw.name} Report (CSV)
+                    </button>
+                  </div>
+                  <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem', fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
+                    <strong>Disclaimer:</strong> This report was generated by the ThemisIQ platform and is provided for informational and planning purposes only. It does not constitute legal advice, regulatory assurance, or a professional opinion. All emissions data requires third-party verification before formal submission.
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
       </div>
     )
   }
@@ -875,7 +901,6 @@ useEffect(() => {
     const totals = fw.gwp === 'AR4' ? totals_ar4 : totals_ar5
     const rev = inventory.revenue_millions
     const emp = inventory.employee_count
-
     const header = [
       [`${fw.full} — GHG Emissions Report`],
       [`Generated by ThemisIQ · www.themisiq.co · ${new Date().toLocaleDateString()}`],
@@ -893,10 +918,7 @@ useEffect(() => {
       ['Scope 1 total (mtCO₂e)', totals.s1_total.toFixed(4)],
       ['Scope 2 location-based (mtCO₂e)', totals.s2_location.toFixed(4)],
       ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Scope 2 market-based (mtCO₂e)', totals.s2_market.toFixed(4)]] : []),
-      ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Biogenic CO₂ (mtCO₂)', totals.biogenic.toFixed(4)]] : []),
-      ...(fw.id === 'esrs' || fw.id === 'gri' ? [['CO₂ component (mtCO₂e)', totals.co2.toFixed(4)], ['CH₄ component (mtCO₂e)', totals.ch4.toFixed(4)], ['N₂O component (mtCO₂e)', totals.n2o.toFixed(4)]] : []),
-      ...(rev > 0 ? [['S1 intensity (mtCO₂e/$M revenue)', (totals.s1_total / rev).toFixed(6)], ['S2 intensity (mtCO₂e/$M revenue)', (totals.s2_location / rev).toFixed(6)]] : []),
-      ...(emp > 0 ? [['S1 per employee (kgCO₂e)', (totals.s1_total / emp * 1000).toFixed(4)]] : []),
+      ...(rev > 0 ? [['S1 intensity (mtCO₂e/$M revenue)', (totals.s1_total / rev).toFixed(6)]] : []),
       [''],
       ['METHODS'],
       ['Combustion factors', EF_SOURCES.combustion],
@@ -904,19 +926,16 @@ useEffect(() => {
       ['GWP values', fw.gwp === 'AR4' ? EF_SOURCES.gwp_ar4 : EF_SOURCES.gwp_ar5],
       [''],
       ['LOCATION BREAKDOWN'],
-      ['Location', 'State', 'S1 Stationary', 'S1 Mobile', 'S1 Fugitive', 'S1 Total', 'S2 Location', ...(fw.id === 'esrs' || fw.id === 'gri' ? ['S2 Market'] : []), 'Docs'],
+      ['Location', 'State', 'S1 Total', 'S2 Location'],
       ...inventory.locations.map(loc => {
         const c = calcLocation(loc, fw.gwp as 'AR4' | 'AR5')
-        return [loc.name, loc.state, c.s1_stationary.toFixed(4), c.s1_mobile.toFixed(4), c.s1_fugitive.toFixed(4), c.s1_total.toFixed(4), c.s2_location.toFixed(4), ...(fw.id === 'esrs' || fw.id === 'gri' ? [c.s2_market.toFixed(4)] : []), loc.source_docs.length]
+        return [loc.name, loc.state, c.s1_total.toFixed(4), c.s2_location.toFixed(4)]
       }),
-      ['TOTAL', '', '', '', '', totals.s1_total.toFixed(4), totals.s2_location.toFixed(4), ...(fw.id === 'esrs' || fw.id === 'gri' ? [totals.s2_market.toFixed(4)] : []), inventory.locations.reduce((a,l)=>a+l.source_docs.length,0)],
       [''],
       ['DISCLAIMER'],
       ['This report was generated by the ThemisIQ platform for informational purposes only.'],
-      ['It does not constitute legal advice, regulatory assurance, or a professional opinion.'],
       ['All emissions require third-party verification before formal submission.'],
     ]
-
     const csv = header.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')
     const blob = new Blob(['\ufeff'+csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
@@ -938,36 +957,36 @@ useEffect(() => {
           {activeFrameworks.length > 0 && <span style={{ fontSize: 11, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 99, padding: '2px 10px', color: '#555553' }}>{activeFrameworks.map(f => f.name).join(' · ')}</span>}
         </div>
         <button onClick={async () => {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) return
-  const payload = {
-    user_id: session.user.id,
-    reporting_year: inventory.reporting_year,
-    company_name: inventory.company_name,
-    revenue_millions: inventory.revenue_millions,
-    employee_count: inventory.employee_count,
-    boundary_approach: inventory.boundary_approach,
-    california_nexus: inventory.california_nexus,
-    prior_year_s1: inventory.prior_year_s1,
-    prior_year_s2: inventory.prior_year_s2,
-    selected_frameworks: inventory.selected_frameworks,
-    locations_data: inventory.locations,
-    scope1_total: totals_ar4.s1_total,
-    scope2_location_total: totals_ar4.s2_location,
-    scope2_market_total: totals_ar4.s2_market,
-    scope1_intensity: inventory.revenue_millions > 0 ? totals_ar4.s1_total / inventory.revenue_millions : 0,
-    scope2_intensity: inventory.revenue_millions > 0 ? totals_ar4.s2_location / inventory.revenue_millions : 0,
-    status: 'draft',
-    updated_at: new Date().toISOString(),
-  }
-  if (inventoryId) {
-    await supabase.from('ghg_inventories').update(payload).eq('id', inventoryId)
-  } else {
-    const { data } = await supabase.from('ghg_inventories').insert(payload).select().single()
-    if (data) setInventoryId(data.id)
-  }
-  setSaved(true)
-}} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 8, background: saved ? '#E1F5EE' : '#f8f7f5', border: `0.5px solid ${saved ? '#0F6E56' : '#e8e7e4'}`, cursor: 'pointer', color: saved ? '#0F6E56' : '#555553', fontWeight: saved ? 500 : 400 }}>
+          const { data: { session } } = await supabase.auth.getSession()
+          if (!session) return
+          const payload = {
+            user_id: session.user.id,
+            reporting_year: inventory.reporting_year,
+            company_name: inventory.company_name,
+            revenue_millions: inventory.revenue_millions,
+            employee_count: inventory.employee_count,
+            boundary_approach: inventory.boundary_approach,
+            california_nexus: inventory.california_nexus,
+            prior_year_s1: inventory.prior_year_s1,
+            prior_year_s2: inventory.prior_year_s2,
+            selected_frameworks: inventory.selected_frameworks,
+            locations_data: inventory.locations,
+            scope1_total: totals_ar4.s1_total,
+            scope2_location_total: totals_ar4.s2_location,
+            scope2_market_total: totals_ar4.s2_market,
+            scope1_intensity: inventory.revenue_millions > 0 ? totals_ar4.s1_total / inventory.revenue_millions : 0,
+            scope2_intensity: inventory.revenue_millions > 0 ? totals_ar4.s2_location / inventory.revenue_millions : 0,
+            status: 'draft',
+            updated_at: new Date().toISOString(),
+          }
+          if (inventoryId) {
+            await supabase.from('ghg_inventories').update(payload).eq('id', inventoryId)
+          } else {
+            const { data } = await supabase.from('ghg_inventories').insert(payload).select().single()
+            if (data) setInventoryId(data.id)
+          }
+          setSaved(true)
+        }} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 8, background: saved ? '#E1F5EE' : '#f8f7f5', border: `0.5px solid ${saved ? '#0F6E56' : '#e8e7e4'}`, cursor: 'pointer', color: saved ? '#0F6E56' : '#555553', fontWeight: saved ? 500 : 400 }}>
           {saved ? '✓ Saved' : 'Save draft'}
         </button>
       </nav>
@@ -995,11 +1014,12 @@ useEffect(() => {
           )}
         </div>
       </div>
+
+      <GHGBot currentStep={step} />
     </div>
   )
 }
 
-// ── HELPER COMPONENTS ─────────────────────────────────────────────────
 function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, uploading }: { label: string; locIdx: number; docType: string; docs: SourceDoc[]; onUpload: (f: FileList, i: number, t: string) => void; onRemove: (i: number, id: string, path: string) => void; uploading: boolean }) {
   const ref = useRef<HTMLInputElement>(null)
   return (
