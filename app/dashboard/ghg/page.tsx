@@ -846,7 +846,6 @@ export default function GHGPage() {
   }
 
   const generateExport = async (frameworkId: string) => {
-    }
     const fw = FRAMEWORKS.find(f => f.id === frameworkId)!
     const totals = fw.gwp === 'AR4' ? totals_ar4 : totals_ar5
     const rev = inventory.revenue_millions
