@@ -23,7 +23,7 @@ export default function Home() {
             From GHG emissions and climate risk to supply chain, M&A diligence, AI governance, workforce, and cybersecurity — ThemisIQ turns complex compliance into competitive clarity.
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: '2.5rem' }}>
-            <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>See your emissions instantly →</a>
+            <a href="/dashboard/ghg" style={{ ...btnPrimary, textDecoration: 'none' }}>See your emissions instantly →</a>
             <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to an advisor</a>
           </div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#555553', background: '#f8f7f5', border: '0.5px solid #e8e7e4', padding: '8px 16px', borderRadius: 99 }}>
@@ -128,7 +128,7 @@ export default function Home() {
                 {features.map(f => <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#555553' }}><span style={{ color: '#0F6E56', flexShrink: 0 }}>✓</span>{f}</div>)}
               </div>
               <div style={{ marginTop: 'auto' }}>
-                <a href="/assess" style={{ display: 'block', textAlign: 'center', padding: '10px', borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: 'none', background: featured ? '#0d0d0d' : 'none', color: featured ? '#fff' : '#0d0d0d', border: featured ? 'none' : '0.5px solid #e8e7e4', cursor: 'pointer' }}>
+                <a href="/dashboard/ghg" style={{ display: 'block', textAlign: 'center', padding: '10px', borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: 'none', background: featured ? '#0d0d0d' : 'none', color: featured ? '#fff' : '#0d0d0d', border: featured ? 'none' : '0.5px solid #e8e7e4', cursor: 'pointer' }}>
                   {plan === 'Platform' ? 'Talk to sales' : 'See your emissions instantly →'}
                 </a>
               </div>
@@ -146,7 +146,7 @@ export default function Home() {
           ThemisIQ can have your Scope 1 and 2 inventory complete and the CARB template pre-filled in days — not months.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>See your emissions instantly — no credit card needed</a>
+          <a href="/dashboard/ghg" style={{ ...btnPrimary, textDecoration: 'none' }}>See your emissions instantly — no credit card needed</a>
           <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Book a 30-min demo</a>
         </div>
       </section>

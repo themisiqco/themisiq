@@ -10,7 +10,7 @@ export default function Page() {
       <div style={{ background: '#7425e3', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff', flexShrink: 0 }} />
         <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>EU AI Act high-risk AI deadline: August 2, 2026 — 77 days. HR, hiring, and credit AI systems require full conformity assessment.</span>
-        <a href="/assess" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>Check if EU AI Act applies to you →</a>
+        <a href="/dashboard/ghg" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>Check if EU AI Act applies to you →</a>
       </div>
 
       {/* HERO */}
@@ -26,7 +26,7 @@ export default function Page() {
               EU AI Act compliance. AI risk register. Model inventory. Board-level AI oversight documentation. NIST AI RMF alignment. ISO 42001 readiness. One platform for your entire AI governance programme.
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
-              <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>See your emissions instantly →</a>
+              <a href="/dashboard/ghg" style={{ ...btnPrimary, textDecoration: 'none' }}>See your emissions instantly →</a>
               <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Book a demo</a>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
@@ -195,7 +195,7 @@ export default function Page() {
           The first step is knowing what AI systems you have and whether they're high-risk. ThemisIQ's AI inventory wizard walks you through every system in days — not months.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-          <a href="/assess" style={{ fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none', display: 'inline-block' }}>See your emissions instantly →</a>
+          <a href="/dashboard/ghg" style={{ fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none', display: 'inline-block' }}>See your emissions instantly →</a>
           <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: 'rgba(255,255,255,0.7)', border: '0.5px solid rgba(255,255,255,0.2)', textDecoration: 'none', display: 'inline-block' }}>Talk to an AI governance advisor</a>
         </div>
       </section>
@@ -207,7 +207,7 @@ export default function Page() {
           <div style={{ display: 'flex', gap: '1.5rem' }}>
             <a href="/privacy" style={{ fontSize: 12, color: '#555553', textDecoration: 'none' }}>Privacy Policy</a>
             <a href="/terms" style={{ fontSize: 12, color: '#555553', textDecoration: 'none' }}>Terms of Service</a>
-            <a href="/assess" style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Free Assessment →</a>
+            <a href="/dashboard/ghg" style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Free Assessment →</a>
           </div>
         </div>
       </footer>

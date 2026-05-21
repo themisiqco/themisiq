@@ -20,7 +20,7 @@ export default function AdvisoryPage() {
           </p>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '3rem' }}>
             <a href="mailto:advisory@themisiq.co" style={{ ...btnPrimary, textDecoration: 'none' }}>Book free 30-min consultation</a>
-            <a href="/assess" style={{ ...btnSecondary, textDecoration: 'none' }}>Start with the free assessment</a>
+            <a href="/dashboard/ghg" style={{ ...btnSecondary, textDecoration: 'none' }}>Start with the free assessment</a>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, maxWidth: 600 }}>
             {[['30 min', 'Free initial consultation'], ['Fixed fees', 'No billable hours surprises'], ['Named advisor', 'Same person throughout']].map(([val, label]) => (
@@ -137,7 +137,7 @@ export default function AdvisoryPage() {
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
           <a href="mailto:advisory@themisiq.co" style={{ fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none', display: 'inline-block' }}>Book free consultation</a>
-          <a href="/assess" style={{ fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: 'rgba(255,255,255,0.6)', border: '0.5px solid rgba(255,255,255,0.15)', textDecoration: 'none', display: 'inline-block' }}>Take the free assessment first</a>
+          <a href="/dashboard/ghg" style={{ fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: 'rgba(255,255,255,0.6)', border: '0.5px solid rgba(255,255,255,0.15)', textDecoration: 'none', display: 'inline-block' }}>Take the free assessment first</a>
         </div>
         <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)', marginTop: '1.5rem' }}>advisory@themisiq.co · hello@themisiq.co</div>
       </section>
@@ -149,7 +149,7 @@ export default function AdvisoryPage() {
           <div style={{ display: 'flex', gap: '1.5rem' }}>
             <a href="/privacy" style={{ fontSize: 12, color: '#555553', textDecoration: 'none' }}>Privacy Policy</a>
             <a href="/terms" style={{ fontSize: 12, color: '#555553', textDecoration: 'none' }}>Terms of Service</a>
-            <a href="/assess" style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Free Assessment →</a>
+            <a href="/dashboard/ghg" style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Free Assessment →</a>
           </div>
         </div>
       </footer>
