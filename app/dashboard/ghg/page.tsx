@@ -235,24 +235,38 @@ export default function GHGPage() {
   })
   const [activeLocation, setActiveLocation] = useState(0)
   const [saved, setSaved] = useState(false)
+const [inventoryId, setInventoryId] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [showWorkings, setShowWorkings] = useState<Record<string, boolean>>({})
   const [activeExport, setActiveExport] = useState('sb253')
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) window.location.href = '/login'
+useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) { window.location.href = '/login'; return }
+      const { data } = await supabase
+        .from('ghg_inventories')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .eq('reporting_year', 2024)
+        .single()
+      if (data) {
+        setInventoryId(data.id)
+        setInventory(inv => ({
+          ...inv,
+          company_name: data.company_name || '',
+          revenue_millions: data.revenue_millions || 0,
+          employee_count: data.employee_count || 0,
+          boundary_approach: data.boundary_approach || 'operational_control',
+          california_nexus: data.california_nexus || false,
+          prior_year_s1: data.prior_year_s1 || 0,
+          prior_year_s2: data.prior_year_s2 || 0,
+          selected_frameworks: data.selected_frameworks || ['sb253'],
+          locations: data.locations_data || inv.locations,
+        }))
+        setSaved(true)
+      }
     })
   }, [])
-
-  const updateLocation = (idx: number, field: keyof Location, value: any) => {
-    setInventory(inv => {
-      const locs = [...inv.locations]
-      locs[idx] = { ...locs[idx], [field]: value }
-      if (field === 'state') locs[idx].grid_region = detectGridRegion(value)
-      return { ...inv, locations: locs }
-    })
-  }
 
   const addLocation = () => {
     const id = String(inventory.locations.length + 1)
@@ -347,7 +361,7 @@ export default function GHGPage() {
       <p style={sectionSub}>This information appears across all your selected reports. Enter it once here.</p>
       <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 20, maxWidth: 560 }}>
         <Field label="Company legal name" hint="Appears on all report submissions">
-          <input value={inventory.company_name} onChange={e => setInventory(i => ({...i, company_name: e.target.value}))} placeholder="e.g. Acme Industries Inc." style={inputStyle} />
+          <input value={inventory.company_name} onChange={e => setInventory(i => ({...i, company_name: e.target.value}))} placeholder="e.g. Bay State Milling Company" style={inputStyle} />
         </Field>
         <Field label="Reporting year">
           <select value={inventory.reporting_year} onChange={e => setInventory(i => ({...i, reporting_year: Number(e.target.value)}))} style={inputStyle}>
@@ -400,7 +414,7 @@ export default function GHGPage() {
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
             {inventory.locations.map((loc, i) => (
               <div key={loc.id} style={{ display: 'flex', gap: 8 }}>
-                <input value={loc.name} onChange={e => updateLocation(i, 'name', e.target.value)} placeholder="e.g. Location/Site Name" style={{ ...inputStyle, flex: 1 }} />
+                <input value={loc.name} onChange={e => updateLocation(i, 'name', e.target.value)} placeholder="e.g. Kansas City Mill" style={{ ...inputStyle, flex: 1 }} />
                 <input value={loc.state} onChange={e => updateLocation(i, 'state', e.target.value)} placeholder="State" style={{ ...inputStyle, width: 70 }} />
               </div>
             ))}
@@ -912,7 +926,37 @@ export default function GHGPage() {
           <span style={{ fontSize: 12, color: '#888784' }}>/ GHG Inventory</span>
           {activeFrameworks.length > 0 && <span style={{ fontSize: 11, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 99, padding: '2px 10px', color: '#555553' }}>{activeFrameworks.map(f => f.name).join(' · ')}</span>}
         </div>
-        <button onClick={() => setSaved(true)} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 8, background: saved ? '#E1F5EE' : '#f8f7f5', border: `0.5px solid ${saved ? '#0F6E56' : '#e8e7e4'}`, cursor: 'pointer', color: saved ? '#0F6E56' : '#555553', fontWeight: saved ? 500 : 400 }}>
+        <button onClick={async () => {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return
+  const payload = {
+    user_id: session.user.id,
+    reporting_year: inventory.reporting_year,
+    company_name: inventory.company_name,
+    revenue_millions: inventory.revenue_millions,
+    employee_count: inventory.employee_count,
+    boundary_approach: inventory.boundary_approach,
+    california_nexus: inventory.california_nexus,
+    prior_year_s1: inventory.prior_year_s1,
+    prior_year_s2: inventory.prior_year_s2,
+    selected_frameworks: inventory.selected_frameworks,
+    locations_data: inventory.locations,
+    scope1_total: totals_ar4.s1_total,
+    scope2_location_total: totals_ar4.s2_location,
+    scope2_market_total: totals_ar4.s2_market,
+    scope1_intensity: inventory.revenue_millions > 0 ? totals_ar4.s1_total / inventory.revenue_millions : 0,
+    scope2_intensity: inventory.revenue_millions > 0 ? totals_ar4.s2_location / inventory.revenue_millions : 0,
+    status: 'draft',
+    updated_at: new Date().toISOString(),
+  }
+  if (inventoryId) {
+    await supabase.from('ghg_inventories').update(payload).eq('id', inventoryId)
+  } else {
+    const { data } = await supabase.from('ghg_inventories').insert(payload).select().single()
+    if (data) setInventoryId(data.id)
+  }
+  setSaved(true)
+}} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 8, background: saved ? '#E1F5EE' : '#f8f7f5', border: `0.5px solid ${saved ? '#0F6E56' : '#e8e7e4'}`, cursor: 'pointer', color: saved ? '#0F6E56' : '#555553', fontWeight: saved ? 500 : 400 }}>
           {saved ? '✓ Saved' : 'Save draft'}
         </button>
       </nav>
