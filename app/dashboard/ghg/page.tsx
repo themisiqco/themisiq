@@ -831,7 +831,7 @@ export default function GHGPage() {
                   ))}
                 </div>
                 <button onClick={() => generateExport(fw.id)} style={{ fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>
-                  ⬇ Download {fw.name} Report (CSV)
+                  fw.id === 'sb253' ? '⬇ Download CARB SB 253 Template (Excel)' : `⬇ Download ${fw.name} Report (CSV)`
                 </button>
               </div>
 
@@ -845,7 +845,48 @@ export default function GHGPage() {
     )
   }
 
-  const generateExport = (frameworkId: string) => {
+  const generateExport = async (frameworkId: string) => {
+    if (frameworkId === 'sb253') {
+      const response = await fetch('/api/carb-export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          company_name: inventory.company_name,
+          reporting_year: inventory.reporting_year,
+          revenue_millions: inventory.revenue_millions,
+          boundary_approach: inventory.boundary_approach,
+          entities_list: inventory.locations.map(l => l.name).join(', '),
+          period_start: `${inventory.reporting_year}-01-01`,
+          period_end: `${inventory.reporting_year}-12-31`,
+          s1_total: totals_ar4.s1_total,
+          s1_stationary: inventory.locations.reduce((a,l) => a+calcLocation(l,'AR4').s1_stationary,0),
+          s1_mobile: inventory.locations.reduce((a,l) => a+calcLocation(l,'AR4').s1_mobile,0),
+          s1_process: 0,
+          s1_fugitive: inventory.locations.reduce((a,l) => a+calcLocation(l,'AR4').s1_fugitive,0),
+          s1_co2: totals_ar4.co2,
+          s1_ch4: totals_ar4.ch4,
+          s1_n2o: totals_ar4.n2o,
+          s1_hfc: inventory.locations.reduce((a,l) => a+calcLocation(l,'AR4').s1_fugitive,0),
+          s1_pfc: 0, s1_sf6: 0, s1_biogenic: totals_ar4.biogenic,
+          s2_location_total: totals_ar4.s2_location,
+          s2_market_total: totals_ar4.s2_market,
+          s2_steam: 0, s2_heating: 0, s2_cooling: 0,
+          renewable_electricity_kwh: inventory.locations.reduce((a,l) => a+l.renewable_electricity_kwh,0),
+        }),
+      })
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `CARB_SB253_${inventory.company_name.replace(/\s+/g,'_')}_${inventory.reporting_year}.xlsx`
+        a.click()
+        URL.revokeObjectURL(url)
+      } else {
+        alert('Failed to generate CARB template. Please try again.')
+      }
+      return
+    }
     const fw = FRAMEWORKS.find(f => f.id === frameworkId)!
     const totals = fw.gwp === 'AR4' ? totals_ar4 : totals_ar5
     const rev = inventory.revenue_millions
