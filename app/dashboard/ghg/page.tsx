@@ -209,7 +209,6 @@ function calcInventory(locations: Location[], gwpVersion: 'AR4' | 'AR5' = 'AR4')
   }, { s1_total: 0, s2_location: 0, s2_market: 0, co2: 0, ch4: 0, n2o: 0, biogenic: 0 })
 }
 
-// ── AI GUIDE BOT ──────────────────────────────────────────────────────
 interface BotMessage { role: 'user' | 'assistant'; content: string }
 
 function GHGBot({ currentStep }: { currentStep: number }) {
@@ -222,10 +221,7 @@ function GHGBot({ currentStep }: { currentStep: number }) {
 
   useEffect(() => {
     if (open && messages.length === 0) {
-      setMessages([{
-        role: 'assistant',
-        content: `Hi! I'm your GHG inventory guide. You're on step ${currentStep + 1}: ${stepNames[currentStep]}. Ask me anything — "What is an Mcf?", "Where do I find my kWh?", "What's Scope 2?"`
-      }])
+      setMessages([{ role: 'assistant', content: `Hi! I'm your GHG inventory guide. You're on step ${currentStep + 1}: ${stepNames[currentStep]}. Ask me anything — "What is an Mcf?", "Where do I find my kWh?", "What's Scope 2?"` }])
     }
   }, [open])
 
@@ -259,7 +255,7 @@ function GHGBot({ currentStep }: { currentStep: number }) {
 
   return (
     <>
-      <button onClick={() => setOpen(o => !o)} style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1000, width: 56, height: 56, borderRadius: '50%', background: 'linear-gradient(135deg,#7425e3,#1fb1ff)', border: 'none', cursor: 'pointer', boxShadow: '0 4px 20px rgba(116,37,227,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }} title="Ask your GHG guide">
+      <button onClick={() => setOpen(o => !o)} style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1000, width: 56, height: 56, borderRadius: '50%', background: 'linear-gradient(135deg,#7425e3,#1fb1ff)', border: 'none', cursor: 'pointer', boxShadow: '0 4px 20px rgba(116,37,227,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>
         {open ? '✕' : '💬'}
       </button>
       {open && (
@@ -270,7 +266,7 @@ function GHGBot({ currentStep }: { currentStep: number }) {
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {messages.map((msg, i) => (
-              <div key={i} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%', background: msg.role === 'user' ? '#7425e3' : '#f8f7f5', color: msg.role === 'user' ? '#fff' : '#0d0d0d', borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px', padding: '8px 12px', fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+              <div key={i} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%', background: msg.role === 'user' ? '#7425e3' : '#f8f7f5', color: msg.role === 'user' ? '#fff' : '#0d0d0d', borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px', padding: '8px 12px', fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap' as const }}>
                 {msg.content}
               </div>
             ))}
@@ -287,17 +283,14 @@ function GHGBot({ currentStep }: { currentStep: number }) {
   )
 }
 
-// ── PAYWALL OVERLAY ───────────────────────────────────────────────────
 function PaywallOverlay({ frameworks }: { frameworks: string[] }) {
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 10, backdropFilter: 'blur(8px)', background: 'rgba(248,247,245,0.85)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: '#fff', borderRadius: 16, padding: '2.5rem', boxShadow: '0 8px 40px rgba(0,0,0,0.12)', border: '0.5px solid #e8e7e4', maxWidth: 480, textAlign: 'center' }}>
+      <div style={{ background: '#fff', borderRadius: 16, padding: '2.5rem', boxShadow: '0 8px 40px rgba(0,0,0,0.12)', border: '0.5px solid #e8e7e4', maxWidth: 480, textAlign: 'center' as const }}>
         <div style={{ fontSize: 32, marginBottom: 12 }}>🔒</div>
         <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 8 }}>Your GHG inventory is complete.</div>
-        <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 300 }}>
-          Your Scope 1 and Scope 2 emissions have been calculated to {frameworks.join(', ')} standards, with full calculation workings ready for third-party assurance. Unlock your submission-ready reports with one click.
-        </div>
-        <div style={{ background: '#f8f7f5', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', textAlign: 'left' }}>
+        <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 300 }}>Your Scope 1 and Scope 2 emissions have been calculated to {frameworks.join(', ')} standards, with full calculation workings ready for third-party assurance. Unlock your submission-ready reports with one click.</div>
+        <div style={{ background: '#f8f7f5', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', textAlign: 'left' as const }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', marginBottom: 10, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>What you unlock</div>
           {[
             ['📄', 'Submission-ready reports for all selected frameworks'],
@@ -321,7 +314,6 @@ function PaywallOverlay({ frameworks }: { frameworks: string[] }) {
   )
 }
 
-// ── LOCKED UPLOAD ─────────────────────────────────────────────────────
 function LockedDocUpload({ label }: { label: string }) {
   return (
     <div style={{ background: '#f8f7f5', border: '0.5px dashed #e8e7e4', borderRadius: 8, padding: '10px 14px', opacity: 0.7 }}>
@@ -332,7 +324,7 @@ function LockedDocUpload({ label }: { label: string }) {
       <div style={{ fontSize: 11, color: '#888784', marginTop: 6, fontWeight: 300 }}>Evidence uploads are available on paid plans — keeping your inventory assurance-ready for third-party verification.</div>
     </div>
   )
-}// ── MAIN COMPONENT ────────────────────────────────────────────────────
+}
 export default function GHGPage() {
   const [step, setStep] = useState(0)
   const [inventory, setInventory] = useState<Inventory>({
@@ -838,7 +830,8 @@ export default function GHGPage() {
         </div>
       </div>
     )
-  }const renderStep5 = () => {
+  }
+  const renderStep5 = () => {
     return (
       <div>
         <h2 style={sectionHead}>Export your reports</h2>
