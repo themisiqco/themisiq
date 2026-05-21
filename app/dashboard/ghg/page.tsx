@@ -372,7 +372,7 @@ useEffect(() => {
       <p style={sectionSub}>This information appears across all your selected reports. Enter it once here.</p>
       <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 20, maxWidth: 560 }}>
         <Field label="Company legal name" hint="Appears on all report submissions">
-          <input value={inventory.company_name} onChange={e => setInventory(i => ({...i, company_name: e.target.value}))} placeholder="e.g. Bay State Milling Company" style={inputStyle} />
+          <input value={inventory.company_name} onChange={e => setInventory(i => ({...i, company_name: e.target.value}))} placeholder="e.g. Acme Industries Inc." style={inputStyle} />
         </Field>
         <Field label="Reporting year">
           <select value={inventory.reporting_year} onChange={e => setInventory(i => ({...i, reporting_year: Number(e.target.value)}))} style={inputStyle}>
@@ -425,7 +425,7 @@ useEffect(() => {
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
             {inventory.locations.map((loc, i) => (
               <div key={loc.id} style={{ display: 'flex', gap: 8 }}>
-                <input value={loc.name} onChange={e => updateLocation(i, 'name', e.target.value)} placeholder="e.g. Kansas City Mill" style={{ ...inputStyle, flex: 1 }} />
+                <input value={loc.name} onChange={e => updateLocation(i, 'name', e.target.value)} placeholder="e.g. Chicago Warehouse" style={{ ...inputStyle, flex: 1 }} />
                 <input value={loc.state} onChange={e => updateLocation(i, 'state', e.target.value)} placeholder="State" style={{ ...inputStyle, width: 70 }} />
               </div>
             ))}
