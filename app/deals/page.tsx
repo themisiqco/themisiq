@@ -19,7 +19,7 @@ export default function Page() {
               Climate risk is now a material transaction risk. ThemisIQ quantifies inherited emissions, transition risk exposure, and SB 253 liability for every deal — in days, not weeks.
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
-              <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>Start free trial</a>
+              <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>See your emissions instantly →</a>
               <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to an M&A advisor</a>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
@@ -168,7 +168,7 @@ export default function Page() {
           ThemisIQ M&A climate diligence can be completed in days. Start with our free assessment to understand your exposure, or talk to our M&A advisory team directly.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-          <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>Start free trial</a>
+          <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>See your emissions instantly →</a>
           <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to an M&A advisor</a>
         </div>
       </section>

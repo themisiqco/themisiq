@@ -68,7 +68,7 @@ export default function SignupPage() {
           {/* HEADER */}
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>Free 14-day trial · No credit card required</div>
-            <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Start your free trial</h1>
+            <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>See your inventory calculate in real time</h1>
             <p style={{ fontSize: 14, color: '#888784', fontWeight: 300 }}>Get your GHG inventory started today. SB 253 deadline: August 10, 2026.</p>
           </div>
 
@@ -117,7 +117,7 @@ export default function SignupPage() {
                 disabled={loading}
                 style={{ fontSize: 14, fontWeight: 500, padding: '11px', borderRadius: 8, background: loading ? '#e8e7e4' : 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: loading ? '#888784' : '#0d0d0d', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', marginTop: 4 }}
               >
-                {loading ? 'Creating account...' : 'Start free trial →'}
+                {loading ? 'Setting up your account...' : 'Create my account →'}
               </button>
 
               <p style={{ fontSize: 11, color: '#888784', textAlign: 'center', margin: 0 }}>

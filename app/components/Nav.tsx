@@ -67,7 +67,7 @@ export default function Nav() {
             background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)',
             color: '#fff', textDecoration: 'none', display: 'inline-block',
             whiteSpace: 'nowrap',
-          }}>Start free trial</a>
+          }}>See your emissions instantly →</a>
 
           {/* HAMBURGER */}
           <button
@@ -120,7 +120,7 @@ export default function Nav() {
               borderRadius: 8, fontSize: 14, fontWeight: 500,
               background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)',
               color: '#0d0d0d', textDecoration: 'none',
-            }}>Start free trial — 14 days</a>
+            }}>See your emissions instantly →</a>
           </div>
           {days > 0 && (
             <div style={{

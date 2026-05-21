@@ -54,7 +54,7 @@ export default function Page() {
           <Section id="t4" num="Section 4" title="Subscription & billing">
             {[
               ['Plans:', 'Starter ($299/month), Professional ($799/month), Platform (custom). Annual plans are priced at 10 months\' equivalent (2 months free). All prices in USD unless otherwise stated.'],
-              ['Free trial:', '14-day free trial. No credit card required. Automatic cancellation at end of trial period unless you subscribe.'],
+              ['Free trial:', 'Reports unlocked on paid plan. No credit card required. Automatic cancellation at end of trial period unless you subscribe.'],
               ['Billing:', 'Monthly or annual in advance. Invoices issued via Stripe. Card charges recur automatically on subscription renewal date.'],
               ['Taxes:', 'Prices exclude applicable taxes (GST/HST in Canada, VAT in EU/UK). Tax is added at checkout based on billing address.'],
               ['Refunds:', 'Pro-rata refunds issued for cancellations within 14 days of annual plan purchase. Monthly plans are non-refundable for the current billing period.'],

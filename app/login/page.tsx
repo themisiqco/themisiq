@@ -32,7 +32,7 @@ export default function LoginPage() {
         <a href="/" style={{ textDecoration: 'none' }}>
           <img src="/logo.png" alt="ThemisIQ" style={{ height: 24, width: 'auto', display: 'block' }} />
         </a>
-        <span style={{ fontSize: 12, color: '#888784' }}>Don't have an account? <a href="/signup" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Start free trial →</a></span>
+        <span style={{ fontSize: 12, color: '#888784' }}>Don't have an account? <a href="/signup" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Create an account →</a></span>
       </nav>
 
       {/* MAIN */}

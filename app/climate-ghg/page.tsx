@@ -26,7 +26,7 @@ export default function Page() {
               Full Scope 1, 2, and 3 GHG inventory under the GHG Protocol. Audit-trail-first, verifier-ready. Pre-filled CARB SB 253 template export. CDP, ESRS E1, and EcoVadis in one inventory.
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
-              <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>Start free trial — 14 days</a>
+              <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>See your emissions instantly →</a>
               <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Book a demo</a>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
@@ -161,7 +161,7 @@ export default function Page() {
           <p style={sectionSub}>The Starter plan covers everything you need for SB 253 year one. Upgrade to add Scope 3 and additional frameworks.</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: '2.5rem', textAlign: 'left' }}>
             {[
-              { plan: 'Starter', price: '$299', cadence: '/month · Climate GHG', features: ['Scope 1 + 2 · CARB SB 253 ready', 'IPCC AR5 · IEA 2024 factors', 'Audit trail + assurance package', 'CDP C6 · ESRS E1 · EcoVadis export', '1 entity · 3 users', '14-day free trial'], featured: false },
+              { plan: 'Starter', price: '$299', cadence: '/month · Climate GHG', features: ['Scope 1 + 2 · CARB SB 253 ready', 'IPCC AR5 · IEA 2024 factors', 'Audit trail + assurance package', 'CDP C6 · ESRS E1 · EcoVadis export', '1 entity · 3 users', 'Reports unlocked on paid plan'], featured: false },
               { plan: 'Professional', price: '$799', cadence: '/month · Climate GHG + Risk', features: ['Everything in Starter', 'Scope 3 · all 15 categories', 'Climate Risk module included', 'CDP full suite · IFRS S2 scenarios', '10 entities · 10 users', 'Regulatory Monitor weekly alerts'], featured: true },
             ].map(({ plan, price, cadence, features, featured }) => (
               <div key={plan} style={{ background: featured ? '#0d0d0d' : '#fff', borderRadius: 12, padding: '2rem', border: featured ? 'none' : '0.5px solid #e8e7e4' }}>
@@ -175,7 +175,7 @@ export default function Page() {
                   </div>
                 ))}
                 <a href="/assess" style={{ display: 'block', textAlign: 'center', padding: '11px', borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: 'none', background: featured ? 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)' : '#0d0d0d', color: featured ? '#0d0d0d' : '#fff', marginTop: '1.5rem' }}>
-                  Start free trial
+                  See your emissions instantly →
                 </a>
               </div>
             ))}
@@ -190,10 +190,10 @@ export default function Page() {
           <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Start today.</span>
         </h2>
         <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
-          ThemisIQ can have your Scope 1 and 2 inventory complete and the CARB template pre-filled in days. 14-day free trial. No credit card required.
+          ThemisIQ can have your Scope 1 and 2 inventory complete and the CARB template pre-filled in days. Reports unlocked on paid plan. No credit card required.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-          <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>Start free trial</a>
+          <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>See your emissions instantly →</a>
           <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to an advisor</a>
           <a href="/assess" style={{ ...btnSecondary, textDecoration: 'none' }}>Check if SB 253 applies to you →</a>
         </div>

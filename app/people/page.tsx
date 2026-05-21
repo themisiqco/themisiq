@@ -25,7 +25,7 @@ export default function Page() {
               Human capital reporting. Gender pay gap analysis. DEI metrics. Health & safety. Training and development. ESRS S1, GRI 401–410, EU Pay Transparency, SEC Item 101, and California Pay Data — one platform.
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
-              <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>Start free trial</a>
+              <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>See your emissions instantly →</a>
               <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Book a demo</a>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
@@ -169,7 +169,7 @@ export default function Page() {
           Most companies don't — and the EU Pay Transparency Directive gives you until June 2026 to find out. ThemisIQ calculates your gap, identifies bands above 5%, and prepares your disclosure.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-          <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>Start free trial</a>
+          <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>See your emissions instantly →</a>
           <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to a workforce advisor</a>
         </div>
       </section>

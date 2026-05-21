@@ -23,7 +23,7 @@ export default function Home() {
             From GHG emissions and climate risk to supply chain, M&A diligence, AI governance, workforce, and cybersecurity — ThemisIQ turns complex compliance into competitive clarity.
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: '2.5rem' }}>
-            <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>Start free trial</a>
+            <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>See your emissions instantly →</a>
             <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to an advisor</a>
           </div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#555553', background: '#f8f7f5', border: '0.5px solid #e8e7e4', padding: '8px 16px', borderRadius: 99 }}>
@@ -112,7 +112,7 @@ export default function Home() {
         <p style={sectionSub}>Start with one module. Add more as your programme matures. Annual plans include 2 months free.</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden', marginTop: '2.5rem' }}>
           {[
-            { plan: 'Starter', price: '$299', cadence: 'per month · Climate GHG only', desc: 'Scope 1 & 2 · SB 253 export · 1 entity · 3 users · 14-day free trial', features: ['Scope 1 & 2 · CARB SB 253 ready', 'IPCC AR5 · IEA 2024 factors', 'Audit trail & assurance package', 'CSV import · EcoVadis export'], featured: false },
+            { plan: 'Starter', price: '$299', cadence: 'per month · Climate GHG only', desc: 'Scope 1 & 2 · SB 253 export · 1 entity · 3 users · Reports unlocked on paid plan', features: ['Scope 1 & 2 · CARB SB 253 ready', 'IPCC AR5 · IEA 2024 factors', 'Audit trail & assurance package', 'CSV import · EcoVadis export'], featured: false },
             { plan: 'Professional', price: '$799', cadence: 'per month · Climate GHG + Risk', desc: 'Full GHG Protocol · all scopes · 10 entities · 10 users', features: ['Everything in Starter', 'Scope 3 · all 15 categories', 'Climate Risk module included', 'CDP · ESRS · IFRS S2 · EcoVadis', 'Regulatory Monitor (weekly)'], featured: true },
             { plan: 'Platform', price: 'Custom', cadence: 'multi-module · enterprise', desc: 'Any combination of 8 modules · unlimited entities & users', features: ['Any combination of 8 modules', 'Unlimited entities & users', 'SSO / SAML · dedicated support', 'Advisory concierge included'], featured: false },
           ].map(({ plan, price, cadence, desc, features, featured }) => (
@@ -129,7 +129,7 @@ export default function Home() {
               </div>
               <div style={{ marginTop: 'auto' }}>
                 <a href="/assess" style={{ display: 'block', textAlign: 'center', padding: '10px', borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: 'none', background: featured ? '#0d0d0d' : 'none', color: featured ? '#fff' : '#0d0d0d', border: featured ? 'none' : '0.5px solid #e8e7e4', cursor: 'pointer' }}>
-                  {plan === 'Platform' ? 'Talk to sales' : 'Start free trial'}
+                  {plan === 'Platform' ? 'Talk to sales' : 'See your emissions instantly →'}
                 </a>
               </div>
             </div>
@@ -146,7 +146,7 @@ export default function Home() {
           ThemisIQ can have your Scope 1 and 2 inventory complete and the CARB template pre-filled in days — not months.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>Start free trial — no credit card</a>
+          <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>See your emissions instantly — no credit card needed</a>
           <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Book a 30-min demo</a>
         </div>
       </section>
