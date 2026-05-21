@@ -13,7 +13,10 @@ export async function POST(request: NextRequest) {
     const ws = wb.Sheets['Form']
     const set = (cell: string, value: any) => {
       if (value === null || value === undefined || value === '') return
-      ws[cell] = { v: value, t: typeof value === 'number' ? 'n' : 's' }
+      if (!ws[cell]) ws[cell] = {}
+      ws[cell].v = value
+      ws[cell].t = typeof value === 'number' ? 'n' : 's'
+      ws[cell].w = undefined
     }
     const yn = (v: boolean) => v ? 'Yes' : 'No'
     const r4 = (n: number) => Math.round(n * 10000) / 10000
