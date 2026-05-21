@@ -1,5 +1,6 @@
+export const runtime = "nodejs"
+
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '../../../lib/supabase'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -7,6 +8,7 @@ export async function GET(request: NextRequest) {
   const next = searchParams.get('next') ?? '/dashboard'
 
   if (code) {
+    const { createServerClient } = await import('../../../lib/supabase')
     const supabase = createServerClient()
     await supabase.auth.exchangeCodeForSession(code)
   }

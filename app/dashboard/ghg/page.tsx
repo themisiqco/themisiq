@@ -1,7 +1,9 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+export const dynamic = 'force-dynamic'
 import { supabase } from '../../../lib/supabase'
+
+import { useState, useEffect, useRef } from 'react'
 
 // ── EMISSION FACTORS ──────────────────────────────────────────────────
 // Both AR4 (CARB/CDP default) and AR5 (ESRS/GRI) GWP values
