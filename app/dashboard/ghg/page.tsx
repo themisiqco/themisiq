@@ -831,7 +831,7 @@ export default function GHGPage() {
                   ))}
                 </div>
                 <button onClick={() => generateExport(fw.id)} style={{ fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>
-                  fw.id === 'sb253' ? '⬇ Download CARB SB 253 Template (Excel)' : `⬇ Download ${fw.name} Report (CSV)`
+                  `⬇ Download ${fw.name} Report (CSV)`
                 </button>
               </div>
 
