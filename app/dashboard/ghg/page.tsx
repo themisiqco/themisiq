@@ -105,7 +105,7 @@ const FRAMEWORKS = [
 interface SourceDoc { id: string; file_name: string; document_type: string; uploaded_at: string; file_path: string }
 
 interface Location {
-  id: string; name: string; state: string; country: string
+ id: string; name: string; country: string; state?: string; province?: string; region?: string
   has_natural_gas: boolean; natural_gas_amount: number; natural_gas_unit: 'mcf' | 'therms' | 'mmbtu'
   has_propane: boolean; propane_amount: number; propane_unit: 'gallons' | 'litres'
   has_diesel_stationary: boolean; diesel_stationary_amount: number; diesel_stationary_unit: 'gallons' | 'litres'
@@ -128,7 +128,7 @@ interface Inventory {
 }
 
 const emptyLocation = (id: string, name: string, state = ''): Location => ({
-  id, name, state, country: 'USA',
+  id, name, country: 'US', state: '', province: '', region: '',
   has_natural_gas: false, natural_gas_amount: 0, natural_gas_unit: 'mcf',
   has_propane: false, propane_amount: 0, propane_unit: 'gallons',
   has_diesel_stationary: false, diesel_stationary_amount: 0, diesel_stationary_unit: 'gallons',
@@ -424,7 +424,8 @@ export default function GHGPage() {
     setInventory(inv => {
       const locs = [...inv.locations]
       locs[idx] = { ...locs[idx], [field]: value }
-      if (field === 'state') locs[idx].grid_region = detectGridRegion(value)
+     if (field === 'state') locs[idx].grid_region = detectGridRegion(value)
+if (field === 'province') locs[idx].grid_region = value // Canadian provinces map directly
       return { ...inv, locations: locs }
     })
   }
@@ -573,8 +574,36 @@ export default function GHGPage() {
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
             {inventory.locations.map((loc, i) => (
               <div key={loc.id} style={{ display: 'flex', gap: 8 }}>
-                <input value={loc.name} onChange={e => updateLocation(i, 'name', e.target.value)} placeholder="e.g. Chicago Warehouse" style={{ ...inputStyle, flex: 1 }} />
-                <input value={loc.state} onChange={e => updateLocation(i, 'state', e.target.value)} placeholder="State" style={{ ...inputStyle, width: 70 }} />
+               <input value={loc.name} onChange={e => updateLocation(i, 'name', e.target.value)} placeholder="e.g. Chicago Warehouse" style={{ ...inputStyle, flex: 1 }} />
+<select value={loc.country} onChange={e => updateLocation(i, 'country', e.target.value)} style={{ ...inputStyle, width: 110 }}>
+  <option value="">Country…</option>
+  <option value="US">🇺🇸 USA</option>
+  <option value="CA">🇨🇦 Canada</option>
+  <option value="GB">🇬🇧 UK</option>
+  <option value="DE">🇩🇪 Germany</option>
+  <option value="FR">🇫🇷 France</option>
+  <option value="AU">🇦🇺 Australia</option>
+  <option value="OTHER">Other…</option>
+</select>
+{loc.country === 'US' && (
+  <select value={loc.state || ''} onChange={e => updateLocation(i, 'state', e.target.value)} style={{ ...inputStyle, width: 130 }}>
+    <option value="">State…</option>
+    {['CA','TX','NY','FL','IL','OH','PA','MA','CO','WA','OR','GA','NC','VA','MI','MN','WI','AZ','NV','NJ','DC'].map(s => (
+      <option key={s} value={s}>{s}</option>
+    ))}
+  </select>
+)}
+{loc.country === 'CA' && (
+  <select value={loc.province || ''} onChange={e => updateLocation(i, 'province', e.target.value)} style={{ ...inputStyle, width: 130 }}>
+    <option value="">Province…</option>
+    {['ON','BC','AB','QC','MB','SK','NS','NB','NL','PE','NT','NU','YT'].map(p => (
+      <option key={p} value={p}>{p}</option>
+    ))}
+  </select>
+)}
+{loc.country && loc.country !== 'US' && loc.country !== 'CA' && (
+  <input value={loc.region || ''} onChange={e => updateLocation(i, 'region', e.target.value)} placeholder="State/Region" style={{ ...inputStyle, width: 120 }} />
+)}
               </div>
             ))}
             <button onClick={addLocation} style={{ fontSize: 13, padding: '8px 16px', borderRadius: 8, background: 'none', border: '0.5px solid #7425e3', color: '#7425e3', cursor: 'pointer', alignSelf: 'flex-start' }}>+ Add location</button>
