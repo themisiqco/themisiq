@@ -32,12 +32,12 @@ const TIER_FEATURES: Record<Tier, { title: string; sub: string; features: string
     title: 'Starter',
     sub: 'Core reports for each module you select',
     features: [
-      'Core framework reports (e.g. SB 253)',
+      'Core reporting frameworks for your selected modules',
       'Assurance-ready calculation workings',
-      'Auto emission factors (eGRID, NIR, IEA)',
-      'CSV export',
+      'Audit trail — every entry logged',
+      'Data export (CSV)',
       '1 entity · 3 users',
-      'AI guide bot included',
+      'ThemisIQ Wizard — always on',
     ],
   },
   professional: {
@@ -45,11 +45,11 @@ const TIER_FEATURES: Record<Tier, { title: string; sub: string; features: string
     sub: 'All frameworks — one inventory, every report',
     features: [
       'Everything in Starter',
-      'All frameworks (CDP, ESRS, GRI, IFRS S2)',
-      'Market-based Scope 2 reporting',
-      'Biogenic CO₂ disclosure',
-      'Verifier access role',
-      '10 entities · 10 users',
+      'All reporting frameworks for your selected modules',
+      'Multi-entity support (10 entities · 10 users)',
+      'Verifier & third-party access role',
+      'Advanced disclosure outputs',
+      'Regulatory monitor — weekly deadline alerts',
       'Priority support',
     ],
   },
@@ -427,17 +427,28 @@ export default function PricingPage() {
 
         {/* Credibility bar */}
         <div style={s.credBar}>
-          {[
-            { label: 'Methodology', val: 'EPA 2024 · IPCC AR4+AR5 · ISO 14064-3 · GHG Protocol' },
-            { label: 'Frameworks', val: 'SB 253 · CDP · ESRS E1 · GRI 305 · IFRS S2 · EcoVadis' },
-            { label: 'Built by', val: 'Practitioners with Big 4 & climate consulting experience' },
-            { label: 'Next Reporting Deadline', val: `SB 253 · Aug 10, 2026 · ${daysLeft} days`, red: true },
-          ].map((item, i) => (
-            <div key={i} style={{ ...s.credItem, ...(i > 0 ? { borderLeft: '1px solid #e8e7e4', paddingLeft: 12 } : {}) }}>
-              <div style={s.credLabel}>{item.label}</div>
-              <div style={{ ...s.credVal, ...((item as any).red ? { color: '#B91C1C', fontWeight: 600 } : {}) }}>{item.val}</div>
+          <div style={s.credItem}>
+            <div style={s.credLabel}>Platform</div>
+            <div style={s.credVal}>7 compliance domains · one platform · one inventory</div>
+          </div>
+          <div style={{ ...s.credItem, borderLeft: '1px solid #e8e7e4', paddingLeft: 12 }}>
+            <div style={s.credLabel}>Frameworks</div>
+            <div style={s.credVal}>30+ frameworks · mandatory & voluntary · global coverage</div>
+          </div>
+          <div style={{ ...s.credItem, borderLeft: '1px solid #e8e7e4', paddingLeft: 12 }}>
+            <div style={s.credLabel}>Built by</div>
+            <div style={s.credVal}>Practitioners with Big 4 & sustainability consulting experience</div>
+          </div>
+          <div style={{ ...s.credItem, borderLeft: '1px solid #e8e7e4', paddingLeft: 12 }}>
+            <div style={s.credLabel}>Upcoming Deadlines</div>
+            <div style={{ fontSize: 10, lineHeight: 1.7 }}>
+              <span style={{ color: '#B91C1C', fontWeight: 600 }}>SB 253 · Aug 10</span>
+              <span style={{ color: '#888784' }}> · </span>
+              <span style={{ color: '#B91C1C', fontWeight: 600 }}>EU AI Act · Aug 2</span>
+              <span style={{ color: '#888784' }}> · </span>
+              <span style={{ color: '#B91C1C', fontWeight: 600 }}>EU Pay · Jun 2026</span>
             </div>
-          ))}
+          </div>
         </div>
 
         {/* Section title */}
@@ -539,7 +550,9 @@ export default function PricingPage() {
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{mod.name}</span>
+                    <Link href={mod.cta.href} style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', textDecoration: 'none' }} onClick={e => e.stopPropagation()}>
+                      {mod.name} ↗
+                    </Link>
                     {mod.tags.map(t => (
                       <span key={t.label} style={tag(t.label, t.color)}>{t.label}</span>
                     ))}
