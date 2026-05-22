@@ -444,6 +444,7 @@ export default function PricingPage() {
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
           <div style={{ fontFamily: 'Georgia, serif', fontSize: 22, fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Simple, honest pricing</div>
           <div style={{ fontSize: 12, color: '#555553', fontWeight: 300 }}>Start with one module. Build your compliance platform as you grow.</div>
+          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6, fontWeight: 300 }}>All prices in USD</div>
         </div>
 
         {/* Tier cards */}
@@ -507,6 +508,11 @@ export default function PricingPage() {
                   <span style={{ color: '#1fb1ff', flexShrink: 0, fontSize: 10, marginTop: 1 }}>✓</span>{f}
                 </div>
               ))}
+              <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #f3f4f6' }}>
+                <div style={{ fontSize: 10, color: '#888784', lineHeight: 1.6 }}>
+                  Advisory clients are invoiced directly. Prefer to pay by card? We accept all major credit cards and ACH bank transfer.
+                </div>
+              </div>
             </div>
           </div>
 
