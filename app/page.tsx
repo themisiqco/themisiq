@@ -89,7 +89,6 @@ export default function Home() {
             <a key={i} href={mod.href} style={{ background: '#fff', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textDecoration: 'none', transition: 'background 0.15s', cursor: 'pointer' }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f8f7f5' }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff' }}>
-              <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784' }}>{mod.family}</div>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.2 }}>{mod.name}</div>
               <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 300 }}>{mod.desc}</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 'auto', paddingTop: 8 }}>
@@ -142,6 +141,17 @@ export default function Home() {
             Whether your driver is a regulator, a board, an investor, or a customer — ThemisIQ is your sustainability compliance reporting solution.
           </p>
           <p style={{ fontSize: 12, color: '#9ca3af', fontWeight: 300, marginBottom: '2.5rem' }}>All prices in USD</p>
+
+          {/* Interactive prompt */}
+          <div style={{ background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', borderRadius: 12, padding: 1, marginBottom: 20 }}>
+            <div style={{ background: '#fff', borderRadius: 11, padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', animation: 'pulse 2s ease-in-out infinite' }} />
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>This pricing section is interactive — </span>
+                <span style={{ fontSize: 13, color: '#555553', fontWeight: 300 }}>click a tier card to select your level, then click any module to add it. Your total updates instantly.</span>
+              </div>
+            </div>
+          </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
 
@@ -215,13 +225,15 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Bundle hint + see full pricing */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-            <div style={{ fontSize: 12, color: '#374151' }}>
-              <span style={{ fontWeight: 600 }}>Platform Bundle:</span>
-              <span style={{ color: '#888784' }}> 2 modules = 10% off · 3+ modules = 20% off · applied automatically</span>
+          {/* Bundle hint + strong CTA */}
+          <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: '#fff', marginBottom: 3 }}>Platform Bundle savings</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', fontWeight: 300 }}>2 modules = 10% off · 3+ modules = 20% off · applied automatically</div>
             </div>
-            <a href="/pricing" style={{ fontSize: 12, fontWeight: 600, color: '#7425e3', textDecoration: 'none' }}>See full pricing & build your platform →</a>
+            <a href="/pricing" style={{ whiteSpace: 'nowrap', padding: '11px 22px', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#0d0d0d', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', textDecoration: 'none' }}>
+              Build your compliance platform →
+            </a>
           </div>
 
         </div>
