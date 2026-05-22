@@ -119,7 +119,7 @@ export default function Home() {
             {[
               ['01', 'Tell us about your business', "Answer a few guided questions about your operations, locations, and obligations. ThemisIQ's Wizard does the heavy lifting — no compliance expertise required to get started."],
               ['02', 'We apply the right methodology', 'ThemisIQ automatically applies the correct frameworks, factors, and calculations for your selected modules — versioned, auditable, and traceable to source.'],
-              ['03', 'Generate the reports you need', 'One data set. Every report. Whether it\'s a regulator, an investor, a customer, or a board asking — ThemisIQ generates the right output automatically.'],
+              ['03', 'Generate the reports you need', 'One data set. Numerous reports. Whether it\'s a regulator, an investor, a customer, or a board asking — ThemisIQ generates the right output automatically.'],
               ['04', 'Stand behind your numbers', 'Every calculation and data point is logged with a full audit trail. Your verifiers, auditors, and regulators get everything they need — without the scramble.'],
             ].map(([num, title, desc]) => (
               <div key={num}>
