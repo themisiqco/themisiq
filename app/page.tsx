@@ -24,15 +24,15 @@ export default function Home() {
             </p>
           </div>
           <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2.6rem, 5vw, 4rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
-            Every framework.<br />
-            One <em style={gradText}>intelligent</em> platform.
+            Countless compliance requirements.<br />
+            <em style={gradText}>One Intelligent Platform.</em>
           </h1>
           <p style={{ fontSize: 17, color: '#555553', maxWidth: 580, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.75 }}>
             From GHG emissions and climate risk to supply chain, M&A diligence, AI governance, workforce, and cybersecurity — ThemisIQ turns complex compliance into competitive clarity.
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: '2.5rem' }}>
-            <a href="/dashboard/ghg" style={{ ...btnPrimary, textDecoration: 'none' }}>See your emissions instantly →</a>
-            <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to an advisor</a>
+            <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>See where you stand — free assessment →</a>
+            <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to a specialist</a>
           </div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#555553', background: '#f8f7f5', border: '0.5px solid #e8e7e4', padding: '8px 16px', borderRadius: 99 }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#B91C1C', display: 'inline-block', animation: 'pulse 1.8s infinite' }} />
@@ -44,15 +44,24 @@ export default function Home() {
       {/* ── STATS BAR ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', borderBottom: '0.5px solid #e8e7e4', background: '#f8f7f5' }}>
         {[
-          ['8', 'Intelligence modules'],
-          ['15+', 'Frameworks supported'],
-          ['GHG Protocol', 'Verifier-ready by design'],
-          ['Intelligence-first', 'Precision by design'],
-          ['14-day trial', 'No credit card required'],
+          ['7', 'Compliance modules'],
+          ['30+', 'Frameworks covered'],
+          ['Practitioner-built', 'Big 4 & consulting experience'],
+          ['Audit-ready', 'Verifier-ready by design'],
+          ['deadlines', 'Do you have upcoming compliance deadlines?'],
         ].map(([val, label], i) => (
           <div key={i} style={{ padding: '1.75rem 1rem', textAlign: 'center', borderRight: i < 4 ? '0.5px solid #e8e7e4' : 'none' }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 4 }}>{val}</div>
-            <div style={{ fontSize: 12, color: '#888784' }}>{label}</div>
+            {val === 'deadlines' ? (
+              <a href="/assess" style={{ textDecoration: 'none', display: 'block' }}>
+                <div style={{ fontSize: 12, color: '#7425e3', fontWeight: 600, lineHeight: 1.4, marginBottom: 4 }}>Check your compliance deadlines →</div>
+                <div style={{ fontSize: 11, color: '#888784' }}>{label}</div>
+              </a>
+            ) : (
+              <>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 4 }}>{val}</div>
+                <div style={{ fontSize: 12, color: '#888784' }}>{label}</div>
+              </>
+            )}
           </div>
         ))}
       </div>
@@ -73,21 +82,32 @@ export default function Home() {
       {/* ── PRODUCTS ── */}
       <section style={{ padding: '5rem 2.5rem', maxWidth: 1100, margin: '0 auto' }}>
         <p style={eyebrow}>The ThemisIQ platform</p>
-        <h2 style={sectionTitle}>Eight modules. One source of truth.</h2>
+        <h2 style={sectionTitle}>Seven modules. One source of truth.</h2>
         <p style={sectionSub}>Enter your data once. ThemisIQ maps it across every module and framework automatically.</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden', marginTop: '3rem' }}>
-          {modules.map((mod, i) => (
-            <a key={i} href={mod.href} style={{ background: mod.dark ? '#0d0d0d' : '#fff', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textDecoration: 'none', transition: 'background 0.15s', cursor: 'pointer' }}
-              onMouseEnter={e => { if (!mod.dark) (e.currentTarget as HTMLElement).style.background = '#f8f7f5' }}
-              onMouseLeave={e => { if (!mod.dark) (e.currentTarget as HTMLElement).style.background = '#fff' }}>
-              <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase', color: mod.dark ? 'rgba(255,255,255,0.4)' : '#888784' }}>{mod.family}</div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, color: mod.dark ? '#fff' : '#0d0d0d', lineHeight: 1.2 }}>{mod.name}</div>
-              <div style={{ fontSize: 12, color: mod.dark ? 'rgba(255,255,255,0.5)' : '#555553', lineHeight: 1.6, fontWeight: 300 }}>{mod.desc}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, background: '#0d0d0d', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden', marginTop: '3rem' }}>
+          {modules.filter(m => m.family !== 'Advisory').map((mod, i) => (
+            <a key={i} href={mod.href} style={{ background: '#fff', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textDecoration: 'none', transition: 'background 0.15s', cursor: 'pointer' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f8f7f5' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff' }}>
+              <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784' }}>{mod.family}</div>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.2 }}>{mod.name}</div>
+              <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 300 }}>{mod.desc}</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 'auto', paddingTop: 8 }}>
-                {mod.tags.map(t => <span key={t} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: mod.dark ? 'rgba(255,255,255,0.08)' : '#f8f7f5', border: `0.5px solid ${mod.dark ? 'rgba(255,255,255,0.1)' : '#e8e7e4'}`, color: mod.dark ? 'rgba(255,255,255,0.5)' : '#888784' }}>{t}</span>)}
+                {mod.tags.map(t => <span key={t} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#888784' }}>{t}</span>)}
               </div>
             </a>
           ))}
+          {/* Advisory — 8th cell, column 4 row 2 */}
+          <a href="/advisory" style={{ gridColumn: '4', gridRow: '2', background: '#0d0d0d', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textDecoration: 'none', transition: 'opacity 0.15s' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.9' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 2 }}>Advisory Services</div>
+            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, color: '#fff', lineHeight: 1.2 }}>Available across all modules</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, fontWeight: 300 }}>Expert advisory services — sector-specific guidance, assurance prep, and board-ready narratives from practitioners who speak your language.</div>
+            <div style={{ marginTop: 'auto', paddingTop: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: '#0d0d0d', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', padding: '8px 16px', borderRadius: 8, whiteSpace: 'nowrap' }}>Talk to a specialist →</span>
+            </div>
+          </a>
         </div>
       </section>
 
@@ -95,7 +115,7 @@ export default function Home() {
       <div style={{ padding: '5rem 2.5rem', background: '#f8f7f5', borderTop: '0.5px solid #e8e7e4', borderBottom: '0.5px solid #e8e7e4' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <p style={eyebrow}>How it works</p>
-          <h2 style={sectionTitle}>One inventory. Every output.</h2>
+          <h2 style={sectionTitle}>Collect once. Comply everywhere.</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '2.5rem', marginTop: '3rem' }}>
             {[
               ['01', 'Connect your data', 'Manual entry, CSV import, or guided wizard — ThemisIQ collects activity data and maps it to the right scope automatically.'],
@@ -282,7 +302,6 @@ const modules = [
   { family: 'ThemisIQ', name: 'AI Governance', desc: 'AI risk register. Model inventory. Policy management. EU AI Act readiness. Board-level AI oversight documentation.', tags: ['EU AI Act', 'NIST AI RMF', 'ISO 42001', 'Model risk'], href: '/ai-governance', dark: false },
   { family: 'ThemisIQ', name: 'People & Workforce', desc: 'Human capital reporting. DEI metrics. Pay equity and gender pay gap. Health & safety. Training management.', tags: ['ESRS S1', 'GRI 401-410', 'Pay Transparency', 'CA Pay Data'], href: '/people', dark: false },
   { family: 'ThemisIQ', name: 'Cyber Governance', desc: 'Cyber risk registers. Policy management. Vendor cybersecurity reviews. Incident workflows. CISO dashboards.', tags: ['NIS2', 'DORA', 'ISO 27001', 'NIST CSF'], href: '/cyber', dark: false },
-  { family: 'ThemisIQ', name: 'Advisory Concierge', desc: 'Expert guidance across any module. Regulatory filing, verifier preparation, board reporting, M&A diligence support.', tags: ['Expert-led', 'Fixed fees', 'Named advisor', 'All modules'], href: '/advisory', dark: true },
 ]
 
 // ── STYLES ──────────────────────────────────────────────────────────

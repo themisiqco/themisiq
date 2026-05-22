@@ -229,7 +229,7 @@ export default function PricingPage() {
     }
     if (count >= 4) return {
       headline: 'Ready to build your compliance platform?',
-      sub: 'One inventory. Every framework. Specialists who speak your language.',
+      sub: 'Countless compliance requirements. One Intelligent Platform — built by specialists who speak your language.',
       buttons: [
         { label: 'Start your free assessment →', href: '/assess', primary: true },
         { label: 'Talk to a specialist', href: '/advisory', primary: false },
