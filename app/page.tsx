@@ -1,7 +1,15 @@
 'use client'
+import { useState, useEffect } from 'react'
 import Nav from './components/Nav'
 
 export default function Home() {
+  const [daysLeft, setDaysLeft] = useState(81)
+  useEffect(() => {
+    const deadline = new Date('2026-08-10')
+    const today = new Date()
+    const diff = Math.ceil((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    setDaysLeft(Math.max(0, diff))
+  }, [])
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d', margin: 0, padding: 0 }}>
       <Nav />
@@ -28,7 +36,7 @@ export default function Home() {
           </div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#555553', background: '#f8f7f5', border: '0.5px solid #e8e7e4', padding: '8px 16px', borderRadius: 99 }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#B91C1C', display: 'inline-block', animation: 'pulse 1.8s infinite' }} />
-            SB 253 first-year deadline: August 10, 2026 —  83 days away
+            SB 253 first-year deadline: August 10, 2026 — {daysLeft} days away
           </div>
         </div>
       </section>
@@ -93,7 +101,7 @@ export default function Home() {
               ['01', 'Connect your data', 'Manual entry, CSV import, or guided wizard — ThemisIQ collects activity data and maps it to the right scope automatically.'],
               ['02', 'Calculate with real factors', 'IPCC AR5, IEA 2024 grid factors, DEFRA 2024 — all versioned and auditable. Every result traces back to its source.'],
               ['03', 'Report to every framework', 'CARB SB 253, CDP, ESRS E1, EcoVadis — generated automatically from your single inventory.'],
-              ['04', 'Get assured', 'ThemisIQ\'s audit trail and assurance package give your verifier everything they need for limited or reasonable assurance.'],
+              ['04', 'Get assured', "ThemisIQ's audit trail and assurance package give your verifier everything they need for limited or reasonable assurance."],
             ].map(([num, title, desc]) => (
               <div key={num}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '2.5rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', opacity: 0.5, marginBottom: '0.75rem' }}>{num}</div>
@@ -106,41 +114,103 @@ export default function Home() {
       </div>
 
       {/* ── PRICING ── */}
-      <section style={{ padding: '5rem 2.5rem', maxWidth: 1100, margin: '0 auto' }}>
-        <p style={eyebrow}>Pricing</p>
-        <h2 style={sectionTitle}>Modular by design.</h2>
-        <p style={sectionSub}>Start with one module. Add more as your programme matures. Annual plans include 2 months free.</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden', marginTop: '2.5rem' }}>
-          {[
-            { plan: 'Starter', price: '$299', cadence: 'per month · Climate GHG only', desc: 'Scope 1 & 2 · SB 253 export · 1 entity · 3 users · Reports unlocked on paid plan', features: ['Scope 1 & 2 · CARB SB 253 ready', 'IPCC AR5 · IEA 2024 factors', 'Audit trail & assurance package', 'CSV import · EcoVadis export'], featured: false },
-            { plan: 'Professional', price: '$799', cadence: 'per month · Climate GHG + Risk', desc: 'Full GHG Protocol · all scopes · 10 entities · 10 users', features: ['Everything in Starter', 'Scope 3 · all 15 categories', 'Climate Risk module included', 'CDP · ESRS · IFRS S2 · EcoVadis', 'Regulatory Monitor (weekly)'], featured: true },
-            { plan: 'Platform', price: 'Custom', cadence: 'multi-module · enterprise', desc: 'Any combination of 8 modules · unlimited entities & users', features: ['Any combination of 8 modules', 'Unlimited entities & users', 'SSO / SAML · dedicated support', 'Advisory concierge included'], featured: false },
-          ].map(({ plan, price, cadence, desc, features, featured }) => (
-            <div key={plan} style={{ background: featured ? '#f8f7f5' : '#fff', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784' }}>{plan}</div>
-              <div>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '2.6rem', fontWeight: 400, color: '#0d0d0d' }}>{price}</div>
-                <div style={{ fontSize: 12, color: '#888784', marginTop: 4 }}>{cadence}</div>
+      <section style={{ padding: '5rem 2.5rem', background: '#f8f7f5', borderBottom: '0.5px solid #e8e7e4' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          <p style={eyebrow}>Pricing</p>
+          <h2 style={sectionTitle}>Simple, honest pricing.</h2>
+          <p style={{ ...sectionSub, marginBottom: '0.5rem' }}>
+            Whether your driver is a regulator, a board, an investor, or a customer — ThemisIQ is your sustainability compliance reporting solution.
+          </p>
+          <p style={{ fontSize: 12, color: '#9ca3af', fontWeight: 300, marginBottom: '2.5rem' }}>All prices in USD</p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+
+            {/* Starter */}
+            <div style={{ background: '#fff', border: '1px solid #e8e7e4', borderRadius: 14, padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Starter</div>
+              <div style={{ fontSize: 11, color: '#888784', textDecoration: 'line-through', marginBottom: 2 }}>$1,499</div>
+              <div style={{ fontSize: 28, fontWeight: 600, color: '#0d0d0d', marginBottom: 4 }}>$799<span style={{ fontSize: 11, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
+              <div style={{ fontSize: 9, color: '#92400e', background: '#FEF3E2', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginBottom: 16 }}>Early access</div>
+              <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: 12, flex: 1 }}>
+                <div style={{ fontSize: 11, color: '#888784', marginBottom: 8 }}>Core reports for each module you select</div>
+                {['Core reporting frameworks', 'Assurance-ready workings', 'Audit trail — every entry logged', 'ThemisIQ Wizard — always on'].map(f => (
+                  <div key={f} style={{ display: 'flex', gap: 7, fontSize: 12, color: '#374151', marginBottom: 5 }}>
+                    <span style={{ color: '#0F6E56', flexShrink: 0 }}>✓</span>{f}
+                  </div>
+                ))}
               </div>
-              <div style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.5 }}>{desc}</div>
-              <div style={{ height: '0.5px', background: '#e8e7e4' }} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {features.map(f => <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#555553' }}><span style={{ color: '#0F6E56', flexShrink: 0 }}>✓</span>{f}</div>)}
-              </div>
-              <div style={{ marginTop: 'auto' }}>
-                <a href="/dashboard/ghg" style={{ display: 'block', textAlign: 'center', padding: '10px', borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: 'none', background: featured ? '#0d0d0d' : 'none', color: featured ? '#fff' : '#0d0d0d', border: featured ? 'none' : '0.5px solid #e8e7e4', cursor: 'pointer' }}>
-                  {plan === 'Platform' ? 'Talk to sales' : 'See your emissions instantly →'}
-                </a>
-              </div>
+              <a href="/pricing" style={{ display: 'block', textAlign: 'center', padding: '9px', borderRadius: 8, background: '#f8f7f5', border: '1px solid #e8e7e4', fontSize: 12, fontWeight: 500, color: '#0d0d0d', textDecoration: 'none', marginTop: 16 }}>Get started</a>
             </div>
-          ))}
+
+            {/* Professional */}
+            <div style={{ background: '#0d0d0d', border: '2px solid #7425e3', borderRadius: 14, padding: '1.5rem', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+              <div style={{ position: 'absolute', top: -11, left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#0d0d0d', padding: '2px 10px', borderRadius: 99, whiteSpace: 'nowrap' }}>Most popular</div>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 8 }}>Professional</div>
+              <div style={{ fontSize: 28, fontWeight: 600, color: '#fff', marginBottom: 4 }}>$2,499<span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}> /module/yr</span></div>
+              <div style={{ fontSize: 9, color: '#a78bfa', background: 'rgba(116,37,227,0.15)', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginBottom: 16 }}>All frameworks</div>
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 12, flex: 1 }}>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>All frameworks for your selected modules</div>
+                {['Everything in Starter', 'All reporting frameworks', 'Multi-entity · 10 entities · 10 users', 'Verifier & third-party access role', 'Regulatory monitor — weekly alerts'].map((f, i) => (
+                  <div key={f} style={{ display: 'flex', gap: 7, fontSize: 12, color: i === 0 ? 'rgba(255,255,255,0.45)' : '#fff', marginBottom: 5 }}>
+                    <span style={{ color: '#64fe3e', flexShrink: 0 }}>✓</span>{f}
+                  </div>
+                ))}
+              </div>
+              <a href="/pricing" style={{ display: 'block', textAlign: 'center', padding: '9px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', fontSize: 12, fontWeight: 600, color: '#0d0d0d', textDecoration: 'none', marginTop: 16 }}>Get started</a>
+            </div>
+
+            {/* Advisory */}
+            <div style={{ background: '#fff', border: '1px solid #1fb1ff', borderRadius: 14, padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1fb1ff', marginBottom: 8 }}>Advisory</div>
+              <div style={{ fontSize: 28, fontWeight: 600, color: '#0d0d0d', marginBottom: 4 }}>$4,999<span style={{ fontSize: 11, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
+              <div style={{ fontSize: 9, color: '#0C447C', background: '#E6F1FB', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginBottom: 16 }}>+ Expert guidance</div>
+              <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: 12, flex: 1 }}>
+                <div style={{ fontSize: 11, color: '#888784', marginBottom: 8 }}>Platform + dedicated expert guidance</div>
+                {['Everything in Professional', 'Onboarding session', 'Guided inventory review', 'Sector-specific guidance', 'Board-ready narrative'].map(f => (
+                  <div key={f} style={{ display: 'flex', gap: 7, fontSize: 12, color: '#374151', marginBottom: 5 }}>
+                    <span style={{ color: '#1fb1ff', flexShrink: 0 }}>✓</span>{f}
+                  </div>
+                ))}
+              </div>
+              <a href="/advisory" style={{ display: 'block', textAlign: 'center', padding: '9px', borderRadius: 8, background: '#0d0d0d', fontSize: 12, fontWeight: 500, color: '#fff', textDecoration: 'none', marginTop: 16 }}>Talk to us</a>
+            </div>
+
+          </div>
+
+          {/* Module pills */}
+          <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem 1.25rem', marginBottom: 12 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784', marginBottom: 10 }}>Available compliance modules</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {[
+                { label: 'Climate — GHG Inventory · Scope 1 & 2', href: '/climate-ghg' },
+                { label: 'Climate Risk', href: '/dashboard/ghg' },
+                { label: 'Supply Chain & Scope 3', href: '/supply-chain' },
+                { label: 'People & Workforce', href: '/people' },
+                { label: 'Deals & Investment', href: '/deals' },
+                { label: 'AI Governance', href: '/ai-governance' },
+                { label: 'Cyber Governance', href: '/cyber' },
+              ].map(m => (
+                <a key={m.label} href={m.href} style={{ fontSize: 11, fontWeight: 500, color: '#0d0d0d', background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 8, padding: '6px 10px', textDecoration: 'none' }}>{m.label}</a>
+              ))}
+            </div>
+          </div>
+
+          {/* Bundle hint + see full pricing */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ fontSize: 12, color: '#374151' }}>
+              <span style={{ fontWeight: 600 }}>Platform Bundle:</span>
+              <span style={{ color: '#888784' }}> 2 modules = 10% off · 3+ modules = 20% off · applied automatically</span>
+            </div>
+            <a href="/pricing" style={{ fontSize: 12, fontWeight: 600, color: '#7425e3', textDecoration: 'none' }}>See full pricing & build your platform →</a>
+          </div>
+
         </div>
       </section>
 
       {/* ── CTA ── */}
       <section style={{ padding: '6rem 2.5rem', textAlign: 'center', borderTop: '0.5px solid #e8e7e4' }}>
         <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
-          The SB 253 deadline is <em style={gradText}> 83 days away.</em>
+          The SB 253 deadline is <em style={gradText}> {daysLeft} days away.</em>
         </h2>
         <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
           ThemisIQ can have your Scope 1 and 2 inventory complete and the CARB template pre-filled in days — not months.
@@ -168,7 +238,7 @@ export default function Home() {
             <div key={col.heading}>
               <div style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#888784', marginBottom: '1rem' }}>{col.heading}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {col.links.map(l => <a key={l} href={l === "Privacy Policy" ? "/privacy" : l === "Terms of Service" ? "/terms" : l === "Security" ? "/security" : "#"} style={{ fontSize: 13, color: '#555553', textDecoration: 'none' }}>{l}</a>)}
+                {col.links.map(l => <a key={l} href={l === "Privacy Policy" ? "/privacy" : l === "Terms of Service" ? "/terms" : l === "Security" ? "/security" : l === "Pricing" ? "/pricing" : "#"} style={{ fontSize: 13, color: '#555553', textDecoration: 'none' }}>{l}</a>)}
               </div>
             </div>
           ))}
@@ -206,8 +276,8 @@ function Logo({ size = 130 }: { size?: number }) {
 // ── DATA ────────────────────────────────────────────────────────────
 const modules = [
   { family: 'ThemisIQ Climate', name: 'GHG Emissions', desc: 'Full Scope 1, 2 and 3 inventory under GHG Protocol. Audit-trail-first, verifier-ready. CARB SB 253 pre-filled export.', tags: ['SB 253', 'CDP C6', 'ESRS E1-6', 'GHG Protocol'], href: '/climate-ghg', dark: false },
-  { family: 'ThemisIQ Climate', name: 'Climate Risk', desc: 'TCFD-aligned physical and transition risk disclosures. Scenario analysis under IPCC 1.5°C, 2°C, and 3°C pathways.', tags: ['SB 261', 'IFRS S2', 'TCFD', 'CDP-P'], href: '/climate-risk', dark: false },
-  { family: 'ThemisIQ', name: 'Supply Chain', desc: 'Supplier emissions mapping. Scope 3 Cat. 1 primary data collection portal. Labour compliance. Human rights risk.', tags: ['Scope 3 Cat.1', 'EcoVadis', 'ESRS S2', 'CSRD'], href: '/supply-chain', dark: false },
+  { family: 'ThemisIQ Climate', name: 'Climate Risk', desc: 'TCFD-aligned physical and transition risk disclosures. Scenario analysis under IPCC 1.5°C, 2°C, and 3°C pathways.', tags: ['SB 261', 'IFRS S2', 'TCFD', 'CDP-P'], href: '/dashboard/ghg', dark: false },
+  { family: 'ThemisIQ', name: 'Supply Chain & Scope 3', desc: 'Supplier emissions mapping. Scope 3 Cat. 1 primary data collection portal. Labour compliance. Human rights risk.', tags: ['Scope 3 Cat.1', 'EcoVadis', 'ESRS S2', 'CS3D'], href: '/supply-chain', dark: false },
   { family: 'ThemisIQ', name: 'Deals & Investment', desc: 'M&A climate diligence. Transition risk quantification. Portfolio benchmarking. Investment committee reporting.', tags: ['M&A diligence', 'PE / family office', 'IFRS S2', 'TCFD'], href: '/deals', dark: false },
   { family: 'ThemisIQ', name: 'AI Governance', desc: 'AI risk register. Model inventory. Policy management. EU AI Act readiness. Board-level AI oversight documentation.', tags: ['EU AI Act', 'NIST AI RMF', 'ISO 42001', 'Model risk'], href: '/ai-governance', dark: false },
   { family: 'ThemisIQ', name: 'People & Workforce', desc: 'Human capital reporting. DEI metrics. Pay equity and gender pay gap. Health & safety. Training management.', tags: ['ESRS S1', 'GRI 401-410', 'Pay Transparency', 'CA Pay Data'], href: '/people', dark: false },
