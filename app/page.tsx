@@ -117,10 +117,10 @@ export default function Home() {
           <h2 style={sectionTitle}>Collect once. Comply everywhere.</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '2.5rem', marginTop: '3rem' }}>
             {[
-              ['01', 'Connect your data', 'Manual entry, CSV import, or guided wizard — ThemisIQ collects activity data and maps it to the right scope automatically.'],
-              ['02', 'Calculate with real factors', 'IPCC AR5, IEA 2024 grid factors, DEFRA 2024 — all versioned and auditable. Every result traces back to its source.'],
-              ['03', 'Report to every framework', 'CARB SB 253, CDP, ESRS E1, EcoVadis — generated automatically from your single inventory.'],
-              ['04', 'Get assured', "ThemisIQ's audit trail and assurance package give your verifier everything they need for limited or reasonable assurance."],
+              ['01', 'Tell us about your business', "Answer a few guided questions about your operations, locations, and obligations. ThemisIQ's Wizard does the heavy lifting — no compliance expertise required to get started."],
+              ['02', 'We apply the right methodology', 'ThemisIQ automatically applies the correct frameworks, factors, and calculations for your selected modules — versioned, auditable, and traceable to source.'],
+              ['03', 'Generate every report you need', 'One data set. Every report. Whether it\'s a regulator, an investor, a customer, or a board asking — ThemisIQ generates the right output automatically.'],
+              ['04', 'Stand behind your numbers', 'Every calculation and data point is logged with a full audit trail. Your verifiers, auditors, and regulators get everything they need — without the scramble.'],
             ].map(([num, title, desc]) => (
               <div key={num}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '2.5rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', opacity: 0.5, marginBottom: '0.75rem' }}>{num}</div>
