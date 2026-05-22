@@ -414,17 +414,6 @@ export default function PricingPage() {
           </p>
         </div>
 
-        {/* Interactive prompt */}
-        <div style={s.promptWrap}>
-          <div style={s.promptInner}>
-            <div style={{ ...s.promptDot, animation: 'pulse 2s ease-in-out infinite' }} />
-            <div style={{ flex: 1 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d' }}>This pricing tool is interactive — </span>
-              <span style={{ fontSize: 12, color: '#555553', fontWeight: 300 }}>explore the tiers below, then select the compliance modules your business needs. Your total updates instantly with bundle discounts applied automatically.</span>
-            </div>
-          </div>
-        </div>
-
         {/* Credibility bar */}
         <div style={s.credBar}>
           <div style={s.credItem}>
@@ -456,6 +445,17 @@ export default function PricingPage() {
           <div style={{ fontFamily: 'Georgia, serif', fontSize: 22, fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Simple, honest pricing</div>
           <div style={{ fontSize: 12, color: '#555553', fontWeight: 300 }}>Start with one module. Build your compliance platform as you grow.</div>
           <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6, fontWeight: 300 }}>All prices in USD</div>
+        </div>
+
+        {/* Interactive prompt — sits above tier cards */}
+        <div style={s.promptWrap}>
+          <div style={s.promptInner}>
+            <div style={{ ...s.promptDot, animation: 'pulse 2s ease-in-out infinite' }} />
+            <div style={{ flex: 1 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d' }}>This pricing tool is interactive — </span>
+              <span style={{ fontSize: 12, color: '#555553', fontWeight: 300 }}>click a tier card to select your level, then click any module below to add it to your platform. Your total updates instantly with bundle discounts applied automatically.</span>
+            </div>
+          </div>
         </div>
 
         {/* Tier cards */}
