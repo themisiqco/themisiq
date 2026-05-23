@@ -26,7 +26,7 @@ export default function Page() {
               NIS2, DORA, SEC cyber disclosure, ISO 27001, and NIST CSF — all in one platform. Cyber risk registers, policy management, incident workflows, vendor reviews, and board-level reporting.
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
-              <a href="/dashboard/ghg" style={{ ...btnPrimary, textDecoration: 'none' }}>See your emissions instantly →</a>
+              <a href="/cyber" style={{ ...btnPrimary, textDecoration: 'none' }}>Check your cyber readiness →</a>
               <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Book a demo</a>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
@@ -195,7 +195,7 @@ export default function Page() {
           ThemisIQ's cyber governance gap assessment identifies where you stand against NIS2, DORA, and SEC cyber rules — and tells you exactly what to fix first.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-          <a href="/dashboard/ghg" style={{ fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none', display: 'inline-block' }}>See your emissions instantly →</a>
+          <a href="/dashboard/ghg" style={{ fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none', display: 'inline-block' }}>Check your cyber readiness →</a>
           <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: 'rgba(255,255,255,0.7)', border: '0.5px solid rgba(255,255,255,0.2)', textDecoration: 'none', display: 'inline-block' }}>Talk to a cyber governance advisor</a>
         </div>
       </section>

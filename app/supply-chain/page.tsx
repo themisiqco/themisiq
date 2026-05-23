@@ -19,7 +19,7 @@ export default function Page() {
               Scope 3 Category 1 primary data collection. Supplier sustainability portal. Human rights due diligence. CS3D value chain mapping. EcoVadis programme management. One platform.
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
-              <a href="/dashboard/ghg" style={{ ...btnPrimary, textDecoration: 'none' }}>See your emissions instantly →</a>
+              <a href="/supply-chain" style={{ ...btnPrimary, textDecoration: 'none' }}>Map your supply chain →</a>
               <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Book a demo</a>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
@@ -149,7 +149,7 @@ export default function Page() {
           Supply chain due diligence programmes take 12–18 months to establish properly. The companies starting now will be ready. The ones starting in 2026 won't be.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-          <a href="/dashboard/ghg" style={{ ...btnPrimary, textDecoration: 'none' }}>See your emissions instantly →</a>
+          <a href="/supply-chain" style={{ ...btnPrimary, textDecoration: 'none' }}>Map your supply chain →</a>
           <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to a supply chain advisor</a>
         </div>
       </section>
