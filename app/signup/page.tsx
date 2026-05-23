@@ -68,8 +68,8 @@ export default function SignupPage() {
           {/* HEADER */}
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>Your sustainability compliance platform</div>
-            <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>See your inventory calculate in real time</h1>
-            <p style={{ fontSize: 14, color: '#888784', fontWeight: 300 }}>Get your GHG inventory started today. SB 253 deadline: August 10, 2026.</p>
+            <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Countless compliance requirements. One Intelligent Platform.</h1>
+            <p style={{ fontSize: 14, color: '#888784', fontWeight: 300 }}>Whether your driver is a regulator, a board, an investor, or a customer — ThemisIQ is your sustainability compliance reporting solution.</p>
           </div>
 
           {/* FORM */}
