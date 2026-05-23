@@ -109,7 +109,7 @@ export default function PeopleDashboard() {
   const [dataConfirmed, setDataConfirmed] = useState(false)
   const [activeBand, setActiveBand] = useState(0)
   const fileRef = useRef<HTMLInputElement>(null)
-  const isPaid = false // TODO: wire to Stripe
+  const isPaid = true // TODO: wire to Stripe
 
   const update = (field: keyof PeopleInventory, value: any) =>
     setInventory(prev => ({ ...prev, [field]: value }))

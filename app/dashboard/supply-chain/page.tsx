@@ -151,7 +151,7 @@ const FRAMEWORK_CONFIG: Record<Framework, { label: string; desc: string }> = {
 }
 
 const STEP_NAMES = ['Setup', 'Suppliers', 'Risk Scoring', 'Scope 3', 'Export']
-const isPaid = false
+const isPaid = true
 
 // ─── Component ────────────────────────────────────────────────────────────────
 

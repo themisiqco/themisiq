@@ -139,7 +139,7 @@ const SEVERITY_CONFIG = {
 }
 
 const STEP_NAMES = ['Deal Setup', 'ESG Screening', 'Risk Findings', 'Cost Estimate', 'Export']
-const isPaid = false
+const isPaid = true
 
 // ─── Component ────────────────────────────────────────────────────────────────
 

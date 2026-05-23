@@ -165,7 +165,7 @@ const RISK_CONFIG: Record<RiskLevel, { label: string; color: string; bg: string;
 
 const STEP_NAMES = ['Setup', 'AI Systems', 'Classification', 'Requirements', 'Export']
 const SECTORS = ['Financial services', 'Healthcare', 'Technology', 'Retail & e-commerce', 'Manufacturing', 'Energy & utilities', 'Transport & logistics', 'Education', 'Public sector', 'Professional services', 'Other']
-const isPaid = false
+const isPaid = true
 
 // ─── Component ────────────────────────────────────────────────────────────────
 

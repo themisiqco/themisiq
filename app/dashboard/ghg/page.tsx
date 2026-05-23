@@ -409,7 +409,7 @@ export default function GHGPage() {
   const [showWorkings, setShowWorkings] = useState<Record<string, boolean>>({})
   const [activeExport, setActiveExport] = useState('sb253')
   const [dataConfirmed, setDataConfirmed] = useState(false)
-  const isPaid = false // TODO: wire to Stripe
+  const isPaid = true // TODO: wire to Stripe
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {

@@ -177,7 +177,7 @@ const SEVERITY_CONFIG = {
 }
 
 const STEP_NAMES = ['Setup', 'Physical Risk', 'Transition Risk', 'Scenario Summary', 'Export']
-const isPaid = false
+const isPaid = true
 
 export default function ClimateRiskDashboard() {
   const [step, setStep] = useState(0)
