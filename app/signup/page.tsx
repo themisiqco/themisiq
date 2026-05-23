@@ -42,7 +42,7 @@ export default function SignupPage() {
           <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#E1F5EE', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', fontSize: 24 }}>✓</div>
           <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Check your email</h2>
           <p style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, fontWeight: 300, marginBottom: '1.5rem' }}>
-            We've sent a confirmation link to <strong>{form.email}</strong>. Click the link to activate your account and start your free 14-day trial.
+            We've sent a confirmation link to <strong>{form.email}</strong>. Click the link to activate your account and start your free assessment.
           </p>
           <a href="/login" style={{ fontSize: 13, color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Back to sign in →</a>
         </div>
@@ -67,7 +67,7 @@ export default function SignupPage() {
 
           {/* HEADER */}
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>Free 14-day trial · No credit card required</div>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>Your sustainability compliance platform</div>
             <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>See your inventory calculate in real time</h1>
             <p style={{ fontSize: 14, color: '#888784', fontWeight: 300 }}>Get your GHG inventory started today. SB 253 deadline: August 10, 2026.</p>
           </div>
