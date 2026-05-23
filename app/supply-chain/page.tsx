@@ -10,10 +10,10 @@ export default function Page() {
       <section style={{ padding: '5rem 2.5rem 4rem', borderBottom: '0.5px solid #e8e7e4' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
           <div>
-            <div style={eyebrow}>ThemisIQ Supply Chain</div>
+            <div style={eyebrow}>Supply Chain & Sustainable Procurement</div>
             <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
-              Supply Chain<br />
-              <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Sustainability</span>
+              Supply Chain &
+              <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Scope 3</span>
             </h1>
             <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 300, marginBottom: '2rem', maxWidth: 480 }}>
               Scope 3 Category 1 primary data collection. Supplier sustainability portal. Human rights due diligence. CS3D value chain mapping. EcoVadis programme management. One platform.
@@ -99,9 +99,9 @@ export default function Page() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
           {[
-            { icon: '🌐', title: 'Supplier portal', desc: 'Branded supplier sustainability data collection portal. Suppliers complete structured questionnaires on emissions, labour practices, and environmental performance — no spreadsheets.' },
-            { icon: '📊', title: 'Scope 3 Cat.1 primary data', desc: 'Collect spend data, activity data, and supplier-specific emission factors directly from your supply base. Supports all GHG Protocol Scope 3 Category 1 calculation methods.' },
-            { icon: '⚖️', title: 'Human rights risk mapping', desc: 'Risk-based HRDD across your value chain. Country and sector risk scoring. Supplier prioritisation for deeper assessment. Grievance mechanism management.' },
+            { icon: '', title: 'Supplier portal', desc: 'Branded supplier sustainability data collection portal. Suppliers complete structured questionnaires on emissions, labour practices, and environmental performance — no spreadsheets.' },
+            { icon: '', title: 'Scope 3 Cat.1 primary data', desc: 'Collect spend data, activity data, and supplier-specific emission factors directly from your supply base. Supports all GHG Protocol Scope 3 Category 1 calculation methods.' },
+            { icon: '', title: 'Human rights risk mapping', desc: 'Risk-based HRDD across your value chain. Country and sector risk scoring. Supplier prioritisation for deeper assessment. Grievance mechanism management.' },
             { icon: '🏆', title: 'EcoVadis integration', desc: 'EcoVadis scorecard tracking, improvement plan management, and CDP C12 supplier engagement programme documentation — all in one platform.' },
             { icon: '🔍', title: 'Modern Slavery Act', desc: 'UK and Australia Modern Slavery Act statement preparation. Supply chain mapping, risk identification, and director sign-off workflow. Published to government registry.' },
             { icon: '📋', title: 'ESRS S2 + G1 disclosure', desc: 'ESRS S2 (value chain workers) and G1 (business conduct) disclosure preparation. Supplier due diligence policy documentation and outcomes reporting.' },
@@ -150,7 +150,7 @@ export default function Page() {
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
           <a href="/supply-chain" style={{ ...btnPrimary, textDecoration: 'none' }}>Map your supply chain →</a>
-          <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to a supply chain advisor</a>
+          <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to a ssedialist</a>
         </div>
       </section>
 
@@ -161,7 +161,7 @@ export default function Page() {
           <div style={{ display: 'flex', gap: '1.5rem' }}>
             <a href="/privacy" style={{ fontSize: 12, color: '#555553', textDecoration: 'none' }}>Privacy Policy</a>
             <a href="/terms" style={{ fontSize: 12, color: '#555553', textDecoration: 'none' }}>Terms of Service</a>
-            <a href="/dashboard/ghg" style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Free Assessment →</a>
+            <a href="/assess" style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Free Assessment →</a>
           </div>
         </div>
       </footer>
