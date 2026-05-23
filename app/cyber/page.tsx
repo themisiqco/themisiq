@@ -10,14 +10,14 @@ export default function Page() {
       <div style={{ background: '#B91C1C', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
         <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>NIS2 active since Oct 2024 · DORA active since Jan 2025 · SEC cyber disclosure active since Dec 2023. Are you compliant?</span>
-        <a href="/dashboard/ghg" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>Check your obligations →</a>
+        <a href="/assess" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>Check your obligations →</a>
       </div>
 
       {/* HERO */}
       <section style={{ padding: '5rem 2.5rem 4rem', borderBottom: '0.5px solid #e8e7e4' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
           <div>
-            <div style={eyebrow}>ThemisIQ Cyber Governance</div>
+            <div style={eyebrow}>Cyber Governance</div>
             <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
               Cyber Governance &<br />
               <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Resilience</span>
@@ -27,7 +27,7 @@ export default function Page() {
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
               <a href="/cyber" style={{ ...btnPrimary, textDecoration: 'none' }}>Check your cyber readiness →</a>
-              <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Book a demo</a>
+              <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to a specialist</a>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
               {['NIS2', 'DORA', 'SEC cyber', 'ISO 27001', 'NIST CSF', 'ISO 27001', 'SOC 2', 'NIST 800-53'].map(tag => (
@@ -109,15 +109,15 @@ export default function Page() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
           {[
-            { icon: '🔍', title: 'Cyber risk register', desc: 'Structured cyber risk identification, assessment, and treatment. NIST CSF and ISO 27001 Annex A control mapping. Risk heat maps and board-ready risk summaries.' },
-            { icon: '📋', title: 'Policy management', desc: 'Information security policy library aligned to ISO 27001:2022 and NIS2 Article 21. Version control, review workflows, and staff acknowledgement tracking.' },
-            { icon: '🚨', title: 'Incident response', desc: 'NIS2-compliant incident classification and notification workflow. 24h early warning, 72h full report, and 1-month final report templates. SEC 8-K materiality assessment.' },
-            { icon: '🏢', title: 'Vendor cyber reviews', desc: 'Supplier ICT risk assessment questionnaires, DORA Critical Third-Party Provider (CTPP) register, and ongoing vendor cyber monitoring. NIS2 supply chain security compliance.' },
-            { icon: '🏛️', title: 'Board reporting', desc: 'Cyber risk dashboard for board and audit committee. NIS2 Article 20 personal accountability documentation. SEC 10-K governance disclosure preparation. CISO briefing packs.' },
-            { icon: '🧪', title: 'Resilience testing', desc: 'DORA digital operational resilience testing programme management. TLPT coordination, penetration test tracking, and finding remediation. TIBER-EU framework alignment.' },
-          ].map(({ icon, title, desc }) => (
+            { title: 'Cyber risk register', desc: 'Structured cyber risk identification, assessment, and treatment. NIST CSF and ISO 27001 Annex A control mapping. Risk heat maps and board-ready risk summaries.' },
+            { title: 'Policy management', desc: 'Information security policy library aligned to ISO 27001:2022 and NIS2 Article 21. Version control, review workflows, and staff acknowledgement tracking.' },
+            { title: 'Incident response', desc: 'NIS2-compliant incident classification and notification workflow. 24h early warning, 72h full report, and 1-month final report templates. SEC 8-K materiality assessment.' },
+            { title: 'Vendor cyber reviews', desc: 'Supplier ICT risk assessment questionnaires, DORA Critical Third-Party Provider (CTPP) register, and ongoing vendor cyber monitoring. NIS2 supply chain security compliance.' },
+            { title: 'Board reporting', desc: 'Cyber risk dashboard for board and audit committee. NIS2 Article 20 personal accountability documentation. SEC 10-K governance disclosure preparation. CISO briefing packs.' },
+            { title: 'Resilience testing', desc: 'DORA digital operational resilience testing programme management. TLPT coordination, penetration test tracking, and finding remediation. TIBER-EU framework alignment.' },
+          ].map(({ title, desc }) => (
             <div key={title} style={{ background: '#fff', padding: '2rem' }}>
-              <div style={{ fontSize: 24, marginBottom: 12 }}>{icon}</div>
+              
               <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
               <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 300 }}>{desc}</div>
             </div>
@@ -195,8 +195,8 @@ export default function Page() {
           ThemisIQ's cyber governance gap assessment identifies where you stand against NIS2, DORA, and SEC cyber rules — and tells you exactly what to fix first.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-          <a href="/dashboard/ghg" style={{ fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none', display: 'inline-block' }}>Check your cyber readiness →</a>
-          <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: 'rgba(255,255,255,0.7)', border: '0.5px solid rgba(255,255,255,0.2)', textDecoration: 'none', display: 'inline-block' }}>Talk to a cyber governance advisor</a>
+          <a href="/cyber" style={{ fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none', display: 'inline-block' }}>Check your cyber readiness →</a>
+          <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: 'rgba(255,255,255,0.7)', border: '0.5px solid rgba(255,255,255,0.2)', textDecoration: 'none', display: 'inline-block' }}>Talk to a specialist</a>
         </div>
       </section>
 
@@ -207,7 +207,7 @@ export default function Page() {
           <div style={{ display: 'flex', gap: '1.5rem' }}>
             <a href="/privacy" style={{ fontSize: 12, color: '#555553', textDecoration: 'none' }}>Privacy Policy</a>
             <a href="/terms" style={{ fontSize: 12, color: '#555553', textDecoration: 'none' }}>Terms of Service</a>
-            <a href="/dashboard/ghg" style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Free Assessment →</a>
+            <a href="/assess" style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Free Assessment →</a>
           </div>
         </div>
       </footer>
