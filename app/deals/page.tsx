@@ -10,7 +10,7 @@ export default function Page() {
       <section style={{ padding: '5rem 2.5rem 4rem', borderBottom: '0.5px solid #e8e7e4' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
           <div>
-            <div style={eyebrow}>ThemisIQ Deals & Investment</div>
+            <div style={eyebrow}>Deals & Investment</div>
             <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
               M&A Climate<br />
               <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Diligence</span>
@@ -20,7 +20,7 @@ export default function Page() {
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
               <a href="/deals" style={{ ...btnPrimary, textDecoration: 'none' }}>Assess your M&A exposure →</a>
-              <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to an M&A advisor</a>
+              <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to a specialist</a>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
               {['M&A diligence', 'PE / family office', 'IFRS S2', 'TCFD', 'SB 253', 'LP ESG', 'IC reporting', 'Portfolio monitoring'].map(tag => (
@@ -104,15 +104,15 @@ export default function Page() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
           {[
-            { icon: '🏢', title: 'Private Equity', desc: 'Portfolio company climate baseline, LP ESG reporting, SBTi target setting, value creation through ESG improvement, and exit readiness preparation.' },
-            { icon: '👨‍👩‍👧', title: 'Family Office', desc: 'Direct investment climate risk screening, IFRS S2 physical risk assessment across portfolio, and legacy asset transition planning.' },
-            { icon: '🤝', title: 'Corporate M&A', desc: 'Target company GHG inventory assessment, SB 253 inherited liability quantification, TCFD risk evaluation, and post-merger ESG integration planning.' },
-            { icon: '💼', title: 'Investment Banking', desc: 'Climate diligence for leveraged finance approvals, ESG data for deal marketing materials, and IFRS S2 risk disclosure for listing documents.' },
-            { icon: '🏦', title: 'Venture Capital', desc: 'Portfolio-level Scope 1 + 2 carbon footprint reporting for LPs, climate risk screening for new investments, and ESG readiness for Series B+ rounds.' },
-            { icon: '📋', title: 'IC Reporting', desc: 'Investment committee climate risk memo generation, scenario analysis outputs (1.5°C / 2°C / 3°C), and portfolio benchmark comparison.' },
-          ].map(({ icon, title, desc }) => (
+            { title: 'Private Equity', desc: 'Portfolio company climate baseline, LP ESG reporting, SBTi target setting, value creation through ESG improvement, and exit readiness preparation.' },
+            { title: 'Family Office', desc: 'Direct investment climate risk screening, IFRS S2 physical risk assessment across portfolio, and legacy asset transition planning.' },
+            { title: 'Corporate M&A', desc: 'Target company GHG inventory assessment, SB 253 inherited liability quantification, TCFD risk evaluation, and post-merger ESG integration planning.' },
+            { title: 'Investment Banking', desc: 'Climate diligence for leveraged finance approvals, ESG data for deal marketing materials, and IFRS S2 risk disclosure for listing documents.' },
+            { title: 'Venture Capital', desc: 'Portfolio-level Scope 1 + 2 carbon footprint reporting for LPs, climate risk screening for new investments, and ESG readiness for Series B+ rounds.' },
+            { title: 'IC Reporting', desc: 'Investment committee climate risk memo generation, scenario analysis outputs (1.5°C / 2°C / 3°C), and portfolio benchmark comparison.' },
+          ].map(({ title, desc }) => (
             <div key={title} style={{ background: '#fff', padding: '2rem' }}>
-              <div style={{ fontSize: 24, marginBottom: 12 }}>{icon}</div>
+              
               <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
               <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 300 }}>{desc}</div>
             </div>
@@ -169,7 +169,7 @@ export default function Page() {
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
           <a href="/deals" style={{ ...btnPrimary, textDecoration: 'none' }}>Assess your M&A exposure →</a>
-          <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to an M&A advisor</a>
+          <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to a specialist</a>
         </div>
       </section>
 
@@ -180,7 +180,7 @@ export default function Page() {
           <div style={{ display: 'flex', gap: '1.5rem' }}>
             <a href="/privacy" style={{ fontSize: 12, color: '#555553', textDecoration: 'none' }}>Privacy Policy</a>
             <a href="/terms" style={{ fontSize: 12, color: '#555553', textDecoration: 'none' }}>Terms of Service</a>
-            <a href="/dashboard/ghg" style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Free Assessment →</a>
+            <a href="/assess" style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Free Assessment →</a>
           </div>
         </div>
       </footer>
