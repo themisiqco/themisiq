@@ -46,7 +46,6 @@ export default function Nav() {
             ['/people', 'People'],
             ['/ai-governance', 'AI Governance'],
             ['/cyber', 'Cyber'],
-            ['/advisory', 'Advisory'],
           ].map(([href, label]) => (
             <a key={href} href={href} style={{
               fontSize: 12, color: '#555553', textDecoration: 'none',
@@ -57,17 +56,17 @@ export default function Nav() {
 
         {/* CTA BUTTONS */}
         <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
-          <a href="/dashboard/ghg" style={{
+          <a href="/assess" style={{
             fontSize: 12, fontWeight: 400, padding: '7px 14px', borderRadius: 8,
             background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4',
             textDecoration: 'none', display: 'inline-block', whiteSpace: 'nowrap',
-          }} className="desktop-only">Free Assessment</a>
-          <a href="/dashboard/ghg" style={{
+          }} className="desktop-only">Free Assessment →</a>
+          <a href="/pricing" style={{
             fontSize: 12, fontWeight: 500, padding: '7px 14px', borderRadius: 8,
             background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)',
             color: '#fff', textDecoration: 'none', display: 'inline-block',
             whiteSpace: 'nowrap',
-          }}>See your emissions instantly →</a>
+          }}>Build your platform →</a>
 
           {/* HAMBURGER */}
           <button
@@ -102,7 +101,6 @@ export default function Nav() {
             ['/people', 'People & Workforce', 'ESRS S1 · EU Pay Transparency · CA Pay Data'],
             ['/ai-governance', 'AI Governance', 'EU AI Act · NIST AI RMF · ISO 42001'],
             ['/cyber', 'Cyber Governance', 'NIS2 · DORA · SEC cyber · ISO 27001'],
-            ['/advisory', 'Advisory', 'Expert guidance · Fixed fees · Named advisors'],
             ['/assess', 'Free Assessment →', 'Check which regulations apply to you'],
           ].map(([href, label, sub]) => (
             <a key={href} href={href} onClick={() => setMenuOpen(false)} style={{
@@ -115,12 +113,12 @@ export default function Nav() {
             </a>
           ))}
           <div style={{ marginTop: '1rem' }}>
-            <a href="/dashboard/ghg" style={{
+            <a href="/pricing" style={{
               display: 'block', textAlign: 'center', padding: '13px',
               borderRadius: 8, fontSize: 14, fontWeight: 500,
               background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)',
               color: '#0d0d0d', textDecoration: 'none',
-            }}>See your emissions instantly →</a>
+            }}>Build your platform →</a>
           </div>
           {days > 0 && (
             <div style={{
