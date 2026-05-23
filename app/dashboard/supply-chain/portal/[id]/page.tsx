@@ -48,6 +48,55 @@ export default function CampaignDetail() {
   const [showAdd, setShowAdd] = useState(false)
   const [newSupplier, setNewSupplier] = useState({ supplier_name: '', supplier_email: '', contact_name: '' })
   const [saving, setSaving] = useState(false)
+  const [exporting, setExporting] = useState(false)
+
+  const exportAllResponses = async () => {
+    setExporting(true)
+    const completedSuppliers = suppliers.filter(s => s.status === 'completed')
+    if (completedSuppliers.length === 0) { setExporting(false); return }
+
+    // Fetch all responses for all completed suppliers
+    const allResponses: Record<string, Record<string, string>> = {}
+    for (const s of completedSuppliers) {
+      const { data: resps } = await supabase
+        .from('supplier_responses')
+        .select('*')
+        .eq('campaign_supplier_id', s.id)
+      if (resps) {
+        allResponses[s.id] = {}
+        resps.forEach((r: any) => { allResponses[s.id][r.question_id] = r.response })
+      }
+    }
+
+    // Build CSV — one row per supplier, one column per question
+    const allQuestionIds = [...new Set(Object.values(allResponses).flatMap(r => Object.keys(r)))]
+    const header = ['Supplier', 'Email', 'Contact', 'Status', 'Completed', ...allQuestionIds]
+    const rows = [
+      [`ThemisIQ — Bulk Supplier Response Export`],
+      [`Campaign: ${campaign?.name}`],
+      [`Exported: ${new Date().toLocaleDateString()}`],
+      [`Completed suppliers: ${completedSuppliers.length}`],
+      [],
+      header,
+      ...completedSuppliers.map(s => [
+        s.supplier_name,
+        s.supplier_email,
+        s.contact_name || '',
+        s.status,
+        s.completed_at ? new Date(s.completed_at).toLocaleDateString() : '',
+        ...allQuestionIds.map(qid => allResponses[s.id]?.[qid] || ''),
+      ]),
+    ]
+
+    const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${campaign?.name}_AllResponses_${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    setExporting(false)
+  }
   const [copied, setCopied] = useState<string | null>(null)
 
   useEffect(() => {
@@ -155,6 +204,11 @@ export default function CampaignDetail() {
             <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
               <input ref={fileRef} type="file" accept=".csv" onChange={handleCSVImport} style={{ display: 'none' }} />
               <button onClick={() => fileRef.current?.click()} style={{ fontSize: 12, padding: '8px 14px', borderRadius: 8, background: '#f8f7f5', border: '1px solid #e8e7e4', color: '#555553', cursor: 'pointer' }}>Import CSV</button>
+              {suppliers.filter(s => s.status === 'completed').length > 0 && (
+                <button onClick={exportAllResponses} disabled={exporting} style={{ fontSize: 12, fontWeight: 500, padding: '8px 14px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', cursor: 'pointer', opacity: exporting ? 0.6 : 1 }}>
+                  {exporting ? 'Exporting...' : `⬇ Export all (${suppliers.filter(s => s.status === 'completed').length})`}
+                </button>
+              )}
               <button onClick={() => setShowAdd(true)} style={{ fontSize: 12, fontWeight: 500, padding: '8px 14px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>+ Add supplier</button>
             </div>
           </div>
@@ -244,7 +298,7 @@ export default function CampaignDetail() {
               return (
                 <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', padding: '12px 16px', borderBottom: i < suppliers.length - 1 ? '0.5px solid #e8e7e4' : 'none', alignItems: 'center' }}>
                   <div>
-                    <div onClick={() => s.status === 'completed' && router.push(`/dashboard/supply-chain/portal/${id}/supplier/${s.id}`)} style={{ fontSize: 13, fontWeight: 500, color: s.status === 'completed' ? '#7425e3' : '#0d0d0d', cursor: s.status === 'completed' ? 'pointer' : 'default', textDecoration: s.status === 'completed' ? 'underline' : 'none' }}>{s.supplier_name}{s.status === 'completed' && ' →'}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{s.supplier_name}</div>
                     <div style={{ fontSize: 11, color: '#888784' }}>{s.supplier_email}</div>
                     {s.contact_name && <div style={{ fontSize: 11, color: '#888784' }}>{s.contact_name}</div>}
                   </div>
