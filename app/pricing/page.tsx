@@ -20,7 +20,7 @@ interface Module {
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
 const PRICES: Record<Tier, number> = {
-  starter: 799,
+  starter: 999,
   professional: 2499,
   advisory: 4999,
 }
@@ -470,7 +470,7 @@ export default function PricingPage() {
             )}
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784', marginBottom: 6 }}>Starter</div>
             <div style={{ fontSize: 10, color: '#888784', textDecoration: 'line-through' }}>${FULL_PRICE.toLocaleString()}</div>
-            <div style={{ fontSize: 22, fontWeight: 600, color: '#0d0d0d' }}>$799<span style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
+            <div style={{ fontSize: 22, fontWeight: 600, color: '#0d0d0d' }}>$999<span style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
             <div style={{ fontSize: 9, color: '#92400e', background: '#FEF3E2', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginTop: 4, marginBottom: 14 }}>Early access</div>
             <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: 12, textAlign: 'left' }}>
               <div style={{ fontSize: 10, color: '#888784', marginBottom: 8 }}>{TIER_FEATURES.starter.sub}</div>
@@ -490,7 +490,7 @@ export default function PricingPage() {
               </div>
             )}
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 6 }}>Professional</div>
-            <div style={{ fontSize: 22, fontWeight: 600, color: tier === 'professional' ? '#fff' : '#0d0d0d' }}>$2,499<span style={{ fontSize: 10, color: tier === 'professional' ? 'rgba(255,255,255,0.4)' : '#888784', fontWeight: 400 }}> /module/yr</span></div>
+            <div style={{ fontSize: 22, fontWeight: 600, color: tier === 'professional' ? '#fff' : '#0d0d0d' }}>$2,999<span style={{ fontSize: 10, color: tier === 'professional' ? 'rgba(255,255,255,0.4)' : '#888784', fontWeight: 400 }}> /module/yr</span></div>
             <div style={{ fontSize: 9, color: '#a78bfa', background: 'rgba(116,37,227,0.15)', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginTop: 4, marginBottom: 14 }}>All frameworks</div>
             <div style={{ borderTop: `1px solid ${tier === 'professional' ? 'rgba(255,255,255,0.08)' : '#f3f4f6'}`, paddingTop: 12, textAlign: 'left' }}>
               <div style={{ fontSize: 10, color: tier === 'professional' ? 'rgba(255,255,255,0.4)' : '#888784', marginBottom: 8 }}>{TIER_FEATURES.professional.sub}</div>
@@ -510,7 +510,7 @@ export default function PricingPage() {
               </div>
             )}
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1fb1ff', marginBottom: 6 }}>Advisory</div>
-            <div style={{ fontSize: 22, fontWeight: 600, color: '#0d0d0d' }}>$4,999<span style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
+            <div style={{ fontSize: 22, fontWeight: 600, color: '#0d0d0d' }}>$7,999<span style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
             <div style={{ fontSize: 9, color: '#0C447C', background: '#E6F1FB', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginTop: 4, marginBottom: 14 }}>+ Expert guidance</div>
             <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: 12, textAlign: 'left' }}>
               <div style={{ fontSize: 10, color: '#888784', marginBottom: 8 }}>{TIER_FEATURES.advisory.sub}</div>
@@ -612,7 +612,7 @@ export default function PricingPage() {
           {[
             { label: 'Core', sub: '1 module · full price' },
             { label: 'Growth', sub: '2 modules · 10% off' },
-            { label: 'Platform', sub: '3+ modules · 20% off' },
+            { label: 'Platform', sub: '3+ modules · 15% off' },
           ].map(h => {
             const isActive =
               (h.label === 'Core' && activeBundle === 'core') ||
