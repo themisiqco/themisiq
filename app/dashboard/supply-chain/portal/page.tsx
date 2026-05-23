@@ -13,9 +13,18 @@ interface Campaign {
   status: 'draft' | 'active' | 'closed'
   deadline: string | null
   created_at: string
+  questionnaire_template?: string
   supplier_count?: number
   completed_count?: number
 }
+
+const TEMPLATES = [
+  { id: 'ecovadis', label: 'EcoVadis-style', desc: 'Full 38-question assessment — Environment, Labour, Ethics, Procurement', color: '#7425e3' },
+  { id: 'scope3', label: 'Scope 3 Cat.1', desc: '8 questions on GHG emissions, energy use and reduction targets', color: '#0F6E56' },
+  { id: 'modern_slavery', label: 'Modern Slavery Act', desc: '12 questions on forced labour, child labour and working conditions', color: '#B91C1C' },
+  { id: 'cs3d', label: 'CS3D HRDD', desc: '15 questions on human rights due diligence across the value chain', color: '#0C447C' },
+  { id: 'custom', label: 'Custom questionnaire', desc: 'Define your own questions after creating the campaign', color: '#ba7517' },
+]
 
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
 
@@ -24,7 +33,7 @@ export default function SupplierPortalDashboard() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
   const [showNew, setShowNew] = useState(false)
-  const [newCampaign, setNewCampaign] = useState({ name: '', description: '', reporting_year: 2024, deadline: '' })
+  const [newCampaign, setNewCampaign] = useState({ name: '', description: '', reporting_year: 2024, deadline: '', questionnaire_template: 'ecovadis' })
   const [saving, setSaving] = useState(false)
   const [user, setUser] = useState<any>(null)
 
@@ -63,12 +72,13 @@ export default function SupplierPortalDashboard() {
         description: newCampaign.description,
         reporting_year: newCampaign.reporting_year,
         deadline: newCampaign.deadline || null,
+        questionnaire_template: newCampaign.questionnaire_template,
       }),
     })
     const { data } = await res.json()
     if (data) {
       setShowNew(false)
-      setNewCampaign({ name: '', description: '', reporting_year: 2024, deadline: '' })
+      setNewCampaign({ name: '', description: '', reporting_year: 2024, deadline: '', questionnaire_template: 'ecovadis' })
       router.push(`/dashboard/supply-chain/portal/${data.id}`)
     }
     setSaving(false)
@@ -125,6 +135,20 @@ export default function SupplierPortalDashboard() {
                     <input style={inputStyle} type="date" value={newCampaign.deadline} onChange={e => setNewCampaign(p => ({ ...p, deadline: e.target.value }))} />
                   </div>
                 </div>
+                <div>
+                  <label style={labelStyle}>Questionnaire template</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {TEMPLATES.map(t => (
+                      <div key={t.id} onClick={() => setNewCampaign(p => ({ ...p, questionnaire_template: t.id }))} style={{ border: `1.5px solid ${newCampaign.questionnaire_template === t.id ? t.color : '#e8e7e4'}`, borderRadius: 10, padding: '10px 14px', cursor: 'pointer', background: newCampaign.questionnaire_template === t.id ? t.color + '10' : '#f8f7f5', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${newCampaign.questionnaire_template === t.id ? t.color : '#e8e7e4'}`, background: newCampaign.questionnaire_template === t.id ? t.color : '#fff', flexShrink: 0 }} />
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: newCampaign.questionnaire_template === t.id ? t.color : '#0d0d0d' }}>{t.label}</div>
+                          <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.4 }}>{t.desc}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: '1.5rem', justifyContent: 'flex-end' }}>
                 <button onClick={() => setShowNew(false)} style={{ fontSize: 13, padding: '9px 18px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: 'pointer' }}>Cancel</button>
@@ -160,6 +184,11 @@ export default function SupplierPortalDashboard() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
                         <div style={{ fontSize: 15, fontWeight: 600, color: '#0d0d0d' }}>{c.name}</div>
                         <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: statusBg(c.status), color: statusColor(c.status), textTransform: 'uppercase' }}>{c.status}</span>
+                        {c.questionnaire_template && (
+                          <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#555553' }}>
+                            {TEMPLATES.find(t => t.id === c.questionnaire_template)?.label || c.questionnaire_template}
+                          </span>
+                        )}
                       </div>
                       {c.description && <div style={{ fontSize: 13, color: '#888784' }}>{c.description}</div>}
                     </div>

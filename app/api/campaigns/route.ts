@@ -9,13 +9,13 @@ const getSupabase = () => createClient(
 export async function POST(req: NextRequest) {
   const supabase = getSupabase()
   const body = await req.json()
-  const { name, description, reporting_year, deadline, buyer_id } = body
+  const { name, description, reporting_year, deadline, buyer_id, questionnaire_template } = body
   if (!name || !buyer_id) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
   }
   const { data, error } = await supabase
     .from('supplier_campaigns')
-    .insert({ buyer_id, name, description: description || null, reporting_year, deadline: deadline || null, status: 'active' })
+    .insert({ buyer_id, name, description: description || null, reporting_year, deadline: deadline || null, status: 'active', questionnaire_template: questionnaire_template || 'ecovadis'  })
     .select().single()
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
