@@ -99,6 +99,22 @@ export default function CampaignDetail() {
     })
   }
 
+  const [sending, setSending] = useState<string | null>(null)
+  const [sentStatus, setSentStatus] = useState<Record<string, string>>({})
+
+  const sendInvite = async (s: CampaignSupplier, type: 'invite' | 'reminder') => {
+    setSending(s.id)
+    const res = await fetch('/api/supplier-invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ supplier_id: s.id, type, buyer_company: campaign?.name?.split(' ')[0] || 'ThemisIQ' }),
+    })
+    const data = await res.json()
+    setSending(null)
+    setSentStatus(prev => ({ ...prev, [s.id]: data.success ? (type === 'invite' ? 'invited' : 'reminded') : 'error' }))
+    setTimeout(() => setSentStatus(prev => { const n = { ...prev }; delete n[s.id]; return n }), 3000)
+  }
+
   const copyLink = (token: string) => {
     const url = `${window.location.origin}/supplier/${token}`
     navigator.clipboard.writeText(url)
@@ -217,17 +233,18 @@ export default function CampaignDetail() {
         ) : (
           <div style={{ border: '0.5px solid #e8e7e4', borderRadius: 14, overflow: 'hidden', background: '#fff' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', background: '#f8f7f5', padding: '10px 16px', borderBottom: '0.5px solid #e8e7e4' }}>
-              {['Supplier', 'Status', 'Invited', 'Completed', 'Portal link'].map(h => (
+              {['Supplier', 'Status', 'Invited', 'Completed', 'Actions'].map(h => (
                 <div key={h} style={{ fontSize: 10, fontWeight: 700, color: '#888784', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
               ))}
             </div>
             {suppliers.map((s, i) => {
               const cfg = STATUS_CONFIG[s.status]
-              const portalUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://www.themisiq.co'}/supplier/${s.token}`
+              const isSending = sending === s.id
+              const sent = sentStatus[s.id]
               return (
                 <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', padding: '12px 16px', borderBottom: i < suppliers.length - 1 ? '0.5px solid #e8e7e4' : 'none', alignItems: 'center' }}>
                   <div>
-                    <div onClick={() => s.status === 'completed' && router.push(`/dashboard/supply-chain/portal/${id}/supplier/${s.id}`)} style={{ fontSize: 13, fontWeight: 500, color: s.status === 'completed' ? '#7425e3' : '#0d0d0d', cursor: s.status === 'completed' ? 'pointer' : 'default', textDecoration: s.status === 'completed' ? 'underline' : 'none' }}>{s.supplier_name}{s.status === 'completed' && ' →'}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{s.supplier_name}</div>
                     <div style={{ fontSize: 11, color: '#888784' }}>{s.supplier_email}</div>
                     {s.contact_name && <div style={{ fontSize: 11, color: '#888784' }}>{s.contact_name}</div>}
                   </div>
@@ -238,9 +255,29 @@ export default function CampaignDetail() {
                   <div style={{ fontSize: 11, color: s.completed_at ? '#0F6E56' : '#888784' }}>
                     {s.completed_at ? new Date(s.completed_at).toLocaleDateString() : '—'}
                   </div>
-                  <button onClick={() => copyLink(s.token)} style={{ fontSize: 11, fontWeight: 500, padding: '5px 10px', borderRadius: 6, background: copied === s.token ? '#E1F5EE' : '#f8f7f5', color: copied === s.token ? '#0F6E56' : '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                    {copied === s.token ? '✓ Copied!' : 'Copy link'}
-                  </button>
+                  <div style={{ display: 'flex', gap: 6, flexDirection: 'column', alignItems: 'flex-end' }}>
+                    {sent ? (
+                      <span style={{ fontSize: 10, fontWeight: 600, color: sent === 'error' ? '#B91C1C' : '#0F6E56' }}>
+                        {sent === 'error' ? '✗ Failed' : sent === 'invited' ? '✓ Invite sent!' : '✓ Reminder sent!'}
+                      </span>
+                    ) : (
+                      <>
+                        {s.status !== 'completed' && (
+                          <button onClick={() => sendInvite(s, 'invite')} disabled={isSending} style={{ fontSize: 10, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', opacity: isSending ? 0.5 : 1 }}>
+                            {isSending ? '...' : '✉ Send invite'}
+                          </button>
+                        )}
+                        {s.status === 'in_progress' && (
+                          <button onClick={() => sendInvite(s, 'reminder')} disabled={isSending} style={{ fontSize: 10, fontWeight: 500, padding: '4px 10px', borderRadius: 6, background: '#f8f7f5', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                            ↩ Remind
+                          </button>
+                        )}
+                        <button onClick={() => copyLink(s.token)} style={{ fontSize: 10, fontWeight: 500, padding: '4px 10px', borderRadius: 6, background: copied === s.token ? '#E1F5EE' : '#f8f7f5', color: copied === s.token ? '#0F6E56' : '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                          {copied === s.token ? '✓ Copied!' : 'Copy link'}
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               )
             })}
