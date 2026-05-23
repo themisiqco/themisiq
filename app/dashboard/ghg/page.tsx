@@ -141,6 +141,24 @@ const emptyLocation = (id: string, name: string, state = ''): Location => ({
   source_docs: [],
 })
 
+
+function validateElectricity(kwh: number): string | null {
+  if (kwh > 0 && kwh < 1000) return "u26a0 This seems low for a commercial location u2014 please confirm this is the annual total, not a single month."
+  if (kwh > 50000000) return "u26a0 This is unusually high u2014 please confirm the unit is kWh, not MWh."
+  return null
+}
+function validateNaturalGas(amount: number, unit: string): string | null {
+  if (amount > 0 && unit === "mcf" && amount < 10) return "u26a0 This seems low u2014 please confirm this is the annual total."
+  if (unit === "mcf" && amount > 500000) return "u26a0 This seems high u2014 please double-check your bills."
+  return null
+}
+function validateCompleteness(loc: Location): string[] {
+  const warnings: string[] = []
+  if (loc.electricity_kwh === 0) warnings.push("No electricity entered u2014 most commercial locations use grid electricity.")
+  if (!loc.has_natural_gas && !loc.has_propane && !loc.has_diesel_stationary && !loc.has_mobile) warnings.push("No Scope 1 sources selected u2014 if this location has no on-site fuel use, that is fine.")
+  return warnings
+}
+
 function calcGas(ef: { co2: number; ch4: number; n2o: number }, amount: number, gwpVersion: 'AR4' | 'AR5') {
   const gwp = GWP[gwpVersion]
   return {
@@ -642,6 +660,11 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                   </div>
                   <Field label={`Total natural gas — ${inventory.reporting_year} (${loc.natural_gas_unit})`} hint="Sum of all 12 monthly bills for this location">
                     <input type="number" value={loc.natural_gas_amount || ''} onChange={e => updateLocation(activeLocation, 'natural_gas_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                    {validateNaturalGas(loc.natural_gas_amount, loc.natural_gas_unit) && (
+                      <div style={{ background: "#FEF3E2", border: "0.5px solid #fde68a", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#92400e", marginTop: 6 }}>
+                        {validateNaturalGas(loc.natural_gas_amount, loc.natural_gas_unit)}
+                      </div>
+                    )}
                   </Field>
                   {isPaid ? <DocUpload label="Upload gas bills" locIdx={activeLocation} docType="utility_bill_gas" docs={loc.source_docs.filter(d => d.document_type === 'utility_bill_gas')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} /> : <LockedDocUpload label="Upload gas bills" />}
                 </div>
@@ -729,6 +752,11 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                 <Field label={`Total electricity — ${inventory.reporting_year} (kWh)`} hint="Sum of all 12 monthly bills for this location">
                   <input type="number" value={loc.electricity_kwh || ''} onChange={e => updateLocation(activeLocation, 'electricity_kwh', Number(e.target.value))} placeholder="0" style={inputStyle} />
                 </Field>
+                {validateElectricity(loc.electricity_kwh) && (
+                  <div style={{ background: "#FEF3E2", border: "0.5px solid #fde68a", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#92400e", marginTop: 6 }}>
+                    {validateElectricity(loc.electricity_kwh)}
+                  </div>
+                )}
                 {loc.state
                   ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region auto-detected: <strong>{detectedRegion?.label}</strong> — {detectedRegion?.ef} kg CO₂e/kWh (eGRID 2023)</div>
                   : <Field label="Grid region"><select value={loc.grid_region} onChange={e => updateLocation(activeLocation, 'grid_region', e.target.value)} style={inputStyle}>{GRID_REGIONS.map(r => <option key={r.value} value={r.value}>{r.label} — {r.ef} kg CO₂e/kWh</option>)}</select></Field>
@@ -753,6 +781,9 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                 </div>
               ))}
               <div style={{ marginTop: 10, fontSize: 10, color: 'rgba(255,255,255,0.25)', lineHeight: 1.6 }}>EPA 2024 · IPCC AR4 GWP · eGRID 2023</div>
+              {validateCompleteness(loc).map((w, i) => (
+                <div key={i} style={{ marginTop: 8, background: "rgba(254,243,226,0.1)", border: "0.5px solid rgba(253,230,138,0.3)", borderRadius: 6, padding: "6px 10px", fontSize: 10, color: "#fde68a", lineHeight: 1.5 }}>{w}</div>
+              ))}
             </div>
             <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem' }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>All locations</div>
