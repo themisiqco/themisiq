@@ -1,4 +1,5 @@
 'use client'
+import HomePricing from './components/HomePricing'
 import { useState, useEffect } from 'react'
 import Nav from './components/Nav'
 
@@ -132,113 +133,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ── PRICING ── */}
-      <section style={{ padding: '5rem 2.5rem', background: '#f8f7f5', borderBottom: '0.5px solid #e8e7e4' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-          <p style={eyebrow}>Pricing</p>
-          <h2 style={sectionTitle}>Simple, honest pricing.</h2>
-          <p style={{ ...sectionSub, marginBottom: '0.5rem' }}>
-            Whether your driver is a regulator, a board, an investor, or a customer — ThemisIQ is your sustainability compliance reporting solution.
-          </p>
-          <p style={{ fontSize: 12, color: '#9ca3af', fontWeight: 300, marginBottom: '2.5rem' }}>All prices in USD</p>
-
-          {/* Interactive prompt */}
-          <div style={{ background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', borderRadius: 12, padding: 1, marginBottom: 20 }}>
-            <div style={{ background: '#fff', borderRadius: 11, padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', animation: 'pulse 2s ease-in-out infinite' }} />
-              <div style={{ flex: 1 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>This pricing section is interactive — </span>
-                <span style={{ fontSize: 13, color: '#555553', fontWeight: 300 }}>click a tier card to select your level, then click any module to add it. Your total updates instantly.</span>
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
-
-            {/* Starter */}
-            <div style={{ background: '#fff', border: '1px solid #e8e7e4', borderRadius: 14, padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Starter</div>
-              <div style={{ fontSize: 11, color: '#888784', textDecoration: 'line-through', marginBottom: 2 }}>$1,499</div>
-              <div style={{ fontSize: 28, fontWeight: 600, color: '#0d0d0d', marginBottom: 4 }}>$799<span style={{ fontSize: 11, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
-              <div style={{ fontSize: 9, color: '#92400e', background: '#FEF3E2', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginBottom: 16 }}>Early access</div>
-              <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: 12, flex: 1 }}>
-                <div style={{ fontSize: 11, color: '#888784', marginBottom: 8 }}>Core reports for each module you select</div>
-                {['Core reporting frameworks', 'Assurance-ready workings', 'Audit trail — every entry logged', 'ThemisIQ Wizard — always on'].map(f => (
-                  <div key={f} style={{ display: 'flex', gap: 7, fontSize: 12, color: '#374151', marginBottom: 5 }}>
-                    <span style={{ color: '#0F6E56', flexShrink: 0 }}>✓</span>{f}
-                  </div>
-                ))}
-              </div>
-              <a href="/pricing" style={{ display: 'block', textAlign: 'center', padding: '9px', borderRadius: 8, background: '#f8f7f5', border: '1px solid #e8e7e4', fontSize: 12, fontWeight: 500, color: '#0d0d0d', textDecoration: 'none', marginTop: 16 }}>Get started</a>
-            </div>
-
-            {/* Professional */}
-            <div style={{ background: '#0d0d0d', border: '2px solid #7425e3', borderRadius: 14, padding: '1.5rem', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-              <div style={{ position: 'absolute', top: -11, left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#0d0d0d', padding: '2px 10px', borderRadius: 99, whiteSpace: 'nowrap' }}>Most popular</div>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 8 }}>Professional</div>
-              <div style={{ fontSize: 28, fontWeight: 600, color: '#fff', marginBottom: 4 }}>$2,499<span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}> /module/yr</span></div>
-              <div style={{ fontSize: 9, color: '#a78bfa', background: 'rgba(116,37,227,0.15)', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginBottom: 16 }}>All frameworks</div>
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 12, flex: 1 }}>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>All frameworks for your selected modules</div>
-                {['Everything in Starter', 'All reporting frameworks', 'Multi-entity · 10 entities · 10 users', 'Verifier & third-party access role', 'Regulatory monitor — weekly alerts'].map((f, i) => (
-                  <div key={f} style={{ display: 'flex', gap: 7, fontSize: 12, color: i === 0 ? 'rgba(255,255,255,0.45)' : '#fff', marginBottom: 5 }}>
-                    <span style={{ color: '#64fe3e', flexShrink: 0 }}>✓</span>{f}
-                  </div>
-                ))}
-              </div>
-              <a href="/pricing" style={{ display: 'block', textAlign: 'center', padding: '9px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', fontSize: 12, fontWeight: 600, color: '#0d0d0d', textDecoration: 'none', marginTop: 16 }}>Get started</a>
-            </div>
-
-            {/* Advisory */}
-            <div style={{ background: '#fff', border: '1px solid #1fb1ff', borderRadius: 14, padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1fb1ff', marginBottom: 8 }}>Advisory</div>
-              <div style={{ fontSize: 28, fontWeight: 600, color: '#0d0d0d', marginBottom: 4 }}>$4,999<span style={{ fontSize: 11, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
-              <div style={{ fontSize: 9, color: '#0C447C', background: '#E6F1FB', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginBottom: 16 }}>+ Expert guidance</div>
-              <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: 12, flex: 1 }}>
-                <div style={{ fontSize: 11, color: '#888784', marginBottom: 8 }}>Platform + dedicated expert guidance</div>
-                {['Everything in Professional', 'Onboarding session', 'Guided inventory review', 'Sector-specific guidance', 'Board-ready narrative'].map(f => (
-                  <div key={f} style={{ display: 'flex', gap: 7, fontSize: 12, color: '#374151', marginBottom: 5 }}>
-                    <span style={{ color: '#1fb1ff', flexShrink: 0 }}>✓</span>{f}
-                  </div>
-                ))}
-              </div>
-              <a href="/advisory" style={{ display: 'block', textAlign: 'center', padding: '9px', borderRadius: 8, background: '#0d0d0d', fontSize: 12, fontWeight: 500, color: '#fff', textDecoration: 'none', marginTop: 16 }}>Talk to us</a>
-            </div>
-
-          </div>
-
-          {/* Module pills */}
-          <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem 1.25rem', marginBottom: 12 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784', marginBottom: 10 }}>Available compliance modules</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {[
-                { label: 'Climate — GHG Inventory · Scope 1 & 2', href: '/climate-ghg' },
-                { label: 'Climate Risk', href: '/dashboard/ghg' },
-                { label: 'Supply Chain & Scope 3', href: '/supply-chain' },
-                { label: 'People & Workforce', href: '/people' },
-                { label: 'Deals & Investment', href: '/deals' },
-                { label: 'AI Governance', href: '/ai-governance' },
-                { label: 'Cyber Governance', href: '/cyber' },
-              ].map(m => (
-                <a key={m.label} href={m.href} style={{ fontSize: 11, fontWeight: 500, color: '#0d0d0d', background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 8, padding: '6px 10px', textDecoration: 'none' }}>{m.label}</a>
-              ))}
-            </div>
-          </div>
-
-          {/* Bundle hint + strong CTA */}
-          <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 500, color: '#fff', marginBottom: 3 }}>Platform Bundle savings</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', fontWeight: 300 }}>2 modules = 10% off · 3+ modules = 20% off · applied automatically</div>
-            </div>
-            <a href="/pricing" style={{ whiteSpace: 'nowrap', padding: '11px 22px', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#0d0d0d', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', textDecoration: 'none' }}>
-              Build your compliance platform →
-            </a>
-          </div>
-
-        </div>
-      </section>
-
+      <HomePricing />
       {/* ── CTA ── */}
       <section style={{ padding: '6rem 2.5rem', textAlign: 'center', borderTop: '0.5px solid #e8e7e4' }}>
         <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
