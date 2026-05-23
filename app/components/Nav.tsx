@@ -41,6 +41,7 @@ export default function Nav() {
         }} className="desktop-nav">
           {[
             ['/climate-ghg', 'Climate · GHG'],
+            ['/dashboard/ghg', 'Climate Risk'],
             ['/supply-chain', 'Supply Chain'],
             ['/deals', 'Deals'],
             ['/people', 'People'],
@@ -96,6 +97,7 @@ export default function Nav() {
         }}>
           {[
             ['/climate-ghg', 'Climate · GHG', 'SB 253 · CDP · ESRS E1 · GHG Protocol'],
+            ['/dashboard/ghg', 'Climate Risk', 'SB 261 · TCFD · IFRS S2 · scenario analysis'],
             ['/supply-chain', 'Supply Chain', 'Scope 3 Cat.1 · EcoVadis · CS3D · ESRS S2'],
             ['/deals', 'Deals & Investment', 'M&A diligence · PE · IFRS S2 · LP ESG'],
             ['/people', 'People & Workforce', 'ESRS S1 · EU Pay Transparency · CA Pay Data'],
