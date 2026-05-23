@@ -1,7 +1,15 @@
 'use client'
+import { useState, useEffect } from 'react'
 import Nav from '../components/Nav'
 
 export default function Page() {
+  const [daysLeft, setDaysLeft] = useState(71)
+  useEffect(() => {
+    const deadline = new Date('2026-08-02')
+    const today = new Date()
+    const diff = Math.ceil((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    setDaysLeft(Math.max(0, diff))
+  }, [])
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d' }}>
       <Nav />
@@ -9,15 +17,15 @@ export default function Page() {
       {/* URGENCY BANNER */}
       <div style={{ background: '#7425e3', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff', flexShrink: 0 }} />
-        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>EU AI Act high-risk AI deadline: August 2, 2026 — 77 days. HR, hiring, and credit AI systems require full conformity assessment.</span>
-        <a href="/dashboard/ghg" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>Check if EU AI Act applies to you →</a>
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>EU AI Act high-risk AI deadline: August 2, 2026 — {daysLeft} days. HR, hiring, and credit AI systems require full conformity assessment.</span>
+        <a href="/assess" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>Check if EU AI Act applies to you →</a>
       </div>
 
       {/* HERO */}
       <section style={{ padding: '5rem 2.5rem 4rem', borderBottom: '0.5px solid #e8e7e4' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
           <div>
-            <div style={eyebrow}>ThemisIQ AI Governance</div>
+            <div style={eyebrow}>AI Governance</div>
             <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
               AI Governance &<br />
               <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Risk Management</span>
@@ -27,7 +35,7 @@ export default function Page() {
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
               <a href="/ai-governance" style={{ ...btnPrimary, textDecoration: 'none' }}>Start your AI inventory →</a>
-              <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Book a demo</a>
+              <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to a specialist</a>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
               {['EU AI Act', 'NIST AI RMF', 'ISO 42001', 'Model risk', 'SR 11-7', 'GDPR Art. 22', 'Bill C-27 AIDA', 'Board AI oversight'].map(tag => (
@@ -39,7 +47,7 @@ export default function Page() {
           {/* STAT CARDS */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {[
-              { val: '77', unit: 'days', label: 'to EU AI Act high-risk AI deadline — August 2, 2026', color: '#B91C1C', bg: '#FCEBEB' },
+              { val: String(daysLeft), unit: 'days', label: 'to EU AI Act high-risk AI deadline — August 2, 2026', color: '#B91C1C', bg: '#FCEBEB' },
               { val: 'Annex III', unit: 'high-risk', label: 'HR, hiring, credit, education AI — full conformity assessment required', color: '#7425e3', bg: '#EDE9FE' },
               { val: '€35M', unit: 'or 7%', label: 'maximum EU AI Act fine for prohibited AI practices', color: '#ba7517', bg: '#FEF3E2' },
               { val: 'Feb 2025', unit: 'active', label: 'prohibited AI practices already banned — manipulation, social scoring, real-time biometrics', color: '#0F6E56', bg: '#E1F5EE' },
@@ -60,7 +68,7 @@ export default function Page() {
           <div>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>EU AI Act — Regulation (EU) 2024/1689</div>
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
-              77 days to the high-risk<br />AI deadline.
+              {daysLeft} days to the high-risk<br />AI deadline.
             </h2>
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
               If your company uses AI for HR decisions, hiring, credit scoring, or education in the EU, you are in scope for the EU AI Act Annex III high-risk provisions. Full conformity assessment, Article 11 technical documentation, transparency notices, and EU database registration are required by August 2, 2026.
@@ -111,15 +119,15 @@ export default function Page() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
           {[
-            { icon: '🗂️', title: 'AI system inventory', desc: 'Comprehensive register of all AI systems across your organisation. Purpose, data inputs, outputs, affected individuals, and deployment context — all documented and version-controlled.' },
-            { icon: '⚖️', title: 'Risk classification', desc: 'Automated EU AI Act risk classification (prohibited, high-risk Annex III, limited risk, minimal risk) with justification documentation. Updated as regulation evolves.' },
-            { icon: '📋', title: 'Technical documentation', desc: 'Article 11 technical documentation generation for high-risk AI systems. System description, training data, accuracy metrics, robustness testing, and human oversight measures.' },
-            { icon: '🎯', title: 'NIST AI RMF alignment', desc: 'Map, Measure, Manage, Govern — ThemisIQ structures your AI risk management programme around the NIST AI Risk Management Framework and tracks maturity over time.' },
-            { icon: '🏛️', title: 'Board AI governance', desc: 'Board-level AI oversight documentation, AI ethics policy management, accountability framework, and executive AI risk reporting — designed for directors, not just technologists.' },
-            { icon: '✅', title: 'Conformity assessment', desc: 'Step-by-step conformity assessment workflow for high-risk AI systems. Evidence collection, gap identification, remediation tracking, and EU database registration preparation.' },
-          ].map(({ icon, title, desc }) => (
+            { title: 'AI system inventory', desc: 'Comprehensive register of all AI systems across your organisation. Purpose, data inputs, outputs, affected individuals, and deployment context — all documented and version-controlled.' },
+            { title: 'Risk classification', desc: 'Automated EU AI Act risk classification (prohibited, high-risk Annex III, limited risk, minimal risk) with justification documentation. Updated as regulation evolves.' },
+            { title: 'Technical documentation', desc: 'Article 11 technical documentation generation for high-risk AI systems. System description, training data, accuracy metrics, robustness testing, and human oversight measures.' },
+            { title: 'NIST AI RMF alignment', desc: 'Map, Measure, Manage, Govern — ThemisIQ structures your AI risk management programme around the NIST AI Risk Management Framework and tracks maturity over time.' },
+            { title: 'Board AI governance', desc: 'Board-level AI oversight documentation, AI ethics policy management, accountability framework, and executive AI risk reporting — designed for directors, not just technologists.' },
+            { title: 'Conformity assessment', desc: 'Step-by-step conformity assessment workflow for high-risk AI systems. Evidence collection, gap identification, remediation tracking, and EU database registration preparation.' },
+          ].map(({ title, desc }) => (
             <div key={title} style={{ background: '#fff', padding: '2rem' }}>
-              <div style={{ fontSize: 24, marginBottom: 12 }}>{icon}</div>
+              
               <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
               <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 300 }}>{desc}</div>
             </div>
@@ -172,7 +180,7 @@ export default function Page() {
           {[
             { date: 'Feb 2, 2025', status: 'Active', label: 'Prohibited AI', desc: 'Manipulation, social scoring, real-time biometric surveillance in public spaces, and emotion recognition in workplaces banned. Non-compliance: fines up to €35M or 7% global revenue.', color: '#B91C1C', bg: '#FCEBEB' },
             { date: 'May 2, 2025', status: 'Active', label: 'GPAI obligations', desc: 'General Purpose AI models (GPT-4-class and above) subject to transparency, copyright, and systemic risk provisions. GPAI providers must publish technical documentation.', color: '#ba7517', bg: '#FEF3E2' },
-            { date: 'Aug 2, 2026', status: '77 days', label: 'High-risk AI (Annex III)', desc: 'HR, hiring, credit, education, essential services AI — full conformity assessment, Article 11 documentation, EU database registration required. Fines up to €15M or 3% global revenue.', color: '#7425e3', bg: '#EDE9FE' },
+            { date: 'Aug 2, 2026', status: `${daysLeft} days`, label: 'High-risk AI (Annex III)', desc: 'HR, hiring, credit, education, essential services AI — full conformity assessment, Article 11 documentation, EU database registration required. Fines up to €15M or 3% global revenue.', color: '#7425e3', bg: '#EDE9FE' },
             { date: 'Aug 2, 2027', status: 'Prepare now', label: 'High-risk AI (Annex II)', desc: 'AI embedded in regulated products (medical devices, machinery, vehicles) subject to full Annex III obligations. CE marking integration required.', color: '#0C447C', bg: '#E6F1FB' },
           ].map(({ date, status, label, desc, color, bg }) => (
             <div key={date} style={{ background: '#fff', padding: '2rem', borderTop: `4px solid ${color}` }}>
@@ -188,15 +196,15 @@ export default function Page() {
       {/* CTA */}
       <section style={{ background: '#0d0d0d', padding: '6rem 2.5rem', textAlign: 'center' }}>
         <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2, color: '#fff' }}>
-          77 days to the EU AI Act deadline.<br />
+          {daysLeft} days to the EU AI Act deadline.<br />
           <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Start your inventory today.</span>
         </h2>
         <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
           The first step is knowing what AI systems you have and whether they're high-risk. ThemisIQ's AI inventory wizard walks you through every system in days — not months.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-          <a href="/dashboard/ghg" style={{ fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none', display: 'inline-block' }}>Start your AI inventory →</a>
-          <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: 'rgba(255,255,255,0.7)', border: '0.5px solid rgba(255,255,255,0.2)', textDecoration: 'none', display: 'inline-block' }}>Talk to an AI governance advisor</a>
+          <a href="/ai-governance" style={{ fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none', display: 'inline-block' }}>Start your AI inventory →</a>
+          <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: 'rgba(255,255,255,0.7)', border: '0.5px solid rgba(255,255,255,0.2)', textDecoration: 'none', display: 'inline-block' }}>Talk to a specialist</a>
         </div>
       </section>
 
@@ -207,7 +215,7 @@ export default function Page() {
           <div style={{ display: 'flex', gap: '1.5rem' }}>
             <a href="/privacy" style={{ fontSize: 12, color: '#555553', textDecoration: 'none' }}>Privacy Policy</a>
             <a href="/terms" style={{ fontSize: 12, color: '#555553', textDecoration: 'none' }}>Terms of Service</a>
-            <a href="/dashboard/ghg" style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Free Assessment →</a>
+            <a href="/assess" style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Free Assessment →</a>
           </div>
         </div>
       </footer>
