@@ -227,7 +227,7 @@ export default function CampaignDetail() {
               return (
                 <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', padding: '12px 16px', borderBottom: i < suppliers.length - 1 ? '0.5px solid #e8e7e4' : 'none', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{s.supplier_name}</div>
+                    <div onClick={() => s.status === 'completed' && router.push(`/dashboard/supply-chain/portal/${id}/supplier/${s.id}`)} style={{ fontSize: 13, fontWeight: 500, color: s.status === 'completed' ? '#7425e3' : '#0d0d0d', cursor: s.status === 'completed' ? 'pointer' : 'default', textDecoration: s.status === 'completed' ? 'underline' : 'none' }}>{s.supplier_name}{s.status === 'completed' && ' →'}</div>
                     <div style={{ fontSize: 11, color: '#888784' }}>{s.supplier_email}</div>
                     {s.contact_name && <div style={{ fontSize: 11, color: '#888784' }}>{s.contact_name}</div>}
                   </div>
