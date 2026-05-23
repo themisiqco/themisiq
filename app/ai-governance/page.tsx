@@ -34,7 +34,7 @@ export default function Page() {
               EU AI Act compliance. AI risk register. Model inventory. Board-level AI oversight documentation. NIST AI RMF alignment. ISO 42001 readiness. One platform for your entire AI governance programme.
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
-              <a href="/ai-governance" style={{ ...btnPrimary, textDecoration: 'none' }}>Start your AI inventory →</a>
+              <a href="/dashboard/ai-governance" style={{ ...btnPrimary, textDecoration: 'none' }}>Start your AI inventory →</a>
               <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to a specialist</a>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
