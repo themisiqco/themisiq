@@ -204,7 +204,7 @@ export default function PricingPage() {
   const unitPrice = PRICES[tier]
   const count = selected.size
   const gross = count * unitPrice
-  const discount = count >= 3 ? 0.20 : count >= 2 ? 0.10 : 0
+  const discount = count >= 3 ? 0.15 : count >= 2 ? 0.10 : 0
   const net = Math.round(gross * (1 - discount))
 
   const toggleModule = (id: ModuleId) => {
