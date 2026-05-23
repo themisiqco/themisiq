@@ -9,7 +9,7 @@ export default function Page() {
       {/* URGENCY BANNER */}
       <div style={{ background: '#ba7517', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>EU Pay Transparency Directive — member state transposition deadline: June 2026. Gender pay gap reporting mandatory for 100+ EU employees.</span>
-        <a href="/assess" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>Check if this applies to you →</a>
+        <a href="/dashboard/people" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>Check if this applies to you →</a>
       </div>
 
       {/* HERO */}
@@ -340,7 +340,7 @@ export default function Page() {
           <div style={{ display: 'flex', gap: '1.5rem' }}>
             <a href="/privacy" style={{ fontSize: 12, color: '#555553', textDecoration: 'none' }}>Privacy Policy</a>
             <a href="/terms" style={{ fontSize: 12, color: '#555553', textDecoration: 'none' }}>Terms of Service</a>
-            <a href="/assess" style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Free Assessment →</a>
+            <a href="/dashboard/people" style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Free Assessment →</a>
           </div>
         </div>
       </footer>

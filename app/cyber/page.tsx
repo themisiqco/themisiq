@@ -26,7 +26,7 @@ export default function Page() {
               NIS2, DORA, SEC cyber disclosure, ISO 27001, and NIST CSF — all in one platform. Cyber risk registers, policy management, incident workflows, vendor reviews, and board-level reporting.
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
-              <a href="/cyber" style={{ ...btnPrimary, textDecoration: 'none' }}>Check your cyber readiness →</a>
+              <a href="/dashboard/cyber" style={{ ...btnPrimary, textDecoration: 'none' }}>Check your cyber readiness →</a>
               <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to a specialist</a>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
