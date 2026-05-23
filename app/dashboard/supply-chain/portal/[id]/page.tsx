@@ -1,0 +1,257 @@
+'use client'
+
+import { useState, useEffect, useRef } from 'react'
+import { useRouter, useParams } from 'next/navigation'
+import Nav from '../../../../components/Nav'
+import { supabase } from '../../../../../lib/supabase'
+import Papa from 'papaparse'
+
+interface CampaignSupplier {
+  id: string
+  supplier_name: string
+  supplier_email: string
+  contact_name: string | null
+  token: string
+  status: 'invited' | 'in_progress' | 'completed' | 'expired'
+  invited_at: string
+  completed_at: string | null
+  reminder_sent_at: string | null
+}
+
+interface Campaign {
+  id: string
+  name: string
+  description: string
+  reporting_year: number
+  status: string
+  deadline: string | null
+}
+
+const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+
+const STATUS_CONFIG = {
+  invited:     { label: 'Invited', color: '#0C447C', bg: '#E6F1FB' },
+  in_progress: { label: 'In progress', color: '#ba7517', bg: '#FEF3E2' },
+  completed:   { label: 'Completed', color: '#0F6E56', bg: '#E1F5EE' },
+  expired:     { label: 'Expired', color: '#888784', bg: '#f8f7f5' },
+}
+
+export default function CampaignDetail() {
+  const router = useRouter()
+  const params = useParams()
+  const id = params.id as string
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const [campaign, setCampaign] = useState<Campaign | null>(null)
+  const [suppliers, setSuppliers] = useState<CampaignSupplier[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showAdd, setShowAdd] = useState(false)
+  const [newSupplier, setNewSupplier] = useState({ supplier_name: '', supplier_email: '', contact_name: '' })
+  const [saving, setSaving] = useState(false)
+  const [copied, setCopied] = useState<string | null>(null)
+
+  useEffect(() => {
+    loadCampaign()
+  }, [id])
+
+  const loadCampaign = async () => {
+    setLoading(true)
+    const { data: camp } = await supabase.from('supplier_campaigns').select('*').eq('id', id).single()
+    const { data: sups } = await supabase.from('campaign_suppliers').select('*').eq('campaign_id', id).order('invited_at', { ascending: false })
+    if (camp) setCampaign(camp)
+    if (sups) setSuppliers(sups)
+    setLoading(false)
+  }
+
+  const addSupplier = async () => {
+    if (!newSupplier.supplier_name || !newSupplier.supplier_email) return
+    setSaving(true)
+    await supabase.from('campaign_suppliers').insert({
+      campaign_id: id,
+      supplier_name: newSupplier.supplier_name,
+      supplier_email: newSupplier.supplier_email,
+      contact_name: newSupplier.contact_name || null,
+      status: 'invited',
+    })
+    setNewSupplier({ supplier_name: '', supplier_email: '', contact_name: '' })
+    setShowAdd(false)
+    setSaving(false)
+    loadCampaign()
+  }
+
+  const handleCSVImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    Papa.parse(file, {
+      header: true, skipEmptyLines: true,
+      complete: async (results) => {
+        const rows = results.data as any[]
+        for (const row of rows) {
+          const name = row['Supplier'] || row['supplier'] || row['Name'] || row['name'] || ''
+          const email = row['Email'] || row['email'] || ''
+          const contact = row['Contact'] || row['contact'] || ''
+          if (name && email) {
+            await supabase.from('campaign_suppliers').insert({ campaign_id: id, supplier_name: name, supplier_email: email, contact_name: contact || null, status: 'invited' })
+          }
+        }
+        loadCampaign()
+      },
+    })
+  }
+
+  const copyLink = (token: string) => {
+    const url = `${window.location.origin}/supplier/${token}`
+    navigator.clipboard.writeText(url)
+    setCopied(token)
+    setTimeout(() => setCopied(null), 2000)
+  }
+
+  const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
+  const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
+
+  const completed = suppliers.filter(s => s.status === 'completed').length
+  const inProgress = suppliers.filter(s => s.status === 'in_progress').length
+  const invited = suppliers.filter(s => s.status === 'invited').length
+  const pct = suppliers.length ? Math.round((completed / suppliers.length) * 100) : 0
+
+  if (loading) return (
+    <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
+      <Nav />
+      <div style={{ textAlign: 'center', padding: '4rem', color: '#888784' }}>Loading...</div>
+    </div>
+  )
+
+  return (
+    <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
+      <Nav />
+
+      {/* Header */}
+      <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
+        <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <button onClick={() => router.push('/dashboard/supply-chain/portal')} style={{ fontSize: 12, color: '#888784', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>← All campaigns</button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+            <div>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{campaign?.name}</div>
+              {campaign?.description && <div style={{ fontSize: 13, color: '#888784' }}>{campaign.description}</div>}
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+              <input ref={fileRef} type="file" accept=".csv" onChange={handleCSVImport} style={{ display: 'none' }} />
+              <button onClick={() => fileRef.current?.click()} style={{ fontSize: 12, padding: '8px 14px', borderRadius: 8, background: '#f8f7f5', border: '1px solid #e8e7e4', color: '#555553', cursor: 'pointer' }}>Import CSV</button>
+              <button onClick={() => setShowAdd(true)} style={{ fontSize: 12, fontWeight: 500, padding: '8px 14px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>+ Add supplier</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '2rem 2.5rem' }}>
+
+        {/* Stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
+          {[
+            { label: 'Total invited', val: suppliers.length, color: '#0d0d0d', bg: '#fff' },
+            { label: 'Completed', val: completed, color: '#0F6E56', bg: '#E1F5EE' },
+            { label: 'In progress', val: inProgress, color: '#ba7517', bg: '#FEF3E2' },
+            { label: 'Awaiting response', val: invited, color: '#0C447C', bg: '#E6F1FB' },
+          ].map(({ label, val, color, bg }) => (
+            <div key={label} style={{ background: bg, border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem', textAlign: 'center' }}>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', fontWeight: 400, color }}>{val}</div>
+              <div style={{ fontSize: 11, color: '#888784', marginTop: 4 }}>{label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Progress bar */}
+        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem 1.25rem', marginBottom: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>Completion rate</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: pct === 100 ? '#0F6E56' : '#0d0d0d' }}>{pct}%</div>
+          </div>
+          <div style={{ height: 6, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? '#0F6E56' : GRAD, borderRadius: 99, transition: 'width 0.3s' }} />
+          </div>
+          {campaign?.deadline && (
+            <div style={{ fontSize: 11, color: '#888784', marginTop: 8 }}>Deadline: {new Date(campaign.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+          )}
+        </div>
+
+        {/* Add supplier modal */}
+        {showAdd && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+            <div style={{ background: '#fff', borderRadius: 16, padding: '2rem', width: '100%', maxWidth: 420 }}>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, color: '#0d0d0d', marginBottom: '1.25rem' }}>Add supplier</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Company name</label>
+                  <input style={inputStyle} value={newSupplier.supplier_name} onChange={e => setNewSupplier(p => ({ ...p, supplier_name: e.target.value }))} placeholder="Supplier company name" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Email address</label>
+                  <input style={inputStyle} type="email" value={newSupplier.supplier_email} onChange={e => setNewSupplier(p => ({ ...p, supplier_email: e.target.value }))} placeholder="contact@supplier.com" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Contact name (optional)</label>
+                  <input style={inputStyle} value={newSupplier.contact_name} onChange={e => setNewSupplier(p => ({ ...p, contact_name: e.target.value }))} placeholder="First and last name" />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: '1.25rem', justifyContent: 'flex-end' }}>
+                <button onClick={() => setShowAdd(false)} style={{ fontSize: 13, padding: '9px 18px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: 'pointer' }}>Cancel</button>
+                <button onClick={addSupplier} disabled={saving || !newSupplier.supplier_name || !newSupplier.supplier_email} style={{ fontSize: 13, fontWeight: 500, padding: '9px 18px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer', opacity: saving || !newSupplier.supplier_name || !newSupplier.supplier_email ? 0.5 : 1 }}>
+                  {saving ? 'Adding...' : 'Add supplier'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Supplier list */}
+        {suppliers.length === 0 ? (
+          <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '3rem', textAlign: 'center' }}>
+            <div style={{ fontSize: 14, color: '#888784', marginBottom: 16 }}>No suppliers added yet</div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+              <button onClick={() => fileRef.current?.click()} style={{ fontSize: 12, padding: '9px 18px', borderRadius: 8, background: '#f8f7f5', border: '1px solid #e8e7e4', color: '#555553', cursor: 'pointer' }}>Import from CSV</button>
+              <button onClick={() => setShowAdd(true)} style={{ fontSize: 12, fontWeight: 500, padding: '9px 18px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>+ Add manually</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ border: '0.5px solid #e8e7e4', borderRadius: 14, overflow: 'hidden', background: '#fff' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', background: '#f8f7f5', padding: '10px 16px', borderBottom: '0.5px solid #e8e7e4' }}>
+              {['Supplier', 'Status', 'Invited', 'Completed', 'Portal link'].map(h => (
+                <div key={h} style={{ fontSize: 10, fontWeight: 700, color: '#888784', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
+              ))}
+            </div>
+            {suppliers.map((s, i) => {
+              const cfg = STATUS_CONFIG[s.status]
+              const portalUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://www.themisiq.co'}/supplier/${s.token}`
+              return (
+                <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', padding: '12px 16px', borderBottom: i < suppliers.length - 1 ? '0.5px solid #e8e7e4' : 'none', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{s.supplier_name}</div>
+                    <div style={{ fontSize: 11, color: '#888784' }}>{s.supplier_email}</div>
+                    {s.contact_name && <div style={{ fontSize: 11, color: '#888784' }}>{s.contact_name}</div>}
+                  </div>
+                  <div>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#888784' }}>{new Date(s.invited_at).toLocaleDateString()}</div>
+                  <div style={{ fontSize: 11, color: s.completed_at ? '#0F6E56' : '#888784' }}>
+                    {s.completed_at ? new Date(s.completed_at).toLocaleDateString() : '—'}
+                  </div>
+                  <button onClick={() => copyLink(s.token)} style={{ fontSize: 11, fontWeight: 500, padding: '5px 10px', borderRadius: 6, background: copied === s.token ? '#E1F5EE' : '#f8f7f5', color: copied === s.token ? '#0F6E56' : '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    {copied === s.token ? '✓ Copied!' : 'Copy link'}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* CSV template */}
+        <div style={{ marginTop: 16, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '0.75rem 1rem', fontSize: 12, color: '#888784' }}>
+          CSV import format: <code style={{ background: '#fff', padding: '1px 6px', borderRadius: 4 }}>Supplier, Email, Contact</code>
+        </div>
+      </div>
+    </div>
+  )
+}
