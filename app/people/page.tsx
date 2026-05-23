@@ -77,8 +77,8 @@ export default function Page() {
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
           <div>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>EU Pay Transparency Directive (2023/970)</div>
-            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
-              Do you know your gender<br />pay gap by job band?
+            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.5rem, 2.5vw, 2rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
+              Do you know your gender pay gap?
             </h2>
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
               Most companies don't. The EU Pay Transparency Directive requires employers with 100+ EU employees to report their gender pay gap annually (250+ employees) or every 3 years (100–249 employees). A gap exceeding 5% in any job band triggers a mandatory joint pay assessment with worker representatives.
@@ -130,15 +130,15 @@ export default function Page() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
           {[
-            { icon: '⚖️', title: 'Gender pay gap analysis', desc: 'Mean and median pay gap calculation by job band, level, and function. Automated identification of bands exceeding the 5% EU Pay Transparency threshold. Remediation tracking.' },
-            { icon: '👥', title: 'DEI metrics', desc: 'Workforce composition by gender, ethnicity, age, disability, and seniority. Representation tracking against targets. Board and senior management diversity reporting.' },
-            { icon: '🏥', title: 'Health & safety', desc: 'LTIFR, TRIR, near-miss tracking, and fatality reporting. ISO 45001 alignment. ESRS S1-14 health and safety outcome disclosure preparation.' },
-            { icon: '📚', title: 'Training & development', desc: 'Training hours per employee, investment per FTE, skills gap tracking, and development programme effectiveness. GRI 404 and ESRS S1-13 disclosure preparation.' },
-            { icon: '🤝', title: 'Labour relations', desc: 'Collective bargaining coverage, works council engagement, freedom of association policy management. ESRS S1-4 documentation and GRI 402–407 reporting.' },
-            { icon: '📊', title: 'Multi-framework export', desc: 'One workforce data set exports to ESRS S1, GRI 401–410, SEC Item 101, California Pay Data DFEH submission, SASB, and CDP human capital sections.' },
-          ].map(({ icon, title, desc }) => (
+            { title: 'Gender pay gap analysis', desc: 'Mean and median pay gap calculation by job band, level, and function. Automated identification of bands exceeding the 5% EU Pay Transparency threshold. Remediation tracking.' },
+            { title: 'DEI metrics', desc: 'Workforce composition by gender, ethnicity, age, disability, and seniority. Representation tracking against targets. Board and senior management diversity reporting.' },
+            { title: 'Health & safety', desc: 'LTIFR, TRIR, near-miss tracking, and fatality reporting. ISO 45001 alignment. ESRS S1-14 health and safety outcome disclosure preparation.' },
+            { title: 'Training & development', desc: 'Training hours per employee, investment per FTE, skills gap tracking, and development programme effectiveness. GRI 404 and ESRS S1-13 disclosure preparation.' },
+            { title: 'Labour relations', desc: 'Collective bargaining coverage, works council engagement, freedom of association policy management. ESRS S1-4 documentation and GRI 402–407 reporting.' },
+            { title: 'Multi-framework export', desc: 'One workforce data set exports to ESRS S1, GRI 401–410, SEC Item 101, California Pay Data DFEH submission, SASB, and CDP human capital sections.' },
+          ].map(({ title, desc }) => (
             <div key={title} style={{ background: '#fff', padding: '2rem' }}>
-              <div style={{ fontSize: 24, marginBottom: 12 }}>{icon}</div>
+              
               <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
               <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 300 }}>{desc}</div>
             </div>
@@ -180,7 +180,7 @@ export default function Page() {
 
       {/* CTA */}
       <section style={{ padding: '6rem 2.5rem', textAlign: 'center' }}>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
+        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
           Do you know your gender pay gap<br />
           <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>by job band?</span>
         </h2>
