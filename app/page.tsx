@@ -133,6 +133,39 @@ export default function Home() {
         </div>
       </div>
 
+      {/* ── Starter Packs ── */}
+      <section style={{ padding: '5rem 2.5rem', background: '#f8f7f5', borderTop: '0.5px solid #e8e7e4' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>Not sure where to start?</div>
+            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Built for who's asking.</h2>
+            <p style={{ fontSize: 15, color: '#555553', maxWidth: 520, margin: '0 auto', fontWeight: 300 }}>Whether it's a customer, your bank, your board or your investor — we've bundled exactly what you need.</p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+            {[
+              { name: 'Supplier Readiness', driver: 'A customer is asking', price: '$1,999', color: '#0F6E56', bg: '#E1F5EE', href: '/pricing', items: ['GHG Inventory', 'Supply Chain risk register', 'Supplier questionnaire'] },
+              { name: 'Climate Readiness', driver: 'Your bank is asking', price: '$1,999', color: '#0C447C', bg: '#E6F1FB', href: '/pricing', items: ['GHG Inventory', 'Climate Risk assessment', 'TCFD / IFRS S2 output'] },
+              { name: 'ESG Foundation', driver: 'Your board wants it', price: '$2,999', color: '#7425e3', bg: '#EDE9FE', href: '/pricing', items: ['GHG Inventory', 'People & Workforce', 'Climate Risk'] },
+              { name: 'Investor ESG', driver: 'Your investor requires it', price: '$3,999', color: '#B91C1C', bg: '#FCEBEB', href: '/pricing', items: ['GHG Inventory', 'Climate Risk', 'Supply Chain', 'Deals & Investment'] },
+            ].map(pack => (
+              <a key={pack.name} href={pack.href} style={{ background: '#fff', border: `1.5px solid ${pack.color}25`, borderRadius: 14, padding: '1.5rem', textDecoration: 'none', display: 'block', transition: 'all 0.15s' }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = pack.color}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = pack.color + '25'}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: pack.color, marginBottom: 6 }}>{pack.driver}</div>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{pack.name}</div>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, color: pack.color, marginBottom: 12 }}>{pack.price}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'inherit' }}>/yr</span></div>
+                {pack.items.map(item => (
+                  <div key={item} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                    <span style={{ color: pack.color, flexShrink: 0, fontSize: 12 }}>✓</span>
+                    <span style={{ fontSize: 12, color: '#555553' }}>{item}</span>
+                  </div>
+                ))}
+                <div style={{ marginTop: 16, fontSize: 12, fontWeight: 600, color: pack.color }}>See details →</div>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
       <HomePricing />
       {/* ── CTA ── */}
       <section style={{ padding: '6rem 2.5rem', textAlign: 'center', borderTop: '0.5px solid #e8e7e4' }}>
