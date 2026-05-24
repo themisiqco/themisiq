@@ -67,21 +67,16 @@ export default function Home() {
         ))}
       </div>
 
-      {/* ── TRUST BAR ── */}
-      <div style={{ background: '#0d0d0d', padding: '1rem 2.5rem' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3rem', flexWrap: 'wrap' as const }}>
-          {[
-            'Encrypted in transit and at rest',
-            'We never sell or share your data',
-            'Canadian-incorporated · PIPEDA compliant',
-            'Your data is never used to train AI models',
-            'SOC 2 aligned data handling',
-          ].map(text => (
-            <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#64fe3e', flexShrink: 0 }} />
-              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap' as const }}>{text}</span>
-            </div>
-          ))}
+     {/* ── TRUST BAR ── */}
+      <div style={{ background: '#0d0d0d', padding: '1.5rem 2.5rem', textAlign: 'center' as const }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          <p style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1rem, 2vw, 1.3rem)', fontWeight: 400, color: '#fff', marginBottom: '1rem', lineHeight: 1.5 }}>
+            We know trust is everything. At ThemisIQ, you can trust our methodologies and how we handle your data.
+          </p>
+          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' as const }}>
+            <a href="/methodology" style={{ fontSize: 13, fontWeight: 500, padding: '8px 20px', borderRadius: 8, border: '0.5px solid rgba(255,255,255,0.3)', color: '#fff', textDecoration: 'none', background: 'none' }}>Our methodologies →</a>
+            <a href="/trust" style={{ fontSize: 13, fontWeight: 500, padding: '8px 20px', borderRadius: 8, border: '0.5px solid rgba(255,255,255,0.3)', color: '#fff', textDecoration: 'none', background: 'none' }}>How we handle your data →</a>
+          </div>
         </div>
       </div>
       {/* ── FRAMEWORKS ── */}
