@@ -1,7 +1,14 @@
 'use client'
 import Nav from '../components/Nav'
-
+import { useState, useEffect } from 'react'
 export default function Page() {
+  const [daysLeft, setDaysLeft] = useState(83)
+  useEffect(() => {
+    const deadline = new Date('2026-08-10')
+    const today = new Date()
+    const diff = Math.ceil((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    setDaysLeft(Math.max(0, diff))
+  }, [])
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d' }}>
       <Nav />
@@ -9,7 +16,7 @@ export default function Page() {
       {/* URGENCY BANNER */}
       <div style={{ background: '#B91C1C', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff', animation: 'pulse 1.5s infinite' }} />
-        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>SB 253 first-year deadline: August 10, 2026 —  83 days away. Scope 1 + 2 disclosure required.</span>
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>SB 253 first-year deadline: August 10, 2026 —  {daysLeft} days away. Scope 1 + 2 disclosure required.</span>
         <a href="/dashboard/ghg" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>Check if SB 253 applies to you →</a>
       </div>
 
@@ -60,7 +67,7 @@ export default function Page() {
           <div>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>SB 253 — California</div>
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
-              August 10 is  83 days away.<br />Are you ready?
+              August 10 is  {daysLeft} days away.<br />Are you ready?
             </h2>
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
               SB 253 requires California-nexus companies with global revenue over $1B to disclose Scope 1 and 2 emissions by August 10, 2026. ThemisIQ can have your inventory complete and the CARB template pre-filled in days — not months.
