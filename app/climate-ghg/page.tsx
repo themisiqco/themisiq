@@ -82,7 +82,7 @@ export default function Page() {
           <div style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: '2rem' }}>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 12 }}>SB 253 timeline</div>
             {[
-              { date: 'Aug 10, 2026', event: 'Scope 1 + 2 first disclosure', status: 'critical', days: ' 83 days' },
+              { date: 'Aug 10, 2026', event: 'Scope 1 + 2 first disclosure', status: 'critical', days: `${daysLeft} days` },
               { date: '2027', event: 'Scope 3 disclosure begins', status: 'upcoming', days: '~1 year' },
               { date: '2027+', event: 'Limited assurance required (Scope 1 + 2)', status: 'upcoming', days: 'Plan now' },
               { date: '2030+', event: 'Reasonable assurance (Scope 1 + 2)', status: 'future', days: 'Build toward' },
@@ -193,7 +193,7 @@ export default function Page() {
       {/* CTA */}
       <section style={{ padding: '6rem 2.5rem', textAlign: 'center' }}>
         <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
-           83 days to SB 253.<br />
+           {daysLeft} days to SB 253.<br />
           <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Start today.</span>
         </h2>
         <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
