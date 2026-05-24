@@ -80,28 +80,7 @@ export default function Home() {
         </div>
       </div>
 
- {/* ── WHO IT'S FOR ── */}
-      <section style={{ padding: '3rem 2.5rem', borderTop: '0.5px solid #e8e7e4', borderBottom: '0.5px solid #e8e7e4', background: '#f8f7f5' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', alignItems: 'center', gap: '3rem', flexWrap: 'wrap' as const }}>
-          <div style={{ flexShrink: 0 }}>
-            <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 6 }}>Getting asked about ESG?</p>
-            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', maxWidth: 220, lineHeight: 1.3 }}>Someone is asking. We have the answer.</h2>
-          </div>
-          <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-            {[
-              { who: 'A customer is asking', pack: 'Supplier Readiness', color: '#0F6E56', href: '/pricing' },
-              { who: 'Your bank is asking', pack: 'Climate Readiness', color: '#0C447C', href: '/pricing' },
-              { who: 'Your board wants it', pack: 'ESG Foundation', color: '#7425e3', href: '/pricing' },
-              { who: 'Your investor requires it', pack: 'Investor ESG', color: '#B91C1C', href: '/pricing' },
-            ].map(card => (
-              <a key={card.who} href={card.href} style={{ background: '#fff', border: `1px solid ${card.color}25`, borderRadius: 10, padding: '1rem', textDecoration: 'none', display: 'block' }}>
-                <div style={{ fontSize: 11, color: '#888784', marginBottom: 4 }}>{card.who}</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: card.color }}>{card.pack} Pack →</div>
-              </a>
-            ))}
-          </div>
-        </div>
-      </section>
+ {/*  </section>
       {/* ── PRODUCTS ── */}
       <section style={{ padding: '5rem 2.5rem', maxWidth: 1100, margin: '0 auto' }}>
         <p style={eyebrow}>The ThemisIQ platform</p>
