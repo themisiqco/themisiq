@@ -626,6 +626,21 @@ export default function PricingPage() {
             )
           })}
         </div>
+<div style={{ background: '#0d0d0d', borderRadius: 16, padding: '2.5rem', marginBottom: '3rem' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '2rem', flexWrap: 'wrap' as const }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#0F6E56', marginBottom: 8 }}>Standalone product</div>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#fff', marginBottom: 8 }}>Supplier Portal</div>
+              <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, marginBottom: 16, maxWidth: 520 }}>Send branded sustainability questionnaires to your entire supply chain. Track completion, view responses, export data. Replaces EcoVadis supplier outreach at a fraction of the cost.</div>
+            </div>
+            <div style={{ textAlign: 'center', flexShrink: 0 }}>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '3rem', fontWeight: 400, color: '#fff', lineHeight: 1 }}>$3,999</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>per year · USD</div>
+              <div style={{ fontSize: 11, color: '#0F6E56', marginBottom: 20 }}>vs $15,000–$50,000 for EcoVadis</div>
+              <a href="/dashboard/supply-chain/portal" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: '#0F6E56', color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Try the portal →</a>
+            </div>
+          </div>
+        </div>
 
         {/* Dynamic closing CTA */}
         <div style={s.ctaWrap}>
