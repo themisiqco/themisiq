@@ -3,6 +3,7 @@
 import { useState } from 'react'
 
 interface Answers {
+  driver?: string 
   revenue?: number
   employees?: string
   jurisdictions?: string[]
@@ -99,9 +100,11 @@ export default function AssessPage() {
   const critical = obligations.filter(o => o.urgency === 'critical').length
   const high = obligations.filter(o => o.urgency === 'high').length
 
-  const pct = Math.round((step / 9) * 100)
+  const pct = Math.round((step / 10) * 100)
 
   const questions = [
+    { id: 'driver' as keyof Answers, title: "What's driving your ESG focus right now?", sub: 'This helps us identify the right starting point.', type: 'options', options: [{ value: 'regulatory', label: 'A regulation applies to us', sub: 'SB 253, CSRD, EU AI Act, NIS2 — mandatory compliance' }, { value: 'customer', label: 'A customer is asking us', sub: 'Supplier questionnaire, EcoVadis, procurement requirement' }, { value: 'investor', label: 'Our investor requires it', sub: 'LP ESG reporting, portfolio climate disclosure' }, { value: 'bank', label: 'Our bank or insurer is asking', sub: 'Sustainability-linked loan, climate risk questionnaire' }, { value: 'board', label: 'Our board wants it', sub: 'Governance, talent, reputation, proactive ESG' }, { value: 'ahead', label: 'We want to get ahead', sub: 'Proactive compliance before mandatory deadlines' }] },
+
     { id: 'revenue' as keyof Answers, title: "What is your company's global annual revenue?", sub: 'Determines eligibility for SB 253 ($1B), SB 261 ($500M), ESRS/CSRD, and Modern Slavery Act thresholds.', type: 'slider' },
     { id: 'employees' as keyof Answers, title: 'How many employees does your company have globally?', sub: 'Determines CSRD/ESRS scope, EU Pay Transparency, and California Pay Data Reporting thresholds.', type: 'options', options: [{ value: 'under50', label: 'Under 50', sub: 'Small organisation' }, { value: '50_249', label: '50–249', sub: 'NIS2 important entity threshold' }, { value: '250_499', label: '250–499', sub: 'ESRS mid-size · EU Pay Transparency (every 3 years)' }, { value: '500_999', label: '500–999', sub: 'ESRS large entity · EU Pay Transparency annual' }, { value: '1000_4999', label: '1,000–4,999', sub: 'Full ESRS scope · EU AI Act · NIS2 essential entity' }, { value: '5000plus', label: '5,000+', sub: 'All obligations apply · SEC human capital disclosure' }] },
     { id: 'jurisdictions' as keyof Answers, title: 'Where does your company operate or have revenue?', sub: 'Select all that apply. Each jurisdiction triggers different mandatory disclosure obligations.', type: 'multiselect', options: [{ value: 'california', label: '🇺🇸 California, USA', sub: 'SB 253, SB 261, CA Pay Data' }, { value: 'us_other', label: '🇺🇸 United States (other)', sub: 'SEC rules, NIST, Model Risk' }, { value: 'eu', label: '🇪🇺 European Union', sub: 'CSRD, ESRS, NIS2, DORA, EU AI Act' }, { value: 'uk', label: '🇬🇧 United Kingdom', sub: 'TCFD mandatory, Modern Slavery Act' }, { value: 'australia', label: '🇦🇺 Australia', sub: 'Modern Slavery Act, AASB S2' }, { value: 'canada', label: '🇨🇦 Canada', sub: 'IFRS S2 adoption, federal modern slavery' }, { value: 'apac', label: '🌏 Asia Pacific (other)', sub: 'Singapore, Japan, Hong Kong TCFD' }, { value: 'global', label: '🌐 Global / multiple regions', sub: 'CDP, GRI, SBTi, UNGP' }] },
@@ -212,7 +215,7 @@ export default function AssessPage() {
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '1.5rem', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#0d0d0d', color: '#fff', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{step + 1}</div>
-            <div style={{ fontSize: 11, color: '#888784' }}>Question {step + 1} of 7</div>
+            <div style={{ fontSize: 11, color: '#888784' }}>Question {step + 1} of 8</div>
           </div>
           <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.35rem', fontWeight: 400, lineHeight: 1.25, marginBottom: 6, color: '#0d0d0d' }}>{q.title}</h2>
           <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '1.25rem' }}>{q.sub}</p>
