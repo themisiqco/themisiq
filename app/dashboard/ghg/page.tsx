@@ -73,7 +73,7 @@ const FRAMEWORKS = [
     intensity_denominator: 'revenue',
   },
   {
-    id: 'esrs', name: 'ESRS E1', full: 'ESRS E1 — EU CSRD', color: '#7425e3', bg: '#EDE9FE',
+    id: 'esrs', name: 'ESRS E1', full: 'ESRS E1 — EU CSRD (Scope 3 mandatory)', color: '#7425e3', bg: '#EDE9FE',
     gwp: 'AR5', deadline: 'FY2024 (large EU companies)',
     desc: 'Full ESRS E1 disclosure — location AND market-based Scope 2, biogenic, by gas',
     requires: ['market_based_s2', 'renewable_energy_kwh', 'biogenic_co2'],
