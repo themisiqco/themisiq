@@ -853,7 +853,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     return (
       <div>
         <h2 style={sectionHead}>Review, results & calculation workings</h2>
-        <p style={sectionSub}>Your complete GHG inventory for {inventory.company_name || 'your company'}, {inventory.reporting_year}.</p>
+<p style={sectionSub}>{inventory.selected_frameworks.includes('esrs') || inventory.selected_frameworks.includes('gri') ? `Your Scope 1 & 2 inventory for ${inventory.company_name || 'your company'}, ${inventory.reporting_year}. Scope 3 required — complete it after export.` : `Your complete GHG inventory for ${inventory.company_name || 'your company'}, ${inventory.reporting_year}.`}</p>
         <div style={{ position: 'relative' }}>
           {!isPaid && <PaywallOverlay frameworks={activeFrameworks.map(f => f.name)} />}
           <div style={{ filter: isPaid ? 'none' : 'blur(4px)', pointerEvents: isPaid ? 'auto' : 'none' }}>
