@@ -17,7 +17,7 @@ export default function Page() {
       {/* URGENCY BANNER */}
       <div style={{ background: '#7425e3', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff', flexShrink: 0 }} />
-        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>EU AI Act high-risk AI deadline: August 2, 2026 — {daysLeft} days. HR, hiring, and credit AI systems require full conformity assessment.</span>
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>EU AI Act high-risk AI deadline: August 2, 2026. A proposed delay is under discussion — but it is not yet law. Prepare now.</span>
         <a href="/dashboard/ai-governance" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>Check if EU AI Act applies to you →</a>
       </div>
 
@@ -47,7 +47,7 @@ export default function Page() {
           {/* STAT CARDS */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {[
-              { val: String(daysLeft), unit: 'days', label: 'to EU AI Act high-risk AI deadline — August 2, 2026', color: '#B91C1C', bg: '#FCEBEB' },
+              { val: 'Aug 2', unit: '2026', label: 'Current operative deadline for high-risk AI obligations — still binding law', color: '#B91C1C', bg: '#FCEBEB' },
               { val: 'Annex III', unit: 'high-risk', label: 'HR, hiring, credit, education AI — full conformity assessment required', color: '#7425e3', bg: '#EDE9FE' },
               { val: '€35M', unit: 'or 7%', label: 'maximum EU AI Act fine for prohibited AI practices', color: '#ba7517', bg: '#FEF3E2' },
               { val: 'Feb 2025', unit: 'active', label: 'prohibited AI practices already banned — manipulation, social scoring, real-time biometrics', color: '#0F6E56', bg: '#E1F5EE' },
@@ -68,10 +68,10 @@ export default function Page() {
           <div>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>EU AI Act — Regulation (EU) 2024/1689</div>
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
-              {daysLeft} days to the high-risk<br />AI deadline.
+              The August 2, 2026<br />deadline is still law.
             </h2>
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
-              If your company uses AI for HR decisions, hiring, credit scoring, or education in the EU, you are in scope for the EU AI Act Annex III high-risk provisions. Full conformity assessment, Article 11 technical documentation, transparency notices, and EU database registration are required by August 2, 2026.
+              If your company uses AI for HR decisions, hiring, credit scoring, or education in the EU, you are in scope for the EU AI Act Annex III high-risk provisions. The operative deadline remains August 2, 2026. A proposed amendment (the AI Act Omnibus, political agreement reached May 2026) would defer some obligations — but it is not yet enacted law. The prudent position: prepare for August 2, 2026 and treat any deferral as a bonus, not a plan.
             </p>
             {[
               'AI system inventory and Annex III risk classification',
