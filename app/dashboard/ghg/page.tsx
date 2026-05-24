@@ -946,13 +946,54 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     return (
       <div>
         <h2 style={sectionHead}>Export your reports</h2>
-        <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.2)', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#0F6E56', marginBottom: 4 }}>Ready to calculate your Scope 3 emissions?</div>
-            <div style={{ fontSize: 12, color: '#555553' }}>This wizard covers Scope 1 & 2. Use the Scope 3 Complete Calculator for all 15 categories — GHG Protocol aligned.</div>
-          </div>
-          <a href="/dashboard/scope3" style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, background: '#0F6E56', color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap' }}>Calculate Scope 3 →</a>
-        </div>
+        {(() => {
+          const fw = inventory.selected_frameworks
+          const year = inventory.reporting_year
+          const needsScope3Now = fw.includes('esrs') || fw.includes('csrd') || fw.includes('gri')
+          const scope3Encouraged = fw.includes('cdp') || fw.includes('ecovadis')
+          const sb253Only = fw.includes('sb253') && fw.length === 1
+          const sb253FirstYear = sb253Only && year <= 2024
+
+          if (needsScope3Now) return (
+            <div style={{ background: '#FCEBEB', border: '0.5px solid rgba(185,28,28,0.2)', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#B91C1C', marginBottom: 4 }}>⚠ Scope 3 required for your selected frameworks</div>
+                <div style={{ fontSize: 12, color: '#555553' }}>CSRD ESRS E1-6 and GRI 305-3 require Scope 3 disclosure. Complete your Scope 3 inventory before finalising your report.</div>
+              </div>
+              <a href="/dashboard/scope3" style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, background: '#B91C1C', color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>Complete Scope 3 →</a>
+            </div>
+          )
+
+          if (sb253FirstYear) return (
+            <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.2)', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#0C447C', marginBottom: 4 }}>SB 253 — Scope 3 not required for your first reporting year</div>
+                <div style={{ fontSize: 12, color: '#555553' }}>Scope 3 becomes mandatory from FY2025 data (due 2026). Start your inventory now to get ahead of the deadline.</div>
+              </div>
+              <a href="/dashboard/scope3" style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, background: '#0C447C', color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>Start Scope 3 inventory →</a>
+            </div>
+          )
+
+          if (scope3Encouraged) return (
+            <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 4 }}>Scope 3 will improve your CDP/EcoVadis score</div>
+                <div style={{ fontSize: 12, color: '#555553' }}>CDP and EcoVadis score Scope 3 disclosure. Cat.1 (purchased goods) and Cat.6 (business travel) are the highest-impact categories to start with.</div>
+              </div>
+              <a href="/dashboard/scope3" style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, background: '#ba7517', color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>Calculate Scope 3 →</a>
+            </div>
+          )
+
+          return (
+            <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.2)', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#0F6E56', marginBottom: 4 }}>Ready to calculate your Scope 3 emissions?</div>
+                <div style={{ fontSize: 12, color: '#555553' }}>This wizard covers Scope 1 & 2. Use the Scope 3 Complete Calculator for all 15 categories — GHG Protocol aligned.</div>
+              </div>
+              <a href="/dashboard/scope3" style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, background: '#0F6E56', color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>Calculate Scope 3 →</a>
+            </div>
+          )
+        })()}
         <p style={sectionSub}>One inventory — {activeFrameworks.length} report{activeFrameworks.length > 1 ? 's' : ''}. Unlock your paid plan to download.</p>
         <div style={{ position: 'relative' }}>
           {!isPaid && <PaywallOverlay frameworks={activeFrameworks.map(f => f.name)} />}
