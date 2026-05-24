@@ -626,19 +626,83 @@ export default function PricingPage() {
             )
           })}
         </div>
-<div style={{ background: '#0d0d0d', borderRadius: 16, padding: '2.5rem', marginBottom: '3rem' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '2rem', flexWrap: 'wrap' as const }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#0F6E56', marginBottom: 8 }}>Standalone product</div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#fff', marginBottom: 8 }}>Supplier Portal</div>
-              <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, marginBottom: 16, maxWidth: 520 }}>Send branded sustainability questionnaires to your entire supply chain. Track completion, view responses, export data. Replaces EcoVadis supplier outreach at a fraction of the cost.</div>
-            </div>
-            <div style={{ textAlign: 'center', flexShrink: 0 }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '3rem', fontWeight: 400, color: '#fff', lineHeight: 1 }}>$3,999</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>per year · USD</div>
-              <div style={{ fontSize: 11, color: '#0F6E56', marginBottom: 20 }}>vs $15,000–$50,000 for EcoVadis</div>
-              <a href="/dashboard/supply-chain/portal" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: '#0F6E56', color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Try the portal →</a>
-            </div>
+        {/* Starter Packs */}
+        <div style={{ marginBottom: '3rem' }}>
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>Not sure where to start?</div>
+            <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Starter packs — built for who's asking</div>
+            <div style={{ fontSize: 14, color: '#888784', maxWidth: 540, margin: '0 auto' }}>Whether it's a customer, your bank, your board or your investor — we've bundled exactly what you need to respond with confidence.</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+            {[
+              {
+                name: 'Supplier Readiness Pack',
+                driver: 'A customer is asking you',
+                price: '$1,999',
+                color: '#0F6E56',
+                bg: '#E1F5EE',
+                modules: ['GHG Inventory — Scope 1 & 2', 'Supply Chain risk register', 'Supplier questionnaire template'],
+                pitch: 'Your customer sent you a sustainability questionnaire. This gets you ready to respond — and keeps you ready for the next one.',
+                cta: '/dashboard/ghg',
+                ctaLabel: 'Start now →',
+              },
+              {
+                name: 'Climate Readiness Pack',
+                driver: 'Your bank or insurer is asking',
+                price: '$1,999',
+                color: '#0C447C',
+                bg: '#E6F1FB',
+                modules: ['GHG Inventory — Scope 1 & 2', 'Climate Risk — physical & transition', 'TCFD / IFRS S2 aligned output'],
+                pitch: 'Your bank wants your climate data. This gives you your emissions baseline and climate risk exposure — the two things they always ask for.',
+                cta: '/dashboard/ghg',
+                ctaLabel: 'Start now →',
+              },
+              {
+                name: 'ESG Foundation Pack',
+                driver: 'Your board wants it',
+                price: '$2,999',
+                color: '#7425e3',
+                bg: '#EDE9FE',
+                modules: ['GHG Inventory — Scope 1 & 2', 'People & Workforce — pay gap & safety', 'Climate Risk — physical & transition'],
+                pitch: 'The three things every board asks about — emissions, people, and climate risk. One platform, one annual price.',
+                cta: '/pricing',
+                ctaLabel: 'Build your pack →',
+              },
+              {
+                name: 'Investor ESG Pack',
+                driver: 'Your investor or PE firm requires it',
+                price: '$3,999',
+                color: '#B91C1C',
+                bg: '#FCEBEB',
+                modules: ['GHG Inventory — Scope 1 & 2', 'Climate Risk — scenario analysis', 'Supply Chain risk register', 'Deals & Investment — ESG diligence'],
+                pitch: 'Everything your PE firm or LP will ask for in their annual ESG questionnaire — in one platform.',
+                cta: '/pricing',
+                ctaLabel: 'Build your pack →',
+              },
+            ].map(pack => (
+              <div key={pack.name} style={{ border: `1.5px solid ${pack.color}30`, borderRadius: 16, overflow: 'hidden', background: '#fff' }}>
+                <div style={{ background: pack.bg, padding: '1.25rem 1.5rem', borderBottom: `1px solid ${pack.color}20` }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: pack.color, marginBottom: 4 }}>{pack.driver}</div>
+                  <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 2 }}>{pack.name}</div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                    <span style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', fontWeight: 400, color: pack.color }}>{pack.price}</span>
+                    <span style={{ fontSize: 12, color: '#888784' }}>/yr · USD</span>
+                  </div>
+                </div>
+                <div style={{ padding: '1.25rem 1.5rem' }}>
+                  <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, marginBottom: 16 }}>{pack.pitch}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8, marginBottom: 16 }}>
+                    {pack.modules.map(m => (
+                      <div key={m} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                        <span style={{ color: pack.color, flexShrink: 0, marginTop: 1 }}>✓</span>
+                        <span style={{ fontSize: 13, color: '#374151' }}>{m}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <a href={pack.cta} style={{ display: 'inline-block', padding: '9px 20px', borderRadius: 8, background: pack.color, color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>{pack.ctaLabel}</a>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
