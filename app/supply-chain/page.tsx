@@ -13,10 +13,10 @@ export default function Page() {
             <div style={eyebrow}>Supply Chain & Sustainable Procurement</div>
             <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
               Supply Chain &
-              <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Scope 3</span>
+              <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Sustainable Procurement</span>
             </h1>
             <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 300, marginBottom: '2rem', maxWidth: 480 }}>
-              Scope 3 Category 1 primary data collection. Supplier sustainability portal. Human rights due diligence. CS3D value chain mapping. EcoVadis programme management. One platform.
+             Know your supply chain risks. Collect sustainability data from suppliers. Meet CS3D, EcoVadis, Modern Slavery and ESRS S2 obligations — without spreadsheets or consultants.
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
               <a href="/dashboard/supply-chain" style={{ ...btnPrimary, textDecoration: 'none' }}>Map your supply chain →</a>
@@ -34,8 +34,8 @@ export default function Page() {
             {[
               { val: '70%', unit: 'of emissions', label: 'typically in Scope 3 Cat.1 for manufacturers', color: '#7425e3', bg: '#EDE9FE' },
               { val: 'CS3D', unit: '2027', label: 'EU supply chain due diligence — civil liability for failures', color: '#B91C1C', bg: '#FCEBEB' },
-              { val: 'Tier 1+', unit: 'visibility', label: 'primary data collection beyond tier 1 suppliers', color: '#0F6E56', bg: '#E1F5EE' },
-              { val: '1', unit: 'portal', label: 'supplier sustainability data collection — no spreadsheets', color: '#0C447C', bg: '#E6F1FB' },
+              { val: '5+', unit: 'frameworks', label: 'CS3D · EcoVadis · Modern Slavery · CDP C12 · ESRS S2 — one platform', color: '#0F6E56', bg: '#E1F5EE' },
+              { val: '$3,999', unit: 'portal/yr', label: 'vs $15,000–$50,000 for EcoVadis supplier outreach — same outcome', color: '#0C447C', bg: '#E6F1FB' },
             ].map(({ val, unit, label, color, bg }) => (
               <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid ${color}22` }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
