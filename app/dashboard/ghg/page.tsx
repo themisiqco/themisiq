@@ -946,6 +946,13 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     return (
       <div>
         <h2 style={sectionHead}>Export your reports</h2>
+        <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.2)', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#0F6E56', marginBottom: 4 }}>Ready to calculate your Scope 3 emissions?</div>
+            <div style={{ fontSize: 12, color: '#555553' }}>This wizard covers Scope 1 & 2. Use the Scope 3 Complete Calculator for all 15 categories — GHG Protocol aligned.</div>
+          </div>
+          <a href="/dashboard/scope3" style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, background: '#0F6E56', color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap' }}>Calculate Scope 3 →</a>
+        </div>
         <p style={sectionSub}>One inventory — {activeFrameworks.length} report{activeFrameworks.length > 1 ? 's' : ''}. Unlock your paid plan to download.</p>
         <div style={{ position: 'relative' }}>
           {!isPaid && <PaywallOverlay frameworks={activeFrameworks.map(f => f.name)} />}
