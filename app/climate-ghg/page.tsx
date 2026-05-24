@@ -109,16 +109,16 @@ export default function Page() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
           {[
-            { icon: '·', title: 'Guided inventory wizard', desc: 'Step-by-step data collection across all Scope 1, 2, and 3 categories. No blank spreadsheets. No guessing which sources to include.' },
-            { icon: '·', title: 'Real emission factors', desc: 'IPCC AR5 GWP values throughout. IEA 2024 grid electricity factors. DEFRA 2024 travel and freight factors. Auto-converts to AR4 on CARB export.' },
-            { icon: '·', title: 'Immutable audit trail', desc: 'Every data entry, edit, and deletion is logged with user, timestamp, and previous value. Written by the database — not the application. Cannot be altered.' },
-            { icon: '·', title: 'Multi-framework export', desc: 'One inventory exports to: CARB SB 253 template, CDP C6 and C7, ESRS E1-6, EcoVadis, GRI 305, and IFRS S2 simultaneously.' },
-            { icon: '·', title: 'Scope 3 — all 15 categories', desc: 'Primary data collection, spend-based, hybrid, and supplier-specific methods. CDP C12 supplier engagement. CS3D value chain mapping.' },
-            { icon: '·', title: 'Assurance-ready package', desc: 'Pre-formatted data room for your verifier: methodology documentation, emission factor citations, uncertainty assessment, and boundary justification.' },
+            { icon: '', title: 'Guided inventory wizard', desc: 'Step-by-step data collection across all Scope 1, 2, and 3 categories. No blank spreadsheets. No guessing which sources to include.' },
+            { icon: '', title: 'Real emission factors', desc: 'IPCC AR5 GWP values throughout. IEA 2024 grid electricity factors. DEFRA 2024 travel and freight factors. Auto-converts to AR4 on CARB export.' },
+            { icon: '', title: 'Immutable audit trail', desc: 'Every data entry, edit, and deletion is logged with user, timestamp, and previous value. Written by the database — not the application. Cannot be altered.' },
+            { icon: '', title: 'Multi-framework export', desc: 'One inventory exports to: CARB SB 253 template, CDP C6 and C7, ESRS E1-6, EcoVadis, GRI 305, and IFRS S2 simultaneously.' },
+            { icon: '', title: 'Scope 3 — all 15 categories', desc: 'Primary data collection, spend-based, hybrid, and supplier-specific methods. CDP C12 supplier engagement. CS3D value chain mapping.' },
+            { icon: '', title: 'Assurance-ready package', desc: 'Pre-formatted data room for your verifier: methodology documentation, emission factor citations, uncertainty assessment, and boundary justification.' },
           ].map(({ icon, title, desc }) => (
             <div key={title} style={{ background: '#fff', padding: '2rem' }}>
-              <div style={{ fontSize: 24, marginBottom: 12 }}>{icon}</div>
-              <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
+   
+              <div style={{ fontSize: 16, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
               <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 300 }}>{desc}</div>
             </div>
           ))}
