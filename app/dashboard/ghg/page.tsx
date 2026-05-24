@@ -413,11 +413,10 @@ export default function GHGPage() {
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) { window.location.href = '/login'; return }
+    if (!session) { return }
       const { data } = await supabase
         .from('ghg_inventories')
         .select('*')
-        .eq('user_id', session.user.id)
         .eq('reporting_year', 2024)
         .single()
       if (data) {
