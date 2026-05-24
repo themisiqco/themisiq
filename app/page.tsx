@@ -156,10 +156,10 @@ export default function Home() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
             {[
-              { name: 'Supplier Readiness', driver: 'A customer is asking', price: '$1,999', color: '#0F6E56', bg: '#E1F5EE', href: '/pricing', items: ['GHG Inventory', 'Supply Chain risk register', 'Supplier questionnaire'] },
-              { name: 'Climate Readiness', driver: 'Your bank is asking', price: '$1,999', color: '#0C447C', bg: '#E6F1FB', href: '/pricing', items: ['GHG Inventory', 'Climate Risk assessment', 'TCFD / IFRS S2 output'] },
-              { name: 'ESG Foundation', driver: 'Your board wants it', price: '$2,999', color: '#7425e3', bg: '#EDE9FE', href: '/pricing', items: ['GHG Inventory', 'People & Workforce', 'Climate Risk'] },
-              { name: 'Investor ESG', driver: 'Your investor requires it', price: '$3,999', color: '#B91C1C', bg: '#FCEBEB', href: '/pricing', items: ['GHG Inventory', 'Climate Risk', 'Supply Chain', 'Deals & Investment'] },
+              { name: 'Supplier Readiness', driver: 'A customer is asking', price: '$1,999', color: '#0F6E56', bg: '#E1F5EE', href: '/dashboard/ghg?pack=supplier', items: ['GHG Inventory', 'Supply Chain risk register', 'Supplier questionnaire'] },
+              { name: 'Climate Readiness', driver: 'Your bank is asking', price: '$1,999', color: '#0C447C', bg: '#E6F1FB', href: '/dashboard/ghg?pack=climate', items: ['GHG Inventory', 'Climate Risk assessment', 'TCFD / IFRS S2 output'] },
+              { name: 'ESG Foundation', driver: 'Your board wants it', price: '$2,999', color: '#7425e3', bg: '#EDE9FE', href: '/dashboard/ghg?pack=foundation', items: ['GHG Inventory', 'People & Workforce', 'Climate Risk'] },
+              { name: 'Investor ESG', driver: 'Your investor requires it', price: '$3,999', color: '#B91C1C', bg: '#FCEBEB', href: 'dashboard/ghg?pack=investor', items: ['GHG Inventory', 'Climate Risk', 'Supply Chain', 'Deals & Investment'] },
             ].map(pack => (
               <a key={pack.name} href={pack.href} style={{ background: '#fff', border: `1.5px solid ${pack.color}25`, borderRadius: 14, padding: '1.5rem', textDecoration: 'none', display: 'block', transition: 'all 0.15s' }}
                 onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = pack.color}
