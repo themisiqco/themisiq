@@ -20,7 +20,7 @@ export default function Page() {
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
               <a href="/dashboard/supply-chain" style={{ ...btnPrimary, textDecoration: 'none' }}>Map your supply chain →</a>
-              <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Book a demo</a>
+              <a href="/dashboard/scope3" style={{ ...btnSecondary, textDecoration: 'none' }}>Calculate Scope 3 →</a>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
               {['Scope 3 Cat.1', 'ESRS S2', 'CS3D', 'EcoVadis', 'CDP C12', 'Modern Slavery', 'UNGP', 'GRI 414'].map(tag => (
