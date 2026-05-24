@@ -80,27 +80,24 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ── WHO IT'S FOR ── */}
-      <section style={{ padding: '5rem 2.5rem', borderTop: '0.5px solid #e8e7e4', borderBottom: '0.5px solid #e8e7e4' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <p style={eyebrow}>Getting asked about ESG?</p>
-            <h2 style={sectionTitle}>You're not alone — and it doesn't have to be complicated.</h2>
-            <p style={sectionSub}>Most companies come to ThemisIQ because someone is asking them a question they don't know how to answer. Here's how we help.</p>
+ {/* ── WHO IT'S FOR ── */}
+      <section style={{ padding: '3rem 2.5rem', borderTop: '0.5px solid #e8e7e4', borderBottom: '0.5px solid #e8e7e4', background: '#f8f7f5' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', alignItems: 'center', gap: '3rem', flexWrap: 'wrap' as const }}>
+          <div style={{ flexShrink: 0 }}>
+            <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 6 }}>Getting asked about ESG?</p>
+            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', maxWidth: 220, lineHeight: 1.3 }}>Someone is asking. We have the answer.</h2>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+          <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
             {[
-              { emoji: '🏢', who: 'A customer sent you a questionnaire', what: 'EcoVadis, supplier sustainability forms, procurement ESG requirements — ThemisIQ gets you ready to respond professionally in days.', href: '/pricing', cta: 'Supplier Readiness Pack →', color: '#0F6E56' },
-              { emoji: '🏦', who: 'Your bank or insurer is asking', what: 'Sustainability-linked loans and insurance renewals now require climate data. ThemisIQ gives you your emissions baseline and climate risk exposure.', href: '/pricing', cta: 'Climate Readiness Pack →', color: '#0C447C' },
-              { emoji: '📊', who: 'Your board wants an ESG programme', what: 'Governance, talent and reputation are driving board ESG requests. ThemisIQ gives you a credible programme — emissions, people and climate risk.', href: '/pricing', cta: 'ESG Foundation Pack →', color: '#7425e3' },
-              { emoji: '💼', who: 'Your investor requires ESG reporting', what: 'PE firms and LPs require annual ESG questionnaires from portfolio companies. ThemisIQ covers everything they ask — GHG, climate risk, supply chain and diligence.', href: '/pricing', cta: 'Investor ESG Pack →', color: '#B91C1C' },
+              { who: 'A customer is asking', pack: 'Supplier Readiness', color: '#0F6E56', href: '/pricing' },
+              { who: 'Your bank is asking', pack: 'Climate Readiness', color: '#0C447C', href: '/pricing' },
+              { who: 'Your board wants it', pack: 'ESG Foundation', color: '#7425e3', href: '/pricing' },
+              { who: 'Your investor requires it', pack: 'Investor ESG', color: '#B91C1C', href: '/pricing' },
             ].map(card => (
-              <div key={card.who} style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '1.5rem' }}>
-                <div style={{ fontSize: 24, marginBottom: 12 }}>{card.emoji}</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 8, lineHeight: 1.4 }}>{card.who}</div>
-                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 300, marginBottom: 16 }}>{card.what}</div>
-                <a href={card.href} style={{ fontSize: 12, fontWeight: 600, color: card.color, textDecoration: 'none' }}>{card.cta}</a>
-              </div>
+              <a key={card.who} href={card.href} style={{ background: '#fff', border: `1px solid ${card.color}25`, borderRadius: 10, padding: '1rem', textDecoration: 'none', display: 'block' }}>
+                <div style={{ fontSize: 11, color: '#888784', marginBottom: 4 }}>{card.who}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: card.color }}>{card.pack} Pack →</div>
+              </a>
             ))}
           </div>
         </div>
