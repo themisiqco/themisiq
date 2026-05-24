@@ -643,7 +643,7 @@ export default function PricingPage() {
                 bg: '#E1F5EE',
                 modules: ['GHG Inventory — Scope 1 & 2', 'Supply Chain risk register', 'Supplier questionnaire template'],
                 pitch: 'Your customer sent you a sustainability questionnaire. This gets you ready to respond — and keeps you ready for the next one.',
-                cta: '/dashboard/ghg',
+                cta: '/dashboard/ghg?pack=supplier',
                 ctaLabel: 'Start now →',
               },
               {
@@ -654,7 +654,7 @@ export default function PricingPage() {
                 bg: '#E6F1FB',
                 modules: ['GHG Inventory — Scope 1 & 2', 'Climate Risk — physical & transition', 'TCFD / IFRS S2 aligned output'],
                 pitch: 'Your bank wants your climate data. This gives you your emissions baseline and climate risk exposure — the two things they always ask for.',
-                cta: '/dashboard/ghg',
+                cta: '/dashboard/ghg?pack=climate',
                 ctaLabel: 'Start now →',
               },
               {
@@ -665,8 +665,8 @@ export default function PricingPage() {
                 bg: '#EDE9FE',
                 modules: ['GHG Inventory — Scope 1 & 2', 'People & Workforce — pay gap & safety', 'Climate Risk — physical & transition'],
                 pitch: 'The three things every board asks about — emissions, people, and climate risk. One platform, one annual price.',
-                cta: '/pricing',
-                ctaLabel: 'Build your pack →',
+                cta: '/dashboard/ghg?pack=foundation',
+                ctaLabel: 'Start now →',
               },
               {
                 name: 'Investor ESG Pack',
@@ -676,8 +676,8 @@ export default function PricingPage() {
                 bg: '#FCEBEB',
                 modules: ['GHG Inventory — Scope 1 & 2', 'Climate Risk — scenario analysis', 'Supply Chain risk register', 'Deals & Investment — ESG diligence'],
                 pitch: 'Everything your PE firm or LP will ask for in their annual ESG questionnaire — in one platform.',
-                cta: '/pricing',
-                ctaLabel: 'Build your pack →',
+                cta: '//dashboard/ghg?pack=investor',
+                ctaLabel: 'Start now →',
               },
             ].map(pack => (
               <div key={pack.name} style={{ border: `1.5px solid ${pack.color}30`, borderRadius: 16, overflow: 'hidden', background: '#fff' }}>

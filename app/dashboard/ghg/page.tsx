@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../../lib/supabase'
+import { useSearchParams } from 'next/navigation'
 
 const GWP = {
   AR4: { CO2: 1, CH4: 25, N2O: 298 },
@@ -402,11 +403,20 @@ function LockedDocUpload({ label }: { label: string }) {
 }
 export default function GHGPage() {
   const [step, setStep] = useState(0)
+const searchParams = useSearchParams()
+  const pack = searchParams.get('pack')
+  const packFrameworks: Record<string, string[]> = {
+    supplier: ['gri', 'ecovadis'],
+    climate: ['ifrs', 'cdp'],
+    foundation: ['gri', 'esrs'],
+    investor: ['cdp', 'ifrs'],
+  }
+  const defaultFrameworks = pack && packFrameworks[pack] ? packFrameworks[pack] : ['sb253']
   const [inventory, setInventory] = useState<Inventory>({
     company_name: '', reporting_year: 2024, revenue_millions: 0, employee_count: 0,
     boundary_approach: 'operational_control', california_nexus: false,
     prior_year_s1: 0, prior_year_s2: 0,
-    selected_frameworks: ['sb253'],
+    selected_frameworks: defaultFrameworks,
     locations: [emptyLocation('1', 'Location 1')],
   })
   const [activeLocation, setActiveLocation] = useState(0)
