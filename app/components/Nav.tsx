@@ -40,11 +40,9 @@ export default function Nav() {
           overflow: 'hidden',
         }} className="desktop-nav">
           {[
-            ['/climate-ghg', 'Climate · GHG'],
-            ['/dashboard/scope3', 'Scope 3'],
+           ['/climate-ghg', 'GHG Emissions'],
             ['/climate-risk', 'Climate Risk'],
             ['/supply-chain', 'Supply Chain'],
-            ['/dashboard/supply-chain/portal', 'Supplier Portal'],
             ['/deals', 'Deals'],
             ['/people', 'People'],
             ['/ai-governance', 'AI Governance'],
@@ -59,6 +57,7 @@ export default function Nav() {
 
         {/* CTA BUTTONS */}
         <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
+          <a href="/dashboard/supply-chain/portal" style={{ fontSize: 12, fontWeight: 500, padding: '7px 14px', borderRadius: 8, background: '#0F6E56', color: '#fff', textDecoration: 'none', display: 'inline-block', whiteSpace: 'nowrap' }} className="desktop-only">Supplier Portal →</a>
           <a href="/assess" style={{
             fontSize: 12, fontWeight: 400, padding: '7px 14px', borderRadius: 8,
             background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4',
@@ -99,10 +98,9 @@ export default function Nav() {
         }}>
           {[
             ['/climate-ghg', 'Climate · GHG', 'SB 253 · CDP · ESRS E1 · GHG Protocol'],
-            ['/dashboard/scope3', 'Scope 3 Calculator', 'All 15 categories · GHG Protocol · CSRD · CDP · SBTi'],
-            ['/climate-risk', 'Climate Risk', 'SB 261 · TCFD · IFRS S2 · scenario analysis'],
+           ['/climate-ghg', 'GHG Emissions', 'SB 253 · CDP · ESRS E1 · GHG Protocol · Scope 3'],
             ['/supply-chain', 'Supply Chain', 'Scope 3 Cat.1 · EcoVadis · CS3D · ESRS S2'],
-            ['/dashboard/supply-chain/portal', 'Supplier Portal', 'Send questionnaires · track responses · export data'],
+            
             ['/deals', 'Deals & Investment', 'M&A diligence · PE · IFRS S2 · LP ESG'],
             ['/people', 'People & Workforce', 'ESRS S1 · EU Pay Transparency · CA Pay Data'],
             ['/ai-governance', 'AI Governance', 'EU AI Act · NIST AI RMF · ISO 42001'],
