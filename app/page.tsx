@@ -67,6 +67,23 @@ export default function Home() {
         ))}
       </div>
 
+      {/* ── TRUST BAR ── */}
+      <div style={{ background: '#0d0d0d', padding: '1rem 2.5rem' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3rem', flexWrap: 'wrap' as const }}>
+          {[
+            'Encrypted in transit and at rest',
+            'We never sell or share your data',
+            'Canadian-incorporated · PIPEDA compliant',
+            'Your data is never used to train AI models',
+            'SOC 2 aligned data handling',
+          ].map(text => (
+            <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#64fe3e', flexShrink: 0 }} />
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap' as const }}>{text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
       {/* ── FRAMEWORKS ── */}
       <div style={{ padding: '4rem 2.5rem', background: '#f8f7f5', borderBottom: '0.5px solid #e8e7e4' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', textAlign: 'center' }}>

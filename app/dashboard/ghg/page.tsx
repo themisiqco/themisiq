@@ -355,20 +355,19 @@ function PaywallOverlay({ frameworks }: { frameworks: string[] }) {
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 10, backdropFilter: 'blur(8px)', background: 'rgba(248,247,245,0.85)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ background: '#fff', borderRadius: 16, padding: '2.5rem', boxShadow: '0 8px 40px rgba(0,0,0,0.12)', border: '0.5px solid #e8e7e4', maxWidth: 480, textAlign: 'center' as const }}>
-        <div style={{ fontSize: 32, marginBottom: 12 }}>🔒</div>
         <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 8 }}>Your GHG inventory is complete.</div>
         <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 300 }}>Your Scope 1 and Scope 2 emissions have been calculated to {frameworks.join(', ')} standards, with full calculation workings ready for third-party assurance. Unlock your submission-ready reports with one click.</div>
         <div style={{ background: '#f8f7f5', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', textAlign: 'left' as const }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', marginBottom: 10, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>What you unlock</div>
           {[
-            ['📄', 'Submission-ready reports for all selected frameworks'],
-            ['🔒', 'Assurance-ready evidence uploads per emission source'],
-            ['📊', 'Full calculation workings export (ISO 14064-3)'],
-            ['🔄', 'Unlimited updates throughout your reporting year'],
-            ['✅', 'Priority support through your filing deadline'],
-          ].map(([icon, text]) => (
-            <div key={text as string} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 8 }}>
-              <span style={{ fontSize: 14, flexShrink: 0 }}>{icon}</span>
+            'Submission-ready reports for all selected frameworks',
+            'Assurance-ready evidence uploads per emission source',
+            'Full calculation workings export (ISO 14064-3)',
+            'Unlimited updates throughout your reporting year',
+            'Priority support through your filing deadline',
+          ].map(text => (
+            <div key={text} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 8 }}>
+              <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#7425e3', flexShrink: 0, marginTop: 6 }} />
               <span style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>{text}</span>
             </div>
           ))}
@@ -376,11 +375,19 @@ function PaywallOverlay({ frameworks }: { frameworks: string[] }) {
         <button onClick={() => window.location.href = '/signup?upgrade=true'} style={{ width: '100%', fontSize: 14, fontWeight: 600, padding: '14px 28px', borderRadius: 10, border: 'none', cursor: 'pointer', marginBottom: 10, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d' }}>
           Unlock My Reports →
         </button>
-        <div style={{ fontSize: 11, color: '#888784' }}>Secure payment · Instant access · Cancel anytime</div>
+        <div style={{ fontSize: 11, color: '#888784', marginBottom: 12 }}>Secure payment · Instant access · Cancel anytime</div>
+        <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' as const, borderTop: '0.5px solid #e8e7e4', paddingTop: 12 }}>
+          {['Your data is encrypted', 'Never sold or shared', 'PIPEDA compliant', 'Not used to train AI'].map(t => (
+            <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#64fe3e', flexShrink: 0 }} />
+              <span style={{ fontSize: 10, color: '#888784' }}>{t}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
-}
+} 
 
 function LockedDocUpload({ label }: { label: string }) {
   return (
@@ -416,6 +423,7 @@ export default function GHGPage() {
     if (!session) { return }
       const { data } = await supabase
         .from('ghg_inventories')
+
         .select('*')
         .eq('reporting_year', 2024)
         .single()
