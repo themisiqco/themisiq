@@ -229,6 +229,36 @@ function calcInventory(locations: Location[], gwpVersion: 'AR4' | 'AR5' = 'AR4')
   }, { s1_total: 0, s2_location: 0, s2_market: 0, co2: 0, ch4: 0, n2o: 0, biogenic: 0 })
 }
 
+function buildWorkings(locations: Location[], gwpVersion: 'AR4' | 'AR5' = 'AR4') {
+  const rows: any[] = []
+  const pushFuel = (loc: Location, source: string, scope: number, activity: number, unit: string, ef: { co2: number; ch4: number; n2o: number }) => {
+    const g = calcGas(ef, activity, gwpVersion)
+    rows.push({ location: loc.name || 'Location', source, scope, activity_data: activity, activity_unit: unit,
+      emission_factor: `CO2 ${ef.co2}, CH4 ${ef.ch4}, N2O ${ef.n2o} kg/${unit}`, ef_source: EF_SOURCES.combustion, gwp_basis: gwpVersion, result_tco2e: g.total })
+  }
+  for (const loc of locations) {
+    if (loc.has_natural_gas && loc.natural_gas_amount > 0) pushFuel(loc, 'Natural gas', 1, loc.natural_gas_amount, loc.natural_gas_unit, EF[`natural_gas_${loc.natural_gas_unit}` as keyof typeof EF] as any)
+    if (loc.has_propane && loc.propane_amount > 0) pushFuel(loc, 'Propane', 1, loc.propane_amount, loc.propane_unit, EF[`propane_${loc.propane_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF] as any)
+    if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0) pushFuel(loc, 'Diesel (stationary)', 1, loc.diesel_stationary_amount, loc.diesel_stationary_unit, EF[`diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF] as any)
+    if (loc.has_fuel_oil && loc.fuel_oil_gallons > 0) pushFuel(loc, 'Fuel oil', 1, loc.fuel_oil_gallons, 'gallons', EF.fuel_oil_gallon as any)
+    if (loc.has_mobile && loc.gasoline_amount > 0) pushFuel(loc, 'Gasoline (mobile)', 1, loc.gasoline_amount, loc.gasoline_unit, EF[`gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF] as any)
+    if (loc.has_mobile && loc.diesel_mobile_amount > 0) pushFuel(loc, 'Diesel (mobile)', 1, loc.diesel_mobile_amount, loc.diesel_mobile_unit, EF[`diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF] as any)
+    if (!loc.uses_ammonia && loc.has_hfc_refrigerants && loc.refrigerant_purchased_kg > 0) {
+      const ref_gwp = (EF[loc.refrigerant_type as keyof typeof EF] as number) || 0
+      rows.push({ location: loc.name || 'Location', source: `Refrigerant (${loc.refrigerant_type})`, scope: 1, activity_data: loc.refrigerant_purchased_kg, activity_unit: 'kg', emission_factor: `GWP ${ref_gwp}`, ef_source: 'IPCC GWP', gwp_basis: gwpVersion, result_tco2e: loc.refrigerant_purchased_kg * ref_gwp / 1000 })
+    }
+    if (loc.electricity_kwh > 0) {
+      const grid_ef = (EF[loc.grid_region as keyof typeof EF] as number) || EF.us_average
+      rows.push({ location: loc.name || 'Location', source: `Electricity (${loc.grid_region})`, scope: 2, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${grid_ef} kg/kWh`, ef_source: EF_SOURCES.electricity, gwp_basis: 'location-based', result_tco2e: loc.electricity_kwh * grid_ef / 1000 })
+    }
+    if (loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0) {
+      rows.push({ location: loc.name || 'Location', source: 'Purchased steam', scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: 'mmbtu', emission_factor: `${EF.steam_mmbtu} kg/mmbtu`, ef_source: EF_SOURCES.combustion, gwp_basis: 'location-based', result_tco2e: loc.purchased_steam_mmbtu * EF.steam_mmbtu / 1000 })
+    }
+  }
+  return rows
+}
+
+
 interface BotMessage { role: 'user' | 'assistant'; content: string }
 
 function GHGBot({ currentStep }: { currentStep: number }) {
@@ -1159,6 +1189,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
             scope1_intensity: inventory.revenue_millions > 0 ? totals_ar4.s1_total / inventory.revenue_millions : 0,
             scope2_intensity: inventory.revenue_millions > 0 ? totals_ar4.s2_location / inventory.revenue_millions : 0,
             status: 'draft',
+            workings: buildWorkings(inventory.locations, 'AR4'),
             updated_at: new Date().toISOString(),
           }
           if (inventoryId) {
