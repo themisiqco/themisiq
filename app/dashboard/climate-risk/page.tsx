@@ -110,6 +110,7 @@ const TRANSITION_RISKS: Record<string, { risk: string; type: string; severity_1_
     { risk: 'Portfolio transition risk', type: 'Market', severity_1_5c: 'critical', detail: 'Financed emissions in high-carbon sectors face significant devaluation under rapid transition. PCAF and TCFD disclosure required.' },
     { risk: 'Green taxonomy reclassification', type: 'Policy', severity_1_5c: 'high', detail: 'EU and UK taxonomy frameworks reclassifying assets. Green vs brown financing cost differential widening.' },
     { risk: 'SFDR greenwashing enforcement', type: 'Reputation', severity_1_5c: 'high', detail: 'EU SFDR enforcement increasing. Greenwashing claims trigger regulatory fines and reputational damage.' },
+    { risk: 'Canadian greenwashing enforcement', type: 'Reputation', severity_1_5c: 'high', detail: 'Competition Act (Bill C-59, 2024; amended by C-15, 2026) requires environmental claims to be adequately and properly substantiated. Penalties up to $10M or 3% of global revenue.' },
   ],
   'Real Estate': [
     { risk: 'Energy efficiency regulations', type: 'Policy', severity_1_5c: 'critical', detail: 'EU Energy Performance of Buildings Directive requires EPC B+ by 2030. Non-compliant assets face rental prohibition.' },
