@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useSearchParams } from 'next/navigation'
 
@@ -401,7 +401,7 @@ function LockedDocUpload({ label }: { label: string }) {
     </div>
   )
 }
-export default function GHGPage() {
+function GHGPage() {
   const [step, setStep] = useState(0)
 const searchParams = useSearchParams()
   const pack = searchParams.get('pack')
@@ -1247,3 +1247,10 @@ const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSiz
 const sectionSub: React.CSSProperties = { fontSize: 14, color: '#555553', fontWeight: 300, lineHeight: 1.7, marginBottom: '2rem' }
 const wTd: React.CSSProperties = { padding: '6px 10px', borderBottom: '0.5px solid #e8e7e4', color: '#555553', fontSize: 11, verticalAlign: 'top' }
 const qHint: React.CSSProperties = { fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '0.75rem' }
+export default function Page() {
+  return (
+    <Suspense fallback={<div style={{ padding: '4rem', textAlign: 'center', color: '#888784' }}>Loading…</div>}>
+      <GHGPage />
+    </Suspense>
+  )
+}
