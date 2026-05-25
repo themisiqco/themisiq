@@ -125,7 +125,41 @@ export default function Page() {
         </div>
       </section>
 
-      {/* FRAMEWORK TABLE */}
+      {/* GREENWASHING CALLOUT — Canada Competition Act */}
+      <section style={{ background: '#0d0d0d', padding: '4rem 2.5rem' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>Greenwashing risk — Canada</div>
+            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
+              Every carbon claim now needs proof behind it.
+            </h2>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
+              Canada&apos;s Competition Act now targets unsubstantiated environmental claims. If you state &ldquo;net zero,&rdquo; &ldquo;carbon neutral,&rdquo; or &ldquo;emissions reduced by X%,&rdquo; the burden is on you to prove it — under a reverse-onus standard, the company making the claim must show it is adequately and properly substantiated, not the regulator. An audit-trailed GHG inventory is that proof.
+            </p>
+            {['Reverse onus — you must substantiate the claim', 'Penalties up to $10M or 3% of global revenue', 'Applies to marketing, websites, and reports', 'ThemisIQ gives every figure a documented, defensible basis'].map((item, i) => (
+              <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8, alignItems: 'flex-start' }}>
+                <span style={{ color: '#64fe3e', flexShrink: 0, marginTop: 2 }}>✓</span>
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 300, lineHeight: 1.5 }}>{item}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: '2rem' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 12 }}>Claim vs. proof</div>
+            {[
+              { claim: '"We are carbon neutral"', proof: 'Scope 1 + 2 inventory with cited emission factors' },
+              { claim: '"Emissions down 30%"', proof: 'Prior-year baseline + current inventory, same methodology' },
+              { claim: '"Net zero by 2040"', proof: 'Documented baseline and tracked reduction pathway' },
+              { claim: '"Low-carbon operations"', proof: 'Intensity figures benchmarked and source-documented' },
+            ].map(({ claim, proof }) => (
+              <div key={claim} style={{ padding: '12px 0', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: '#fff', marginBottom: 3 }}>{claim}</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>Needs: {proof}</div>
+              </div>
+            ))}
+            <div style={{ marginTop: 12, fontSize: 10, color: 'rgba(255,255,255,0.3)', lineHeight: 1.6 }}>Competition Act (Bill C-59, 2024; amended by C-15, 2026). Requirements are evolving and subject to a constitutional challenge — confirm your obligations with counsel.</div>
+          </div>
+        </div>
+      </section>{/* FRAMEWORK TABLE */}
       <section style={{ padding: '0 2.5rem 5rem', maxWidth: 1100, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={eyebrow}>Framework coverage</div>
