@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (accessErr || !access) {
-    return NextResponse.json({ error: 'invalid_or_expired' }, { status: 403 })
+    return NextResponse.json({ error: 'invalid_or_expired', detail: accessErr?.message || 'no matching row', hasKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY }, { status: 403 })
   }
   if (new Date(access.expires_at) < new Date()) {
     return NextResponse.json({ error: 'invalid_or_expired' }, { status: 403 })
