@@ -1204,6 +1204,7 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, uploading
         <button onClick={() => ref.current?.click()} disabled={uploading} style={{ fontSize: 11, padding: '4px 12px', borderRadius: 6, background: '#fff', border: '0.5px solid #e8e7e4', cursor: 'pointer', color: '#555553' }}>{uploading ? 'Uploading...' : '+ Upload'}</button>
         <input ref={ref} type="file" multiple accept=".pdf,.xlsx,.csv,.jpg,.png" style={{ display: 'none' }} onChange={e => e.target.files && onUpload(e.target.files, locIdx, docType)} />
       </div>
+      <div style={{ fontSize: 10, color: '#888784', fontWeight: 300, marginTop: 4 }}>Accepted: PDF, Excel, CSV, JPG, PNG · max 50 MB</div>
       {docs.map(doc => (
         <div key={doc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '3px 0', fontSize: 12 }}>
           <span style={{ color: '#0d0d0d' }}>✓ {doc.file_name}</span>
