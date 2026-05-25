@@ -41,7 +41,7 @@ export default function Nav() {
         }} className="desktop-nav">
           {[
            ['/climate-ghg', 'GHG Emissions'],
-            ['/climate-risk', 'Climate Risk'],
+            ['/dashboard/climate-risk', 'Climate Risk'],
             ['/supply-chain', 'Supply Chain'],
             ['/deals', 'Deals'],
             ['/people', 'People'],
@@ -97,10 +97,9 @@ export default function Nav() {
           borderTop: '0.5px solid #e8e7e4', overflowY: 'auto',
         }}>
           {[
-            ['/climate-ghg', 'Climate · GHG', 'SB 253 · CDP · ESRS E1 · GHG Protocol'],
-           ['/climate-ghg', 'GHG Emissions', 'SB 253 · CDP · ESRS E1 · GHG Protocol · Scope 3'],
+            ['/climate-ghg', 'GHG Emissions', 'SB 253 · CDP · ESRS E1 · GHG Protocol · Scope 3'],
+            ['/dashboard/climate-risk', 'Climate Risk', 'TCFD · IFRS S2 · ESRS E1 · scenario analysis'],
             ['/supply-chain', 'Supply Chain', 'Scope 3 Cat.1 · EcoVadis · CS3D · ESRS S2'],
-            
             ['/deals', 'Deals & Investment', 'M&A diligence · PE · IFRS S2 · LP ESG'],
             ['/people', 'People & Workforce', 'ESRS S1 · EU Pay Transparency · CA Pay Data'],
             ['/ai-governance', 'AI Governance', 'EU AI Act · NIST AI RMF · ISO 42001'],
