@@ -7,12 +7,19 @@ interface AuditEntry {
   id: string; action: string; user_email: string | null; created_at: string
   old_values: Record<string, unknown> | null; new_values: Record<string, unknown> | null
 }
+interface WorkingRow {
+  location: string; source: string; scope: number
+  activity_data: number; activity_unit: string
+  emission_factor: string; ef_source: string; gwp_basis: string
+  result_tco2e: number
+}
 interface InventoryData {
   company_name: string; reporting_year: number; revenue_millions: number
   boundary_approach: string; selected_frameworks: string[]
   scope1_total: number; scope2_location_total: number; scope2_market_total: number
   scope1_intensity: number; scope2_intensity: number
   locations_data: { name: string }[]
+  workings?: WorkingRow[]
 }
 interface VerifierPayload {
   inventory?: InventoryData
@@ -106,6 +113,40 @@ export default function VerifierPage() {
             <div key={i} style={{ padding: '8px 0', borderBottom: '0.5px solid #e8e7e4' }}>{l.name || `Location ${i + 1}`}</div>
           ))}
         </div>
+
+        <SectionHead>Calculation Workings</SectionHead>
+        <p style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '1rem' }}>
+          Per-source breakdown as calculated at save time. Each line shows the activity data, emission factor, and GWP basis used — enabling independent recalculation under ISO 14064-3.
+        </p>
+        {(inv.workings && inv.workings.length > 0) ? (
+          <div style={{ overflowX: 'auto', marginBottom: '2rem' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: '#0d0d0d' }}>
+                  {['Location', 'Source', 'Scope', 'Activity data', 'Emission factor', 'GWP', 'Result (tCO2e)'].map(h => (
+                    <th key={h} style={{ color: '#fff', textAlign: 'left', padding: '8px 10px', fontWeight: 500, fontSize: 11, whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {inv.workings.map((w, i) => (
+                  <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#f8f7f5', borderBottom: '0.5px solid #e8e7e4' }}>
+                    <td style={{ padding: '8px 10px', color: '#555553' }}>{w.location}</td>
+                    <td style={{ padding: '8px 10px', color: '#0d0d0d', fontWeight: 500 }}>{w.source}</td>
+                    <td style={{ padding: '8px 10px', color: '#555553' }}>{w.scope}</td>
+                    <td style={{ padding: '8px 10px', color: '#555553', whiteSpace: 'nowrap' }}>{w.activity_data.toLocaleString()} {w.activity_unit}</td>
+                    <td style={{ padding: '8px 10px', color: '#888784', fontSize: 11 }}>{w.emission_factor}</td>
+                    <td style={{ padding: '8px 10px', color: '#555553' }}>{w.gwp_basis}</td>
+                    <td style={{ padding: '8px 10px', color: '#7425e3', fontWeight: 600, whiteSpace: 'nowrap' }}>{w.result_tco2e.toFixed(3)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{ fontSize: 11, color: '#888784', marginTop: 8 }}>Emission factor sources: US EPA (combustion), US EPA eGRID (electricity), IPCC (GWP). Verifier should confirm each sampled line independently.</div>
+          </div>
+        ) : (
+          <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.5rem', textAlign: 'center', fontSize: 13, color: '#888784', marginBottom: '2rem' }}>No calculation workings recorded for this inventory yet.</div>
+        )}
 
         <SectionHead>Audit Trail</SectionHead>
         <div style={{ background: '#0d0d0d', borderRadius: 10, padding: '12px 16px', marginBottom: '1.25rem', fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
