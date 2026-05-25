@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
     <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
       <td align="center">
         <table cellpadding="0" cellspacing="0" border="0"><tr>
-          <td style="padding-right:10px;"><a href="https://app.themisiq.co/signup" style="display:inline-block;font-size:13px;font-weight:600;color:#0d0d0d;background:linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e);padding:11px 24px;border-radius:8px;text-decoration:none;">Sign Up Today</a></td>
+          <td style="padding-right:10px;"><a href="https://www.themisiq.co/signup" style="display:inline-block;font-size:13px;font-weight:600;color:#0d0d0d;background:linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e);padding:11px 24px;border-radius:8px;text-decoration:none;">Sign Up Today</a></td>
           <td><a href="https://www.themisiq.co/advisory" style="display:inline-block;font-size:13px;font-weight:500;color:#0d0d0d;background:#fff;border:1px solid #e8e7e4;padding:11px 24px;border-radius:8px;text-decoration:none;">Book Free Consultation</a></td>
         </tr></table>
       </td>

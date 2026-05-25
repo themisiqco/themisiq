@@ -63,7 +63,7 @@ export default function PrivacyPage() {
           <div id="s1" style={sectionStyle}>
             <div style={eyebrow}>Section 1</div>
             <h2 style={sectionHead}>Who we are</h2>
-            <p style={body}><strong>ThemisIQ Compliance Inc.</strong> ("ThemisIQ", "we", "us") is a compliance intelligence and SaaS platform company incorporated in Canada, operating app.themisiq.co and www.themisiq.co.</p>
+            <p style={body}><strong>ThemisIQ Compliance Inc.</strong> ("ThemisIQ", "we", "us") is a compliance intelligence and SaaS platform company incorporated in Canada, operating www.themisiq.co.</p>
             <p style={body}>Our designated <strong>Privacy Officer</strong> is the Chief Executive Officer — <a href="mailto:privacy@themisiq.co" style={link}>privacy@themisiq.co</a>. All privacy requests should be directed to this address.</p>
           </div>
           <div style={divider} />
