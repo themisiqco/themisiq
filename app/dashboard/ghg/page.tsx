@@ -1188,7 +1188,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         {step === 3 && renderStep3()}
         {step === 4 && renderStep4()}
         {step === 5 && renderStep5()}
-        {step === 6 && <AuditTrail inventoryId={inventoryId} />}
+        {step === 6 && <AuditTrail inventoryId={inventoryId} step={step} />}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
           <button onClick={() => setStep(s => Math.max(0, s-1))} disabled={step === 0} style={{ fontSize: 13, padding: '10px 24px', borderRadius: 8, background: 'none', border: '0.5px solid #e8e7e4', cursor: step === 0 ? 'not-allowed' : 'pointer', color: '#555553', opacity: step === 0 ? 0.4 : 1 }}>← Back</button>
@@ -1306,7 +1306,7 @@ function diffRow(oldV: any, newV: any): { label: string; from: string; to: strin
   return changes
 }
 
-function AuditTrail({ inventoryId }: { inventoryId: string | null }) {
+function AuditTrail({ inventoryId, step }: { inventoryId: string | null; step: number }) {
   const [rows, setRows] = useState<AuditRow[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -1323,7 +1323,7 @@ function AuditTrail({ inventoryId }: { inventoryId: string | null }) {
         setRows(res.data || [])
         setLoading(false)
       })
-  }, [inventoryId])
+  }, [inventoryId, step])
 
   if (!inventoryId) {
     return (
