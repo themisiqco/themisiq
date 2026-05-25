@@ -510,7 +510,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   const totals_ar4 = calcInventory(inventory.locations, 'AR4')
   const totals_ar5 = calcInventory(inventory.locations, 'AR5')
 
-  const STEPS = ['Reporting frameworks', 'Company setup', 'Energy & fuel data', 'Additional data', 'Review & workings', 'Export reports']
+  const STEPS = ['Reporting frameworks', 'Company setup', 'Energy & fuel data', 'Additional data', 'Review & workings', 'Export reports', 'Audit trail']
   const activeFrameworks = FRAMEWORKS.filter(f => inventory.selected_frameworks.includes(f.id))
 
   const renderStep0 = () => (
@@ -1181,6 +1181,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         {step === 3 && renderStep3()}
         {step === 4 && renderStep4()}
         {step === 5 && renderStep5()}
+        {step === 6 && <AuditTrail inventoryId={inventoryId} />}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
           <button onClick={() => setStep(s => Math.max(0, s-1))} disabled={step === 0} style={{ fontSize: 13, padding: '10px 24px', borderRadius: 8, background: 'none', border: '0.5px solid #e8e7e4', cursor: step === 0 ? 'not-allowed' : 'pointer', color: '#555553', opacity: step === 0 ? 0.4 : 1 }}>← Back</button>
@@ -1255,3 +1256,138 @@ export default function Page() {
     </Suspense>
   )
 }
+
+interface AuditRow {
+  id: string
+  action: string
+  old_values: any
+  new_values: any
+  user_email: string | null
+  created_at: string
+}
+
+// Fields worth surfacing in the diff (skip noisy/internal ones)
+const TRACKED_FIELDS: Record<string, string> = {
+  company_name: 'Company name',
+  reporting_year: 'Reporting year',
+  scope1_total: 'Scope 1 total (mtCO₂e)',
+  scope2_location_total: 'Scope 2 location-based (mtCO₂e)',
+  scope2_market_total: 'Scope 2 market-based (mtCO₂e)',
+  revenue_millions: 'Revenue (USD M)',
+  employee_count: 'Employees',
+  boundary_approach: 'Boundary approach',
+  selected_frameworks: 'Frameworks',
+  status: 'Status',
+}
+
+function fmt(v: any): string {
+  if (v === null || v === undefined || v === '') return '—'
+  if (Array.isArray(v)) return v.join(', ') || '—'
+  if (typeof v === 'number') return String(v)
+  return String(v)
+}
+
+function diffRow(oldV: any, newV: any): { label: string; from: string; to: string }[] {
+  const changes: { label: string; from: string; to: string }[] = []
+  const o = oldV || {}
+  const n = newV || {}
+  for (const key of Object.keys(TRACKED_FIELDS)) {
+    const before = fmt(o[key])
+    const after = fmt(n[key])
+    if (before !== after) changes.push({ label: TRACKED_FIELDS[key], from: before, to: after })
+  }
+  return changes
+}
+
+function AuditTrail({ inventoryId }: { inventoryId: string | null }) {
+  const [rows, setRows] = useState<AuditRow[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!inventoryId) return
+    setLoading(true)
+    supabase
+      .from('audit_log')
+      .select('*')
+      .eq('table_name', 'ghg_inventories')
+      .eq('record_id', inventoryId)
+      .order('created_at', { ascending: false })
+      .then((res: { data: AuditRow[] | null }) => {
+        setRows(res.data || [])
+        setLoading(false)
+      })
+  }, [inventoryId])
+
+  if (!inventoryId) {
+    return (
+      <div>
+        <h2 style={auditSectionHead}>Audit trail</h2>
+        <p style={auditSectionSub}>Every change to this inventory is recorded automatically — who, what, and when — in a tamper-evident log. This is the record your verifier reviews.</p>
+        <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '2rem', textAlign: 'center' }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 6 }}>No history yet</div>
+          <div style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6 }}>Your audit trail will appear here once you save your inventory. Use the &ldquo;Save draft&rdquo; button at the top right to create the first entry.</div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <h2 style={auditSectionHead}>Audit trail</h2>
+      <p style={auditSectionSub}>Every change to this inventory is recorded automatically — who, what, and when — in a tamper-evident log. This is the record your verifier reviews.</p>
+
+      <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '1.25rem 1.5rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>Append-only record</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: 300 }}>{rows.length} change{rows.length !== 1 ? 's' : ''} logged · entries cannot be edited or deleted</div>
+        </div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>ISO 14064-3 / ISAE 3410 traceability</div>
+      </div>
+
+      {loading && <div style={{ textAlign: 'center', padding: '2rem', color: '#888784', fontSize: 13 }}>Loading history…</div>}
+
+      {!loading && rows.length === 0 && (
+        <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '2rem', textAlign: 'center', fontSize: 13, color: '#555553' }}>No entries recorded yet.</div>
+      )}
+
+      {!loading && rows.map((row, i) => {
+        const isCreate = row.action === 'INSERT'
+        const isDelete = row.action === 'DELETE'
+        const changes = row.action === 'UPDATE' ? diffRow(row.old_values, row.new_values) : []
+        const color = isCreate ? '#0F6E56' : isDelete ? '#B91C1C' : '#7425e3'
+        const bg = isCreate ? '#E1F5EE' : isDelete ? '#FCEBEB' : '#EDE9FE'
+        const actionLabel = isCreate ? 'Created' : isDelete ? 'Deleted' : 'Updated'
+        return (
+          <div key={row.id} style={{ position: 'relative', paddingLeft: 28, paddingBottom: i < rows.length - 1 ? 18 : 0 }}>
+            {i < rows.length - 1 && <div style={{ position: 'absolute', left: 7, top: 18, bottom: 0, width: 2, background: '#e8e7e4' }} />}
+            <div style={{ position: 'absolute', left: 0, top: 4, width: 16, height: 16, borderRadius: '50%', background: color, border: '3px solid #fff', boxShadow: '0 0 0 1px #e8e7e4' }} />
+            <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: changes.length ? 10 : 0, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color, background: bg, padding: '3px 10px', borderRadius: 99 }}>{actionLabel}</span>
+                  <span style={{ fontSize: 12, color: '#555553' }}>{row.user_email || 'System'}</span>
+                </div>
+                <span style={{ fontSize: 11, color: '#888784' }}>{new Date(row.created_at).toLocaleString()}</span>
+              </div>
+              {changes.length > 0 && (
+                <div style={{ borderTop: '0.5px solid #f0efed', paddingTop: 10 }}>
+                  {changes.map((c, j) => (
+                    <div key={j} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 8, alignItems: 'center', fontSize: 12, padding: '3px 0' }}>
+                      <span style={{ color: '#555553' }}>{c.label}</span>
+                      <span style={{ color: '#888784', textDecoration: 'line-through' }}>{c.from}</span>
+                      <span style={{ color: '#888784' }}>→</span>
+                      <span style={{ color: '#0d0d0d', fontWeight: 500 }}>{c.to}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+const auditSectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
+const auditSectionSub: React.CSSProperties = { fontSize: 14, color: '#555553', fontWeight: 300, lineHeight: 1.7, marginBottom: '2rem' }
