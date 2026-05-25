@@ -1162,9 +1162,9 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
             updated_at: new Date().toISOString(),
           }
           if (inventoryId) {
-            await supabase.from('ghg_inventories').update(payload).eq('id', inventoryId)
+            const { error } = await supabase.from('ghg_inventories').update(payload).eq('id', inventoryId); if (error) { alert('Save failed: ' + error.message); console.error(error); return }
           } else {
-            const { data } = await supabase.from('ghg_inventories').insert(payload).select().single()
+            const { data, error } = await supabase.from('ghg_inventories').insert(payload).select().single(); if (error) { alert('Save failed: ' + error.message); console.error(error); return }
             if (data) setInventoryId(data.id)
           }
           setSaved(true)
