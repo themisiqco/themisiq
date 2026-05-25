@@ -53,11 +53,11 @@ export default function Page() {
 
           <Section id="t4" num="Section 4" title="Subscription & billing">
             {[
-              ['Plans:', 'Starter ($299/month), Professional ($799/month), Platform (custom). Annual plans are priced at 10 months\' equivalent (2 months free). All prices in USD unless otherwise stated.'],
+              ['Plans:', 'Modules are priced at $999 per module per year (early-access pricing, all amounts USD). Bundle discounts apply automatically: 10% off two modules, 15% off three or more modules. Starter packs are offered at fixed annual rates. Early-access pricing may change for new subscriptions; existing subscriptions are honoured for their paid term.'],
               ['Access:','Modules are free to explore. Reports and exports unlock on a paid plan.'],
-              ['Billing:', 'Monthly or annual in advance. Invoices issued via Stripe. Card charges recur automatically on subscription renewal date.'],
+              ['Billing:', 'Annual, billed in advance. Invoices issued via Stripe. Charges recur automatically on the annual renewal date unless cancelled before renewal.'],
               ['Taxes:', 'Prices exclude applicable taxes (GST/HST in Canada, VAT in EU/UK). Tax is added at checkout based on billing address.'],
-              ['Refunds:', 'Pro-rata refunds issued for cancellations within 14 days of annual plan purchase. Monthly plans are non-refundable for the current billing period.'],
+              ['Refunds:', 'All sales are final. Because reports and exports are delivered digitally and available immediately upon payment, subscriptions are non-refundable. You may cancel before your annual renewal date to avoid the next charge.'],
               ['Suspension:', 'Service may be suspended for non-payment after 7 days\' notice. Data is retained for 90 days after suspension before deletion.'],
             ].map(([label, text], i) => (
               <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
