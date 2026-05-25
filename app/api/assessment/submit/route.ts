@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
 
     <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:14px;"><tr>
       <td width="32" valign="top" style="padding-right:12px;"><div style="width:28px;height:28px;border-radius:50%;background:#0d0d0d;font-size:12px;font-weight:700;color:#fff;text-align:center;line-height:28px;">2</div></td>
-      <td valign="top"><div style="font-size:13px;font-weight:600;color:#0d0d0d;margin-bottom:3px;">Start your free 14-day trial</div><div style="font-size:12px;color:#555553;line-height:1.6;">ThemisIQ can have your most urgent obligations addressed in days. No credit card required for the trial.</div></td>
+      <td valign="top"><div style="font-size:13px;font-weight:600;color:#0d0d0d;margin-bottom:3px;">Get started with ThemisIQ</div><div style="font-size:12px;color:#555553;line-height:1.6;">ThemisIQ can have your most urgent obligations addressed in days. Set up your account in minutes.</div></td>
     </tr></table>
 
     <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:24px;"><tr>
@@ -110,8 +110,8 @@ export async function POST(req: NextRequest) {
     <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
       <td align="center">
         <table cellpadding="0" cellspacing="0" border="0"><tr>
-          <td style="padding-right:10px;"><a href="https://app.themisiq.co/signup" style="display:inline-block;font-size:13px;font-weight:600;color:#0d0d0d;background:linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e);padding:11px 24px;border-radius:8px;text-decoration:none;">Start free trial — 14 days</a></td>
-          <td><a href="https://www.themisiq.co/advisory" style="display:inline-block;font-size:13px;font-weight:500;color:#0d0d0d;background:#fff;border:1px solid #e8e7e4;padding:11px 24px;border-radius:8px;text-decoration:none;">Book free consultation</a></td>
+          <td style="padding-right:10px;"><a href="https://app.themisiq.co/signup" style="display:inline-block;font-size:13px;font-weight:600;color:#0d0d0d;background:linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e);padding:11px 24px;border-radius:8px;text-decoration:none;">Sign Up Today</a></td>
+          <td><a href="https://www.themisiq.co/advisory" style="display:inline-block;font-size:13px;font-weight:500;color:#0d0d0d;background:#fff;border:1px solid #e8e7e4;padding:11px 24px;border-radius:8px;text-decoration:none;">Book Free Consultation</a></td>
         </tr></table>
       </td>
     </tr></table>
@@ -176,7 +176,7 @@ export async function POST(req: NextRequest) {
         reply_to: 'hello@themisiq.co',
         subject: `Your ThemisIQ Compliance Obligation Map — ${total} regulations identified for ${lead.company}`,
         html: leadHtml,
-        text: `ThemisIQ identified ${total} regulations that apply to ${lead.company}. ${critical} require immediate action. Visit www.themisiq.co to start your free trial.`,
+        text: `ThemisIQ identified ${total} regulations that apply to ${lead.company}. ${critical} require immediate action. Visit www.themisiq.co to get started.`,
       }),
     })
 
