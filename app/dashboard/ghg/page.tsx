@@ -1188,7 +1188,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         {step === 3 && renderStep3()}
         {step === 4 && renderStep4()}
         {step === 5 && renderStep5()}
-        {step === 6 && <AuditTrail inventoryId={inventoryId} step={step} />}
+        {step === 6 && <><AuditTrail inventoryId={inventoryId} step={step} /><VerifierInvite inventoryId={inventoryId} /></>}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
           <button onClick={() => setStep(s => Math.max(0, s-1))} disabled={step === 0} style={{ fontSize: 13, padding: '10px 24px', borderRadius: 8, background: 'none', border: '0.5px solid #e8e7e4', cursor: step === 0 ? 'not-allowed' : 'pointer', color: '#555553', opacity: step === 0 ? 0.4 : 1 }}>← Back</button>
@@ -1398,3 +1398,105 @@ function AuditTrail({ inventoryId, step }: { inventoryId: string | null; step: n
 
 const auditSectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
 const auditSectionSub: React.CSSProperties = { fontSize: 14, color: '#555553', fontWeight: 300, lineHeight: 1.7, marginBottom: '2rem' }
+
+
+interface VerifierGrant {
+  id: string
+  token: string
+  verifier_name: string | null
+  verifier_email: string | null
+  status: string
+  expires_at: string
+  created_at: string
+}
+
+function VerifierInvite({ inventoryId }: { inventoryId: string | null }) {
+  const [grants, setGrants] = useState<VerifierGrant[]>([])
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+
+  const load = () => {
+    if (!inventoryId) return
+    supabase
+      .from('verifier_access')
+      .select('*')
+      .eq('inventory_id', inventoryId)
+      .order('created_at', { ascending: false })
+      .then((res: { data: VerifierGrant[] | null }) => setGrants(res.data || []))
+  }
+
+  useEffect(() => { load() }, [inventoryId])
+
+  const createInvite = async () => {
+    if (!inventoryId) return
+    setCreating(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { alert('Please sign in to invite a verifier.'); setCreating(false); return }
+    const { error } = await supabase.from('verifier_access').insert({
+      inventory_id: inventoryId,
+      customer_user_id: session.user.id,
+      verifier_name: name || null,
+      verifier_email: email || null,
+    })
+    setCreating(false)
+    if (error) { alert('Could not create invitation: ' + error.message); return }
+    setName(''); setEmail(''); load()
+  }
+
+  const revoke = async (id: string) => {
+    const { error } = await supabase.from('verifier_access')
+      .update({ status: 'revoked', revoked_at: new Date().toISOString() })
+      .eq('id', id)
+    if (error) { alert('Could not revoke: ' + error.message); return }
+    load()
+  }
+
+  const linkFor = (token: string) => `${typeof window !== 'undefined' ? window.location.origin : 'https://www.themisiq.co'}/verify/${token}`
+
+  const copy = (token: string, id: string) => {
+    navigator.clipboard.writeText(linkFor(token))
+    setCopiedId(id)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  if (!inventoryId) return null
+
+  const active = grants.filter(g => g.status === 'active')
+
+  return (
+    <div style={{ marginTop: '2.5rem', borderTop: '0.5px solid #e8e7e4', paddingTop: '2rem' }}>
+      <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Invite a verifier</h3>
+      <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.7, marginBottom: '1.25rem' }}>
+        Generate a secure, read-only link for your independent assurance provider. They&apos;ll see this inventory&apos;s summary, methodology, and full audit trail &mdash; with no ability to edit. Links expire in 90 days, and you can revoke access at any time.
+      </p>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <input value={name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} placeholder="Verifier name (optional)" style={{ flex: 1, minWidth: 160, fontSize: 13, padding: '10px 12px', borderRadius: 8, border: '0.5px solid #e8e7e4' }} />
+        <input value={email} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)} placeholder="Verifier email (optional)" style={{ flex: 1, minWidth: 160, fontSize: 13, padding: '10px 12px', borderRadius: 8, border: '0.5px solid #e8e7e4' }} />
+        <button onClick={createInvite} disabled={creating} style={{ fontSize: 13, fontWeight: 500, padding: '10px 20px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', cursor: creating ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>{creating ? 'Generating…' : 'Generate verifier link'}</button>
+      </div>
+
+      {active.length === 0 && (
+        <div style={{ fontSize: 12, color: '#888784', fontStyle: 'italic' }}>No active verifier links yet.</div>
+      )}
+
+      {active.map(g => (
+        <div key={g.id} style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px', marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{g.verifier_name || 'Verifier'}{g.verifier_email ? ` · ${g.verifier_email}` : ''}</div>
+              <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>Expires {new Date(g.expires_at).toLocaleDateString()}</div>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => copy(g.token, g.id)} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 6, background: '#fff', border: '0.5px solid #e8e7e4', cursor: 'pointer', color: '#555553' }}>{copiedId === g.id ? '✓ Copied' : 'Copy link'}</button>
+              <button onClick={() => revoke(g.id)} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 6, background: 'none', border: '0.5px solid #e8e7e4', cursor: 'pointer', color: '#B91C1C' }}>Revoke</button>
+            </div>
+          </div>
+          <div style={{ marginTop: 8, fontSize: 11, color: '#888784', wordBreak: 'break-all', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 6, padding: '6px 10px' }}>{linkFor(g.token)}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
