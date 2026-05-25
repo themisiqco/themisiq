@@ -132,7 +132,12 @@ export default function AssessPage() {
           </h2>
           <p style={{ fontSize: 14, color: '#555553', fontWeight: 300 }}>{critical} require immediate action. {high} are high priority. Click each to expand.</p>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: '1.5rem' }}>
+        <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.2)', borderRadius: 10, padding: '12px 16px', marginBottom: '1.5rem', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          <span style={{ flexShrink: 0, marginTop: 1, color: '#0C447C' }}>✉</span>
+          <div style={{ fontSize: 13, color: '#0C447C', lineHeight: 1.55 }}>
+            We&apos;ve emailed a copy of your Compliance Obligation Map to <strong>{email.emailAddr || 'your inbox'}</strong>. If you don&apos;t see it within a few minutes, please check your spam or junk folder — and mark it &ldquo;not spam&rdquo; so future updates reach you.
+          </div>
+        </div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: '1.5rem' }}>
           {[{ val: critical, label: 'Immediate action', color: '#B91C1C' }, { val: high, label: 'High priority', color: '#ba7517' }, { val: obligations.length - critical - high, label: 'Monitor / annual', color: '#1fb1ff' }].map(({ val, label, color }) => (
             <div key={label} style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px', textAlign: 'center' as const }}>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color, marginBottom: 2 }}>{val}</div>
