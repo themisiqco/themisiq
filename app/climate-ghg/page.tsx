@@ -148,7 +148,7 @@ export default function Page() {
             {[
               { claim: '"We are carbon neutral"', proof: 'Scope 1 + 2 inventory with cited emission factors' },
               { claim: '"Emissions down 30%"', proof: 'Prior-year baseline + current inventory, same methodology' },
-              { claim: '"Net zero by 2040"', proof: 'Documented baseline and tracked reduction pathway' },
+              { claim: '"Science-based target"', proof: 'Verified baseline inventory - the foundation for any target' },
               { claim: '"Low-carbon operations"', proof: 'Intensity figures benchmarked and source-documented' },
             ].map(({ claim, proof }) => (
               <div key={claim} style={{ padding: '12px 0', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
