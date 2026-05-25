@@ -7,6 +7,7 @@ interface AuditEntry {
   id: string; action: string; user_email: string | null; created_at: string
   old_values: Record<string, unknown> | null; new_values: Record<string, unknown> | null
 }
+interface VerifierDoc { file_name: string; document_type: string; location: string; signed_url: string | null }
 interface WorkingRow {
   location: string; source: string; scope: number
   activity_data: number; activity_unit: string
@@ -62,6 +63,8 @@ export default function VerifierPage() {
   const token = params.token as string
   const [data, setData] = useState<VerifierPayload | null>(null)
   const [loading, setLoading] = useState(true)
+  const [docs, setDocs] = useState<VerifierDoc[]>([])
+  const [docsLoading, setDocsLoading] = useState(false)
 
   useEffect(() => {
     if (!token) return
@@ -69,6 +72,15 @@ export default function VerifierPage() {
       setData(res.data)
       setLoading(false)
     })
+  }, [token])
+
+  useEffect(() => {
+    if (!token) return
+    setDocsLoading(true)
+    fetch('/api/verifier-documents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) })
+      .then(r => r.ok ? r.json() : { documents: [] })
+      .then((d: { documents?: VerifierDoc[] }) => { setDocs(d.documents || []); setDocsLoading(false) })
+      .catch(() => setDocsLoading(false))
   }, [token])
 
   if (loading) return <Shell><div style={{ padding: '4rem', textAlign: 'center', color: '#888784' }}>Loading verification review…</div></Shell>
@@ -146,6 +158,32 @@ export default function VerifierPage() {
           </div>
         ) : (
           <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.5rem', textAlign: 'center', fontSize: 13, color: '#888784', marginBottom: '2rem' }}>No calculation workings recorded for this inventory yet.</div>
+        )}
+
+        <SectionHead>Source Documents</SectionHead>
+        <p style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '1rem' }}>
+          Supporting evidence uploaded for this inventory. View links are secure and expire after 10 minutes — trace each activity-data figure back to its source document.
+        </p>
+        {docsLoading && <div style={{ fontSize: 13, color: '#888784', marginBottom: '2rem' }}>Loading documents…</div>}
+        {!docsLoading && docs.length === 0 && (
+          <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.5rem', textAlign: 'center', fontSize: 13, color: '#888784', marginBottom: '2rem' }}>No source documents have been uploaded for this inventory.</div>
+        )}
+        {!docsLoading && docs.length > 0 && (
+          <div style={{ marginBottom: '2rem' }}>
+            {docs.map((d, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px', marginBottom: 8, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{d.file_name}</div>
+                  <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{d.location} · {d.document_type}</div>
+                </div>
+                {d.signed_url ? (
+                  <a href={d.signed_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, padding: '6px 16px', borderRadius: 6, background: '#0d0d0d', color: '#fff', textDecoration: 'none' }}>View</a>
+                ) : (
+                  <span style={{ fontSize: 11, color: '#888784' }}>Unavailable</span>
+                )}
+              </div>
+            ))}
+          </div>
         )}
 
         <SectionHead>Audit Trail</SectionHead>
