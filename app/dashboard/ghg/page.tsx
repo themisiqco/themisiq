@@ -1298,6 +1298,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
           if (inventoryId) {
             const { error } = await supabase.from('ghg_inventories').update(payload).eq('id', inventoryId); if (error) { alert('Save failed: ' + error.message); console.error(error); return }
           } else {
+            const { data: dup } = await supabase.from('ghg_inventories').select('id').eq('company_name', inventory.company_name).eq('reporting_year', inventory.reporting_year).maybeSingle()
+            if (dup) { alert(`You already have a ${inventory.reporting_year} inventory for "${inventory.company_name}". Open it from "Your inventories" instead of creating a duplicate.`); return }
             const { data, error } = await supabase.from('ghg_inventories').insert(payload).select().single(); if (error) { alert('Save failed: ' + error.message); console.error(error); return }
             if (data) setInventoryId(data.id)
           }
