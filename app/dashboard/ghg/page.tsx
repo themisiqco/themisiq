@@ -11,20 +11,20 @@ const GWP = {
 }
 
 const EF = {
-  natural_gas_mcf: { co2: 52.91, ch4: 0.10, n2o: 0.10 },
-  natural_gas_therms: { co2: 5.291, ch4: 0.010, n2o: 0.010 },
-  natural_gas_mmbtu: { co2: 52.87, ch4: 0.10, n2o: 0.09 },
-  propane_gallon: { co2: 5.68, ch4: 0.003, n2o: 0.003 },
-  propane_litre: { co2: 1.500, ch4: 0.001, n2o: 0.001 },
-  diesel_gallon: { co2: 10.15, ch4: 0.003, n2o: 0.06 },
-  diesel_litre: { co2: 2.681, ch4: 0.001, n2o: 0.016 },
-  fuel_oil_gallon: { co2: 10.10, ch4: 0.003, n2o: 0.06 },
-  gasoline_gallon: { co2: 8.71, ch4: 0.005, n2o: 0.056 },
-  gasoline_litre: { co2: 2.301, ch4: 0.001, n2o: 0.015 },
-  diesel_mobile_gallon: { co2: 10.15, ch4: 0.003, n2o: 0.06 },
-  diesel_mobile_litre: { co2: 2.681, ch4: 0.001, n2o: 0.016 },
+  natural_gas_mcf: { co2: 54.43956, ch4: 0.001026, n2o: 0.0001026 },
+  natural_gas_therms: { co2: 5.306, ch4: 0.0001, n2o: 0.00001 },
+  natural_gas_mmbtu: { co2: 53.06, ch4: 0.001, n2o: 0.0001 },
+  propane_gallon: { co2: 5.61561, ch4: 0.000273, n2o: 0.0000546 },
+  propane_litre: { co2: 1.48349, ch4: 0.0000721, n2o: 0.0000144 },
+  diesel_gallon: { co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 },
+  diesel_litre: { co2: 2.69627, ch4: 0.0001094, n2o: 0.0000219 },
+  fuel_oil_gallon: { co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 },
+  gasoline_gallon: { co2: 8.7775, ch4: 0.000375, n2o: 0.000075 },
+  gasoline_litre: { co2: 2.31877, ch4: 0.0000991, n2o: 0.0000198 },
+  diesel_mobile_gallon: { co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 },
+  diesel_mobile_litre: { co2: 2.69627, ch4: 0.0001094, n2o: 0.0000219 },
   r22: 1810, r134a: 1430, r404a: 3922, r410a: 2088, r507: 3985, ammonia: 0,
-  steam_mmbtu: 66.4,
+  steam_mmbtu: 66.33,
 }
 
 const EF_SOURCES = {
