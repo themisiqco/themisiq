@@ -485,7 +485,42 @@ const searchParams = useSearchParams()
   const [showWorkings, setShowWorkings] = useState<Record<string, boolean>>({})
   const [activeExport, setActiveExport] = useState('sb253')
   const [dataConfirmed, setDataConfirmed] = useState(false)
+  const [mode, setMode] = useState<'loading' | 'list' | 'wizard'>('loading')
+  const [inventoryList, setInventoryList] = useState<Array<{ id: string; company_name: string; reporting_year: number; updated_at: string }>>([])
   const isPaid = true // TODO: wire to Stripe
+
+  // Decide initial view: ?id -> wizard (loads that one); else if user has inventories -> list; else -> blank wizard
+  useEffect(() => {
+    const loadId = searchParams.get('id')
+    if (loadId) { setMode('wizard'); return }
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) { setMode('wizard'); return }
+      const { data } = await supabase
+        .from('ghg_inventories')
+        .select('id, company_name, reporting_year, updated_at')
+        .order('updated_at', { ascending: false })
+      if (data && data.length > 0) {
+        setInventoryList(data)
+        setMode('list')
+      } else {
+        setMode('wizard')
+      }
+    })
+  }, [searchParams])
+
+  const startNewInventory = () => {
+    setInventoryId(null)
+    setSaved(false)
+    setStep(0)
+    setInventory({
+      company_name: '', reporting_year: 2024, revenue_millions: 0, employee_count: 0,
+      boundary_approach: 'operational_control', california_nexus: false,
+      prior_year_s1: 0, prior_year_s2: 0,
+      selected_frameworks: defaultFrameworks,
+      locations: [emptyLocation('1', 'Location 1')],
+    })
+    setMode('wizard')
+  }
 
   useEffect(() => {
     const loadId = searchParams.get('id')
@@ -1187,6 +1222,43 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     a.download = `ThemisIQ_${fw.id.toUpperCase()}_${inventory.company_name.replace(/\s+/g,'_')}_${inventory.reporting_year}.csv`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  if (mode === 'loading') {
+    return <div style={{ background: '#fff', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888784', fontSize: 14 }}>Loading…</div>
+  }
+  if (mode === 'list') {
+    return (
+      <div style={{ background: '#fff', minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+        <nav style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2rem', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <a href="/dashboard" style={{ textDecoration: 'none' }}><img src="/logo.png" alt="ThemisIQ" style={{ height: 24, width: 'auto', display: 'block' }} /></a>
+            <span style={{ fontSize: 12, color: '#888784' }}>/ GHG Inventory</span>
+          </div>
+        </nav>
+        <div style={{ maxWidth: 760, margin: '0 auto', padding: '3rem 1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: 12 }}>
+            <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', fontWeight: 400, color: '#0d0d0d', margin: 0 }}>Your inventories</h1>
+            <button onClick={startNewInventory} style={{ fontSize: 13, fontWeight: 500, padding: '10px 20px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', cursor: 'pointer' }}>+ New inventory</button>
+          </div>
+          {inventoryList.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: '#888784', fontSize: 14 }}>No inventories yet. Click &ldquo;New inventory&rdquo; to begin.</div>
+          ) : (
+            inventoryList.map(inv => (
+              <a key={inv.id} href={`/dashboard/ghg?id=${inv.id}`} style={{ textDecoration: 'none', display: 'block' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '16px 20px', marginBottom: 10, cursor: 'pointer', flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 500, color: '#0d0d0d' }}>{inv.company_name || 'Untitled inventory'}</div>
+                    <div style={{ fontSize: 12, color: '#888784', marginTop: 3 }}>Reporting year {inv.reporting_year} · Updated {new Date(inv.updated_at).toLocaleDateString()}</div>
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: '#7425e3' }}>Open →</span>
+                </div>
+              </a>
+            ))
+          )}
+        </div>
+      </div>
+    )
   }
 
   return (
