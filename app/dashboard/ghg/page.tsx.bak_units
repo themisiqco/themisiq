@@ -308,13 +308,6 @@ function normalizeNgUnit(country: string, unit: string): string {
   const valid = ngUnitOptions(country).map(([v]) => v)
   return valid.includes(unit) ? unit : valid[0]
 }
-// Liquid-fuel units offered per country. Metric countries (CA, UK, EU) get litres only —
-// gallons is never offered, so a verifier can't find US units on a metric inventory.
-function liquidUnitOptions(country: string): Array<[string, string]> {
-  const ctry = (country || '').toUpperCase().trim()
-  const metric = ctry === 'CA' || ctry === 'GB' || ctry === 'UK' || EU_COUNTRIES.includes(ctry)
-  return metric ? [['litres', 'Litres']] : [['gallons', 'US gallons'], ['litres', 'Litres']]
-}
 
 
 function validateElectricity(kwh: number): string | null {
@@ -994,7 +987,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
               {loc.has_propane && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-                    {liquidUnitOptions(loc.country).map(([val, label]) => (
+                    {[['gallons', 'US gallons'], ['litres', 'Litres']].map(([val, label]) => (
                       <button key={val} onClick={() => updateLocation(activeLocation, 'propane_unit', val as any)} style={unitBtn(loc.propane_unit === val)}>{label}</button>
                     ))}
                   </div>
@@ -1009,7 +1002,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
               {loc.has_diesel_stationary && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-                    {liquidUnitOptions(loc.country).map(([val, label]) => (
+                    {[['gallons', 'US gallons'], ['litres', 'Litres']].map(([val, label]) => (
                       <button key={val} onClick={() => updateLocation(activeLocation, 'diesel_stationary_unit', val as any)} style={unitBtn(loc.diesel_stationary_unit === val)}>{label}</button>
                     ))}
                   </div>
@@ -1027,9 +1020,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                     <div style={{ display: 'flex', gap: 8 }}>
                       <input type="number" value={loc.gasoline_amount || ''} onChange={e => updateLocation(activeLocation, 'gasoline_amount', Number(e.target.value))} placeholder="0" style={{ ...inputStyle, flex: 1 }} />
                       <select value={loc.gasoline_unit} onChange={e => updateLocation(activeLocation, 'gasoline_unit', e.target.value as any)} style={{ ...inputStyle, width: 130 }}>
-                        {liquidUnitOptions(loc.country).map(([val, label]) => (
-                          <option key={val} value={val}>{label}</option>
-                        ))}
+                        <option value="gallons">US gallons</option>
+                        <option value="litres">Litres</option>
                       </select>
                     </div>
                   </Field>
@@ -1037,9 +1029,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                     <div style={{ display: 'flex', gap: 8 }}>
                       <input type="number" value={loc.diesel_mobile_amount || ''} onChange={e => updateLocation(activeLocation, 'diesel_mobile_amount', Number(e.target.value))} placeholder="0" style={{ ...inputStyle, flex: 1 }} />
                       <select value={loc.diesel_mobile_unit} onChange={e => updateLocation(activeLocation, 'diesel_mobile_unit', e.target.value as any)} style={{ ...inputStyle, width: 130 }}>
-                        {liquidUnitOptions(loc.country).map(([val, label]) => (
-                          <option key={val} value={val}>{label}</option>
-                        ))}
+                        <option value="gallons">US gallons</option>
+                        <option value="litres">Litres</option>
                       </select>
                     </div>
                   </Field>
