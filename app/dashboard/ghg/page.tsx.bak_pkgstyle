@@ -652,12 +652,6 @@ const searchParams = useSearchParams()
     foundation: ['gri', 'esrs'],
     investor: ['cdp', 'ifrs'],
   }
-  const packNames: Record<string, string> = {
-    supplier: 'Supplier Readiness',
-    climate: 'Climate Readiness',
-    foundation: 'ESG Foundation',
-    investor: 'Investor ESG',
-  }
   const defaultFrameworks = pack && packFrameworks[pack] ? packFrameworks[pack] : ['sb253']
   const [inventory, setInventory] = useState<Inventory>({
     company_name: '', reporting_year: 2024, revenue_millions: 0, employee_count: 0,
@@ -816,22 +810,18 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   const renderStep0 = () => (
     <div>
       <h2 style={sectionHead}>Which reporting frameworks do you need?</h2>
-      {pack && packNames[pack] ? (
-        <p style={sectionSub}>Based on your <strong style={{ color: '#0F6E56', fontWeight: 600 }}>{packNames[pack]}</strong> selection, these are the reports you need — the highlighted frameworks below are included in your package. You can add others any time.</p>
-      ) : (
-        <p style={sectionSub}>Select all that apply. ThemisIQ collects your data once and generates each report automatically — no duplicate entry required.</p>
-      )}
+      <p style={sectionSub}>Select all that apply. ThemisIQ collects your data once and generates each report automatically — no duplicate entry required.</p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12, marginBottom: '2rem' }}>
         {FRAMEWORKS.map(fw => {
           const selected = inventory.selected_frameworks.includes(fw.id)
           return (
-            <div key={fw.id} onClick={() => toggleFramework(fw.id)} style={{ background: selected ? fw.bg : '#fff', border: selected ? '3px solid #0F6E56' : '1.5px solid #e8e7e4', borderRadius: 12, padding: '1.25rem', cursor: 'pointer', transition: 'all 0.15s', opacity: selected ? 1 : 0.5 }}>
+            <div key={fw.id} onClick={() => toggleFramework(fw.id)} style={{ background: selected ? fw.bg : '#fff', border: `1.5px solid ${selected ? fw.color : '#e8e7e4'}`, borderRadius: 12, padding: '1.25rem', cursor: 'pointer', transition: 'all 0.15s' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
                 <div>
                   <div style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, color: fw.color, background: fw.bg, border: `0.5px solid ${fw.color}33`, borderRadius: 6, padding: '2px 8px', marginBottom: 6 }}>{fw.name}</div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{fw.full}</div>
                 </div>
-                <div style={{ width: 20, height: 20, borderRadius: 6, border: `1.5px solid ${selected ? '#0F6E56' : '#e8e7e4'}`, background: selected ? '#0F6E56' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <div style={{ width: 20, height: 20, borderRadius: 6, border: `1.5px solid ${selected ? fw.color : '#e8e7e4'}`, background: selected ? fw.color : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   {selected && <span style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>✓</span>}
                 </div>
               </div>
