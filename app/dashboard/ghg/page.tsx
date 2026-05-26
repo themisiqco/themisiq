@@ -24,40 +24,68 @@ const EF = {
   diesel_mobile_gallon: { co2: 10.15, ch4: 0.003, n2o: 0.06 },
   diesel_mobile_litre: { co2: 2.681, ch4: 0.001, n2o: 0.016 },
   r22: 1810, r134a: 1430, r404a: 3922, r410a: 2088, r507: 3985, ammonia: 0,
-  us_average: 0.3866, mro: 0.4891, serc: 0.3629, wecc: 0.2877,
-  npcc: 0.1967, spp: 0.4652, frcc: 0.4051, hicc: 0.6389, ascc: 0.5893,
   steam_mmbtu: 66.4,
 }
 
 const EF_SOURCES = {
   combustion: 'US EPA (2024) Emission Factors for Greenhouse Gas Inventories',
-  electricity: 'US EPA eGRID (2023) subregion location-based factors',
+  electricity: 'US EPA eGRID2023 (US) / ECCC v3.0 NIR 1990-2023 (Canada)',
   gwp_ar4: 'IPCC AR4 (2007) — required by CARB SB 253 and CDP default',
   gwp_ar5: 'IPCC AR5 (2014) — required by ESRS E1 and GRI 305',
 }
 
-const GRID_REGIONS = [
-  { value: 'us_average', label: "US Average (use if unknown)", ef: 0.3866 },
-  { value: 'mro', label: 'Midwest (IL, MI, MN, WI, ND, SD, NE, MO, KS, IA)', ef: 0.4891 },
-  { value: 'serc', label: 'Southeast (AL, GA, FL, TN, SC, NC, VA, KY, MS)', ef: 0.3629 },
-  { value: 'wecc', label: 'West (CA, OR, WA, NV, AZ, UT, CO, ID, MT, WY)', ef: 0.2877 },
-  { value: 'npcc', label: 'Northeast (NY, NJ, CT, MA, RI, VT, NH, ME)', ef: 0.1967 },
-  { value: 'spp', label: 'South Central (TX, OK, AR, LA, KS, NE, MO)', ef: 0.4652 },
-  { value: 'frcc', label: 'Florida', ef: 0.4051 },
-]
-
-function detectGridRegion(state: string): string {
-  const s = state.toUpperCase().trim()
-  const map: Record<string, string> = {
-    'IL': 'mro', 'MI': 'mro', 'MN': 'mro', 'WI': 'mro', 'ND': 'mro', 'SD': 'mro', 'NE': 'mro', 'MO': 'mro', 'KS': 'mro', 'IA': 'mro',
-    'AL': 'serc', 'GA': 'serc', 'TN': 'serc', 'SC': 'serc', 'NC': 'serc', 'VA': 'serc', 'KY': 'serc', 'MS': 'serc',
-    'CA': 'wecc', 'OR': 'wecc', 'WA': 'wecc', 'NV': 'wecc', 'AZ': 'wecc', 'UT': 'wecc', 'CO': 'wecc', 'ID': 'wecc', 'MT': 'wecc', 'WY': 'wecc',
-    'NY': 'npcc', 'NJ': 'npcc', 'CT': 'npcc', 'MA': 'npcc', 'RI': 'npcc', 'VT': 'npcc', 'NH': 'npcc', 'ME': 'npcc',
-    'TX': 'spp', 'OK': 'spp', 'AR': 'spp', 'LA': 'spp',
-    'FL': 'frcc',
-  }
-  return map[s] || 'us_average'
+const GRID_EF: Record<string, Record<number, number>> = {
+  // Canadian provinces / territories — ECCC "Emission factors and reference values" v3.0 (Oct 2025), NIR 1990-2023 consumption intensities
+  ON: { 2024: 0.030, 2025: 0.038, 2026: 0.059 },
+  QC: { 2024: 0.0017, 2025: 0.0017, 2026: 0.0019 },
+  BC: { 2024: 0.015, 2025: 0.015, 2026: 0.018 },
+  AB: { 2024: 0.540, 2025: 0.490, 2026: 0.438 },
+  SK: { 2024: 0.730, 2025: 0.670, 2026: 0.631 },
+  MB: { 2024: 0.0020, 2025: 0.0014, 2026: 0.0025 },
+  NB: { 2024: 0.300, 2025: 0.350, 2026: 0.234 },
+  NS: { 2024: 0.690, 2025: 0.700, 2026: 0.581 },
+  PE: { 2024: 0.300, 2025: 0.350, 2026: 0.234 },
+  NL: { 2024: 0.017, 2025: 0.018, 2026: 0.017 },
+  YT: { 2024: 0.080, 2025: 0.070, 2026: 0.074 },
+  NT: { 2024: 0.170, 2025: 0.190, 2026: 0.420 },
+  NU: { 2024: 0.840, 2025: 0.820, 2026: 0.800 },
+  // US states — EPA eGRID2023 state output rates (lb/MWh x 0.4536 / 1000)
+  US_AK: { 2023: 0.3695 }, US_AL: { 2023: 0.3239 }, US_AR: { 2023: 0.4529 }, US_AZ: { 2023: 0.3126 },
+  US_CA: { 2023: 0.1791 }, US_CO: { 2023: 0.4949 }, US_CT: { 2023: 0.2453 }, US_DC: { 2023: 0.1792 },
+  US_DE: { 2023: 0.3194 }, US_FL: { 2023: 0.3579 }, US_GA: { 2023: 0.3254 }, US_HI: { 2023: 0.6326 },
+  US_IA: { 2023: 0.2877 }, US_ID: { 2023: 0.1424 }, US_IL: { 2023: 0.2152 }, US_IN: { 2023: 0.6648 },
+  US_KS: { 2023: 0.3326 }, US_KY: { 2023: 0.7924 }, US_LA: { 2023: 0.3461 }, US_MA: { 2023: 0.3765 },
+  US_MD: { 2023: 0.2369 }, US_ME: { 2023: 0.1437 }, US_MI: { 2023: 0.3617 }, US_MN: { 2023: 0.3412 },
+  US_MO: { 2023: 0.6598 }, US_MS: { 2023: 0.3757 }, US_MT: { 2023: 0.4826 }, US_NC: { 2023: 0.2841 },
+  US_ND: { 2023: 0.5887 }, US_NE: { 2023: 0.4653 }, US_NH: { 2023: 0.1253 }, US_NJ: { 2023: 0.2133 },
+  US_NM: { 2023: 0.3509 }, US_NV: { 2023: 0.2921 }, US_NY: { 2023: 0.2116 }, US_OH: { 2023: 0.4846 },
+  US_OK: { 2023: 0.2943 }, US_OR: { 2023: 0.1656 }, US_PA: { 2023: 0.2939 }, US_RI: { 2023: 0.3810 },
+  US_SC: { 2023: 0.2542 }, US_SD: { 2023: 0.1522 }, US_TN: { 2023: 0.2999 }, US_TX: { 2023: 0.3498 },
+  US_UT: { 2023: 0.6447 }, US_VA: { 2023: 0.2448 }, US_VT: { 2023: 0.0237 }, US_WA: { 2023: 0.1209 },
+  US_WI: { 2023: 0.5278 }, US_WV: { 2023: 0.8931 }, US_WY: { 2023: 0.8316 },
+  US_AVG: { 2023: 0.3497 },
 }
+function getGridFactor(region: string, year: number): { ef: number; usedRegion: string; usedYear: number } {
+  const table = GRID_EF[region]
+  if (!table) return { ef: GRID_EF.US_AVG[2023], usedRegion: 'US_AVG', usedYear: 2023 }
+  const years = Object.keys(table).map(Number).sort((a, b) => a - b)
+  if (table[year] !== undefined) return { ef: table[year], usedRegion: region, usedYear: year }
+  let best = years[0]
+  for (const y of years) { if (y <= year) best = y }
+  return { ef: table[best], usedRegion: region, usedYear: best }
+}
+const CA_PROVINCES = ['BC', 'AB', 'SK', 'MB', 'ON', 'QC', 'NB', 'NS', 'PE', 'NL', 'YT', 'NT', 'NU']
+const US_STATES = ['AK','AL','AR','AZ','CA','CO','CT','DC','DE','FL','GA','HI','IA','ID','IL','IN','KS','KY','LA','MA','MD','ME','MI','MN','MO','MS','MT','NC','ND','NE','NH','NJ','NM','NV','NY','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VA','VT','WA','WI','WV','WY']
+function detectGridRegion(code: string, country?: string): string {
+  const c = (code || '').toUpperCase().trim()
+  const ctry = (country || '').toUpperCase().trim()
+  if ((ctry === 'CA' || ctry === 'CANADA') && CA_PROVINCES.includes(c)) return c
+  if (CA_PROVINCES.includes(c) && !US_STATES.includes(c)) return c
+  if (US_STATES.includes(c)) return 'US_' + c
+  return 'US_AVG'
+}
+const GRID_REGIONS_CA = CA_PROVINCES.map(p => { const y = GRID_EF[p]; const latest = Math.max(...Object.keys(y).map(Number)); return { value: p, label: p, ef: y[latest] } })
+const GRID_REGIONS_US = US_STATES.map(s => { const y = GRID_EF['US_' + s]; const latest = Math.max(...Object.keys(y).map(Number)); return { value: 'US_' + s, label: s, ef: y[latest] } })
 
 const FRAMEWORKS = [
   {
@@ -171,7 +199,7 @@ function calcGas(ef: { co2: number; ch4: number; n2o: number }, amount: number, 
   }
 }
 
-function calcLocation(loc: Location, gwpVersion: 'AR4' | 'AR5' = 'AR4') {
+function calcLocation(loc: Location, gwpVersion: 'AR4' | 'AR5' = 'AR4', year: number = 2024) {
   let s1_stationary = 0, s1_mobile = 0
   const gases = { co2: 0, ch4: 0, n2o: 0 }
   if (loc.has_natural_gas && loc.natural_gas_amount > 0) {
@@ -208,15 +236,15 @@ function calcLocation(loc: Location, gwpVersion: 'AR4' | 'AR5' = 'AR4') {
   const ref_gwp = EF[loc.refrigerant_type as keyof typeof EF] as number || 0
   const s1_fugitive = (!loc.uses_ammonia && loc.has_hfc_refrigerants) ? loc.refrigerant_purchased_kg * ref_gwp / 1000 : 0
   const s1_total = s1_stationary + s1_mobile + s1_fugitive
-  const grid_ef = EF[loc.grid_region as keyof typeof EF] as number || EF.us_average
+  const grid_ef = getGridFactor(loc.grid_region, year).ef
   const s2_location = (loc.electricity_kwh * grid_ef + (loc.has_purchased_steam ? loc.purchased_steam_mmbtu * EF.steam_mmbtu : 0)) / 1000
   const s2_market = ((loc.electricity_kwh - loc.renewable_electricity_kwh) * grid_ef + (loc.has_purchased_steam ? loc.purchased_steam_mmbtu * EF.steam_mmbtu : 0)) / 1000
   return { s1_stationary, s1_mobile, s1_fugitive, s1_total, s2_location, s2_market, gases, biogenic: loc.biogenic_co2_mt }
 }
 
-function calcInventory(locations: Location[], gwpVersion: 'AR4' | 'AR5' = 'AR4') {
+function calcInventory(locations: Location[], gwpVersion: 'AR4' | 'AR5' = 'AR4', year: number = 2024) {
   return locations.reduce((acc, loc) => {
-    const c = calcLocation(loc, gwpVersion)
+    const c = calcLocation(loc, gwpVersion, year)
     return {
       s1_total: acc.s1_total + c.s1_total,
       s2_location: acc.s2_location + c.s2_location,
@@ -229,7 +257,7 @@ function calcInventory(locations: Location[], gwpVersion: 'AR4' | 'AR5' = 'AR4')
   }, { s1_total: 0, s2_location: 0, s2_market: 0, co2: 0, ch4: 0, n2o: 0, biogenic: 0 })
 }
 
-function buildWorkings(locations: Location[], gwpVersion: 'AR4' | 'AR5' = 'AR4') {
+function buildWorkings(locations: Location[], gwpVersion: 'AR4' | 'AR5' = 'AR4', year: number = 2024) {
   const rows: any[] = []
   const pushFuel = (loc: Location, source: string, scope: number, activity: number, unit: string, ef: { co2: number; ch4: number; n2o: number }) => {
     const g = calcGas(ef, activity, gwpVersion)
@@ -248,8 +276,8 @@ function buildWorkings(locations: Location[], gwpVersion: 'AR4' | 'AR5' = 'AR4')
       rows.push({ location: loc.name || 'Location', source: `Refrigerant (${loc.refrigerant_type})`, scope: 1, activity_data: loc.refrigerant_purchased_kg, activity_unit: 'kg', emission_factor: `GWP ${ref_gwp}`, ef_source: 'IPCC GWP', gwp_basis: gwpVersion, result_tco2e: loc.refrigerant_purchased_kg * ref_gwp / 1000 })
     }
     if (loc.electricity_kwh > 0) {
-      const grid_ef = (EF[loc.grid_region as keyof typeof EF] as number) || EF.us_average
-      rows.push({ location: loc.name || 'Location', source: `Electricity (${loc.grid_region})`, scope: 2, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${grid_ef} kg/kWh`, ef_source: EF_SOURCES.electricity, gwp_basis: 'location-based', result_tco2e: loc.electricity_kwh * grid_ef / 1000 })
+      const gf = getGridFactor(loc.grid_region, year)
+      rows.push({ location: loc.name || 'Location', source: `Electricity (${gf.usedRegion}, ${gf.usedYear})`, scope: 2, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${gf.ef} kg/kWh`, ef_source: EF_SOURCES.electricity, gwp_basis: 'location-based', result_tco2e: loc.electricity_kwh * gf.ef / 1000 })
     }
     if (loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0) {
       rows.push({ location: loc.name || 'Location', source: 'Purchased steam', scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: 'mmbtu', emission_factor: `${EF.steam_mmbtu} kg/mmbtu`, ef_source: EF_SOURCES.combustion, gwp_basis: 'location-based', result_tco2e: loc.purchased_steam_mmbtu * EF.steam_mmbtu / 1000 })
@@ -491,7 +519,7 @@ const searchParams = useSearchParams()
     setInventory(inv => {
       const locs = [...inv.locations]
       locs[idx] = { ...locs[idx], [field]: value }
-     if (field === 'state') locs[idx].grid_region = detectGridRegion(value)
+     if (field === 'state') locs[idx].grid_region = detectGridRegion(value, 'US')
 if (field === 'province') locs[idx].grid_region = value // Canadian provinces map directly
       return { ...inv, locations: locs }
     })
@@ -538,8 +566,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   const needsEmployees = inventory.selected_frameworks.includes('ecovadis')
   const needsBiogenic = inventory.selected_frameworks.includes('esrs') || inventory.selected_frameworks.includes('gri')
 
-  const totals_ar4 = calcInventory(inventory.locations, 'AR4')
-  const totals_ar5 = calcInventory(inventory.locations, 'AR5')
+  const totals_ar4 = calcInventory(inventory.locations, 'AR4', inventory.reporting_year)
+  const totals_ar5 = calcInventory(inventory.locations, 'AR5', inventory.reporting_year)
 
   const STEPS = ['Reporting frameworks', 'Company setup', 'Energy & fuel data', 'Additional data', 'Review & workings', 'Export reports', 'Audit trail']
   const activeFrameworks = FRAMEWORKS.filter(f => inventory.selected_frameworks.includes(f.id))
@@ -682,8 +710,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
 
   const renderStep2 = () => {
     const loc = inventory.locations[activeLocation]
-    const calc = calcLocation(loc, 'AR4')
-    const detectedRegion = GRID_REGIONS.find(r => r.value === loc.grid_region)
+    const calc = calcLocation(loc, 'AR4', inventory.reporting_year)
+    const detectedRegion = [...GRID_REGIONS_CA, ...GRID_REGIONS_US].find(r => r.value === loc.grid_region)
     return (
       <div>
         <h2 style={sectionHead}>Energy & fuel data</h2>
@@ -808,7 +836,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                 )}
                 {loc.state
                   ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region auto-detected: <strong>{detectedRegion?.label}</strong> — {detectedRegion?.ef} kg CO₂e/kWh (eGRID 2023)</div>
-                  : <Field label="Grid region"><select value={loc.grid_region} onChange={e => updateLocation(activeLocation, 'grid_region', e.target.value)} style={inputStyle}>{GRID_REGIONS.map(r => <option key={r.value} value={r.value}>{r.label} — {r.ef} kg CO₂e/kWh</option>)}</select></Field>
+                  : <Field label="Grid region"><select value={loc.grid_region} onChange={e => updateLocation(activeLocation, 'grid_region', e.target.value)} style={inputStyle}><optgroup label="Canada">{GRID_REGIONS_CA.map(r => <option key={r.value} value={r.value}>{r.label} — {r.ef} kg CO₂e/kWh</option>)}</optgroup><optgroup label="United States">{GRID_REGIONS_US.map(r => <option key={r.value} value={r.value}>{r.label} — {r.ef} kg CO₂e/kWh</option>)}</optgroup></select></Field>
                 }
                 {isPaid ? <DocUpload label="Upload electricity bills" locIdx={activeLocation} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} /> : <LockedDocUpload label="Upload electricity bills" />}
               </div>
@@ -926,7 +954,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
               })}
             </div>
             {inventory.locations.map((loc, i) => {
-              const c = calcLocation(loc, 'AR4')
+              const c = calcLocation(loc, 'AR4', inventory.reporting_year)
               const key = `loc_${i}`
               return (
                 <div key={loc.id} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, marginBottom: 12, overflow: 'hidden' }}>
@@ -956,7 +984,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                             return <tr><td style={wTd}>Propane</td><td style={wTd}>{loc.propane_amount} {loc.propane_unit}</td><td style={wTd}>{(ef.co2 + ef.ch4 * GWP.AR4.CH4 + ef.n2o * GWP.AR4.N2O).toFixed(3)} kg CO₂e/{loc.propane_unit === 'gallons' ? 'gal' : 'L'}</td><td style={wTd}>{EF_SOURCES.combustion}</td><td style={wTd}>AR4</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
                           })()}
                           {loc.electricity_kwh > 0 && (() => {
-                            const ef = EF[loc.grid_region as keyof typeof EF] as number || EF.us_average
+                            const ef = getGridFactor(loc.grid_region, inventory.reporting_year).ef
                             return <tr style={{ background: '#f8f7f5' }}><td style={wTd}>Electricity (S2 location)</td><td style={wTd}>{loc.electricity_kwh.toLocaleString()} kWh</td><td style={wTd}>{ef.toFixed(4)} kg CO₂e/kWh</td><td style={wTd}>{EF_SOURCES.electricity} — {loc.grid_region}</td><td style={wTd}>N/A</td><td style={{ ...wTd, fontWeight: 600, color: '#0F6E56' }}>{(loc.electricity_kwh * ef / 1000).toFixed(4)}</td></tr>
                           })()}
                           <tr style={{ background: '#0d0d0d' }}><td colSpan={5} style={{ ...wTd, color: '#fff', fontWeight: 700, background: '#0d0d0d' }}>TOTAL — {loc.name}</td><td style={{ ...wTd, color: '#fff', fontWeight: 700, background: '#0d0d0d' }}>{(c.s1_total + c.s2_location).toFixed(4)}</td></tr>
@@ -1140,7 +1168,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       ['LOCATION BREAKDOWN'],
       ['Location', 'State', 'S1 Total', 'S2 Location'],
       ...inventory.locations.map(loc => {
-        const c = calcLocation(loc, fw.gwp as 'AR4' | 'AR5')
+        const c = calcLocation(loc, fw.gwp as 'AR4' | 'AR5', inventory.reporting_year)
         return [loc.name, loc.state, c.s1_total.toFixed(4), c.s2_location.toFixed(4)]
       }),
       [''],
@@ -1189,7 +1217,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
             scope1_intensity: inventory.revenue_millions > 0 ? totals_ar4.s1_total / inventory.revenue_millions : 0,
             scope2_intensity: inventory.revenue_millions > 0 ? totals_ar4.s2_location / inventory.revenue_millions : 0,
             status: 'draft',
-            workings: buildWorkings(inventory.locations, 'AR4'),
+            workings: buildWorkings(inventory.locations, 'AR4', inventory.reporting_year),
             updated_at: new Date().toISOString(),
           }
           if (inventoryId) {
