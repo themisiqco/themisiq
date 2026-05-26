@@ -62,36 +62,9 @@ const EF_CA_NG_CO2_M3: Record<string, number> = {
 }
 const M3_PER_MCF = 1000 / 35.3147 // 28.3168
 
-// UK combustion factors — DEFRA/DESNZ 2025 "Greenhouse gas reporting: conversion factors"
-// (condensed set, Fuels tab). The mandatory basis for UK SECR reporting.
-// STORAGE NOTE: stored as combined kg CO2e in the `co2` field with ch4:0, n2o:0, so calcGas
-// reproduces DEFRA's PUBLISHED figure exactly (Option 2 — exact match for verifier reconciliation).
-// DEFRA bakes in its own GWP basis, so UK fuels intentionally do NOT respond to the AR4/AR5 toggle.
-// Per DEFRA guidance: natural gas uses the "Natural gas" row (kWh, gross CV — billing basis);
-// diesel/petrol use the "average biofuel blend" rows (forecourt fuel). gallon values are a
-// non-breaking fallback only (US gallon × litre value); UK wizard defaults to kWh/litres.
-const EF_UK = {
-  // Natural gas, kWh (Gross CV): 0.18296 kgCO2e/kWh (DEFRA Fuels row "Natural gas").
-  natural_gas_kwh: { co2: 0.18296, ch4: 0, n2o: 0 },
-  // Propane, litres: 1.54358 kgCO2e/L.
-  propane_litre: { co2: 1.54358, ch4: 0, n2o: 0 },
-  propane_gallon: { co2: 5.843083, ch4: 0, n2o: 0 },
-  // Diesel (average biofuel blend), litres: 2.57082 kgCO2e/L.
-  diesel_litre: { co2: 2.57082, ch4: 0, n2o: 0 },
-  diesel_gallon: { co2: 9.731608, ch4: 0, n2o: 0 },
-  diesel_mobile_litre: { co2: 2.57082, ch4: 0, n2o: 0 },
-  diesel_mobile_gallon: { co2: 9.731608, ch4: 0, n2o: 0 },
-  // Fuel oil (residual), litres 3.17492 → per US-gallon fallback.
-  fuel_oil_gallon: { co2: 12.018374, ch4: 0, n2o: 0 },
-  // Petrol (average biofuel blend), litres: 2.06916 kgCO2e/L.
-  gasoline_litre: { co2: 2.06916, ch4: 0, n2o: 0 },
-  gasoline_gallon: { co2: 7.832619, ch4: 0, n2o: 0 },
-}
-
 const EF_SOURCES = {
   combustion: 'US EPA (2024) Emission Factors for Greenhouse Gas Inventories',
   combustion_ca: 'ECCC (2025) Emission factors and reference values v3.0',
-  combustion_uk: 'UK DEFRA/DESNZ (2025) GHG Conversion Factors for Company Reporting',
   electricity: 'US EPA eGRID2023 (US) / ECCC v3.0 NIR 1990-2023 (Canada)',
   gwp_ar4: 'IPCC AR4 (2007) — required by CARB SB 253 and CDP default',
   gwp_ar5: 'IPCC AR5 (2014) — required by ESRS E1 and GRI 305',
@@ -199,7 +172,7 @@ interface SourceDoc { id: string; file_name: string; document_type: string; uplo
 
 interface Location {
  id: string; name: string; country: string; state?: string; province?: string; region?: string
-  has_natural_gas: boolean; natural_gas_amount: number; natural_gas_unit: 'mcf' | 'therms' | 'mmbtu' | 'm3' | 'kwh'
+  has_natural_gas: boolean; natural_gas_amount: number; natural_gas_unit: 'mcf' | 'therms' | 'mmbtu' | 'm3'
   has_propane: boolean; propane_amount: number; propane_unit: 'gallons' | 'litres'
   has_diesel_stationary: boolean; diesel_stationary_amount: number; diesel_stationary_unit: 'gallons' | 'litres'
   has_fuel_oil: boolean; fuel_oil_gallons: number
@@ -235,13 +208,12 @@ const emptyLocation = (id: string, name: string, state = ''): Location => ({
 })
 
 // Natural gas units offered per country. CA uses mcf/m3 only (ECCC has no energy-basis
-// factor for therms/mmbtu). UK uses kWh only (DEFRA's billing basis — how UK gas bills read).
-// US keeps all three. Returned as [value, label] pairs.
+// factor for therms/mmbtu). US keeps all three. Returned as [value, label] pairs.
 function ngUnitOptions(country: string): Array<[string, string]> {
-  const ctry = (country || '').toUpperCase().trim()
-  if (ctry === 'CA') return [['m3', 'm³'], ['mcf', 'Mcf']]
-  if (ctry === 'GB' || ctry === 'UK') return [['kwh', 'kWh']]
-  return [['mcf', 'Mcf'], ['therms', 'Therms'], ['mmbtu', 'MMBtu']]
+  const isCA = (country || '').toUpperCase().trim() === 'CA'
+  return isCA
+    ? [['m3', 'm³'], ['mcf', 'Mcf']]
+    : [['mcf', 'Mcf'], ['therms', 'Therms'], ['mmbtu', 'MMBtu']]
 }
 // Snap a natural gas unit to a valid one for the given country (used when country changes).
 function normalizeNgUnit(country: string, unit: string): string {
@@ -269,15 +241,10 @@ function validateCompleteness(loc: Location): string[] {
 
 // Country-aware combustion factor selection.
 // US -> EPA EF[key] (unchanged). CA -> ECCC EF_CA[key], with per-province NG CO2 override.
-// GB/UK -> DEFRA EF_UK[key] (national, no province override).
-// Falls back to EF[key] if a country key is missing, so a location can never silently zero out.
-function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof typeof EF_UK): { co2: number; ch4: number; n2o: number } {
-  const ctry = (loc.country || '').toUpperCase().trim()
-  if (ctry === 'GB' || ctry === 'UK') {
-    const ukBase = (EF_UK as any)[key] as { co2: number; ch4: number; n2o: number } | undefined
-    return ukBase ? { ...ukBase } : ({ ...((EF as any)[key] as { co2: number; ch4: number; n2o: number }) })
-  }
-  if (ctry !== 'CA') return (EF as any)[key] as { co2: number; ch4: number; n2o: number }
+// Falls back to EF[key] if a CA key is missing, so a CA location can never silently zero out.
+function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA): { co2: number; ch4: number; n2o: number } {
+  const isCA = (loc.country || '').toUpperCase().trim() === 'CA'
+  if (!isCA) return (EF as any)[key] as { co2: number; ch4: number; n2o: number }
   const caBase = (EF_CA as any)[key] as { co2: number; ch4: number; n2o: number } | undefined
   const ef = caBase ? { ...caBase } : ({ ...((EF as any)[key] as { co2: number; ch4: number; n2o: number }) })
   // Per-province natural gas CO2 override (CH4/N2O remain sector-based).
@@ -291,12 +258,9 @@ function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof
   return ef
 }
 
-// Source citation for a combustion row, country-aware (ECCC for CA, DEFRA for GB/UK, EPA otherwise).
+// Source citation for a combustion row, country-aware (ECCC for CA, EPA for US).
 function combustionSource(loc: Location): string {
-  const ctry = (loc.country || '').toUpperCase().trim()
-  if (ctry === 'CA') return EF_SOURCES.combustion_ca
-  if (ctry === 'GB' || ctry === 'UK') return EF_SOURCES.combustion_uk
-  return EF_SOURCES.combustion
+  return (loc.country || '').toUpperCase().trim() === 'CA' ? EF_SOURCES.combustion_ca : EF_SOURCES.combustion
 }
 
 function calcGas(ef: { co2: number; ch4: number; n2o: number }, amount: number, gwpVersion: 'AR4' | 'AR5') {
@@ -1006,7 +970,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                   <span style={{ fontSize: 12, color, fontWeight: bold ? 700 : 400 }}>{val.toFixed(2)} mt</span>
                 </div>
               ))}
-              <div style={{ marginTop: 10, fontSize: 10, color: 'rgba(255,255,255,0.25)', lineHeight: 1.6 }}>EPA 2024 (US) · ECCC v3.0 (CA) · DEFRA 2025 (UK) · IPCC AR4 GWP · eGRID 2023</div>
+              <div style={{ marginTop: 10, fontSize: 10, color: 'rgba(255,255,255,0.25)', lineHeight: 1.6 }}>EPA 2024 · IPCC AR4 GWP · eGRID 2023</div>
               {validateCompleteness(loc).map((w, i) => (
                 <div key={i} style={{ marginTop: 8, background: "rgba(254,243,226,0.1)", border: "0.5px solid rgba(253,230,138,0.3)", borderRadius: 6, padding: "6px 10px", fontSize: 10, color: "#fde68a", lineHeight: 1.5 }}>{w}</div>
               ))}
@@ -1145,7 +1109,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
             <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '1.5rem', marginTop: '1.5rem' }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginBottom: 12 }}>Assurance readiness — ISO 14064-3 / ISAE 3410</div>
               {[
-                { label: 'Emission factors cited with source and year', done: true, note: 'EPA 2024 (US) · ECCC v3.0 (CA) · DEFRA 2025 (UK) · eGRID 2023 · IPCC AR4 + AR5 GWP' },
+                { label: 'Emission factors cited with source and year', done: true, note: 'EPA 2024 · eGRID 2023 · IPCC AR4 + AR5 GWP' },
                 { label: 'Calculation workings documented per source', done: true, note: 'Full formula shown for every emission source' },
                 { label: 'Organizational boundary documented', done: !!inventory.boundary_approach, note: inventory.boundary_approach.replace(/_/g, ' ') },
                 { label: 'Source documents uploaded', done: isPaid && inventory.locations.some(l => l.source_docs.length > 0), note: isPaid ? `${inventory.locations.reduce((a, l) => a + l.source_docs.length, 0)} documents` : 'Available on paid plan' },
