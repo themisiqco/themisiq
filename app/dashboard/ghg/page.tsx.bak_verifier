@@ -1369,7 +1369,6 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
               )
             })}
           </div>
-          <VerifierInvite inventoryId={inventoryId} />
         </div>
       </div>
     )
