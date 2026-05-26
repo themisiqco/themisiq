@@ -21,7 +21,7 @@ const METHODOLOGIES = [
       },
       {
         title: 'Emission factors',
-        content: 'Stationary and mobile combustion factors are sourced from the US EPA (2024) for US locations and Environment and Climate Change Canada (ECCC) "Emission factors and reference values" v3.0 for Canadian locations, with DEFRA/DESNZ (2023) for other international locations. For Canadian locations, natural gas CO₂ factors are applied per province (ECCC marketable values), and natural gas is reported in m³ or Mcf. Electricity emission factors use eGRID 2023 for US locations and ECCC NIR factors for Canadian provinces. All factors are versioned, country-matched, and cited in exports.',
+        content: 'Stationary combustion and mobile combustion factors are sourced from the US EPA (2024) and DEFRA/DESNZ (2023). Electricity emission factors use eGRID 2023 for US locations and IEA grid factors for international locations. All factors are versioned and cited in exports.',
       },
       {
         title: 'Scope 2 accounting',
