@@ -27,44 +27,8 @@ const EF = {
   steam_mmbtu: 66.33,
 }
 
-// Canadian combustion factors — ECCC "Emission factors and reference values" v3.0 (Oct 2025).
-// Stored as kg per activity unit (raw gas amounts; calcGas applies GWP). Source values are g/unit.
-// Mirrors the US EF key structure so factor selection is a clean country swap, with two exceptions:
-//   - natural_gas CO2 is per-province (see EF_CA_NG_CO2); the value below is a fallback only.
-//   - therms/mmbtu have no ECCC energy-basis factor — CA natural gas uses mcf/m3 only (handled in UI).
-// CH4/N2O use the Commercial/Industrial sector rows (Tables 2.x: ~0.037 CH4; 4.x Industrial for oils).
-// Combustion factors are year-stable across ECCC 2023/24, 2025, 2026, so no year dimension is needed.
-const EF_CA = {
-  // Natural gas: per m3 in source (1921 g CO2/m3 Ontario fallback; per-province override via EF_CA_NG_CO2).
-  // mcf conversion: 1 mcf = 28.3168 m3. CH4 0.037 g/m3, N2O 0.035 g/m3 (Res/Comm/Institutional).
-  natural_gas_mcf: { co2: 54.396611, ch4: 0.001048, n2o: 0.000991 },
-  natural_gas_m3: { co2: 1.921, ch4: 0.000037, n2o: 0.000035 },
-  // Propane "All Other Uses" (Table 3.x): 1515 / 0.024 / 0.108 g/L. gallon = litre × 3.78541.
-  propane_litre: { co2: 1.515, ch4: 0.000024, n2o: 0.000108 },
-  propane_gallon: { co2: 5.734896, ch4: 0.000091, n2o: 0.000409 },
-  // Diesel "Refineries and Others" (Table 4.x): 2681 / 0.078 / 0.022 g/L.
-  diesel_litre: { co2: 2.681, ch4: 0.000078, n2o: 0.000022 },
-  diesel_gallon: { co2: 10.148684, ch4: 0.000295, n2o: 0.000083 },
-  // Light fuel oil "Industrial" (Table 4.x): 2753 / 0.006 / 0.031 g/L.
-  fuel_oil_gallon: { co2: 10.421234, ch4: 0.000023, n2o: 0.000117 },
-  // Motor gasoline (Table 4.x): 2307 / 0.100 / 0.02 g/L.
-  gasoline_litre: { co2: 2.307, ch4: 0.0001, n2o: 0.00002 },
-  gasoline_gallon: { co2: 8.732941, ch4: 0.000379, n2o: 0.000076 },
-  diesel_mobile_litre: { co2: 2.681, ch4: 0.000078, n2o: 0.000022 },
-  diesel_mobile_gallon: { co2: 10.148684, ch4: 0.000295, n2o: 0.000083 },
-}
-
-// Per-province natural gas CO2 (kg/m3) — ECCC Tables 1.1–1.3, "Marketable" column, year-stable.
-// Used to override EF_CA.natural_gas_*.co2 for the location's province. CH4/N2O stay sector-based.
-const EF_CA_NG_CO2_M3: Record<string, number> = {
-  BC: 1.966, AB: 1.962, SK: 1.920, MB: 1.915, ON: 1.921, QC: 1.926,
-  NB: 1.919, NS: 1.919, PE: 1.919, NL: 1.919, YT: 1.966, NT: 1.966, NU: 1.966,
-}
-const M3_PER_MCF = 1000 / 35.3147 // 28.3168
-
 const EF_SOURCES = {
   combustion: 'US EPA (2024) Emission Factors for Greenhouse Gas Inventories',
-  combustion_ca: 'ECCC (2025) Emission factors and reference values v3.0',
   electricity: 'US EPA eGRID2023 (US) / ECCC v3.0 NIR 1990-2023 (Canada)',
   gwp_ar4: 'IPCC AR4 (2007) — required by CARB SB 253 and CDP default',
   gwp_ar5: 'IPCC AR5 (2014) — required by ESRS E1 and GRI 305',
@@ -172,7 +136,7 @@ interface SourceDoc { id: string; file_name: string; document_type: string; uplo
 
 interface Location {
  id: string; name: string; country: string; state?: string; province?: string; region?: string
-  has_natural_gas: boolean; natural_gas_amount: number; natural_gas_unit: 'mcf' | 'therms' | 'mmbtu' | 'm3'
+  has_natural_gas: boolean; natural_gas_amount: number; natural_gas_unit: 'mcf' | 'therms' | 'mmbtu'
   has_propane: boolean; propane_amount: number; propane_unit: 'gallons' | 'litres'
   has_diesel_stationary: boolean; diesel_stationary_amount: number; diesel_stationary_unit: 'gallons' | 'litres'
   has_fuel_oil: boolean; fuel_oil_gallons: number
@@ -207,20 +171,6 @@ const emptyLocation = (id: string, name: string, state = ''): Location => ({
   source_docs: [],
 })
 
-// Natural gas units offered per country. CA uses mcf/m3 only (ECCC has no energy-basis
-// factor for therms/mmbtu). US keeps all three. Returned as [value, label] pairs.
-function ngUnitOptions(country: string): Array<[string, string]> {
-  const isCA = (country || '').toUpperCase().trim() === 'CA'
-  return isCA
-    ? [['m3', 'm³'], ['mcf', 'Mcf']]
-    : [['mcf', 'Mcf'], ['therms', 'Therms'], ['mmbtu', 'MMBtu']]
-}
-// Snap a natural gas unit to a valid one for the given country (used when country changes).
-function normalizeNgUnit(country: string, unit: string): string {
-  const valid = ngUnitOptions(country).map(([v]) => v)
-  return valid.includes(unit) ? unit : valid[0]
-}
-
 
 function validateElectricity(kwh: number): string | null {
   if (kwh > 0 && kwh < 1000) return "u26a0 This seems low for a commercial location u2014 please confirm this is the annual total, not a single month."
@@ -239,30 +189,6 @@ function validateCompleteness(loc: Location): string[] {
   return warnings
 }
 
-// Country-aware combustion factor selection.
-// US -> EPA EF[key] (unchanged). CA -> ECCC EF_CA[key], with per-province NG CO2 override.
-// Falls back to EF[key] if a CA key is missing, so a CA location can never silently zero out.
-function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA): { co2: number; ch4: number; n2o: number } {
-  const isCA = (loc.country || '').toUpperCase().trim() === 'CA'
-  if (!isCA) return (EF as any)[key] as { co2: number; ch4: number; n2o: number }
-  const caBase = (EF_CA as any)[key] as { co2: number; ch4: number; n2o: number } | undefined
-  const ef = caBase ? { ...caBase } : ({ ...((EF as any)[key] as { co2: number; ch4: number; n2o: number }) })
-  // Per-province natural gas CO2 override (CH4/N2O remain sector-based).
-  if (key === 'natural_gas_mcf' || key === 'natural_gas_m3') {
-    const prov = (loc.grid_region || loc.province || '').toUpperCase().trim()
-    const provCo2M3 = EF_CA_NG_CO2_M3[prov]
-    if (provCo2M3 !== undefined) {
-      ef.co2 = key === 'natural_gas_mcf' ? provCo2M3 * M3_PER_MCF : provCo2M3
-    }
-  }
-  return ef
-}
-
-// Source citation for a combustion row, country-aware (ECCC for CA, EPA for US).
-function combustionSource(loc: Location): string {
-  return (loc.country || '').toUpperCase().trim() === 'CA' ? EF_SOURCES.combustion_ca : EF_SOURCES.combustion
-}
-
 function calcGas(ef: { co2: number; ch4: number; n2o: number }, amount: number, gwpVersion: 'AR4' | 'AR5') {
   const gwp = GWP[gwpVersion]
   return {
@@ -277,32 +203,32 @@ function calcLocation(loc: Location, gwpVersion: 'AR4' | 'AR5' = 'AR4', year: nu
   let s1_stationary = 0, s1_mobile = 0
   const gases = { co2: 0, ch4: 0, n2o: 0 }
   if (loc.has_natural_gas && loc.natural_gas_amount > 0) {
-    const ef = pickEF(loc, `natural_gas_${loc.natural_gas_unit}` as keyof typeof EF)
+    const ef = EF[`natural_gas_${loc.natural_gas_unit}` as keyof typeof EF] as { co2: number; ch4: number; n2o: number }
     const g = calcGas(ef, loc.natural_gas_amount, gwpVersion)
     s1_stationary += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
   }
   if (loc.has_propane && loc.propane_amount > 0) {
-    const ef = pickEF(loc, `propane_${loc.propane_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF)
+    const ef = EF[`propane_${loc.propane_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF] as { co2: number; ch4: number; n2o: number }
     const g = calcGas(ef, loc.propane_amount, gwpVersion)
     s1_stationary += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
   }
   if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0) {
-    const ef = pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF)
+    const ef = EF[`diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF] as { co2: number; ch4: number; n2o: number }
     const g = calcGas(ef, loc.diesel_stationary_amount, gwpVersion)
     s1_stationary += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
   }
   if (loc.has_fuel_oil && loc.fuel_oil_gallons > 0) {
-    const g = calcGas(pickEF(loc, 'fuel_oil_gallon'), loc.fuel_oil_gallons, gwpVersion)
+    const g = calcGas(EF.fuel_oil_gallon as any, loc.fuel_oil_gallons, gwpVersion)
     s1_stationary += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
   }
   if (loc.has_mobile) {
     if (loc.gasoline_amount > 0) {
-      const ef = pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF)
+      const ef = EF[`gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF] as { co2: number; ch4: number; n2o: number }
       const g = calcGas(ef, loc.gasoline_amount, gwpVersion)
       s1_mobile += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
     }
     if (loc.diesel_mobile_amount > 0) {
-      const ef = pickEF(loc, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF)
+      const ef = EF[`diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF] as { co2: number; ch4: number; n2o: number }
       const g = calcGas(ef, loc.diesel_mobile_amount, gwpVersion)
       s1_mobile += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
     }
@@ -336,15 +262,15 @@ function buildWorkings(locations: Location[], gwpVersion: 'AR4' | 'AR5' = 'AR4',
   const pushFuel = (loc: Location, source: string, scope: number, activity: number, unit: string, ef: { co2: number; ch4: number; n2o: number }) => {
     const g = calcGas(ef, activity, gwpVersion)
     rows.push({ location: loc.name || 'Location', source, scope, activity_data: activity, activity_unit: unit,
-      emission_factor: `CO2 ${ef.co2}, CH4 ${ef.ch4}, N2O ${ef.n2o} kg/${unit}`, ef_source: combustionSource(loc), gwp_basis: gwpVersion, result_tco2e: g.total })
+      emission_factor: `CO2 ${ef.co2}, CH4 ${ef.ch4}, N2O ${ef.n2o} kg/${unit}`, ef_source: EF_SOURCES.combustion, gwp_basis: gwpVersion, result_tco2e: g.total })
   }
   for (const loc of locations) {
-    if (loc.has_natural_gas && loc.natural_gas_amount > 0) pushFuel(loc, 'Natural gas', 1, loc.natural_gas_amount, loc.natural_gas_unit, pickEF(loc, `natural_gas_${loc.natural_gas_unit}` as keyof typeof EF))
-    if (loc.has_propane && loc.propane_amount > 0) pushFuel(loc, 'Propane', 1, loc.propane_amount, loc.propane_unit, pickEF(loc, `propane_${loc.propane_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF))
-    if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0) pushFuel(loc, 'Diesel (stationary)', 1, loc.diesel_stationary_amount, loc.diesel_stationary_unit, pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF))
-    if (loc.has_fuel_oil && loc.fuel_oil_gallons > 0) pushFuel(loc, 'Fuel oil', 1, loc.fuel_oil_gallons, 'gallons', pickEF(loc, 'fuel_oil_gallon'))
-    if (loc.has_mobile && loc.gasoline_amount > 0) pushFuel(loc, 'Gasoline (mobile)', 1, loc.gasoline_amount, loc.gasoline_unit, pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF))
-    if (loc.has_mobile && loc.diesel_mobile_amount > 0) pushFuel(loc, 'Diesel (mobile)', 1, loc.diesel_mobile_amount, loc.diesel_mobile_unit, pickEF(loc, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF))
+    if (loc.has_natural_gas && loc.natural_gas_amount > 0) pushFuel(loc, 'Natural gas', 1, loc.natural_gas_amount, loc.natural_gas_unit, EF[`natural_gas_${loc.natural_gas_unit}` as keyof typeof EF] as any)
+    if (loc.has_propane && loc.propane_amount > 0) pushFuel(loc, 'Propane', 1, loc.propane_amount, loc.propane_unit, EF[`propane_${loc.propane_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF] as any)
+    if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0) pushFuel(loc, 'Diesel (stationary)', 1, loc.diesel_stationary_amount, loc.diesel_stationary_unit, EF[`diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF] as any)
+    if (loc.has_fuel_oil && loc.fuel_oil_gallons > 0) pushFuel(loc, 'Fuel oil', 1, loc.fuel_oil_gallons, 'gallons', EF.fuel_oil_gallon as any)
+    if (loc.has_mobile && loc.gasoline_amount > 0) pushFuel(loc, 'Gasoline (mobile)', 1, loc.gasoline_amount, loc.gasoline_unit, EF[`gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF] as any)
+    if (loc.has_mobile && loc.diesel_mobile_amount > 0) pushFuel(loc, 'Diesel (mobile)', 1, loc.diesel_mobile_amount, loc.diesel_mobile_unit, EF[`diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF] as any)
     if (!loc.uses_ammonia && loc.has_hfc_refrigerants && loc.refrigerant_purchased_kg > 0) {
       const ref_gwp = (EF[loc.refrigerant_type as keyof typeof EF] as number) || 0
       rows.push({ location: loc.name || 'Location', source: `Refrigerant (${loc.refrigerant_type})`, scope: 1, activity_data: loc.refrigerant_purchased_kg, activity_unit: 'kg', emission_factor: `GWP ${ref_gwp}`, ef_source: 'IPCC GWP', gwp_basis: gwpVersion, result_tco2e: loc.refrigerant_purchased_kg * ref_gwp / 1000 })
@@ -633,7 +559,6 @@ const searchParams = useSearchParams()
       locs[idx] = { ...locs[idx], [field]: value }
      if (field === 'state') locs[idx].grid_region = detectGridRegion(value, 'US')
 if (field === 'province') locs[idx].grid_region = value // Canadian provinces map directly
-      if (field === 'country') locs[idx].natural_gas_unit = normalizeNgUnit(value, locs[idx].natural_gas_unit) as any
       return { ...inv, locations: locs }
     })
   }
@@ -844,7 +769,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <p style={qHint}>What unit does your gas supplier show on bills?</p>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-                    {ngUnitOptions(loc.country).map(([val, label]) => (
+                    {[['mcf', 'Mcf'], ['therms', 'Therms'], ['mmbtu', 'MMBtu']].map(([val, label]) => (
                       <button key={val} onClick={() => updateLocation(activeLocation, 'natural_gas_unit', val)} style={unitBtn(loc.natural_gas_unit === val)}>{label}</button>
                     ))}
                   </div>
@@ -1085,14 +1010,16 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                         <thead><tr>{['Source', 'Activity data', 'Emission factor', 'Factor source', 'GWP basis', 'Result (mtCO₂e)'].map(h => <th key={h} style={{ background: '#f8f7f5', padding: '6px 10px', textAlign: 'left', fontSize: 10, fontWeight: 600, color: '#888784', borderBottom: '0.5px solid #e8e7e4' }}>{h}</th>)}</tr></thead>
                         <tbody>
                           {loc.has_natural_gas && loc.natural_gas_amount > 0 && (() => {
-                            const ef = pickEF(loc, `natural_gas_${loc.natural_gas_unit}` as keyof typeof EF)
+                            const efKey = `natural_gas_${loc.natural_gas_unit}` as keyof typeof EF
+                            const ef = EF[efKey] as { co2: number; ch4: number; n2o: number }
                             const total = (ef.co2 + ef.ch4 * GWP.AR4.CH4 + ef.n2o * GWP.AR4.N2O) * loc.natural_gas_amount / 1000
-                            return <tr><td style={wTd}>Natural gas</td><td style={wTd}>{loc.natural_gas_amount} {loc.natural_gas_unit}</td><td style={wTd}>{(ef.co2 + ef.ch4 * GWP.AR4.CH4 + ef.n2o * GWP.AR4.N2O).toFixed(3)} kg CO₂e/{loc.natural_gas_unit}</td><td style={wTd}>{combustionSource(loc)}</td><td style={wTd}>AR4</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
+                            return <tr><td style={wTd}>Natural gas</td><td style={wTd}>{loc.natural_gas_amount} {loc.natural_gas_unit}</td><td style={wTd}>{(ef.co2 + ef.ch4 * GWP.AR4.CH4 + ef.n2o * GWP.AR4.N2O).toFixed(3)} kg CO₂e/{loc.natural_gas_unit}</td><td style={wTd}>{EF_SOURCES.combustion}</td><td style={wTd}>AR4</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
                           })()}
                           {loc.has_propane && loc.propane_amount > 0 && (() => {
-                            const ef = pickEF(loc, `propane_${loc.propane_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF)
+                            const efKey = `propane_${loc.propane_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF
+                            const ef = EF[efKey] as { co2: number; ch4: number; n2o: number }
                             const total = (ef.co2 + ef.ch4 * GWP.AR4.CH4 + ef.n2o * GWP.AR4.N2O) * loc.propane_amount / 1000
-                            return <tr><td style={wTd}>Propane</td><td style={wTd}>{loc.propane_amount} {loc.propane_unit}</td><td style={wTd}>{(ef.co2 + ef.ch4 * GWP.AR4.CH4 + ef.n2o * GWP.AR4.N2O).toFixed(3)} kg CO₂e/{loc.propane_unit === 'gallons' ? 'gal' : 'L'}</td><td style={wTd}>{combustionSource(loc)}</td><td style={wTd}>AR4</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
+                            return <tr><td style={wTd}>Propane</td><td style={wTd}>{loc.propane_amount} {loc.propane_unit}</td><td style={wTd}>{(ef.co2 + ef.ch4 * GWP.AR4.CH4 + ef.n2o * GWP.AR4.N2O).toFixed(3)} kg CO₂e/{loc.propane_unit === 'gallons' ? 'gal' : 'L'}</td><td style={wTd}>{EF_SOURCES.combustion}</td><td style={wTd}>AR4</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
                           })()}
                           {loc.electricity_kwh > 0 && (() => {
                             const ef = getGridFactor(loc.grid_region, inventory.reporting_year).ef
