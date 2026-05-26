@@ -488,19 +488,22 @@ const searchParams = useSearchParams()
   const isPaid = true // TODO: wire to Stripe
 
   useEffect(() => {
+    const loadId = searchParams.get('id')
+    if (!loadId) return  // no id -> start clean (no auto-load of a random inventory)
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-    if (!session) { return }
-      const { data } = await supabase
+      if (!session) { return }
+      const { data, error } = await supabase
         .from('ghg_inventories')
-
         .select('*')
-        .eq('reporting_year', 2024)
-        .single()
+        .eq('id', loadId)
+        .maybeSingle()
+      if (error) { console.error('Load failed:', error); return }
       if (data) {
         setInventoryId(data.id)
         setInventory(inv => ({
           ...inv,
           company_name: data.company_name || '',
+          reporting_year: data.reporting_year || inv.reporting_year,
           revenue_millions: data.revenue_millions || 0,
           employee_count: data.employee_count || 0,
           boundary_approach: data.boundary_approach || 'operational_control',
@@ -513,7 +516,7 @@ const searchParams = useSearchParams()
         setSaved(true)
       }
     })
-  }, [])
+  }, [searchParams])
 
   const updateLocation = (idx: number, field: keyof Location, value: any) => {
     setInventory(inv => {
