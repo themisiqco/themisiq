@@ -88,37 +88,10 @@ const EF_UK = {
   gasoline_gallon: { co2: 7.832619, ch4: 0, n2o: 0 },
 }
 
-// EU combustion factors — IPCC 2006 Guidelines Vol.2 Tier-1 defaults (fossil, full oxidation),
-// converted to per-unit via standard net calorific values and densities. CO2 from Ch.1 Table 1.4;
-// CH4/N2O stationary defaults from Ch.2. Gas split is stored (calcGas applies AR4/AR5).
-// BASIS NOTE: these are 100% fossil Tier-1 defaults — they reconcile with ECCC (±1%) and run
-// ~5–11% above DEFRA's blended figures purely because DEFRA excludes biofuel content. This is the
-// agreed verifier-defensible EU baseline (proceeding on internal recommendation, not verifier sign-off).
-// Metric units are the EU norm: natural gas m3, liquids litres. gallon/mcf are non-breaking fallbacks.
-const EF_EU = {
-  // Natural gas, per m3 (CO2 56100 kg/TJ × ~36 MJ/m3 net): 2.0196 kg CO2/m3.
-  natural_gas_m3: { co2: 2.0196, ch4: 0.000036, n2o: 0.0000036 },
-  natural_gas_mcf: { co2: 57.188649, ch4: 0.001019406, n2o: 0.000101941 },
-  // Propane/LPG (CO2 63100 kg/TJ, NCV 47.3, dens 0.510): 1.52216 kg CO2/L.
-  propane_litre: { co2: 1.52216, ch4: 0.0000241, n2o: 0.0000024 },
-  propane_gallon: { co2: 5.762, ch4: 0.000091228, n2o: 0.000009085 },
-  // Diesel/gas oil (CO2 74100 kg/TJ, NCV 43.0, dens 0.844): 2.68924 kg CO2/L.
-  diesel_litre: { co2: 2.68924, ch4: 0.0001089, n2o: 0.0000218 },
-  diesel_gallon: { co2: 10.179876, ch4: 0.000412231, n2o: 0.000082522 },
-  diesel_mobile_litre: { co2: 2.68924, ch4: 0.0001089, n2o: 0.0000218 },
-  diesel_mobile_gallon: { co2: 10.179876, ch4: 0.000412231, n2o: 0.000082522 },
-  // Residual fuel oil (CO2 77400 kg/TJ, NCV 40.4, dens 0.990): 3.09569 kg CO2/L → per US-gallon fallback.
-  fuel_oil_gallon: { co2: 11.718456, ch4: 0.000454249, n2o: 0.00009085 },
-  // Motor gasoline (CO2 69300 kg/TJ, NCV 44.3, dens 0.745): 2.28714 kg CO2/L.
-  gasoline_litre: { co2: 2.28714, ch4: 0.000099, n2o: 0.0000198 },
-  gasoline_gallon: { co2: 8.657763, ch4: 0.000374756, n2o: 0.000074951 },
-}
-
 const EF_SOURCES = {
   combustion: 'US EPA (2024) Emission Factors for Greenhouse Gas Inventories',
   combustion_ca: 'ECCC (2025) Emission factors and reference values v3.0',
   combustion_uk: 'UK DEFRA/DESNZ (2025) GHG Conversion Factors for Company Reporting',
-  combustion_eu: 'IPCC (2006) Guidelines Vol.2 — Tier 1 default combustion factors',
   electricity: 'US EPA eGRID2023 (US) / ECCC v3.0 (CA) / DEFRA 2025 (UK) / EEA 2023 (EU)',
   gwp_ar4: 'IPCC AR4 (2007) — required by CARB SB 253 and CDP default',
   gwp_ar5: 'IPCC AR5 (2014) — required by ESRS E1 and GRI 305',
@@ -300,7 +273,6 @@ function ngUnitOptions(country: string): Array<[string, string]> {
   const ctry = (country || '').toUpperCase().trim()
   if (ctry === 'CA') return [['m3', 'm³'], ['mcf', 'Mcf']]
   if (ctry === 'GB' || ctry === 'UK') return [['kwh', 'kWh']]
-  if (EU_COUNTRIES.includes(ctry)) return [['m3', 'm³']]
   return [['mcf', 'Mcf'], ['therms', 'Therms'], ['mmbtu', 'MMBtu']]
 }
 // Snap a natural gas unit to a valid one for the given country (used when country changes).
@@ -329,17 +301,13 @@ function validateCompleteness(loc: Location): string[] {
 
 // Country-aware combustion factor selection.
 // US -> EPA EF[key] (unchanged). CA -> ECCC EF_CA[key], with per-province NG CO2 override.
-// GB/UK -> DEFRA EF_UK[key] (national). EU member -> IPCC EF_EU[key] (national Tier-1 defaults).
+// GB/UK -> DEFRA EF_UK[key] (national, no province override).
 // Falls back to EF[key] if a country key is missing, so a location can never silently zero out.
-function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof typeof EF_UK | keyof typeof EF_EU): { co2: number; ch4: number; n2o: number } {
+function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof typeof EF_UK): { co2: number; ch4: number; n2o: number } {
   const ctry = (loc.country || '').toUpperCase().trim()
   if (ctry === 'GB' || ctry === 'UK') {
     const ukBase = (EF_UK as any)[key] as { co2: number; ch4: number; n2o: number } | undefined
     return ukBase ? { ...ukBase } : ({ ...((EF as any)[key] as { co2: number; ch4: number; n2o: number }) })
-  }
-  if (EU_COUNTRIES.includes(ctry)) {
-    const euBase = (EF_EU as any)[key] as { co2: number; ch4: number; n2o: number } | undefined
-    return euBase ? { ...euBase } : ({ ...((EF as any)[key] as { co2: number; ch4: number; n2o: number }) })
   }
   if (ctry !== 'CA') return (EF as any)[key] as { co2: number; ch4: number; n2o: number }
   const caBase = (EF_CA as any)[key] as { co2: number; ch4: number; n2o: number } | undefined
@@ -355,12 +323,11 @@ function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof
   return ef
 }
 
-// Source citation for a combustion row, country-aware (ECCC for CA, DEFRA for GB/UK, IPCC for EU, EPA otherwise).
+// Source citation for a combustion row, country-aware (ECCC for CA, DEFRA for GB/UK, EPA otherwise).
 function combustionSource(loc: Location): string {
   const ctry = (loc.country || '').toUpperCase().trim()
   if (ctry === 'CA') return EF_SOURCES.combustion_ca
   if (ctry === 'GB' || ctry === 'UK') return EF_SOURCES.combustion_uk
-  if (EU_COUNTRIES.includes(ctry)) return EF_SOURCES.combustion_eu
   return EF_SOURCES.combustion
 }
 
@@ -739,15 +706,6 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         // UK and EU grids are national — set grid_region directly from the country.
         const gr = gridRegionForCountry(value)
         if (gr) locs[idx].grid_region = gr
-        // Metric countries (CA, UK, EU) default liquid fuels to litres; US/other keep gallons.
-        const ctryUp = (value || '').toUpperCase().trim()
-        const metric = ctryUp === 'CA' || ctryUp === 'GB' || ctryUp === 'UK' || EU_COUNTRIES.includes(ctryUp)
-        if (metric) {
-          locs[idx].propane_unit = 'litres'
-          locs[idx].diesel_stationary_unit = 'litres'
-          locs[idx].gasoline_unit = 'litres'
-          locs[idx].diesel_mobile_unit = 'litres'
-        }
       }
       return { ...inv, locations: locs }
     })
