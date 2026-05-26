@@ -92,7 +92,7 @@ const EF_SOURCES = {
   combustion: 'US EPA (2024) Emission Factors for Greenhouse Gas Inventories',
   combustion_ca: 'ECCC (2025) Emission factors and reference values v3.0',
   combustion_uk: 'UK DEFRA/DESNZ (2025) GHG Conversion Factors for Company Reporting',
-  electricity: 'US EPA eGRID2023 (US) / ECCC v3.0 (CA) / DEFRA 2025 (UK) / EEA 2023 (EU)',
+  electricity: 'US EPA eGRID2023 (US) / ECCC v3.0 NIR 1990-2023 (Canada)',
   gwp_ar4: 'IPCC AR4 (2007) — required by CARB SB 253 and CDP default',
   gwp_ar5: 'IPCC AR5 (2014) — required by ESRS E1 and GRI 305',
 }
@@ -127,18 +127,6 @@ const GRID_EF: Record<string, Record<number, number>> = {
   US_UT: { 2023: 0.6447 }, US_VA: { 2023: 0.2448 }, US_VT: { 2023: 0.0237 }, US_WA: { 2023: 0.1209 },
   US_WI: { 2023: 0.5278 }, US_WV: { 2023: 0.8931 }, US_WY: { 2023: 0.8316 },
   US_AVG: { 2023: 0.3497 },
-  // United Kingdom — DEFRA/DESNZ 2025, "UK electricity" generation factor (location-based, excl. T&D)
-  UK: { 2025: 0.177 },
-  // EU member states — EEA "GHG emission intensity of electricity generation, country level" (2023),
-  // gCO2e/kWh ÷ 1000. Generation-based, location-based Scope 2. EU_AVG = EEA EU-27 aggregate.
-  EU_AT: { 2023: 0.085 }, EU_BE: { 2023: 0.145 }, EU_BG: { 2023: 0.281 }, EU_HR: { 2023: 0.134 },
-  EU_CY: { 2023: 0.585 }, EU_CZ: { 2023: 0.440 }, EU_DK: { 2023: 0.094 }, EU_EE: { 2023: 0.690 },
-  EU_FI: { 2023: 0.040 }, EU_FR: { 2023: 0.050 }, EU_DE: { 2023: 0.329 }, EU_EL: { 2023: 0.258 },
-  EU_HU: { 2023: 0.154 }, EU_IE: { 2023: 0.260 }, EU_IT: { 2023: 0.225 }, EU_LV: { 2023: 0.067 },
-  EU_LT: { 2023: 0.124 }, EU_LU: { 2023: 0.056 }, EU_MT: { 2023: 0.342 }, EU_NL: { 2023: 0.263 },
-  EU_PL: { 2023: 0.614 }, EU_PT: { 2023: 0.119 }, EU_RO: { 2023: 0.234 }, EU_SK: { 2023: 0.084 },
-  EU_SI: { 2023: 0.176 }, EU_ES: { 2023: 0.158 }, EU_SE: { 2023: 0.008 },
-  EU_AVG: { 2023: 0.210 },
 }
 function getGridFactor(region: string, year: number): { ef: number; usedRegion: string; usedYear: number } {
   const table = GRID_EF[region]
@@ -151,18 +139,6 @@ function getGridFactor(region: string, year: number): { ef: number; usedRegion: 
 }
 const CA_PROVINCES = ['BC', 'AB', 'SK', 'MB', 'ON', 'QC', 'NB', 'NS', 'PE', 'NL', 'YT', 'NT', 'NU']
 const US_STATES = ['AK','AL','AR','AZ','CA','CO','CT','DC','DE','FL','GA','HI','IA','ID','IL','IN','KS','KY','LA','MA','MD','ME','MI','MN','MO','MS','MT','NC','ND','NE','NH','NJ','NM','NV','NY','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VA','VT','WA','WI','WV','WY']
-// EU-27 ISO codes (EL = Greece per EEA/EU convention). Maps country -> EU_XX grid key.
-const EU_COUNTRIES = ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','EL','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE']
-// EU-27 dropdown options: [ISO, label with flag], alphabetical by country name.
-const EU_COUNTRY_OPTIONS: Array<[string, string]> = [
-  ['AT','🇦🇹 Austria'],['BE','🇧🇪 Belgium'],['BG','🇧🇬 Bulgaria'],['HR','🇭🇷 Croatia'],
-  ['CY','🇨🇾 Cyprus'],['CZ','🇨🇿 Czechia'],['DK','🇩🇰 Denmark'],['EE','🇪🇪 Estonia'],
-  ['FI','🇫🇮 Finland'],['FR','🇫🇷 France'],['DE','🇩🇪 Germany'],['EL','🇬🇷 Greece'],
-  ['HU','🇭🇺 Hungary'],['IE','🇮🇪 Ireland'],['IT','🇮🇹 Italy'],['LV','🇱🇻 Latvia'],
-  ['LT','🇱🇹 Lithuania'],['LU','🇱🇺 Luxembourg'],['MT','🇲🇹 Malta'],['NL','🇳🇱 Netherlands'],
-  ['PL','🇵🇱 Poland'],['PT','🇵🇹 Portugal'],['RO','🇷🇴 Romania'],['SK','🇸🇰 Slovakia'],
-  ['SI','🇸🇮 Slovenia'],['ES','🇪🇸 Spain'],['SE','🇸🇪 Sweden'],
-]
 function detectGridRegion(code: string, country?: string): string {
   const c = (code || '').toUpperCase().trim()
   const ctry = (country || '').toUpperCase().trim()
@@ -170,14 +146,6 @@ function detectGridRegion(code: string, country?: string): string {
   if (CA_PROVINCES.includes(c) && !US_STATES.includes(c)) return c
   if (US_STATES.includes(c)) return 'US_' + c
   return 'US_AVG'
-}
-// Country-level grid region for countries whose grid factor is national (UK, EU members).
-// Returns the GRID_EF key, or '' if the country isn't one we map at country level.
-function gridRegionForCountry(country: string): string {
-  const ctry = (country || '').toUpperCase().trim()
-  if (ctry === 'GB' || ctry === 'UK') return 'UK'
-  if (EU_COUNTRIES.includes(ctry)) return 'EU_' + ctry
-  return ''
 }
 const GRID_REGIONS_CA = CA_PROVINCES.map(p => { const y = GRID_EF[p]; const latest = Math.max(...Object.keys(y).map(Number)); return { value: p, label: p, ef: y[latest] } })
 const GRID_REGIONS_US = US_STATES.map(s => { const y = GRID_EF['US_' + s]; const latest = Math.max(...Object.keys(y).map(Number)); return { value: 'US_' + s, label: s, ef: y[latest] } })
@@ -701,12 +669,7 @@ const searchParams = useSearchParams()
       locs[idx] = { ...locs[idx], [field]: value }
      if (field === 'state') locs[idx].grid_region = detectGridRegion(value, 'US')
 if (field === 'province') locs[idx].grid_region = value // Canadian provinces map directly
-      if (field === 'country') {
-        locs[idx].natural_gas_unit = normalizeNgUnit(value, locs[idx].natural_gas_unit) as any
-        // UK and EU grids are national — set grid_region directly from the country.
-        const gr = gridRegionForCountry(value)
-        if (gr) locs[idx].grid_region = gr
-      }
+      if (field === 'country') locs[idx].natural_gas_unit = normalizeNgUnit(value, locs[idx].natural_gas_unit) as any
       return { ...inv, locations: locs }
     })
   }
@@ -861,11 +824,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   <option value="US">🇺🇸 USA</option>
   <option value="CA">🇨🇦 Canada</option>
   <option value="GB">🇬🇧 UK</option>
-  <optgroup label="European Union">
-    {EU_COUNTRY_OPTIONS.map(([code, label]) => (
-      <option key={code} value={code}>{label}</option>
-    ))}
-  </optgroup>
+  <option value="DE">🇩🇪 Germany</option>
+  <option value="FR">🇫🇷 France</option>
   <option value="AU">🇦🇺 Australia</option>
   <option value="OTHER">Other…</option>
 </select>
@@ -885,12 +845,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     ))}
   </select>
 )}
-{loc.country && loc.country !== 'US' && loc.country !== 'CA' && gridRegionForCountry(loc.country) && (
-  <span style={{ fontSize: 12, color: '#0F6E56', alignSelf: 'center', whiteSpace: 'nowrap' }}>
-    Grid: {gridRegionForCountry(loc.country)} ({getGridFactor(gridRegionForCountry(loc.country), inventory.reporting_year).ef} kg/kWh)
-  </span>
-)}
-{loc.country && loc.country !== 'US' && loc.country !== 'CA' && !gridRegionForCountry(loc.country) && (
+{loc.country && loc.country !== 'US' && loc.country !== 'CA' && (
   <input value={loc.region || ''} onChange={e => updateLocation(i, 'region', e.target.value)} placeholder="State/Region" style={{ ...inputStyle, width: 120 }} />
 )}
               </div>
