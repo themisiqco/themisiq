@@ -931,7 +931,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
 {loc.country === 'US' && (
   <select value={loc.state || ''} onChange={e => updateLocation(i, 'state', e.target.value)} style={{ ...inputStyle, width: 130 }}>
     <option value="">State…</option>
-    {US_STATES.map(s => (
+    {['CA','TX','NY','FL','IL','OH','PA','MA','CO','WA','OR','GA','NC','VA','MI','MN','WI','AZ','NV','NJ','DC'].map(s => (
       <option key={s} value={s}>{s}</option>
     ))}
   </select>
