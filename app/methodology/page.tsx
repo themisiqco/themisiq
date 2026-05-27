@@ -115,6 +115,11 @@ const METHODOLOGIES = [
         title: 'Limitations',
         content: 'The Materiality Assessment is a structured screening intended to scope and support a formal IFRS S2 disclosure or CSRD double-materiality assessment. A fully compliant ESRS assessment additionally requires (a) a defined materiality threshold agreed by the entity\'s governance body, and (b) stakeholder engagement informing the impact-materiality axis. The tool produces the prioritisation structure but does not replace either requirement, and outputs are not a substitute for independent professional review prior to publication.',
       },
+      {
+        title: 'Full specification',
+        content: 'The complete published methodology specification — framework basis, full risk model, scoring tables, calibration approach, and limitations — is available as a downloadable PDF for advisors, auditors and assurance providers conducting diligence.',
+        download: { href: '/themisiq-materiality-methodology.pdf', label: 'Download methodology PDF (v1.0)' },
+      },
     ],
   },
   {
@@ -251,35 +256,6 @@ export default function MethodologyPage() {
         </div>
       </div>
 
-      {/* Published methodology spec download */}
-      <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
-        <div style={{ maxWidth: 900, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: '#7425e3', marginBottom: 4 }}>Published methodology specification</div>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 4 }}>Materiality &amp; Scenario Analysis — full methodology document</div>
-            <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65 }}>The complete published specification behind ThemisIQ&apos;s IFRS S2 and CSRD double-materiality engine — framework basis, risk model, scoring scheme, calibration approach, and limitations. The artifact your auditor or assurance provider will want to see.</div>
-          </div>
-          <a
-            href="/themisiq-materiality-methodology.pdf"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: 'inline-block',
-              padding: '11px 22px',
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 600,
-              color: '#fff',
-              background: '#7425e3',
-              textDecoration: 'none',
-              whiteSpace: 'nowrap' as const,
-            }}
-          >
-            ⬇ Download PDF
-          </a>
-        </div>
-      </div>
-
       {/* Methodology sections */}
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '3rem 2.5rem' }}>
         <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '2.5rem' }}>
@@ -295,7 +271,30 @@ export default function MethodologyPage() {
                   {method.sections.map(section => (
                     <div key={section.title} style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 24, paddingBottom: 16, borderBottom: '0.5px solid #f3f4f6' }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: method.color, lineHeight: 1.4 }}>{section.title}</div>
-                      <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, fontWeight: 300 }}>{section.content}</div>
+                      <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, fontWeight: 300 }}>
+                        {section.content}
+                        {(section as any).download && (
+                          <div style={{ marginTop: 12 }}>
+                            <a
+                              href={(section as any).download.href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                display: 'inline-block',
+                                padding: '8px 16px',
+                                borderRadius: 6,
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: '#fff',
+                                background: method.color,
+                                textDecoration: 'none',
+                              }}
+                            >
+                              ⬇ {(section as any).download.label}
+                            </a>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
