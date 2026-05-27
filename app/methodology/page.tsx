@@ -61,23 +61,59 @@ const METHODOLOGIES = [
     module: 'Climate Risk',
     color: '#ba7517',
     bg: '#FEF3E2',
-    standard: 'TCFD · IPCC AR6 · NGFS Scenarios',
+    standard: 'TCFD · IPCC AR6 · IFRS S2 · ESRS E1',
     sections: [
       {
         title: 'Scenario framework',
-        content: 'ThemisIQ assesses climate risk across three IPCC-aligned scenarios: 1.5°C (rapid decarbonisation, highest transition risk), 2°C (orderly transition), and 3°C+ (delayed transition, highest physical risk). These align with TCFD, IFRS S2, and CSRD ESRS E1 scenario analysis requirements.',
+        content: 'ThemisIQ supports climate risk assessment across recognised IPCC-aligned warming pathways and NGFS finance-oriented transition scenarios. Both IFRS S2 and CSRD ESRS E1 require testing resilience across a range of scenarios rather than against a single forecast. See the Materiality Assessment methodology below for the full SSP/NGFS scenario set used by the integrated risk engine.',
       },
       {
         title: 'Physical risk data',
-        content: 'Physical risk assessments draw on IPCC AR6 Working Group II regional findings, peer-reviewed climate science, and published national adaptation plans. Hazard classifications (acute vs chronic) follow TCFD terminology.',
+        content: 'Physical risk assessments draw on IPCC AR6 Working Group I and II regional findings, peer-reviewed climate science, and published national adaptation plans. Hazard classifications follow IPCC climatic impact-driver categories and TCFD acute/chronic terminology.',
       },
       {
         title: 'Transition risk data',
-        content: 'Transition risks are mapped to IEA Net Zero 2050 pathway milestones, EU taxonomy activity classifications, and published regulatory transition timelines. Sector-specific transition risks reflect NGFS scenario narratives.',
+        content: 'Transition risks are mapped to IEA Net Zero 2050 pathway milestones, EU taxonomy activity classifications, and published regulatory transition timelines. Sector-specific transition risks reflect NGFS scenario narratives and the four TCFD transition-risk categories: policy and legal, technology, market, and reputation.',
       },
       {
         title: 'Disclosure alignment',
-        content: 'Output is structured to support TCFD four-pillar disclosure (Governance, Strategy, Risk Management, Metrics & Targets), IFRS S2 climate-related disclosures, and CSRD ESRS E1 climate change requirements.',
+        content: 'Output is structured to support TCFD four-pillar disclosure (Governance, Strategy, Risk Management, Metrics & Targets), IFRS S2 climate-related disclosures, CSRD ESRS E1 climate change requirements, and California SB 261 climate-related financial risk reporting.',
+      },
+    ],
+  },
+  {
+    module: 'Materiality Assessment',
+    color: '#7425e3',
+    bg: '#EDE9FE',
+    standard: 'IFRS S2 single materiality · CSRD ESRS double materiality · IPCC AR6 · TCFD',
+    sections: [
+      {
+        title: 'Primary standards',
+        content: 'ThemisIQ supports two distinct materiality determination modes kept architecturally separate because they answer fundamentally different questions: IFRS S2 single (financial) materiality — how climate-related risks affect the entity\'s enterprise value, cash flows and access to finance — and CSRD ESRS double materiality, which retains the financial axis and adds impact materiality (how the entity affects people and the environment). Double materiality is operationalised as the union of the two axes: a topic is reportable if material on either.',
+      },
+      {
+        title: 'Risk model',
+        content: 'Material climate risk is modelled as the product of four factors. Physical risk = industry sensitivity × IPCC AR6 regional hazard exposure × scenario severity × time horizon. Transition risk = industry carbon exposure × jurisdictional policy intensity × scenario policy-speed × time horizon. Physical and transition geographies are deliberately distinct: physical exposure depends on where assets are; transition exposure depends on which regulatory regimes apply. A risk is flagged only where industry sensitivity intersects with real regional or jurisdictional exposure — preventing common false-positives.',
+      },
+      {
+        title: 'Scenario framework',
+        content: 'Scenarios use two public, widely-adopted sets. IPCC Shared Socioeconomic Pathways (SSP1-2.6, SSP2-4.5, SSP5-8.5) provide the warming dimension. NGFS scenarios (Orderly, Disorderly, Hot House) provide a finance-oriented transition dimension. Scenarios carry inverse physical and transition multipliers: high-warming pathways raise physical risk and lower transition pressure; rapid-policy pathways raise transition risk and lower physical pressure. Resilient strategy requires testing across both ends — a disclosable judgment under both IFRS S2 and ESRS.',
+      },
+      {
+        title: 'Geographic and topic frameworks',
+        content: 'Physical-risk geography uses the IPCC Sixth Assessment Report (AR6) Working Group I reference regions (Iturbide et al., 2020) — public, climate-science-defined land regions, not country borders. Transition risks use the TCFD four-category classification. The impact-materiality axis (CSRD mode) uses the ten ESRS topical standards: E1–E5 environmental, S1–S4 social, G1 governance.',
+      },
+      {
+        title: 'Scoring scheme',
+        content: 'All factor scores are held on simple ordinal scales and combined multiplicatively, then mapped to a 0–10 materiality score and a high/medium/low band. The scheme is intentionally transparent: any flagged risk or material topic can be traced to its inputs. Scoring values are starter values, independently derived from the public frameworks listed and pending entity-specific calibration. Calibration is an ongoing process; the model version active at run time is stamped on every report so users can trace outputs to the specific version that produced them.',
+      },
+      {
+        title: 'Independent derivation',
+        content: 'No input layer reproduces or is structured to mirror any licensed proprietary classification. Every weighting and topic mapping is traceable to its public source framework. This is a deliberate design choice documented in the full methodology specification.',
+      },
+      {
+        title: 'Limitations',
+        content: 'The Materiality Assessment is a structured screening intended to scope and support a formal IFRS S2 disclosure or CSRD double-materiality assessment. A fully compliant ESRS assessment additionally requires (a) a defined materiality threshold agreed by the entity\'s governance body, and (b) stakeholder engagement informing the impact-materiality axis. The tool produces the prioritisation structure but does not replace either requirement, and outputs are not a substitute for independent professional review prior to publication.',
       },
     ],
   },
@@ -197,10 +233,10 @@ export default function MethodologyPage() {
             <em style={{ background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>classifies and reports.</em>
           </h1>
           <p style={{ fontSize: 16, color: '#555553', maxWidth: 620, lineHeight: 1.75, fontWeight: 300, marginBottom: '2rem' }}>
-            Every number ThemisIQ produces is grounded in a recognised international standard or regulatory framework. We don't invent methodologies — we implement the ones that matter, correctly, and keep them current.
+            Every number ThemisIQ produces is grounded in a recognised international standard or regulatory framework. We don&apos;t invent methodologies — we implement the ones that matter, correctly, and keep them current.
           </p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' as const }}>
-            {['GHG Protocol', 'IPCC AR6', 'TCFD', 'EU AI Act', 'NIST CSF 2.0', 'PCAF', 'CS3D', 'IFRS S2'].map(tag => (
+            {['GHG Protocol', 'IPCC AR6', 'TCFD', 'IFRS S2', 'CSRD ESRS', 'EU AI Act', 'NIST CSF 2.0', 'PCAF', 'CS3D'].map(tag => (
               <span key={tag} style={{ fontSize: 12, padding: '5px 14px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#555553' }}>{tag}</span>
             ))}
           </div>
@@ -212,6 +248,35 @@ export default function MethodologyPage() {
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#0F6E56', flexShrink: 0 }} />
           <span style={{ fontSize: 13, color: '#0F6E56', fontWeight: 500 }}>Emission factors and regulatory mappings are reviewed and updated annually — or immediately when a material regulatory change occurs. Last reviewed: May 2026.</span>
+        </div>
+      </div>
+
+      {/* Published methodology spec download */}
+      <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
+        <div style={{ maxWidth: 900, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: '#7425e3', marginBottom: 4 }}>Published methodology specification</div>
+            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 4 }}>Materiality &amp; Scenario Analysis — full methodology document</div>
+            <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65 }}>The complete published specification behind ThemisIQ&apos;s IFRS S2 and CSRD double-materiality engine — framework basis, risk model, scoring scheme, calibration approach, and limitations. The artifact your auditor or assurance provider will want to see.</div>
+          </div>
+          <a
+            href="/themisiq-materiality-methodology.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-block',
+              padding: '11px 22px',
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#fff',
+              background: '#7425e3',
+              textDecoration: 'none',
+              whiteSpace: 'nowrap' as const,
+            }}
+          >
+            ⬇ Download PDF
+          </a>
         </div>
       </div>
 
@@ -243,7 +308,7 @@ export default function MethodologyPage() {
         <div style={{ marginTop: '2.5rem', background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.5rem' }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: '#555553', marginBottom: 8 }}>Important note</div>
           <div style={{ fontSize: 13, color: '#888784', lineHeight: 1.7, fontWeight: 300 }}>
-            ThemisIQ is a compliance preparation and assessment tool. Outputs are designed to support — not replace — professional legal, financial, and sustainability advisory services. Compliance cost estimates are indicative only. Regulatory requirements change frequently; always verify current obligations with qualified advisors and check ThemisIQ's methodology update log for the latest changes. ThemisIQ Compliance Inc. accepts no liability for regulatory non-compliance arising from reliance on platform outputs without appropriate professional review.
+            ThemisIQ is a compliance preparation and assessment tool. Outputs are designed to support — not replace — professional legal, financial, and sustainability advisory services. Compliance cost estimates are indicative only. Regulatory requirements change frequently; always verify current obligations with qualified advisors and check ThemisIQ&apos;s methodology update log for the latest changes. ThemisIQ Compliance Inc. accepts no liability for regulatory non-compliance arising from reliance on platform outputs without appropriate professional review.
           </div>
         </div>
 
