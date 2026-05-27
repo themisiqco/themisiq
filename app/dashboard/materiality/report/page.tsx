@@ -360,6 +360,28 @@ function Matrix({ topics }: { topics: any[] }) {
   const midX = padL + 0.5 * (W - padL - padR)
   const midY = padT + 0.5 * (H - padT - padB)
   const color = (q: string) => q === 'both' ? '#A32D2D' : (q === 'financial' || q === 'impact') ? '#ba7517' : '#888784'
+
+  // Offset dots that would land on top of an earlier-placed dot so labels stay readable.
+  // 8 directions in a small circle; first collision -> right, second -> left, etc.
+  const OFFSET = 16
+  const OFFSETS: [number, number][] = [
+    [0, 0], [OFFSET, 0], [-OFFSET, 0], [0, OFFSET], [0, -OFFSET],
+    [OFFSET, OFFSET], [-OFFSET, -OFFSET], [OFFSET, -OFFSET], [-OFFSET, OFFSET],
+  ]
+  type Placed = { code: string; cx: number; cy: number; q: string }
+  const placed: Placed[] = []
+  for (const t of topics) {
+    const bx = Math.round(padL + (t.impact / 10) * (W - padL - padR))
+    const by = Math.round(padT + (1 - t.financial / 10) * (H - padT - padB))
+    let collisions = 0
+    for (const p of placed) {
+      const dx = bx - p.cx, dy = by - p.cy
+      if (dx * dx + dy * dy < 20 * 20) collisions++
+    }
+    const [ox, oy] = OFFSETS[Math.min(collisions, OFFSETS.length - 1)]
+    placed.push({ code: t.code, cx: bx + ox, cy: by + oy, q: t.quadrant })
+  }
+
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10 }} role="img" aria-label="Double materiality matrix">
       <line x1={padL} y1={midY} x2={W - padR} y2={midY} stroke="#e8e7e4" strokeDasharray="4 4" />
@@ -370,16 +392,12 @@ function Matrix({ topics }: { topics: any[] }) {
       <text x={padL - 8} y={H - padB} textAnchor="end" fontSize="11" fill="#888784">Low</text>
       <text x="18" y={H / 2} textAnchor="middle" fontSize="12" fill="#555553" transform={`rotate(-90 18 ${H / 2})`}>Financial materiality →</text>
       <text x={W / 2} y={H - 10} textAnchor="middle" fontSize="12" fill="#555553">Impact materiality →</text>
-      {topics.map(t => {
-        const x = Math.round(padL + (t.impact / 10) * (W - padL - padR))
-        const y = Math.round(padT + (1 - t.financial / 10) * (H - padT - padB))
-        return (
-          <g key={t.code}>
-            <circle cx={x} cy={y} r={15} fill={color(t.quadrant)} opacity={0.88} />
-            <text x={x} y={y + 4} textAnchor="middle" fontSize="11" fontWeight="700" fill="#fff">{t.code}</text>
-          </g>
-        )
-      })}
+      {placed.map(p => (
+        <g key={p.code}>
+          <circle cx={p.cx} cy={p.cy} r={15} fill={color(p.q)} opacity={0.88} />
+          <text x={p.cx} y={p.cy + 4} textAnchor="middle" fontSize="11" fontWeight="700" fill="#fff">{p.code}</text>
+        </g>
+      ))}
     </svg>
   )
 }

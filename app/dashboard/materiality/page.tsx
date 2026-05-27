@@ -380,6 +380,27 @@ export default function MaterialityWizard() {
     const midX = padL + 0.5 * (W - padL - padR)
     const midY = padT + 0.5 * (H - padT - padB)
     const dotColor = (q: string) => q === 'both' ? '#A32D2D' : (q === 'financial' || q === 'impact') ? '#ba7517' : '#888784'
+
+    // Offset overlapping dots so labels remain readable when topics share coordinates
+    const OFFSET = 14
+    const OFFSETS: [number, number][] = [
+      [0, 0], [OFFSET, 0], [-OFFSET, 0], [0, OFFSET], [0, -OFFSET],
+      [OFFSET, OFFSET], [-OFFSET, -OFFSET], [OFFSET, -OFFSET], [-OFFSET, OFFSET],
+    ]
+    type Placed = { code: string; cx: number; cy: number; q: string }
+    const placed: Placed[] = []
+    for (const t of topics) {
+      const bx = Math.round(padL + (t.impact / 10) * (W - padL - padR))
+      const by = Math.round(padT + (1 - t.financial / 10) * (H - padT - padB))
+      let collisions = 0
+      for (const p of placed) {
+        const dx = bx - p.cx, dy = by - p.cy
+        if (dx * dx + dy * dy < 18 * 18) collisions++
+      }
+      const [ox, oy] = OFFSETS[Math.min(collisions, OFFSETS.length - 1)]
+      placed.push({ code: t.code, cx: bx + ox, cy: by + oy, q: t.quadrant })
+    }
+
     return (
       <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '1rem', marginBottom: 12 }}>
         <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }} role="img" aria-label="Double materiality matrix">
@@ -395,16 +416,12 @@ export default function MaterialityWizard() {
           <text x="14" y={H / 2} textAnchor="middle" fontSize="12" fill="#555553" transform={`rotate(-90 14 ${H / 2})`}>Financial materiality →</text>
           <text x={W / 2} y={H - 6} textAnchor="middle" fontSize="12" fill="#555553">Impact materiality →</text>
           {/* dots */}
-          {topics.map((t: any) => {
-            const x = Math.round(padL + (t.impact / 10) * (W - padL - padR))
-            const y = Math.round(padT + (1 - t.financial / 10) * (H - padT - padB))
-            return (
-              <g key={t.code}>
-                <circle cx={x} cy={y} r={13} fill={dotColor(t.quadrant)} opacity={0.85} />
-                <text x={x} y={y + 4} textAnchor="middle" fontSize="11" fontWeight="600" fill="#fff">{t.code}</text>
-              </g>
-            )
-          })}
+          {placed.map(p => (
+            <g key={p.code}>
+              <circle cx={p.cx} cy={p.cy} r={13} fill={dotColor(p.q)} opacity={0.85} />
+              <text x={p.cx} y={p.cy + 4} textAnchor="middle" fontSize="11" fontWeight="600" fill="#fff">{p.code}</text>
+            </g>
+          ))}
         </svg>
         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, fontSize: 12, color: '#555553' }}>
           {[['#A32D2D', 'Material on both'], ['#ba7517', 'Material on one axis'], ['#888784', 'Lower priority']].map(([c, l]) => (
