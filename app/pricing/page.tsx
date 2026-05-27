@@ -87,14 +87,18 @@ const MODULES: Module[] = [
   },
   {
     id: 'risk',
-    name: 'Climate Risk',
-    description: 'SB 261 · TCFD · IFRS S2 · ESRS E1 · CDP (P-series) · SASB · scenario analysis · physical & transition risk',
-    tags: [{ label: 'SB 261 · Jan 2026', color: 'orange' }],
+    name: 'Climate Risk & Materiality',
+    description: 'IFRS S2 single materiality · CSRD ESRS double materiality · SB 261 · TCFD · scenario analysis · physical & transition risk · CDP (P-series) · SASB',
+    tags: [
+      { label: 'IFRS S2 · Active', color: 'blue' },
+      { label: 'CSRD · Wave 2', color: 'orange' },
+      { label: 'SB 261 · Jan 2026', color: 'orange' },
+    ],
     cta: {
-      headline: 'Ready to assess your climate risk?',
-      sub: 'Physical and transition risk quantified. TCFD and SB 261 ready.',
-      btn: 'Assess your climate risk →',
-      href: '/dashboard/ghg',
+      headline: 'Ready to assess your climate risk and materiality?',
+      sub: 'Physical and transition risk, plus IFRS S2 single materiality and CSRD ESRS double materiality. TCFD and SB 261 ready.',
+      btn: 'Assess your climate risk & materiality →',
+      href: '/dashboard/climate-risk',
     },
   },
   {
@@ -410,7 +414,7 @@ export default function PricingPage() {
             <span style={gradText}>Expert-grade, priced for every business.</span>
           </div>
           <p style={s.heroSub}>
-            Whether your driver is a regulator, a board, an investor, or a customer — ThemisIQ is your sustainability compliance reporting solution.
+            Whether your driver is a regulator, a reporting obligation, a board, an investor, or a customer — ThemisIQ is your sustainability compliance reporting solution.
           </p>
         </div>
 
@@ -422,7 +426,7 @@ export default function PricingPage() {
           </div>
           <div style={{ ...s.credItem, borderLeft: '1px solid #e8e7e4', paddingLeft: 12 }}>
             <div style={s.credLabel}>Frameworks</div>
-            <div style={s.credVal}>30+ frameworks · mandatory & voluntary · global coverage</div>
+            <div style={s.credVal}>30+ frameworks including IFRS S2 (active globally) · mandatory & voluntary</div>
           </div>
           <div style={{ ...s.credItem, borderLeft: '1px solid #e8e7e4', paddingLeft: 12 }}>
             <div style={s.credLabel}>Built by</div>
@@ -436,6 +440,8 @@ export default function PricingPage() {
               <span style={{ color: '#B91C1C', fontWeight: 600 }}>EU AI Act · Aug 2</span>
               <span style={{ color: '#888784' }}> · </span>
               <span style={{ color: '#B91C1C', fontWeight: 600 }}>EU Pay · Jun 2026</span>
+              <span style={{ color: '#888784' }}> · </span>
+              <span style={{ color: '#B91C1C', fontWeight: 600 }}>CSRD · Jan 2026</span>
             </div>
           </div>
         </div>
@@ -626,7 +632,8 @@ export default function PricingPage() {
             )
           })}
         </div>
-        {/* Starter Packs */}
+
+        {/* Starter Packs — driver-based */}
         <div style={{ marginBottom: '3rem' }}>
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>Not sure where to start?</div>
@@ -649,34 +656,34 @@ export default function PricingPage() {
               {
                 name: 'Climate Readiness Pack',
                 driver: 'Your bank or insurer is asking',
-                price: '$1,999',
+                price: '$2,499',
                 color: '#0C447C',
                 bg: '#E6F1FB',
-                modules: ['GHG Inventory — Scope 1 & 2', 'Climate Risk — physical & transition', 'TCFD / IFRS S2 aligned output'],
-                pitch: 'Your bank wants your climate data. This gives you your emissions baseline and climate risk exposure — the two things they always ask for.',
+                modules: ['IFRS S2 single materiality assessment', 'GHG Inventory — Scope 1 & 2', 'Climate Risk — physical & transition', 'TCFD / IFRS S2 aligned output'],
+                pitch: 'Your bank wants your climate data — and the IFRS S2 materiality determination they expect. This gives you the materiality assessment, your emissions baseline and climate risk exposure in one package.',
                 cta: '/dashboard/ghg?pack=climate',
                 ctaLabel: 'Start now →',
               },
               {
                 name: 'ESG Foundation Pack',
                 driver: 'Your board wants it',
-                price: '$2,999',
+                price: '$3,499',
                 color: '#7425e3',
                 bg: '#EDE9FE',
-                modules: ['GHG Inventory — Scope 1 & 2', 'People & Workforce — pay gap & safety', 'Climate Risk — physical & transition'],
-                pitch: 'The three things every board asks about — emissions, people, and climate risk. One platform, one annual price.',
+                modules: ['IFRS S2 single materiality assessment', 'GHG Inventory — Scope 1 & 2', 'People & Workforce — pay gap & safety', 'Climate Risk — physical & transition'],
+                pitch: 'The four things every board asks about — what is material, what are emissions, how are people treated, and how exposed are we to climate. One platform, one annual price.',
                 cta: '/dashboard/ghg?pack=foundation',
                 ctaLabel: 'Start now →',
               },
               {
                 name: 'Investor ESG Pack',
                 driver: 'Your investor or PE firm requires it',
-                price: '$3,999',
+                price: '$4,499',
                 color: '#B91C1C',
                 bg: '#FCEBEB',
-                modules: ['GHG Inventory — Scope 1 & 2', 'Climate Risk — scenario analysis', 'Supply Chain risk register', 'Deals & Investment — ESG diligence'],
-                pitch: 'Everything your PE firm or LP will ask for in their annual ESG questionnaire — in one platform.',
-                cta: '//dashboard/ghg?pack=investor',
+                modules: ['CSRD ESRS double materiality assessment', 'GHG Inventory — Scope 1 & 2', 'Climate Risk — scenario analysis', 'Supply Chain risk register', 'Deals & Investment — ESG diligence'],
+                pitch: 'Everything your PE firm or LP will ask for in their annual ESG questionnaire — investor-grade reporting including CSRD double materiality where applicable.',
+                cta: '/dashboard/ghg?pack=investor',
                 ctaLabel: 'Start now →',
               },
             ].map(pack => (
@@ -700,6 +707,77 @@ export default function PricingPage() {
                     ))}
                   </div>
                   <a href={pack.cta} style={{ display: 'inline-block', padding: '9px 20px', borderRadius: 8, background: pack.color, color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>{pack.ctaLabel}</a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Flagship — standard-aligned packs */}
+        <div style={{ marginBottom: '3rem' }}>
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>Aligned to your reporting standard</div>
+            <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Two reporting obligations, two paths</div>
+            <div style={{ fontSize: 14, color: '#888784', maxWidth: 600, margin: '0 auto' }}>Whether you report under IFRS S2 / ISSB (single materiality) or CSRD / ESRS (double materiality), ThemisIQ delivers the materiality determination and supporting disclosures your standard requires.</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+            {[
+              {
+                name: 'IFRS S2 Compliance Pack',
+                driver: 'Your IFRS S2 / ISSB reporting obligation requires it',
+                price: '$4,999',
+                color: '#0C447C',
+                bg: '#E6F1FB',
+                modules: [
+                  'IFRS S2 single materiality assessment',
+                  'Climate Risk — physical & transition',
+                  'Scenario analysis (1.5°C / 2°C / 3°C+)',
+                  'GHG Inventory — Scope 1 & 2',
+                  'TCFD-aligned narrative output',
+                ],
+                pitch: 'Built for IFRS S2 / ISSB-aligned disclosure — active in Canada (CSDS), the UK, Australia and across 30+ ISSB-adopting jurisdictions. Materiality determination is the foundation, supported by the climate-risk evidence S2 demands.',
+                cta: '/dashboard/materiality?mode=s2',
+                ctaLabel: 'Start IFRS S2 Pack →',
+              },
+              {
+                name: 'CSRD Compliance Pack',
+                driver: 'Your CSRD reporting obligation requires it',
+                price: '$5,999',
+                color: '#1e1b4b',
+                bg: '#eef2ff',
+                modules: [
+                  'CSRD ESRS double materiality assessment',
+                  'Climate Risk — physical & transition (E1)',
+                  'Supply Chain register (E2, E5, S2)',
+                  'People & Workforce (S1, S2)',
+                  'Business conduct & governance (G1)',
+                  'GHG Inventory — Scope 1, 2, 3',
+                ],
+                pitch: 'Comprehensive CSRD / ESRS readiness — anchored by double materiality assessment across all ten ESRS topical standards (E1–E5, S1–S4, G1). Built for Wave 2 reporters and entities preparing for first ESRS disclosure.',
+                cta: '/dashboard/materiality?mode=csrd',
+                ctaLabel: 'Start CSRD Pack →',
+              },
+            ].map(pack => (
+              <div key={pack.name} style={{ border: `2px solid ${pack.color}`, borderRadius: 16, overflow: 'hidden', background: '#fff' }}>
+                <div style={{ background: pack.bg, padding: '1.5rem 1.75rem', borderBottom: `1px solid ${pack.color}30` }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: pack.color, marginBottom: 6 }}>{pack.driver}</div>
+                  <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{pack.name}</div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                    <span style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color: pack.color }}>{pack.price}</span>
+                    <span style={{ fontSize: 12, color: '#888784' }}>/yr · USD</span>
+                  </div>
+                </div>
+                <div style={{ padding: '1.5rem 1.75rem' }}>
+                  <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, marginBottom: 18 }}>{pack.pitch}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8, marginBottom: 18 }}>
+                    {pack.modules.map(m => (
+                      <div key={m} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                        <span style={{ color: pack.color, flexShrink: 0, marginTop: 1, fontWeight: 700 }}>✓</span>
+                        <span style={{ fontSize: 13, color: '#374151' }}>{m}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <a href={pack.cta} style={{ display: 'inline-block', padding: '10px 22px', borderRadius: 8, background: pack.color, color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>{pack.ctaLabel}</a>
                 </div>
               </div>
             ))}
