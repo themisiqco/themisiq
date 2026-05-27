@@ -9,7 +9,7 @@
 //
 // Print-optimized via @media print CSS: page breaks, white background, no nav.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabase'
 
@@ -56,6 +56,15 @@ const SEV = {
 } as const
 
 export default function CsrdReportPage() {
+  // useSearchParams must be inside a Suspense boundary for Next.js to prerender this page.
+  return (
+    <Suspense fallback={<Centered>Loading report…</Centered>}>
+      <ReportInner />
+    </Suspense>
+  )
+}
+
+function ReportInner() {
   const params = useSearchParams()
   const id = params.get('id')
   const [loading, setLoading] = useState(true)
