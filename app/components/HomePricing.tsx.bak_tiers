@@ -5,7 +5,7 @@ import { useState } from 'react'
 type Tier = 'starter' | 'professional' | 'advisory'
 type ModuleId = 'ghg' | 'risk' | 'supply' | 'people' | 'deals' | 'ai' | 'cyber'
 
-const PRICES: Record<Tier, number> = { starter: 999, professional: 2999, advisory: 4999 }
+const PRICES: Record<Tier, number> = { starter: 999, professional: 2999, advisory: 7999 }
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
 
 const MODULES: { id: ModuleId; name: string; frameworks: string; href: string }[] = [
@@ -36,12 +36,12 @@ const TIER_FEATURES: Record<Tier, { sub: string; features: string[]; color: stri
   },
   professional: {
     sub: 'All frameworks for your selected modules',
-    features: ['Everything in Starter', 'All reporting frameworks', 'Multi-organization — up to 5 organizations', 'Verifier & third-party access role', 'Regulatory monitor — weekly alerts'],
+    features: ['Everything in Starter', 'All reporting frameworks', 'Multi-entity · 10 entities · 10 users', 'Verifier & third-party access role', 'Regulatory monitor — weekly alerts'],
     color: '#64fe3e',
   },
   advisory: {
     sub: 'Platform + dedicated expert guidance',
-    features: ['Everything in Professional', 'Up to 10 organizations', 'Onboarding session', 'Guided inventory review', 'Sector-specific guidance', 'Board-ready narrative'],
+    features: ['Everything in Professional', 'Onboarding session', 'Guided inventory review', 'Sector-specific guidance', 'Board-ready narrative'],
     color: '#1fb1ff',
   },
 }
@@ -149,7 +149,7 @@ export default function HomePricing() {
           <div onClick={() => setTier('advisory')} style={{ background: '#fff', border: tier === 'advisory' ? '2px solid #1fb1ff' : '1px solid #e8e7e4', borderRadius: 14, padding: '1.5rem', display: 'flex', flexDirection: 'column', cursor: 'pointer', position: 'relative', transition: 'all 0.15s' }}>
             {tier === 'advisory' && <div style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', background: GRAD, fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#0d0d0d', padding: '2px 10px', borderRadius: 99, whiteSpace: 'nowrap' }}>Selected</div>}
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1fb1ff', marginBottom: 8 }}>Advisory</div>
-            <div style={{ fontSize: 28, fontWeight: 600, color: '#0d0d0d', marginBottom: 4 }}>$4,999<span style={{ fontSize: 11, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
+            <div style={{ fontSize: 28, fontWeight: 600, color: '#0d0d0d', marginBottom: 4 }}>$7,999<span style={{ fontSize: 11, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
             <div style={{ fontSize: 9, color: '#0C447C', background: '#E6F1FB', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginBottom: 14 }}>+ Expert guidance</div>
             <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: 12, flex: 1 }}>
               <div style={{ fontSize: 11, color: '#888784', marginBottom: 8 }}>Platform + dedicated expert guidance</div>
@@ -161,11 +161,6 @@ export default function HomePricing() {
             </div>
           </div>
 
-        </div>
-
-        {/* Custom / more organizations note */}
-        <div style={{ textAlign: 'center', fontSize: 11, color: '#888784', lineHeight: 1.6, marginBottom: 16, maxWidth: 600, marginLeft: 'auto', marginRight: 'auto' }}>
-          * Need more than 10 organizations or have additional subsidiaries? <a href="/advisory" style={{ color: '#1fb1ff', textDecoration: 'none' }}>Contact us for custom pricing.</a>
         </div>
 
         {/* Module rows */}

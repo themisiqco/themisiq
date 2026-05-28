@@ -21,7 +21,7 @@ interface Module {
 
 const PRICES: Record<Tier, number> = {
   starter: 999,
-  professional: 2999,
+  professional: 2499,
   advisory: 4999,
 }
 
@@ -36,7 +36,7 @@ const TIER_FEATURES: Record<Tier, { title: string; sub: string; features: string
       'Assurance-ready calculation workings',
       'Audit trail — every entry logged',
       'Data export (CSV)',
-      '1 organization',
+      '1 entity · 3 users',
       'ThemisIQ Wizard — always on',
     ],
   },
@@ -46,7 +46,7 @@ const TIER_FEATURES: Record<Tier, { title: string; sub: string; features: string
     features: [
       'Everything in Starter',
       'All reporting frameworks for your selected modules',
-      'Multi-organization support — up to 5 organizations',
+      'Multi-entity support (10 entities · 10 users)',
       'Verifier & third-party access role',
       'Advanced disclosure outputs',
       'Regulatory monitor — weekly deadline alerts',
@@ -58,7 +58,6 @@ const TIER_FEATURES: Record<Tier, { title: string; sub: string; features: string
     sub: 'Platform + dedicated expert guidance',
     features: [
       'Everything in Professional',
-      'Up to 10 organizations',
       'Onboarding session',
       'Guided inventory review',
       'Sector-specific guidance',
@@ -517,7 +516,7 @@ export default function PricingPage() {
               </div>
             )}
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1fb1ff', marginBottom: 6 }}>Advisory</div>
-            <div style={{ fontSize: 22, fontWeight: 600, color: '#0d0d0d' }}>$4,999<span style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
+            <div style={{ fontSize: 22, fontWeight: 600, color: '#0d0d0d' }}>$7,999<span style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
             <div style={{ fontSize: 9, color: '#0C447C', background: '#E6F1FB', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginTop: 4, marginBottom: 14 }}>+ Expert guidance</div>
             <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: 12, textAlign: 'left' }}>
               <div style={{ fontSize: 10, color: '#888784', marginBottom: 8 }}>{TIER_FEATURES.advisory.sub}</div>
@@ -534,11 +533,6 @@ export default function PricingPage() {
             </div>
           </div>
 
-        </div>
-
-        {/* Custom / more organizations note */}
-        <div style={{ textAlign: 'center', fontSize: 11, color: '#888784', lineHeight: 1.6, marginTop: 14, maxWidth: 640, marginLeft: 'auto', marginRight: 'auto' }}>
-          * Need more than 10 organizations or have additional subsidiaries? <a href="/advisory" style={{ color: '#1fb1ff', textDecoration: 'none' }}>Contact us for custom pricing.</a>
         </div>
 
         {/* Module selector */}

@@ -47,7 +47,6 @@ export default function Nav() {
             ['/people', 'People'],
             ['/ai-governance', 'AI Governance'],
             ['/cyber', 'Cyber'],
-            ['/pricing', 'Pricing'],
           ].map(([href, label]) => (
             <a key={href} href={href} style={{
               fontSize: 12, color: '#555553', textDecoration: 'none',
@@ -105,7 +104,6 @@ export default function Nav() {
             ['/people', 'People & Workforce', 'ESRS S1 · EU Pay Transparency · CA Pay Data'],
             ['/ai-governance', 'AI Governance', 'EU AI Act · NIST AI RMF · ISO 42001'],
             ['/cyber', 'Cyber Governance', 'NIS2 · DORA · SEC cyber · ISO 27001'],
-            ['/pricing', 'Pricing', 'Plans, tiers, and what each includes'],
             ['/assess', 'Free Assessment →', 'Check which regulations apply to you'],
           ].map(([href, label, sub]) => (
             <a key={href} href={href} onClick={() => setMenuOpen(false)} style={{
