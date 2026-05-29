@@ -98,12 +98,12 @@ export default function Home() {
         <p style={eyebrow}>The ThemisIQ platform</p>
         <h2 style={sectionTitle}>Seven modules. One source of truth.</h2>
         <p style={sectionSub}>Enter your data once. ThemisIQ maps it across every module and framework automatically.</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, background: '#0d0d0d', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden', marginTop: '3rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden', marginTop: '3rem' }}>
           {modules.filter(m => m.family !== 'Advisory').map((mod, i) => (
-            <a key={i} href={mod.href} style={{ background: '#fff', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textDecoration: 'none', transition: 'background 0.15s', cursor: 'pointer' }}
+            <a key={i} href={mod.href} style={{ background: '#fff', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textDecoration: 'none', transition: 'background 0.15s', cursor: 'pointer', borderRight: i % 4 < 3 ? '0.5px solid #e8e7e4' : 'none', borderBottom: i < 4 ? '0.5px solid #e8e7e4' : 'none' }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f8f7f5' }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff' }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.2 }}>{mod.name}</div>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.2 }}>{mod.name === 'Supply Chain & Scope 3' ? <>Supply Chain &amp; <span style={{ whiteSpace: 'nowrap' }}>Scope 3</span></> : mod.name}</div>
               <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 300 }}>{mod.desc}</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 'auto', paddingTop: 8 }}>
                 {mod.tags.map(t => <span key={t} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#888784' }}>{t}</span>)}
