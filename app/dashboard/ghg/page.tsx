@@ -5,12 +5,26 @@ import { supabase } from '../../../lib/supabase'
 import { generateAssurancePDF } from '../../../lib/assurancePdf'
 import { useSearchParams } from 'next/navigation'
 
+// AR4/AR5 do not distinguish fossil vs biogenic methane — both keys carry the single published GWP100.
+// AR6 is the first IPCC set to split them (fossil 29.8 incl. oxidation; biogenic/non-fossil 27.0). N2O AR6 = 273.
 const GWP = {
-  AR4: { CO2: 1, CH4: 25, N2O: 298 },
-  AR5: { CO2: 1, CH4: 28, N2O: 265 },
+  AR4: { CO2: 1, CH4_fossil: 25,   CH4_biogenic: 25,   N2O: 298 },
+  AR5: { CO2: 1, CH4_fossil: 28,   CH4_biogenic: 28,   N2O: 265 },
+  AR6: { CO2: 1, CH4_fossil: 29.8, CH4_biogenic: 27.0, N2O: 273 },
 }
 
-const EF = {
+// Refrigerant GWP-100 by IPCC set, so fugitive emissions follow the same GWP routing as
+   // combustion gases. AR4 column preserves the platform's prior hardcoded values (no SB 253
+   // regression). Blends (R-404A/410A/507A) are composition-derived — CONFIRM before assurance.
+   const REFRIGERANT_GWP: Record<string, Record<GwpVersion, number>> = {
+     r22:   { AR4: 1810, AR5: 1760, AR6: 1960 },
+     r134a: { AR4: 1430, AR5: 1300, AR6: 1530 },
+     r404a: { AR4: 3922, AR5: 3943, AR6: 4728 },
+     r410a: { AR4: 2088, AR5: 1924, AR6: 2256 },
+     r507:  { AR4: 3985, AR5: 3985, AR6: 4775 },
+   }
+
+   const EF = {
   natural_gas_mcf: { co2: 54.43956, ch4: 0.001026, n2o: 0.0001026 },
   natural_gas_therms: { co2: 5.306, ch4: 0.0001, n2o: 0.00001 },
   natural_gas_mmbtu: { co2: 53.06, ch4: 0.001, n2o: 0.0001 },
@@ -23,7 +37,7 @@ const EF = {
   gasoline_litre: { co2: 2.31877, ch4: 0.0000991, n2o: 0.0000198 },
   diesel_mobile_gallon: { co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 },
   diesel_mobile_litre: { co2: 2.69627, ch4: 0.0001094, n2o: 0.0000219 },
-  r22: 1810, r134a: 1430, r404a: 3922, r410a: 2088, r507: 3985, ammonia: 0,
+  ammonia: 0,
   steam_mmbtu: 66.33,
 }
 
@@ -120,6 +134,8 @@ const EF_SOURCES = {
   combustion_uk: 'UK DEFRA/DESNZ (2025) GHG Conversion Factors for Company Reporting',
   combustion_eu: 'IPCC (2006) Guidelines Vol.2 — Tier 1 default combustion factors',
   electricity: 'US EPA eGRID2023 (US) / ECCC v3.0 (CA) / DEFRA 2025 (UK) / EEA 2023 (EU)',
+  residual_us: 'Green-e Residual Mix 2025 (2023 data, publ. 2026-01-29, CRS) — residual CO₂; eGRID2023 Rev2 (publ. 2025-06-12) CH₄/N₂O. Green-e factors out Green-e-certified voluntary sales (the only published US residual source per CRS).',
+  residual_eu: 'AIB European Residual Mixes 2024 (publ. 2025-05-30, Grexel/AIB; Ecoinvent CO₂ inputs) — combined CO₂e, gCO₂/kWh.',
   gwp_ar4: 'IPCC AR4 (2007) — required by CARB SB 253 and CDP default',
   gwp_ar5: 'IPCC AR5 (2014) — required by ESRS E1 and GRI 305',
 }
@@ -167,6 +183,66 @@ const GRID_EF: Record<string, Record<number, number>> = {
   EU_SI: { 2023: 0.176 }, EU_ES: { 2023: 0.158 }, EU_SE: { 2023: 0.008 },
   EU_AVG: { 2023: 0.210 },
 }
+// ── RESIDUAL MIX (market-based Scope 2) ──────────────────────────────────────
+// Market-based Scope 2 applies a RESIDUAL-MIX factor to UNCOVERED load (electricity
+// not backed by a contractual instrument) — NOT the location-based grid average.
+// Both sources are primary and dated:
+//   EU — AIB "European Residual Mixes" 2024 (publ. 2025-05-30; Grexel/AIB; Ecoinvent CO2 inputs).
+//        Published as COMBINED CO2e in gCO2/kWh (no separate CH4/N2O); helper divides by 1000 -> kg/kWh.
+//        Austria (AT) runs a full-disclosure regime -> NO residual mix calculated -> null (NOT zero).
+//   US — Green-e "2025 Residual Mix" (2023 data, publ. 2026-01-29, CRS) supplies residual CO2
+//        ("Adjusted System Mix", lb/MWh); eGRID2023 Rev2 (publ. 2025-06-12) supplies CH4/N2O (lb/MWh).
+//        Green-e strips ONLY Green-e-certified voluntary sales (the only published US residual source).
+//        Stored with the gas split so CO2e recomputes via the selected GWP set (AR6/AR5/AR4).
+// Year keys = DATA year (EU 2024, US 2023). Helper falls back to nearest available and stamps the vintage.
+
+const RESIDUAL_EU: Record<string, Record<number, number | null>> = {
+  EU_AT: { 2024: null },   // full-disclosure regime — residual mix not applicable (do NOT treat as 0)
+  EU_BE: { 2024: 131.73 }, EU_BG: { 2024: 379.53 }, EU_HR: { 2024: 573.17 },
+  EU_CY: { 2024: 613.08 }, EU_CZ: { 2024: 584.07 }, EU_DK: { 2024: 421.89 },
+  EU_EE: { 2024: 611.96 }, EU_FI: { 2024: 405.59 }, EU_FR: { 2024: 23.52 },
+  EU_DE: { 2024: 724.56 }, EU_EL: { 2024: 367.07 }, EU_HU: { 2024: 318.64 },
+  EU_IE: { 2024: 365.61 }, EU_IT: { 2024: 441.20 }, EU_LV: { 2024: 504.22 },
+  EU_LT: { 2024: 567.91 }, EU_LU: { 2024: 213.07 }, EU_MT: { 2024: 398.45 },
+  EU_NL: { 2024: 382.47 }, EU_PL: { 2024: 808.30 }, EU_PT: { 2024: 501.76 },
+  EU_RO: { 2024: 233.02 }, EU_SK: { 2024: 334.33 }, EU_SI: { 2024: 429.45 },
+  EU_ES: { 2024: 292.20 }, EU_SE: { 2024: 85.52 },
+}
+
+// US residual: lb/MWh with gas split. co2 = Green-e Adjusted System Mix (residual);
+// ch4/n2o = eGRID2023 Rev2 grid values (Green-e publishes no residual CH4/N2O — grid is the
+// accepted composite input; its contribution is <0.3% of total). Keyed by eGRID SUBREGION.
+type ResidualGas = { co2: number; ch4: number; n2o: number }
+const RESIDUAL_US: Record<string, Record<number, ResidualGas>> = {
+  AKGD: { 2023: { co2: 914.64,  ch4: 0.086, n2o: 0.012 } },
+  AKMS: { 2023: { co2: 532.73,  ch4: 0.026, n2o: 0.004 } },
+  AZNM: { 2023: { co2: 707.73,  ch4: 0.039, n2o: 0.005 } },
+  CAMX: { 2023: { co2: 434.22,  ch4: 0.025, n2o: 0.003 } },
+  ERCT: { 2023: { co2: 823.81,  ch4: 0.043, n2o: 0.006 } },
+  FRCC: { 2023: { co2: 801.24,  ch4: 0.041, n2o: 0.005 } },
+  HIMS: { 2023: { co2: 1133.29, ch4: 0.146, n2o: 0.022 } },
+  HIOA: { 2023: { co2: 1498.95, ch4: 0.134, n2o: 0.021 } },
+  MROE: { 2023: { co2: 1405.43, ch4: 0.116, n2o: 0.017 } },
+  MROW: { 2023: { co2: 977.88,  ch4: 0.097, n2o: 0.014 } },
+  NEWE: { 2023: { co2: 543.23,  ch4: 0.063, n2o: 0.008 } },
+  NWPP: { 2023: { co2: 656.53,  ch4: 0.054, n2o: 0.008 } },
+  NYCW: { 2023: { co2: 865.74,  ch4: 0.022, n2o: 0.002 } },
+  NYLI: { 2023: { co2: 1189.33, ch4: 0.140, n2o: 0.018 } },
+  NYUP: { 2023: { co2: 242.80,  ch4: 0.011, n2o: 0.001 } },
+  PRMS: { 2023: { co2: 1548.53, ch4: 0.077, n2o: 0.012 } },
+  RFCE: { 2023: { co2: 599.24,  ch4: 0.036, n2o: 0.005 } },
+  RFCM: { 2023: { co2: 988.66,  ch4: 0.082, n2o: 0.012 } },
+  RFCW: { 2023: { co2: 917.78,  ch4: 0.071, n2o: 0.010 } },
+  RMPA: { 2023: { co2: 1065.86, ch4: 0.090, n2o: 0.013 } },
+  SPNO: { 2023: { co2: 1016.82, ch4: 0.087, n2o: 0.012 } },
+  SPSO: { 2023: { co2: 1020.77, ch4: 0.054, n2o: 0.008 } },
+  SRMV: { 2023: { co2: 744.96,  ch4: 0.032, n2o: 0.004 } },
+  SRMW: { 2023: { co2: 1287.87, ch4: 0.132, n2o: 0.019 } },
+  SRSO: { 2023: { co2: 855.10,  ch4: 0.056, n2o: 0.008 } },
+  SRTV: { 2023: { co2: 903.72,  ch4: 0.079, n2o: 0.011 } },
+  SRVC: { 2023: { co2: 601.89,  ch4: 0.045, n2o: 0.006 } },
+}
+
 function getGridFactor(region: string, year: number): { ef: number; usedRegion: string; usedYear: number } {
   const table = GRID_EF[region]
   if (!table) return { ef: GRID_EF.US_AVG[2023], usedRegion: 'US_AVG', usedYear: 2023 }
@@ -176,7 +252,68 @@ function getGridFactor(region: string, year: number): { ef: number; usedRegion: 
   for (const y of years) { if (y <= year) best = y }
   return { ef: table[best], usedRegion: region, usedYear: best }
 }
+// Returns the market-based residual factor for a region, in kg CO2e/kWh, with provenance.
+// applicable=false means no residual mix exists for this region (e.g. full-disclosure AT, or a
+// region we don't cover) — caller MUST fall back to the location-based factor and stamp the note.
+// US factors carry a gas split so CO2e responds to the GWP set; EU factors are published CO2e (GWP-fixed).
+function getResidualFactor(
+  region: string,
+  year: number,
+  gwpVersion: GwpVersion
+): { ef: number; applicable: boolean; source: string; vintage: string; usedRegion: string; note: string } {
+  // EU: published combined CO2e in gCO2/kWh. region is the EU_XX grid key.
+  if (region.startsWith('EU_')) {
+    const table = RESIDUAL_EU[region]
+    if (table) {
+      const years = Object.keys(table).map(Number).sort((a, b) => a - b)
+      let y = years[0]; for (const yy of years) { if (yy <= year) y = yy }
+      const val = table[y]
+      if (val === null) {
+        return { ef: 0, applicable: false, source: EF_SOURCES.residual_eu, vintage: `AIB ${y}`, usedRegion: region,
+          note: 'Full-disclosure regime — no residual mix published; market-based falls back to location factor.' }
+      }
+      return { ef: val / 1000, applicable: true, source: EF_SOURCES.residual_eu, vintage: `AIB ${y}`, usedRegion: region,
+        note: year !== y ? `AIB ${y} residual mix applied to ${year} inventory (latest available).` : '' }
+    }
+    return { ef: 0, applicable: false, source: EF_SOURCES.residual_eu, vintage: 'n/a', usedRegion: region,
+      note: 'No published residual mix for this region; market-based falls back to location factor.' }
+  }
+  // US: Green-e residual CO2 + eGRID CH4/N2O, lb/MWh -> kg/kWh CO2e via selected GWP. region is the eGRID subregion.
+  const table = RESIDUAL_US[region]
+  if (table) {
+    const years = Object.keys(table).map(Number).sort((a, b) => a - b)
+    let y = years[0]; for (const yy of years) { if (yy <= year) y = yy }
+    const g = table[y]
+    const gwp = GWP[gwpVersion]
+    const lbPerMwh = g.co2 + g.ch4 * gwp.CH4_fossil + g.n2o * gwp.N2O
+    const ef = lbPerMwh * 0.453592 / 1000 // lb/MWh -> kg/kWh
+    return { ef, applicable: true, source: EF_SOURCES.residual_us, vintage: `Green-e ${y + 2} [${y} data] + eGRID2023 Rev2`, usedRegion: region,
+      note: year !== y ? `Green-e ${y} residual mix applied to ${year} inventory (latest available).` : '' }
+  }
+  return { ef: 0, applicable: false, source: EF_SOURCES.residual_us, vintage: 'n/a', usedRegion: region,
+    note: 'No published residual mix for this subregion; market-based falls back to location factor.' }
+}
+
 const CA_PROVINCES = ['BC', 'AB', 'SK', 'MB', 'ON', 'QC', 'NB', 'NS', 'PE', 'NL', 'YT', 'NT', 'NU']
+// eGRID subregions for the US market-based residual-mix picker (item 5). Code -> readable label.
+// Users select their exact subregion via EPA Power Profiler (ZIP lookup) rather than inferring from state,
+// because several states span multiple subregions (e.g. TX = ERCT + SPP; NY = NYCW/NYLI/NYUP).
+const US_SUBREGIONS: Array<[string, string]> = [
+  ['AKGD', 'AKGD — ASCC Alaska Grid'], ['AKMS', 'AKMS — ASCC Miscellaneous'],
+  ['AZNM', 'AZNM — WECC Southwest'], ['CAMX', 'CAMX — WECC California'],
+  ['ERCT', 'ERCT — ERCOT All'], ['FRCC', 'FRCC — FRCC All'],
+  ['HIMS', 'HIMS — HICC Miscellaneous'], ['HIOA', 'HIOA — HICC Oahu'],
+  ['MROE', 'MROE — MRO East'], ['MROW', 'MROW — MRO West'],
+  ['NEWE', 'NEWE — NPCC New England'], ['NWPP', 'NWPP — WECC Northwest'],
+  ['NYCW', 'NYCW — NPCC NYC/Westchester'], ['NYLI', 'NYLI — NPCC Long Island'],
+  ['NYUP', 'NYUP — NPCC Upstate NY'], ['PRMS', 'PRMS — Puerto Rico Miscellaneous'],
+  ['RFCE', 'RFCE — RFC East'], ['RFCM', 'RFCM — RFC Michigan'],
+  ['RFCW', 'RFCW — RFC West'], ['RMPA', 'RMPA — WECC Rockies'],
+  ['SPNO', 'SPNO — SPP North'], ['SPSO', 'SPSO — SPP South'],
+  ['SRMV', 'SRMV — SERC Mississippi Valley'], ['SRMW', 'SRMW — SERC Midwest'],
+  ['SRSO', 'SRSO — SERC South'], ['SRTV', 'SRTV — SERC Tennessee Valley'],
+  ['SRVC', 'SRVC — SERC Virginia/Carolina'],
+]
 const US_STATES = ['AK','AL','AR','AZ','CA','CO','CT','DC','DE','FL','GA','HI','IA','ID','IL','IN','KS','KY','LA','MA','MD','ME','MI','MN','MO','MS','MT','NC','ND','NE','NH','NJ','NM','NV','NY','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VA','VT','WA','WI','WV','WY']
 // EU-27 ISO codes (EL = Greece per EEA/EU convention). Maps country -> EU_XX grid key.
 const EU_COUNTRIES = ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','EL','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE']
@@ -219,35 +356,35 @@ const FRAMEWORKS = [
   },
   {
     id: 'cdp', name: 'CDP', full: 'CDP Climate — C6/C7/C11', color: '#0C447C', bg: '#E6F1FB',
-    gwp: 'AR4', deadline: 'Annual — July',
+    gwp: 'AR6', deadline: 'Annual — July',
     desc: 'Full CDP Climate questionnaire Scope 1 + 2 disclosure with prior year comparison',
     requires: ['prior_year_s1', 'prior_year_s2'],
     intensity_denominator: 'revenue',
   },
   {
     id: 'esrs', name: 'ESRS E1', full: 'ESRS E1 — EU CSRD (Scope 3 mandatory)', color: '#7425e3', bg: '#EDE9FE',
-    gwp: 'AR5', deadline: 'FY2024 (large EU companies)',
+    gwp: 'AR6', deadline: 'FY2024 (large EU companies)',
     desc: 'Full ESRS E1 disclosure — location AND market-based Scope 2, biogenic, by gas',
     requires: ['market_based_s2', 'renewable_energy_kwh', 'biogenic_co2'],
     intensity_denominator: 'revenue',
   },
   {
     id: 'gri', name: 'GRI 305', full: 'GRI 305 — Emissions', color: '#0F6E56', bg: '#E1F5EE',
-    gwp: 'AR5', deadline: 'Annual',
+    gwp: 'AR6', deadline: 'Annual',
     desc: 'GRI 305-1, 305-2, 305-3 disclosure — by gas (CO₂, CH₄, N₂O, HFCs separately)',
     requires: ['biogenic_co2'],
     intensity_denominator: 'revenue',
   },
   {
     id: 'ecovadis', name: 'EcoVadis', full: 'EcoVadis — E1 Module', color: '#ba7517', bg: '#FEF3E2',
-    gwp: 'AR4', deadline: 'Annual — assessment cycle',
+    gwp: 'AR6', deadline: 'Annual — assessment cycle',
     desc: 'Simplified Scope 1 + 2 total with revenue and employee intensity ratios',
     requires: ['employee_count'],
     intensity_denominator: 'both',
   },
   {
     id: 'ifrs', name: 'IFRS S2', full: 'IFRS S2 — Climate Disclosures', color: '#555553', bg: '#f8f7f5',
-    gwp: 'AR4', deadline: 'Jurisdiction dependent',
+    gwp: 'AR6', deadline: 'Jurisdiction dependent',
     desc: 'GHG inventory component of IFRS S2 — feeds into physical and transition risk disclosure',
     requires: ['revenue_millions'],
     intensity_denominator: 'revenue',
@@ -264,7 +401,7 @@ interface Location {
   has_fuel_oil: boolean; fuel_oil_gallons: number
   has_mobile: boolean; gasoline_amount: number; gasoline_unit: 'gallons' | 'litres'; diesel_mobile_amount: number; diesel_mobile_unit: 'gallons' | 'litres'
   uses_ammonia: boolean; has_hfc_refrigerants: boolean; refrigerant_type: string; refrigerant_purchased_kg: number
-  electricity_kwh: number; grid_region: string; renewable_electricity_kwh: number
+  electricity_kwh: number; grid_region: string; renewable_electricity_kwh: number; residual_region: string
   has_purchased_steam: boolean; purchased_steam_mmbtu: number
   biogenic_co2_mt: number
   source_docs: SourceDoc[]
@@ -371,13 +508,16 @@ function combustionSource(loc: Location): string {
   return EF_SOURCES.combustion
 }
 
-function calcGas(ef: { co2: number; ch4: number; n2o: number }, amount: number, gwpVersion: 'AR4' | 'AR5') {
+type GwpVersion = 'AR4' | 'AR5' | 'AR6'
+
+function calcGas(ef: { co2: number; ch4: number; n2o: number }, amount: number, gwpVersion: GwpVersion, biogenic = false) {
   const gwp = GWP[gwpVersion]
+  const ch4Gwp = biogenic ? gwp.CH4_biogenic : gwp.CH4_fossil
   return {
     co2: amount * ef.co2 / 1000,
-    ch4: amount * ef.ch4 * gwp.CH4 / 1000,
+    ch4: amount * ef.ch4 * ch4Gwp / 1000,
     n2o: amount * ef.n2o * gwp.N2O / 1000,
-    total: amount * (ef.co2 + ef.ch4 * gwp.CH4 + ef.n2o * gwp.N2O) / 1000,
+    total: amount * (ef.co2 + ef.ch4 * ch4Gwp + ef.n2o * gwp.N2O) / 1000,
   }
 }
 
@@ -415,12 +555,20 @@ function calcLocation(loc: Location, gwpVersion: 'AR4' | 'AR5' = 'AR4', year: nu
       s1_mobile += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
     }
   }
-  const ref_gwp = EF[loc.refrigerant_type as keyof typeof EF] as number || 0
+  const ref_gwp = REFRIGERANT_GWP[loc.refrigerant_type]?.[gwpVersion] ?? 0
   const s1_fugitive = (!loc.uses_ammonia && loc.has_hfc_refrigerants) ? loc.refrigerant_purchased_kg * ref_gwp / 1000 : 0
   const s1_total = s1_stationary + s1_mobile + s1_fugitive
   const grid_ef = getGridFactor(loc.grid_region, year).ef
-  const s2_location = (loc.electricity_kwh * grid_ef + (loc.has_purchased_steam ? loc.purchased_steam_mmbtu * EF.steam_mmbtu : 0)) / 1000
-  const s2_market = ((loc.electricity_kwh - loc.renewable_electricity_kwh) * grid_ef + (loc.has_purchased_steam ? loc.purchased_steam_mmbtu * EF.steam_mmbtu : 0)) / 1000
+  const steam_kg = loc.has_purchased_steam ? loc.purchased_steam_mmbtu * EF.steam_mmbtu : 0
+  const s2_location = (loc.electricity_kwh * grid_ef + steam_kg) / 1000
+  // Market-based: covered (contractual) kWh @ 0 (RECs/PPAs/green tariffs assumed zero-emission — documented);
+  // uncovered kWh @ residual-mix factor. If no residual mix applies (full-disclosure region, or US subregion
+  // not yet selected), fall back to the location grid factor for uncovered load and flag it.
+  const uncovered_kwh = Math.max(0, loc.electricity_kwh - loc.renewable_electricity_kwh)
+  const resRegion = loc.residual_region || (loc.grid_region.startsWith('EU_') ? loc.grid_region : '')
+  const res = getResidualFactor(resRegion, year, gwpVersion)
+  const market_elec_ef = res.applicable ? res.ef : grid_ef
+  const s2_market = (uncovered_kwh * market_elec_ef + steam_kg) / 1000
   return { s1_stationary, s1_mobile, s1_fugitive, s1_total, s2_location, s2_market, gases, biogenic: loc.biogenic_co2_mt }
 }
 
@@ -454,7 +602,7 @@ function buildWorkings(locations: Location[], gwpVersion: 'AR4' | 'AR5' = 'AR4',
     if (loc.has_mobile && loc.gasoline_amount > 0) pushFuel(loc, 'Gasoline (mobile)', 1, loc.gasoline_amount, loc.gasoline_unit, pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF))
     if (loc.has_mobile && loc.diesel_mobile_amount > 0) pushFuel(loc, 'Diesel (mobile)', 1, loc.diesel_mobile_amount, loc.diesel_mobile_unit, pickEF(loc, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF))
     if (!loc.uses_ammonia && loc.has_hfc_refrigerants && loc.refrigerant_purchased_kg > 0) {
-      const ref_gwp = (EF[loc.refrigerant_type as keyof typeof EF] as number) || 0
+      const ref_gwp = REFRIGERANT_GWP[loc.refrigerant_type]?.[gwpVersion] ?? 0
       rows.push({ location: loc.name || 'Location', source: `Refrigerant (${loc.refrigerant_type})`, scope: 1, activity_data: loc.refrigerant_purchased_kg, activity_unit: 'kg', emission_factor: `GWP ${ref_gwp}`, ef_source: 'IPCC GWP', gwp_basis: gwpVersion, result_tco2e: loc.refrigerant_purchased_kg * ref_gwp / 1000 })
     }
     if (loc.electricity_kwh > 0) {
@@ -809,6 +957,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
 
   const totals_ar4 = calcInventory(inventory.locations, 'AR4', inventory.reporting_year)
   const totals_ar5 = calcInventory(inventory.locations, 'AR5', inventory.reporting_year)
+  const totals_ar6 = calcInventory(inventory.locations, 'AR6', inventory.reporting_year)
+  const totalsByGwp: Record<GwpVersion, typeof totals_ar4> = { AR4: totals_ar4, AR5: totals_ar5, AR6: totals_ar6 }
 
   const STEPS = ['Reporting frameworks', 'Company setup', 'Energy & fuel data', 'Additional data', 'Review & workings', 'Export reports', 'Audit trail']
   const activeFrameworks = FRAMEWORKS.filter(f => inventory.selected_frameworks.includes(f.id))
@@ -1091,8 +1241,21 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                 )}
                 {loc.state
                   ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region auto-detected: <strong>{detectedRegion?.label}</strong> — {detectedRegion?.ef} kg CO₂e/kWh (eGRID 2023)</div>
+                  : (loc.grid_region.startsWith('EU_') || loc.grid_region === 'UK')
+                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{loc.grid_region}</strong> — {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh ({loc.grid_region === 'UK' ? 'DEFRA 2025' : 'EEA 2023'})</div>
                   : <Field label="Grid region"><select value={loc.grid_region} onChange={e => updateLocation(activeLocation, 'grid_region', e.target.value)} style={inputStyle}><optgroup label="Canada">{GRID_REGIONS_CA.map(r => <option key={r.value} value={r.value}>{r.label} — {r.ef} kg CO₂e/kWh</option>)}</optgroup><optgroup label="United States">{GRID_REGIONS_US.map(r => <option key={r.value} value={r.value}>{r.label} — {r.ef} kg CO₂e/kWh</option>)}</optgroup></select></Field>
                 }
+                {loc.country === 'US' && (
+                  <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 8, padding: '12px 14px' }}>
+                    <Field label="eGRID subregion (for market-based Scope 2)" hint="Required only for ESRS E1 / GRI 305 market-based reporting. Leave blank if not reporting those — market-based will use the grid-average factor as a conservative fallback.">
+                      <select value={loc.residual_region || ''} onChange={e => updateLocation(activeLocation, 'residual_region', e.target.value)} style={inputStyle}>
+                        <option value="">Select your eGRID subregion…</option>
+                        {US_SUBREGIONS.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+                      </select>
+                    </Field>
+                    <a href="https://www.epa.gov/egrid/power-profiler" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#0C447C', textDecoration: 'none', display: 'inline-block', marginTop: 6 }}>🔎 Find your subregion with EPA Power Profiler (enter your ZIP) →</a>
+                  </div>
+                )}
                 {isPaid ? <DocUpload label="Upload electricity bills" locIdx={activeLocation} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} /> : <LockedDocUpload label="Upload electricity bills" />}
               </div>
             </div>
@@ -1176,21 +1339,20 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     )
   }
 
-  const renderStep4 = () => {
-    const ar4 = totals_ar4
+    const renderStep4 = () => {
     const ar5 = totals_ar5
     const rev = inventory.revenue_millions
     const emp = inventory.employee_count
     return (
       <div>
         <h2 style={sectionHead}>Review, results & calculation workings</h2>
-<p style={sectionSub}>{inventory.selected_frameworks.includes('esrs') || inventory.selected_frameworks.includes('gri') ? `Your Scope 1 & 2 inventory for ${inventory.company_name || 'your company'}, ${inventory.reporting_year}. Scope 3 required — complete it after export.` : `Your complete GHG inventory for ${inventory.company_name || 'your company'}, ${inventory.reporting_year}.`}</p>
+        <p style={sectionSub}>{inventory.selected_frameworks.includes('esrs') || inventory.selected_frameworks.includes('gri') ? `Your Scope 1 & 2 inventory for ${inventory.company_name || 'your company'}, ${inventory.reporting_year}. Scope 3 required — complete it after export.` : `Your complete GHG inventory for ${inventory.company_name || 'your company'}, ${inventory.reporting_year}.`}</p>
         <div style={{ position: 'relative' }}>
           {!isPaid && <PaywallOverlay frameworks={activeFrameworks.map(f => f.name)} />}
           <div style={{ filter: isPaid ? 'none' : 'blur(4px)', pointerEvents: isPaid ? 'auto' : 'none' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: '2rem' }}>
               {activeFrameworks.map(fw => {
-                const totals = fw.gwp === 'AR4' ? ar4 : ar5
+                const totals = totalsByGwp[fw.gwp as GwpVersion]
                 return (
                   <div key={fw.id} style={{ background: fw.bg, border: `0.5px solid ${fw.color}33`, borderRadius: 10, padding: '1.25rem' }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: fw.color, letterSpacing: '0.06em', textTransform: 'uppercase' as const, marginBottom: 8 }}>{fw.name} — GWP {fw.gwp}</div>
@@ -1202,6 +1364,12 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                       <div style={{ fontSize: 11, color: '#888784' }}>Scope 2 (location)</div>
                       <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: fw.color }}>{totals.s2_location.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
                     </div>
+                    {(fw.id === 'esrs' || fw.id === 'gri') && (
+                      <div style={{ marginBottom: 6 }}>
+                        <div style={{ fontSize: 11, color: '#888784' }}>Scope 2 (market)</div>
+                        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: fw.color }}>{totals.s2_market.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                      </div>
+                    )}
                     {rev > 0 && <div style={{ fontSize: 11, color: '#888784', marginTop: 4 }}>Intensity: {(totals.s1_total / rev).toFixed(4)} mt/$M</div>}
                     {emp > 0 && fw.id === 'ecovadis' && <div style={{ fontSize: 11, color: '#888784' }}>Per employee: {(totals.s1_total / emp * 1000).toFixed(2)} kgCO₂e</div>}
                   </div>
@@ -1209,7 +1377,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
               })}
             </div>
             {inventory.locations.map((loc, i) => {
-              const c = calcLocation(loc, 'AR4', inventory.reporting_year)
+              const wGwp: GwpVersion = (FRAMEWORKS.find(f => f.id === activeExport)?.gwp as GwpVersion) || (activeFrameworks[0]?.gwp as GwpVersion) || 'AR6'
+              const c = calcLocation(loc, wGwp, inventory.reporting_year)
               const key = `loc_${i}`
               return (
                 <div key={loc.id} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, marginBottom: 12, overflow: 'hidden' }}>
@@ -1228,13 +1397,17 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                         <tbody>
                           {loc.has_natural_gas && loc.natural_gas_amount > 0 && (() => {
                             const ef = pickEF(loc, `natural_gas_${loc.natural_gas_unit}` as keyof typeof EF)
-                            const total = (ef.co2 + ef.ch4 * GWP.AR4.CH4 + ef.n2o * GWP.AR4.N2O) * loc.natural_gas_amount / 1000
-                            return <tr><td style={wTd}>Natural gas</td><td style={wTd}>{loc.natural_gas_amount} {loc.natural_gas_unit}</td><td style={wTd}>{(ef.co2 + ef.ch4 * GWP.AR4.CH4 + ef.n2o * GWP.AR4.N2O).toFixed(3)} kg CO₂e/{loc.natural_gas_unit}</td><td style={wTd}>{combustionSource(loc)}</td><td style={wTd}>AR4</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
+                            const g = GWP[wGwp]
+                            const efCo2e = ef.co2 + ef.ch4 * g.CH4_fossil + ef.n2o * g.N2O
+                            const total = efCo2e * loc.natural_gas_amount / 1000
+                            return <tr><td style={wTd}>Natural gas</td><td style={wTd}>{loc.natural_gas_amount} {loc.natural_gas_unit}</td><td style={wTd}>{efCo2e.toFixed(3)} kg CO₂e/{loc.natural_gas_unit}</td><td style={wTd}>{combustionSource(loc)}</td><td style={wTd}>{wGwp}</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
                           })()}
                           {loc.has_propane && loc.propane_amount > 0 && (() => {
                             const ef = pickEF(loc, `propane_${loc.propane_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF)
-                            const total = (ef.co2 + ef.ch4 * GWP.AR4.CH4 + ef.n2o * GWP.AR4.N2O) * loc.propane_amount / 1000
-                            return <tr><td style={wTd}>Propane</td><td style={wTd}>{loc.propane_amount} {loc.propane_unit}</td><td style={wTd}>{(ef.co2 + ef.ch4 * GWP.AR4.CH4 + ef.n2o * GWP.AR4.N2O).toFixed(3)} kg CO₂e/{loc.propane_unit === 'gallons' ? 'gal' : 'L'}</td><td style={wTd}>{combustionSource(loc)}</td><td style={wTd}>AR4</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
+                            const g = GWP[wGwp]
+                            const efCo2e = ef.co2 + ef.ch4 * g.CH4_fossil + ef.n2o * g.N2O
+                            const total = efCo2e * loc.propane_amount / 1000
+                            return <tr><td style={wTd}>Propane</td><td style={wTd}>{loc.propane_amount} {loc.propane_unit}</td><td style={wTd}>{efCo2e.toFixed(3)} kg CO₂e/{loc.propane_unit === 'gallons' ? 'gal' : 'L'}</td><td style={wTd}>{combustionSource(loc)}</td><td style={wTd}>{wGwp}</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
                           })()}
                           {loc.electricity_kwh > 0 && (() => {
                             const ef = getGridFactor(loc.grid_region, inventory.reporting_year).ef
@@ -1251,7 +1424,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
             <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '1.5rem', marginTop: '1.5rem' }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginBottom: 12 }}>Assurance readiness — ISO 14064-3 / ISAE 3410</div>
               {[
-                { label: 'Emission factors cited with source and year', done: true, note: 'EPA 2024 (US) · ECCC v3.0 (CA) · DEFRA 2025 (UK) · eGRID 2023 · IPCC AR4 + AR5 GWP' },
+                { label: 'Emission factors cited with source and year', done: true, note: 'EPA 2024 (US) · ECCC v3.0 (CA) · DEFRA 2025 (UK) · eGRID 2023 · IPCC AR6 GWP' },
                 { label: 'Calculation workings documented per source', done: true, note: 'Full formula shown for every emission source' },
                 { label: 'Organizational boundary documented', done: !!inventory.boundary_approach, note: inventory.boundary_approach.replace(/_/g, ' ') },
                 { label: 'Source documents uploaded', done: isPaid && inventory.locations.some(l => l.source_docs.length > 0), note: isPaid ? `${inventory.locations.reduce((a, l) => a + l.source_docs.length, 0)} documents` : 'Available on paid plan' },
@@ -1271,7 +1444,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       </div>
     )
   }
-  const renderStep5 = () => {
+ const renderStep5 = () => {
     return (
       <div>
         <h2 style={sectionHead}>Export your reports</h2>
@@ -1336,7 +1509,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
             </div>
             {activeFrameworks.map(fw => {
               if (fw.id !== activeExport) return null
-              const totals = fw.gwp === 'AR4' ? totals_ar4 : totals_ar5
+              const totals = totalsByGwp[fw.gwp as GwpVersion]
               const rev = inventory.revenue_millions
               const emp = inventory.employee_count
               return (
@@ -1392,7 +1565,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
 
   const generateExport = async (frameworkId: string) => {
     const fw = FRAMEWORKS.find(f => f.id === frameworkId)!
-    const totals = fw.gwp === 'AR4' ? totals_ar4 : totals_ar5
+    const totals = totalsByGwp[fw.gwp as GwpVersion]
     const rev = inventory.revenue_millions
     const emp = inventory.employee_count
     const header = [
