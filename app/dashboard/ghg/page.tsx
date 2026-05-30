@@ -424,7 +424,7 @@ const emptyLocation = (id: string, name: string, state = ''): Location => ({
   has_fuel_oil: false, fuel_oil_gallons: 0,
   has_mobile: false, gasoline_amount: 0, gasoline_unit: 'gallons', diesel_mobile_amount: 0, diesel_mobile_unit: 'gallons',
   uses_ammonia: false, has_hfc_refrigerants: false, refrigerant_type: 'r410a', refrigerant_purchased_kg: 0,
-  electricity_kwh: 0, grid_region: 'us_average', renewable_electricity_kwh: 0,
+  electricity_kwh: 0, grid_region: 'us_average', renewable_electricity_kwh: 0, residual_region: '',
   has_purchased_steam: false, purchased_steam_mmbtu: 0,
   biogenic_co2_mt: 0,
   source_docs: [],
@@ -521,7 +521,7 @@ function calcGas(ef: { co2: number; ch4: number; n2o: number }, amount: number, 
   }
 }
 
-function calcLocation(loc: Location, gwpVersion: 'AR4' | 'AR5' = 'AR4', year: number = 2024) {
+function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR4', year: number = 2024) {
   let s1_stationary = 0, s1_mobile = 0
   const gases = { co2: 0, ch4: 0, n2o: 0 }
   if (loc.has_natural_gas && loc.natural_gas_amount > 0) {
@@ -572,7 +572,7 @@ function calcLocation(loc: Location, gwpVersion: 'AR4' | 'AR5' = 'AR4', year: nu
   return { s1_stationary, s1_mobile, s1_fugitive, s1_total, s2_location, s2_market, gases, biogenic: loc.biogenic_co2_mt }
 }
 
-function calcInventory(locations: Location[], gwpVersion: 'AR4' | 'AR5' = 'AR4', year: number = 2024) {
+function calcInventory(locations: Location[], gwpVersion: GwpVersion = 'AR4', year: number = 2024) {
   return locations.reduce((acc, loc) => {
     const c = calcLocation(loc, gwpVersion, year)
     return {
@@ -587,7 +587,7 @@ function calcInventory(locations: Location[], gwpVersion: 'AR4' | 'AR5' = 'AR4',
   }, { s1_total: 0, s2_location: 0, s2_market: 0, co2: 0, ch4: 0, n2o: 0, biogenic: 0 })
 }
 
-function buildWorkings(locations: Location[], gwpVersion: 'AR4' | 'AR5' = 'AR4', year: number = 2024) {
+function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR4', year: number = 2024) {
   const rows: any[] = []
   const pushFuel = (loc: Location, source: string, scope: number, activity: number, unit: string, ef: { co2: number; ch4: number; n2o: number }) => {
     const g = calcGas(ef, activity, gwpVersion)
