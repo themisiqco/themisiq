@@ -17,7 +17,7 @@ const METHODOLOGIES = [
       },
       {
         title: 'Global Warming Potentials (GWP)',
-        content: 'ThemisIQ supports both IPCC AR4 GWP values (required by CARB SB 253 and CDP) and IPCC AR5 GWP values (required by ESRS E1 and GRI 305). The correct GWP set is applied automatically based on your selected frameworks.',
+        content: 'ThemisIQ applies IPCC Sixth Assessment Report (AR6) 100-year GWP values by default — the latest published IPCC set — across CDP, ESRS E1, GRI 305, EcoVadis, and IFRS S2. The one exception is California SB 253, which is reported on IPCC AR4 values for consistency with CARB\'s existing AB 32 / Mandatory Reporting Regulation program. AR6 distinguishes fossil from non-fossil (biogenic) methane (fossil CH₄ GWP 29.8, non-fossil 27.0, N₂O 273); the correct GWP set is applied automatically based on each selected framework and stamped on every export.',
       },
       {
         title: 'Emission factors',
@@ -25,7 +25,7 @@ const METHODOLOGIES = [
       },
       {
         title: 'Scope 2 accounting',
-        content: 'ThemisIQ supports both location-based and market-based Scope 2 accounting. Market-based Scope 2 subtracts electricity covered by PPAs, RECs, and green tariffs from location-based emissions — required by ESRS E1 and GRI 305.',
+        content: 'ThemisIQ supports both location-based and market-based Scope 2 accounting, following the GHG Protocol Scope 2 Guidance dual-reporting requirement (ESRS E1 and GRI 305). Location-based figures use grid-average emission factors. Market-based figures apply a residual-mix emission factor to the electricity NOT covered by a contractual instrument (PPAs, RECs, green tariffs) — rather than deducting contracted volumes from the grid average — so emissions attributable to untracked supply are not understated. Residual-mix factors are sourced from the Association of Issuing Bodies (AIB) European Residual Mixes 2024 for EU member states, and from Green-e (2025 residual mix, 2023 data) combined with US EPA eGRID2023 for US locations, keyed by eGRID subregion. For full-disclosure jurisdictions where no residual mix is published (e.g. Austria), the location-based factor is applied with that treatment disclosed. Every market-based factor is vintage-stamped and cited in exports.',
       },
       {
         title: 'Assurance readiness',
