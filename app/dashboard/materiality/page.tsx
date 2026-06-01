@@ -83,21 +83,27 @@ const REGION_COVERAGE: Record<string, string> = {
 }
 
 const JURISDICTIONS = [
-  { code: 'eu_ets', label: 'EU (EU ETS)' }, { code: 'cbam', label: 'EU CBAM exposure' },
-  { code: 'uk_ets', label: 'UK (UK ETS)' }, { code: 'ca', label: 'Canada (federal pricing)' },
-  { code: 'us_fed', label: 'US (federal)' }, { code: 'us_ca', label: 'US — California cap-and-trade' },
-  { code: 'cn', label: 'China (national ETS)' }, { code: 'kr', label: 'South Korea (K-ETS)' },
-  { code: 'jp', label: 'Japan' }, { code: 'au', label: 'Australia (Safeguard)' },
-  { code: 'nz', label: 'New Zealand (NZ ETS)' }, { code: 'ch', label: 'Switzerland (CH ETS)' },
+  { code: 'eu_ets', label: 'EU (EU ETS)', desc: 'Operate facilities in, or import energy-intensive goods into, the EU.' },
+  { code: 'cbam', label: 'EU CBAM exposure', desc: 'Sell steel, aluminium, cement, fertiliser, hydrogen, or electricity into the EU.' },
+  { code: 'uk_ets', label: 'UK (UK ETS)', desc: 'Operate energy-intensive installations, power, or aviation in the UK.' },
+  { code: 'ca', label: 'Canada (federal pricing)', desc: 'Operations in Canadian provinces under the federal carbon-pricing backstop.' },
+  { code: 'us_fed', label: 'US (federal)', desc: 'US operations exposed to federal climate rules and SEC climate disclosure.' },
+  { code: 'us_ca', label: 'US — California cap-and-trade', desc: 'Operations or large emissions sources located in California.' },
+  { code: 'cn', label: 'China (national ETS)', desc: "Power or industrial operations covered by China's national emissions trading." },
+  { code: 'kr', label: 'South Korea (K-ETS)', desc: "Operations covered by Korea's emissions trading scheme." },
+  { code: 'jp', label: 'Japan', desc: "Operations exposed to Japan's GX carbon-pricing and disclosure regime." },
+  { code: 'au', label: 'Australia (Safeguard)', desc: 'Run a facility above the Safeguard Mechanism emissions threshold.' },
+  { code: 'nz', label: 'New Zealand (NZ ETS)', desc: "Operations covered by New Zealand's emissions trading scheme." },
+  { code: 'ch', label: 'Switzerland (CH ETS)', desc: "Operations covered by the Swiss emissions trading scheme." },
 ]
 
 const SCENARIOS = [
-  { code: 'ssp245', label: 'IPCC SSP2-4.5', descriptor: '~2.7°C' },
-  { code: 'ssp126', label: 'IPCC SSP1-2.6', descriptor: '~1.8°C' },
-  { code: 'ssp585', label: 'IPCC SSP5-8.5', descriptor: '~4.4°C' },
-  { code: 'ngfs_orderly', label: 'NGFS Orderly', descriptor: 'Early policy' },
-  { code: 'ngfs_disorderly', label: 'NGFS Disorderly', descriptor: 'Late, abrupt' },
-  { code: 'ngfs_hothouse', label: 'NGFS Hot House', descriptor: 'Limited action' },
+  { code: 'ssp245', label: 'IPCC SSP2-4.5', descriptor: '~2.7°C', desc: "Middle-of-the-road: emissions stay near today's track and the world warms about 2.7°C by 2100. The common central case." },
+  { code: 'ssp126', label: 'IPCC SSP1-2.6', descriptor: '~1.8°C', desc: 'A sustainable, cooperative, low-emissions world that keeps warming close to the Paris goal. The optimistic case.' },
+  { code: 'ssp585', label: 'IPCC SSP5-8.5', descriptor: '~4.4°C', desc: 'Fossil-fuelled development where emissions keep rising, producing about 4.4°C of warming. The severe-physical-risk case.' },
+  { code: 'ngfs_orderly', label: 'NGFS Orderly', descriptor: 'Early policy', desc: 'Early, gradual policy action — moderate transition risk and the lowest physical-risk path.' },
+  { code: 'ngfs_disorderly', label: 'NGFS Disorderly', descriptor: 'Late, abrupt', desc: 'Late, sudden policy action — high transition risk from abrupt regulatory and market shifts.' },
+  { code: 'ngfs_hothouse', label: 'NGFS Hot House', descriptor: 'Limited action', desc: 'Little further climate action — minimal transition risk but the most severe physical damage.' },
 ]
 
 // ESRS topics with one-line plain-English descriptions (UX fix #2)
@@ -154,12 +160,12 @@ export default function MaterialityWizard() {
   const [savedId, setSavedId] = useState<string | null>(null)
   const [acknowledgedReport, setAcknowledgedReport] = useState(false)
 
-  const SCENARIO_RATIONALE = "We've set a middle pathway (SSP2-4.5, ~2.7°C) — the most common choice for a first assessment and a reasonable central case. Change it if you have a specific reason to test a higher- or lower-warming scenario."
+  const SCENARIO_RATIONALE = "Yes — SSP2-4.5 (~2.7°C) is the most common starting choice and a reasonable middle case, so it's fine to leave it as-is. Change it only if you have a specific reason to test a more optimistic or more severe future. You can always re-run with a different scenario later."
   const HORIZON_RATIONALE = "Medium term (to 2040) is the default lens for a first screening. Companies with long-lived physical assets may prefer the long-term view."
 
   const stepNames = mode === 'csrd'
-    ? ['Industry', 'Regions', 'Jurisdictions', 'Scenario', 'Impact', 'Results']
-    : ['Industry', 'Regions', 'Jurisdictions', 'Scenario', 'Results']
+    ? ['Industry', 'Operating regions', 'Regulatory exposure', 'Scenario', 'Impact', 'Results']
+    : ['Industry', 'Operating regions', 'Regulatory exposure', 'Scenario', 'Results']
   const resultsStep = stepNames.length - 1
   const isLastInputStep = step === resultsStep - 1
 
@@ -260,6 +266,7 @@ export default function MaterialityWizard() {
   const renderRegions = () => (
     <div>
       <h2 style={sectionHead}>Where do you operate?</h2>
+      <p style={{ fontSize: 12, color: '#888784', lineHeight: 1.6, marginTop: -4, marginBottom: 12 }}>This step is about <strong style={{ color: '#555553' }}>physical location</strong> — where your assets sit, which drives weather and climate hazards. Whose climate laws apply comes in the next step.</p>
       <p style={sectionSub}><strong style={{ color: '#7425e3', fontWeight: 600 }}>Click the ⓘ on any region to see the countries it covers and confirm your operations fall within it.</strong> These follow the IPCC AR6 climate reference regions — each carries a distinct hazard profile that drives your physical-risk results.</p>
       {REGION_GROUPS.map(g => (
         <div key={g.group} style={{ marginBottom: 16 }}>
@@ -307,17 +314,26 @@ export default function MaterialityWizard() {
 
   const renderJurisdictions = () => (
     <div>
-      <h2 style={sectionHead}>Policy jurisdictions</h2>
-      <p style={sectionSub}>Where you face carbon pricing or climate regulation — this drives transition risk, and is distinct from your physical regions.</p>
+      <h2 style={sectionHead}>Regulatory exposure</h2>
+      {/* Contrast callback: distinguishes this step from Operating regions */}
+      <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#0d0d0d', marginBottom: 4 }}>Different from the last step</div>
+        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}><em>Operating regions</em> was about where your assets physically sit — that drives weather and climate hazards. This step is about whose climate <em>laws</em> reach you — carbon costs and disclosure rules — which can include places you don't operate at all, like selling into the EU.</div>
+      </div>
+      <p style={sectionSub}>Tick every place where your company has operations, legal entities, or significant sales — those are where carbon-pricing and climate rules can reach you, even if you're not headquartered there. Not sure? Tick where you're based and where you earn most of your revenue. This drives transition risk, separately from your physical regions.</p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
         {JURISDICTIONS.map(j => {
           const sel = jurisdictionCodes.includes(j.code)
-          return <div key={j.code} onClick={() => toggle(jurisdictionCodes, j.code, setJurisdictionCodes)} style={{ border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, borderRadius: 10, padding: '9px 12px', cursor: 'pointer', background: sel ? '#EDE9FE' : '#f8f7f5', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, background: sel ? '#7425e3' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{sel && <span style={{ color: '#fff', fontSize: 8, fontWeight: 700 }}>✓</span>}</div>
-            <span style={{ fontSize: 12, fontWeight: sel ? 600 : 400, color: sel ? '#7425e3' : '#555553' }}>{j.label}</span>
+          return <div key={j.code} onClick={() => toggle(jurisdictionCodes, j.code, setJurisdictionCodes)} style={{ border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer', background: sel ? '#EDE9FE' : '#f8f7f5', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            <div style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, background: sel ? '#7425e3' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>{sel && <span style={{ color: '#fff', fontSize: 8, fontWeight: 700 }}>✓</span>}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, fontWeight: sel ? 600 : 500, color: sel ? '#7425e3' : '#0d0d0d' }}>{j.label}</div>
+              <div style={{ fontSize: 11, color: '#888784', marginTop: 2, lineHeight: 1.5 }}>{j.desc}</div>
+            </div>
           </div>
         })}
       </div>
+      <p style={{ fontSize: 11, color: '#888784', lineHeight: 1.6, marginTop: 12 }}>These are simplified guides — each scheme has its own thresholds and exceptions, so check the specific rules if you're near a threshold.</p>
     </div>
   )
 
@@ -325,8 +341,13 @@ export default function MaterialityWizard() {
     <div>
       <h2 style={sectionHead}>Scenario & time horizon</h2>
       <p style={sectionSub}>We've pre-selected sensible defaults. Higher-warming pathways raise physical risk; faster-policy pathways raise transition risk.</p>
+      {/* UX: plain-English "what is a scenario?" explainer */}
+      <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#0d0d0d', marginBottom: 4 }}>What's a climate scenario?</div>
+        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>A scenario is a plausible future used to stress-test your business — not a prediction. Each one describes how far the world warms and how fast climate policy tightens. Higher-warming futures raise physical risk (floods, heat, storms); faster-policy futures raise transition risk (carbon costs, market shifts). Good practice is to test more than one. We've picked a sensible default below — you can keep it.</div>
+      </div>
       <div style={{ background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.2)', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: '#7425e3', marginBottom: 4 }}>Why this default?</div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#7425e3', marginBottom: 4 }}>Why this default — and can I just keep it?</div>
         <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{SCENARIO_RATIONALE}</div>
       </div>
       <label style={labelStyle}>Scenario</label>
@@ -335,7 +356,8 @@ export default function MaterialityWizard() {
           const sel = scenarioCode === s.code
           return <div key={s.code} onClick={() => setScenarioCode(s.code)} style={{ border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer', background: sel ? '#EDE9FE' : '#f8f7f5' }}>
             <div style={{ fontSize: 13, fontWeight: sel ? 600 : 500, color: sel ? '#7425e3' : '#0d0d0d' }}>{s.label}</div>
-            <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{s.descriptor}</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', marginTop: 2 }}>{s.descriptor}</div>
+            <div style={{ fontSize: 11, color: '#888784', marginTop: 4, lineHeight: 1.45 }}>{s.desc}</div>
           </div>
         })}
       </div>
