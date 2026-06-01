@@ -8,6 +8,7 @@
 //
 // Model: physical risk  = industry sensitivity x regional hazard x scenario x horizon
 //        transition risk = industry carbon    x jurisdiction policy x scenario x horizon
+//        opportunities   = industry relevance x scenario link (TCFD five categories)
 //        CSRD matrix     = per-ESRS-topic financial score (vertical) x impact score (horizontal)
 // E1 (climate) financial score is overridden by the live physical/transition engine.
 
@@ -24,6 +25,7 @@ export type IndustryHazard = { industry_code: string; hazard: string; sensitivit
 export type Jurisdiction = { code: string; label: string; policy_intensity: number }
 export type EsrsTopic = { code: string; label: string; category: string; sort_order: number }
 export type TopicBaseline = { industry_code: string; topic_code: string; financial_base: number; impact_base: number }
+export type IndustryOpportunity = { industry_code: string; opportunity_category: string; relevance: number; sort_order: number }
 export type Scenario = {
   code: string; label: string; framework: string; descriptor: string | null
   physical_mult: number; transition_mult: number
@@ -38,6 +40,7 @@ export type ReferenceData = {
   esrsTopics: EsrsTopic[]
   topicBaselines: TopicBaseline[]
   scenarios: Scenario[]
+  industryOpportunities: IndustryOpportunity[]
 }
 
 // ---------- User input ----------
@@ -56,6 +59,7 @@ export type AssessmentInput = {
 export type Band = 'high' | 'med' | 'low'
 export type PhysicalRisk = { hazard: string; band: Band; score: number; drivingRegion: string }
 export type TransitionRisk = { driver: string; band: Band; score: number }
+export type Opportunity = { category: string; label: string; band: Band; relevance: number }
 export type MatrixTopic = {
   code: string; label: string; category: string
   financial: number; impact: number
@@ -67,15 +71,36 @@ export type AssessmentResult = {
   modelVersion: string
   physical: PhysicalRisk[]
   transition: TransitionRisk[]
+  opportunities: Opportunity[]
   matrix: MatrixTopic[]            // empty in s2 mode
   climateFinancialScore: number    // 0..10, the E1 financial number from the engine
-  summary: { physicalHigh: number; transitionHigh: number; topicsBothAxes: number }
+  summary: { physicalHigh: number; transitionHigh: number; topicsBothAxes: number; opportunitiesStrong: number }
 }
 
 const HAZARD_LABELS: Record<string, string> = {
   drought: 'Drought', water: 'Water stress', heat: 'Extreme heat',
   flood: 'Inland flooding', coastal: 'Coastal flooding', wildfire: 'Wildfire',
   cyclone: 'Storms / cyclones', cold: 'Cold / permafrost',
+}
+
+const OPPORTUNITY_LABELS: Record<string, string> = {
+  resource_efficiency: 'Resource efficiency',
+  energy_source: 'Energy source',
+  products_services: 'Products & services',
+  markets: 'Markets',
+  resilience: 'Resilience',
+}
+
+// Transition-linked opportunities (energy/products/markets) strengthen under
+// ambitious-policy scenarios — the mirror of the physical/transition risk inversion.
+// Resource efficiency and resilience are scenario-neutral / physical-linked
+// (efficiency always pays; resilience tracks physical pressure).
+const OPP_SCENARIO_LINK: Record<string, 'transition' | 'physical' | 'neutral'> = {
+  resource_efficiency: 'neutral',
+  energy_source: 'transition',
+  products_services: 'transition',
+  markets: 'transition',
+  resilience: 'physical',
 }
 
 // Asset profile modifies hazard exposure within selected regions.
@@ -147,6 +172,35 @@ function computeTransition(input: AssessmentInput, ref: ReferenceData, scenario:
   ]
 }
 
+// ---------------------------------------------------------------------------
+// Climate opportunities: TCFD five-category relevance per industry, lightly
+// modulated by scenario (transition-linked categories rise under ambitious-policy
+// pathways; resilience tracks physical pressure; resource efficiency is neutral).
+// Relevance bands mirror the qualitative high/med/low treatment of the risk side.
+// ---------------------------------------------------------------------------
+function computeOpportunities(input: AssessmentInput, ref: ReferenceData, scenario: Scenario): Opportunity[] {
+  const rows = (ref.industryOpportunities ?? [])
+    .filter(o => o.industry_code === input.industryCode)
+    .sort((a, b) => a.sort_order - b.sort_order)
+  const out: Opportunity[] = []
+
+  for (const o of rows) {
+    if (o.relevance <= 0) continue
+    const link = OPP_SCENARIO_LINK[o.opportunity_category] ?? 'neutral'
+    const mult = link === 'transition' ? scenario.transition_mult
+               : link === 'physical'   ? scenario.physical_mult
+               : 1
+    const score = o.relevance * mult
+    out.push({
+      category: o.opportunity_category,
+      label: OPPORTUNITY_LABELS[o.opportunity_category] ?? o.opportunity_category,
+      band: score >= 3.5 ? 'high' : score >= 2 ? 'med' : 'low',
+      relevance: Math.round(score * 10) / 10,
+    })
+  }
+  return out
+}
+
 // climate financial materiality (E1) — single 0..10 number from physical + transition.
 function climateFinancial(physical: PhysicalRisk[], transition: TransitionRisk[]): number {
   const physMax = physical.reduce((m, p) => Math.max(m, p.score), 0)
@@ -201,6 +255,7 @@ export function runAssessment(input: AssessmentInput, ref: ReferenceData): Asses
 
   const physical = computePhysical(input, ref, scenario)
   const transition = computeTransition(input, ref, scenario)
+  const opportunities = computeOpportunities(input, ref, scenario)
   const climateFin = climateFinancial(physical, transition)
   const matrix = input.mode === 'csrd' ? computeMatrix(input, ref, climateFin) : []
 
@@ -209,12 +264,14 @@ export function runAssessment(input: AssessmentInput, ref: ReferenceData): Asses
     modelVersion: ref.config.model_version,
     physical,
     transition,
+    opportunities,
     matrix,
     climateFinancialScore: climateFin,
     summary: {
       physicalHigh: physical.filter(p => p.band === 'high').length,
       transitionHigh: transition.filter(t => t.band === 'high').length,
       topicsBothAxes: matrix.filter(m => m.quadrant === 'both').length,
+      opportunitiesStrong: opportunities.filter(o => o.band === 'high').length,
     },
   }
 }
