@@ -18,6 +18,13 @@ const SEV = {
   low:  { label: 'LOW', color: '#888784', bg: '#f8f7f5', border: '#e8e7e4' },
 }
 
+// opportunity palette — green to read as upside, distinct from the risk reds/ambers
+const OPP = {
+  high: { label: 'STRONG', color: '#0F6E56', bg: '#E1F5EE', border: '#0F6E56' },
+  med:  { label: 'MODERATE', color: '#0C7C59', bg: '#E1F5EE', border: '#7FCBB4' },
+  low:  { label: 'LIMITED', color: '#888784', bg: '#f8f7f5', border: '#e8e7e4' },
+}
+
 // ─── Static option data (mirrors the seeded DB) ───────────────────────────────
 const SECTORS = [
   { code: 'energy', label: 'Energy & Utilities' }, { code: 'finance', label: 'Financial Services' },
@@ -114,6 +121,15 @@ const ASSET_PROFILES = [
   { code: 'water', label: 'Water-dependent operations', desc: 'You rely heavily on water (e.g. agriculture, manufacturing, power). Raises drought and water-stress sensitivity.' },
   { code: 'distributed', label: 'Distributed / asset-light', desc: 'Few physical assets (e.g. services, software). Your exposure is mainly indirect, via the supply chain.' },
 ]
+
+// TCFD opportunity category descriptions (static — same for all industries)
+const OPPORTUNITY_DESC: Record<string, string> = {
+  'Resource efficiency': 'Lower operating costs through more efficient production, materials, transport, and energy use.',
+  'Energy source': 'Shifting to low-carbon energy (renewables, PPAs, electrified process heat) and the savings that follow.',
+  'Products & services': 'Developing low-emission products or services that meet rising demand for sustainable options.',
+  'Markets': 'Accessing new markets and customer segments opened up by the low-carbon transition.',
+  'Resilience': 'Strengthening adaptive capacity so the business withstands physical and transition climate pressures.',
+}
 
 type Mode = 's2' | 'csrd'
 type Band = 'high' | 'med' | 'low'
@@ -374,6 +390,16 @@ export default function MaterialityWizard() {
     )
   }
 
+  // opportunity pill — green palette, reads as upside
+  const oppPill = (label: string, band: Band) => {
+    const c = OPP[band]
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: c.bg, color: c.color, fontSize: 12, padding: '4px 10px', borderRadius: 99, margin: '0 6px 6px 0', border: `0.5px solid ${c.border}` }}>
+        {label}<span style={{ fontSize: 10, fontWeight: 700 }}>{c.label}</span>
+      </span>
+    )
+  }
+
   const renderMatrix = () => {
     const topics: any[] = result?.matrix || []
     const W = 500, H = 360, padL = 48, padR = 16, padT = 16, padB = 40
@@ -481,6 +507,30 @@ export default function MaterialityWizard() {
     )
   }
 
+  // climate opportunities — TCFD five categories, green to read as upside
+  const renderOpportunities = () => {
+    const opps: any[] = result?.opportunities || []
+    return (
+      <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderLeft: '3px solid #0F6E56', borderRadius: '0 14px 14px 0', padding: '1rem', marginBottom: 12 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 2 }}>Climate opportunities <span style={{ fontWeight: 400, color: '#aaa', fontSize: 12 }}>TCFD categories · industry × scenario</span></div>
+        <p style={{ fontSize: 12, color: '#888784', margin: '0 0 12px' }}>The upside view IFRS S2 and TCFD ask for alongside risk — where the transition creates opportunity for your industry.</p>
+        {opps.length ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {opps.map((o: any, i: number) => (
+              <div key={'o'+i} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, color: '#0d0d0d', fontWeight: 500 }}>{o.label}</div>
+                  <div style={{ fontSize: 11, color: '#888784', marginTop: 1, lineHeight: 1.5 }}>{OPPORTUNITY_DESC[o.label] || ''}</div>
+                </div>
+                <div style={{ flexShrink: 0 }}>{oppPill('', o.band)}</div>
+              </div>
+            ))}
+          </div>
+        ) : <span style={{ fontSize: 13, color: '#888784' }}>No opportunity profile available for this industry yet.</span>}
+      </div>
+    )
+  }
+
   const renderResults = () => {
     const ind = SECTORS.find(s => s.code === industryCode)?.label || industryCode
     const sc = SCENARIOS.find(s => s.code === scenarioCode)
@@ -498,19 +548,21 @@ export default function MaterialityWizard() {
         </div>
 
         {/* count cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: mode === 'csrd' ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)', gap: 10, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: mode === 'csrd' ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
           <div style={{ background: '#FCEBEB', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color: '#B91C1C' }}>{s.physicalHigh ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>High physical risks</div></div>
           <div style={{ background: '#FEF3E2', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color: '#ba7517' }}>{s.transitionHigh ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>High transition risks</div></div>
+          <div style={{ background: '#E1F5EE', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color: '#0F6E56' }}>{s.opportunitiesStrong ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>Strong opportunities</div></div>
           {mode === 'csrd' && <div style={{ background: '#EDE9FE', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color: '#7425e3' }}>{s.topicsBothAxes ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>Topics material on both axes</div></div>}
         </div>
 
         {mode === 'csrd' && renderMatrix()}
         {mode === 'csrd' && renderMatrixTable()}
         {renderRegister()}
+        {renderOpportunities()}
 
         {/* honesty footnote */}
         <div style={{ background: '#E6F1FB', borderRadius: 10, padding: '12px 14px', fontSize: 12, color: '#0C447C', lineHeight: 1.6, marginBottom: 12 }}>
-          Screening output, built on IPCC AR6 climatic impact-drivers, TCFD risk categories{mode === 'csrd' ? ', and the ten ESRS topics' : ''} — all public frameworks. This is a structured first pass to scope a formal assessment, not a disclosure. Refine weightings with your own materiality assessment.
+          Screening output, built on IPCC AR6 climatic impact-drivers, TCFD risk{mode === 'csrd' ? ' and opportunity categories, and the ten ESRS topics' : ' and opportunity categories'} — all public frameworks. This is a structured first pass to scope a formal assessment, not a disclosure. Refine weightings with your own materiality assessment.
         </div>
 
         {/* acknowledgment block — required before download */}
