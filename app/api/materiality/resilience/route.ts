@@ -1,0 +1,126 @@
+// app/api/materiality/resilience/route.ts
+// ThemisIQ — Multi-scenario resilience analysis API route.
+//
+// Runs the fixed diverse trio (IFRS S2 / TCFD scenario analysis) and the
+// rules-based resilience synthesis, then persists the analysis to
+// materiality_assessments (results jsonb, marked analysisType:'resilience').
+//
+// Mirrors /api/materiality: same auth, same reference-table fetch, same house
+// error pattern. Separate route because the result shape (ResilienceResult)
+// differs from a single-scenario AssessmentResult.
+
+import { NextRequest, NextResponse } from 'next/server'
+import { getAuthedClient, bearerFrom, AuthError } from '../../../../lib/supabaseAuthed'
+import {
+  runResilience, ReferenceData, AssessmentInput,
+} from '../../../../lib/materiality'
+
+export async function POST(req: NextRequest) {
+  try {
+    // ── Authenticate as the user ─────────────────────────────────────
+    const token = bearerFrom(req)
+    const { supabase, userId } = await getAuthedClient(token)
+
+    // ── Parse & validate input (same shape as a single assessment;
+    //    scenarioCode is ignored — the trio is fixed — but kept for parity) ──
+    const body = await req.json()
+    const input: AssessmentInput = {
+      mode: body.mode === 's2' ? 's2' : 'csrd',
+      industryCode: body.industryCode,
+      regionCodes: Array.isArray(body.regionCodes) ? body.regionCodes : [],
+      jurisdictionCodes: Array.isArray(body.jurisdictionCodes) ? body.jurisdictionCodes : [],
+      assetProfile: ['coastal', 'inland', 'water', 'distributed'].includes(body.assetProfile)
+        ? body.assetProfile : 'inland',
+      scenarioCode: 'ssp245',   // the trio is fixed; middle scenario stored for the record
+      horizon: ['short', 'medium', 'long'].includes(body.horizon) ? body.horizon : 'medium',
+      impactOverrides: body.impactOverrides && typeof body.impactOverrides === 'object'
+        ? body.impactOverrides : {},
+    }
+    if (!input.industryCode) {
+      return NextResponse.json({ error: 'industryCode is required' }, { status: 400 })
+    }
+    if (input.regionCodes.length === 0) {
+      return NextResponse.json({ error: 'Select at least one region' }, { status: 400 })
+    }
+
+    // ── Fetch reference data (public-readable) ───────────────────────
+    const [
+      configRes, industriesRes, regionHazardsRes, industryHazardsRes,
+      jurisdictionsRes, esrsTopicsRes, topicBaselinesRes, scenariosRes,
+      opportunitiesRes, transitionDriversRes,
+    ] = await Promise.all([
+      supabase.from('mr_model_config').select('*').eq('id', 1).single(),
+      supabase.from('mr_industries').select('code,label,carbon_exposure'),
+      supabase.from('mr_region_hazards').select('region_code,hazard,intensity'),
+      supabase.from('mr_industry_hazards').select('industry_code,hazard,sensitivity'),
+      supabase.from('mr_jurisdictions').select('code,label,policy_intensity'),
+      supabase.from('mr_esrs_topics').select('code,label,category,sort_order'),
+      supabase.from('mr_industry_topic_baselines').select('industry_code,topic_code,financial_base,impact_base'),
+      supabase.from('mr_scenarios').select('code,label,framework,descriptor,physical_mult,transition_mult'),
+      supabase.from('mr_industry_opportunities').select('industry_code,opportunity_category,relevance,sort_order'),
+      supabase.from('mr_industry_transition_drivers').select('industry_code,transition_driver,weight,sort_order'),
+    ])
+
+    const firstErr = [
+      configRes, industriesRes, regionHazardsRes, industryHazardsRes,
+      jurisdictionsRes, esrsTopicsRes, topicBaselinesRes, scenariosRes,
+      opportunitiesRes, transitionDriversRes,
+    ].find(r => r.error)
+    if (firstErr?.error) {
+      console.error('Resilience reference fetch error:', firstErr.error)
+      return NextResponse.json({ error: 'Failed to load model data' }, { status: 500 })
+    }
+
+    const ref: ReferenceData = {
+      config: configRes.data!,
+      industries: industriesRes.data!,
+      regionHazards: regionHazardsRes.data!,
+      industryHazards: industryHazardsRes.data!,
+      jurisdictions: jurisdictionsRes.data!,
+      esrsTopics: esrsTopicsRes.data!,
+      topicBaselines: topicBaselinesRes.data!,
+      scenarios: scenariosRes.data!,
+      industryOpportunities: opportunitiesRes.data!,
+      industryTransitionDrivers: transitionDriversRes.data!,
+    }
+
+    // ── Run the resilience analysis ──────────────────────────────────
+    const resilience = runResilience(input, ref)
+
+    // ── Persist (results jsonb carries the full ResilienceResult + marker) ──
+    const { data: saved, error: saveErr } = await supabase
+      .from('materiality_assessments')
+      .insert({
+        user_id: userId,
+        company_name: typeof body.companyName === 'string' ? body.companyName : null,
+        mode: input.mode,
+        industry_code: input.industryCode,
+        region_codes: input.regionCodes,
+        jurisdiction_codes: input.jurisdictionCodes,
+        asset_profile: input.assetProfile,
+        scenario_code: input.scenarioCode,
+        horizon: input.horizon,
+        impact_overrides: input.impactOverrides,
+        results: { analysisType: 'resilience', resilience },
+        workings: { input, modelVersion: resilience.modelVersion, analysisType: 'resilience' },
+        model_version: resilience.modelVersion,
+        status: 'complete',
+      })
+      .select('id')
+      .single()
+
+    if (saveErr) {
+      console.error('Resilience save error:', saveErr)
+      return NextResponse.json({ error: 'Failed to save analysis' }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true, id: saved.id, resilience })
+
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: 401 })
+    }
+    console.error('Resilience route error:', error)
+    return NextResponse.json({ error: 'Resilience analysis failed' }, { status: 500 })
+  }
+}
