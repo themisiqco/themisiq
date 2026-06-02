@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     const [
       configRes, industriesRes, regionHazardsRes, industryHazardsRes,
       jurisdictionsRes, esrsTopicsRes, topicBaselinesRes, scenariosRes,
-      opportunitiesRes,
+      opportunitiesRes, transitionDriversRes,
     ] = await Promise.all([
       supabase.from('mr_model_config').select('*').eq('id', 1).single(),
       supabase.from('mr_industries').select('code,label,carbon_exposure'),
@@ -59,12 +59,13 @@ export async function POST(req: NextRequest) {
       supabase.from('mr_industry_topic_baselines').select('industry_code,topic_code,financial_base,impact_base'),
       supabase.from('mr_scenarios').select('code,label,framework,descriptor,physical_mult,transition_mult'),
       supabase.from('mr_industry_opportunities').select('industry_code,opportunity_category,relevance,sort_order'),
+      supabase.from('mr_industry_transition_drivers').select('industry_code,transition_driver,weight,sort_order'),
     ])
 
     const firstErr = [
       configRes, industriesRes, regionHazardsRes, industryHazardsRes,
       jurisdictionsRes, esrsTopicsRes, topicBaselinesRes, scenariosRes,
-      opportunitiesRes,
+      opportunitiesRes, transitionDriversRes,
     ].find(r => r.error)
     if (firstErr?.error) {
       console.error('Materiality reference fetch error:', firstErr.error)
@@ -81,6 +82,7 @@ export async function POST(req: NextRequest) {
       topicBaselines: topicBaselinesRes.data!,
       scenarios: scenariosRes.data!,
       industryOpportunities: opportunitiesRes.data!,
+      industryTransitionDrivers: transitionDriversRes.data!,
     }
 
     // ── 4. Run the engine ────────────────────────────────────────────
