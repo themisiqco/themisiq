@@ -159,6 +159,7 @@ export default function MaterialityWizard() {
   const [result, setResult] = useState<any>(null)
   const [savedId, setSavedId] = useState<string | null>(null)
   const [acknowledgedReport, setAcknowledgedReport] = useState(false)
+  const [resilienceResult, setResilienceResult] = useState<any>(null)
 
   const SCENARIO_RATIONALE = "Yes — SSP2-4.5 (~2.7°C) is the most common starting choice and a reasonable middle case, so it's fine to leave it as-is. Change it only if you have a specific reason to test a more optimistic or more severe future. You can always re-run with a different scenario later."
   const HORIZON_RATIONALE = "Medium term (to 2040) is the default lens for a first screening. Companies with long-lived physical assets may prefer the long-term view."
@@ -198,6 +199,27 @@ export default function MaterialityWizard() {
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'Assessment failed.'); setSubmitting(false); return }
       setResult(data.result); setSavedId(data.id); setStep(resultsStep)
+    } catch (e: any) {
+      setError(e?.message || 'Something went wrong.')
+    } finally { setSubmitting(false) }
+  }
+
+  async function submitResilience() {
+    setSubmitting(true); setError(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) { setError('Please sign in to run an assessment.'); setSubmitting(false); return }
+      const res = await fetch('/api/materiality/resilience', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({
+          mode, companyName, legalEntity, reportingPeriod, industryCode, regionCodes, jurisdictionCodes,
+          assetProfile, horizon,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error || 'Resilience analysis failed.'); setSubmitting(false); return }
+      setResilienceResult(data.resilience); setResult(null); setSavedId(data.id); setStep(resultsStep)
     } catch (e: any) {
       setError(e?.message || 'Something went wrong.')
     } finally { setSubmitting(false) }
@@ -632,8 +654,176 @@ export default function MaterialityWizard() {
     )
   }
 
+  // ─── Resilience analysis results (multi-scenario) ─────────────────────────
+  const renderResilience = () => {
+    const r = resilienceResult
+    if (!r) return null
+    const ind = SECTORS.find(s => s.code === industryCode)?.label || industryCode
+    const syn = r.synthesis || {}
+    const trio: any[] = r.trio || []
+    const items: any[] = r.items || []
+    const physical = items.filter(i => i.kind === 'physical')
+    const transition = items.filter(i => i.kind === 'transition')
+    const opportunity = items.filter(i => i.kind === 'opportunity')
+
+    const roleLabel: Record<string, string> = { paris: 'Paris-aligned', middle: 'Current trajectory', high: 'High warming' }
+    const clsLabel: Record<string, string> = {
+      'persistent': 'Persistent', 'warming-contingent': 'Warming-driven',
+      'policy-path-contingent': 'Policy-driven', 'low-across-futures': 'Low across futures',
+    }
+    const clsColor: Record<string, { bg: string; color: string; border: string }> = {
+      'persistent': { bg: '#FCEBEB', color: '#B91C1C', border: '#B91C1C' },
+      'warming-contingent': { bg: '#FEF3E2', color: '#ba7517', border: '#ba7517' },
+      'policy-path-contingent': { bg: '#EDE9FE', color: '#7425e3', border: '#7425e3' },
+      'low-across-futures': { bg: '#f8f7f5', color: '#888784', border: '#e8e7e4' },
+    }
+    const cellBox = (band: Band, score: number, kind: string) => {
+      const c = kind === 'opportunity' ? OPP[band] : SEV[band]
+      return (
+        <div style={{ background: c.bg, color: c.color, border: `0.5px solid ${c.border}`, borderRadius: 6, padding: '4px 8px', fontSize: 11, textAlign: 'center', minWidth: 64 }}>
+          <div style={{ fontWeight: 700 }}>{c.label}</div>
+          <div style={{ fontSize: 10, opacity: 0.8 }}>{score}</div>
+        </div>
+      )
+    }
+    const clsTag = (cls: string) => {
+      const c = clsColor[cls] || clsColor['low-across-futures']
+      return <span style={{ background: c.bg, color: c.color, border: `0.5px solid ${c.border}`, borderRadius: 99, padding: '2px 9px', fontSize: 10, fontWeight: 600 }}>{clsLabel[cls] || cls}</span>
+    }
+
+    const itemRows = (list: any[], kind: string) => (
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 560 }}>
+          <thead>
+            <tr style={{ textAlign: 'left', color: '#888784' }}>
+              <th style={{ padding: '6px 8px', fontWeight: 600, minWidth: 150 }}>Item</th>
+              {trio.map((t: any) => (
+                <th key={t.role} style={{ padding: '6px 8px', fontWeight: 600, textAlign: 'center' }}>{roleLabel[t.role]}<div style={{ fontSize: 10, fontWeight: 400, color: '#aaa' }}>{t.warming}</div></th>
+              ))}
+              <th style={{ padding: '6px 8px', fontWeight: 600 }}>Pattern</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((it: any, i: number) => {
+              const cellByRole = (role: string) => it.cells.find((c: any) => c.role === role)
+              return (
+                <tr key={kind + i} style={{ borderTop: '0.5px solid #e8e7e4' }}>
+                  <td style={{ padding: '8px', color: '#0d0d0d', verticalAlign: 'top' }}>
+                    <div style={{ fontWeight: 500 }}>{it.label}</div>
+                    <div style={{ fontSize: 10, color: '#aaa', marginTop: 1 }}>{kind === 'physical' ? 'in ' + it.driver : kind === 'transition' ? it.driver : ''}</div>
+                  </td>
+                  {trio.map((t: any) => {
+                    const c = cellByRole(t.role)
+                    return <td key={t.role} style={{ padding: '8px', textAlign: 'center', verticalAlign: 'top' }}>{c ? cellBox(c.band, c.score, kind) : '—'}</td>
+                  })}
+                  <td style={{ padding: '8px', verticalAlign: 'top' }}>{clsTag(it.classification)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        <div style={{ marginTop: 8 }}>
+          {list.map((it: any, i: number) => (
+            <div key={'int' + kind + i} style={{ fontSize: 11, color: '#888784', lineHeight: 1.55, marginBottom: 3 }}>{it.interpretation}</div>
+          ))}
+        </div>
+      </div>
+    )
+
+    return (
+      <div>
+        <h2 style={sectionHead}>Climate resilience analysis</h2>
+        <p style={sectionSub}>Your risk and opportunity profile tested across a diverse range of climate futures — the multi-scenario resilience assessment IFRS S2 and CSRD/ESRS ask for.</p>
+
+        {/* trio header — provenance inline */}
+        <div style={{ background: '#f8f7f5', borderRadius: 14, padding: '1.25rem', marginBottom: 12 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Scenarios tested</div>
+          <div style={{ fontSize: 15, color: '#0d0d0d', marginBottom: 8 }}><strong>{companyName || ind}</strong> · {ind} · {horizon} term</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+            {trio.map((t: any) => (
+              <div key={t.role} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 8, padding: '8px 10px' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d' }}>{roleLabel[t.role]}</div>
+                <div style={{ fontSize: 11, color: '#888784' }}>{t.warming} · {t.source}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.6, marginTop: 10 }}>
+            These three pathways span a low-warming Paris-aligned future, a current-trajectory middle case, and a high-warming case — a diverse range that stresses both transition and physical risk, and includes a Paris-aligned scenario as IFRS S2 requires.
+          </div>
+        </div>
+
+        {/* resilience synthesis statement — the "so what" */}
+        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderLeft: '3px solid #7425e3', borderRadius: '0 14px 14px 0', padding: '1.25rem', marginBottom: 12 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 8 }}>Resilience read</div>
+          <p style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, margin: 0 }}>{syn.statement}</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, marginTop: 14 }}>
+            <div style={{ background: '#f8f7f5', borderRadius: 8, padding: '8px 10px' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#888784' }}>Two-channel exposure</div>
+              <div style={{ fontSize: 12, color: '#0d0d0d', marginTop: 2 }}>{syn.twoChannel === 'both' ? 'Both transition & physical' : syn.twoChannel === 'transition-led' ? 'Transition-led' : syn.twoChannel === 'physical-led' ? 'Physical-led' : 'Limited'}</div>
+            </div>
+            <div style={{ background: '#f8f7f5', borderRadius: 8, padding: '8px 10px' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#888784' }}>Profile swing</div>
+              <div style={{ fontSize: 12, color: '#0d0d0d', marginTop: 2 }}>{syn.profileSwing?.magnitude ?? '—'} ({syn.profileSwing?.parisRiskCount ?? 0}→{syn.profileSwing?.highRiskCount ?? 0})</div>
+            </div>
+            <div style={{ background: '#f8f7f5', borderRadius: 8, padding: '8px 10px' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#888784' }}>Horizon trend</div>
+              <div style={{ fontSize: 12, color: '#0d0d0d', marginTop: 2 }}>{syn.horizonNote === 'worsens' ? 'Worsens toward 2050' : 'Stable over time'}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* comparison grids */}
+        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderLeft: '3px solid #ba7517', borderRadius: '0 14px 14px 0', padding: '1rem', marginBottom: 12 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 10 }}>Physical risks across scenarios</div>
+          {physical.length ? itemRows(physical, 'physical') : <span style={{ fontSize: 13, color: '#888784' }}>No material physical risks at this intersection.</span>}
+        </div>
+        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderLeft: '3px solid #534AB7', borderRadius: '0 14px 14px 0', padding: '1rem', marginBottom: 12 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 10 }}>Transition risks across scenarios</div>
+          {transition.length ? itemRows(transition, 'transition') : <span style={{ fontSize: 13, color: '#888784' }}>None flagged.</span>}
+        </div>
+        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderLeft: '3px solid #0F6E56', borderRadius: '0 14px 14px 0', padding: '1rem', marginBottom: 12 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 10 }}>Opportunities across scenarios</div>
+          {opportunity.length ? itemRows(opportunity, 'opportunity') : <span style={{ fontSize: 13, color: '#888784' }}>No opportunity profile available for this industry yet.</span>}
+        </div>
+
+        {/* honesty footnote */}
+        <div style={{ background: '#E6F1FB', borderRadius: 10, padding: '12px 14px', fontSize: 12, color: '#0C447C', lineHeight: 1.6, marginBottom: 12 }}>
+          Screening-level resilience analysis across IPCC AR6 scenarios (SSP1-2.6, SSP2-4.5, SSP5-8.5). Qualitative classifications are rules-derived from the scored profile; final resilience determination is a matter for management judgement informed by entity-specific data. Not a formal disclosure.
+        </div>
+
+        {/* acknowledgment + download, reusing the same gate */}
+        {savedId && (
+          <div style={{ background: '#fff', border: '1px solid #e8e7e4', borderRadius: 12, padding: '1.25rem', marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#555553', marginBottom: 10 }}>Before you download — limitations and disclaimer</div>
+            <p style={{ fontSize: 12, color: '#555553', lineHeight: 1.7, margin: '0 0 10px' }}>
+              <strong>This is a screening-level resilience analysis, not a formal {mode === 'csrd' ? 'CSRD / ESRS' : 'IFRS S2'} disclosure.</strong> Scenario classifications are derived from starter scoring values and require validation against your entity's own data and circumstances before publication.
+            </p>
+            <p style={{ fontSize: 11, color: '#888784', lineHeight: 1.7, margin: '12px 0', paddingTop: 12, borderTop: '0.5px solid #e8e7e4' }}>
+              This report is generated by the ThemisIQ platform for informational and planning purposes only. It does not constitute legal advice, regulatory assurance, or a professional opinion. ThemisIQ Compliance Inc. does not accept responsibility for regulatory filings made on the basis of platform outputs without independent professional review.
+            </p>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', marginTop: 12, paddingTop: 12, borderTop: '0.5px solid #e8e7e4' }}>
+              <input type="checkbox" checked={acknowledgedReport} onChange={e => setAcknowledgedReport(e.target.checked)} style={{ marginTop: 3, flexShrink: 0 }} />
+              <span style={{ fontSize: 12, color: '#0d0d0d', lineHeight: 1.6 }}>I acknowledge that this resilience analysis is a screening intended to scope a formal assessment, and I accept the limitations and disclaimer above.</span>
+            </label>
+          </div>
+        )}
+        {savedId && (
+          acknowledgedReport ? (
+            <a href={`/dashboard/materiality/report?id=${savedId}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', fontSize: 13, fontWeight: 500, padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', textDecoration: 'none', marginBottom: 8 }}>
+              ⬇ Download resilience report (PDF)
+            </a>
+          ) : (
+            <button disabled style={{ fontSize: 13, fontWeight: 500, padding: '11px 24px', borderRadius: 8, background: '#e8e7e4', color: '#888784', border: 'none', cursor: 'not-allowed', marginBottom: 8 }}>
+              ⬇ Download resilience report (PDF)
+            </button>
+          )
+        )}
+      </div>
+    )
+  }
+
   const renderStep = () => {
-    if (step === resultsStep) return renderResults()
+    if (step === resultsStep) return resilienceResult ? renderResilience() : renderResults()
     if (step === 0) return renderIndustry()
     if (step === 1) return renderRegions()
     if (step === 2) return renderJurisdictions()
@@ -672,15 +862,18 @@ export default function MaterialityWizard() {
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
               <button onClick={() => setStep(s => Math.max(0, s - 1))} disabled={step === 0} style={{ fontSize: 13, padding: '9px 20px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: step === 0 ? 'not-allowed' : 'pointer', opacity: step === 0 ? 0.4 : 1 }}>← Back</button>
               {isLastInputStep ? (
-                <button onClick={submit} disabled={submitting || !canAdvance()} style={{ fontSize: 13, fontWeight: 500, padding: '9px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: submitting ? 'wait' : 'pointer', opacity: (submitting || !canAdvance()) ? 0.5 : 1 }}>{submitting ? 'Running…' : 'Run assessment →'}</button>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                  <button onClick={submitResilience} disabled={submitting || !canAdvance()} style={{ fontSize: 13, fontWeight: 600, padding: '9px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: submitting ? 'wait' : 'pointer', opacity: (submitting || !canAdvance()) ? 0.5 : 1 }}>{submitting ? 'Running…' : 'Run resilience analysis →'}</button>
+                  <div style={{ fontSize: 11, color: '#888784', textAlign: 'right', maxWidth: 320, lineHeight: 1.5 }}>Recommended. Tests three diverse climate futures (Paris-aligned, current trajectory, high warming) — what IFRS S2 and CSRD ask for.</div>
+                </div>
               ) : (
                 <button onClick={() => canAdvance() && setStep(s => s + 1)} disabled={!canAdvance()} style={{ fontSize: 13, fontWeight: 500, padding: '9px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: canAdvance() ? 'pointer' : 'not-allowed', opacity: canAdvance() ? 1 : 0.5 }}>Next →</button>
               )}
             </div>
           ) : (
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
-              <button onClick={() => { setStep(0); setResult(null) }} style={{ fontSize: 13, padding: '9px 20px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: 'pointer' }}>↺ Start over</button>
-              <button onClick={() => { setMode(null); setStep(0); setResult(null) }} style={{ fontSize: 13, fontWeight: 500, padding: '9px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>New assessment →</button>
+              <button onClick={() => { setStep(0); setResult(null); setResilienceResult(null); setAcknowledgedReport(false) }} style={{ fontSize: 13, padding: '9px 20px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: 'pointer' }}>↺ Start over</button>
+              <button onClick={() => { setMode(null); setStep(0); setResult(null); setResilienceResult(null); setAcknowledgedReport(false) }} style={{ fontSize: 13, fontWeight: 500, padding: '9px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>New assessment →</button>
             </div>
           )}
         </div>
