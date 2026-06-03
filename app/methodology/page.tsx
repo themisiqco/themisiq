@@ -65,7 +65,7 @@ const METHODOLOGIES = [
     sections: [
       {
         title: 'Scenario framework',
-        content: 'ThemisIQ supports climate risk assessment across recognised IPCC-aligned warming pathways and NGFS finance-oriented transition scenarios. Both IFRS S2 and CSRD ESRS E1 require testing resilience across a range of scenarios rather than against a single forecast. See the Materiality Assessment methodology below for the full SSP/NGFS scenario set used by the integrated risk engine.',
+        content: 'ThemisIQ supports climate risk assessment across recognised IPCC-aligned warming pathways and NGFS finance-oriented transition scenarios. Both IFRS S2 and CSRD ESRS E1 require testing resilience across a range of scenarios rather than against a single forecast. See the Climate Risk & Materiality methodology below for the full SSP/NGFS scenario set used by the integrated risk engine.',
       },
       {
         title: 'Physical risk data',
@@ -82,7 +82,7 @@ const METHODOLOGIES = [
     ],
   },
   {
-    module: 'Materiality Assessment',
+    module: 'Climate Risk & Materiality',
     color: '#7425e3',
     bg: '#EDE9FE',
     standard: 'IFRS S2 single materiality · CSRD ESRS double materiality · IPCC AR6 · TCFD',
@@ -113,7 +113,7 @@ const METHODOLOGIES = [
       },
       {
         title: 'Limitations',
-        content: 'The Materiality Assessment is a structured screening intended to scope and support a formal IFRS S2 disclosure or CSRD double-materiality assessment. A fully compliant ESRS assessment additionally requires (a) a defined materiality threshold agreed by the entity\'s governance body, and (b) stakeholder engagement informing the impact-materiality axis. The tool produces the prioritisation structure but does not replace either requirement, and outputs are not a substitute for independent professional review prior to publication.',
+        content: 'The Climate Risk & Materiality assessment is a structured screening intended to scope and support a formal IFRS S2 disclosure or CSRD double-materiality assessment. A fully compliant ESRS assessment additionally requires (a) a defined materiality threshold agreed by the entity\'s governance body, and (b) stakeholder engagement informing the impact-materiality axis. The tool produces the prioritisation structure but does not replace either requirement, and outputs are not a substitute for independent professional review prior to publication.',
       },
       {
         title: 'Full specification',
