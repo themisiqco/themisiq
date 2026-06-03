@@ -1629,7 +1629,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
           ]
         })
       : []
-    generateAssurancePDF(inventory as any, totals_ar4 as any, totals_ar5 as any, activeFrameworks as any, (auditRows as any) || [], EF_SOURCES, residualRows)
+    generateAssurancePDF(inventory as any, totals_ar4 as any, totals_ar5 as any, totals_ar6 as any, activeFrameworks as any, (auditRows as any) || [], EF_SOURCES, residualRows)
   }
 
   const generateExport = async (frameworkId: string) => {

@@ -49,6 +49,7 @@ export function generateAssurancePDF(
   inventory: PdfInventory,
   totalsAR4: PdfTotals,
   totalsAR5: PdfTotals,
+  totalsAR6: PdfTotals,
   frameworks: PdfFramework[],
   auditRows: PdfAuditRow[],
   efSources: { combustion: string; electricity: string; gwp_ar4: string; gwp_ar5: string; gwp_ar6?: string },
@@ -100,7 +101,7 @@ export function generateAssurancePDF(
   doc.addPage()
   sectionTitle(doc, 'Emissions Summary', M)
   const summaryRows = frameworks.map(f => {
-    const t = f.gwp === 'AR5' ? totalsAR5 : totalsAR4
+    const t = f.gwp === 'AR6' ? totalsAR6 : f.gwp === 'AR5' ? totalsAR5 : totalsAR4
     const rev = inventory.revenue_millions
     return [
       f.name,
