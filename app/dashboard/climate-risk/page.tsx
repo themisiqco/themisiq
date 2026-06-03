@@ -231,9 +231,9 @@ export default function MaterialityWizard() {
       <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
         <Nav />
         <div style={{ maxWidth: 900, margin: '0 auto', padding: '2.5rem 2.5rem' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Materiality Assessment</div>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Climate Risk &amp; Materiality</div>
           <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Which assessment do you need?</h1>
-          <p style={{ ...sectionSub, marginBottom: 24 }}>Double materiality is single (financial) materiality plus impact materiality. Choose the standard you report under.</p>
+          <p style={{ ...sectionSub, marginBottom: 24 }}>Assess your climate-related physical and transition risk, and determine what's material under your reporting standard. Double materiality adds impact materiality to single (financial) materiality. Choose the standard you report under.</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             {[
               { m: 's2' as Mode, t: 'IFRS S2', sub: 'Single (financial) materiality', d: 'How climate-related risks affect your enterprise value. Produces a physical & transition risk register with scenario analysis.', feat: false },
@@ -838,7 +838,7 @@ export default function MaterialityWizard() {
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Materiality Assessment</div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Climate Risk &amp; Materiality</div>
             <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>{mode === 'csrd' ? 'CSRD double materiality' : 'IFRS S2 single materiality'}</div>
           </div>
           <button onClick={() => { setMode(null); setStep(0); setResult(null) }} style={{ fontSize: 12, color: '#888784', background: 'none', border: '1px solid #e8e7e4', borderRadius: 8, padding: '6px 14px', cursor: 'pointer' }}>Switch mode</button>
