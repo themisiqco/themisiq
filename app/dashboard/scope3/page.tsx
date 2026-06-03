@@ -87,7 +87,7 @@ const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSiz
 const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '1.5rem' }
 
 const STEP_NAMES = ['Setup', 'Materiality', 'Calculate', 'Results', 'Export']
-const isPaid = false
+const isPaid = true // TODO: wire to Stripe
 
 interface CategoryData {
   included: boolean
