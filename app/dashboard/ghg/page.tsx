@@ -138,6 +138,8 @@ const EF_SOURCES = {
   residual_eu: 'AIB European Residual Mixes 2024 (publ. 2025-05-30, Grexel/AIB; Ecoinvent CO₂ inputs) — combined CO₂e, gCO₂/kWh.',
   gwp_ar4: 'IPCC AR4 (2007) — required by CARB SB 253 and CDP default',
   gwp_ar5: 'IPCC AR5 (2014) — required by ESRS E1 and GRI 305',
+  gwp_ar6: 'IPCC AR6 (2021) — used by ESRS E1, GRI 305, CDP, EcoVadis, IFRS S2',
+
 }
 
 const GRID_EF: Record<string, Record<number, number>> = {
@@ -608,6 +610,12 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR4', ye
     if (loc.electricity_kwh > 0) {
       const gf = getGridFactor(loc.grid_region, year)
       rows.push({ location: loc.name || 'Location', source: `Electricity (${gf.usedRegion}, ${gf.usedYear})`, scope: 2, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${gf.ef} kg/kWh`, ef_source: EF_SOURCES.electricity, gwp_basis: 'location-based', result_tco2e: loc.electricity_kwh * gf.ef / 1000 })
+      // Market-based Scope 2: residual-mix factor on uncovered load, with provenance stamped for the verifier.
+      const resRegion = loc.residual_region || (loc.grid_region.startsWith('EU_') ? loc.grid_region : '')
+      const res = getResidualFactor(resRegion, year, gwpVersion)
+      const uncovered = Math.max(0, loc.electricity_kwh - loc.renewable_electricity_kwh)
+      const mktEf = res.applicable ? res.ef : gf.ef
+      rows.push({ location: loc.name || 'Location', source: `Electricity (S2 market-based${res.applicable ? `, residual mix ${res.usedRegion}` : ', location-factor fallback'})`, scope: 2, activity_data: uncovered, activity_unit: 'kWh uncovered', emission_factor: `${mktEf.toFixed(4)} kg/kWh`, ef_source: `${res.source}${res.vintage && res.vintage !== 'n/a' ? ` · vintage: ${res.vintage}` : ''}${res.note ? ` · ${res.note}` : ''}`, gwp_basis: res.applicable ? gwpVersion : 'location-based', result_tco2e: uncovered * mktEf / 1000 })
     }
     if (loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0) {
       rows.push({ location: loc.name || 'Location', source: 'Purchased steam', scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: 'mmbtu', emission_factor: `${EF.steam_mmbtu} kg/mmbtu`, ef_source: EF_SOURCES.combustion, gwp_basis: 'location-based', result_tco2e: loc.purchased_steam_mmbtu * EF.steam_mmbtu / 1000 })
@@ -1409,9 +1417,58 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                             const total = efCo2e * loc.propane_amount / 1000
                             return <tr><td style={wTd}>Propane</td><td style={wTd}>{loc.propane_amount} {loc.propane_unit}</td><td style={wTd}>{efCo2e.toFixed(3)} kg CO₂e/{loc.propane_unit === 'gallons' ? 'gal' : 'L'}</td><td style={wTd}>{combustionSource(loc)}</td><td style={wTd}>{wGwp}</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
                           })()}
+                          {loc.has_diesel_stationary && loc.diesel_stationary_amount > 0 && (() => {
+                            const ef = pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF)
+                            const g = GWP[wGwp]
+                            const efCo2e = ef.co2 + ef.ch4 * g.CH4_fossil + ef.n2o * g.N2O
+                            const total = efCo2e * loc.diesel_stationary_amount / 1000
+                            return <tr><td style={wTd}>Diesel (stationary)</td><td style={wTd}>{loc.diesel_stationary_amount} {loc.diesel_stationary_unit}</td><td style={wTd}>{efCo2e.toFixed(3)} kg CO₂e/{loc.diesel_stationary_unit === 'gallons' ? 'gal' : 'L'}</td><td style={wTd}>{combustionSource(loc)}</td><td style={wTd}>{wGwp}</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
+                          })()}
+                          {loc.has_fuel_oil && loc.fuel_oil_gallons > 0 && (() => {
+                            const ef = pickEF(loc, 'fuel_oil_gallon')
+                            const g = GWP[wGwp]
+                            const efCo2e = ef.co2 + ef.ch4 * g.CH4_fossil + ef.n2o * g.N2O
+                            const total = efCo2e * loc.fuel_oil_gallons / 1000
+                            return <tr><td style={wTd}>Fuel oil</td><td style={wTd}>{loc.fuel_oil_gallons} gallons</td><td style={wTd}>{efCo2e.toFixed(3)} kg CO₂e/gal</td><td style={wTd}>{combustionSource(loc)}</td><td style={wTd}>{wGwp}</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
+                          })()}
+                          {loc.has_mobile && loc.gasoline_amount > 0 && (() => {
+                            const ef = pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF)
+                            const g = GWP[wGwp]
+                            const efCo2e = ef.co2 + ef.ch4 * g.CH4_fossil + ef.n2o * g.N2O
+                            const total = efCo2e * loc.gasoline_amount / 1000
+                            return <tr><td style={wTd}>Gasoline (mobile)</td><td style={wTd}>{loc.gasoline_amount} {loc.gasoline_unit}</td><td style={wTd}>{efCo2e.toFixed(3)} kg CO₂e/{loc.gasoline_unit === 'gallons' ? 'gal' : 'L'}</td><td style={wTd}>{combustionSource(loc)}</td><td style={wTd}>{wGwp}</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
+                          })()}
+                          {loc.has_mobile && loc.diesel_mobile_amount > 0 && (() => {
+                            const ef = pickEF(loc, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF)
+                            const g = GWP[wGwp]
+                            const efCo2e = ef.co2 + ef.ch4 * g.CH4_fossil + ef.n2o * g.N2O
+                            const total = efCo2e * loc.diesel_mobile_amount / 1000
+                            return <tr><td style={wTd}>Diesel (mobile)</td><td style={wTd}>{loc.diesel_mobile_amount} {loc.diesel_mobile_unit}</td><td style={wTd}>{efCo2e.toFixed(3)} kg CO₂e/{loc.diesel_mobile_unit === 'gallons' ? 'gal' : 'L'}</td><td style={wTd}>{combustionSource(loc)}</td><td style={wTd}>{wGwp}</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
+                          })()}
+                          {!loc.uses_ammonia && loc.has_hfc_refrigerants && loc.refrigerant_purchased_kg > 0 && (() => {
+                            const ref_gwp = REFRIGERANT_GWP[loc.refrigerant_type]?.[wGwp] ?? 0
+                            const total = loc.refrigerant_purchased_kg * ref_gwp / 1000
+                            return <tr><td style={wTd}>Refrigerant ({loc.refrigerant_type})</td><td style={wTd}>{loc.refrigerant_purchased_kg} kg</td><td style={wTd}>GWP {ref_gwp}</td><td style={wTd}>IPCC {wGwp} / GHG Protocol</td><td style={wTd}>{wGwp}</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
+                          })()}
                           {loc.electricity_kwh > 0 && (() => {
                             const ef = getGridFactor(loc.grid_region, inventory.reporting_year).ef
                             return <tr style={{ background: '#f8f7f5' }}><td style={wTd}>Electricity (S2 location)</td><td style={wTd}>{loc.electricity_kwh.toLocaleString()} kWh</td><td style={wTd}>{ef.toFixed(4)} kg CO₂e/kWh</td><td style={wTd}>{EF_SOURCES.electricity} — {loc.grid_region}</td><td style={wTd}>N/A</td><td style={{ ...wTd, fontWeight: 600, color: '#0F6E56' }}>{(loc.electricity_kwh * ef / 1000).toFixed(4)}</td></tr>
+                          })()}
+                          {loc.electricity_kwh > 0 && needsMarketBased && (() => {
+                            const mGwp: GwpVersion = (FRAMEWORKS.find(f => (f.id === 'esrs' || f.id === 'gri') && inventory.selected_frameworks.includes(f.id))?.gwp as GwpVersion) || 'AR6'
+                            const resRegion = loc.residual_region || (loc.grid_region.startsWith('EU_') ? loc.grid_region : '')
+                            const res = getResidualFactor(resRegion, inventory.reporting_year, mGwp)
+                            const gf = getGridFactor(loc.grid_region, inventory.reporting_year)
+                            const uncovered = Math.max(0, loc.electricity_kwh - loc.renewable_electricity_kwh)
+                            const mktEf = res.applicable ? res.ef : gf.ef
+                            const total = uncovered * mktEf / 1000
+                            const factorLabel = res.applicable ? `${mktEf.toFixed(4)} kg CO₂e/kWh (residual mix · ${res.usedRegion})` : `${mktEf.toFixed(4)} kg CO₂e/kWh (location-factor fallback)`
+                            const sourceLabel = `${res.source}${res.vintage && res.vintage !== 'n/a' ? ` · vintage: ${res.vintage}` : ''}${res.note ? ` · ${res.note}` : ''}`
+                            return <tr style={{ background: '#f8f7f5' }}><td style={wTd}>Electricity (S2 market-based)</td><td style={wTd}>{uncovered.toLocaleString()} kWh uncovered</td><td style={wTd}>{factorLabel}</td><td style={wTd}>{sourceLabel}</td><td style={wTd}>{res.applicable ? mGwp : 'location-based'}</td><td style={{ ...wTd, fontWeight: 600, color: '#0F6E56' }}>{total.toFixed(4)}</td></tr>
+                          })()}
+                          {loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0 && (() => {
+                            const total = loc.purchased_steam_mmbtu * EF.steam_mmbtu / 1000
+                            return <tr style={{ background: '#f8f7f5' }}><td style={wTd}>Purchased steam (S2 location)</td><td style={wTd}>{loc.purchased_steam_mmbtu} mmbtu</td><td style={wTd}>{EF.steam_mmbtu} kg CO₂e/mmbtu</td><td style={wTd}>{EF_SOURCES.combustion}</td><td style={wTd}>N/A</td><td style={{ ...wTd, fontWeight: 600, color: '#0F6E56' }}>{total.toFixed(4)}</td></tr>
                           })()}
                           <tr style={{ background: '#0d0d0d' }}><td colSpan={5} style={{ ...wTd, color: '#fff', fontWeight: 700, background: '#0d0d0d' }}>TOTAL — {loc.name}</td><td style={{ ...wTd, color: '#fff', fontWeight: 700, background: '#0d0d0d' }}>{(c.s1_total + c.s2_location).toFixed(4)}</td></tr>
                         </tbody>
@@ -1590,7 +1647,17 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       ['METHODS'],
       ['Combustion factors', EF_SOURCES.combustion],
       ['Electricity factors', EF_SOURCES.electricity],
-      ['GWP values', fw.gwp === 'AR4' ? EF_SOURCES.gwp_ar4 : EF_SOURCES.gwp_ar5],
+['GWP values', fw.gwp === 'AR4' ? EF_SOURCES.gwp_ar4 : fw.gwp === 'AR5' ? EF_SOURCES.gwp_ar5 : EF_SOURCES.gwp_ar6],
+      ...((fw.id === 'esrs' || fw.id === 'gri')
+        ? [
+            ['Market-based Scope 2', 'Residual-mix factor applied to uncovered load; covered (contractual) kWh counted at zero'],
+            ...inventory.locations.filter(l => l.electricity_kwh > 0).map(l => {
+              const resRegion = l.residual_region || (l.grid_region.startsWith('EU_') ? l.grid_region : '')
+              const res = getResidualFactor(resRegion, inventory.reporting_year, fw.gwp as GwpVersion)
+              return [`Residual factor — ${l.name}`, res.applicable ? `${res.source} · vintage: ${res.vintage}${res.note ? ` · ${res.note}` : ''}` : `Location-factor fallback${res.note ? ` · ${res.note}` : ''}`]
+            }),
+          ]
+        : []),
       [''],
       ['LOCATION BREAKDOWN'],
       ['Location', 'State', 'S1 Total', 'S2 Location'],
