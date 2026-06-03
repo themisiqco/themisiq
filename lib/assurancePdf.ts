@@ -22,6 +22,18 @@ const INK = '#0d0d0d'
 const MUTE = '#888784'
 const PURPLE = '#7425e3'
 
+// Formal Important Notice — five paragraphs, matching the language used across
+// ThemisIQ generated reports. Rendered as a dedicated final page; this is in
+// addition to the assurance-specific (ISO 14064-3 / ISAE 3410) disclaimer on
+// the cover page, which is retained.
+const DISCLAIMER_PARAS: string[] = [
+  'This report has been generated automatically by the ThemisIQ platform using information provided by the user and publicly available regulatory guidance. The report is provided solely for informational, planning, and compliance-support purposes and does not constitute legal advice, accounting advice, investment advice, assurance services, engineering advice, or any other professional opinion.',
+  'ThemisIQ Compliance Inc. makes no representation or warranty, express or implied, regarding the completeness, accuracy, suitability, or regulatory sufficiency of the information contained in this report. Regulatory requirements may change and may vary by jurisdiction.',
+  'Users remain solely responsible for reviewing, validating, and approving all information prior to submission to regulators, investors, customers, lenders, assurance providers, or other third parties.',
+  'ThemisIQ Compliance Inc. is not an accredited assurance provider and does not provide verification, validation, certification, attestation, or assurance services under the GHG Protocol, ISO 14064, CARB regulations, CDP, ESRS, IFRS Sustainability Disclosure Standards, or any other reporting framework unless explicitly engaged under a separate written agreement.',
+  'To the fullest extent permitted by law, ThemisIQ Compliance Inc. disclaims liability for any loss, damage, penalty, claim, enforcement action, regulatory finding, or other consequence arising from the use of or reliance upon this report.',
+]
+
 const boundaryLabel = (b: string) =>
   ({ operational_control: 'Operational Control', financial_control: 'Financial Control', equity_share: 'Equity Share' }[b] || b)
 
@@ -225,6 +237,27 @@ export function generateAssurancePDF(
     columnStyles: { 0: { cellWidth: 110 }, 1: { cellWidth: 50 }, 3: { cellWidth: 'auto' } },
     margin: { left: M, right: M },
   })
+
+  // ── PAGE 6 — IMPORTANT NOTICE ──
+  // Formal notice in addition to the assurance-specific disclaimer on the cover.
+  doc.addPage()
+  sectionTitle(doc, 'Important Notice', M)
+  {
+    const H = doc.internal.pageSize.getHeight()
+    const lineH = 13
+    const paraGap = 9
+    let ny = 100
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor('#333333')
+    DISCLAIMER_PARAS.forEach(par => {
+      const lines = doc.splitTextToSize(par, W - 2 * M) as string[]
+      lines.forEach(ln => {
+        if (ny > H - 60) { doc.addPage(); ny = 100 }
+        doc.text(ln, M, ny)
+        ny += lineH
+      })
+      ny += paraGap
+    })
+  }
 
   // ── Footer on every page ──
   const pageCount = doc.getNumberOfPages()
