@@ -198,7 +198,7 @@ export default function MaterialityWizard() {
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'Assessment failed.'); setSubmitting(false); return }
-      setResult(data.result); setSavedId(data.id); setStep(resultsStep)
+      setResult(data.result); setResilienceResult(null); setSavedId(data.id); setStep(resultsStep)
     } catch (e: any) {
       setError(e?.message || 'Something went wrong.')
     } finally { setSubmitting(false) }
@@ -862,10 +862,20 @@ export default function MaterialityWizard() {
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
               <button onClick={() => setStep(s => Math.max(0, s - 1))} disabled={step === 0} style={{ fontSize: 13, padding: '9px 20px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: step === 0 ? 'not-allowed' : 'pointer', opacity: step === 0 ? 0.4 : 1 }}>← Back</button>
               {isLastInputStep ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-                  <button onClick={submitResilience} disabled={submitting || !canAdvance()} style={{ fontSize: 13, fontWeight: 600, padding: '9px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: submitting ? 'wait' : 'pointer', opacity: (submitting || !canAdvance()) ? 0.5 : 1 }}>{submitting ? 'Running…' : 'Run resilience analysis →'}</button>
-                  <div style={{ fontSize: 11, color: '#888784', textAlign: 'right', maxWidth: 320, lineHeight: 1.5 }}>Recommended. Tests three diverse climate futures (Paris-aligned, current trajectory, high warming) — what IFRS S2 and CSRD ask for.</div>
-                </div>
+                mode === 'csrd' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <button onClick={submitResilience} disabled={submitting || !canAdvance()} style={{ fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: '#fff', color: '#0d0d0d', border: '1px solid #e8e7e4', cursor: submitting ? 'wait' : 'pointer', opacity: (submitting || !canAdvance()) ? 0.5 : 1 }}>{submitting ? 'Running…' : 'Run resilience analysis →'}</button>
+                      <button onClick={submit} disabled={submitting || !canAdvance()} style={{ fontSize: 13, fontWeight: 600, padding: '9px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: submitting ? 'wait' : 'pointer', opacity: (submitting || !canAdvance()) ? 0.5 : 1 }}>{submitting ? 'Running…' : 'Run double materiality assessment →'}</button>
+                    </div>
+                    <div style={{ fontSize: 11, color: '#888784', textAlign: 'right', maxWidth: 400, lineHeight: 1.5 }}>Double materiality plots all ten ESRS topics on the financial × impact matrix using your inputs above. Resilience tests three diverse climate futures (Paris-aligned, current trajectory, high warming). Both are disclosable under CSRD/ESRS — each is saved as its own report.</div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                    <button onClick={submitResilience} disabled={submitting || !canAdvance()} style={{ fontSize: 13, fontWeight: 600, padding: '9px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: submitting ? 'wait' : 'pointer', opacity: (submitting || !canAdvance()) ? 0.5 : 1 }}>{submitting ? 'Running…' : 'Run resilience analysis →'}</button>
+                    <div style={{ fontSize: 11, color: '#888784', textAlign: 'right', maxWidth: 320, lineHeight: 1.5 }}>Recommended. Tests three diverse climate futures (Paris-aligned, current trajectory, high warming) — what IFRS S2 and CSRD ask for.</div>
+                  </div>
+                )
               ) : (
                 <button onClick={() => canAdvance() && setStep(s => s + 1)} disabled={!canAdvance()} style={{ fontSize: 13, fontWeight: 500, padding: '9px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: canAdvance() ? 'pointer' : 'not-allowed', opacity: canAdvance() ? 1 : 0.5 }}>Next →</button>
               )}
