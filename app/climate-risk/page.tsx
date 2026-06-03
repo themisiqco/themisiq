@@ -105,6 +105,52 @@ export default function Page() {
         </div>
       </section>
 
+      {/* FLAGSHIP — RESILIENCE REPORT DEPTH */}
+      <section style={{ padding: '5rem 2.5rem', maxWidth: 1100, margin: '0 auto', borderTop: '0.5px solid #e8e7e4' }}>
+        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+          <div style={eyebrow}>Flagship output</div>
+          <h2 style={sectionTitle}>The resilience report, in depth.</h2>
+          <p style={sectionSub}>IFRS S2 and CSRD/ESRS ask for resilience across a diverse range of climate futures — and for the judgment behind it to be documented. ThemisIQ produces exactly that, with every figure traceable to its basis.</p>
+        </div>
+
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 12, textAlign: 'center' }}>Tested across a diverse trio of scenarios</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: '2.5rem' }}>
+          {[
+            { role: 'Paris-aligned', warming: '~1.8°C', src: 'IPCC SSP1-2.6', color: '#0F6E56', bg: '#E1F5EE' },
+            { role: 'Current trajectory', warming: '~2.7°C', src: 'IPCC SSP2-4.5', color: '#0C447C', bg: '#E6F1FB' },
+            { role: 'High warming', warming: '~4.4°C', src: 'IPCC SSP5-8.5', color: '#ba7517', bg: '#FEF3E2' },
+          ].map(scn => (
+            <div key={scn.role} style={{ background: scn.bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid ${scn.color}22` }}>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color: scn.color, lineHeight: 1 }}>{scn.warming}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', marginTop: 8 }}>{scn.role}</div>
+              <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{scn.src}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 12, textAlign: 'center' }}>Documented for assurance, not just generated</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: '2.5rem' }}>
+          {[
+            ['Resilience conclusion', 'A rules-based read of how exposure shifts across the trio — persistent, warming-driven, or policy-driven.'],
+            ['Scenario rationale', 'Why these pathways, including a Paris-aligned scenario as IFRS S2 requires — the choice itself is disclosable.'],
+            ['Methodology & basis', 'IPCC AR6 regions and impact-drivers, TCFD transition categories, IPCC SSP scenarios — public frameworks throughout.'],
+            ['Assumptions register', 'Every weighting and threshold stated as a disclosed methodological choice, not a black box.'],
+            ['Data lineage', 'A clear boundary between your inputs and platform reference defaults — what assurance needs to see.'],
+            ['Limitations & notice', 'Where screening ends and formal assessment begins, with a formal Important Notice on every report.'],
+          ].map(([title, desc]) => (
+            <div key={title} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderLeft: '2px solid #7425e3', borderRadius: '0 10px 10px 0', padding: '1rem 1.25rem' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', marginBottom: 4 }}>{title}</div>
+              <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 300 }}>{desc}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ textAlign: 'center' }}>
+          <a href="/dashboard/climate-risk" style={{ ...btnPrimary, textDecoration: 'none' }}>Assess your climate risk →</a>
+          <p style={{ fontSize: 12, color: '#888784', marginTop: 14, fontWeight: 300 }}>Reporting under CSRD/ESRS? The same assessment also produces the double-materiality matrix across all ten ESRS topics.</p>
+        </div>
+      </section>
+
       {/* GLOBAL REGULATORY MAP */}
       <section style={{ padding: '0 2.5rem 5rem', maxWidth: 1100, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
