@@ -51,7 +51,8 @@ export function generateAssurancePDF(
   totalsAR5: PdfTotals,
   frameworks: PdfFramework[],
   auditRows: PdfAuditRow[],
-  efSources: { combustion: string; electricity: string; gwp_ar4: string; gwp_ar5: string }
+  efSources: { combustion: string; electricity: string; gwp_ar4: string; gwp_ar5: string; gwp_ar6?: string },
+  residualRows: string[][] = []
 ) {
   const doc = new jsPDF({ unit: 'pt', format: 'letter' })
   const W = doc.internal.pageSize.getWidth()
@@ -132,6 +133,7 @@ export function generateAssurancePDF(
       ['Electricity factors', efSources.electricity],
       ['GWP values (AR4)', efSources.gwp_ar4],
       ['GWP values (AR5)', efSources.gwp_ar5],
+      ...(efSources.gwp_ar6 ? [['GWP values (AR6)', efSources.gwp_ar6]] : []),
       ['Reporting year', String(inventory.reporting_year)],
       ['Standard', 'GHG Protocol Corporate Standard'],
     ],
@@ -141,6 +143,30 @@ export function generateAssurancePDF(
     columnStyles: { 0: { fontStyle: 'bold', cellWidth: 160 } },
     margin: { left: M, right: M },
   })
+
+  // Market-based Scope 2 residual-mix citation (only when ESRS/GRI is in scope).
+  if (residualRows.length > 0) {
+    const afterMethods = (doc as any).lastAutoTable?.finalY ?? 92
+    doc.setTextColor(PURPLE); doc.setFont('helvetica', 'bold'); doc.setFontSize(11)
+    doc.text('Market-based Scope 2 — Residual Mix', M, afterMethods + 30)
+    doc.setTextColor(MUTE); doc.setFont('helvetica', 'normal'); doc.setFontSize(8)
+    doc.text(
+      doc.splitTextToSize('Residual-mix factor applied to uncovered load; contractual (covered) kWh counted at zero. Per-location source and vintage below.', W - 2 * M),
+      M, afterMethods + 44
+    )
+    autoTable(doc, {
+      startY: afterMethods + 64,
+      head: [['Location', 'Residual factor source', 'Vintage / note']],
+      body: residualRows.map(r => r.map(cell =>
+        (cell || '').replace(/₂/g, '2').replace(/₃/g, '3').replace(/₄/g, '4')
+      )),
+      theme: 'grid',
+      headStyles: { fillColor: INK, textColor: '#ffffff', fontSize: 8 },
+      bodyStyles: { fontSize: 7, textColor: '#333333' },
+      columnStyles: { 0: { cellWidth: 90 }, 2: { cellWidth: 'auto' } },
+      margin: { left: M, right: M },
+    })
+  }
 
   // ── PAGE 4 — SOURCE DOCUMENT INDEX ──
   doc.addPage()

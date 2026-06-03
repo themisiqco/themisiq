@@ -139,7 +139,6 @@ const EF_SOURCES = {
   gwp_ar4: 'IPCC AR4 (2007) — required by CARB SB 253 and CDP default',
   gwp_ar5: 'IPCC AR5 (2014) — required by ESRS E1 and GRI 305',
   gwp_ar6: 'IPCC AR6 (2021) — used by ESRS E1, GRI 305, CDP, EcoVadis, IFRS S2',
-
 }
 
 const GRID_EF: Record<string, Record<number, number>> = {
@@ -1617,7 +1616,20 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
 
   const generateAssurance = async () => {
     const { data: auditRows } = await supabase.from('audit_log').select('*').eq('table_name', 'ghg_inventories').eq('record_id', inventoryId).order('created_at', { ascending: false })
-    generateAssurancePDF(inventory as any, totals_ar4 as any, totals_ar5 as any, activeFrameworks as any, (auditRows as any) || [], EF_SOURCES)
+    // Per-location residual-mix citation for the PDF (only when a market-based framework is in scope).
+    const needsMkt = activeFrameworks.some(f => f.id === 'esrs' || f.id === 'gri')
+    const residualRows: string[][] = needsMkt
+      ? inventory.locations.filter(l => l.electricity_kwh > 0).map(l => {
+          const resRegion = l.residual_region || (l.grid_region.startsWith('EU_') ? l.grid_region : '')
+          const res = getResidualFactor(resRegion, inventory.reporting_year, 'AR6')
+          return [
+            l.name || 'Location',
+            res.applicable ? res.source : 'Location-factor fallback',
+            res.applicable ? `${res.vintage}${res.note ? ` — ${res.note}` : ''}` : (res.note || '—'),
+          ]
+        })
+      : []
+    generateAssurancePDF(inventory as any, totals_ar4 as any, totals_ar5 as any, activeFrameworks as any, (auditRows as any) || [], EF_SOURCES, residualRows)
   }
 
   const generateExport = async (frameworkId: string) => {
@@ -1647,7 +1659,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       ['METHODS'],
       ['Combustion factors', EF_SOURCES.combustion],
       ['Electricity factors', EF_SOURCES.electricity],
-['GWP values', fw.gwp === 'AR4' ? EF_SOURCES.gwp_ar4 : fw.gwp === 'AR5' ? EF_SOURCES.gwp_ar5 : EF_SOURCES.gwp_ar6],
+      ['GWP values', fw.gwp === 'AR4' ? EF_SOURCES.gwp_ar4 : fw.gwp === 'AR5' ? EF_SOURCES.gwp_ar5 : EF_SOURCES.gwp_ar6],
       ...((fw.id === 'esrs' || fw.id === 'gri')
         ? [
             ['Market-based Scope 2', 'Residual-mix factor applied to uncovered load; covered (contractual) kWh counted at zero'],
