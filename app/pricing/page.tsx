@@ -20,54 +20,12 @@ interface Module {
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
 const PRICES: Record<Tier, number> = {
-  starter: 999,
-  professional: 2999,
+  starter: 799,
+  professional: 2499,
   advisory: 4999,
 }
 
 const FULL_PRICE = 1499 // Starter full price before early access
-
-const TIER_FEATURES: Record<Tier, { title: string; sub: string; features: string[] }> = {
-  starter: {
-    title: 'Starter',
-    sub: 'Core reports for each module you select',
-    features: [
-      'Core reporting frameworks for your selected modules',
-      'Assurance-ready calculation workings',
-      'Audit trail — every entry logged',
-      'Data export (CSV)',
-      '1 organization',
-      'ThemisIQ Wizard — always on',
-    ],
-  },
-  professional: {
-    title: 'Professional',
-    sub: 'All frameworks — one inventory, every report',
-    features: [
-      'Everything in Starter',
-      'All reporting frameworks for your selected modules',
-      'Multi-organization support — up to 5 organizations',
-      'Verifier & third-party access role',
-      'Advanced disclosure outputs',
-      'Regulatory monitor — weekly deadline alerts',
-      'Priority support',
-    ],
-  },
-  advisory: {
-    title: 'Advisory',
-    sub: 'Platform + dedicated expert guidance',
-    features: [
-      'Everything in Professional',
-      'Up to 10 organizations',
-      'Onboarding session',
-      'Guided inventory review',
-      'Sector-specific guidance',
-      'Assurance prep support',
-      'Board-ready narrative',
-      'Dedicated consultant',
-    ],
-  },
-}
 
 const MODULES: Module[] = [
   {
@@ -88,18 +46,14 @@ const MODULES: Module[] = [
   },
   {
     id: 'risk',
-    name: 'Climate Risk & Materiality',
-    description: 'IFRS S2 single materiality · CSRD ESRS double materiality · SB 261 · TCFD · scenario analysis · physical & transition risk · CDP (P-series) · SASB',
-    tags: [
-      { label: 'IFRS S2 · Active', color: 'blue' },
-      { label: 'CSRD · Wave 2', color: 'orange' },
-      { label: 'SB 261 · Jan 2026', color: 'orange' },
-    ],
+    name: 'Climate Risk',
+    description: 'SB 261 · TCFD · IFRS S2 · ESRS E1 · CDP (P-series) · SASB · scenario analysis · physical & transition risk',
+    tags: [{ label: 'SB 261 · Jan 2026', color: 'orange' }],
     cta: {
-      headline: 'Ready to assess your climate risk and materiality?',
-      sub: 'Physical and transition risk, plus IFRS S2 single materiality and CSRD ESRS double materiality. TCFD and SB 261 ready.',
-      btn: 'Assess your climate risk & materiality →',
-      href: '/dashboard/climate-risk',
+      headline: 'Ready to assess your climate risk?',
+      sub: 'Physical and transition risk quantified. TCFD and SB 261 ready.',
+      btn: 'Assess your climate risk →',
+      href: '/dashboard/ghg',
     },
   },
   {
@@ -209,7 +163,7 @@ export default function PricingPage() {
   const unitPrice = PRICES[tier]
   const count = selected.size
   const gross = count * unitPrice
-  const discount = count >= 3 ? 0.15 : count >= 2 ? 0.10 : 0
+  const discount = count >= 3 ? 0.20 : count >= 2 ? 0.10 : 0
   const net = Math.round(gross * (1 - discount))
 
   const toggleModule = (id: ModuleId) => {
@@ -234,7 +188,7 @@ export default function PricingPage() {
     }
     if (count >= 4) return {
       headline: 'Ready to build your compliance platform?',
-      sub: 'Countless compliance requirements. One Intelligent Platform — built by specialists who speak your language.',
+      sub: 'One inventory. Every framework. Specialists who speak your language.',
       buttons: [
         { label: 'Start your free assessment →', href: '/assess', primary: true },
         { label: 'Talk to a specialist', href: '/advisory', primary: false },
@@ -415,54 +369,40 @@ export default function PricingPage() {
             <span style={gradText}>Expert-grade, priced for every business.</span>
           </div>
           <p style={s.heroSub}>
-            Whether your driver is a regulator, a reporting obligation, a board, an investor, or a customer — ThemisIQ is your sustainability compliance reporting solution.
+            Whether your driver is a regulator, a board, an investor, or a customer — ThemisIQ is your sustainability compliance reporting solution.
           </p>
+        </div>
+
+        {/* Interactive prompt */}
+        <div style={s.promptWrap}>
+          <div style={s.promptInner}>
+            <div style={{ ...s.promptDot, animation: 'pulse 2s ease-in-out infinite' }} />
+            <div style={{ flex: 1 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d' }}>This pricing tool is interactive — </span>
+              <span style={{ fontSize: 12, color: '#555553', fontWeight: 300 }}>explore the tiers below, then select the compliance modules your business needs. Your total updates instantly with bundle discounts applied automatically.</span>
+            </div>
+          </div>
         </div>
 
         {/* Credibility bar */}
         <div style={s.credBar}>
-          <div style={s.credItem}>
-            <div style={s.credLabel}>Platform</div>
-            <div style={s.credVal}>7 compliance domains · one platform · one inventory</div>
-          </div>
-          <div style={{ ...s.credItem, borderLeft: '1px solid #e8e7e4', paddingLeft: 12 }}>
-            <div style={s.credLabel}>Frameworks</div>
-            <div style={s.credVal}>30+ frameworks including IFRS S2 (active globally) · mandatory & voluntary</div>
-          </div>
-          <div style={{ ...s.credItem, borderLeft: '1px solid #e8e7e4', paddingLeft: 12 }}>
-            <div style={s.credLabel}>Built by</div>
-            <div style={s.credVal}>Practitioners with Big 4 & sustainability consulting experience</div>
-          </div>
-          <div style={{ ...s.credItem, borderLeft: '1px solid #e8e7e4', paddingLeft: 12 }}>
-            <div style={s.credLabel}>Upcoming Deadlines</div>
-            <div style={{ fontSize: 10, lineHeight: 1.7 }}>
-              <span style={{ color: '#B91C1C', fontWeight: 600 }}>SB 253 · Aug 10</span>
-              <span style={{ color: '#888784' }}> · </span>
-              <span style={{ color: '#B91C1C', fontWeight: 600 }}>EU AI Act · Aug 2</span>
-              <span style={{ color: '#888784' }}> · </span>
-              <span style={{ color: '#B91C1C', fontWeight: 600 }}>EU Pay · Jun 2026</span>
-              <span style={{ color: '#888784' }}> · </span>
-              <span style={{ color: '#B91C1C', fontWeight: 600 }}>CSRD · Jan 2026</span>
+          {[
+            { label: 'Methodology', val: 'EPA 2024 · IPCC AR4+AR5 · ISO 14064-3 · GHG Protocol' },
+            { label: 'Frameworks', val: 'SB 253 · CDP · ESRS E1 · GRI 305 · IFRS S2 · EcoVadis' },
+            { label: 'Built by', val: 'Practitioners with Big 4 & climate consulting experience' },
+            { label: 'Next Reporting Deadline', val: `SB 253 · Aug 10, 2026 · ${daysLeft} days`, red: true },
+          ].map((item, i) => (
+            <div key={i} style={{ ...s.credItem, ...(i > 0 ? { borderLeft: '1px solid #e8e7e4', paddingLeft: 12 } : {}) }}>
+              <div style={s.credLabel}>{item.label}</div>
+              <div style={{ ...s.credVal, ...((item as any).red ? { color: '#B91C1C', fontWeight: 600 } : {}) }}>{item.val}</div>
             </div>
-          </div>
+          ))}
         </div>
 
         {/* Section title */}
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
           <div style={{ fontFamily: 'Georgia, serif', fontSize: 22, fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Simple, honest pricing</div>
           <div style={{ fontSize: 12, color: '#555553', fontWeight: 300 }}>Start with one module. Build your compliance platform as you grow.</div>
-          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6, fontWeight: 300 }}>All prices in USD</div>
-        </div>
-
-        {/* Interactive prompt — sits above tier cards */}
-        <div style={s.promptWrap}>
-          <div style={s.promptInner}>
-            <div style={{ ...s.promptDot, animation: 'pulse 2s ease-in-out infinite' }} />
-            <div style={{ flex: 1 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d' }}>This pricing tool is interactive — </span>
-              <span style={{ fontSize: 12, color: '#555553', fontWeight: 300 }}>click a tier card to select your level, then click any module below to add it to your platform. Your total updates instantly with bundle discounts applied automatically.</span>
-            </div>
-          </div>
         </div>
 
         {/* Tier cards */}
@@ -477,16 +417,8 @@ export default function PricingPage() {
             )}
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784', marginBottom: 6 }}>Starter</div>
             <div style={{ fontSize: 10, color: '#888784', textDecoration: 'line-through' }}>${FULL_PRICE.toLocaleString()}</div>
-            <div style={{ fontSize: 22, fontWeight: 600, color: '#0d0d0d' }}>$999<span style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
-            <div style={{ fontSize: 9, color: '#92400e', background: '#FEF3E2', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginTop: 4, marginBottom: 14 }}>Early access</div>
-            <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: 12, textAlign: 'left' }}>
-              <div style={{ fontSize: 10, color: '#888784', marginBottom: 8 }}>{TIER_FEATURES.starter.sub}</div>
-              {TIER_FEATURES.starter.features.map((f, i) => (
-                <div key={i} style={{ display: 'flex', gap: 7, alignItems: 'flex-start', fontSize: 11, color: '#374151', marginBottom: 5 }}>
-                  <span style={{ color: '#0F6E56', flexShrink: 0, fontSize: 10, marginTop: 1 }}>✓</span>{f}
-                </div>
-              ))}
-            </div>
+            <div style={{ fontSize: 22, fontWeight: 600, color: '#0d0d0d' }}>$799<span style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
+            <div style={{ fontSize: 9, color: '#92400e', background: '#FEF3E2', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginTop: 4 }}>Early access</div>
           </div>
 
           {/* Professional */}
@@ -496,17 +428,9 @@ export default function PricingPage() {
                 <span style={{ background: GRAD, fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#0d0d0d', padding: '2px 10px', borderRadius: 99, whiteSpace: 'nowrap' }}>Selected</span>
               </div>
             )}
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 6 }}>Professional</div>
-            <div style={{ fontSize: 22, fontWeight: 600, color: tier === 'professional' ? '#fff' : '#0d0d0d' }}>$2,999<span style={{ fontSize: 10, color: tier === 'professional' ? 'rgba(255,255,255,0.4)' : '#888784', fontWeight: 400 }}> /module/yr</span></div>
-            <div style={{ fontSize: 9, color: '#a78bfa', background: 'rgba(116,37,227,0.15)', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginTop: 4, marginBottom: 14 }}>All frameworks</div>
-            <div style={{ borderTop: `1px solid ${tier === 'professional' ? 'rgba(255,255,255,0.08)' : '#f3f4f6'}`, paddingTop: 12, textAlign: 'left' }}>
-              <div style={{ fontSize: 10, color: tier === 'professional' ? 'rgba(255,255,255,0.4)' : '#888784', marginBottom: 8 }}>{TIER_FEATURES.professional.sub}</div>
-              {TIER_FEATURES.professional.features.map((f, i) => (
-                <div key={i} style={{ display: 'flex', gap: 7, alignItems: 'flex-start', fontSize: 11, color: tier === 'professional' ? (i === 0 ? 'rgba(255,255,255,0.45)' : '#fff') : '#374151', marginBottom: 5 }}>
-                  <span style={{ color: '#64fe3e', flexShrink: 0, fontSize: 10, marginTop: 1 }}>✓</span>{f}
-                </div>
-              ))}
-            </div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: tier === 'professional' ? '#7425e3' : '#7425e3', marginBottom: 6 }}>Professional</div>
+            <div style={{ fontSize: 22, fontWeight: 600, color: tier === 'professional' ? '#fff' : '#0d0d0d' }}>$2,499<span style={{ fontSize: 10, color: tier === 'professional' ? 'rgba(255,255,255,0.4)' : '#888784', fontWeight: 400 }}> /module/yr</span></div>
+            <div style={{ fontSize: 9, color: '#a78bfa', background: 'rgba(116,37,227,0.15)', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginTop: 4 }}>All frameworks</div>
           </div>
 
           {/* Advisory */}
@@ -518,27 +442,9 @@ export default function PricingPage() {
             )}
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1fb1ff', marginBottom: 6 }}>Advisory</div>
             <div style={{ fontSize: 22, fontWeight: 600, color: '#0d0d0d' }}>$4,999<span style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
-            <div style={{ fontSize: 9, color: '#0C447C', background: '#E6F1FB', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginTop: 4, marginBottom: 14 }}>+ Expert guidance</div>
-            <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: 12, textAlign: 'left' }}>
-              <div style={{ fontSize: 10, color: '#888784', marginBottom: 8 }}>{TIER_FEATURES.advisory.sub}</div>
-              {TIER_FEATURES.advisory.features.map((f, i) => (
-                <div key={i} style={{ display: 'flex', gap: 7, alignItems: 'flex-start', fontSize: 11, color: '#374151', marginBottom: 5 }}>
-                  <span style={{ color: '#1fb1ff', flexShrink: 0, fontSize: 10, marginTop: 1 }}>✓</span>{f}
-                </div>
-              ))}
-              <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #f3f4f6' }}>
-                <div style={{ fontSize: 10, color: '#888784', lineHeight: 1.6 }}>
-                  Advisory clients are invoiced directly. Prefer to pay by card? We accept all major credit cards and ACH bank transfer.
-                </div>
-              </div>
-            </div>
+            <div style={{ fontSize: 9, color: '#0C447C', background: '#E6F1FB', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginTop: 4 }}>+ Expert guidance</div>
           </div>
 
-        </div>
-
-        {/* Custom / more organizations note */}
-        <div style={{ textAlign: 'center', fontSize: 11, color: '#888784', lineHeight: 1.6, marginTop: 14, maxWidth: 640, marginLeft: 'auto', marginRight: 'auto' }}>
-          * Need more than 10 organizations or have additional subsidiaries? <a href="/advisory" style={{ color: '#1fb1ff', textDecoration: 'none' }}>Contact us for custom pricing.</a>
         </div>
 
         {/* Module selector */}
@@ -562,9 +468,7 @@ export default function PricingPage() {
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
-                    <Link href={mod.cta.href} style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', textDecoration: 'none' }} onClick={e => e.stopPropagation()}>
-                      {mod.name} ↗
-                    </Link>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{mod.name}</span>
                     {mod.tags.map(t => (
                       <span key={t.label} style={tag(t.label, t.color)}>{t.label}</span>
                     ))}
@@ -624,7 +528,7 @@ export default function PricingPage() {
           {[
             { label: 'Core', sub: '1 module · full price' },
             { label: 'Growth', sub: '2 modules · 10% off' },
-            { label: 'Platform', sub: '3+ modules · 15% off' },
+            { label: 'Platform', sub: '3+ modules · 20% off' },
           ].map(h => {
             const isActive =
               (h.label === 'Core' && activeBundle === 'core') ||
@@ -637,157 +541,6 @@ export default function PricingPage() {
               </div>
             )
           })}
-        </div>
-
-        {/* Starter Packs — driver-based */}
-        <div style={{ marginBottom: '3rem' }}>
-          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>Not sure where to start?</div>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Starter packs — built for who's asking</div>
-            <div style={{ fontSize: 14, color: '#888784', maxWidth: 540, margin: '0 auto' }}>Whether it's a customer, your bank, your board or your investor — we've bundled exactly what you need to respond with confidence.</div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
-            {[
-              {
-                name: 'Supplier Readiness Pack',
-                driver: 'A customer is asking you',
-                price: '$1,999',
-                color: '#0F6E56',
-                bg: '#E1F5EE',
-                modules: ['GHG Inventory — Scope 1 & 2', 'Supply Chain risk register', 'Supplier questionnaire template'],
-                pitch: 'Your customer sent you a sustainability questionnaire. This gets you ready to respond — and keeps you ready for the next one.',
-                cta: '/dashboard/ghg?pack=supplier',
-                ctaLabel: 'Start now →',
-              },
-              {
-                name: 'Climate Readiness Pack',
-                driver: 'Your bank or insurer is asking',
-                price: '$2,499',
-                color: '#0C447C',
-                bg: '#E6F1FB',
-                modules: ['IFRS S2 single materiality assessment', 'GHG Inventory — Scope 1 & 2', 'Climate Risk — physical & transition', 'TCFD / IFRS S2 aligned output'],
-                pitch: 'Your bank wants your climate data — and the IFRS S2 materiality determination they expect. This gives you the materiality assessment, your emissions baseline and climate risk exposure in one package.',
-                cta: '/dashboard/ghg?pack=climate',
-                ctaLabel: 'Start now →',
-              },
-              {
-                name: 'ESG Foundation Pack',
-                driver: 'Your board wants it',
-                price: '$3,499',
-                color: '#7425e3',
-                bg: '#EDE9FE',
-                modules: ['IFRS S2 single materiality assessment', 'GHG Inventory — Scope 1 & 2', 'People & Workforce — pay gap & safety', 'Climate Risk — physical & transition'],
-                pitch: 'The four things every board asks about — what is material, what are emissions, how are people treated, and how exposed are we to climate. One platform, one annual price.',
-                cta: '/dashboard/ghg?pack=foundation',
-                ctaLabel: 'Start now →',
-              },
-              {
-                name: 'Investor ESG Pack',
-                driver: 'Your investor or PE firm requires it',
-                price: '$4,499',
-                color: '#B91C1C',
-                bg: '#FCEBEB',
-                modules: ['CSRD ESRS double materiality assessment', 'GHG Inventory — Scope 1 & 2', 'Climate Risk — scenario analysis', 'Supply Chain risk register', 'Deals & Investment — ESG diligence'],
-                pitch: 'Everything your PE firm or LP will ask for in their annual ESG questionnaire — investor-grade reporting including CSRD double materiality where applicable.',
-                cta: '/dashboard/ghg?pack=investor',
-                ctaLabel: 'Start now →',
-              },
-            ].map(pack => (
-              <div key={pack.name} style={{ border: `1.5px solid ${pack.color}30`, borderRadius: 16, overflow: 'hidden', background: '#fff' }}>
-                <div style={{ background: pack.bg, padding: '1.25rem 1.5rem', borderBottom: `1px solid ${pack.color}20` }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: pack.color, marginBottom: 4 }}>{pack.driver}</div>
-                  <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 2 }}>{pack.name}</div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                    <span style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', fontWeight: 400, color: pack.color }}>{pack.price}</span>
-                    <span style={{ fontSize: 12, color: '#888784' }}>/yr · USD</span>
-                  </div>
-                </div>
-                <div style={{ padding: '1.25rem 1.5rem' }}>
-                  <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, marginBottom: 16 }}>{pack.pitch}</div>
-                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8, marginBottom: 16 }}>
-                    {pack.modules.map(m => (
-                      <div key={m} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                        <span style={{ color: pack.color, flexShrink: 0, marginTop: 1 }}>✓</span>
-                        <span style={{ fontSize: 13, color: '#374151' }}>{m}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <a href={pack.cta} style={{ display: 'inline-block', padding: '9px 20px', borderRadius: 8, background: pack.color, color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>{pack.ctaLabel}</a>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Flagship — standard-aligned packs */}
-        <div style={{ marginBottom: '3rem' }}>
-          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>Aligned to your reporting standard</div>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Two reporting obligations, two paths</div>
-            <div style={{ fontSize: 14, color: '#888784', maxWidth: 600, margin: '0 auto' }}>Whether you report under IFRS S2 / ISSB (single materiality) or CSRD / ESRS (double materiality), ThemisIQ delivers the materiality determination and supporting disclosures your standard requires.</div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
-            {[
-              {
-                name: 'IFRS S2 Compliance Pack',
-                driver: 'Your IFRS S2 / ISSB reporting obligation requires it',
-                price: '$4,999',
-                color: '#0C447C',
-                bg: '#E6F1FB',
-                modules: [
-                  'IFRS S2 single materiality assessment',
-                  'Climate Risk — physical & transition',
-                  'Scenario analysis (1.5°C / 2°C / 3°C+)',
-                  'GHG Inventory — Scope 1 & 2',
-                  'TCFD-aligned narrative output',
-                ],
-                pitch: 'Built for IFRS S2 / ISSB-aligned disclosure — active in Canada (CSDS), the UK, Australia and across 30+ ISSB-adopting jurisdictions. Materiality determination is the foundation, supported by the climate-risk evidence S2 demands.',
-                cta: '/dashboard/materiality?mode=s2',
-                ctaLabel: 'Start IFRS S2 Pack →',
-              },
-              {
-                name: 'CSRD Compliance Pack',
-                driver: 'Your CSRD reporting obligation requires it',
-                price: '$5,999',
-                color: '#1e1b4b',
-                bg: '#eef2ff',
-                modules: [
-                  'CSRD ESRS double materiality assessment',
-                  'Climate Risk — physical & transition (E1)',
-                  'Supply Chain register (E2, E5, S2)',
-                  'People & Workforce (S1, S2)',
-                  'Business conduct & governance (G1)',
-                  'GHG Inventory — Scope 1, 2, 3',
-                ],
-                pitch: 'Comprehensive CSRD / ESRS readiness — anchored by double materiality assessment across all ten ESRS topical standards (E1–E5, S1–S4, G1). Built for Wave 2 reporters and entities preparing for first ESRS disclosure.',
-                cta: '/dashboard/materiality?mode=csrd',
-                ctaLabel: 'Start CSRD Pack →',
-              },
-            ].map(pack => (
-              <div key={pack.name} style={{ border: `2px solid ${pack.color}`, borderRadius: 16, overflow: 'hidden', background: '#fff' }}>
-                <div style={{ background: pack.bg, padding: '1.5rem 1.75rem', borderBottom: `1px solid ${pack.color}30` }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: pack.color, marginBottom: 6 }}>{pack.driver}</div>
-                  <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{pack.name}</div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                    <span style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color: pack.color }}>{pack.price}</span>
-                    <span style={{ fontSize: 12, color: '#888784' }}>/yr · USD</span>
-                  </div>
-                </div>
-                <div style={{ padding: '1.5rem 1.75rem' }}>
-                  <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, marginBottom: 18 }}>{pack.pitch}</div>
-                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8, marginBottom: 18 }}>
-                    {pack.modules.map(m => (
-                      <div key={m} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                        <span style={{ color: pack.color, flexShrink: 0, marginTop: 1, fontWeight: 700 }}>✓</span>
-                        <span style={{ fontSize: 13, color: '#374151' }}>{m}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <a href={pack.cta} style={{ display: 'inline-block', padding: '10px 22px', borderRadius: 8, background: pack.color, color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>{pack.ctaLabel}</a>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
 
         {/* Dynamic closing CTA */}
