@@ -92,7 +92,6 @@ export default function Home() {
         </div>
       </div>
 
- {/*  </section>
       {/* ── PRODUCTS ── */}
       <section style={{ padding: '5rem 2.5rem', maxWidth: 1100, margin: '0 auto' }}>
         <p style={eyebrow}>The ThemisIQ platform</p>
@@ -121,6 +120,61 @@ export default function Home() {
               <span style={{ fontSize: 12, fontWeight: 500, color: '#0d0d0d', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', padding: '8px 16px', borderRadius: 8, whiteSpace: 'nowrap' }}>Talk to a specialist →</span>
             </div>
           </a>
+        </div>
+      </section>
+
+      {/* ── FLAGSHIP: CLIMATE RESILIENCE REPORT SHOWCASE ── */}
+      <section style={{ background: '#0d0d0d', padding: '5rem 2.5rem' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          <div style={{ maxWidth: 640, marginBottom: '2.5rem' }}>
+            <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>Flagship output · Climate Risk &amp; Materiality</p>
+            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
+              A climate resilience report that holds up under scrutiny.
+            </h2>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', lineHeight: 1.75, fontWeight: 300 }}>
+              IFRS S2 and CSRD/ESRS don&apos;t just ask you to run a scenario — they ask you to show resilience across a <em>diverse range</em> of climate futures, and to document the judgment behind it. ThemisIQ produces exactly that: a multi-scenario resilience report, generated from your assessment, with every figure traceable to its basis.
+            </p>
+          </div>
+
+          {/* The diverse trio */}
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Tested across a diverse trio of scenarios</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: '2rem' }}>
+            {[
+              { role: 'Paris-aligned', warming: '~1.8°C', src: 'IPCC SSP1-2.6', color: '#64fe3e' },
+              { role: 'Current trajectory', warming: '~2.7°C', src: 'IPCC SSP2-4.5', color: '#1fb1ff' },
+              { role: 'High warming', warming: '~4.4°C', src: 'IPCC SSP5-8.5', color: '#ba7517' },
+            ].map(s => (
+              <div key={s.role} style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '1.25rem' }}>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: s.color, lineHeight: 1 }}>{s.warming}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginTop: 8 }}>{s.role}</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>{s.src}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* What the report documents — the credibility registers */}
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Documented for assurance, not just generated</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: '2.5rem' }}>
+            {[
+              ['Resilience conclusion', 'A rules-based read of how exposure shifts across the trio — persistent, warming-driven, or policy-driven.'],
+              ['Scenario rationale', 'Why these pathways, including a Paris-aligned scenario as IFRS S2 requires — the choice itself is disclosable.'],
+              ['Methodology & basis', 'IPCC AR6 regions and impact-drivers, TCFD transition categories, SSP scenarios — public frameworks throughout.'],
+              ['Assumptions register', 'Every weighting and threshold stated as a disclosed methodological choice, not a black box.'],
+              ['Data lineage', 'A clear boundary between your inputs and platform reference defaults — what assurance needs to see.'],
+              ['Limitations & notice', 'Where the screening ends and formal assessment begins, with a formal Important Notice on every report.'],
+            ].map(([title, desc]) => (
+              <div key={title} style={{ background: 'rgba(255,255,255,0.03)', borderLeft: '2px solid rgba(116,37,227,0.6)', borderRadius: '0 10px 10px 0', padding: '1rem 1.25rem' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginBottom: 4 }}>{title}</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, fontWeight: 300 }}>{desc}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' as const }}>
+            <a href="/dashboard/climate-risk" style={{ fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none' }}>Assess your climate risk →</a>
+            <a href="/climate-risk" style={{ fontSize: 13, fontWeight: 500, padding: '11px 24px', borderRadius: 8, border: '0.5px solid rgba(255,255,255,0.3)', color: '#fff', textDecoration: 'none' }}>See how it works</a>
+            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Also produces the CSRD double-materiality matrix across all ten ESRS topics.</span>
+          </div>
         </div>
       </section>
 
@@ -157,9 +211,9 @@ export default function Home() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
             {[
               { name: 'Supplier Readiness', driver: 'A customer is asking', price: '$1,999', color: '#0F6E56', bg: '#E1F5EE', href: '/dashboard/ghg?pack=supplier', items: ['GHG Inventory', 'Supply Chain risk register', 'Supplier questionnaire'] },
-              { name: 'Climate Readiness', driver: 'Your bank is asking', price: '$1,999', color: '#0C447C', bg: '#E6F1FB', href: '/dashboard/ghg?pack=climate', items: ['GHG Inventory', 'Climate Risk assessment', 'TCFD / IFRS S2 output'] },
-              { name: 'ESG Foundation', driver: 'Your board wants it', price: '$2,999', color: '#7425e3', bg: '#EDE9FE', href: '/dashboard/ghg?pack=foundation', items: ['GHG Inventory', 'People & Workforce', 'Climate Risk'] },
-              { name: 'Investor ESG', driver: 'Your investor requires it', price: '$3,999', color: '#B91C1C', bg: '#FCEBEB', href: 'dashboard/ghg?pack=investor', items: ['GHG Inventory', 'Climate Risk', 'Supply Chain', 'Deals & Investment'] },
+              { name: 'Climate Readiness', driver: 'Your bank is asking', price: '$2,499', color: '#0C447C', bg: '#E6F1FB', href: '/dashboard/ghg?pack=climate', items: ['GHG Inventory', 'Climate Risk assessment', 'TCFD / IFRS S2 output'] },
+              { name: 'ESG Foundation', driver: 'Your board wants it', price: '$3,499', color: '#7425e3', bg: '#EDE9FE', href: '/dashboard/ghg?pack=foundation', items: ['GHG Inventory', 'People & Workforce', 'Climate Risk'] },
+              { name: 'Investor ESG', driver: 'Your investor requires it', price: '$4,499', color: '#B91C1C', bg: '#FCEBEB', href: '/dashboard/ghg?pack=investor', items: ['GHG Inventory', 'Climate Risk', 'Supply Chain', 'Deals & Investment'] },
             ].map(pack => (
               <a key={pack.name} href={pack.href} style={{ background: '#fff', border: `1.5px solid ${pack.color}25`, borderRadius: 14, padding: '1.5rem', textDecoration: 'none', display: 'block', transition: 'all 0.15s' }}
                 onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = pack.color}
@@ -249,7 +303,7 @@ function Logo({ size = 130 }: { size?: number }) {
 // ── DATA ────────────────────────────────────────────────────────────
 const modules = [
   { family: 'ThemisIQ Climate', name: 'GHG Emissions', desc: 'Full Scope 1, 2 and 3 inventory under GHG Protocol. Audit-trail-first, verifier-ready. CARB SB 253 pre-filled export.', tags: ['SB 253', 'CDP C6', 'ESRS E1-6', 'GHG Protocol'], href: '/climate-ghg', dark: false },
-  { family: 'ThemisIQ Climate', name: 'Climate Risk', desc: 'TCFD-aligned physical and transition risk disclosures. Scenario analysis under IPCC 1.5°C, 2°C, and 3°C pathways.', tags: ['SB 261', 'IFRS S2', 'TCFD', 'CDP-P'], href: '/dashboard/ghg', dark: false },
+  { family: 'ThemisIQ Climate', name: 'Climate Risk', desc: 'TCFD-aligned physical and transition risk disclosures. Scenario analysis under IPCC 1.5°C, 2°C, and 3°C pathways.', tags: ['SB 261', 'IFRS S2', 'TCFD', 'CDP-P'], href: '/dashboard/climate-risk', dark: false },
   { family: 'ThemisIQ', name: 'Supply Chain & Scope 3', desc: 'Supplier emissions mapping. Scope 3 Cat. 1 primary data collection portal. Labour compliance. Human rights risk.', tags: ['Scope 3 Cat.1', 'EcoVadis', 'ESRS S2', 'CS3D'], href: '/supply-chain', dark: false },
   { family: 'ThemisIQ', name: 'Deals & Investment', desc: 'M&A climate diligence. Transition risk quantification. Portfolio benchmarking. Investment committee reporting.', tags: ['M&A diligence', 'PE / family office', 'IFRS S2', 'TCFD'], href: '/deals', dark: false },
   { family: 'ThemisIQ', name: 'AI Governance', desc: 'AI risk register. Model inventory. Policy management. EU AI Act readiness. Board-level AI oversight documentation.', tags: ['EU AI Act', 'NIST AI RMF', 'ISO 42001', 'Model risk'], href: '/ai-governance', dark: false },
