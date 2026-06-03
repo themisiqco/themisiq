@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-20250514',
+        model: 'claude-opus-4-6',
         max_tokens: 1024,
         messages: [
           {
@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       fields,
-      model: data.model ?? 'claude-opus-4-20250514',
+      model: data.model ?? 'claude-opus-4-6',
       usage: data.usage ?? null,
     })
 
