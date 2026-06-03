@@ -1,13 +1,22 @@
 'use client'
 
-// app/dashboard/materiality/report/page.tsx
-// ThemisIQ — Printable CSRD double materiality report.
+// app/dashboard/climate-risk/report/page.tsx
+// ThemisIQ — Climate resilience report, served under the climate-risk module.
 //
-// Reads ?id=<uuid> from the URL, fetches the assessment from the authed GET API,
-// renders the full report (cover, exec summary, methodology, scenario rationale,
-// matrix, materiality table, risk register, limitations, disclaimer).
+// LAYER 1 RELOCATION (interim): this is a standalone copy of the ResilienceReport
+// renderer from app/dashboard/materiality/report/page.tsx, mounted at a
+// climate-risk URL so the report can *live* under climate-risk without touching
+// the live materiality path or the data model. It reads the same authed
+// GET endpoint (/api/materiality/{id}); resilience is a result *shape* on an
+// ordinary assessment row (results.analysisType === 'resilience'), not a
+// separate data source — so no storage change is required to serve it here.
 //
-// Print-optimized via @media print CSS: page breaks, white background, no nav.
+// This route is resilience-specific: if the id resolves to a non-resilience
+// record it says so rather than rendering an empty report.
+//
+// NOTE: the shared helpers below are duplicated from the materiality report on
+// purpose, to keep this change isolated and reversible. When the real
+// extraction happens (shared component used by both routes), delete this copy.
 
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -37,16 +46,8 @@ const JURISDICTION_LABEL: Record<string, string> = {
   cn: 'China (national ETS)', kr: 'South Korea (K-ETS)', jp: 'Japan',
   au: 'Australia (Safeguard)', nz: 'New Zealand (NZ ETS)', ch: 'Switzerland (CH ETS)',
 }
-const SCENARIO_LABEL: Record<string, { l: string; d: string }> = {
-  ssp245: { l: 'IPCC SSP2-4.5', d: '~2.7°C' }, ssp126: { l: 'IPCC SSP1-2.6', d: '~1.8°C' },
-  ssp585: { l: 'IPCC SSP5-8.5', d: '~4.4°C' },
-  ngfs_orderly: { l: 'NGFS Orderly', d: 'Early policy' },
-  ngfs_disorderly: { l: 'NGFS Disorderly', d: 'Late, abrupt' },
-  ngfs_hothouse: { l: 'NGFS Hot House', d: 'Limited action' },
-}
 
-// Formal Important Notice — five paragraphs, rendered as a final section in both
-// the CSRD/IFRS S2 report and the resilience report.
+// Formal Important Notice — five paragraphs, rendered as the report's final section.
 const DISCLAIMER_PARAS: string[] = [
   "This report has been generated automatically by the ThemisIQ platform using information provided by the user and publicly available regulatory guidance. The report is provided solely for informational, planning, and compliance-support purposes and does not constitute legal advice, accounting advice, investment advice, assurance services, engineering advice, or any other professional opinion.",
   "ThemisIQ Compliance Inc. makes no representation or warranty, express or implied, regarding the completeness, accuracy, suitability, or regulatory sufficiency of the information contained in this report. Regulatory requirements may change and may vary by jurisdiction.",
@@ -63,16 +64,17 @@ const SEV = {
   low:  { color: '#888784', bg: '#f8f7f5', border: '#e8e7e4' },
 } as const
 
-export default function CsrdReportPage() {
+// ─── Page wrapper ─────────────────────────────────────────────────────────────
+export default function ClimateRiskResilienceReportPage() {
   // useSearchParams must be inside a Suspense boundary for Next.js to prerender this page.
   return (
     <Suspense fallback={<Centered>Loading report…</Centered>}>
-      <ReportInner />
+      <ResilienceReportInner />
     </Suspense>
   )
 }
 
-function ReportInner() {
+function ResilienceReportInner() {
   const params = useSearchParams()
   const id = params.get('id')
   const [loading, setLoading] = useState(true)
@@ -101,242 +103,13 @@ function ReportInner() {
   if (error) return <Centered>{error}</Centered>
   if (!a) return <Centered>No assessment data.</Centered>
 
-  const result = a.results || {}
-  const physical: any[] = result.physical || []
-  const transition: any[] = result.transition || []
-  const matrix: any[] = result.matrix || []
-  const isCsrd = a.mode === 'csrd'
-
-  const rationale = a.workings?.input ? null : null  // placeholder; we read from saved workings below
-  const savedRationale = (a as any).workings?.rationale  // not always present, set in stage-two wizard
-
-  const reportDate = new Date(a.created_at).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })
-
-  // Resilience records carry a different shape; render the dedicated report.
-  if ((a.results || {}).analysisType === 'resilience') {
-    return <ResilienceReport a={a} reportDate={reportDate} />
+  // This route renders resilience reports only.
+  if ((a.results || {}).analysisType !== 'resilience') {
+    return <Centered>This report isn’t a resilience analysis. Open it from its own module, or run a resilience analysis to generate one.</Centered>
   }
 
-  return (
-    <div className="report-root" style={{ background: '#fff', minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', color: '#0d0d0d' }}>
-      {/* Print button (hidden when printing) */}
-      <div className="no-print" style={{ position: 'sticky', top: 0, background: '#0d0d0d', color: '#fff', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>ThemisIQ · {isCsrd ? 'CSRD double materiality report' : 'IFRS S2 single materiality report'}</div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={() => window.print()} style={{ fontSize: 13, fontWeight: 500, padding: '8px 20px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>
-            ⬇ Save as PDF (Cmd+P)
-          </button>
-        </div>
-      </div>
-
-      <div className="report-body" style={{ maxWidth: 780, margin: '0 auto', padding: '3rem 3rem 4rem' }}>
-
-        {/* ── COVER ───────────────────────────────────────────────────────── */}
-        <section className="page">
-          <div style={{ height: 6, background: GRAD, marginBottom: 32, borderRadius: 2 }} />
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 12 }}>
-            Prepared by ThemisIQ Compliance Inc.
-          </div>
-          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '2.2rem', fontWeight: 400, lineHeight: 1.2, margin: '0 0 16px', color: '#0d0d0d' }}>
-            {isCsrd ? 'Double Materiality Screening Report' : 'Climate Risk & Scenario Analysis Report'}
-          </h1>
-          <p style={{ fontSize: 15, color: '#555553', marginBottom: 36, lineHeight: 1.6 }}>
-            {isCsrd
-              ? 'CSRD / ESRS — financial and impact materiality screening across the ten ESRS topical standards.'
-              : 'IFRS S2 — single (financial) materiality screening for climate-related risks and opportunities.'}
-          </p>
-          <div style={{ borderTop: '1px solid #e8e7e4', borderBottom: '1px solid #e8e7e4', padding: '20px 0', marginBottom: 24 }}>
-            <Row k="Legal entity" v={a.workings?.input?.legalEntity || (a as any).legal_entity || a.company_name || '—'} />
-            <Row k="Reporting period" v={a.workings?.input?.reportingPeriod || 'FY2025'} />
-            <Row k="Primary sector" v={SECTOR_LABEL[a.industry_code] || a.industry_code} />
-            <Row k="Operating regions (IPCC AR6)" v={(a.region_codes || []).map((c: string) => `${REGION_LABEL[c] || c} (${c})`).join(', ') || '—'} />
-            <Row k="Policy jurisdictions" v={(a.jurisdiction_codes || []).map((c: string) => JURISDICTION_LABEL[c] || c).join(', ') || '—'} />
-            <Row k="Scenario tested" v={`${SCENARIO_LABEL[a.scenario_code]?.l || a.scenario_code} (${SCENARIO_LABEL[a.scenario_code]?.d || ''})`} />
-            <Row k="Time horizon" v={`${a.horizon} term`} />
-            <Row k="Asset profile" v={a.asset_profile} />
-            <Row k="Model version" v={a.model_version || result.modelVersion || '—'} />
-            <Row k="Report date" v={reportDate} />
-          </div>
-        </section>
-
-        {/* ── EXECUTIVE SUMMARY ─────────────────────────────────────────── */}
-        <section className="page" style={{ marginTop: 48 }}>
-          <H>Executive summary</H>
-          <p style={p}>
-            This {isCsrd ? 'double materiality' : 'single materiality'} screening identifies climate-related risks and {isCsrd ? 'sustainability topics' : 'transition exposures'} that are likely to be material for{' '}
-            <strong>{a.company_name || SECTOR_LABEL[a.industry_code] || 'the entity'}</strong>{' '}
-            under the {SCENARIO_LABEL[a.scenario_code]?.l} pathway over the {a.horizon} term.
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: isCsrd ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)', gap: 12, margin: '18px 0' }}>
-            <Stat label="High physical risks" val={result.summary?.physicalHigh ?? 0} color="#B91C1C" bg="#FCEBEB" />
-            <Stat label="High transition risks" val={result.summary?.transitionHigh ?? 0} color="#ba7517" bg="#FEF3E2" />
-            {isCsrd && <Stat label="Topics material on both axes" val={result.summary?.topicsBothAxes ?? 0} color="#7425e3" bg="#EDE9FE" />}
-          </div>
-          <h3 style={h3}>Key findings</h3>
-          <ul style={ul}>
-            {physical.filter(p => p.band === 'high').slice(0, 3).map((p, i) => (
-              <li key={'phf'+i} style={li}>Physical risk: <strong>{p.hazard}</strong> is material (high band, score {p.score}) — driven by exposure in <strong>{p.drivingRegion}</strong>.</li>
-            ))}
-            {transition.filter(t => t.band === 'high').slice(0, 2).map((t, i) => (
-              <li key={'trf'+i} style={li}>Transition risk: <strong>{t.driver}</strong> is material (high band) under the chosen scenario and jurisdictions.</li>
-            ))}
-            {isCsrd && matrix.filter(m => m.quadrant === 'both').slice(0, 4).map((m, i) => (
-              <li key={'mf'+i} style={li}>{m.code} <strong>{m.label}</strong> is material on <strong>both axes</strong> (financial {m.financial.toFixed(1)} / impact {m.impact.toFixed(1)}).</li>
-            ))}
-            {physical.filter(p => p.band === 'high').length === 0 && transition.filter(t => t.band === 'high').length === 0 && (
-              <li style={li}>No <em>high-band</em> risks were flagged at this combination of industry, geography and scenario. Medium-band items below still warrant review.</li>
-            )}
-          </ul>
-        </section>
-
-        {/* ── METHODOLOGY ───────────────────────────────────────────────── */}
-        <section className="page" style={{ marginTop: 48 }}>
-          <H>Methodology and basis</H>
-          <p style={p}>
-            This screening combines four public, independently-sourced frameworks. No proprietary or licensed third-party classification is reproduced.
-          </p>
-          <h3 style={h3}>Frameworks</h3>
-          <ul style={ul}>
-            <li style={li}><strong>IPCC AR6 WGI reference regions</strong> — the 20 land regions used here are drawn from the Sixth Assessment Report Working Group I reference-region set (Iturbide et al., 2020), each with its characteristic profile of climatic impact-drivers.</li>
-            <li style={li}><strong>IPCC climatic impact-drivers</strong> — the physical hazards (extreme heat, drought, water stress, inland flooding, coastal flooding, wildfire, storms/cyclones, cold/permafrost) follow the AR6 climatic-impact-driver categories.</li>
-            <li style={li}><strong>TCFD transition risk categories</strong> — transition risks follow the Task Force on Climate-related Financial Disclosures classification: policy and legal, technology, market, and reputation.</li>
-            {isCsrd && <li style={li}><strong>ESRS topical standards</strong> — the impact-materiality axis assesses the ten ESRS topical standards (E1–E5 environment, S1–S4 social, G1 governance).</li>}
-            <li style={li}><strong>Scenario pathways</strong> — both IPCC Shared Socioeconomic Pathways (SSP1-2.6, SSP2-4.5, SSP5-8.5) and NGFS scenarios (Orderly, Disorderly, Hot House) are available; this screening uses {SCENARIO_LABEL[a.scenario_code]?.l}.</li>
-          </ul>
-          <h3 style={h3}>Risk model</h3>
-          <p style={p}>
-            <strong>Physical risk</strong> is computed as industry sensitivity × regional hazard exposure × scenario severity × time-horizon multiplier. A risk is flagged only where industry sensitivity and regional hazard exposure intersect — preventing the common error of flagging, for example, drought for any agricultural entity regardless of where it operates.
-          </p>
-          <p style={p}>
-            <strong>Transition risk</strong> is computed as industry carbon exposure × jurisdictional policy intensity × scenario policy-speed × time-horizon multiplier. Transition geography (policy jurisdictions) is deliberately distinct from physical geography (IPCC regions): physical exposure depends on where assets and hazards are; transition exposure depends on which policy regimes apply.
-          </p>
-          {isCsrd && (
-            <p style={p}>
-              <strong>Double materiality</strong> is operationalised as the combination of single (financial) materiality and impact materiality: <em>double materiality = financial + impact</em>. The financial axis uses the engine above; climate (E1) financial score is taken directly from the physical + transition computation. The impact axis uses industry baselines for the ten ESRS topics, refined by the user's self-assessment.
-            </p>
-          )}
-          <h3 style={h3}>Scenario inversion</h3>
-          <p style={p}>
-            Physical and transition risk move in opposite directions across scenarios: high-warming pathways raise physical risk and lower transition pressure; rapid- or abrupt-policy pathways raise transition risk and lower physical pressure. A resilient strategy must hold up across both ends, which is why both frameworks require testing resilience across a range rather than against a single forecast.
-          </p>
-        </section>
-
-        {/* ── SCENARIO RATIONALE ─────────────────────────────────────────── */}
-        <section className="page" style={{ marginTop: 48 }}>
-          <H>Scenario selection and rationale</H>
-          <p style={p}>
-            <strong>Pathway used:</strong> {SCENARIO_LABEL[a.scenario_code]?.l} ({SCENARIO_LABEL[a.scenario_code]?.d}).
-          </p>
-          <p style={p}>
-            {savedRationale?.scenario || 'A middle pathway (SSP2-4.5, ~2.7°C) was selected as a reasonable central case for first-pass screening. Higher- or lower-warming pathways can be tested to assess resilience across a range.'}
-          </p>
-          <p style={p}>
-            <strong>Time horizon used:</strong> {a.horizon} term.
-          </p>
-          <p style={p}>
-            {savedRationale?.horizon || 'A medium-term horizon (to 2040) was selected as the default screening lens. Companies with long-lived physical assets may prefer the long-term view; near-term commitments may benefit from the short-term view.'}
-          </p>
-          <p style={p}>
-            Under both IFRS S2 and CSRD/ESRS, the choice of scenarios used and the rationale for that choice are themselves disclosable. This section documents that judgment.
-          </p>
-        </section>
-
-        {/* ── MATRIX (CSRD only) ─────────────────────────────────────────── */}
-        {isCsrd && matrix.length > 0 && (
-          <section className="page" style={{ marginTop: 48 }}>
-            <H>Double materiality matrix</H>
-            <p style={p}>
-              Each ESRS topic is plotted on the two axes — financial materiality (vertical) and impact materiality (horizontal). Topics in the top-right quadrant are material on both axes and represent the highest reporting and management priority.
-            </p>
-            <Matrix topics={matrix} />
-            <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginTop: 8, fontSize: 12, color: '#555553' }}>
-              {[['#A32D2D', 'Material on both'], ['#ba7517', 'Material on one axis'], ['#888784', 'Lower priority']].map(([c, l]) => (
-                <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: '50%', background: c, display: 'inline-block' }} />{l}</span>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* ── MATERIALITY TABLE (CSRD) ───────────────────────────────────── */}
-        {isCsrd && matrix.length > 0 && (
-          <section className="page" style={{ marginTop: 48 }}>
-            <H>Materiality determination — all topics</H>
-            <p style={p}>
-              All ten ESRS topical standards, with their financial and impact materiality scores (0–10) and band. Sorted by maximum of the two axes.
-            </p>
-            <MatrixTable topics={matrix} />
-          </section>
-        )}
-
-        {/* ── RISK REGISTER ──────────────────────────────────────────────── */}
-        <section className="page" style={{ marginTop: 48 }}>
-          <H>Risk register</H>
-          <h3 style={h3}>Physical risks</h3>
-          <p style={p}><em>Industry sensitivity × regional hazard exposure × scenario × horizon. Flagged only where industry sensitivity meets real regional hazard exposure.</em></p>
-          {physical.length > 0 ? (
-            <table style={tbl}>
-              <thead><tr style={trh}><th style={th}>Hazard</th><th style={th}>Severity</th><th style={th}>Driving region</th><th style={th}>Score</th></tr></thead>
-              <tbody>
-                {physical.map((p, i) => (
-                  <tr key={'pr'+i} style={tr}>
-                    <td style={td}>{p.hazard}</td>
-                    <td style={td}><Pill band={p.band} /></td>
-                    <td style={td}>{REGION_LABEL[p.drivingRegion] || p.drivingRegion} ({p.drivingRegion})</td>
-                    <td style={td}>{p.score?.toFixed?.(1)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <p style={{ ...p, color: '#888784' }}>No material physical risks flagged at this intersection of industry, region and scenario.</p>
-          )}
-          <h3 style={{ ...h3, marginTop: 28 }}>Transition risks</h3>
-          <p style={p}><em>Industry carbon exposure × jurisdictional policy intensity × scenario policy-speed × horizon.</em></p>
-          <table style={tbl}>
-            <thead><tr style={trh}><th style={th}>Driver</th><th style={th}>Severity</th></tr></thead>
-            <tbody>
-              {transition.map((t, i) => (
-                <tr key={'tr'+i} style={tr}>
-                  <td style={td}>{t.driver}</td>
-                  <td style={td}><Pill band={t.band} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-
-        {/* ── IMPORTANT NOTICE ───────────────────────────────────────────────
-            Now rendered in the printed report itself. Previously the disclaimer
-            was only shown on-screen as a pre-generation acknowledgment; once a
-            saved PDF circulates to a third party that on-screen gate isn't
-            attached to it, so the document carries its own notice. */}
-        <section className="page" style={{ marginTop: 48 }}>
-          <H>Important Notice</H>
-          {DISCLAIMER_PARAS.map((para, i) => (
-            <p key={'disc' + i} style={{ ...p, fontSize: 11, color: '#888784' }}>{para}</p>
-          ))}
-        </section>
-
-        <div style={{ marginTop: 32, paddingTop: 16, borderTop: '0.5px solid #e8e7e4', fontSize: 11, color: '#888784', textAlign: 'center' }}>
-          ThemisIQ Compliance Inc. · www.themisiq.co · Report ID {String(a.id).slice(0, 8)}… · Generated {reportDate}
-        </div>
-      </div>
-
-      {/* Print styles */}
-      <style>{`
-        @media print {
-          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          .no-print { display: none !important; }
-          .report-body { padding: 0 !important; max-width: none !important; }
-          body { background: white !important; }
-          .page { page-break-inside: avoid; break-inside: avoid; }
-          section.page { margin-top: 24px !important; }
-          h2 { page-break-after: avoid; }
-        }
-        @page { size: A4; margin: 1.6cm 1.6cm 2cm; }
-      `}</style>
-    </div>
-  )
+  const reportDate = new Date(a.created_at).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })
+  return <ResilienceReport a={a} reportDate={reportDate} />
 }
 
 // ─── Small shared components & styles ─────────────────────────────────────────
@@ -362,92 +135,33 @@ function Row({ k, v }: { k: string; v: string }) {
     </div>
   )
 }
-function Stat({ label, val, color, bg }: { label: string; val: number; color: string; bg: string }) {
-  return (
-    <div style={{ background: bg, borderRadius: 10, padding: '14px 12px', textAlign: 'center' }}>
-      <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.9rem', color, lineHeight: 1 }}>{val}</div>
-      <div style={{ fontSize: 11, color: '#555553', marginTop: 4 }}>{label}</div>
-    </div>
-  )
-}
 function Pill({ band }: { band: 'high' | 'med' | 'low' }) {
   const c = SEV[band]
   return <span style={{ background: c.bg, color: c.color, border: `0.5px solid ${c.border}`, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99 }}>{band.toUpperCase()}</span>
 }
 function Centered({ children }: { children: any }) {
-  return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui', color: '#555' }}>{children}</div>
+  return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui', color: '#555', padding: '2rem', textAlign: 'center', lineHeight: 1.6 }}>{children}</div>
 }
 
-function Matrix({ topics }: { topics: any[] }) {
-  const W = 600, H = 400, padL = 56, padR = 20, padT = 20, padB = 48
-  const midX = padL + 0.5 * (W - padL - padR)
-  const midY = padT + 0.5 * (H - padT - padB)
-  const color = (q: string) => q === 'both' ? '#A32D2D' : (q === 'financial' || q === 'impact') ? '#ba7517' : '#888784'
-
-  // Offset dots that would land on top of an earlier-placed dot so labels stay readable.
-  // 8 directions in a small circle; first collision -> right, second -> left, etc.
-  const OFFSET = 16
-  const OFFSETS: [number, number][] = [
-    [0, 0], [OFFSET, 0], [-OFFSET, 0], [0, OFFSET], [0, -OFFSET],
-    [OFFSET, OFFSET], [-OFFSET, -OFFSET], [OFFSET, -OFFSET], [-OFFSET, OFFSET],
-  ]
-  type Placed = { code: string; cx: number; cy: number; q: string }
-  const placed: Placed[] = []
-  for (const t of topics) {
-    const bx = Math.round(padL + (t.impact / 10) * (W - padL - padR))
-    const by = Math.round(padT + (1 - t.financial / 10) * (H - padT - padB))
-    let collisions = 0
-    for (const pp of placed) {
-      const dx = bx - pp.cx, dy = by - pp.cy
-      if (dx * dx + dy * dy < 20 * 20) collisions++
-    }
-    const [ox, oy] = OFFSETS[Math.min(collisions, OFFSETS.length - 1)]
-    placed.push({ code: t.code, cx: bx + ox, cy: by + oy, q: t.quadrant })
-  }
-
+// small text-valued stat tile for the resilience conclusion
+function TextStat({ label, v }: { label: string; v: string }) {
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10 }} role="img" aria-label="Double materiality matrix">
-      <line x1={padL} y1={midY} x2={W - padR} y2={midY} stroke="#e8e7e4" strokeDasharray="4 4" />
-      <line x1={midX} y1={padT} x2={midX} y2={H - padB} stroke="#e8e7e4" strokeDasharray="4 4" />
-      <line x1={padL} y1={padT} x2={padL} y2={H - padB} stroke="#888784" />
-      <line x1={padL} y1={H - padB} x2={W - padR} y2={H - padB} stroke="#888784" />
-      <text x={padL - 8} y={padT + 10} textAnchor="end" fontSize="11" fill="#888784">High</text>
-      <text x={padL - 8} y={H - padB} textAnchor="end" fontSize="11" fill="#888784">Low</text>
-      <text x="18" y={H / 2} textAnchor="middle" fontSize="12" fill="#555553" transform={`rotate(-90 18 ${H / 2})`}>Financial materiality →</text>
-      <text x={W / 2} y={H - 10} textAnchor="middle" fontSize="12" fill="#555553">Impact materiality →</text>
-      {placed.map(pp => (
-        <g key={pp.code}>
-          <circle cx={pp.cx} cy={pp.cy} r={15} fill={color(pp.q)} opacity={0.88} />
-          <text x={pp.cx} y={pp.cy + 4} textAnchor="middle" fontSize="11" fontWeight="700" fill="#fff">{pp.code}</text>
-        </g>
-      ))}
-    </svg>
+    <div style={{ background: '#f8f7f5', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#888784', letterSpacing: '0.04em' }}>{label}</div>
+      <div style={{ fontSize: 13, color: '#0d0d0d', marginTop: 4 }}>{v}</div>
+    </div>
   )
 }
 
-function MatrixTable({ topics }: { topics: any[] }) {
-  const sorted = [...topics].sort((a, b) => Math.max(b.financial, b.impact) - Math.max(a.financial, a.impact))
-  const band = (v: number): 'high' | 'med' | 'low' => v >= 8 ? 'high' : v >= 5 ? 'med' : 'low'
-  return (
-    <table style={tbl}>
-      <thead><tr style={trh}><th style={th}>ESRS topic</th><th style={th}>Financial</th><th style={th}>Impact</th></tr></thead>
-      <tbody>
-        {sorted.map(t => (
-          <tr key={t.code} style={tr}>
-            <td style={td}><span style={{ color: '#aaa', fontSize: 11 }}>{t.code}</span> {t.label}</td>
-            <td style={td}><Pill band={band(t.financial)} /> <span style={{ fontSize: 11, color: '#888784', marginLeft: 4 }}>{t.financial.toFixed(1)}</span></td>
-            <td style={td}><Pill band={band(t.impact)} /> <span style={{ fontSize: 11, color: '#888784', marginLeft: 4 }}>{t.impact.toFixed(1)}</span></td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )
+// join helper for the report's channel summaries
+function joinList(xs: string[]): string {
+  if (xs.length <= 1) return xs[0] ?? ''
+  if (xs.length === 2) return `${xs[0]} and ${xs[1]}`
+  return `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`
 }
-
 
 // ─── Resilience report (multi-scenario) ───────────────────────────────────────
 // Rendered when the saved record has results.analysisType === 'resilience'.
-// Reuses the shared styles/components above; adds the six credibility registers.
 function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
   const res = (a.results || {}).resilience || {}
   const trio: any[] = res.trio || []
@@ -666,23 +380,6 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
         }
         @page { size: A4; margin: 1.6cm 1.6cm 2cm; }
       `}</style>
-    </div>
-  )
-}
-
-// join helper for the report's channel summaries
-function joinList(xs: string[]): string {
-  if (xs.length <= 1) return xs[0] ?? ''
-  if (xs.length === 2) return `${xs[0]} and ${xs[1]}`
-  return `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`
-}
-
-// small text-valued stat tile for the resilience conclusion
-function TextStat({ label, v }: { label: string; v: string }) {
-  return (
-    <div style={{ background: '#f8f7f5', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#888784', letterSpacing: '0.04em' }}>{label}</div>
-      <div style={{ fontSize: 13, color: '#0d0d0d', marginTop: 4 }}>{v}</div>
     </div>
   )
 }
