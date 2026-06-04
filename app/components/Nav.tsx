@@ -47,6 +47,7 @@ export default function Nav() {
             ['/people', 'People'],
             ['/ai-governance', 'AI Governance'],
             ['/cyber', 'Cyber'],
+            ['/verification-readiness', 'Verification'],
             ['/pricing', 'Pricing'],
           ].map(([href, label]) => (
             <a key={href} href={href} style={{
@@ -105,6 +106,7 @@ export default function Nav() {
             ['/people', 'People & Workforce', 'ESRS S1 · EU Pay Transparency · CA Pay Data'],
             ['/ai-governance', 'AI Governance', 'EU AI Act · NIST AI RMF · ISO 42001'],
             ['/cyber', 'Cyber Governance', 'NIS2 · DORA · SEC cyber · ISO 27001'],
+            ['/verification-readiness', 'Verification Readiness', 'ISO 14064-3 · ISAE 3410 · verifier-ready package'],
             ['/pricing', 'Pricing', 'Plans, tiers, and what each includes'],
             ['/assess', 'Free Assessment →', 'Check which regulations apply to you'],
           ].map(([href, label, sub]) => (

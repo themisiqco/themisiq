@@ -258,14 +258,14 @@ export default function Home() {
             </p>
           </div>
           {[
-            { heading: 'Products', links: ['Climate · GHG', 'Climate · Risk', 'Supply Chain', 'Deals & Investment', 'AI Governance', 'People & Workforce', 'Cyber Governance', 'Advisory'] },
+            { heading: 'Products', links: ['Climate · GHG', 'Climate · Risk', 'Supply Chain', 'Deals & Investment', 'AI Governance', 'People & Workforce', 'Cyber Governance', 'Advisory', 'Verification Readiness'] },
             { heading: 'Frameworks', links: ['SB 253 · SB 261', 'ESRS / CSRD', 'IFRS S2', 'CDP Climate', 'EcoVadis', 'GHG Protocol', 'TCFD · SBTi', 'NIST CSF · AI RMF'] },
             { heading: 'Company', links: ['Advisory', 'Pricing', 'Privacy Policy', 'Terms of Service', 'Security', 'Contact'] },
           ].map(col => (
             <div key={col.heading}>
               <div style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#888784', marginBottom: '1rem' }}>{col.heading}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {col.links.map(l => <a key={l} href={l === "Privacy Policy" ? "/privacy" : l === "Terms of Service" ? "/terms" : l === "Security" ? "/security" : l === "Pricing" ? "/pricing" : "#"} style={{ fontSize: 13, color: '#555553', textDecoration: 'none' }}>{l}</a>)}
+                {col.links.map(l => <a key={l} href={l === "Privacy Policy" ? "/privacy" : l === "Terms of Service" ? "/terms" : l === "Security" ? "/security" : l === "Pricing" ? "/pricing" : l === "Verification Readiness" ? "/verification-readiness": "#"} style={{ fontSize: 13, color: '#555553', textDecoration: 'none' }}>{l}</a>)}
               </div>
             </div>
           ))}
