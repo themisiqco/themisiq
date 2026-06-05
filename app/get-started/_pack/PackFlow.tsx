@@ -140,8 +140,8 @@ export const PACKS: Record<string, PackConfig> = {
         state: 'locked',
       },
       {
-        title: 'Export your CDP-aligned disclosure',
-        description: 'Generate the IFRS S2 / CDP report your bank or insurer requested. Export unlocks here.',
+        title: 'Export your climate risk & resilience report',
+        description: 'Generate the multi-scenario climate resilience report your bank or insurer asked for — pre-mapped to IFRS S2 and CDP disclosure requirements, and built to also support SB 261, ESRS E1, and investor and lender requests. Export unlocks here.',
         href: '/dashboard/ghg?pack=climate&step=export',
         cta: 'Review & export →',
         state: 'locked',
@@ -234,7 +234,7 @@ export const PACKS: Record<string, PackConfig> = {
       },
       {
         title: 'Export your investor-ready report',
-        description: 'Generate the CDP / IFRS S2 package your investor requires. Export unlocks here.',
+        description: 'Generate the CDP / IFRS S2 package your investor requires, including your multi-scenario climate resilience analysis. Export unlocks here.',
         href: '/dashboard/ghg?pack=investor&step=export',
         cta: 'Review & export →',
         state: 'locked',
