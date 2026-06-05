@@ -15,7 +15,7 @@ export default function Page() {
       <Nav />
 
       {/* URGENCY BANNER */}
-      <div style={{ background: '#B91C1C', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+      <div style={{ background: '#B91C1C', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, position: 'sticky', top: 64, zIndex: 99 }}>
         <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff', animation: 'pulse 1.5s infinite' }} />
         <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>SB 253 first-year deadline: August 10, 2026 —  {daysLeft} days away. Scope 1 + 2 disclosure required.</span>
         <a href="/dashboard/ghg" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>Check if SB 253 applies to you →</a>
@@ -47,7 +47,7 @@ export default function Page() {
           {/* STAT CARDS */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {[
-              { val: '86', unit: 'days', label: 'to SB 253 first deadline', color: '#B91C1C', bg: '#FCEBEB' },
+              { val: 'Aug 10', unit: '2026', label: 'SB 253 first deadline', color: '#B91C1C', bg: '#FCEBEB' },
               { val: '15', unit: 'Scope 3', label: 'categories covered', color: '#7425e3', bg: '#EDE9FE' },
               { val: '100%', unit: 'audit', label: 'trail — every edit logged', color: '#0F6E56', bg: '#E1F5EE' },
               { val: '5+', unit: 'frameworks', label: 'from one inventory', color: '#0C447C', bg: '#E6F1FB' },
