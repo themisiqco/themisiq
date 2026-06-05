@@ -240,7 +240,7 @@ export default function Page() {
               {
                 name: 'EU Pay Transparency Directive',
                 ref: 'Directive 2023/970',
-                deadline: 'June 2026',
+  deadline: 'In force · 2027',
                 urgency: 'critical',
                 who: 'Companies with 100+ EU employees',
                 what: 'Annual gender pay gap reporting by job band · 5% threshold triggers joint pay assessment · remediation tracking',
@@ -326,7 +326,7 @@ export default function Page() {
           <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>by job band?</span>
         </h2>
         <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
-                    Most companies don't — and the EU Pay Transparency Directive gives you until June 2026 to find out. ThemisIQ calculates your gap, identifies bands above 5%, and prepares your disclosure.
+        Most companies don't — and the EU Pay Transparency Directive is now in force, with first pay-gap reports due in 2027. ThemisIQ calculates your gap, identifies bands above 5%, and prepares your disclosure.
 
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
