@@ -1,5 +1,6 @@
 'use client'
 import Nav from '../components/Nav'
+import Footer from '@/app/components/Footer'
 
 export default function Page() {
   return (
@@ -180,16 +181,7 @@ export default function Page() {
       </section>
 
       {/* FOOTER */}
-      <footer style={{ background: '#f8f7f5', borderTop: '0.5px solid #e8e7e4', padding: '2rem 2.5rem' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' as const, gap: 8 }}>
-          <div style={{ fontSize: 12, color: '#888784' }}>© 2026 ThemisIQ Compliance Inc. · www.themisiq.co · TIQ-SEC-001 v2.0</div>
-          <div style={{ display: 'flex', gap: '1.5rem' }}>
-            <a href="/privacy" style={{ fontSize: 12, color: '#555553', textDecoration: 'none' }}>Privacy Policy</a>
-            <a href="/terms" style={{ fontSize: 12, color: '#555553', textDecoration: 'none' }}>Terms of Service</a>
-            <a href="/dashboard/ghg" style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Free Assessment →</a>
-          </div>
-        </div>
-      </footer>
+      <Footer />
 
     </div>
   )

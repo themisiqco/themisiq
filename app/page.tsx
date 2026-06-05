@@ -2,6 +2,7 @@
 import HomePricing from './components/HomePricing'
 import { useState, useEffect } from 'react'
 import Nav from './components/Nav'
+import Footer from './components/Footer'
 
 export default function Home() {
   const [daysLeft, setDaysLeft] = useState(81)
@@ -249,32 +250,7 @@ export default function Home() {
       </section>
 
       {/* ── FOOTER ── */}
-      <footer style={{ background: '#f8f7f5', borderTop: '0.5px solid #e8e7e4', padding: '3.5rem 2.5rem 2rem' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '2.2fr 1fr 1fr 1fr', gap: '3rem' }}>
-          <div>
-            <Logo size={130} />
-            <p style={{ fontSize: 13, color: '#888784', lineHeight: 1.65, fontWeight: 300, marginTop: '1rem', maxWidth: 270 }}>
-              Compliance Intelligence for Sustainable Business. GHG emissions, climate risk, supply chain, M&A diligence, AI governance, people & workforce, and cybersecurity — one platform.
-            </p>
-          </div>
-          {[
-            { heading: 'Products', links: ['Climate · GHG', 'Climate · Risk', 'Supply Chain', 'Deals & Investment', 'AI Governance', 'People & Workforce', 'Cyber Governance', 'Advisory', 'Verification Readiness'] },
-            { heading: 'Frameworks', links: ['SB 253 · SB 261', 'ESRS / CSRD', 'IFRS S2', 'CDP Climate', 'EcoVadis', 'GHG Protocol', 'TCFD · SBTi', 'NIST CSF · AI RMF'] },
-            { heading: 'Company', links: ['Advisory', 'Pricing', 'Privacy Policy', 'Terms of Service', 'Security', 'Contact'] },
-          ].map(col => (
-            <div key={col.heading}>
-              <div style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#888784', marginBottom: '1rem' }}>{col.heading}</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {col.links.map(l => <a key={l} href={l === "Privacy Policy" ? "/privacy" : l === "Terms of Service" ? "/terms" : l === "Security" ? "/security" : l === "Pricing" ? "/pricing" : l === "Verification Readiness" ? "/verification-readiness": "#"} style={{ fontSize: 13, color: '#555553', textDecoration: 'none' }}>{l}</a>)}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{ maxWidth: 1100, margin: '2.5rem auto 0', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 12, color: '#888784' }}>© 2026 ThemisIQ Compliance Inc. · www.themisiq.co · All rights reserved</div>
-          <div style={{ fontSize: 12, color: '#888784' }}>Compliance Intelligence for Sustainable Business</div>
-        </div>
-      </footer>
+      <Footer />
 
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }

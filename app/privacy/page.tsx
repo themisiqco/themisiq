@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Nav from '../components/Nav'
+import Footer from '@/app/components/Footer'
 
 const sections = [
   { id: 's1', num: '01', title: 'Who we are' },
@@ -206,15 +207,7 @@ export default function PrivacyPage() {
       </div>
 
       {/* FOOTER */}
-      <footer style={{ background: '#f8f7f5', borderTop: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
-        <div style={{ maxWidth: 920, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' as const, gap: 8 }}>
-          <div style={{ fontSize: 12, color: '#888784' }}>© 2026 ThemisIQ Compliance Inc. · www.themisiq.co · TIQ-PRV-001 v2.0</div>
-          <div style={{ display: 'flex', gap: '1.5rem' }}>
-            <a href="/terms" style={{ fontSize: 12, color: '#555553', textDecoration: 'none' }}>Terms of Service</a>
-            <a href="/security" style={{ fontSize: 12, color: '#555553', textDecoration: 'none' }}>Security</a>
-          </div>
-        </div>
-      </footer>
+      <Footer />
 
     </div>
   )
