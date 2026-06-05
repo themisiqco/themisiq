@@ -236,7 +236,7 @@ export default function MaterialityWizard() {
           <p style={{ ...sectionSub, marginBottom: 24 }}>Assess your climate-related physical and transition risk, and determine what's material under your reporting standard. Double materiality adds impact materiality to single (financial) materiality. Choose the standard you report under.</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             {[
-              { m: 's2' as Mode, t: 'IFRS S2', sub: 'Single (financial) materiality', d: 'How climate-related risks affect your enterprise value. Produces a physical & transition risk register with scenario analysis.', feat: false },
+              { m: 's2' as Mode, t: 'IFRS S2', sub: 'Single (financial) materiality · resilience', d: 'How climate-related risks affect your enterprise value. Produces the multi-scenario climate resilience report — the resilience analysis IFRS S2 (and CSRD) call for.', feat: false },
               { m: 'csrd' as Mode, t: 'CSRD / ESRS', sub: 'Double materiality', d: 'Financial materiality plus impact materiality across all ten ESRS topics, plotted on the double-materiality matrix.', feat: true },
             ].map(o => (
               <div key={o.m} style={{ background: '#fff', border: o.feat ? '2px solid #7425e3' : '0.5px solid #e8e7e4', borderRadius: 16, padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
