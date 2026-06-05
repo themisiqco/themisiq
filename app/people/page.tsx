@@ -8,8 +8,8 @@ export default function Page() {
       <Nav />
 
       {/* URGENCY BANNER */}
-      <div style={{ background: '#ba7517', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>EU Pay Transparency Directive — member state transposition deadline: June 2026. Gender pay gap reporting mandatory for 100+ EU employees.</span>
+     <div style={{ background: '#ba7517', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, position: 'sticky', top: 64, zIndex: 99 }}>
+ <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>EU Pay Transparency Directive is now in force — first gender pay-gap reports due 2027. Applies to employers with 100+ EU employees.</span>
         <a href="/dashboard/people" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>Check if this applies to you →</a>
       </div>
 
@@ -40,7 +40,7 @@ export default function Page() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {[
               { val: '5%', unit: 'gap trigger', label: 'EU Pay Transparency — gaps above 5% require mandatory joint pay assessment', color: '#ba7517', bg: '#FEF3E2' },
-              { val: 'Jun 2026', unit: 'deadline', label: 'EU Pay Transparency member state transposition — 100+ EU employees', color: '#B91C1C', bg: '#FCEBEB' },
+{ val: 'Jun 2027', unit: 'first report', label: 'EU pay-gap reporting — employers 150+', color: '#B91C1C', bg: '#FCEBEB' },
               { val: 'ESRS S1', unit: 'active now', label: 'large EU companies reporting on own workforce from FY2024', color: '#7425e3', bg: '#EDE9FE' },
               { val: '100+', unit: 'CA employees', label: 'triggers California Pay Data Reporting Act — annual DFEH submission', color: '#0F6E56', bg: '#E1F5EE' },
             ].map(({ val, unit, label, color, bg }) => (
@@ -129,7 +129,7 @@ export default function Page() {
               Do you know your gender pay gap?
             </h2>
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
-              Most companies don't. The EU Pay Transparency Directive requires employers with 100+ EU employees to report their gender pay gap annually (250+ employees) or every 3 years (100–249 employees). A gap exceeding 5% in any job band triggers a mandatory joint pay assessment with worker representatives.
+             Most companies don't. The EU Pay Transparency Directive — now in force — requires employers with 100+ EU employees to report their gender pay gap annually (250+ employees) or every 3 years (100–249 employees). A gap exceeding 5% in any job band triggers a mandatory joint pay assessment with worker representatives.
             </p>
             {[
               'Mean and median gender pay gap calculation by job band',
@@ -147,7 +147,7 @@ export default function Page() {
           <div style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: '2rem' }}>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 16 }}>Workforce framework coverage</div>
             {[
-              { fw: 'EU Pay Transparency Dir.', scope: 'Gender pay gap reporting · 100+ EU employees', deadline: 'Jun 2026', urgency: 'critical' },
+             { fw: 'EU Pay Transparency Dir.', scope: 'Gender pay gap reporting · 100+ EU employees', deadline: 'In force · 2027', urgency: 'critical' },
               { fw: 'ESRS S1', scope: 'Own workforce disclosure · large EU companies', deadline: 'FY2024 active', urgency: 'critical' },
               { fw: 'CA Pay Data Reporting', scope: 'Annual DFEH pay data · 100+ CA employees', deadline: 'Annual · May', urgency: 'high' },
               { fw: 'SEC Item 101', scope: 'Human capital disclosure · US public companies', deadline: 'Annual 10-K', urgency: 'high' },
@@ -326,7 +326,8 @@ export default function Page() {
           <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>by job band?</span>
         </h2>
         <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
-          Most companies don't — and the EU Pay Transparency Directive gives you until June 2026 to find out. ThemisIQ calculates your gap, identifies bands above 5%, and prepares your disclosure.
+                    Most companies don't — and the EU Pay Transparency Directive gives you until June 2026 to find out. ThemisIQ calculates your gap, identifies bands above 5%, and prepares your disclosure.
+
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
           <a href="/dashboard/people" style={{ ...btnPrimary, textDecoration: 'none' }}>Calculate your pay gap →</a>
