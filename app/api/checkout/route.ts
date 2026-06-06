@@ -13,7 +13,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import type Stripe from 'stripe'
-import { stripe } from '../../../lib/stripe'
+import { getStripe } from '../../../lib/stripe'
 import { getAuthedClient, bearerFrom, AuthError } from '../../../lib/supabaseAuthed'
 import {
   CURRENCY,
@@ -44,6 +44,9 @@ interface CheckoutBody {
 
 export async function POST(req: NextRequest) {
   try {
+    // 0) Stripe client (created lazily).
+    const stripe = getStripe()
+
     // 1) Who is this? Verify the token; never trust a client-sent user id.
     const token = bearerFrom(req)
     const { supabase, userId, email } = await getAuthedClient(token)

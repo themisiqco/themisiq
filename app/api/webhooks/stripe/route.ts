@@ -15,8 +15,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import type Stripe from 'stripe'
-import { stripe } from '../../../../lib/stripe'
-import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
+import { getStripe } from '../../../../lib/stripe'
+import { getSupabaseAdmin } from '../../../../lib/supabaseAdmin'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -28,6 +28,8 @@ export async function POST(req: NextRequest) {
     console.error('[webhook] STRIPE_WEBHOOK_SECRET is not set')
     return NextResponse.json({ error: 'Webhook not configured.' }, { status: 500 })
   }
+
+  const stripe = getStripe()
 
   // Signature verification needs the RAW body, not parsed JSON.
   const signature = req.headers.get('stripe-signature')
@@ -99,6 +101,7 @@ async function grantFromMetadata(
     source,
   }))
 
+  const supabaseAdmin = getSupabaseAdmin()
   const { error } = await supabaseAdmin
     .from('entitlements')
     .upsert(rows, { onConflict: 'user_id,module_key' })
