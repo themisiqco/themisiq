@@ -325,7 +325,7 @@ export default function Dashboard() {
                           )}
                         </>
                       ) : (
-                        <span style={{ fontSize: 11, color: '#888784' }}>Preview free · <a href="/pricing" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>unlock from $999/yr</a></span>
+                        <span style={{ fontSize: 11, color: '#888784' }}>Preview free · <a href="/pricing" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>unlock for $999</a></span>
                       )}
                     </div>
                   </a>
