@@ -145,7 +145,7 @@ export default function Dashboard() {
       const KEY_TO_CARD_IDS: Record<string, string[]> = {
         'ghg': ['ghg'],
         'climate-risk': ['climate_risk'],
-        'supply-chain': ['supply_chain', 'scope3'],
+        'supply-chain': ['supply_chain', 'scope3', 'portal'],
         'people': ['people'],
         'deals': ['deals'],
         'ai-governance': ['ai'],

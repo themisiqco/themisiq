@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Nav from '../../../../../../components/Nav'
 import { supabase } from '../../../../../../../lib/supabase'
+import { useEntitlement } from '../../../../../../../lib/useEntitlement'
+import PaywallCard from '../../../../../../components/PaywallCard'
 
 const TEMPLATE_SECTIONS: Record<string, { id: string; title: string; color: string; bg: string; questions: { id: string; label: string }[] }[]> = {
   ecovadis: [
@@ -132,6 +134,7 @@ const getResponseColor = (response: string): string => {
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
 
 export default function SupplierResponseViewer() {
+  const isPaid = useEntitlement('supply-chain')
   const router = useRouter()
   const params = useParams()
   const campaignId = params.id as string
@@ -212,6 +215,7 @@ export default function SupplierResponseViewer() {
     </div>
   )
 
+  if (!isPaid) return <PaywallCard title="Unlock the Supply Chain module" body="The Supplier Portal is part of the Supply Chain module. Unlock it to create campaigns, invite suppliers, and review responses." />
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />

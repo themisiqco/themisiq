@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Nav from '../../../../components/Nav'
 import { supabase } from '../../../../../lib/supabase'
+import { useEntitlement } from '../../../../../lib/useEntitlement'
+import PaywallCard from '../../../../components/PaywallCard'
 import Papa from 'papaparse'
 
 interface CampaignSupplier {
@@ -37,6 +39,7 @@ const STATUS_CONFIG = {
 }
 
 export default function CampaignDetail() {
+  const isPaid = useEntitlement('supply-chain')
   const router = useRouter()
   const params = useParams()
   const id = params.id as string
@@ -186,6 +189,7 @@ export default function CampaignDetail() {
     </div>
   )
 
+  if (!isPaid) return <PaywallCard title="Unlock the Supply Chain module" body="The Supplier Portal is part of the Supply Chain module. Unlock it to create campaigns, invite suppliers, and review responses." />
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />

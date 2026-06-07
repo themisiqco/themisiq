@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Nav from '../../../components/Nav'
 import { supabase } from '../../../../lib/supabase'
+import { useEntitlement } from '../../../../lib/useEntitlement'
+import PaywallCard from '../../../components/PaywallCard'
 
 interface Campaign {
   id: string
@@ -29,6 +31,7 @@ const TEMPLATES = [
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
 
 export default function SupplierPortalDashboard() {
+  const isPaid = useEntitlement('supply-chain')
   const router = useRouter()
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
@@ -90,6 +93,7 @@ export default function SupplierPortalDashboard() {
   const statusColor = (s: string) => s === 'active' ? '#0F6E56' : s === 'closed' ? '#888784' : '#ba7517'
   const statusBg = (s: string) => s === 'active' ? '#E1F5EE' : s === 'closed' ? '#f8f7f5' : '#FEF3E2'
 
+  if (!isPaid) return <PaywallCard title="Unlock the Supply Chain module" body="The Supplier Portal is part of the Supply Chain module. Unlock it to create campaigns, invite suppliers, and review responses." />
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
