@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { startCheckout } from '../../lib/checkout'
+import { LEGACY_PRICING_PAGE_ID } from '../../lib/pricing'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -165,6 +167,11 @@ export default function PricingPage() {
   const gross = count * unitPrice
   const discount = count >= 3 ? 0.20 : count >= 2 ? 0.10 : 0
   const net = Math.round(gross * (1 - discount))
+  const handleBuy = () => {
+    const moduleKeys = Array.from(selected).map((id) => LEGACY_PRICING_PAGE_ID[id]).filter(Boolean)
+    if (moduleKeys.length === 0) return
+    startCheckout({ tier, moduleKeys })
+  }
 
   const toggleModule = (id: ModuleId) => {
     setSelected(prev => {
@@ -551,6 +558,11 @@ export default function PricingPage() {
           <div style={s.ctaHeadline}>{cta.headline}</div>
           <div style={s.ctaSub}>{cta.sub}</div>
           <div style={s.ctaBtns}>
+            {tier !== 'advisory' && (
+              <button onClick={handleBuy} style={primaryBtn}>
+                Buy now — ${net.toLocaleString()}/yr →
+              </button>
+            )}
             {cta.buttons.map((btn, i) => (
               <Link key={i} href={btn.href} style={btn.primary ? primaryBtn : ghostBtn}>
                 {btn.label}

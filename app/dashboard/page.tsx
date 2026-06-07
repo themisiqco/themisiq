@@ -134,12 +134,28 @@ export default function Dashboard() {
       if (!session) { router.push('/login'); return }
       setUser(session.user)
 
-      // Load subscriptions
-      const { data: subs } = await supabase
-        .from('user_subscriptions')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .eq('status', 'active')
+      // Load entitlements (written by the Stripe webhook). RLS scopes to this user.
+      const { data: ents } = await supabase
+        .from('entitlements')
+        .select('module_key')
+
+      // Map canonical module_key (entitlements) -> this dashboard's card id(s).
+      // Note: owning 'supply-chain' unlocks BOTH the Supply Chain and Scope 3 cards,
+      // mirroring how the scope3 page shares the 'supply-chain' entitlement key.
+      const KEY_TO_CARD_IDS: Record<string, string[]> = {
+        'ghg': ['ghg'],
+        'climate-risk': ['climate_risk'],
+        'supply-chain': ['supply_chain', 'scope3'],
+        'people': ['people'],
+        'deals': ['deals'],
+        'ai-governance': ['ai'],
+        'cyber': ['cyber'],
+      }
+      const cardIds = new Set<string>()
+      ;(ents || []).forEach((e: any) => {
+        (KEY_TO_CARD_IDS[e.module_key] || []).forEach((cid) => cardIds.add(cid))
+      })
+      const subs = Array.from(cardIds).map((id) => ({ module_id: id }))
 
       setSubscriptions(subs || [])
 
