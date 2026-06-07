@@ -122,3 +122,20 @@ Published policy: **Customer platform data = "Subscription duration + 90 days" (
 ---
 
 *This spec reflects decisions made with the team. ThemisIQ is a software provider and is not an accredited assurance or verification provider; verification is performed by an independent third party chosen by the customer.*
+
+## Supabase GRANTs required for entitlements (added 2026-06-07)
+
+These privileges were applied directly in the Supabase dashboard (no migration file).
+They MUST be re-applied in any rebuilt or new Supabase environment, or entitlement
+writes/reads will fail silently:
+
+1. Webhook writes (service_role):
+   GRANT SELECT, INSERT, UPDATE ON public.entitlements TO service_role;
+
+2. In-app entitlement reads (authenticated user, scoped by RLS policy
+   "read own entitlements" = auth.uid() = user_id):
+   GRANT SELECT ON public.entitlements TO authenticated;
+
+Without #1, the Stripe webhook handler returns 500 ("permission denied for table
+entitlements"). Without #2, useEntitlement() returns false for everyone and locks
+out paying customers.

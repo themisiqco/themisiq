@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Nav from '../../components/Nav'
+import { useEntitlement } from '../../../lib/useEntitlement'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -92,7 +93,7 @@ const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: 
 const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.4rem, 2.5vw, 1.8rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
 const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '1.5rem' }
 const STEP_NAMES = ['Setup', 'Gap Assessment', 'Results', 'Remediation', 'Export']
-const isPaid = true
+
 
 // ─── Score Calculator ─────────────────────────────────────────────────────────
 
@@ -126,6 +127,7 @@ const getTop5 = (gaps: typeof CONTROLS, frameworks: Framework[]) => {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function CyberDashboard() {
+  const isPaid = useEntitlement('cyber')
   const [step, setStep] = useState(0)
   const [inventory, setInventory] = useState<CyberInventory>({
     company: '', reporting_year: 2025, sector: '',

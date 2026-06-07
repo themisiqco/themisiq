@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
+import { useEntitlement } from '../../../lib/useEntitlement'
 import Nav from '../../components/Nav'
 
 // ─── Design tokens (matching the live climate page) ───────────────────────────
@@ -141,6 +142,7 @@ type Mode = 's2' | 'csrd'
 type Band = 'high' | 'med' | 'low'
 
 export default function MaterialityWizard() {
+  const isPaid = useEntitlement('climate-risk')
   const [mode, setMode] = useState<Mode | null>(null)
   const [step, setStep] = useState(0)
   const [companyName, setCompanyName] = useState('')
@@ -599,10 +601,31 @@ export default function MaterialityWizard() {
           {mode === 'csrd' && <div style={{ background: '#EDE9FE', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color: '#7425e3' }}>{s.topicsBothAxes ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>Topics material on both axes</div></div>}
         </div>
 
-        {mode === 'csrd' && renderMatrix()}
-        {mode === 'csrd' && renderMatrixTable()}
-        {renderRegister()}
-        {renderOpportunities()}
+        {isPaid ? (
+          <>
+            {mode === 'csrd' && renderMatrix()}
+            {mode === 'csrd' && renderMatrixTable()}
+            {renderRegister()}
+            {renderOpportunities()}
+          </>
+        ) : (
+          <div style={{ position: 'relative', marginBottom: 12 }}>
+            <div style={{ filter: 'blur(6px)', pointerEvents: 'none', userSelect: 'none' }} aria-hidden="true">
+              {mode === 'csrd' && renderMatrix()}
+              {mode === 'csrd' && renderMatrixTable()}
+              {renderRegister()}
+              {renderOpportunities()}
+            </div>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+              <div style={{ background: '#0d0d0d', borderRadius: 16, padding: '2rem 1.75rem', maxWidth: 420, textAlign: 'center', boxShadow: '0 12px 40px rgba(13,13,13,0.28)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', marginBottom: 12 }}>Preview</div>
+                <h3 style={{ fontFamily: 'Georgia, serif', fontWeight: 400, fontSize: '1.4rem', color: '#fff', margin: '0 0 10px', lineHeight: 1.3 }}>Unlock your full assessment</h3>
+                <p style={{ fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: '0 0 20px' }}>You can see your headline results above. Unlock the Climate Risk module to view the full materiality matrix, topic-by-topic scores, risk register, and download the report.</p>
+                <a href="/pricing" style={{ display: 'inline-block', padding: '11px 26px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>See pricing &amp; unlock &rarr;</a>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* honesty footnote */}
         <div style={{ background: '#E6F1FB', borderRadius: 10, padding: '12px 14px', fontSize: 12, color: '#0C447C', lineHeight: 1.6, marginBottom: 12 }}>

@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import Nav from '../../components/Nav'
 import Papa from 'papaparse'
+import { useEntitlement } from '../../../lib/useEntitlement'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -109,7 +110,7 @@ export default function PeopleDashboard() {
   const [dataConfirmed, setDataConfirmed] = useState(false)
   const [activeBand, setActiveBand] = useState(0)
   const fileRef = useRef<HTMLInputElement>(null)
-  const isPaid = true // TODO: wire to Stripe
+  const isPaid = useEntitlement('people')
 
   const update = (field: keyof PeopleInventory, value: any) =>
     setInventory(prev => ({ ...prev, [field]: value }))

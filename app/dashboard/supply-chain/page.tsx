@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import Nav from '../../components/Nav'
 import Papa from 'papaparse'
+import { useEntitlement } from '../../../lib/useEntitlement'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -151,11 +152,11 @@ const FRAMEWORK_CONFIG: Record<Framework, { label: string; desc: string }> = {
 }
 
 const STEP_NAMES = ['Setup', 'Suppliers', 'Risk Scoring', 'Scope 3', 'Export']
-const isPaid = true
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function SupplyChainDashboard() {
+  const isPaid = useEntitlement('supply-chain')
   const [step, setStep] = useState(0)
   const [inventory, setInventory] = useState<SupplyChainInventory>({
     company: '', reporting_year: 2024,

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { supabase } from '../../../lib/supabase'
+import { useEntitlement } from '../../../lib/useEntitlement'
 import { generateAssurancePDF } from '../../../lib/assurancePdf'
 import { useSearchParams } from 'next/navigation'
 
@@ -830,7 +831,7 @@ const searchParams = useSearchParams()
   const [dataConfirmed, setDataConfirmed] = useState(false)
   const [mode, setMode] = useState<'loading' | 'list' | 'wizard'>('loading')
   const [inventoryList, setInventoryList] = useState<Array<{ id: string; company_name: string; reporting_year: number; updated_at: string }>>([])
-  const isPaid = true // TODO: wire to Stripe
+  const isPaid = useEntitlement('ghg')
 
   // Decide initial view: ?id -> wizard (loads that one); else if user has inventories -> list; else -> blank wizard
   useEffect(() => {

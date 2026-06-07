@@ -21,6 +21,8 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabase'
+import { useEntitlement } from '../../../../lib/useEntitlement'
+import PaywallCard from '../../../components/PaywallCard'
 
 // ─── Lookup helpers (labels we don't store on the assessment row) ─────────────
 
@@ -76,6 +78,7 @@ export default function ClimateRiskResilienceReportPage() {
 
 function ResilienceReportInner() {
   const params = useSearchParams()
+  const isPaid = useEntitlement('climate-risk')
   const id = params.get('id')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -99,6 +102,8 @@ function ResilienceReportInner() {
     })()
   }, [id])
 
+
+  if (!isPaid) return <PaywallCard />
   if (loading) return <Centered>Loading report…</Centered>
   if (error) return <Centered>{error}</Centered>
   if (!a) return <Centered>No assessment data.</Centered>

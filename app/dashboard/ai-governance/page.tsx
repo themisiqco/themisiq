@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useEntitlement } from '../../../lib/useEntitlement'
 import Nav from '../../components/Nav'
 
 // ─── AI System Library ────────────────────────────────────────────────────────
@@ -165,11 +166,11 @@ const RISK_CONFIG: Record<RiskLevel, { label: string; color: string; bg: string;
 
 const STEP_NAMES = ['Setup', 'AI Systems', 'Classification', 'Requirements', 'Export']
 const SECTORS = ['Financial services', 'Healthcare', 'Technology', 'Retail & e-commerce', 'Manufacturing', 'Energy & utilities', 'Transport & logistics', 'Education', 'Public sector', 'Professional services', 'Other']
-const isPaid = true
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function AIGovernanceDashboard() {
+  const isPaid = useEntitlement('ai-governance')
   const [step, setStep] = useState(0)
   const [inventory, setInventory] = useState<AIInventory>({ company: '', reporting_year: 2025, jurisdiction: 'EU', sector: '', systems: [] })
   const [activeSystem, setActiveSystem] = useState(0)

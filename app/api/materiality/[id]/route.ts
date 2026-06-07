@@ -18,6 +18,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const token = bearerFrom(req)
     const { supabase } = await getAuthedClient(token)
 
+    // Gate: require the climate-risk entitlement before returning any report data.
+    // RLS scopes this query to the current user, mirroring the checkout route.
+    const { data: ent } = await supabase
+      .from("entitlements")
+      .select("module_key")
+      .eq("module_key", "climate-risk")
+      .maybeSingle()
+    if (!ent) {
+      return NextResponse.json({ error: "This report requires the Climate Risk module." }, { status: 403 })
+    }
+
+
     const { data, error } = await supabase
       .from('materiality_assessments')
       .select('*')

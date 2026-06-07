@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Nav from '../../components/Nav'
+import { useEntitlement } from '../../../lib/useEntitlement'
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -139,11 +140,12 @@ const SEVERITY_CONFIG = {
 }
 
 const STEP_NAMES = ['Deal Setup', 'ESG Screening', 'Risk Findings', 'Cost Estimate', 'Export']
-const isPaid = true
+
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function DealsDashboard() {
+  const isPaid = useEntitlement('deals')
   const [step, setStep] = useState(0)
   const [deal, setDeal] = useState({
     target_name: '',

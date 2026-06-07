@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Nav from '../../components/Nav'
+import { useEntitlement } from '../../../lib/useEntitlement'
 
 // ─── Scope 3 Category Definitions ────────────────────────────────────────────
 
@@ -87,7 +88,6 @@ const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSiz
 const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '1.5rem' }
 
 const STEP_NAMES = ['Setup', 'Materiality', 'Calculate', 'Results', 'Export']
-const isPaid = true // TODO: wire to Stripe
 
 interface CategoryData {
   included: boolean
@@ -125,6 +125,7 @@ interface CategoryData {
 }
 
 export default function Scope3Dashboard() {
+  const isPaid = useEntitlement('supply-chain')
   const [step, setStep] = useState(0)
   const [company, setCompany] = useState('')
   const [sector, setSector] = useState('')
