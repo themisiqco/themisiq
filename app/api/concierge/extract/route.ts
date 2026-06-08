@@ -165,8 +165,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       fields,
-      model: data.model ?? 'claude-opus-4-6',
-      usage: data.usage ?? null,
     })
 
   } catch (error) {
