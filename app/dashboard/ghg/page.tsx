@@ -409,10 +409,25 @@ interface Location {
   source_docs: SourceDoc[]
 }
 
+// Derive the reporting period from a reporting year + fiscal year-end MONTH (1-12).
+// 12 (December) -> Jan 1 – Dec 31 of the reporting year (calendar year, the default).
+// Any other month -> the 12 months ENDING on the last day of that month in the reporting year.
+// The last day is computed leap-year-aware (e.g. a February end resolves to 28 or 29 correctly).
+function periodFromYearAndEnd(reportingYear: number, fiscalYearEndMonth: number = 12): { start: Date; end: Date; label: string } {
+  const m = (fiscalYearEndMonth >= 1 && fiscalYearEndMonth <= 12) ? fiscalYearEndMonth : 12
+  const end = new Date(reportingYear, m, 0) // day 0 of the next month = last day of month m (leap-aware)
+  const start = new Date(end)
+  start.setDate(start.getDate() + 1)
+  start.setFullYear(start.getFullYear() - 1)
+  const fmt = (d: Date) => d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  return { start, end, label: `${fmt(start)} – ${fmt(end)}` }
+}
+
 interface Inventory {
   company_name: string; reporting_year: number; revenue_millions: number
   employee_count: number; boundary_approach: string
   california_nexus: boolean
+  fiscal_year_end_month: number
   prior_year_s1: number; prior_year_s2: number
   selected_frameworks: string[]
   locations: Location[]
@@ -818,6 +833,7 @@ const searchParams = useSearchParams()
   const [inventory, setInventory] = useState<Inventory>({
     company_name: '', reporting_year: 2024, revenue_millions: 0, employee_count: 0,
     boundary_approach: 'operational_control', california_nexus: false,
+    fiscal_year_end_month: 12,
     prior_year_s1: 0, prior_year_s2: 0,
     selected_frameworks: defaultFrameworks,
     locations: [emptyLocation('1', 'Location 1')],
@@ -859,6 +875,7 @@ const searchParams = useSearchParams()
     setInventory({
       company_name: '', reporting_year: 2024, revenue_millions: 0, employee_count: 0,
       boundary_approach: 'operational_control', california_nexus: false,
+      fiscal_year_end_month: 12,
       prior_year_s1: 0, prior_year_s2: 0,
       selected_frameworks: defaultFrameworks,
       locations: [emptyLocation('1', 'Location 1')],
@@ -883,6 +900,7 @@ const searchParams = useSearchParams()
           ...inv,
           company_name: data.company_name || '',
           reporting_year: data.reporting_year || inv.reporting_year,
+          fiscal_year_end_month: data.fiscal_year_end_month || 12,
           revenue_millions: data.revenue_millions || 0,
           employee_count: data.employee_count || 0,
           boundary_approach: data.boundary_approach || 'operational_control',
@@ -1023,10 +1041,25 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         </Field>
         <Field label="Reporting year">
           <select value={inventory.reporting_year} onChange={e => setInventory(i => ({...i, reporting_year: Number(e.target.value)}))} style={inputStyle}>
-            <option value={2024}>2024</option>
-            <option value={2023}>2023</option>
-            <option value={2025}>2025</option>
+            {[2023, 2024, 2025].map(yr => (
+              <option key={yr} value={yr}>{`FY${yr} · ${periodFromYearAndEnd(yr, inventory.fiscal_year_end_month).label}`}</option>
+            ))}
           </select>
+        </Field>
+        <Field label="Fiscal year-end" hint="Most organizations report on the calendar year. Change this only if your reporting year ends in a month other than December.">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' as const }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#555553', cursor: 'pointer' }}>
+              <input type="checkbox" checked={inventory.fiscal_year_end_month === 12} onChange={e => setInventory(i => ({...i, fiscal_year_end_month: e.target.checked ? 12 : 3}))} />
+              Calendar year (Jan–Dec)
+            </label>
+            {inventory.fiscal_year_end_month !== 12 && (
+              <select value={inventory.fiscal_year_end_month} onChange={e => setInventory(i => ({...i, fiscal_year_end_month: Number(e.target.value)}))} style={{ ...inputStyle, maxWidth: 260 }}>
+                {['January','February','March','April','May','June','July','August','September','October','November','December'].map((mn, idx) => (
+                  <option key={idx + 1} value={idx + 1}>{`Fiscal year ends in ${mn}`}</option>
+                ))}
+              </select>
+            )}
+          </div>
         </Field>
         <Field label="Global annual revenue (USD millions)" hint="Required by CARB SB 253, CDP, ESRS E1, EcoVadis, and IFRS S2 for emission intensity calculations">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1746,6 +1779,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
           const payload = {
             user_id: session.user.id,
             reporting_year: inventory.reporting_year,
+            fiscal_year_end_month: inventory.fiscal_year_end_month,
             company_name: inventory.company_name,
             revenue_millions: inventory.revenue_millions,
             employee_count: inventory.employee_count,
