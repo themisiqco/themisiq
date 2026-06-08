@@ -59,7 +59,12 @@ export default function Nav() {
 
         {/* CTA BUTTONS */}
         <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
-          <a href="/dashboard/supply-chain/portal" style={{ fontSize: 12, fontWeight: 500, padding: '7px 14px', borderRadius: 8, background: '#0F6E56', color: '#fff', textDecoration: 'none', display: 'inline-block', whiteSpace: 'nowrap' }} className="desktop-only">Supplier Portal →</a>
+          <a href="/login" style={{
+            fontSize: 12, fontWeight: 500, padding: '7px 10px',
+            color: '#555553', textDecoration: 'none',
+            display: 'inline-block', whiteSpace: 'nowrap',
+          }} className="desktop-only">Log in</a>
+          <a href="/dashboard/supply-chain/portal" style={{ fontSize: 12, fontWeight: 500, padding: '7px 14px', borderRadius: 8, background: '#0F6E56', color: '#fff', textDecoration: 'none', display: 'inline-block', whiteSpace: 'nowrap' }} className="desktop-only">SupplierPortal →</a>
           <a href="/assess" style={{
             fontSize: 12, fontWeight: 400, padding: '7px 14px', borderRadius: 8,
             background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4',
@@ -109,6 +114,7 @@ export default function Nav() {
             ['/verification-readiness', 'Verification Readiness', 'ISO 14064-3 · ISAE 3410 · verifier-ready package'],
             ['/pricing', 'Pricing', 'Plans, tiers, and what each includes'],
             ['/assess', 'Free Assessment →', 'Check which regulations apply to you'],
+            ['/login', 'Log in', 'Access your dashboard'],
           ].map(([href, label, sub]) => (
             <a key={href} href={href} onClick={() => setMenuOpen(false)} style={{
               display: 'block', padding: '14px 0',
