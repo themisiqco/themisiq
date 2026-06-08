@@ -68,7 +68,7 @@ export const FOUNDING_OFFER_ACTIVE = true
 // pro & advisory are set to no discount (early === full). Change if you want them
 // discounted too.
 export const TIER_PRICING: Record<Tier, { full: number; early: number }> = {
-  starter:      { full: 1499, early: 799 },
+  starter:      { full: 1499, early: 999 },
   professional: { full: 2499, early: 2499 },
   advisory:     { full: 4999, early: 4999 },
 }
