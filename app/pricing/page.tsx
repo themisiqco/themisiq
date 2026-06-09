@@ -22,7 +22,7 @@ interface Module {
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
 const PRICES: Record<Tier, number> = {
-  starter: 799,
+  starter: 999,
   professional: 2499,
   advisory: 4999,
 }
@@ -424,7 +424,7 @@ export default function PricingPage() {
             )}
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784', marginBottom: 6 }}>Starter</div>
             <div style={{ fontSize: 10, color: '#888784', textDecoration: 'line-through' }}>${FULL_PRICE.toLocaleString()}</div>
-            <div style={{ fontSize: 22, fontWeight: 600, color: '#0d0d0d' }}>$799<span style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
+            <div style={{ fontSize: 22, fontWeight: 600, color: '#0d0d0d' }}>$999<span style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
             <div style={{ fontSize: 9, color: '#92400e', background: '#FEF3E2', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginTop: 4 }}>Early access</div>
           </div>
 
