@@ -5,7 +5,7 @@ import { useState } from 'react'
 type Tier = 'starter' | 'professional' | 'advisory'
 type ModuleId = 'ghg' | 'risk' | 'supply' | 'people' | 'deals' | 'ai' | 'cyber'
 
-const PRICES: Record<Tier, number> = { starter: 999, professional: 2999, advisory: 4999 }
+const PRICES: Record<Tier, number> = { starter: 999, professional: 2499, advisory: 4999 }
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
 
 const MODULES: { id: ModuleId; name: string; frameworks: string; href: string }[] = [
@@ -52,7 +52,7 @@ export default function HomePricing() {
 
   const count = selected.size
   const gross = count * PRICES[tier]
-  const discount = count >= 3 ? 0.15 : count >= 2 ? 0.10 : 0
+  const discount = count >= 3 ? 0.20 : count >= 2 ? 0.10 : 0
   const net = Math.round(gross * (1 - discount))
 
   const toggleModule = (id: ModuleId) => {
@@ -133,7 +133,7 @@ export default function HomePricing() {
             {tier === 'professional' && <div style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', background: GRAD, fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#0d0d0d', padding: '2px 10px', borderRadius: 99, whiteSpace: 'nowrap' }}>Selected</div>}
             <div style={{ position: 'absolute', top: tier === 'professional' ? 10 : -10, right: tier === 'professional' ? 10 : 'auto', left: tier === 'professional' ? 'auto' : '50%', transform: tier === 'professional' ? 'none' : 'translateX(-50%)' }} />
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 8 }}>Professional</div>
-            <div style={{ fontSize: 28, fontWeight: 600, color: tier === 'professional' ? '#fff' : '#0d0d0d', marginBottom: 4 }}>$2,999<span style={{ fontSize: 11, color: tier === 'professional' ? 'rgba(255,255,255,0.4)' : '#888784', fontWeight: 400 }}> /module/yr</span></div>
+            <div style={{ fontSize: 28, fontWeight: 600, color: tier === 'professional' ? '#fff' : '#0d0d0d', marginBottom: 4 }}>$2,499<span style={{ fontSize: 11, color: tier === 'professional' ? 'rgba(255,255,255,0.4)' : '#888784', fontWeight: 400 }}> /module/yr</span></div>
             <div style={{ fontSize: 9, color: '#a78bfa', background: 'rgba(116,37,227,0.15)', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginBottom: 14 }}>All frameworks</div>
             <div style={{ borderTop: `1px solid ${tier === 'professional' ? 'rgba(255,255,255,0.08)' : '#f3f4f6'}`, paddingTop: 12, flex: 1 }}>
               <div style={{ fontSize: 11, color: tier === 'professional' ? 'rgba(255,255,255,0.4)' : '#888784', marginBottom: 8 }}>All frameworks for your selected modules</div>
@@ -224,7 +224,7 @@ export default function HomePricing() {
           {[
             { label: 'Core', sub: '1 module · full price', active: count === 1 },
             { label: 'Growth', sub: '2 modules · 10% off', active: count === 2 },
-            { label: 'Platform', sub: '3+ modules · 15% off', active: count >= 3 },
+            { label: 'Platform', sub: '3+ modules · 20% off', active: count >= 3 },
           ].map(h => (
             <div key={h.label} style={{ background: h.active ? '#fff' : '#f8f7f5', border: h.active ? '1.5px solid #0d0d0d' : '1px solid #e8e7e4', borderRadius: 10, padding: 10, textAlign: 'center', transition: 'all 0.2s' }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: h.active ? '#0d0d0d' : '#888784' }}>{h.label}</div>
