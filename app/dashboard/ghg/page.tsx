@@ -840,6 +840,7 @@ const searchParams = useSearchParams()
   })
   const [activeLocation, setActiveLocation] = useState(0)
   const [saved, setSaved] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const skipSavedReset = useRef(true)
   const [inventoryId, setInventoryId] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -888,6 +889,12 @@ const searchParams = useSearchParams()
     if (skipSavedReset.current) { skipSavedReset.current = false; return }
     setSaved(false)
   }, [inventory])
+  useEffect(() => {
+    if (saved) return
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [saved])
   useEffect(() => {
     const loadId = searchParams.get('id')
     if (!loadId) return  // no id -> start clean (no auto-load of a random inventory)
@@ -996,6 +1003,9 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   const activeFrameworks = FRAMEWORKS.filter(f => inventory.selected_frameworks.includes(f.id))
 
   const handleSave = async () => {
+    if (isSaving) return
+    setIsSaving(true)
+    try {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return
     const payload = {
@@ -1029,6 +1039,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       if (data) setInventoryId(data.id)
     }
     setSaved(true)
+    } finally { setIsSaving(false) }
   }
 
   const renderStep0 = () => (
@@ -1815,8 +1826,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
           <span style={{ fontSize: 12, color: '#888784' }}>/ GHG Inventory</span>
           {activeFrameworks.length > 0 && <span style={{ fontSize: 11, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 99, padding: '2px 10px', color: '#555553' }}>{activeFrameworks.map(f => f.name).join(' · ')}</span>}
         </div>
-        <button onClick={handleSave} style={{ fontSize: 14, padding: '10px 24px', borderRadius: 8, background: saved ? '#E1F5EE' : 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', border: saved ? '1px solid #0F6E56' : 'none', cursor: 'pointer', color: saved ? '#0F6E56' : '#0d0d0d', fontWeight: saved ? 500 : 700 }}>
-          {saved ? '✓ Saved' : 'Save draft'}
+        <button onClick={handleSave} disabled={isSaving} style={{ fontSize: 14, padding: '10px 24px', borderRadius: 8, background: saved ? '#E1F5EE' : 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', border: saved ? '1px solid #0F6E56' : 'none', cursor: 'pointer', color: saved ? '#0F6E56' : '#0d0d0d', fontWeight: saved ? 500 : 700 }}>
+          {isSaving ? 'Saving…' : saved ? '✓ Saved' : 'Save draft'}
         </button>
       </nav>
 
@@ -1849,8 +1860,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         <div style={{ fontSize: 14, fontWeight: 500, color: saved ? '#0F6E56' : '#0d0d0d' }}>
           {saved ? '✓ All changes saved' : 'You have unsaved changes'}
         </div>
-        <button onClick={handleSave} style={{ fontSize: 16, fontWeight: saved ? 500 : 700, padding: '14px 40px', borderRadius: 8, background: saved ? '#E1F5EE' : 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', border: saved ? '1px solid #0F6E56' : 'none', cursor: 'pointer', color: saved ? '#0F6E56' : '#0d0d0d' }}>
-          {saved ? '✓ Saved' : 'Save draft'}
+        <button onClick={handleSave} disabled={isSaving} style={{ fontSize: 16, fontWeight: saved ? 500 : 700, padding: '14px 40px', borderRadius: 8, background: saved ? '#E1F5EE' : 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', border: saved ? '1px solid #0F6E56' : 'none', cursor: 'pointer', color: saved ? '#0F6E56' : '#0d0d0d' }}>
+          {isSaving ? 'Saving…' : saved ? '✓ Saved' : 'Save draft'}
         </button>
       </div>
       <GHGBot currentStep={step} />
