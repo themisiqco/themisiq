@@ -995,6 +995,42 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   const STEPS = ['Reporting frameworks', 'Company setup', 'Energy & fuel data', 'Additional data', 'Review & workings', 'Export reports', 'Audit trail']
   const activeFrameworks = FRAMEWORKS.filter(f => inventory.selected_frameworks.includes(f.id))
 
+  const handleSave = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    const payload = {
+      user_id: session.user.id,
+      reporting_year: inventory.reporting_year,
+      fiscal_year_end_month: inventory.fiscal_year_end_month,
+      company_name: inventory.company_name,
+      revenue_millions: inventory.revenue_millions,
+      employee_count: inventory.employee_count,
+      boundary_approach: inventory.boundary_approach,
+      california_nexus: inventory.california_nexus,
+      prior_year_s1: inventory.prior_year_s1,
+      prior_year_s2: inventory.prior_year_s2,
+      selected_frameworks: inventory.selected_frameworks,
+      locations_data: inventory.locations,
+      scope1_total: totals_ar4.s1_total,
+      scope2_location_total: totals_ar4.s2_location,
+      scope2_market_total: totals_ar4.s2_market,
+      scope1_intensity: inventory.revenue_millions > 0 ? totals_ar4.s1_total / inventory.revenue_millions : 0,
+      scope2_intensity: inventory.revenue_millions > 0 ? totals_ar4.s2_location / inventory.revenue_millions : 0,
+      status: 'draft',
+      workings: buildWorkings(inventory.locations, 'AR4', inventory.reporting_year),
+      updated_at: new Date().toISOString(),
+    }
+    if (inventoryId) {
+      const { error } = await supabase.from('ghg_inventories').update(payload).eq('id', inventoryId); if (error) { alert('Save failed: ' + error.message); console.error(error); return }
+    } else {
+      const { data: dup } = await supabase.from('ghg_inventories').select('id').eq('company_name', inventory.company_name).eq('reporting_year', inventory.reporting_year).maybeSingle()
+      if (dup) { alert(`You already have a ${inventory.reporting_year} inventory for "${inventory.company_name}". Open it from "Your inventories" instead of creating a duplicate.`); return }
+      const { data, error } = await supabase.from('ghg_inventories').insert(payload).select().single(); if (error) { alert('Save failed: ' + error.message); console.error(error); return }
+      if (data) setInventoryId(data.id)
+    }
+    setSaved(true)
+  }
+
   const renderStep0 = () => (
     <div>
       <h2 style={sectionHead}>Which reporting frameworks do you need?</h2>
@@ -1779,41 +1815,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
           <span style={{ fontSize: 12, color: '#888784' }}>/ GHG Inventory</span>
           {activeFrameworks.length > 0 && <span style={{ fontSize: 11, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 99, padding: '2px 10px', color: '#555553' }}>{activeFrameworks.map(f => f.name).join(' · ')}</span>}
         </div>
-        <button onClick={async () => {
-          const { data: { session } } = await supabase.auth.getSession()
-          if (!session) return
-          const payload = {
-            user_id: session.user.id,
-            reporting_year: inventory.reporting_year,
-            fiscal_year_end_month: inventory.fiscal_year_end_month,
-            company_name: inventory.company_name,
-            revenue_millions: inventory.revenue_millions,
-            employee_count: inventory.employee_count,
-            boundary_approach: inventory.boundary_approach,
-            california_nexus: inventory.california_nexus,
-            prior_year_s1: inventory.prior_year_s1,
-            prior_year_s2: inventory.prior_year_s2,
-            selected_frameworks: inventory.selected_frameworks,
-            locations_data: inventory.locations,
-            scope1_total: totals_ar4.s1_total,
-            scope2_location_total: totals_ar4.s2_location,
-            scope2_market_total: totals_ar4.s2_market,
-            scope1_intensity: inventory.revenue_millions > 0 ? totals_ar4.s1_total / inventory.revenue_millions : 0,
-            scope2_intensity: inventory.revenue_millions > 0 ? totals_ar4.s2_location / inventory.revenue_millions : 0,
-            status: 'draft',
-            workings: buildWorkings(inventory.locations, 'AR4', inventory.reporting_year),
-            updated_at: new Date().toISOString(),
-          }
-          if (inventoryId) {
-            const { error } = await supabase.from('ghg_inventories').update(payload).eq('id', inventoryId); if (error) { alert('Save failed: ' + error.message); console.error(error); return }
-          } else {
-            const { data: dup } = await supabase.from('ghg_inventories').select('id').eq('company_name', inventory.company_name).eq('reporting_year', inventory.reporting_year).maybeSingle()
-            if (dup) { alert(`You already have a ${inventory.reporting_year} inventory for "${inventory.company_name}". Open it from "Your inventories" instead of creating a duplicate.`); return }
-            const { data, error } = await supabase.from('ghg_inventories').insert(payload).select().single(); if (error) { alert('Save failed: ' + error.message); console.error(error); return }
-            if (data) setInventoryId(data.id)
-          }
-          setSaved(true)
-        }} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 8, background: saved ? '#E1F5EE' : '#f8f7f5', border: `0.5px solid ${saved ? '#0F6E56' : '#e8e7e4'}`, cursor: 'pointer', color: saved ? '#0F6E56' : '#555553', fontWeight: saved ? 500 : 400 }}>
+        <button onClick={handleSave} style={{ fontSize: 14, padding: '10px 24px', borderRadius: 8, background: saved ? '#E1F5EE' : 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', border: saved ? '1px solid #0F6E56' : 'none', cursor: 'pointer', color: saved ? '#0F6E56' : '#0d0d0d', fontWeight: saved ? 500 : 700 }}>
           {saved ? '✓ Saved' : 'Save draft'}
         </button>
       </nav>
@@ -1826,7 +1828,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         ))}
       </div>
 
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '2.5rem 2rem' }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '2.5rem 2rem 120px' }}>
         {step === 0 && renderStep0()}
         {step === 1 && renderStep1()}
         {step === 2 && renderStep2()}
@@ -1843,6 +1845,14 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         </div>
       </div>
 
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 200, background: '#fff', borderTop: '0.5px solid #e8e7e4', boxShadow: '0 -2px 12px rgba(0,0,0,0.06)', padding: '14px 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: saved ? '#0F6E56' : '#0d0d0d' }}>
+          {saved ? '✓ All changes saved' : 'You have unsaved changes'}
+        </div>
+        <button onClick={handleSave} style={{ fontSize: 16, fontWeight: saved ? 500 : 700, padding: '14px 40px', borderRadius: 8, background: saved ? '#E1F5EE' : 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', border: saved ? '1px solid #0F6E56' : 'none', cursor: 'pointer', color: saved ? '#0F6E56' : '#0d0d0d' }}>
+          {saved ? '✓ Saved' : 'Save draft'}
+        </button>
+      </div>
       <GHGBot currentStep={step} />
     </div>
   )
