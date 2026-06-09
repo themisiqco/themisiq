@@ -30,7 +30,7 @@ export default function Page() {
         {/* TOC */}
         <div style={{ position: 'sticky', top: 80 }}>
           <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.09em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 12 }}>Contents</div>
-          {['The service', 'Your account', 'Acceptable use', 'Subscription & billing', 'Data & privacy', 'Intellectual property', 'Disclaimers', 'Liability', 'Indemnification', 'Governing law'].map((title, i) => (
+          {['The service', 'Your account', 'Acceptable use', 'Purchases & billing', 'Data & privacy', 'Intellectual property', 'Disclaimers', 'Liability', 'Indemnification', 'Governing law'].map((title, i) => (
             <a key={i} href={`#t${i+1}`} style={{ display: 'block', fontSize: 12, color: '#555553', padding: '5px 0 5px 10px', borderLeft: '2px solid transparent', textDecoration: 'none', marginBottom: 2 }}>{title}</a>
           ))}
         </div>
@@ -52,13 +52,13 @@ export default function Page() {
             {['Upload or submit data that is knowingly false, misleading, or fabricated', 'Attempt to circumvent, disable, or probe the security controls of the platform', 'Access or attempt to access data belonging to other ThemisIQ customers', 'Use ThemisIQ outputs as the sole basis for regulatory filings without independent professional review', 'Represent ThemisIQ outputs as the opinion of an accredited assurance provider or legal advisor', 'Share platform access credentials with unauthorised third parties', 'Reverse engineer, decompile, or attempt to extract the source code of the ThemisIQ platform', 'Use the platform to store or transmit unlawful, harmful, or offensive content'].map((item, i) => <BulletItem key={i} text={item} />)}
           </Section>
 
-          <Section id="t4" num="Section 4" title="Subscription & billing">
+          <Section id="t4" num="Section 4" title="Purchases & billing">
             {[
-              ['Plans:', 'Modules are priced at $999 per module per year (early-access pricing, all amounts USD). Bundle discounts apply automatically: 10% off two modules, 15% off three or more modules. Starter packs are offered at fixed annual rates. Early-access pricing may change for new subscriptions; existing subscriptions are honoured for their paid term.'],
+              ['Plans:', 'Modules are priced at $999 per module per year (early-access pricing, all amounts USD). Bundle discounts apply automatically: 10% off two modules, 20% off three or more modules. Starter packs are offered at fixed annual rates. Early-access pricing may change for future purchases; access already purchased is honoured for its 12-month term.'],
               ['Access:','Modules are free to explore. Reports and exports unlock on a paid plan.'],
-              ['Billing:', 'Annual, billed in advance. Invoices issued via Stripe. Charges recur automatically on the annual renewal date unless cancelled before renewal.'],
+              ['Billing:', 'One-time charge per module, billed in advance via Stripe. Each purchase grants 12 months of access to the platform. Access does not auto-renew; we will invite you to renew (the same or additional modules) approximately 8 weeks before your access term ends.'],
               ['Taxes:', 'Prices exclude applicable taxes (GST/HST in Canada, VAT in EU/UK). Tax is added at checkout based on billing address.'],
-              ['Refunds:', 'All sales are final. Because reports and exports are delivered digitally and available immediately upon payment, subscriptions are non-refundable. You may cancel before your annual renewal date to avoid the next charge.'],
+              ['Refunds:', 'All sales are final. Because reports and exports are delivered digitally and available immediately upon payment, purchases are non-refundable.'],
               ['Suspension:', 'Service may be suspended for non-payment after 7 days\' notice. Data is retained for 90 days after suspension before deletion.'],
             ].map(([label, text], i) => (
               <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
@@ -72,7 +72,7 @@ export default function Page() {
             {[
               ['Your data:', 'You retain all ownership of the data you upload or generate in ThemisIQ. We do not claim any rights over your compliance data.'],
               ['Our role:', 'ThemisIQ is a data processor for your platform data. You are the data controller. Our Data Processing Agreement (DPA) is available at legal@themisiq.co.'],
-              ['Data export:', 'You can export all your data in standard formats (CSV, PDF, XLSX) at any time during your subscription.'],
+              ['Data export:', 'You can export all your data in standard formats (CSV, PDF, XLSX) at any time during your access term.'],
               ['Data deletion:', 'On cancellation, your platform data is deleted within 90 days.'],
               ['No data resale:', 'We will never sell, rent, or trade your data to third parties.'],
               ['AI data use:', 'We will not use your compliance data to train AI models without your explicit written consent.'],
@@ -89,7 +89,7 @@ export default function Page() {
               ['ThemisIQ IP:', 'The ThemisIQ platform, including its calculation methodologies, framework mappings, regulatory databases, software code, and visual design, is owned by ThemisIQ Compliance Inc. and protected by applicable intellectual property law.'],
               ['Your IP:', 'You own all data, reports, and outputs generated from your data using the ThemisIQ platform. ThemisIQ makes no claim over your compliance reports or disclosures.'],
               ['Feedback:', 'If you provide feedback, suggestions, or feature requests, ThemisIQ may use these to improve the platform without obligation to you.'],
-              ['Licence to you:', 'ThemisIQ grants you a non-exclusive, non-transferable, revocable licence to access and use the platform during your subscription term.'],
+              ['Licence to you:', 'ThemisIQ grants you a non-exclusive, non-transferable, revocable licence to access and use the platform during your access term.'],
             ].map(([label, text], i) => (
               <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', minWidth: 130, flexShrink: 0 }}>{label}</span>

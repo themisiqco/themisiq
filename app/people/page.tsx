@@ -96,7 +96,7 @@ export default function Page() {
               { feature: 'GRI 401–410 export', big: false, specialist: false, themis: true },
               { feature: 'Multi-module compliance platform', big: false, specialist: false, themis: true },
               { feature: 'Works without existing HR system', big: false, specialist: false, themis: true },
-              { feature: 'Annual cost', big: '$200k+', specialist: '$30–100k', themis: 'From $799' },
+              { feature: 'Annual cost', big: '$200k+', specialist: '$30–100k', themis: '$999 per module' },
             ].map(({ feature, big, specialist, themis }, i) => {
               const renderVal = (val: boolean | string) => {
                 if (val === true) return <span style={{ color: '#0F6E56', fontWeight: 700 }}>✓</span>
