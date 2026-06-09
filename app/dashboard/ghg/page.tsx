@@ -840,6 +840,7 @@ const searchParams = useSearchParams()
   })
   const [activeLocation, setActiveLocation] = useState(0)
   const [saved, setSaved] = useState(false)
+  const skipSavedReset = useRef(true)
   const [inventoryId, setInventoryId] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [showWorkings, setShowWorkings] = useState<Record<string, boolean>>({})
@@ -884,6 +885,10 @@ const searchParams = useSearchParams()
   }
 
   useEffect(() => {
+    if (skipSavedReset.current) { skipSavedReset.current = false; return }
+    setSaved(false)
+  }, [inventory])
+  useEffect(() => {
     const loadId = searchParams.get('id')
     if (!loadId) return  // no id -> start clean (no auto-load of a random inventory)
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -895,6 +900,7 @@ const searchParams = useSearchParams()
         .maybeSingle()
       if (error) { console.error('Load failed:', error); return }
       if (data) {
+       skipSavedReset.current = true 
         setInventoryId(data.id)
         setInventory(inv => ({
           ...inv,
