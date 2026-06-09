@@ -277,6 +277,8 @@ export default function PricingPage() {
     background: active ? '#fff' : '#f8f7f5',
     transition: 'all 0.15s',
     position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
   })
 
   const moduleRow = (active: boolean): React.CSSProperties => ({
@@ -426,6 +428,13 @@ export default function PricingPage() {
             <div style={{ fontSize: 10, color: '#888784', textDecoration: 'line-through' }}>${FULL_PRICE.toLocaleString()}</div>
             <div style={{ fontSize: 22, fontWeight: 600, color: '#0d0d0d' }}>$999<span style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
             <div style={{ fontSize: 9, color: '#92400e', background: '#FEF3E2', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginTop: 4 }}>Early access</div>
+            <div style={{ borderTop: `1px solid ${'#f3f4f6'}`, paddingTop: 12, marginTop: 12, textAlign: 'left', flex: 1 }}>
+              <div style={{ fontSize: 11, color: '#888784', marginBottom: 8 }}>Core reports for each module you select</div>
+              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: '#374151', marginBottom: 5 }}><span style={{ color: '#0F6E56', flexShrink: 0 }}>✓</span>Core reporting frameworks</div>
+              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: '#374151', marginBottom: 5 }}><span style={{ color: '#0F6E56', flexShrink: 0 }}>✓</span>Assurance-ready workings</div>
+              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: '#374151', marginBottom: 5 }}><span style={{ color: '#0F6E56', flexShrink: 0 }}>✓</span>Audit trail — every entry logged</div>
+              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: '#374151', marginBottom: 5 }}><span style={{ color: '#0F6E56', flexShrink: 0 }}>✓</span>ThemisIQ Wizard — always on</div>
+            </div>
           </div>
 
           {/* Professional */}
@@ -438,6 +447,14 @@ export default function PricingPage() {
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: tier === 'professional' ? '#7425e3' : '#7425e3', marginBottom: 6 }}>Professional</div>
             <div style={{ fontSize: 22, fontWeight: 600, color: tier === 'professional' ? '#fff' : '#0d0d0d' }}>$2,499<span style={{ fontSize: 10, color: tier === 'professional' ? 'rgba(255,255,255,0.4)' : '#888784', fontWeight: 400 }}> /module/yr</span></div>
             <div style={{ fontSize: 9, color: '#a78bfa', background: 'rgba(116,37,227,0.15)', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginTop: 4 }}>All frameworks</div>
+            <div style={{ borderTop: `1px solid ${tier === 'professional' ? 'rgba(255,255,255,0.08)' : '#f3f4f6'}`, paddingTop: 12, marginTop: 12, textAlign: 'left', flex: 1 }}>
+              <div style={{ fontSize: 11, color: tier === 'professional' ? 'rgba(255,255,255,0.45)' : '#888784', marginBottom: 8 }}>All frameworks for your selected modules</div>
+              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: tier === 'professional' ? '#fff' : '#374151', marginBottom: 5 }}><span style={{ color: '#64fe3e', flexShrink: 0 }}>✓</span>Everything in Starter</div>
+              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: tier === 'professional' ? '#fff' : '#374151', marginBottom: 5 }}><span style={{ color: '#64fe3e', flexShrink: 0 }}>✓</span>All reporting frameworks</div>
+              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: tier === 'professional' ? '#fff' : '#374151', marginBottom: 5 }}><span style={{ color: '#64fe3e', flexShrink: 0 }}>✓</span>Multi-organization — up to 5 organizations</div>
+              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: tier === 'professional' ? '#fff' : '#374151', marginBottom: 5 }}><span style={{ color: '#64fe3e', flexShrink: 0 }}>✓</span>Verifier & third-party access role</div>
+              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: tier === 'professional' ? '#fff' : '#374151', marginBottom: 5 }}><span style={{ color: '#64fe3e', flexShrink: 0 }}>✓</span>Regulatory monitor — weekly alerts</div>
+            </div>
           </div>
 
           {/* Advisory */}
@@ -450,6 +467,15 @@ export default function PricingPage() {
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1fb1ff', marginBottom: 6 }}>Advisory</div>
             <div style={{ fontSize: 22, fontWeight: 600, color: '#0d0d0d' }}>$4,999<span style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
             <div style={{ fontSize: 9, color: '#0C447C', background: '#E6F1FB', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginTop: 4 }}>+ Expert guidance</div>
+            <div style={{ borderTop: `1px solid ${'#f3f4f6'}`, paddingTop: 12, marginTop: 12, textAlign: 'left', flex: 1 }}>
+              <div style={{ fontSize: 11, color: '#888784', marginBottom: 8 }}>Platform + dedicated expert guidance</div>
+              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: '#374151', marginBottom: 5 }}><span style={{ color: '#1fb1ff', flexShrink: 0 }}>✓</span>Everything in Professional</div>
+              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: '#374151', marginBottom: 5 }}><span style={{ color: '#1fb1ff', flexShrink: 0 }}>✓</span>Up to 10 organizations</div>
+              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: '#374151', marginBottom: 5 }}><span style={{ color: '#1fb1ff', flexShrink: 0 }}>✓</span>Onboarding session</div>
+              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: '#374151', marginBottom: 5 }}><span style={{ color: '#1fb1ff', flexShrink: 0 }}>✓</span>Guided inventory review</div>
+              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: '#374151', marginBottom: 5 }}><span style={{ color: '#1fb1ff', flexShrink: 0 }}>✓</span>Sector-specific guidance</div>
+              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: '#374151', marginBottom: 5 }}><span style={{ color: '#1fb1ff', flexShrink: 0 }}>✓</span>Board-ready narrative</div>
+            </div>
           </div>
 
         </div>
