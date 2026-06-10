@@ -393,7 +393,32 @@ const FRAMEWORKS = [
   },
 ]
 
-interface SourceDoc { id: string; file_name: string; document_type: string; uploaded_at: string; file_path: string }
+type ConciergeStatus = 'extracted' | 'confirmed' | 'rejected' | 'needs_manual_review'
+
+interface ExtractedProposal {
+  fuelType: string
+  rawValue: number | null
+  rawUnit: string | null
+  value: number | null            // canonical value, after lib conversion
+  unit: string | null             // canonical unit
+  conversionNote?: string
+  periodStart: string | null      // ISO yyyy-mm-dd
+  periodEnd: string | null
+  periodConfidence?: 'high' | 'medium' | 'low' | null
+  confidence: 'high' | 'medium' | 'low'
+  sourceQuote: string | null
+  notes: string | null
+  status: ConciergeStatus
+}
+
+interface SourceDoc {
+  id: string
+  file_name: string
+  document_type: string
+  uploaded_at: string
+  file_path: string
+  extracted?: ExtractedProposal[]   // concierge proposals (one per fuel read from this doc)
+}
 
 interface Location {
  id: string; name: string; country: string; state?: string; province?: string; region?: string
@@ -850,6 +875,7 @@ const searchParams = useSearchParams()
   const [mode, setMode] = useState<'loading' | 'list' | 'wizard'>('loading')
   const [inventoryList, setInventoryList] = useState<Array<{ id: string; company_name: string; reporting_year: number; updated_at: string }>>([])
   const isPaid = useEntitlement('ghg')
+  const CONCIERGE_DEV = true   // TEMP: gates concierge extract-and-propose. Swap for useEntitlement('concierge') at step 10.
 
   // Decide initial view: ?id -> wizard (loads that one); else if user has inventories -> list; else -> blank wizard
   useEffect(() => {
@@ -972,18 +998,71 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     if (!files.length) return
     setUploading(true)
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
+    if (!session) { setUploading(false); return }
     for (const file of Array.from(files)) {
       const path = `${session.user.id}/${inventory.reporting_year}/${inventory.locations[locIdx].name.replace(/\s+/g, '_')}/${Date.now()}_${file.name}`
       const { error } = await supabase.storage.from('source-documents').upload(path, file)
       if (!error) {
-        const doc: SourceDoc = { id: Date.now().toString(), file_name: file.name, document_type: docType, uploaded_at: new Date().toISOString(), file_path: path }
-        updateLocation(locIdx, 'source_docs', [...inventory.locations[locIdx].source_docs, doc])
+        const doc: SourceDoc = { id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, file_name: file.name, document_type: docType, uploaded_at: new Date().toISOString(), file_path: path }
+
+        // ── Concierge step 5: read bill, convert via lib (single source of truth), attach proposals to the doc. No field write yet. ──
+        // Refrigerant service records are deliberately NOT concierge-read (judgment, Tier-2/3).
+        if (CONCIERGE_DEV && docType !== 'service_record') {
+          try {
+            const base64: string = await new Promise((resolve, reject) => {
+              const r = new FileReader()
+              r.onload = () => resolve(String(r.result).split(',')[1])
+              r.onerror = () => reject(new Error('file read failed'))
+              r.readAsDataURL(file)
+            })
+            const res = await fetch('/api/concierge/extract', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json', authorization: `Bearer ${session.access_token}` },
+              body: JSON.stringify({ document: base64, mediaType: file.type, locationName: inventory.locations[locIdx].name }),
+            })
+            const json = await res.json()
+            if (json?.success && Array.isArray(json.fields)) {
+              const { convertToCanonical } = await import('../../../lib/unitConversions')
+              const knownFuels = ['electricity', 'natural_gas', 'propane', 'diesel', 'gasoline']
+              doc.extracted = json.fields
+                .filter((f: any) => f && f.value != null && knownFuels.includes(f.fuelType))
+                .map((f: any): ExtractedProposal => {
+                  const conv = convertToCanonical(f.fuelType, f.value, f.unit)
+                  const needsReview = conv.tier === 3 || f.confidence === 'low'
+                  return {
+                    fuelType: f.fuelType,
+                    rawValue: f.value,
+                    rawUnit: f.unit ?? null,
+                    value: conv.value,
+                    unit: conv.unit,
+                    conversionNote: conv.conversionNote,
+                    periodStart: f.periodStart ?? null,
+                    periodEnd: f.periodEnd ?? null,
+                    periodConfidence: f.periodConfidence ?? null,
+                    confidence: f.confidence,
+                    sourceQuote: f.sourceQuote ?? null,
+                    notes: f.notes ?? null,
+                    status: needsReview ? 'needs_manual_review' : 'extracted',
+                  }
+                })
+              console.log('[concierge step5] proposals on doc:', doc.extracted)
+            }
+          } catch (e) {
+            console.error('[concierge extract] failed', e)
+          }
+        }
+
+        // Store the doc (with any proposals) in one functional update — avoids stale-closure append bug on multi-file upload.
+        setInventory(inv => {
+          const locs = [...inv.locations]
+          locs[locIdx] = { ...locs[locIdx], source_docs: [...locs[locIdx].source_docs, doc] }
+          return { ...inv, locations: locs }
+        })
       }
     }
     setUploading(false)
   }
-
+  
   const removeDoc = async (locIdx: number, docId: string, filePath: string) => {
     await supabase.storage.from('source-documents').remove([filePath])
     updateLocation(locIdx, 'source_docs', inventory.locations[locIdx].source_docs.filter(d => d.id !== docId))
