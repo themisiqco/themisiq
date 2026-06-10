@@ -113,15 +113,33 @@ const getComplianceCost = (revenue: number, sector: string, frameworks: string[]
 // Framework applicability
 const getApplicableFrameworks = (jurisdiction: string, revenue: number, sector: string, dealType: string): string[] => {
   const fw: string[] = []
-  if (['USA'].includes(jurisdiction) && revenue > 100000000) fw.push('SB 253')
-  if (['European Union', 'UK', 'Global'].includes(jurisdiction)) fw.push('CSRD')
-  if (['European Union'].includes(jurisdiction) && sector === 'Financial Services') fw.push('SFDR')
+
+  // US — California SB 253 (statutory trigger is >$1B total annual revenue, doing business in CA)
+  if (jurisdiction === 'USA' && revenue > 1000000000) fw.push('SB 253')
+
+  // EU
+  if (['European Union', 'Global'].includes(jurisdiction)) fw.push('CSRD')
+  if (jurisdiction === 'European Union' && sector === 'Financial Services') fw.push('SFDR')
   if (['European Union', 'Global'].includes(jurisdiction)) fw.push('EU Taxonomy')
   if (['European Union', 'Global'].includes(jurisdiction)) fw.push('CS3D')
+
+  // UK — distinct regime, NOT CSRD
+  if (jurisdiction === 'UK') {
+    if (revenue > 36000000) fw.push('SECR')               // large UK cos: Scope 1+2 mandatory (DEFRA factors)
+    fw.push('UK SRS (S1/S2)')                              // IFRS S1/S2 endorsement — voluntary now, proposed mandatory for listed FY2027+
+    if (sector === 'Financial Services') {
+      fw.push('FCA climate disclosure (TCFD)')            // FCA-regulated managers / insurers / pensions
+      fw.push('UK SDR')                                    // sustainability disclosure + investment labels
+      fw.push('Anti-greenwashing rule')                    // applies to all FCA-authorised firms making ESG claims
+    }
+  }
+
+  // Investor baseline (expected regardless of jurisdiction)
   fw.push('IFRS S2')
   fw.push('TCFD')
   if (sector === 'Financial Services') fw.push('PCAF')
   if (['Energy & Utilities', 'Industrials & Manufacturing', 'Mining & Metals'].includes(sector)) fw.push('EU ETS')
+
   return fw
 }
 
