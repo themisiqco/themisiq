@@ -1068,16 +1068,68 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     updateLocation(locIdx, 'source_docs', inventory.locations[locIdx].source_docs.filter(d => d.id !== docId))
   }
 
-  // Concierge: update one proposal on one doc — status flip (confirm/flag) and/or an edited canonical value.
+  // Concierge: update one proposal, then recompute mapped inventory fields from ALL confirmed proposals at this location.
+  // fuelType + docType -> field(s). Write = SUM of confirmed proposals mapping to that field.
+  // Mixed units for one field are NOT summed (would be wrong) -> those proposals flip to needs_manual_review.
   const updateProposal = (locIdx: number, docId: string, propIdx: number, patch: Partial<ExtractedProposal>) => {
     setInventory(inv => {
       const locs = [...inv.locations]
-      const docs = locs[locIdx].source_docs.map(d => {
+
+      // 1. Apply the patch to the target proposal.
+      let docs = locs[locIdx].source_docs.map(d => {
         if (d.id !== docId || !d.extracted) return d
-        const extracted = d.extracted.map((p, i) => i === propIdx ? { ...p, ...patch } : p)
-        return { ...d, extracted }
+        return { ...d, extracted: d.extracted.map((p, i) => i === propIdx ? { ...p, ...patch } : p) }
       })
-      locs[locIdx] = { ...locs[locIdx], source_docs: docs }
+
+      // 2. Map a (docType, fuelType) pair to its inventory field(s).
+      const fieldFor = (docType: string, fuelType: string): { amount: keyof Location; unit?: keyof Location } | null => {
+        if (docType === 'utility_electricity' && fuelType === 'electricity') return { amount: 'electricity_kwh' }
+        if (docType === 'renewable_cert' && fuelType === 'electricity') return { amount: 'renewable_electricity_kwh' }
+        if (docType === 'utility_bill_gas' && fuelType === 'natural_gas') return { amount: 'natural_gas_amount', unit: 'natural_gas_unit' }
+        if (docType === 'fuel_propane' && fuelType === 'propane') return { amount: 'propane_amount', unit: 'propane_unit' }
+        if (docType === 'fuel_diesel' && fuelType === 'diesel') return { amount: 'diesel_stationary_amount', unit: 'diesel_stationary_unit' }
+        if (docType === 'fleet_fuel' && fuelType === 'diesel') return { amount: 'diesel_mobile_amount', unit: 'diesel_mobile_unit' }
+        if (docType === 'fleet_fuel' && fuelType === 'gasoline') return { amount: 'gasoline_amount', unit: 'gasoline_unit' }
+        return null
+      }
+
+      // 3. Gather confirmed proposals per target field.
+      const byField: Record<string, { sum: number; units: Set<string>; unitField?: keyof Location; refs: { docId: string; pi: number }[] }> = {}
+      docs.forEach(d => {
+        d.extracted?.forEach((p, pi) => {
+          if (p.status !== 'confirmed' || p.value == null) return
+          const map = fieldFor(d.document_type, p.fuelType)
+          if (!map) return
+          const key = String(map.amount)
+          if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.unit, refs: [] }
+          byField[key].sum += p.value
+          if (p.unit) byField[key].units.add(p.unit)
+          byField[key].refs.push({ docId: d.id, pi })
+        })
+      })
+
+      // 4. Write each field. Mixed units -> don't write; flag those proposals for review.
+      const loc: any = { ...locs[locIdx] }
+      const flagged: { docId: string; pi: number }[] = []
+      Object.entries(byField).forEach(([amountField, info]) => {
+        if (info.units.size > 1) {
+          flagged.push(...info.refs)
+          return
+        }
+        loc[amountField] = info.sum
+        if (info.unitField && info.units.size === 1) loc[info.unitField] = [...info.units][0]
+      })
+
+      // 5. If any field had mixed units, flip those proposals to needs_manual_review.
+      if (flagged.length) {
+        docs = docs.map(d => {
+          if (!d.extracted) return d
+          return { ...d, extracted: d.extracted.map((p, pi) => flagged.some(f => f.docId === d.id && f.pi === pi) ? { ...p, status: 'needs_manual_review' as ConciergeStatus } : p) }
+        })
+      }
+
+      loc.source_docs = docs
+      locs[locIdx] = loc
       return { ...inv, locations: locs }
     })
   }
