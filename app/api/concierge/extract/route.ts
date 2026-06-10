@@ -21,24 +21,29 @@ import { getAuthedClient, bearerFrom, AuthError } from '../../../../lib/supabase
 
 // Fuel types we currently extract, with the unit(s) the GHG inventory expects.
 // Keep this list aligned with the GHG module's per-location fields.
-const SUPPORTED_FUELS = ['electricity', 'natural_gas', 'diesel', 'propane'] as const
+const SUPPORTED_FUELS = ['electricity', 'natural_gas', 'diesel', 'propane', 'gasoline'] as const
 type FuelType = typeof SUPPORTED_FUELS[number]
 
 const FUEL_GUIDANCE: Record<FuelType, string> = {
   electricity:
-    'Electricity consumption. Preferred unit kWh. Bills may show kWh or MWh (1 MWh = 1000 kWh) — convert to kWh and note the original. Use the billed/metered consumption for the billing period, NOT cost, NOT demand (kW), NOT the meter reading numbers themselves.',
+    'Electricity consumption for the billing period. Report the figure and its unit EXACTLY as printed on the bill (e.g. kWh, MWh, GJ) — do NOT convert. Use the billed/metered consumption, NOT cost, NOT demand (kW), NOT the raw meter-reading numbers.',
   natural_gas:
-    'Natural gas consumption. Provide BOTH a volumetric figure (m3; some bills use ft3, CCF, or therms) AND, if the bill states it, an energy figure (kWh). Use billed consumption for the period, not cost. Note the original unit if not m3.',
+    'Natural gas consumption for the billing period. Report the figure and its unit EXACTLY as printed (e.g. m3, ft3, CCF, therms, mcf, mmbtu, or kWh) — do NOT convert. Use billed consumption, not cost.',
   diesel:
-    'Diesel fuel quantity. Preferred unit litres (some records use US/UK gallons — convert to litres and note the original). Use the delivered/purchased volume.',
+    'Diesel fuel quantity delivered or purchased. Report the figure and its unit EXACTLY as printed (e.g. litres, gallons) — do NOT convert.',
   propane:
-    'Propane (LPG) quantity. Preferred unit litres (some records use kg or gallons — if only kg or gallons are given, return that unit and note it; do NOT guess a conversion). Use the delivered/purchased volume.',
+    'Propane (LPG) quantity delivered or purchased. Report the figure and its unit EXACTLY as printed (e.g. litres, gallons, kg, lbs) — do NOT convert.',
+  gasoline:
+    'Gasoline (petrol) fuel quantity, typically from fleet or fuel-card records. Report the figure and its unit EXACTLY as printed (e.g. litres, gallons) — do NOT convert. Use the purchased/dispensed volume, not cost.',
 }
 
 interface ExtractionField {
   fuelType: FuelType
   value: number | null
   unit: string | null
+  periodStart: string | null   // ISO yyyy-mm-dd — billing/service period start
+  periodEnd: string | null     // ISO yyyy-mm-dd — billing/service period end
+  periodConfidence: 'high' | 'medium' | 'low' | null
   sourceQuote: string | null
   confidence: 'high' | 'medium' | 'low'
   notes: string | null
@@ -51,15 +56,22 @@ function buildPrompt(fuelTypes: FuelType[], locationName?: string): string {
 Extract ONLY the following, when present in this document:
 ${fuelLines}
 
+For EACH figure you report, also extract the billing/service period that the figure covers:
+- periodStart and periodEnd as ISO dates (yyyy-mm-dd).
+- If the document shows an explicit date range (e.g. "Nov 1 - Nov 30, 2024"), use those exact dates.
+- If it shows only a month or month/year (e.g. "Nov 2024"), use the first and last calendar day of that month and set periodConfidence: "medium".
+- If no billing period is visible, return periodStart: null, periodEnd: null, periodConfidence: "low".
+
 CRITICAL RULES — this feeds a regulatory compliance report, so accuracy matters more than completeness:
 1. Only report a figure you can actually see in the document. If a fuel type is not present, return value: null for it.
 2. If you are not confident which number is the correct billed consumption (e.g. the bill is ambiguous, you can't tell consumption from cost or from a meter reading, or the figure is unclear), return value: null and confidence: "low" with a note explaining the ambiguity. DO NOT GUESS. A blank that gets flagged for human entry is far better than a confident wrong number.
-3. For every figure you DO report, include the exact short text snippet from the document you read it from, in "sourceQuote" (under 15 words), so a human can verify it.
-4. Set confidence: "high" only when the figure is clearly labelled and unambiguous; "medium" when you had to interpret or convert; "low" when uncertain.
-5. Do unit conversions where instructed (e.g. MWh to kWh) and state the original in "notes". Never invent a conversion you're unsure of.
+3. For every figure you DO report, include in "sourceQuote" the exact short text snippet you read the figure from, under 15 words, so a human can verify it.
+4. The sourceQuote must contain ONLY the consumption figure and its unit (e.g. "585 kWh"). Do NOT include monetary amounts, rates, taxes, account balances, or the billing dates in the sourceQuote — the dates belong in periodStart/periodEnd, not the quote.
+5. Set confidence: "high" only when the figure is clearly labelled and unambiguous; "medium" when you had to interpret or convert; "low" when uncertain.
+6. Do NOT convert units. Report each figure in the unit exactly as printed on the document — conversion happens later in a separate, audited step. Your job is only to read the figure and its unit faithfully.
 
 Respond with ONLY a JSON array (no prose, no markdown fences), one object per requested fuel type, each shaped exactly:
-{"fuelType": "<one of: ${fuelTypes.join(', ')}>", "value": <number or null>, "unit": "<string or null>", "sourceQuote": "<string or null>", "confidence": "high"|"medium"|"low", "notes": "<string or null>"}`
+{"fuelType": "<one of: ${fuelTypes.join(', ')}>", "value": <number or null>, "unit": "<string or null>", "periodStart": "<yyyy-mm-dd or null>", "periodEnd": "<yyyy-mm-dd or null>", "periodConfidence": "high"|"medium"|"low"|null, "sourceQuote": "<string or null>", "confidence": "high"|"medium"|"low", "notes": "<string or null>"}`
 }
 
 export async function POST(req: NextRequest) {
