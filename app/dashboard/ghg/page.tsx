@@ -1062,10 +1062,24 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     }
     setUploading(false)
   }
-  
+
   const removeDoc = async (locIdx: number, docId: string, filePath: string) => {
     await supabase.storage.from('source-documents').remove([filePath])
     updateLocation(locIdx, 'source_docs', inventory.locations[locIdx].source_docs.filter(d => d.id !== docId))
+  }
+
+  // Concierge: update one proposal on one doc — status flip (confirm/flag) and/or an edited canonical value.
+  const updateProposal = (locIdx: number, docId: string, propIdx: number, patch: Partial<ExtractedProposal>) => {
+    setInventory(inv => {
+      const locs = [...inv.locations]
+      const docs = locs[locIdx].source_docs.map(d => {
+        if (d.id !== docId || !d.extracted) return d
+        const extracted = d.extracted.map((p, i) => i === propIdx ? { ...p, ...patch } : p)
+        return { ...d, extracted }
+      })
+      locs[locIdx] = { ...locs[locIdx], source_docs: docs }
+      return { ...inv, locations: locs }
+    })
   }
 
   const needsMarketBased = inventory.selected_frameworks.includes('esrs') || inventory.selected_frameworks.includes('gri')
@@ -1319,7 +1333,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                       </div>
                     )}
                   </Field>
-                  {isPaid ? <DocUpload label="Upload gas bills" locIdx={activeLocation} docType="utility_bill_gas" docs={loc.source_docs.filter(d => d.document_type === 'utility_bill_gas')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} /> : <LockedDocUpload label="Upload gas bills" />}
+                  {isPaid ? <DocUpload label="Upload gas bills" locIdx={activeLocation} docType="utility_bill_gas" docs={loc.source_docs.filter(d => d.document_type === 'utility_bill_gas')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} uploading={uploading} /> : <LockedDocUpload label="Upload gas bills" />}
                 </div>
               )}
             </QuestionCard>
@@ -1334,7 +1348,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                   <Field label={`Total propane purchased — ${inventory.reporting_year} (${loc.propane_unit})`}>
                     <input type="number" value={loc.propane_amount || ''} onChange={e => updateLocation(activeLocation, 'propane_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload propane delivery records" locIdx={activeLocation} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} /> : <LockedDocUpload label="Upload propane delivery records" />}
+                  {isPaid ? <DocUpload label="Upload propane delivery records" locIdx={activeLocation} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} uploading={uploading} /> : <LockedDocUpload label="Upload propane delivery records" />}
                 </div>
               )}
             </QuestionCard>
@@ -1349,7 +1363,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                   <Field label={`Total diesel in stationary equipment — ${inventory.reporting_year}`}>
                     <input type="number" value={loc.diesel_stationary_amount || ''} onChange={e => updateLocation(activeLocation, 'diesel_stationary_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload diesel purchase records" locIdx={activeLocation} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} /> : <LockedDocUpload label="Upload diesel purchase records" />}
+                  {isPaid ? <DocUpload label="Upload diesel purchase records" locIdx={activeLocation} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} uploading={uploading} /> : <LockedDocUpload label="Upload diesel purchase records" />}
                 </div>
               )}
             </QuestionCard>
@@ -1376,7 +1390,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                       </select>
                     </div>
                   </Field>
-                  {isPaid ? <DocUpload label="Upload fleet fuel records" locIdx={activeLocation} docType="fleet_fuel" docs={loc.source_docs.filter(d => d.document_type === 'fleet_fuel')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} /> : <LockedDocUpload label="Upload fleet fuel records" />}
+                  {isPaid ? <DocUpload label="Upload fleet fuel records" locIdx={activeLocation} docType="fleet_fuel" docs={loc.source_docs.filter(d => d.document_type === 'fleet_fuel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} uploading={uploading} /> : <LockedDocUpload label="Upload fleet fuel records" />}
                 </div>
               )}
             </QuestionCard>
@@ -1396,7 +1410,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                   <Field label="Refrigerant purchased for top-up this year (kg)" hint="From service records or supplier invoices">
                     <input type="number" value={loc.refrigerant_purchased_kg || ''} onChange={e => updateLocation(activeLocation, 'refrigerant_purchased_kg', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload service records" locIdx={activeLocation} docType="service_record" docs={loc.source_docs.filter(d => d.document_type === 'service_record')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} /> : <LockedDocUpload label="Upload service records" />}
+                  {isPaid ? <DocUpload label="Upload service records" locIdx={activeLocation} docType="service_record" docs={loc.source_docs.filter(d => d.document_type === 'service_record')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} uploading={uploading} /> : <LockedDocUpload label="Upload service records" />}
                 </div>
               )}
             </div>
@@ -1429,7 +1443,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                     <a href="https://www.epa.gov/egrid/power-profiler" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#0C447C', textDecoration: 'none', display: 'inline-block', marginTop: 6 }}>🔎 Find your subregion with EPA Power Profiler (enter your ZIP) →</a>
                   </div>
                 )}
-                {isPaid ? <DocUpload label="Upload electricity bills" locIdx={activeLocation} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} /> : <LockedDocUpload label="Upload electricity bills" />}
+                {isPaid ? <DocUpload label="Upload electricity bills" locIdx={activeLocation} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} uploading={uploading} /> : <LockedDocUpload label="Upload electricity bills" />}
               </div>
             </div>
           </div>
@@ -1491,7 +1505,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                   </Field>
                 </div>
               ))}
-              {isPaid ? <DocUpload label="Upload renewable energy certificates or PPA contracts" locIdx={0} docType="renewable_cert" docs={inventory.locations[0].source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} uploading={uploading} /> : <LockedDocUpload label="Upload renewable energy certificates or PPA contracts" />}
+              {isPaid ? <DocUpload label="Upload renewable energy certificates or PPA contracts" locIdx={0} docType="renewable_cert" docs={inventory.locations[0].source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} uploading={uploading} /> : <LockedDocUpload label="Upload renewable energy certificates or PPA contracts" />}
             </div>
           )}
           {needsBiogenic && (
@@ -1948,8 +1962,10 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   )
 }
 
-function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, uploading }: { label: string; locIdx: number; docType: string; docs: SourceDoc[]; onUpload: (f: FileList, i: number, t: string) => void; onRemove: (i: number, id: string, path: string) => void; uploading: boolean }) {
+function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateProposal, uploading }: { label: string; locIdx: number; docType: string; docs: SourceDoc[]; onUpload: (f: FileList, i: number, t: string) => void; onRemove: (i: number, id: string, path: string) => void; onUpdateProposal: (locIdx: number, docId: string, propIdx: number, patch: Partial<ExtractedProposal>) => void; uploading: boolean }) {
   const ref = useRef<HTMLInputElement>(null)
+  const [editing, setEditing] = useState<string | null>(null)   // `${docId}:${propIdx}` being edited
+  const [editVal, setEditVal] = useState<string>('')
   return (
     <div style={{ background: '#f8f7f5', border: '0.5px dashed #e8e7e4', borderRadius: 8, padding: '10px 14px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: docs.length > 0 ? 8 : 0 }}>
@@ -1959,9 +1975,48 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, uploading
       </div>
       <div style={{ fontSize: 10, color: '#888784', fontWeight: 300, marginTop: 4 }}>Accepted: PDF, Excel, CSV, JPG, PNG · max 50 MB</div>
       {docs.map(doc => (
-        <div key={doc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '3px 0', fontSize: 12 }}>
-          <span style={{ color: '#0d0d0d' }}>✓ {doc.file_name}</span>
-          <button onClick={() => onRemove(locIdx, doc.id, doc.file_path)} style={{ fontSize: 11, color: '#B91C1C', background: 'none', border: 'none', }}>Remove</button>
+        <div key={doc.id} style={{ padding: '3px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
+            <span style={{ color: '#0d0d0d' }}>✓ {doc.file_name}</span>
+            <button onClick={() => onRemove(locIdx, doc.id, doc.file_path)} style={{ fontSize: 11, color: '#B91C1C', background: 'none', border: 'none' }}>Remove</button>
+          </div>
+          {doc.extracted && doc.extracted.length > 0 && (
+            <div style={{ marginTop: 4, marginLeft: 14, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {doc.extracted.map((p, pi) => (
+                <div key={pi} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 6, padding: '6px 10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#7425e3' }}>ThemisIQ read</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{p.value != null ? `${p.value.toLocaleString()} ${p.unit ?? ''}` : '—'}</span>
+                    <span style={{ fontSize: 11, color: '#888784' }}>{p.fuelType.replace('_', ' ')}</span>
+                    {(p.periodStart || p.periodEnd) && <span style={{ fontSize: 11, color: '#888784' }}>· {p.periodStart ?? '?'} → {p.periodEnd ?? '?'}</span>}
+                    <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: p.status === 'needs_manual_review' ? '#FEF3E2' : '#E1F5EE', color: p.status === 'needs_manual_review' ? '#ba7517' : '#0F6E56' }}>
+                      {p.status === 'needs_manual_review' ? 'NEEDS REVIEW' : p.confidence.toUpperCase()}
+                    </span>
+                  </div>
+                  {p.sourceQuote && <div style={{ fontSize: 11, color: '#888784', fontStyle: 'italic', marginTop: 2 }}>“{p.sourceQuote}”</div>}
+                  {p.conversionNote && <div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>{p.conversionNote}</div>}
+                  {editing === `${doc.id}:${pi}` ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                      <input type="number" value={editVal} onChange={e => setEditVal(e.target.value)} placeholder="corrected value" style={{ fontSize: 12, padding: '4px 8px', border: '0.5px solid #e8e7e4', borderRadius: 6, width: 130 }} />
+                      <span style={{ fontSize: 11, color: '#888784' }}>{p.unit ?? ''}</span>
+                      <button onClick={() => { const v = Number(editVal); if (Number.isFinite(v)) { onUpdateProposal(locIdx, doc.id, pi, { value: v, status: 'confirmed' }); setEditing(null) } }} style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#0F6E56', color: '#fff', border: 'none', cursor: 'pointer' }}>Save</button>
+                      <button onClick={() => setEditing(null)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#f8f7f5', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Cancel</button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                      {p.status === 'confirmed' ? (
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#0F6E56' }}>✓ Confirmed</span>
+                      ) : (
+                        <button onClick={() => onUpdateProposal(locIdx, doc.id, pi, { status: 'confirmed' })} style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#0F6E56', color: '#fff', border: 'none', cursor: 'pointer' }}>Confirm</button>
+                      )}
+                      <button onClick={() => { setEditing(`${doc.id}:${pi}`); setEditVal(p.value != null ? String(p.value) : '') }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Edit</button>
+                      <button onClick={() => onUpdateProposal(locIdx, doc.id, pi, { status: 'needs_manual_review' })} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#ba7517', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Flag for review</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ))}
     </div>
