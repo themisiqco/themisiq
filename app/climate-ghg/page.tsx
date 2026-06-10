@@ -204,7 +204,7 @@ export default function Page() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: '2.5rem', textAlign: 'left' }}>
             {[
               { plan: 'Starter', price: '$999', cadence: '/yr · Climate GHG', features: ['Scope 1 + 2 · CARB SB 253 ready', 'IPCC AR5 · IEA 2024 factors', 'Audit trail + assurance package', 'CDP C6 · ESRS E1 · EcoVadis export', '1 entity · 3 users', 'Reports unlocked on paid plan'], featured: false },
-              { plan: 'Professional', price: '$2,999', cadence: '/yr · Climate GHG', features: ['Everything in Starter', 'Scope 3 · all 15 categories', 'Climate Risk module included', 'CDP full suite · IFRS S2 scenarios', '10 entities · 10 users', 'Regulatory Monitor weekly alerts'], featured: true },
+              { plan: 'Professional', price: '$2,499', cadence: '/yr · Climate GHG', features: ['Everything in Starter', 'Scope 3 · all 15 categories', 'Climate Risk module included', 'CDP full suite · IFRS S2 scenarios', '10 entities · 10 users', 'Regulatory Monitor weekly alerts'], featured: true },
             ].map(({ plan, price, cadence, features, featured }) => (
               <div key={plan} style={{ background: featured ? '#0d0d0d' : '#fff', borderRadius: 12, padding: '2rem', border: featured ? 'none' : '0.5px solid #e8e7e4' }}>
                 <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: featured ? 'rgba(255,255,255,0.4)' : '#888784', marginBottom: 8 }}>{plan}</div>
