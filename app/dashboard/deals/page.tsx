@@ -87,14 +87,17 @@ const SECTOR_RISKS: Record<string, { risk: string; severity: 'critical' | 'high'
 }
 
 // Compliance cost estimates by deal size and sector complexity
-const getComplianceCost = (revenue: number, sector: string, frameworks: string[]): { low: number; high: number; items: { item: string; cost: string }[] } => {
+const getComplianceCost = (dealValue: number, sector: string, frameworks: string[]): { low: number; high: number; pctLow: number; pctHigh: number; items: { item: string; cost: string }[] } => {
   const isHighEmissions = ['Energy & Utilities', 'Industrials & Manufacturing', 'Mining & Metals', 'Transport & Logistics', 'Agriculture & Food'].includes(sector)
   const isFinancial = sector === 'Financial Services'
   const fwCount = frameworks.length
 
-  const base = revenue * (isHighEmissions ? 0.002 : isFinancial ? 0.0015 : 0.001)
-  const low = Math.max(50000, base * 0.5)
-  const high = Math.max(150000, base * 1.5)
+  // ESG due diligence is a slice of all-in DD (~0.2–4% of deal value). Focused ESG scope lands low in that band.
+  // High-emissions / financial sectors and more applicable frameworks push toward the upper end.
+  const pctLow = isHighEmissions ? 0.0020 : isFinancial ? 0.0015 : 0.0010
+  const pctHigh = (isHighEmissions ? 0.0040 : isFinancial ? 0.0035 : 0.0025) + (fwCount > 2 ? 0.0010 : 0)
+  const low = Math.max(7500, dealValue * pctLow)
+  const high = Math.max(25000, dealValue * pctHigh)
 
   const items = [
     { item: 'GHG inventory & Scope 3 assessment', cost: isHighEmissions ? '$40,000–80,000' : '$15,000–35,000' },
@@ -107,7 +110,7 @@ const getComplianceCost = (revenue: number, sector: string, frameworks: string[]
     { item: 'Ongoing annual compliance (Year 1)', cost: isHighEmissions ? '$60,000–120,000' : '$30,000–60,000' },
   ]
 
-  return { low, high, items }
+  return { low, high, pctLow, pctHigh, items }
 }
 
 // Framework applicability
@@ -194,7 +197,7 @@ export default function DealsDashboard() {
   const criticalRisks = risks.filter(r => r.severity === 'critical')
   const highRisks = risks.filter(r => r.severity === 'high')
   const mediumRisks = risks.filter(r => r.severity === 'medium')
-  const complianceCost = deal.revenue > 0 ? getComplianceCost(deal.revenue, deal.sector, frameworks) : null
+  const complianceCost = deal.deal_value > 0 ? getComplianceCost(deal.deal_value, deal.sector, frameworks) : null
 
   const generateExport = () => {
     const rows = [
@@ -395,7 +398,7 @@ export default function DealsDashboard() {
 
       {!complianceCost ? (
         <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: '#888784' }}>
-          Enter target revenue in Step 1 to generate a compliance cost estimate.
+          Enter deal value in Step 1 to generate a compliance cost estimate.
         </div>
       ) : (
         <>
@@ -403,29 +406,26 @@ export default function DealsDashboard() {
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Estimated ESG compliance cost — {deal.target_name || 'Target'}</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 8 }}>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color: '#64fe3e' }}>
-                {deal.currency} {Math.round(complianceCost.low / 1000)}k – {Math.round(complianceCost.high / 1000)}k
+                {(complianceCost.pctLow * 100).toFixed(2)}% – {(complianceCost.pctHigh * 100).toFixed(2)}% of deal value
               </div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>first-year estimate</div>
+            </div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', marginBottom: 8 }}>
+              ≈ {deal.currency} {Math.round(complianceCost.low / 1000)}k – {Math.round(complianceCost.high / 1000)}k consultant-led first-year cost
             </div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', lineHeight: 1.6 }}>
-              Based on {deal.sector} sector, {deal.jurisdiction} jurisdiction, {frameworks.length} applicable frameworks · Indicative only — requires specialist confirmation
+              ESG due diligence — a focused slice of all-in transaction DD ({deal.sector} sector, {deal.jurisdiction}, {frameworks.length} applicable frameworks) · Indicative only — requires specialist confirmation
             </div>
-            {deal.deal_value > 0 && (
-              <div style={{ marginTop: 12, paddingTop: 12, borderTop: '0.5px solid rgba(255,255,255,0.1)' }}>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
-                  As % of deal value: <span style={{ color: '#64fe3e', fontWeight: 600 }}>
-                    {((complianceCost.low / deal.deal_value) * 100).toFixed(1)}% – {((complianceCost.high / deal.deal_value) * 100).toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-            )}
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: '0.5px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Platform-led ESG screening with ThemisIQ</div>
+              <div style={{ fontSize: 13, color: '#64fe3e', fontWeight: 600 }}>from ~{deal.currency} 5k</div>
+            </div>
           </div>
 
           <div style={{ border: '0.5px solid #e8e7e4', borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ background: '#f8f7f5', padding: '10px 16px', borderBottom: '0.5px solid #e8e7e4' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#888784', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cost breakdown</div>
-                <div style={{ fontSize: 10, fontWeight: 500, color: '#888784' }}>Reference costs in USD</div>
+                <div style={{ fontSize: 10, fontWeight: 500, color: '#888784' }}>Typical consultant project costs (USD)</div>
               </div>
             </div>
             {complianceCost.items.map((item, i) => (
