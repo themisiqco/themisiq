@@ -125,13 +125,13 @@ const features = [
   ["M3 6h18M3 12h18M3 18h12", "Boundary decision register", "Every site considered, included or excluded, with a control-based reason for each."],
   ["M5 21V7l7-4 7 4v14 M9 21v-6h6v6", "Management assertion", "The signed responsible-party statement an engagement is built around — enforced before issue."],
   ["M4 19V5M4 19h16 M8 16l3-5 3 3 4-7", "Emission factor register", "Source, vintage, region, type and units for every factor, with vintage-mismatch flags."],
-  ["", "Activity data & ownership", "Monthly data per source, plus the named owner and reviewer for each stream."],
-  ["", "Calculation workbook", "Per-site, per-source working with the arithmetic shown — independently recalculable."],
+  ["M3 5c0-1.1 4-2 9-2s9 .9 9 2-4 2-9 2-9-.9-9-2z M3 5v14c0 1.1 4 2 9 2s9-.9 9-2V5 M3 12c0 1.1 4 2 9 2s9-.9 9-2", "Activity data & ownership", "Monthly data per source, plus the named owner and reviewer for each stream."],
+  ["M5 3h14v18H5z M8 7h8 M8 11h2M11 11h2M14 11h2 M8 15h2M11 15h2M14 15h2", "Calculation workbook", "Per-site, per-source working with the arithmetic shown — independently recalculable."],
   ["M21 12a9 9 0 1 1-3-6.7L21 8 M21 3v5h-5", "Reconciliation checks", "Monthly tie-outs, recalculation, completeness and duplicate detection — run automatically."],
   ["M12 3l8 4v5c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V7z M9 12l2 2 4-4", "Evidence register", "Source documents linked to each data point, with SHA-256 hashing and chain of custody."],
-  ["M12 8v4l3 2", "Audit trail & lineage", "Append-only record of who entered, reviewed and approved every figure."],
+  ["M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 8v4l3 2", "Audit trail & lineage", "Append-only record of who entered, reviewed and approved every figure."],
   ["M9 11l3 3L22 4 M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11", "Control testing", "Evidence that each control actually operated over the period — not just that it exists."],
-  ["m21 21-4.3-4.3", "Sampling register", "Population counts ready for the verifier to select against — independence preserved."],
+  ["M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M21 21l-4.3-4.3", "Sampling register", "Population counts ready for the verifier to select against — independence preserved."],
   ["M12 9v4M12 17h.01 M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z", "Readiness findings", "Prioritised list of what to fix before fieldwork — generated from the package itself."],
 ];
 
