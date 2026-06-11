@@ -4,11 +4,10 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { startCheckout } from '../../lib/checkout'
-import { LEGACY_PRICING_PAGE_ID } from '../../lib/pricing'
+import { LEGACY_PRICING_PAGE_ID, tierPrice, tierStrikethrough, volumeDiscount, type Tier } from '../../lib/pricing'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tier = 'starter' | 'professional' | 'advisory'
 type ModuleId = 'ghg' | 'risk' | 'supply' | 'people' | 'deals' | 'ai' | 'cyber'
 
 interface Module {
@@ -21,13 +20,7 @@ interface Module {
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
-const PRICES: Record<Tier, number> = {
-  starter: 999,
-  professional: 2499,
-  advisory: 4999,
-}
 
-const FULL_PRICE = 1499 // Starter full price before early access
 
 const MODULES: Module[] = [
   {
@@ -162,10 +155,10 @@ export default function PricingPage() {
   }, [])
 
   // Pricing logic
-  const unitPrice = PRICES[tier]
+  const unitPrice = tierPrice(tier)
   const count = selected.size
   const gross = count * unitPrice
-  const discount = count >= 3 ? 0.20 : count >= 2 ? 0.10 : 0
+  const discount = volumeDiscount(count)
   const net = Math.round(gross * (1 - discount))
   const handleBuy = () => {
     const moduleKeys = Array.from(selected).map((id) => LEGACY_PRICING_PAGE_ID[id]).filter(Boolean)
@@ -425,8 +418,8 @@ export default function PricingPage() {
               </div>
             )}
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784', marginBottom: 6 }}>Starter</div>
-            <div style={{ fontSize: 10, color: '#888784', textDecoration: 'line-through' }}>${FULL_PRICE.toLocaleString()}</div>
-            <div style={{ fontSize: 22, fontWeight: 600, color: '#0d0d0d' }}>$999<span style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
+            <div style={{ fontSize: 10, color: '#888784', textDecoration: 'line-through' }}>${tierStrikethrough('starter')?.toLocaleString()}</div>
+            <div style={{ fontSize: 22, fontWeight: 600, color: '#0d0d0d' }}>${tierPrice('starter').toLocaleString()}<span style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
             <div style={{ fontSize: 9, color: '#92400e', background: '#FEF3E2', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginTop: 4 }}>Early access</div>
             <div style={{ borderTop: `1px solid ${'#f3f4f6'}`, paddingTop: 12, marginTop: 12, textAlign: 'left', flex: 1 }}>
               <div style={{ fontSize: 11, color: '#888784', marginBottom: 8 }}>Core reports for each module you select</div>
@@ -445,7 +438,7 @@ export default function PricingPage() {
               </div>
             )}
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: tier === 'professional' ? '#7425e3' : '#7425e3', marginBottom: 6 }}>Professional</div>
-            <div style={{ fontSize: 22, fontWeight: 600, color: tier === 'professional' ? '#fff' : '#0d0d0d' }}>$2,499<span style={{ fontSize: 10, color: tier === 'professional' ? 'rgba(255,255,255,0.4)' : '#888784', fontWeight: 400 }}> /module/yr</span></div>
+            <div style={{ fontSize: 22, fontWeight: 600, color: tier === 'professional' ? '#fff' : '#0d0d0d' }}>${tierPrice('professional').toLocaleString()}<span style={{ fontSize: 10, color: tier === 'professional' ? 'rgba(255,255,255,0.4)' : '#888784', fontWeight: 400 }}> /module/yr</span></div>
             <div style={{ fontSize: 9, color: '#a78bfa', background: 'rgba(116,37,227,0.15)', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginTop: 4 }}>All frameworks</div>
             <div style={{ borderTop: `1px solid ${tier === 'professional' ? 'rgba(255,255,255,0.08)' : '#f3f4f6'}`, paddingTop: 12, marginTop: 12, textAlign: 'left', flex: 1 }}>
               <div style={{ fontSize: 11, color: tier === 'professional' ? 'rgba(255,255,255,0.45)' : '#888784', marginBottom: 8 }}>All frameworks for your selected modules</div>
@@ -465,7 +458,7 @@ export default function PricingPage() {
               </div>
             )}
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1fb1ff', marginBottom: 6 }}>Advisory</div>
-            <div style={{ fontSize: 22, fontWeight: 600, color: '#0d0d0d' }}>$4,999<span style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
+            <div style={{ fontSize: 22, fontWeight: 600, color: '#0d0d0d' }}>${tierPrice('advisory').toLocaleString()}<span style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
             <div style={{ fontSize: 9, color: '#0C447C', background: '#E6F1FB', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginTop: 4 }}>+ Expert guidance</div>
             <div style={{ borderTop: `1px solid ${'#f3f4f6'}`, paddingTop: 12, marginTop: 12, textAlign: 'left', flex: 1 }}>
               <div style={{ fontSize: 11, color: '#888784', marginBottom: 8 }}>Platform + dedicated expert guidance</div>
@@ -510,7 +503,7 @@ export default function PricingPage() {
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: isSelected ? '#0d0d0d' : '#888784' }}>
-                    ${PRICES[tier].toLocaleString()}
+                    ${tierPrice(tier).toLocaleString()}
                   </div>
                   <div style={{ fontSize: 10, color: '#888784' }}>/yr</div>
                 </div>
