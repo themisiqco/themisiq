@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { PACKS as PRICING } from '../../../lib/pricing'
 
 // ─────────────────────────────────────────────────────────────
 // Design tokens — lifted directly from HomePricing.tsx so these
@@ -73,7 +74,7 @@ export const PACKS: Record<string, PackConfig> = {
   supplier: {
     slug: 'supplier',
     name: 'Supplier Readiness Pack',
-    price: '$1,999',
+    price: '$' + PRICING['supplier-readiness'].price.toLocaleString(),
     priceNote: '/year · all modules included',
     driver: 'A customer is asking you to report.',
     includes: ['GHG Inventory (Scope 1 & 2)', 'Supply Chain & Scope 3', 'Supplier Portal'],
@@ -116,7 +117,7 @@ export const PACKS: Record<string, PackConfig> = {
   climate: {
     slug: 'climate',
     name: 'Climate Readiness Pack',
-    price: '$1,999',
+    price: '$' + PRICING['climate-readiness'].price.toLocaleString(),
     priceNote: '/year · all modules included',
     driver: 'A bank or insurer is asking.',
     includes: ['GHG Inventory (Scope 1 & 2)', 'Climate Risk'],
@@ -152,7 +153,7 @@ export const PACKS: Record<string, PackConfig> = {
   foundation: {
     slug: 'foundation',
     name: 'ESG Foundation Pack',
-    price: '$2,999',
+    price: '$' + PRICING['esg-foundation'].price.toLocaleString(),
     priceNote: '/year · all modules included',
     driver: 'Your board wants ESG in place.',
     includes: ['GHG Inventory (Scope 1 & 2)', 'People & Workforce', 'Climate Risk'],
@@ -195,7 +196,7 @@ export const PACKS: Record<string, PackConfig> = {
   investor: {
     slug: 'investor',
     name: 'Investor ESG Pack',
-    price: '$3,999',
+    price: '$' + PRICING['investor-esg'].price.toLocaleString(),
     priceNote: '/year · all modules included',
     driver: 'An investor requires it.',
     includes: ['GHG Inventory (Scope 1 & 2)', 'Climate Risk', 'Supply Chain & Scope 3', 'Deals & Investment'],
