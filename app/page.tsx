@@ -1,6 +1,7 @@
 'use client'
 import HomePricing from './components/HomePricing'
 import { useState, useEffect } from 'react'
+import { PACKS } from '../lib/pricing'
 import Nav from './components/Nav'
 import Footer from './components/Footer'
 
@@ -211,10 +212,10 @@ export default function Home() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
             {[
-              { name: 'Supplier Readiness', driver: 'A customer is asking', price: '$1,999', color: '#0F6E56', bg: '#E1F5EE', href: '/get-started/supplier', items: ['GHG Inventory', 'Supply Chain risk register', 'Supplier questionnaire'] },
-              { name: 'Climate Readiness', driver: 'Your bank is asking', price: '$1,999', color: '#0C447C', bg: '#E6F1FB', href: '/get-started/climate', items: ['GHG Inventory', 'Climate Risk assessment', 'TCFD / IFRS S2 output'] },
-              { name: 'ESG Foundation', driver: 'Your board wants it', price: '$2,999', color: '#7425e3', bg: '#EDE9FE', href: '/get-started/foundation', items: ['GHG Inventory', 'People & Workforce', 'Climate Risk'] },
-              { name: 'Investor ESG', driver: 'Your investor requires it', price: '$3,999', color: '#B91C1C', bg: '#FCEBEB', href: '/get-started/investor', items: ['GHG Inventory', 'Climate Risk', 'Supply Chain', 'Deals & Investment'] },
+              { name: 'Supplier Readiness', driver: 'A customer is asking', price: '$' + PACKS['supplier-readiness'].price.toLocaleString(), color: '#0F6E56', bg: '#E1F5EE', href: '/get-started/supplier', items: ['GHG Inventory', 'Supply Chain risk register', 'Supplier questionnaire'] },
+              { name: 'Climate Readiness', driver: 'Your bank is asking', price: '$' + PACKS['climate-readiness'].price.toLocaleString(), color: '#0C447C', bg: '#E6F1FB', href: '/get-started/climate', items: ['GHG Inventory', 'Climate Risk assessment', 'TCFD / IFRS S2 output'] },
+              { name: 'ESG Foundation', driver: 'Your board wants it', price: '$' + PACKS['esg-foundation'].price.toLocaleString(), color: '#7425e3', bg: '#EDE9FE', href: '/get-started/foundation', items: ['GHG Inventory', 'People & Workforce', 'Climate Risk'] },
+              { name: 'Investor ESG', driver: 'Your investor requires it', price: '$' + PACKS['investor-esg'].price.toLocaleString(), color: '#B91C1C', bg: '#FCEBEB', href: '/get-started/investor', items: ['GHG Inventory', 'Climate Risk', 'Supply Chain', 'Deals & Investment'] },
             ].map(pack => (
               <a key={pack.name} href={pack.href} style={{ background: '#fff', border: `1.5px solid ${pack.color}25`, borderRadius: 14, padding: '1.5rem', textDecoration: 'none', display: 'block', transition: 'all 0.15s' }}
                 onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = pack.color}
