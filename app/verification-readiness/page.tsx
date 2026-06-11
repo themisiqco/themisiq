@@ -8,6 +8,7 @@ export const metadata = {
     "Turn your completed GHG inventory into a verifier-ready evidence package, and give your chosen verifier secure access.",
 };
 
+import { tierPrice, ADDONS } from '../../lib/pricing'
 const css = `
   .vr{
     --ink:#0d0d0d;--body:#555553;--muted:#888784;--wash:#f8f7f5;--hair:#e8e7e4;--white:#ffffff;
@@ -291,7 +292,7 @@ export default function VerificationReadinessPage() {
           <div className="price-grid">
             <div className="price">
               <div className="tier">Your current plan</div>
-              <div className="amt">$1,499 <small>/ year</small></div>
+              <div className="amt">${tierPrice('starter').toLocaleString()} <small>/ year</small></div>
               <p className="desc">Climate-GHG — your Scope 1 &amp; 2 inventory engine.</p>
               <ul>
                 <li><span className="c">✓</span> Scope 1 &amp; 2 calculation</li>
@@ -303,7 +304,7 @@ export default function VerificationReadinessPage() {
             <div className="price add">
               <span className="ribbon">Add-on</span>
               <div className="tier">+ Verification Readiness</div>
-              <div className="amt">$499 <small>/ reporting year</small></div>
+              <div className="amt">${ADDONS.verification.price} <small>/ reporting year</small></div>
               <p className="desc">Everything needed to hand a verifier a defensible package — verifier access included.</p>
               <ul>
                 <li><span className="c">✓</span> All 12 assurance-package sections</li>
