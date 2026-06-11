@@ -423,7 +423,10 @@ export default function DealsDashboard() {
 
           <div style={{ border: '0.5px solid #e8e7e4', borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ background: '#f8f7f5', padding: '10px 16px', borderBottom: '0.5px solid #e8e7e4' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#888784', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cost breakdown</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#888784', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cost breakdown</div>
+                <div style={{ fontSize: 10, fontWeight: 500, color: '#888784' }}>Reference costs in USD</div>
+              </div>
             </div>
             {complianceCost.items.map((item, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: i < complianceCost.items.length - 1 ? '0.5px solid #f3f4f6' : 'none' }}>
