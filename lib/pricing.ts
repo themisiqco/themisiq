@@ -116,6 +116,8 @@ export type PackId =
   | 'climate-readiness'
   | 'esg-foundation'
   | 'investor-esg'
+  | 'ifrs-s2-compliance'
+  | 'csrd-compliance'
 
 export const PACKS: Record<
   PackId,
@@ -140,6 +142,16 @@ export const PACKS: Record<
     label: 'Investor ESG',
     price: 3999,
     modules: ['ghg', 'climate-risk', 'supply-chain', 'deals'],
+  },
+  'ifrs-s2-compliance': {
+    label: 'IFRS S2 Compliance Pack',
+    price: 4999,
+    modules: ['ghg', 'climate-risk'],
+  },
+  'csrd-compliance': {
+    label: 'CSRD Compliance Pack',
+    price: 5999,
+    modules: ['ghg', 'climate-risk', 'supply-chain', 'people'],
   },
 }
 
