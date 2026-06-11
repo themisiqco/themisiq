@@ -191,6 +191,8 @@ export default function DealsDashboard() {
     if (deal.sector && deal.jurisdiction && deal.revenue) {
       const detected = getApplicableFrameworks(deal.jurisdiction, deal.revenue, deal.sector, deal.deal_type)
       setFrameworks(detected)
+    } else {
+      setFrameworks([])
     }
   }, [deal.sector, deal.jurisdiction, deal.revenue, deal.deal_type])
 
@@ -581,7 +583,7 @@ export default function DealsDashboard() {
                 {frameworks.length > 0 ? (
                   <div style={{ fontSize: 11, color: '#0C447C', lineHeight: 1.6 }}><strong>{frameworks.join(' · ')}</strong><br />ESG is now a material deal risk</div>
                 ) : (
-                  <div style={{ fontSize: 11, color: '#0C447C', lineHeight: 1.6 }}>Complete Step 1 to detect applicable frameworks</div>
+                  <div style={{ fontSize: 11, color: '#0C447C', lineHeight: 1.6 }}>Enter sector, jurisdiction & target revenue in Step 1 to detect applicable frameworks</div>
                 )}
               </div>
             </div>
