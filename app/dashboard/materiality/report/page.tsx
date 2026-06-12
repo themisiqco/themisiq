@@ -38,6 +38,9 @@ const JURISDICTION_LABEL: Record<string, string> = {
   ca: 'Canada (federal pricing)', us_fed: 'US (federal)', us_ca: 'US — California cap-and-trade',
   cn: 'China (national ETS)', kr: 'South Korea (K-ETS)', jp: 'Japan',
   au: 'Australia (Safeguard)', nz: 'New Zealand (NZ ETS)', ch: 'Switzerland (CH ETS)',
+  in: 'India (CCTS)', id: 'Indonesia (ETS)', sg: 'Singapore (carbon tax)',
+  za: 'South Africa (carbon tax)', mx: 'Mexico (carbon tax)', cl: 'Chile (carbon tax)',
+  tw: 'Taiwan (carbon fee)', kz: 'Kazakhstan (ETS)',
 }
 const SCENARIO_LABEL: Record<string, { l: string; d: string }> = {
   ssp245: { l: 'IPCC SSP2-4.5', d: '~2.7°C' }, ssp126: { l: 'IPCC SSP1-2.6', d: '~1.8°C' },

@@ -96,6 +96,14 @@ const JURISDICTIONS = [
   { code: 'au', label: 'Australia (Safeguard)', desc: 'Run a facility above the Safeguard Mechanism emissions threshold.' },
   { code: 'nz', label: 'New Zealand (NZ ETS)', desc: "Operations covered by New Zealand's emissions trading scheme." },
   { code: 'ch', label: 'Switzerland (CH ETS)', desc: "Operations covered by the Swiss emissions trading scheme." },
+  { code: 'in', label: 'India (CCTS)', desc: "Energy-intensive industrial facilities covered by India's mandatory Carbon Credit Trading Scheme." },
+  { code: 'id', label: 'Indonesia (ETS)', desc: "Power-sector facilities covered by Indonesia's emissions trading scheme." },
+  { code: 'sg', label: 'Singapore (carbon tax)', desc: 'Large emitters above 25,000 tCO₂e/yr liable under Singapore\u2019s carbon tax.' },
+  { code: 'za', label: 'South Africa (carbon tax)', desc: "Operations liable under South Africa's carbon tax." },
+  { code: 'mx', label: 'Mexico (carbon tax)', desc: "Operations liable under Mexico's federal or state carbon taxes." },
+  { code: 'cl', label: 'Chile (carbon tax)', desc: "Large stationary sources liable under Chile's carbon tax." },
+  { code: 'tw', label: 'Taiwan (carbon fee)', desc: "Large emitters liable under Taiwan's carbon fee." },
+  { code: 'kz', label: 'Kazakhstan (ETS)', desc: "Facilities covered by Kazakhstan's emissions trading scheme." },
 ]
 
 const SCENARIOS = [
@@ -345,6 +353,7 @@ export default function MaterialityWizard() {
         <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}><em>Operating regions</em> was about where your assets physically sit — that drives weather and climate hazards. This step is about whose climate <em>laws</em> reach you — carbon costs and disclosure rules — which can include places you don't operate at all, like selling into the EU.</div>
       </div>
       <p style={sectionSub}>Tick every place where your company has operations, legal entities, or significant sales — those are where carbon-pricing and climate rules can reach you, even if you're not headquartered there. Not sure? Tick where you're based and where you earn most of your revenue. This drives transition risk, separately from your physical regions.</p>
+      <p style={{ ...sectionSub, marginTop: -8 }}>Not every country prices carbon. Many economies still have no mandatory scheme — much of the Gulf and Middle East, most of Africa outside South Africa, and several South and Southeast Asian economies such as Pakistan, Bangladesh, Thailand, and Vietnam — so you may operate somewhere with nothing to tick here. That's expected: those operations still carry physical climate risk, captured in the previous step. Coverage is expanding quickly, so this list will grow.</p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
         {JURISDICTIONS.map(j => {
           const sel = jurisdictionCodes.includes(j.code)
@@ -785,8 +794,8 @@ export default function MaterialityWizard() {
               <div style={{ fontSize: 12, color: '#0d0d0d', marginTop: 2 }}>{syn.twoChannel === 'both' ? 'Both transition & physical' : syn.twoChannel === 'transition-led' ? 'Transition-led' : syn.twoChannel === 'physical-led' ? 'Physical-led' : 'Limited'}</div>
             </div>
             <div style={{ background: '#f8f7f5', borderRadius: 8, padding: '8px 10px' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#888784' }}>Profile swing</div>
-              <div style={{ fontSize: 12, color: '#0d0d0d', marginTop: 2 }}>{syn.profileSwing?.magnitude ?? '—'} ({syn.profileSwing?.parisRiskCount ?? 0}→{syn.profileSwing?.highRiskCount ?? 0})</div>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#888784' }}>Scenario profile</div>
+              <div style={{ fontSize: 12, color: '#0d0d0d', marginTop: 2 }}>{syn.inverts ? 'Channels invert' : `${syn.profileSwing?.magnitude ?? '—'} shift`}</div>
             </div>
             <div style={{ background: '#f8f7f5', borderRadius: 8, padding: '8px 10px' }}>
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#888784' }}>Horizon trend</div>
