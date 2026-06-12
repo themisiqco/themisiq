@@ -443,7 +443,7 @@ function computeResilience(
   // Assemble the qualitative statement from the rule outputs.
   const parts: string[] = []
   if (robustExposures.length) {
-    parts.push(`Across all three futures, ${joinList(robustExposures)} ${robustExposures.length === 1 ? 'remains a' : 'remain'} material risk — ${robustExposures.length === 1 ? 'a robust exposure' : 'robust exposures'} that warrant attention regardless of the policy path.`)
+    parts.push(`Across all three futures, ${joinList(robustExposures)} ${robustExposures.length === 1 ? 'remains a material risk — a robust exposure that warrants' : 'remain material risks — robust exposures that warrant'} attention regardless of the policy path.`)
   } else {
     parts.push(`No single risk is material across all three futures, indicating exposures are scenario-dependent rather than structural.`)
   }
