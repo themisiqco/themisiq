@@ -337,6 +337,7 @@ function ReportInner() {
           .report-body { padding: 0 !important; max-width: none !important; }
           body { background: white !important; }
           .page { page-break-inside: avoid; break-inside: avoid; }
+          .report-body svg { max-height: 16cm !important; width: 100% !important; height: auto !important; }
           section.page { margin-top: 24px !important; }
           h2 { page-break-after: avoid; }
         }
@@ -752,6 +753,7 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
           .report-body { padding: 0 !important; max-width: none !important; }
           body { background: white !important; }
           .page { page-break-inside: avoid; break-inside: avoid; }
+          .report-body svg { max-height: 16cm !important; width: 100% !important; height: auto !important; }
           section.page { margin-top: 24px !important; }
           h2 { page-break-after: avoid; }
         }
