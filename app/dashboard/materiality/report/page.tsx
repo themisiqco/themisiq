@@ -68,6 +68,104 @@ const SEV = {
   low:  { color: '#888784', bg: '#f8f7f5', border: '#e8e7e4' },
 } as const
 
+// TCFD opportunity descriptions — for the report's climate-opportunities section
+const OPPORTUNITY_DESC: Record<string, string> = {
+  'Resource efficiency': 'Lower operating costs through more efficient production, materials, transport, and energy use.',
+  'Energy source': 'Shifting to low-carbon energy (renewables, PPAs, electrified process heat) and the savings that follow.',
+  'Products & services': 'Developing low-emission products or services that meet rising demand for sustainable options.',
+  'Markets': 'Accessing new markets and customer segments opened up by the low-carbon transition.',
+  'Resilience': 'Strengthening adaptive capacity so the business withstands physical and transition climate pressures.',
+}
+const OPP_LABEL: Record<string, string> = { high: 'STRONG', med: 'MODERATE', low: 'LIMITED' }
+
+// ── ESRS Set 1 disclosure-requirement map (Commission Delegated Regulation (EU) 2023/2772) ──
+// Translates a material topic into the specific disclosures it triggers. 'relief' marks the
+// topics (E4, S2, S3, S4) that Wave 1 undertakings may phase in for FY2025–2026 under the
+// quick-fix amendment, Del. Reg. (EU) 2025/1416.
+const ESRS_DR_MAP: Record<string, { name: string; relief?: boolean; drs: { code: string; title: string; data: string }[] }> = {
+  E1: { name: 'Climate change', drs: [
+    { code: 'E1-1', title: 'Transition plan for climate change mitigation', data: 'Plan compatibility with limiting warming to 1.5°C; decarbonisation levers (disclosed only where a plan exists)' },
+    { code: 'E1-2', title: 'Policies', data: 'Climate change mitigation and adaptation policies' },
+    { code: 'E1-3', title: 'Actions and resources', data: 'Key actions, expected GHG reductions, CapEx/OpEx allocated' },
+    { code: 'E1-4', title: 'Targets', data: 'GHG reduction targets, base year, milestone/target years, absolute and intensity' },
+    { code: 'E1-5', title: 'Energy consumption and mix', data: 'Total energy consumption (MWh); fossil / nuclear / renewable split; energy intensity per net revenue' },
+    { code: 'E1-6', title: 'Gross Scopes 1, 2, 3 and total GHG emissions', data: 'Scope 1; Scope 2 (location- and market-based); Scope 3 by category; total GHG; intensity per net revenue' },
+    { code: 'E1-7', title: 'GHG removals and carbon credits', data: 'Removals (tCO₂e); carbon credits cancelled or planned' },
+    { code: 'E1-8', title: 'Internal carbon pricing', data: 'Schemes applied, prices used, scope of emissions covered' },
+    { code: 'E1-9', title: 'Anticipated financial effects', data: 'Monetary exposure from material physical and transition risks; climate-related opportunities' },
+  ]},
+  E2: { name: 'Pollution', drs: [
+    { code: 'E2-1', title: 'Policies', data: 'Policies to prevent and control pollution of air, water and soil' },
+    { code: 'E2-2', title: 'Actions and resources', data: 'Actions taken and resources allocated' },
+    { code: 'E2-3', title: 'Targets', data: 'Pollution-reduction targets' },
+    { code: 'E2-4', title: 'Pollution of air, water and soil', data: 'Emissions of pollutants to air, water, soil (tonnes), by pollutant' },
+    { code: 'E2-5', title: 'Substances of concern', data: 'Production/use of substances of concern and of very high concern (tonnes)' },
+    { code: 'E2-6', title: 'Anticipated financial effects', data: 'Monetary exposure from pollution-related risks and opportunities' },
+  ]},
+  E3: { name: 'Water and marine resources', drs: [
+    { code: 'E3-1', title: 'Policies', data: 'Water and marine-resources policies' },
+    { code: 'E3-2', title: 'Actions and resources', data: 'Actions taken and resources allocated' },
+    { code: 'E3-3', title: 'Targets', data: 'Water-related targets' },
+    { code: 'E3-4', title: 'Water consumption', data: 'Total water consumption (m³); consumption in water-stressed areas; water intensity per net revenue' },
+    { code: 'E3-5', title: 'Anticipated financial effects', data: 'Monetary exposure from water-related risks and opportunities' },
+  ]},
+  E4: { name: 'Biodiversity and ecosystems', relief: true, drs: [
+    { code: 'E4-1', title: 'Transition plan and resilience', data: 'Biodiversity transition plan; resilience of the strategy' },
+    { code: 'E4-2', title: 'Policies', data: 'Biodiversity and ecosystems policies' },
+    { code: 'E4-3', title: 'Actions and resources', data: 'Actions taken and resources allocated' },
+    { code: 'E4-4', title: 'Targets', data: 'Biodiversity and ecosystems targets' },
+    { code: 'E4-5', title: 'Impact metrics', data: 'Land-use change; state of species and ecosystems' },
+    { code: 'E4-6', title: 'Anticipated financial effects', data: 'Monetary exposure from biodiversity-related risks and opportunities' },
+  ]},
+  E5: { name: 'Resource use and circular economy', drs: [
+    { code: 'E5-1', title: 'Policies', data: 'Resource-use and circular-economy policies' },
+    { code: 'E5-2', title: 'Actions and resources', data: 'Actions taken and resources allocated' },
+    { code: 'E5-3', title: 'Targets', data: 'Resource-use and circular-economy targets' },
+    { code: 'E5-4', title: 'Resource inflows', data: 'Materials used (tonnes); share of recycled / renewable inputs' },
+    { code: 'E5-5', title: 'Resource outflows', data: 'Products, materials and waste (tonnes); recyclable content; hazardous / non-hazardous waste' },
+    { code: 'E5-6', title: 'Anticipated financial effects', data: 'Monetary exposure from resource-related risks and opportunities' },
+  ]},
+  S1: { name: 'Own workforce', drs: [
+    { code: 'S1-1', title: 'Policies', data: 'Own-workforce policies' },
+    { code: 'S1-3', title: 'Channels to raise concerns', data: 'Grievance channels and remediation for own workforce' },
+    { code: 'S1-4', title: 'Actions', data: 'Actions on material impacts and their effectiveness' },
+    { code: 'S1-5', title: 'Targets', data: 'Workforce-related targets' },
+    { code: 'S1-6', title: 'Characteristics of employees', data: 'Headcount by gender, country and contract type; turnover' },
+    { code: 'S1-14', title: 'Health and safety', data: 'Coverage; recordable work-related injuries, fatalities, and ill-health' },
+    { code: 'S1-16', title: 'Remuneration (pay gap)', data: 'Gender pay gap (%); total-remuneration ratio (highest-paid to median)' },
+    { code: 'S1-17', title: 'Incidents and complaints', data: 'Discrimination / harassment incidents; severe human-rights incidents' },
+  ]},
+  S2: { name: 'Workers in the value chain', relief: true, drs: [
+    { code: 'S2-1', title: 'Policies', data: 'Value-chain-worker policies' },
+    { code: 'S2-2', title: 'Engagement', data: 'Processes to engage value-chain workers on impacts' },
+    { code: 'S2-3', title: 'Channels to raise concerns', data: 'Grievance channels and remediation' },
+    { code: 'S2-4', title: 'Actions', data: 'Actions on material impacts and their effectiveness' },
+    { code: 'S2-5', title: 'Targets', data: 'Value-chain-worker targets' },
+  ]},
+  S3: { name: 'Affected communities', relief: true, drs: [
+    { code: 'S3-1', title: 'Policies', data: 'Affected-communities policies' },
+    { code: 'S3-2', title: 'Engagement', data: 'Processes to engage affected communities on impacts' },
+    { code: 'S3-3', title: 'Channels to raise concerns', data: 'Grievance channels and remediation' },
+    { code: 'S3-4', title: 'Actions', data: 'Actions on material impacts and their effectiveness' },
+    { code: 'S3-5', title: 'Targets', data: 'Community-related targets' },
+  ]},
+  S4: { name: 'Consumers and end-users', relief: true, drs: [
+    { code: 'S4-1', title: 'Policies', data: 'Consumer / end-user policies' },
+    { code: 'S4-2', title: 'Engagement', data: 'Processes to engage consumers and end-users on impacts' },
+    { code: 'S4-3', title: 'Channels to raise concerns', data: 'Grievance channels and remediation' },
+    { code: 'S4-4', title: 'Actions', data: 'Actions on material impacts and their effectiveness' },
+    { code: 'S4-5', title: 'Targets', data: 'Consumer / end-user targets' },
+  ]},
+  G1: { name: 'Business conduct', drs: [
+    { code: 'G1-1', title: 'Business conduct policies and corporate culture', data: 'Conduct policies; description of corporate culture' },
+    { code: 'G1-2', title: 'Management of supplier relationships', data: 'Approach to supplier relationships; payment-practices policy' },
+    { code: 'G1-3', title: 'Prevention and detection of corruption and bribery', data: 'Procedures in place; training coverage' },
+    { code: 'G1-4', title: 'Confirmed incidents of corruption or bribery', data: 'Number of confirmed incidents; convictions; fines' },
+    { code: 'G1-5', title: 'Political influence and lobbying', data: 'Political contributions; lobbying spend' },
+    { code: 'G1-6', title: 'Payment practices', data: 'Average time to pay; standard terms; late-payment status' },
+  ]},
+}
+
 export default function CsrdReportPage() {
   // useSearchParams must be inside a Suspense boundary for Next.js to prerender this page.
   return (
@@ -218,9 +316,15 @@ function ReportInner() {
             <strong>Transition risk</strong> is computed as industry carbon exposure × jurisdictional policy intensity × scenario policy-speed × time-horizon multiplier. Transition geography (policy jurisdictions) is deliberately distinct from physical geography (IPCC regions): physical exposure depends on where assets and hazards are; transition exposure depends on which policy regimes apply.
           </p>
           {isCsrd && (
-            <p style={p}>
-              <strong>Double materiality</strong> is operationalised as the combination of single (financial) materiality and impact materiality: <em>double materiality = financial + impact</em>. The financial axis uses the engine above; climate (E1) financial score is taken directly from the physical + transition computation. The impact axis uses industry baselines for the ten ESRS topics, refined by the user's self-assessment.
-            </p>
+            <>
+              <h3 style={h3}>Impact materiality (inside-out)</h3>
+              <p style={p}>
+                <strong>Double materiality</strong> combines single (financial) materiality and impact materiality: <em>double materiality = financial + impact</em>. The financial (outside-in) axis uses the engine above; the climate (E1) financial score is taken directly from the physical + transition computation.
+              </p>
+              <p style={p}>
+                The impact (inside-out) axis assesses how the undertaking's own activities affect people and the environment across the ten ESRS topics. Under ESRS, impact materiality is a function of the <strong>severity</strong> of an impact — its scale, scope, and irremediability — and, for potential impacts, its <strong>likelihood</strong>. Each topic starts from a sector baseline and is refined by the preparer's self-assessment; a topic is material where it is significant on the impact axis, the financial axis, or both.
+              </p>
+            </>
           )}
           <h3 style={h3}>Scenario inversion</h3>
           <p style={p}>
@@ -275,6 +379,25 @@ function ReportInner() {
           </section>
         )}
 
+        {/* ── DISCLOSURE ROADMAP (CSRD) ──────────────────────────────────── */}
+        {isCsrd && matrix.length > 0 && (
+          <>
+            <section className="page" style={{ marginTop: 48 }}>
+              <H>Disclosure roadmap</H>
+              <p style={p}>
+                Each topic determined material above triggers a defined set of ESRS disclosure requirements. This roadmap translates the materiality result into the specific disclosures <strong>{a.company_name || SECTOR_LABEL[a.industry_code] || 'the entity'}</strong> must prepare — turning <em>what is material</em> into <em>what to collect and report</em>. The key disclosure requirements are shown per topic; the full set within each topical standard applies.
+              </p>
+              <p style={p}>
+                Two cross-cutting elements always apply regardless of which topics are material: <strong>ESRS 2 General disclosures</strong> (governance, strategy, and the IRO-1 / IRO-2 / SBM-3 disclosures that document this materiality process), and the minimum disclosure requirements on policies, actions, targets and metrics (MDR-P / A / T / M) referenced within each topic below.
+              </p>
+              <p style={{ ...p, fontSize: 11, color: '#888784' }}>
+                Mapped to ESRS Set 1 (Commission Delegated Regulation (EU) 2023/2772), the standards in force for FY2025–2026 reporting. The revised ESRS ("ESRS 2.0"), adopted mid-2026 and applying from FY2027 (early adoption permitted FY2026), reduce mandatory datapoints by approximately 60%; ThemisIQ tracks both. Topics marked "FY25–26 phase-in" (E4, S2, S3, S4) may be phased in for FY2025–2026 under the quick-fix amendment, Del. Reg. (EU) 2025/1416, subject to the ESRS 2.17 summary disclosure where the topic is material.
+              </p>
+            </section>
+            <DisclosureRoadmap matrix={matrix} />
+          </>
+        )}
+
         {/* ── RISK REGISTER ──────────────────────────────────────────────── */}
         <section className="page" style={{ marginTop: 48 }}>
           <H>Risk register</H>
@@ -310,6 +433,56 @@ function ReportInner() {
               ))}
             </tbody>
           </table>
+        </section>
+
+        {/* ── CLIMATE OPPORTUNITIES ──────────────────────────────────────── */}
+        <section className="page" style={{ marginTop: 48 }}>
+          <H>Climate opportunities</H>
+          <p style={p}><em>TCFD opportunity categories × industry × scenario. The upside view that IFRS S2 and the ESRS anticipated-financial-effects disclosures ask for alongside risk.</em></p>
+          {(result.opportunities || []).length > 0 ? (
+            <table style={tbl}>
+              <thead><tr style={trh}><th style={th}>Opportunity</th><th style={th}>Relevance</th><th style={th}>Description</th></tr></thead>
+              <tbody>
+                {(result.opportunities || []).map((o: any, i: number) => (
+                  <tr key={'op'+i} style={tr}>
+                    <td style={td}>{o.label}</td>
+                    <td style={td}><span style={{ background: '#E1F5EE', color: '#0F6E56', border: '0.5px solid #0F6E56', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99 }}>{OPP_LABEL[o.band] || String(o.band).toUpperCase()}</span></td>
+                    <td style={td}>{OPPORTUNITY_DESC[o.label] || ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : <p style={{ ...p, color: '#888784' }}>No opportunity profile available for this industry yet.</p>}
+        </section>
+
+        {/* ── ASSUMPTIONS REGISTER ───────────────────────────────────────── */}
+        <section className="page" style={{ marginTop: 48 }}>
+          <H>Assumptions register</H>
+          <ul style={ul}>
+            <li style={li}>All scoring inputs are ordinal sector-level starter defaults (0–3 and 0–10 scales) derived from the public frameworks above. They are not empirically calibrated to the entity and require validation against entity-specific data.</li>
+            <li style={li}><strong>Impact-materiality baselines.</strong> Each ESRS topic's impact score starts from a sector baseline and is refined by the preparer's self-assessment. ESRS does not prescribe numeric impact scores — severity (scale, scope, irremediability) and likelihood are a disclosed, preparer-set judgement.</li>
+            <li style={li}><strong>Financial-materiality engine.</strong> The financial axis is the physical + transition computation (industry × geography × jurisdiction × scenario × horizon); the climate (E1) financial score is taken directly from it.</li>
+            <li style={li}><strong>Materiality threshold.</strong> The matrix quadrants use a mid-scale split for illustration. ESRS requires the undertaking to set and document its own materiality threshold through its governance process; that threshold is not set by this screening.</li>
+            <li style={li}><strong>Single scenario.</strong> This determination uses the selected scenario ({SCENARIO_LABEL[a.scenario_code]?.l || a.scenario_code}). Resilience across a diverse range of scenarios is assessed in the separate resilience analysis, as ESRS E1 requires.</li>
+          </ul>
+        </section>
+
+        {/* ── DATA LINEAGE ───────────────────────────────────────────────── */}
+        <section className="page" style={{ marginTop: 48 }}>
+          <H>Data lineage</H>
+          <p style={p}>The following inputs were provided by the user for this assessment: primary sector, operating regions, policy jurisdictions, asset profile, time horizon, scenario, and the per-topic impact-materiality self-assessment. All scoring defaults — hazard sensitivities, regional hazard intensities, carbon exposure, jurisdictional policy intensities, transition-driver weights, opportunity relevances, and ESRS topic baselines — are platform reference values, not entity-supplied. The boundary matters for assurance: user inputs scope the assessment; platform defaults and the impact self-assessment must be validated, and informed by stakeholder engagement, before any disclosure.</p>
+        </section>
+
+        {/* ── LIMITATIONS ────────────────────────────────────────────────── */}
+        <section className="page" style={{ marginTop: 48 }}>
+          <H>Limitations</H>
+          <ul style={ul}>
+            <li style={li}>This is a <strong>screening</strong> to scope a formal CSRD / ESRS double materiality assessment, not the assessment itself. Before publication, a governance-approved materiality threshold, documented stakeholder engagement informing the impact axis, and independent professional review are required.</li>
+            <li style={li}>Scores are <strong>ordinal and relative</strong>, not absolute measures of probability, magnitude, or monetary loss.</li>
+            <li style={li}>The <strong>disclosure roadmap</strong> lists the requirements each material topic triggers under ESRS Set 1; it does not assert that the entity's disclosures are complete or compliant. Datapoint applicability depends on the entity's own facts and on the final revised ESRS for FY2027.</li>
+            <li style={li}>For <strong>financial institutions</strong>, this entity-level screen understates portfolio (financed-emissions) exposure, which requires a separate assessment.</li>
+            <li style={li}>Final determination of material topics is a matter for management judgement, informed by entity-specific data and, where required, independent professional review.</li>
+          </ul>
         </section>
 
         {/* ── IMPORTANT NOTICE ───────────────────────────────────────────────
@@ -522,6 +695,42 @@ function ResilienceMap({ items }: { items: any[] }) {
   )
 }
 
+
+// ── Disclosure roadmap: material topics → the ESRS Set 1 DRs they trigger ──
+// Each material topic renders as its own `.page` section so print pagination keeps
+// each topic's table whole without trying to hold the entire (tall) roadmap together.
+function DisclosureRoadmap({ matrix }: { matrix: any[] }) {
+  const material = [...matrix]
+    .filter((t: any) => Math.max(t.financial ?? 0, t.impact ?? 0) >= 5 && ESRS_DR_MAP[t.code])
+    .sort((a: any, b: any) => Math.max(b.financial, b.impact) - Math.max(a.financial, a.impact))
+  if (!material.length) return null
+  return (
+    <>
+      {material.map((t: any) => {
+        const m = ESRS_DR_MAP[t.code]
+        return (
+          <section key={t.code} className="page" style={{ marginTop: 18 }}>
+            <h3 style={{ ...h3, marginTop: 0, marginBottom: 6 }}>
+              <span style={{ color: '#aaa', fontSize: 12 }}>{t.code}</span> {m.name}
+              {m.relief && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 600, color: '#854F0B', background: '#FAEEDA', border: '0.5px solid #EF9F27', borderRadius: 99, padding: '2px 8px', verticalAlign: 'middle' }}>FY25–26 phase-in</span>}
+            </h3>
+            <table style={tbl}>
+              <thead><tr style={trh}><th style={{ ...th, width: '30%' }}>Disclosure requirement</th><th style={th}>Key datapoints to collect</th></tr></thead>
+              <tbody>
+                {m.drs.map(d => (
+                  <tr key={d.code} style={tr}>
+                    <td style={td}><strong>{d.code}</strong>&nbsp;{d.title}</td>
+                    <td style={td}>{d.data}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )
+      })}
+    </>
+  )
+}
 
 // ─── Resilience report (multi-scenario) ───────────────────────────────────────
 // Rendered when the saved record has results.analysisType === 'resilience'.
