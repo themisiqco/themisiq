@@ -567,7 +567,7 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
           <p style={p}>{syn.statement}</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, margin: '0 0 8px' }}>
             <TextStat label="Two-channel exposure" v={syn.twoChannel === 'both' ? 'Both transition & physical' : syn.twoChannel === 'transition-led' ? 'Transition-led' : syn.twoChannel === 'physical-led' ? 'Physical-led' : 'Limited'} />
-            <TextStat label="Profile swing" v={`${syn.profileSwing?.magnitude ?? '—'} (${syn.profileSwing?.parisRiskCount ?? 0}→${syn.profileSwing?.highRiskCount ?? 0})`} />
+            <TextStat label="Scenario profile" v={syn.inverts ? 'Channels invert' : `${syn.profileSwing?.magnitude ?? '—'} shift`} />
             <TextStat label="Horizon trend" v={syn.horizonNote === 'worsens' ? 'Worsens toward 2050' : 'Stable over time'} />
           </div>
         </section>

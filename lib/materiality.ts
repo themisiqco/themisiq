@@ -303,6 +303,7 @@ export type ResilienceSynthesis = {
   warmingContingent: string[]            // worse under high-warming
   policyContingent: string[]             // worse under Paris-aligned (rapid policy)
   twoChannel: 'both' | 'transition-led' | 'physical-led' | 'limited'
+  inverts: boolean                       // do the two channels move in opposite directions across the range?
   profileSwing: { parisRiskCount: number; highRiskCount: number; swing: number; magnitude: 'limited' | 'moderate' | 'large' }
   horizonNote: 'worsens' | 'stable'
   statement: string                      // assembled qualitative resilience read
@@ -420,23 +421,48 @@ function computeResilience(
     .filter(i => i.kind !== 'opportunity' && i.classification === 'policy-path-contingent')
     .map(i => i.label)
 
-  // Rule 4 — two-channel check: is the entity stressed under physical-led and/or
-  // transition-led futures? Count material risks at each end of the trio.
+  // Rule 4 — two-channel check, SEVERITY-aware. The earlier version counted
+  // material risks at each end; that is blind to severity, so an entity whose
+  // physical risks are already all material at the low-warming end (a sign of
+  // HIGH exposure) could never register as physical-led, because its count
+  // cannot grow. We now sum band ranks (low/med/high = 0/1/2) per channel —
+  // bands are calibrated per driver and so are comparable across channels,
+  // whereas raw scores are not. Transition bites hardest under the rapid-policy
+  // (Paris) end; physical bites hardest under the high-warming end.
   const riskAt = (role: ResilienceRole) => perScenario.find(p => p.role === role)?.result
+  const physSev = (role: ResilienceRole) => { const r = riskAt(role); return r ? r.physical.reduce((s, p) => s + bandRank(p.band), 0) : 0 }
+  const transSev = (role: ResilienceRole) => { const r = riskAt(role); return r ? r.transition.reduce((s, t) => s + bandRank(t.band), 0) : 0 }
+  const physParis = physSev('paris'), physHigh = physSev('high')
+  const transParis = transSev('paris'), transHigh = transSev('high')
+
+  // Material-risk counts retained for disclosure (shown in the report).
   const matCount = (r?: AssessmentResult) =>
     r ? r.physical.filter(p => bandRank(p.band) >= 1).length + r.transition.filter(t => bandRank(t.band) >= 1).length : 0
   const parisRiskCount = matCount(riskAt('paris'))
   const highRiskCount = matCount(riskAt('high'))
-  const transitionLed = parisRiskCount >= 2          // material risk persists even at the low-warming/rapid-policy end
-  const physicalLed = highRiskCount > parisRiskCount  // risk grows toward high warming
+
+  // A channel is "active" if its band severity at its worst-case end is
+  // meaningful (>=2: at least one High, or two Moderates).
+  const transitionActive = transParis >= 2
+  const physicalActive = physHigh >= 2
   const twoChannel: ResilienceSynthesis['twoChannel'] =
-    transitionLed && physicalLed ? 'both'
-      : physicalLed ? 'physical-led'
-      : transitionLed ? 'transition-led'
+    transitionActive && physicalActive ? 'both'
+      : physicalActive ? 'physical-led'
+      : transitionActive ? 'transition-led'
       : 'limited'
 
-  // Rule 3 — profile swing: how much the risk count moves paris→high.
-  const swing = Math.abs(highRiskCount - parisRiskCount)
+  // Inversion — do the two channels move in OPPOSITE directions across the range
+  // (physical worsening toward high warming while transition eases, or the
+  // reverse)? This is the headline resilience finding and the count-based swing
+  // cannot see it, so it is detected explicitly on band-rank severity.
+  const physRises = physHigh > physParis, physEases = physHigh < physParis
+  const transRises = transHigh > transParis, transEases = transHigh < transParis
+  const inverts = (physRises && transEases) || (physEases && transRises)
+
+  // Rule 3 — profile movement. Magnitude is taken from the larger single-channel
+  // severity shift, so a composition inversion (which leaves the material-risk
+  // COUNT almost unchanged) is no longer mis-read as a "limited" swing.
+  const swing = Math.max(Math.abs(physHigh - physParis), Math.abs(transHigh - transParis))
   const magnitude: ResilienceSynthesis['profileSwing']['magnitude'] =
     swing <= 1 ? 'limited' : swing <= 3 ? 'moderate' : 'large'
 
@@ -447,15 +473,23 @@ function computeResilience(
   } else {
     parts.push(`No single risk is material across all three futures, indicating exposures are scenario-dependent rather than structural.`)
   }
+  // Inversion sentence — rules-derived from the per-channel severity directions.
+  if (inverts) {
+    const physLabels = items.filter(i => i.kind === 'physical' && i.classification !== 'low-across-futures').map(i => i.label)
+    const transLabels = items.filter(i => i.kind === 'transition' && i.classification !== 'low-across-futures').map(i => i.label)
+    parts.push(physRises && transEases
+      ? `The balance of risk inverts across the range: transition exposures${transLabels.length ? ` (${joinList(transLabels)})` : ''} are most severe under the Paris-aligned, rapid-policy pathway and ease as policy ambition weakens, while physical exposures${physLabels.length ? ` (${joinList(physLabels)})` : ''} intensify toward the high-warming pathway.`
+      : `The balance of risk inverts across the range: physical exposures${physLabels.length ? ` (${joinList(physLabels)})` : ''} are most severe under the lower-warming pathway while transition exposures${transLabels.length ? ` (${joinList(transLabels)})` : ''} intensify under faster decarbonisation.`)
+  }
   if (warmingContingent.length) parts.push(`${joinList(warmingContingent)} ${warmingContingent.length === 1 ? 'rises' : 'rise'} with warming, biting hardest under the high-warming pathway (physical-risk driven).`)
   if (policyContingent.length) parts.push(`${joinList(policyContingent)} ${policyContingent.length === 1 ? 'is' : 'are'} most material under the Paris-aligned pathway, indicating sensitivity to the speed of decarbonisation policy rather than to warming itself.`)
   parts.push(
-    twoChannel === 'both' ? `The business faces meaningful stress under both transition-led and physical-led futures — resilience requires preparing for either.`
+    twoChannel === 'both' ? `The business faces meaningful stress under both transition-led and physical-led futures — resilience requires preparing for either rather than betting on a single pathway.`
     : twoChannel === 'physical-led' ? `Stress is concentrated in higher-warming (physical-risk) futures.`
     : twoChannel === 'transition-led' ? `Stress is concentrated in rapid-policy (transition-risk) futures.`
     : `Risk exposure is limited across the range tested.`
   )
-  parts.push(`The overall risk profile shows a ${magnitude} swing across scenarios (${parisRiskCount} material risk${parisRiskCount === 1 ? '' : 's'} under the Paris-aligned pathway, ${highRiskCount} under high warming)${magnitude === 'limited' ? ', suggesting a relatively stable profile at screening level' : magnitude === 'large' ? ', indicating outcomes are highly scenario-dependent and warrant deeper analysis' : ''}.`)
+  parts.push(`Measured on band severity, the risk profile shows a ${magnitude} shift across scenarios${inverts ? ' — driven by the inversion above rather than by any change in the number of material risks' : ''} (${parisRiskCount} material risk${parisRiskCount === 1 ? '' : 's'} under the Paris-aligned pathway, ${highRiskCount} under high warming)${!inverts && magnitude === 'limited' ? ', suggesting a relatively stable profile at screening level' : magnitude === 'large' ? ', so outcomes are materially scenario-dependent' : ''}.`)
   if (horizonTrend === 'rises') parts.push(`Exposure also tends to increase over the longer time horizon (toward 2050).`)
   parts.push(`This is a screening-level resilience read; the final determination of strategic resilience is a matter for management judgement, informed by entity-specific data.`)
 
@@ -463,6 +497,7 @@ function computeResilience(
     items,
     synthesis: {
       robustExposures, warmingContingent, policyContingent, twoChannel,
+      inverts,
       profileSwing: { parisRiskCount, highRiskCount, swing, magnitude },
       horizonNote: horizonTrend === 'rises' ? 'worsens' : 'stable',
       statement: parts.join(' '),
