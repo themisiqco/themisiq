@@ -149,6 +149,69 @@ const OPPORTUNITY_DESC: Record<string, string> = {
 type Mode = 's2' | 'csrd'
 type Band = 'high' | 'med' | 'low'
 
+// ─── Resilience map (scenario-response scatter) — kept identical to the PDF report ──
+function ResilienceMap({ items }: { items: any[] }) {
+  const risks = (items || []).filter((i: any) => i.kind !== 'opportunity')
+  const W = 620, H = 470, padL = 92, padT = 50, plotW = 340, plotH = 350
+  const px = (f: number) => padL + f * plotW
+  const py = (f: number) => padT + (1 - f) * plotH
+  const frac = (b: string) => b === 'high' ? 0.82 : b === 'med' ? 0.5 : 0.18
+  const bandAt = (it: any, role: string) => it.cells?.find((c: any) => c.role === role)?.band ?? 'low'
+
+  // Group by (paris-band, high-band) cell; stack collisions vertically so labels stay legible.
+  const groups = new Map<string, any[]>()
+  for (const it of risks) {
+    const key = bandAt(it, 'paris') + '|' + bandAt(it, 'high')
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key)!.push(it)
+  }
+  type P = { it: any; cx: number; cy: number; color: string }
+  const placed: P[] = []
+  for (const [key, arr] of groups) {
+    const [xb, yb] = key.split('|')
+    const baseX = px(frac(xb)), baseY = py(frac(yb))
+    const n = arr.length
+    arr.forEach((it: any, i: number) => {
+      placed.push({ it, cx: baseX, cy: baseY + (i - (n - 1) / 2) * 24, color: it.kind === 'physical' ? '#C2410C' : '#7425e3' })
+    })
+  }
+
+  const axis = '#888784', grid = '#e8e7e4', muted = '#555553', ink = '#0d0d0d', hint = '#a8a6a1'
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10 }} role="img" aria-label="Resilience scenario-response map: risks plotted by exposure under a rapid-policy future versus a high-warming future">
+      <line x1={px(0.5)} y1={padT} x2={px(0.5)} y2={padT + plotH} stroke={grid} strokeDasharray="3 4" />
+      <line x1={padL} y1={py(0.5)} x2={padL + plotW} y2={py(0.5)} stroke={grid} strokeDasharray="3 4" />
+      <line x1={padL} y1={padT} x2={padL} y2={padT + plotH} stroke={axis} />
+      <line x1={padL} y1={padT + plotH} x2={padL + plotW} y2={padT + plotH} stroke={axis} />
+      <line x1={px(0.18)} y1={py(0.18)} x2={px(0.82)} y2={py(0.82)} stroke="#b8b6b1" strokeDasharray="2 5" />
+      <text x={px(0.82)} y={padT + 4} textAnchor="middle" fontSize="11" fill={hint}>persistent / robust</text>
+      <text x={px(0.2)} y={padT + 4} textAnchor="middle" fontSize="11" fill={hint}>warming-driven</text>
+      <text x={px(0.82)} y={padT + plotH - 8} textAnchor="middle" fontSize="11" fill={hint}>policy-driven</text>
+      <text x={padL - 10} y={py(0.82) + 4} textAnchor="end" fontSize="11" fill={muted}>High</text>
+      <text x={padL - 10} y={py(0.5) + 4} textAnchor="end" fontSize="11" fill={muted}>Mod</text>
+      <text x={padL - 10} y={py(0.18) + 4} textAnchor="end" fontSize="11" fill={muted}>Low</text>
+      <text x={px(0.18)} y={padT + plotH + 18} textAnchor="middle" fontSize="11" fill={muted}>Low</text>
+      <text x={px(0.5)} y={padT + plotH + 18} textAnchor="middle" fontSize="11" fill={muted}>Mod</text>
+      <text x={px(0.82)} y={padT + plotH + 18} textAnchor="middle" fontSize="11" fill={muted}>High</text>
+      <text x={padL + plotW / 2} y={padT + plotH + 42} textAnchor="middle" fontSize="12" fill={muted}>Exposure under a rapid-policy (Paris-aligned) future →</text>
+      <text x={34} y={padT + plotH / 2} textAnchor="middle" fontSize="12" fill={muted} transform={`rotate(-90 34 ${padT + plotH / 2})`}>Exposure under a high-warming future →</text>
+      {placed.map((d, i) => {
+        const left = d.cx <= px(0.5)
+        return (
+          <g key={i}>
+            <circle cx={d.cx} cy={d.cy} r={7} fill={d.color} opacity={0.9} />
+            <text x={left ? d.cx - 12 : d.cx + 12} y={d.cy + 4} textAnchor={left ? 'end' : 'start'} fontSize="12" fill={ink}>{d.it.label}</text>
+          </g>
+        )
+      })}
+      <circle cx={padL + 8} cy={H - 12} r={6} fill="#C2410C" />
+      <text x={padL + 20} y={H - 8} fontSize="12" fill={muted}>Physical risk</text>
+      <circle cx={padL + 142} cy={H - 12} r={6} fill="#7425e3" />
+      <text x={padL + 154} y={H - 8} fontSize="12" fill={muted}>Transition risk</text>
+    </svg>
+  )
+}
+
 export default function MaterialityWizard() {
   const isPaid = useEntitlement('climate-risk')
   const [mode, setMode] = useState<Mode | null>(null)
@@ -803,6 +866,15 @@ export default function MaterialityWizard() {
             </div>
           </div>
         </div>
+
+        {/* resilience map — hero visual, matches the PDF report */}
+        {(physical.length > 0 || transition.length > 0) && (
+          <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '1.25rem', marginBottom: 12 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 6 }}>Resilience map</div>
+            <p style={{ fontSize: 12, color: '#888784', lineHeight: 1.6, margin: '0 0 12px' }}>Each risk is positioned by its exposure under a rapid-policy (Paris-aligned) future and under a high-warming future. Risks toward the top-right are material whichever way the future unfolds; the spread between the physical group (toward the top) and the transition group (toward the right) is the two-channel exposure. Axes use the calibrated bands (Low / Moderate / High).</p>
+            <ResilienceMap items={items} />
+          </div>
+        )}
 
         {/* comparison grids */}
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderLeft: '3px solid #ba7517', borderRadius: '0 14px 14px 0', padding: '1rem', marginBottom: 12 }}>
