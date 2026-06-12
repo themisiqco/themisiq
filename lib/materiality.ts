@@ -369,10 +369,15 @@ function interpret(kind: ItemKind, label: string, cls: Classification, cells: Sc
   const paris = get('paris'), high = get('high')
   const upside = kind === 'opportunity'
   switch (cls) {
-    case 'persistent':
-      return upside
-        ? `${label}: relevant across all three futures — a robust opportunity that does not depend on the policy path.`
-        : `${label}: material across all three futures — a robust exposure that warrants attention regardless of how policy or warming unfolds.`
+    case 'persistent': {
+      if (upside) return `${label}: relevant across all three futures — a robust opportunity that does not depend on the policy path.`
+      const pB = bandWord(paris?.band), hB = bandWord(high?.band)
+      const bandPhrase = pB === hB ? `${pB} under every pathway` : `${pB} under the Paris-aligned pathway and ${hB} under high warming`
+      const rising = (high?.score ?? 0) > (paris?.score ?? 0)
+      return kind === 'physical'
+        ? `${label}: material across all three futures (${bandPhrase}) — a persistent physical exposure that ${rising ? 'intensifies as warming increases' : 'stays broadly level across the range'}.`
+        : `${label}: material across all three futures (${bandPhrase}) — a persistent transition exposure, most acute under the Paris-aligned, rapid-policy pathway and ${rising ? 'rising with warming' : 'easing as policy ambition weakens'}.`
+    }
     case 'warming-contingent':
       return upside
         ? `${label}: strengthens under higher-warming futures (${bandWord(high?.band)} at ~4.4°C vs ${bandWord(paris?.band)} at ~1.8°C).`
