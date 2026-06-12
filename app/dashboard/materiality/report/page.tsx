@@ -488,6 +488,7 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
   )
 
   const channelTable = (list: any[], kind: string) => (
+    <>
     <table style={tbl}>
       <thead>
         <tr style={trh}>
@@ -517,6 +518,10 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
         })}
       </tbody>
     </table>
+    <p style={{ ...p, fontSize: 11, color: '#888784', marginTop: -6 }}>
+      Bands (High / Moderate / Low) are the primary signal, calibrated separately per driver. The adjacent index is a relative screening score (higher = greater exposure) — comparable for a single item across the three scenarios, but not directly between different drivers{kind === 'transition' ? '; carbon pricing / policy also reflects jurisdiction intensity and is scored on a wider range than the other three drivers' : ''}.
+    </p>
+    </>
   )
 
   const channelNarrative = (list: any[]) => (
