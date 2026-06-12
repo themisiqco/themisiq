@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { supabase } from '../../lib/supabase'
 
 function daysUntil(dateStr: string): number {
   const target = new Date(dateStr)
@@ -13,6 +14,12 @@ function daysUntil(dateStr: string): number {
 export default function Nav() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [days, setDays] = useState(0)
+  const [isAuthed, setIsAuthed] = useState(false)
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => setIsAuthed(!!session))
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => setIsAuthed(!!session))
+    return () => sub.subscription.unsubscribe()
+  }, [])
 
   useEffect(() => {
     setDays(daysUntil('2026-08-10'))
@@ -59,11 +66,11 @@ export default function Nav() {
 
         {/* CTA BUTTONS */}
         <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
-          <a href="/login" style={{
+          <a href={isAuthed ? '#' : '/login'} onClick={(e) => { if (isAuthed) { e.preventDefault(); supabase.auth.signOut() } }} style={{
             fontSize: 12, fontWeight: 500, padding: '7px 10px',
             color: '#555553', textDecoration: 'none',
             display: 'inline-block', whiteSpace: 'nowrap',
-          }} className="desktop-only">Log in</a>
+          }} className="desktop-only">{isAuthed ? 'Log out' : 'Log in'}</a>
           <a href="/dashboard/supply-chain/portal" style={{ fontSize: 12, fontWeight: 500, padding: '7px 14px', borderRadius: 8, background: '#0F6E56', color: '#fff', textDecoration: 'none', display: 'inline-block', whiteSpace: 'nowrap' }} className="desktop-only">SupplierPortal →</a>
           <a href="/assess" style={{
             fontSize: 12, fontWeight: 400, padding: '7px 14px', borderRadius: 8,
