@@ -149,7 +149,7 @@ export default function Page() {
 
         <div style={{ textAlign: 'center' }}>
           <a href="/dashboard/climate-risk" style={{ ...btnPrimary, textDecoration: 'none' }}>Assess your climate risk →</a>
-          <p style={{ fontSize: 12, color: '#888784', marginTop: 14, fontWeight: 300 }}>Reporting under CSRD/ESRS? The same assessment also produces the double-materiality matrix across all ten ESRS topics.</p>
+          <p style={{ fontSize: 12, color: '#888784', marginTop: 14, fontWeight: 300 }}>Reporting under CSRD/ESRS? The same assessment also produces the double-materiality matrix across all ten ESRS topics. <a href="/materiality" style={{ color: '#7425e3', fontWeight: 500, textDecoration: 'none' }}>See the materiality samples →</a></p>
         </div>
       </section>
 
