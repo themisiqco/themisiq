@@ -302,7 +302,7 @@ export default function MaterialityMarketingPage() {
               <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.7, marginBottom: 12 }}>
                 IFRS S2 single materiality · climate risk · scenario analysis · GHG inventory · TCFD-aligned narrative.
               </div>
-              <Link href="/pricing" style={{ ...ghostBtn, padding: '8px 16px', fontSize: 12 }}>See full pricing →</Link>
+              <Link href="/pricing?modules=risk,ghg" style={{ ...ghostBtn, padding: '8px 16px', fontSize: 12 }}>See full pricing →</Link>
             </div>
             <div style={{ background: '#eef2ff', border: '1.5px solid #1e1b4b', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1e1b4b', marginBottom: 4 }}>CSRD / ESRS</div>
@@ -311,7 +311,7 @@ export default function MaterialityMarketingPage() {
               <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.7, marginBottom: 12 }}>
                 CSRD double materiality · climate risk · supply chain · people &amp; workforce · governance · GHG.
               </div>
-              <Link href="/pricing" style={{ ...ghostBtn, padding: '8px 16px', fontSize: 12 }}>See full pricing →</Link>
+              <Link href="/pricing?modules=risk,ghg,supply,people" style={{ ...ghostBtn, padding: '8px 16px', fontSize: 12 }}>See full pricing →</Link>
             </div>
           </div>
         </section>

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { startCheckout } from '../../lib/checkout'
@@ -142,9 +143,17 @@ const tag = (label: string, color: string): React.CSSProperties => ({
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function PricingPage() {
+function PricingPageInner() {
+  const searchParams = useSearchParams()
+  const VALID_MODULE_IDS: ModuleId[] = ['ghg', 'risk', 'supply', 'people', 'deals', 'ai', 'cyber']
+  const initialModules = (() => {
+    const param = searchParams.get('modules')
+    if (!param) return new Set<ModuleId>(['ghg'])
+    const ids = param.split(',').map(s => s.trim()).filter((s): s is ModuleId => (VALID_MODULE_IDS as string[]).includes(s))
+    return ids.length > 0 ? new Set<ModuleId>(ids) : new Set<ModuleId>(['ghg'])
+  })()
   const [tier, setTier] = useState<Tier>('starter')
-  const [selected, setSelected] = useState<Set<ModuleId>>(new Set(['ghg']))
+  const [selected, setSelected] = useState<Set<ModuleId>>(initialModules)
   const [daysLeft, setDaysLeft] = useState(81)
 
   useEffect(() => {
@@ -600,5 +609,13 @@ export default function PricingPage() {
       `}</style>
 
     </div>
+  )
+}
+
+export default function PricingPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: '4rem', textAlign: 'center', color: '#888784' }}>Loading…</div>}>
+      <PricingPageInner />
+    </Suspense>
   )
 }
