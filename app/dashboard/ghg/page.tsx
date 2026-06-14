@@ -2217,12 +2217,33 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
         )
         if (periods.length === 0) return null
         const cov = analyzeCoverage(periods, win.start, win.end)
+ // Is there already an extrapolation resolution for this fuel at this location?
+        const fuelOfStrip = periods.length > 0 ? (docs.flatMap(d => d.extracted ?? []).find(p => p.status === 'confirmed' && p.periodStart)?.fuelType ?? '') : ''
+        const existingRes = coverageResolutions.find(r => r.kind === 'extrapolate' && r.locId === locId && r.fuelType === fuelOfStrip)
+        const resolved = cov.status === 'gap' && !!existingRes
         const tone =
-          cov.status === 'full' ? { bg: '#E1F5EE', fg: '#0F6E56', icon: '✓' }
+          (cov.status === 'full' || resolved) ? { bg: '#E1F5EE', fg: '#0F6E56', icon: '✓' }
           : { bg: '#FEF3E2', fg: '#ba7517', icon: '⚠' }
         return (
-          <div style={{ marginTop: 8, background: tone.bg, borderRadius: 6, padding: '6px 10px', fontSize: 11, color: tone.fg, fontWeight: 600 }}>
-            {tone.icon} {cov.summary}
+          <div style={{ marginTop: 8, background: tone.bg, borderRadius: 6, padding: '8px 10px', fontSize: 11, color: tone.fg, fontWeight: 600 }}>
+            <div>{tone.icon} {resolved ? `${cov.monthsCovered}/12 months from bills; remaining estimated (${cov.pctEstimated}% estimated).` : cov.summary}</div>
+            {cov.status === 'gap' && !resolved && (
+              <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 400, color: '#7c5a16' }}>Upload the missing bill above, or:</span>
+                <button
+                  onClick={() => onAddCoverageResolution({
+                    locId,
+                    fuelType: fuelOfStrip,
+                    kind: 'extrapolate',
+                    monthsCovered: cov.monthsCovered,
+                    pctEstimated: cov.pctEstimated,
+                    note: `${cov.monthsCovered} of 12 months evidenced by bills; remaining ${12 - cov.monthsCovered} month(s) estimated by scaling metered data ×12/${cov.monthsCovered} (${cov.pctEstimated}% estimated).`,
+                    acknowledgedAt: new Date().toISOString(),
+                  })}
+                  style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#ba7517', color: '#fff', border: 'none', cursor: 'pointer' }}
+                >Acknowledge &amp; estimate</button>
+              </div>
+            )}
           </div>
         )
       })()}
