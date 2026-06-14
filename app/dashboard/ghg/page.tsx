@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { supabase } from '../../../lib/supabase'
-import { useEntitlement } from '../../../lib/useEntitlement'
+import { useEntitlement, useHasConcierge } from '../../../lib/useEntitlement'
 import { generateAssurancePDF } from '../../../lib/assurancePdf'
 import { useSearchParams } from 'next/navigation'
 
@@ -875,7 +875,7 @@ const searchParams = useSearchParams()
   const [mode, setMode] = useState<'loading' | 'list' | 'wizard'>('loading')
   const [inventoryList, setInventoryList] = useState<Array<{ id: string; company_name: string; reporting_year: number; updated_at: string }>>([])
   const isPaid = useEntitlement('ghg')
-  const CONCIERGE_DEV = true   // TEMP: gates concierge extract-and-propose. Swap for useEntitlement('concierge') at step 10.
+  const CONCIERGE_DEV = useHasConcierge()   // concierge gate: true when the customer holds any concierge tier entitlement
 
   // Decide initial view: ?id -> wizard (loads that one); else if user has inventories -> list; else -> blank wizard
   useEffect(() => {
