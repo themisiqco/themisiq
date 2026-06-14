@@ -549,6 +549,25 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
       : `${monthsCovered}/${total} months covered.`,
   }
 }
+// A documented coverage resolution (gap/overlap/straddle), stored on the inventory.
+// Raw confirmed proposals stay untouched; this is the transparent, additive layer
+// the verifier sees (workings records method + basis). Spec: coverage-check addendum.
+interface CoverageResolution {
+  locId: string
+  fuelType: string
+  kind: 'extrapolate' | 'duplicate' | 'straddle'
+  // extrapolate: gross up partial-year data by coverage ratio
+  monthsCovered?: number          // for extrapolate: e.g. 11
+  pctEstimated?: number           // for extrapolate: e.g. 8.3
+  // straddle: day-level proration choice
+  straddleChoice?: 'this_year' | 'next_year' | 'prorate'
+  daysInYear?: number
+  totalDays?: number
+  // duplicate: which doc/proposal was dropped
+  droppedDocId?: string
+  note: string                    // human-readable, flows into workings
+  acknowledgedAt: string          // ISO timestamp
+}
 interface Inventory {
   company_name: string; reporting_year: number; revenue_millions: number
   employee_count: number; boundary_approach: string
@@ -556,7 +575,8 @@ interface Inventory {
   fiscal_year_end_month: number
   prior_year_s1: number; prior_year_s2: number
   selected_frameworks: string[]
-  locations: Location[]
+locations: Location[]
+  coverage_resolutions?: CoverageResolution[]
 }
 
 const emptyLocation = (id: string, name: string, state = ''): Location => ({
@@ -960,6 +980,7 @@ const searchParams = useSearchParams()
     company_name: '', reporting_year: 2024, revenue_millions: 0, employee_count: 0,
     boundary_approach: 'operational_control', california_nexus: false,
     fiscal_year_end_month: 12,
+    coverage_resolutions: [],
     prior_year_s1: 0, prior_year_s2: 0,
     selected_frameworks: defaultFrameworks,
     locations: [emptyLocation('1', 'Location 1')],
@@ -1005,6 +1026,7 @@ const searchParams = useSearchParams()
       company_name: '', reporting_year: 2024, revenue_millions: 0, employee_count: 0,
       boundary_approach: 'operational_control', california_nexus: false,
       fiscal_year_end_month: 12,
+      coverage_resolutions: [],
       prior_year_s1: 0, prior_year_s2: 0,
       selected_frameworks: defaultFrameworks,
       locations: [emptyLocation('1', 'Location 1')],
@@ -1041,6 +1063,7 @@ const searchParams = useSearchParams()
           company_name: data.company_name || '',
           reporting_year: data.reporting_year || inv.reporting_year,
           fiscal_year_end_month: data.fiscal_year_end_month || 12,
+          coverage_resolutions: data.coverage_resolutions || [],
           revenue_millions: data.revenue_millions || 0,
           employee_count: data.employee_count || 0,
           boundary_approach: data.boundary_approach || 'operational_control',
