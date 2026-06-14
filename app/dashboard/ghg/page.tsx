@@ -1484,7 +1484,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                       </div>
                     )}
                   </Field>
-                  {isPaid ? <DocUpload label="Upload gas bills" locIdx={activeLocation} docType="utility_bill_gas" docs={loc.source_docs.filter(d => d.document_type === 'utility_bill_gas')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} uploading={uploading} /> : <LockedDocUpload label="Upload gas bills" />}
+                  {isPaid ? <DocUpload label="Upload gas bills" locIdx={activeLocation} docType="utility_bill_gas" docs={loc.source_docs.filter(d => d.document_type === 'utility_bill_gas')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} /> : <LockedDocUpload label="Upload gas bills" />}
                 </div>
               )}
             </QuestionCard>
@@ -1499,7 +1499,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                   <Field label={`Total propane purchased — ${inventory.reporting_year} (${loc.propane_unit})`}>
                     <input type="number" value={loc.propane_amount || ''} onChange={e => updateLocation(activeLocation, 'propane_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload propane delivery records" locIdx={activeLocation} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} uploading={uploading} /> : <LockedDocUpload label="Upload propane delivery records" />}
+                  {isPaid ? <DocUpload label="Upload propane delivery records" locIdx={activeLocation} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} /> : <LockedDocUpload label="Upload propane delivery records" />}
                 </div>
               )}
             </QuestionCard>
@@ -1514,7 +1514,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                   <Field label={`Total diesel in stationary equipment — ${inventory.reporting_year}`}>
                     <input type="number" value={loc.diesel_stationary_amount || ''} onChange={e => updateLocation(activeLocation, 'diesel_stationary_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload diesel purchase records" locIdx={activeLocation} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} uploading={uploading} /> : <LockedDocUpload label="Upload diesel purchase records" />}
+                  {isPaid ? <DocUpload label="Upload diesel purchase records" locIdx={activeLocation} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} /> : <LockedDocUpload label="Upload diesel purchase records" />}
                 </div>
               )}
             </QuestionCard>
@@ -1541,7 +1541,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                       </select>
                     </div>
                   </Field>
-                  {isPaid ? <DocUpload label="Upload fleet fuel records" locIdx={activeLocation} docType="fleet_fuel" docs={loc.source_docs.filter(d => d.document_type === 'fleet_fuel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} uploading={uploading} /> : <LockedDocUpload label="Upload fleet fuel records" />}
+                  {isPaid ? <DocUpload label="Upload fleet fuel records" locIdx={activeLocation} docType="fleet_fuel" docs={loc.source_docs.filter(d => d.document_type === 'fleet_fuel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} /> : <LockedDocUpload label="Upload fleet fuel records" />}
                 </div>
               )}
             </QuestionCard>
@@ -1561,7 +1561,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                   <Field label="Refrigerant purchased for top-up this year (kg)" hint="From service records or supplier invoices">
                     <input type="number" value={loc.refrigerant_purchased_kg || ''} onChange={e => updateLocation(activeLocation, 'refrigerant_purchased_kg', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload service records" locIdx={activeLocation} docType="service_record" docs={loc.source_docs.filter(d => d.document_type === 'service_record')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} uploading={uploading} /> : <LockedDocUpload label="Upload service records" />}
+                  {isPaid ? <DocUpload label="Upload service records" locIdx={activeLocation} docType="service_record" docs={loc.source_docs.filter(d => d.document_type === 'service_record')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} /> : <LockedDocUpload label="Upload service records" />}
                 </div>
               )}
             </div>
@@ -1594,7 +1594,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                     <a href="https://www.epa.gov/egrid/power-profiler" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#0C447C', textDecoration: 'none', display: 'inline-block', marginTop: 6 }}>🔎 Find your subregion with EPA Power Profiler (enter your ZIP) →</a>
                   </div>
                 )}
-                {isPaid ? <DocUpload label="Upload electricity bills" locIdx={activeLocation} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} uploading={uploading} /> : <LockedDocUpload label="Upload electricity bills" />}
+                {isPaid ? <DocUpload label="Upload electricity bills" locIdx={activeLocation} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} /> : <LockedDocUpload label="Upload electricity bills" />}
               </div>
             </div>
           </div>
@@ -1656,7 +1656,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                   </Field>
                 </div>
               ))}
-              {isPaid ? <DocUpload label="Upload renewable energy certificates or PPA contracts" locIdx={0} docType="renewable_cert" docs={inventory.locations[0].source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} uploading={uploading} /> : <LockedDocUpload label="Upload renewable energy certificates or PPA contracts" />}
+              {isPaid ? <DocUpload label="Upload renewable energy certificates or PPA contracts" locIdx={0} docType="renewable_cert" docs={inventory.locations[0].source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} /> : <LockedDocUpload label="Upload renewable energy certificates or PPA contracts" />}
             </div>
           )}
           {needsBiogenic && (
@@ -2119,7 +2119,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   )
 }
 
-function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateProposal, uploading }: { label: string; locIdx: number; docType: string; docs: SourceDoc[]; onUpload: (f: FileList, i: number, t: string) => void; onRemove: (i: number, id: string, path: string) => void; onUpdateProposal: (locIdx: number, docId: string, propIdx: number, patch: Partial<ExtractedProposal>) => void; uploading: boolean }) {
+function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateProposal, uploading, reportingYear, fiscalYearEndMonth }: { label: string; locIdx: number; docType: string; docs: SourceDoc[]; onUpload: (f: FileList, i: number, t: string) => void; onRemove: (i: number, id: string, path: string) => void; onUpdateProposal: (locIdx: number, docId: string, propIdx: number, patch: Partial<ExtractedProposal>) => void; uploading: boolean; reportingYear: number; fiscalYearEndMonth: number }) {
   const ref = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState<string | null>(null)   // `${docId}:${propIdx}` being edited
   const [editVal, setEditVal] = useState<string>('')
@@ -2131,6 +2131,25 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
         <input ref={ref} type="file" multiple accept=".pdf,.xlsx,.csv,.jpg,.png" style={{ display: 'none' }} onChange={e => e.target.files && onUpload(e.target.files, locIdx, docType)} />
       </div>
       <div style={{ fontSize: 10, color: '#888784', fontWeight: 300, marginTop: 4 }}>Accepted: PDF, Excel, CSV, JPG, PNG · max 50 MB</div>
+      {(() => {
+        // Coverage strip: aggregate this fuel's CONFIRMED proposals at this location, classify completeness.
+        const win = periodFromYearAndEnd(reportingYear, fiscalYearEndMonth)
+        const periods: CoveragePeriod[] = docs.flatMap(d =>
+          (d.extracted ?? []).map((p, pi) => ({ p, pi, docId: d.id }))
+            .filter(x => x.p.status === 'confirmed' && x.p.periodStart && x.p.periodEnd)
+            .map(x => ({ docId: x.docId, pi: x.pi, start: new Date(x.p.periodStart as string), end: new Date(x.p.periodEnd as string) }))
+        )
+        if (periods.length === 0) return null
+        const cov = analyzeCoverage(periods, win.start, win.end)
+        const tone =
+          cov.status === 'full' ? { bg: '#E1F5EE', fg: '#0F6E56', icon: '✓' }
+          : { bg: '#FEF3E2', fg: '#ba7517', icon: '⚠' }
+        return (
+          <div style={{ marginTop: 8, background: tone.bg, borderRadius: 6, padding: '6px 10px', fontSize: 11, color: tone.fg, fontWeight: 600 }}>
+            {tone.icon} {cov.summary}
+          </div>
+        )
+      })()}
       {docs.map(doc => (
         <div key={doc.id} style={{ padding: '3px 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
