@@ -1560,7 +1560,7 @@ if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.uni
                       </div>
                     )}
                   </Field>
-                  {isPaid ? <DocUpload label="Upload gas bills" locIdx={activeLocation} docType="utility_bill_gas" docs={loc.source_docs.filter(d => d.document_type === 'utility_bill_gas')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} /> : <LockedDocUpload label="Upload gas bills" />}
+                  {isPaid ? <DocUpload label="Upload gas bills" locIdx={activeLocation} docType="utility_bill_gas" docs={loc.source_docs.filter(d => d.document_type === 'utility_bill_gas')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} /> : <LockedDocUpload label="Upload gas bills" />}
                 </div>
               )}
             </QuestionCard>
@@ -1575,7 +1575,7 @@ if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.uni
                   <Field label={`Total propane purchased — ${inventory.reporting_year} (${loc.propane_unit})`}>
                     <input type="number" value={loc.propane_amount || ''} onChange={e => updateLocation(activeLocation, 'propane_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload propane delivery records" locIdx={activeLocation} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} /> : <LockedDocUpload label="Upload propane delivery records" />}
+                  {isPaid ? <DocUpload label="Upload propane delivery records" locIdx={activeLocation} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} /> : <LockedDocUpload label="Upload propane delivery records" />}
                 </div>
               )}
             </QuestionCard>
@@ -1590,7 +1590,7 @@ if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.uni
                   <Field label={`Total diesel in stationary equipment — ${inventory.reporting_year}`}>
                     <input type="number" value={loc.diesel_stationary_amount || ''} onChange={e => updateLocation(activeLocation, 'diesel_stationary_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload diesel purchase records" locIdx={activeLocation} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} /> : <LockedDocUpload label="Upload diesel purchase records" />}
+                  {isPaid ? <DocUpload label="Upload diesel purchase records" locIdx={activeLocation} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} /> : <LockedDocUpload label="Upload diesel purchase records" />}
                 </div>
               )}
             </QuestionCard>
@@ -1617,7 +1617,7 @@ if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.uni
                       </select>
                     </div>
                   </Field>
-                  {isPaid ? <DocUpload label="Upload fleet fuel records" locIdx={activeLocation} docType="fleet_fuel" docs={loc.source_docs.filter(d => d.document_type === 'fleet_fuel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} /> : <LockedDocUpload label="Upload fleet fuel records" />}
+                  {isPaid ? <DocUpload label="Upload fleet fuel records" locIdx={activeLocation} docType="fleet_fuel" docs={loc.source_docs.filter(d => d.document_type === 'fleet_fuel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} /> : <LockedDocUpload label="Upload fleet fuel records" />}
                 </div>
               )}
             </QuestionCard>
@@ -1637,7 +1637,7 @@ if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.uni
                   <Field label="Refrigerant purchased for top-up this year (kg)" hint="From service records or supplier invoices">
                     <input type="number" value={loc.refrigerant_purchased_kg || ''} onChange={e => updateLocation(activeLocation, 'refrigerant_purchased_kg', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload service records" locIdx={activeLocation} docType="service_record" docs={loc.source_docs.filter(d => d.document_type === 'service_record')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} /> : <LockedDocUpload label="Upload service records" />}
+                  {isPaid ? <DocUpload label="Upload service records" locIdx={activeLocation} docType="service_record" docs={loc.source_docs.filter(d => d.document_type === 'service_record')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} /> : <LockedDocUpload label="Upload service records" />}
                 </div>
               )}
             </div>
@@ -1670,7 +1670,7 @@ if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.uni
                     <a href="https://www.epa.gov/egrid/power-profiler" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#0C447C', textDecoration: 'none', display: 'inline-block', marginTop: 6 }}>🔎 Find your subregion with EPA Power Profiler (enter your ZIP) →</a>
                   </div>
                 )}
-                {isPaid ? <DocUpload label="Upload electricity bills" locIdx={activeLocation} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} /> : <LockedDocUpload label="Upload electricity bills" />}
+                {isPaid ? <DocUpload label="Upload electricity bills" locIdx={activeLocation} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} /> : <LockedDocUpload label="Upload electricity bills" />}
               </div>
             </div>
           </div>
@@ -1732,7 +1732,7 @@ if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.uni
                   </Field>
                 </div>
               ))}
-              {isPaid ? <DocUpload label="Upload renewable energy certificates or PPA contracts" locIdx={0} docType="renewable_cert" docs={inventory.locations[0].source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} /> : <LockedDocUpload label="Upload renewable energy certificates or PPA contracts" />}
+              {isPaid ? <DocUpload label="Upload renewable energy certificates or PPA contracts" locIdx={0} docType="renewable_cert" docs={inventory.locations[0].source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={inventory.locations[0].id} coverageResolutions={inventory.coverage_resolutions ?? []} /> : <LockedDocUpload label="Upload renewable energy certificates or PPA contracts" />}
             </div>
           )}
           {needsBiogenic && (
@@ -2195,7 +2195,7 @@ if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.uni
   )
 }
 
-function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateProposal, onAddCoverageResolution, uploading, reportingYear, fiscalYearEndMonth }: { label: string; locIdx: number; docType: string; docs: SourceDoc[]; onUpload: (f: FileList, i: number, t: string) => void; onRemove: (i: number, id: string, path: string) => void; onUpdateProposal: (locIdx: number, docId: string, propIdx: number, patch: Partial<ExtractedProposal>) => void; onAddCoverageResolution: (res: CoverageResolution) => void; uploading: boolean; reportingYear: number; fiscalYearEndMonth: number }) {
+function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateProposal, onAddCoverageResolution, uploading, reportingYear, fiscalYearEndMonth, locId, coverageResolutions }: { label: string; locIdx: number; docType: string; docs: SourceDoc[]; onUpload: (f: FileList, i: number, t: string) => void; onRemove: (i: number, id: string, path: string) => void; onUpdateProposal: (locIdx: number, docId: string, propIdx: number, patch: Partial<ExtractedProposal>) => void; onAddCoverageResolution: (res: CoverageResolution) => void; uploading: boolean; reportingYear: number; fiscalYearEndMonth: number; locId: string; coverageResolutions: CoverageResolution[] }) {
   const ref = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState<string | null>(null)   // `${docId}:${propIdx}` being edited
   const [editVal, setEditVal] = useState<string>('')
