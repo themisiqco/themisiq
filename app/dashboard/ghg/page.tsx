@@ -1229,12 +1229,22 @@ if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.uni
       // 4. Write each field. Mixed units -> don't write; flag those proposals for review.
       const loc: any = { ...locs[locIdx] }
       const flagged: { docId: string; pi: number }[] = []
-      Object.entries(byField).forEach(([amountField, info]) => {
+  Object.entries(byField).forEach(([amountField, info]) => {
         if (info.units.size > 1) {
           flagged.push(...info.refs)
           return
         }
-        loc[amountField] = info.sum
+        // Coverage extrapolation: if the customer acknowledged a gap for this fuel+location,
+        // gross up the raw sum by the coverage ratio (×12/monthsCovered). Raw proposals are
+        // never modified — this transparent layer is applied only at field-write time, and the
+        // method is recorded in coverage_resolutions → workings for the verifier.
+        const extr = (inv.coverage_resolutions ?? []).find(r =>
+          r.kind === 'extrapolate' && r.locId === loc.id && r.fuelType === info.fuelType)
+        if (extr && extr.monthsCovered && extr.monthsCovered > 0) {
+          loc[amountField] = info.sum * (12 / extr.monthsCovered)
+        } else {
+          loc[amountField] = info.sum
+        }
         if (info.unitField && info.units.size === 1) loc[info.unitField] = [...info.units][0]
       })
 
@@ -1250,8 +1260,51 @@ if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.uni
       locs[locIdx] = loc
       return { ...inv, locations: locs }
     })
+    }
+    // Write a coverage resolution (gap/overlap/straddle) onto the inventory. Re-resolving the
+  // same fuel+location+kind overwrites the prior one. The extrapolation gross-up is applied
+  // in updateProposal's field-write step; here we also nudge a re-derivation by re-confirming
+  // an existing confirmed proposal so totals refresh immediately.
+  const addCoverageResolution = (res: CoverageResolution) => {
+    setInventory(inv => {
+      const existing = (inv.coverage_resolutions ?? []).filter(
+        r => !(r.locId === res.locId && r.fuelType === res.fuelType && r.kind === res.kind))
+      // Re-derive affected fields so an extrapolation applies right away. We recompute the
+      // same byField sum used in updateProposal, now that the resolution is present.
+      const resolutions = [...existing, res]
+      const locs = inv.locations.map(loc => {
+        if (loc.id !== res.locId) return loc
+        const next: any = { ...loc }
+        const fieldFor = (docType: string, fuelType: string): { amount: keyof Location; unit?: keyof Location } | null => {
+          if (docType === 'utility_electricity' && fuelType === 'electricity') return { amount: 'electricity_kwh' }
+          if (docType === 'renewable_cert' && fuelType === 'electricity') return { amount: 'renewable_electricity_kwh' }
+          if (docType === 'utility_bill_gas' && fuelType === 'natural_gas') return { amount: 'natural_gas_amount', unit: 'natural_gas_unit' }
+          if (docType === 'fuel_propane' && fuelType === 'propane') return { amount: 'propane_amount', unit: 'propane_unit' }
+          if (docType === 'fuel_diesel' && fuelType === 'diesel') return { amount: 'diesel_stationary_amount', unit: 'diesel_stationary_unit' }
+          if (docType === 'fleet_fuel' && fuelType === 'diesel') return { amount: 'diesel_mobile_amount', unit: 'diesel_mobile_unit' }
+          if (docType === 'fleet_fuel' && fuelType === 'gasoline') return { amount: 'gasoline_amount', unit: 'gasoline_unit' }
+          return null
+        }
+        const sums: Record<string, { sum: number; fuelType: string }> = {}
+        loc.source_docs.forEach(d => d.extracted?.forEach(p => {
+          if (p.status !== 'confirmed' || p.value == null) return
+          const map = fieldFor(d.document_type, p.fuelType)
+          if (!map) return
+          const key = String(map.amount)
+          if (!sums[key]) sums[key] = { sum: 0, fuelType: p.fuelType }
+          sums[key].sum += p.value
+        }))
+        Object.entries(sums).forEach(([amountField, info]) => {
+          const extr = resolutions.find(r => r.kind === 'extrapolate' && r.locId === loc.id && r.fuelType === info.fuelType)
+          next[amountField] = (extr && extr.monthsCovered && extr.monthsCovered > 0)
+            ? info.sum * (12 / extr.monthsCovered)
+            : info.sum
+        })
+        return next
+      })
+      return { ...inv, coverage_resolutions: resolutions, locations: locs }
+    })
   }
-
   const needsMarketBased = inventory.selected_frameworks.includes('esrs') || inventory.selected_frameworks.includes('gri')
   // Concierge export gate: block export while any proposal is unconfirmed ('extracted') or flagged ('needs_manual_review').
   // No proposals (manual-entry users) -> trivially ready. Coverage-completeness is a separate check (step 9b).
