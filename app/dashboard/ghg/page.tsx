@@ -447,7 +447,108 @@ function periodFromYearAndEnd(reportingYear: number, fiscalYearEndMonth: number 
   const fmt = (d: Date) => d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
   return { start, end, label: `${fmt(start)} – ${fmt(end)}` }
 }
+// ── Concierge coverage analysis (spec: docs/pricing-and-concierge-spec-v4.md addendum) ──
+// Pure function. Given a fuel's CONFIRMED proposals (each carrying a billing period)
+// and the reporting-year window, classifies data completeness so the wizard can
+// surface gaps/overlaps/straddles and never silently produce an incomplete annual total.
+//
+// METHOD (documented for verifiers): coverage and gaps are assessed at MONTH level
+// against the reporting period; straddle proration is computed at DAY level. The
+// hybrid is recorded in buildWorkings so the basis of every estimate is traceable.
+interface CoveragePeriod { docId: string; pi: number; start: Date; end: Date }
+interface CoverageResult {
+  status: 'full' | 'gap' | 'overlap' | 'straddle' | 'none'
+  monthsCovered: number
+  coverageRatio: number               // monthsCovered / 12
+  pctEstimated: number                // (12 - monthsCovered)/12, for disclosure
+  gaps: { label: string }[]           // uncovered months, human-readable
+  overlaps: { a: CoveragePeriod; b: CoveragePeriod }[]
+  straddles: { p: CoveragePeriod; daysInYear: number; totalDays: number; pctInYear: number }[]
+  summary: string
+}
 
+function monthKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+function monthLabel(y: number, m0: number): string {
+  return new Date(y, m0, 1).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
+}
+function daysBetween(a: Date, b: Date): number {
+  return Math.round((b.getTime() - a.getTime()) / 86400000) + 1 // inclusive
+}
+
+function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date): CoverageResult {
+  if (periods.length === 0) {
+    return { status: 'none', monthsCovered: 0, coverageRatio: 0, pctEstimated: 0, gaps: [], overlaps: [], straddles: [], summary: 'No dated bills yet.' }
+  }
+
+  // Build the set of reporting-year months (month-level coverage).
+  const reqMonths: string[] = []
+  {
+    const d = new Date(winStart.getFullYear(), winStart.getMonth(), 1)
+    const last = new Date(winEnd.getFullYear(), winEnd.getMonth(), 1)
+    while (d <= last) { reqMonths.push(monthKey(d)); d.setMonth(d.getMonth() + 1) }
+  }
+
+  // Map each required month -> how many bills cover it (for gaps + overlaps).
+  const monthCount: Record<string, CoveragePeriod[]> = {}
+  reqMonths.forEach(mk => { monthCount[mk] = [] })
+
+  const straddles: CoverageResult['straddles'] = []
+  periods.forEach(p => {
+    // Straddle: period crosses the reporting-year boundary.
+    if (p.start < winStart || p.end > winEnd) {
+      const overlapStart = p.start < winStart ? winStart : p.start
+      const overlapEnd = p.end > winEnd ? winEnd : p.end
+      if (overlapEnd >= overlapStart) {
+        const daysInYear = daysBetween(overlapStart, overlapEnd)
+        const totalDays = daysBetween(p.start, p.end)
+        straddles.push({ p, daysInYear, totalDays, pctInYear: Math.round((daysInYear / totalDays) * 1000) / 10 })
+      }
+    }
+    // Month-level coverage tally (only for months inside the window).
+    const d = new Date(Math.max(p.start.getTime(), winStart.getTime()))
+    d.setDate(1)
+    const endCap = new Date(Math.min(p.end.getTime(), winEnd.getTime()))
+    while (d <= endCap) {
+      const mk = monthKey(d)
+      if (mk in monthCount) monthCount[mk].push(p)
+      d.setMonth(d.getMonth() + 1)
+    }
+  })
+
+  const covered = reqMonths.filter(mk => monthCount[mk].length >= 1)
+  const gaps = reqMonths.filter(mk => monthCount[mk].length === 0)
+    .map(mk => { const [y, m] = mk.split('-').map(Number); return { label: monthLabel(y, m - 1) } })
+  const overlapPairs: CoverageResult['overlaps'] = []
+  reqMonths.forEach(mk => {
+    const ps = monthCount[mk]
+    if (ps.length >= 2) overlapPairs.push({ a: ps[0], b: ps[1] })
+  })
+
+  const monthsCovered = covered.length
+  const total = reqMonths.length || 12
+  let status: CoverageResult['status'] = 'full'
+  if (gaps.length > 0) status = 'gap'
+  if (overlapPairs.length > 0) status = 'overlap'
+  if (straddles.length > 0 && gaps.length === 0 && overlapPairs.length === 0) status = 'straddle'
+
+  return {
+    status,
+    monthsCovered,
+    coverageRatio: monthsCovered / total,
+    pctEstimated: Math.round(((total - monthsCovered) / total) * 1000) / 10,
+    gaps,
+    overlaps: overlapPairs,
+    straddles,
+    summary:
+      status === 'full' ? `Full year covered (${monthsCovered}/${total} months).`
+      : status === 'gap' ? `${monthsCovered}/${total} months covered — missing: ${gaps.map(g => g.label).join(', ')}.`
+      : status === 'overlap' ? `Possible duplicate: ${overlapPairs.length} month(s) covered by more than one bill.`
+      : status === 'straddle' ? `${straddles.length} bill(s) cross the reporting-year boundary.`
+      : `${monthsCovered}/${total} months covered.`,
+  }
+}
 interface Inventory {
   company_name: string; reporting_year: number; revenue_millions: number
   employee_count: number; boundary_approach: string
