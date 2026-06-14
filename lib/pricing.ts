@@ -165,7 +165,7 @@ export const PACKS: Record<
 //  - Flat $499 — does NOT follow the founding-offer switch.
 //  - Does NOT count toward the 2-/3-module volume discount.
 //  - Its own entitlement key `verification`, gated separately from `ghg`.
-export type AddOnKey = 'verification'
+export type AddOnKey = 'verification' | 'concierge-basic' | 'concierge-standard' | 'concierge-enterprise'
 
 export const ADDONS: Record<
   AddOnKey,
@@ -175,6 +175,24 @@ export const ADDONS: Record<
     key: 'verification',
     label: 'Verification Readiness',
     price: 499,
+    requires: ['ghg'],
+  },
+  'concierge-basic': {
+    key: 'concierge-basic',
+    label: 'Concierge — Basic (up to 5 locations)',
+    price: 799,
+    requires: ['ghg'],
+  },
+  'concierge-standard': {
+    key: 'concierge-standard',
+    label: 'Concierge — Standard (6–15 locations)',
+    price: 1499,
+    requires: ['ghg'],
+  },
+  'concierge-enterprise': {
+    key: 'concierge-enterprise',
+    label: 'Concierge — Enterprise (16+ locations)',
+    price: 0,
     requires: ['ghg'],
   },
 }
