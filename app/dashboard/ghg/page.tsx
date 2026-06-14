@@ -2221,6 +2221,7 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
         )
         if (periods.length === 0) return null
         const cov = analyzeCoverage(periods, win.start, win.end)
+        if (typeof window !== 'undefined') console.log('[coverage debug]', docType, 'periods:', periods.map(p => ({ s: p.start.toISOString().slice(0,10), e: p.end.toISOString().slice(0,10) })), 'status:', cov.status, 'overlaps:', cov.overlaps.length, 'months:', cov.monthsCovered)
  // Is there already an extrapolation resolution for this fuel at this location?
         const fuelOfStrip = periods.length > 0 ? (docs.flatMap(d => d.extracted ?? []).find(p => p.status === 'confirmed' && p.periodStart)?.fuelType ?? '') : ''
         const existingRes = coverageResolutions.find(r => r.kind === 'extrapolate' && r.locId === locId && r.fuelType === fuelOfStrip)
