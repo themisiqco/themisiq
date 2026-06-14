@@ -1212,14 +1212,14 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       }
 
       // 3. Gather confirmed proposals per target field.
-      const byField: Record<string, { sum: number; units: Set<string>; unitField?: keyof Location; refs: { docId: string; pi: number }[] }> = {}
+const byField: Record<string, { sum: number; units: Set<string>; unitField?: keyof Location; refs: { docId: string; pi: number }[]; fuelType: string }> = {}
       docs.forEach(d => {
         d.extracted?.forEach((p, pi) => {
           if (p.status !== 'confirmed' || p.value == null) return
           const map = fieldFor(d.document_type, p.fuelType)
           if (!map) return
           const key = String(map.amount)
-          if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.unit, refs: [] }
+if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.unit, refs: [], fuelType: p.fuelType }
           byField[key].sum += p.value
           if (p.unit) byField[key].units.add(p.unit)
           byField[key].refs.push({ docId: d.id, pi })
