@@ -509,7 +509,11 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
     // Month-level coverage tally (only for months inside the window).
     const d = new Date(Math.max(p.start.getTime(), winStart.getTime()))
     d.setDate(1)
-    const endCap = new Date(Math.min(p.end.getTime(), winEnd.getTime()))
+    // Utility bill periods are [start, end) — the end date is the first day of the NEXT period
+    // (e.g. "Apr 01 → May 01" covers April, not May). Treat the end as exclusive: the last
+    // covered day is end − 1, so consecutive monthly bills tile cleanly without false overlaps.
+    const effEnd = new Date(p.end.getTime() - 86400000)
+    const endCap = new Date(Math.min(effEnd.getTime(), winEnd.getTime()))
     while (d <= endCap) {
       const mk = monthKey(d)
       if (mk in monthCount) monthCount[mk].push(p)
