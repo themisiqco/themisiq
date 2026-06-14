@@ -1009,16 +1009,10 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         // Refrigerant service records are deliberately NOT concierge-read (judgment, Tier-2/3).
         if (CONCIERGE_DEV && docType !== 'service_record') {
           try {
-            const base64: string = await new Promise((resolve, reject) => {
-              const r = new FileReader()
-              r.onload = () => resolve(String(r.result).split(',')[1])
-              r.onerror = () => reject(new Error('file read failed'))
-              r.readAsDataURL(file)
-            })
-            const res = await fetch('/api/concierge/extract', {
+  const res = await fetch('/api/concierge/extract', {
               method: 'POST',
               headers: { 'content-type': 'application/json', authorization: `Bearer ${session.access_token}` },
-              body: JSON.stringify({ document: base64, mediaType: file.type, locationName: inventory.locations[locIdx].name }),
+              body: JSON.stringify({ filePath: doc.file_path, mediaType: file.type, locationName: inventory.locations[locIdx].name }),
             })
             const json = await res.json()
             if (json?.success && Array.isArray(json.fields)) {

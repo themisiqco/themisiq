@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
   try {
     // ── Authenticate as the user (same pattern as /api/materiality) ──
     const token = bearerFrom(req)
-    await getAuthedClient(token)
+    const { supabase } = await getAuthedClient(token)
 
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {
@@ -91,8 +91,22 @@ export async function POST(req: NextRequest) {
     // ── Parse & validate input ───────────────────────────────────────
     const body = await req.json()
 
-    const document: string | undefined = typeof body.document === 'string' ? body.document : undefined
-    const mediaType: string | undefined = typeof body.mediaType === 'string' ? body.mediaType : undefined
+    let document: string | undefined = typeof body.document === 'string' ? body.document : undefined
+    let mediaType: string | undefined = typeof body.mediaType === 'string' ? body.mediaType : undefined
+    const filePath: string | undefined = typeof body.filePath === 'string' ? body.filePath : undefined
+
+    // Preferred path: fetch the file from Supabase Storage server-side, so large
+    // phone photos never travel through the JSON request body (avoids HTTP 413).
+    // Falls back to base64 `document` in the body if no filePath is supplied.
+    if (filePath) {
+      const { data: blob, error: dlErr } = await supabase.storage.from('source-documents').download(filePath)
+      if (dlErr || !blob) {
+        return NextResponse.json({ error: `Could not read uploaded file from storage: ${dlErr?.message ?? 'not found'}` }, { status: 404 })
+      }
+      const arrayBuf = await blob.arrayBuffer()
+      document = Buffer.from(arrayBuf).toString('base64')
+      mediaType = blob.type || mediaType
+    }
     const locationName: string | undefined = typeof body.locationName === 'string' ? body.locationName : undefined
 
     const requestedFuels: FuelType[] = Array.isArray(body.fuelTypes)
@@ -130,7 +144,7 @@ export async function POST(req: NextRequest) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-6',
+        model: 'claude-opus-4-8',
         max_tokens: 1024,
         messages: [
           {
