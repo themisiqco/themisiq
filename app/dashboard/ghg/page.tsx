@@ -453,9 +453,13 @@ function periodFromYearAndEnd(reportingYear: number, fiscalYearEndMonth: number 
 // and the reporting-year window, classifies data completeness so the wizard can
 // surface gaps/overlaps/straddles and never silently produce an incomplete annual total.
 //
-// METHOD (documented for verifiers): coverage and gaps are assessed at MONTH level
-// against the reporting period; straddle proration is computed at DAY level. The
-// hybrid is recorded in buildWorkings so the basis of every estimate is traceable.
+// METHOD (documented for verifiers): coverage, gaps, and overlaps are assessed at DAY
+// level. Each bill period is normalized to a half-open [start, end) interval — utility
+// bills arrive in two end-date conventions (last-day-of-month and first-of-next-month);
+// both are canonicalized so coverage is convention-independent. A month is reported as
+// covered only if every in-window day of it is covered (a partial month is a gap, never
+// silently claimed). Straddle proration is computed at day level. The basis is recorded
+// in buildWorkings so every estimate is traceable.
 interface CoveragePeriod { docId: string; pi: number; start: Date; end: Date }
 interface CoverageResult {
   status: 'full' | 'gap' | 'overlap' | 'straddle' | 'none'
