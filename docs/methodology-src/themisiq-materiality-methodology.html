@@ -1,0 +1,283 @@
+<!--
+  ThemisIQ — Materiality & Scenario Analysis Methodology
+  REGENERABLE SOURCE. To reissue: edit the two values on the next lines,
+  then open in a browser and Print → Save as PDF (A4, default margins),
+  or re-render with the build script.
+
+  DOCUMENT VERSION + DATE  →  see .cover-version below  ("v1.0 · June 2026")
+  MODEL VERSION (must match mr_model_config.model_version in Supabase)
+                           →  appears twice, each tagged  <span class="modelver">1.0</span>
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ThemisIQ — Materiality &amp; Scenario Analysis Methodology</title>
+<style>
+  :root{
+    --violet:#7425e3;
+    --sky:#1fb1ff;
+    --lime:#64fe3e;
+    --ink:#0d0d0d;
+    --muted:#5b5b5f;
+    --rule:#e6e4ea;
+    --serif:Georgia,"Times New Roman","DejaVu Serif",serif;
+    --sans:"Helvetica Neue",Helvetica,Arial,"DejaVu Sans",sans-serif;
+  }
+  @page{ size:A4; margin:20mm 18mm 18mm 18mm; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    font-family:var(--sans);
+    color:var(--ink);
+    font-size:10.5pt;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .page{ page-break-after:always; padding:0; }
+  .page:last-child{ page-break-after:auto; }
+
+  /* gradient hairline used as a brand device */
+  .grad{ height:4px; border:0; border-radius:2px;
+    background:linear-gradient(90deg,var(--violet),var(--sky),var(--lime)); }
+
+  /* wordmark */
+  .wordmark{ font-family:var(--serif); font-weight:700; font-size:22pt; letter-spacing:-0.01em; }
+  .wordmark .iq{ color:var(--sky); }
+  .url{ color:var(--muted); font-size:8.5pt; margin-top:2px; }
+
+  h1{ font-family:var(--serif); font-weight:700; font-size:30pt; line-height:1.08; margin:0 0 2pt; }
+  h1 .accent{ color:var(--violet); display:block; }
+  h2{ font-family:var(--serif); font-weight:700; font-size:16pt; color:var(--ink); margin:0 0 4pt; padding-top:2pt; }
+  h3{ font-family:var(--sans); font-weight:700; font-size:11pt; color:var(--violet); margin:14pt 0 3pt; }
+  .subtitle{ font-family:var(--serif); font-size:12.5pt; color:var(--muted); margin:8pt 0 0; }
+  .cover-version{ color:var(--muted); font-size:10pt; margin-top:10pt; }
+
+  p{ margin:0 0 7pt; }
+  ul{ margin:0 0 8pt; padding-left:16pt; }
+  li{ margin:0 0 4pt; }
+  .lead{ color:var(--muted); }
+  strong{ font-weight:700; }
+  .small{ font-size:9pt; color:var(--muted); }
+  .section-tag{ font-size:8pt; font-weight:700; letter-spacing:0.09em; text-transform:uppercase; color:var(--violet); margin-bottom:5pt; }
+  .src{ font-size:9pt; color:var(--muted); font-style:italic; margin-top:2pt; }
+
+  /* cover layout */
+  .cover{ display:flex; flex-direction:column; min-height:245mm; }
+  .cover .top{ }
+  .cover .mid{ margin-top:78mm; }
+  .cover .foot{ margin-top:auto; }
+  .cover .foot .label{ font-weight:700; font-size:10pt; }
+  .cover .foot .desc{ color:var(--muted); font-size:10pt; }
+
+  .footer{ position:running(footer); }
+  .pagefoot{ margin-top:14pt; border-top:1px solid var(--rule); padding-top:6pt;
+    font-size:8.5pt; color:var(--muted); display:flex; justify-content:space-between; }
+
+  .contents li{ margin-bottom:6pt; }
+  .disclaimer{ background:#faf9fc; border:1px solid var(--rule); border-left:3px solid var(--violet);
+    padding:9pt 11pt; font-size:8pt; line-height:1.42; color:var(--muted); margin-top:9pt;
+    page-break-inside:avoid; }
+  .modelver{ font-variant-numeric:tabular-nums; }
+  sub{ font-size:0.72em; }
+
+  .tight6 p{ margin:0 0 5pt; }
+  .tight6 ul{ margin:0 0 6pt; }
+  .tight6 li{ margin:0 0 3pt; }
+  .tight6 h3{ margin:10pt 0 2pt; }
+</style>
+</head>
+<body>
+
+<!-- ===================== PAGE 1 — COVER ===================== -->
+<section class="page cover">
+  <div class="top">
+    <div class="wordmark">Themis<span class="iq">IQ</span></div>
+    <div class="url">www.themisiq.co</div>
+  </div>
+  <div class="mid">
+    <hr class="grad" style="width:64mm; margin-bottom:10pt;">
+    <h1>Materiality &amp; Scenario Analysis<span class="accent">Methodology</span></h1>
+    <div class="subtitle">Physical risk · Transition risk · Single and double materiality</div>
+    <!-- DOCUMENT VERSION + DATE — edit here to reissue -->
+    <div class="cover-version">v1.0 · June 2026</div>
+  </div>
+  <div class="foot">
+    <hr class="grad" style="width:40mm; margin-bottom:8pt;">
+    <div class="label">Published methodology specification</div>
+    <div class="desc">Supports IFRS S2 and CSRD ESRS double materiality.</div>
+  </div>
+</section>
+
+<!-- ===================== PAGE 2 — ABOUT / CONTENTS ===================== -->
+<section class="page">
+  <div class="section-tag">About this document</div>
+  <h2>About this document</h2>
+  <p>This document specifies the methodology behind the ThemisIQ Materiality Assessment — the screening and prioritisation engine that supports IFRS S2 single (financial) materiality and CSRD ESRS double materiality. It is published to make the methodology transparent and auditable to clients, advisors, and assurance providers; to document the independent derivation of every input layer (no licensed proprietary classification is reproduced); and to give users a defensible reference for the outputs they receive.</p>
+  <p><strong>Scope:</strong> this document describes the determinative engine. It does not describe ThemisIQ's broader GHG, supply-chain, workforce or governance modules, which have their own published methodology notes.</p>
+
+  <h3>Contents</h3>
+  <ul class="contents">
+    <li>1. Frameworks and scope — IFRS S2, CSRD ESRS, and what the tool is (and is not)</li>
+    <li>2. The risk model — physical risk, transition risk, and scenario inversion</li>
+    <li>3. Data foundations — IPCC AR6 regions, TCFD categories, ESRS topics, scenarios</li>
+    <li>4. Scoring scheme — ordinal inputs, multipliers, banding, calibration</li>
+    <li>5. The double-materiality matrix (CSRD mode)</li>
+    <li>6. Limitations, governance and next steps</li>
+  </ul>
+  <div class="pagefoot"><span>ThemisIQ Compliance Inc.</span><span>Materiality &amp; Scenario Analysis Methodology · v1.0</span></div>
+</section>
+
+<!-- ===================== PAGE 3 — SECTION 1 ===================== -->
+<section class="page">
+  <div class="section-tag">1 · Frameworks and scope</div>
+  <h2>1. Frameworks and scope</h2>
+  <p>The ThemisIQ Materiality Assessment supports two distinct reporting standards. They are kept as separate modes because they ask fundamentally different questions — and that distinction matters more than any technical decision elsewhere in the engine.</p>
+
+  <h3>1.1 IFRS S2 — single (financial) materiality</h3>
+  <p>IFRS S2, issued by the International Sustainability Standards Board (ISSB), uses single materiality assessed through a financial lens. It asks how climate-related risks and opportunities affect the reporting entity's enterprise value, cash flows, access to finance, or cost of capital across the short, medium and long term. Materiality is determined from the perspective of a primary user of general-purpose financial reports — essentially, an investor.</p>
+  <p>IFRS S2 is in effect in the jurisdictions that have adopted the ISSB standards, including Canada (CSDS), the United Kingdom, Australia, New Zealand, Brazil, Japan and across 30+ adopting jurisdictions. First reporting periods are FY2024 onwards depending on jurisdiction.</p>
+
+  <h3>1.2 CSRD / ESRS — double materiality</h3>
+  <p>The EU Corporate Sustainability Reporting Directive (CSRD), operationalised through the European Sustainability Reporting Standards (ESRS), uses double materiality. It retains the financial-materiality question of S2 and adds impact materiality: how the company's own activities affect people and the environment. A topic is reportable if it is material on either axis.</p>
+  <p>The relationship the tool encodes explicitly: double materiality = financial materiality + impact materiality. CSRD mode reuses the IFRS S2 financial engine as one axis and adds the impact axis. This is both architecturally efficient and conceptually correct: an entity's S2 disclosure is contained within its ESRS disclosure.</p>
+  <p>CSRD first-wave reporters file ESRS reports starting in 2026 for FY2025 data; Wave 2 listed SMEs follow for FY2026.</p>
+
+  <h3>1.3 What the tool is, and is not</h3>
+  <ul>
+    <li>It <strong>is</strong> a structured screening and prioritisation tool that identifies likely-material topics and tests their sensitivity to climate scenarios.</li>
+    <li>It is <strong>not</strong> a substitute for the full assessment process either standard expects. In particular, ESRS double materiality requires a defined materiality threshold agreed by governance and stakeholder engagement informing the impact axis — which the tool scopes but does not perform.</li>
+    <li>All outputs are screening drafts, clearly labelled as such on every report, intended to focus a subsequent formal assessment, not to be filed as disclosures without independent professional review.</li>
+  </ul>
+  <div class="pagefoot"><span>ThemisIQ Compliance Inc.</span><span>1 · Frameworks and scope</span></div>
+</section>
+
+<!-- ===================== PAGE 4 — SECTION 2 ===================== -->
+<section class="page">
+  <div class="section-tag">2 · The risk model</div>
+  <h2>2. The risk model</h2>
+  <p>Material climate risk is modelled as the product of four factors, applied separately to physical and transition risk and combined for climate (E1) financial materiality. The structure is intentionally transparent: any flagged risk can be traced back to its constituent factors.</p>
+
+  <h3>2.1 Physical risk</h3>
+  <p>Physical risk = industry sensitivity × geographic hazard exposure × scenario severity × time horizon.</p>
+  <ul>
+    <li><strong>Industry sensitivity:</strong> how exposed a sector's operations and assets are to each climate hazard (extreme heat, drought, water stress, inland flooding, coastal flooding, wildfire, storms/cyclones, cold/permafrost).</li>
+    <li><strong>Geographic hazard exposure:</strong> the characteristic hazards of the IPCC AR6 reference region(s) in which the entity operates.</li>
+    <li><strong>Scenario severity:</strong> a multiplier reflecting the warming pathway selected (higher-warming pathways raise physical risk).</li>
+    <li><strong>Time horizon:</strong> a multiplier reflecting whether risk is assessed to ~2030 (short), ~2040 (medium), or ~2050+ (long term).</li>
+  </ul>
+  <p>A physical risk is flagged as material only where both industry sensitivity and regional hazard exposure are non-trivial — the intersection, not either alone. This prevents the common error of flagging, for example, drought for any agricultural entity regardless of where it operates: a Mediterranean grower faces drought risk; an Eastern Canadian grower largely does not.</p>
+
+  <h3>2.2 Transition risk</h3>
+  <p>Transition risk = industry carbon exposure × jurisdictional policy intensity × scenario policy-speed × time horizon.</p>
+  <p>Transition risk uses a different geography from physical risk. Physical exposure depends on where the entity's assets and hazards are (IPCC reference regions). Transition exposure depends on which policy and regulatory jurisdictions the entity is subject to (e.g. EU ETS, EU CBAM, UK ETS, Canadian federal pricing, California cap-and-trade, China national ETS). These are tracked separately because they answer different questions about exposure.</p>
+  <p>The engine produces four standard TCFD transition-risk drivers: carbon pricing and policy, market and demand shift, technology displacement, and reputation. Each is banded high/medium/low based on the entity's industry carbon exposure, jurisdictional policy intensity, and scenario.</p>
+  <div class="pagefoot"><span>ThemisIQ Compliance Inc.</span><span>2 · The risk model</span></div>
+</section>
+
+<!-- ===================== PAGE 5 — SECTION 2.3 + 3 ===================== -->
+<section class="page">
+  <h3>2.3 Scenario severity and the physical/transition inversion</h3>
+  <p>Each scenario carries two multipliers: a physical-severity multiplier and a transition-severity (policy-speed) multiplier. These move inversely. High-warming pathways (limited mitigation, e.g. SSP5-8.5 or NGFS Hot House) raise physical risk and lower transition pressure. Rapid or abrupt-policy pathways (e.g. SSP1-2.6 or NGFS Disorderly) raise transition risk and lower physical pressure.</p>
+  <p>A climate-resilient strategy must hold up across both ends of this spectrum. Both IFRS S2 and CSRD/ESRS expect entities to test resilience across a range of scenarios rather than against a single forecast. The tool documents which scenario was used and the rationale for that choice — itself a disclosable judgment under both standards.</p>
+
+  <div class="section-tag" style="margin-top:14pt;">3 · Data foundations and sources</div>
+  <h2>3. Data foundations and sources</h2>
+  <p>Every input layer is built on public, citable frameworks. None reproduces or is structured to mirror any licensed proprietary classification. The factual climate-science relationships used (which hazards dominate a region; which risks a transition implies for a sector) trace to public sources cited below.</p>
+
+  <h3>3.1 Geographic hazard exposure — IPCC AR6 WGI reference regions</h3>
+  <p>Physical-risk geography uses the IPCC Sixth Assessment Report (AR6) Working Group I reference regions — the version 4 set defined in Iturbide et al. (2020) and used throughout the AR6 WGI Atlas. These are public, climate-science-defined land regions, not country borders. The tool currently uses 20 reference regions covering the populated land areas where reporting entities operate.</p>
+  <p>The tool presents AR6 codes alongside friendly region labels (e.g. "Mediterranean (MED)", "Western North America (WNA)") with country-coverage tooltips so a user can confirm which region their operations sit in.</p>
+  <p class="src">Source: IPCC AR6 WGI Atlas and reference-region dataset (Iturbide et al., 2020). Region hazard profiles trace to the AR6 WGI regional fact sheets and Interactive Atlas.</p>
+
+  <h3>3.2 Hazard and risk categories — IPCC climatic impact-drivers and TCFD</h3>
+  <p>Physical hazards use IPCC climatic impact-driver categories (extreme heat, drought, water stress, inland flooding, coastal flooding, wildfire, storms/cyclones, cold/permafrost). Transition risk categories follow the Task Force on Climate-related Financial Disclosures (TCFD) classification: policy and legal, technology, market, and reputation.</p>
+  <div class="pagefoot"><span>ThemisIQ Compliance Inc.</span><span>2–3 · Risk model · Data foundations</span></div>
+</section>
+
+<!-- ===================== PAGE 6 — SECTION 3.3 + 3.4 + 4 ===================== -->
+<section class="page">
+  <h3>3.3 Topics — ESRS topical standards (CSRD mode)</h3>
+  <p>The impact axis uses the ten ESRS topical standards, which are public EU instruments: five environmental (E1 Climate change; E2 Pollution; E3 Water and marine resources; E4 Biodiversity and ecosystems; E5 Resource use and circular economy), four social (S1 Own workforce; S2 Workers in the value chain; S3 Affected communities; S4 Consumers and end-users), and one governance (G1 Business conduct).</p>
+
+  <h3>3.4 Scenarios — IPCC SSPs and NGFS</h3>
+  <p>Scenario pathways use two public, widely-adopted sets. IPCC Shared Socioeconomic Pathways (SSPs) provide the warming dimension: SSP1-2.6 (~1.8°C), SSP2-4.5 (~2.7°C), and SSP5-8.5 (~4.4°C). NGFS (Network for Greening the Financial System) scenarios provide a finance-oriented transition dimension: Orderly (early policy), Disorderly (late, abrupt), and Hot House (limited action). The tool defaults to SSP2-4.5 medium-term as a reasonable central case for first-pass screening; users are encouraged to test resilience by also running higher- and lower-warming pathways.</p>
+
+  <div class="section-tag" style="margin-top:14pt;">4 · Scoring scheme</div>
+  <h2>4. Scoring scheme</h2>
+  <p>All factor scores are held on simple ordinal scales and combined multiplicatively, then mapped to a 0–10 materiality score and a high/medium/low band. The scheme is intentionally transparent so that any flagged risk or material topic can be traced to its inputs.</p>
+
+  <h3>4.1 Ordinal inputs</h3>
+  <ul>
+    <li><strong>Regional hazard intensity:</strong> 0 (absent) to 3 (dominant), per hazard per IPCC reference region.</li>
+    <li><strong>Industry hazard sensitivity:</strong> 0 to 3, per hazard per sector.</li>
+    <li><strong>Industry carbon exposure:</strong> 1 (low) to 3 (high).</li>
+    <li><strong>Jurisdiction policy intensity:</strong> 1 (emerging) to 3 (stringent — e.g. EU ETS, EU CBAM).</li>
+    <li><strong>Topic baseline relevance per industry (CSRD mode):</strong> low (2) / medium (5) / high (8) on the 0–10 scale, applied independently to financial and impact axes.</li>
+  </ul>
+
+  <h3>4.2 Multipliers</h3>
+  <ul>
+    <li><strong>Scenario physical-severity multiplier:</strong> ranges from 0.75 (low-warming pathway) to 1.5 (high-warming pathway).</li>
+    <li><strong>Scenario transition-severity (policy-speed) multiplier:</strong> ranges from 0.5 (limited-action pathway) to 1.5 (rapid-/abrupt-policy pathway). The inverse relationship to the physical multiplier is the engine's representation of the physical-transition inversion described in Section 2.3.</li>
+    <li><strong>Time horizon multiplier:</strong> 0.85 (short term) / 1.0 (medium term) / 1.2 (long term).</li>
+  </ul>
+  <div class="pagefoot"><span>ThemisIQ Compliance Inc.</span><span>3–4 · Data foundations · Scoring</span></div>
+</section>
+
+<!-- ===================== PAGE 7 — SECTION 4.3 + 4.4 + 5 ===================== -->
+<section class="page">
+  <h3>4.3 Banding</h3>
+  <p>Combined physical scores band as: high ≥ 5.5, medium ≥ 3.0, otherwise low (on the raw ordinal-product scale). Topic scores on the 0–10 scale band as: high ≥ 8, medium ≥ 5, otherwise low. Bands appear alongside the underlying numeric score in every output, so users can see both the qualitative judgment and the score behind it.</p>
+
+  <h3>4.4 Calibration note</h3>
+  <p>Scoring values — industry sensitivities, regional hazard intensities, jurisdictional policy intensities, topic baselines, and threshold bands — are starter values, independently derived from the public frameworks listed above and pending entity-specific calibration. Each weighting is independently sourced, but starter values are the same engineering reality as the GHG-emission-factor sets in industry GHG accounting tools at first commercial release: a defensible foundation that improves with calibration against worked examples and sector-specific validation. Calibration is an ongoing process documented in each model version. The model version (currently <span class="modelver">1.0</span>) is stamped on every report so users can trace outputs to the specific version that produced them.</p>
+
+  <div class="section-tag" style="margin-top:14pt;">5 · The double-materiality matrix</div>
+  <h2>5. The double-materiality matrix (CSRD mode)</h2>
+  <p>In CSRD mode, each of the ten ESRS topics receives a financial-materiality score (vertical axis) and an impact-materiality score (horizontal axis). Climate (E1) takes its financial score directly from the physical/transition engine of Section 2; the remaining topics use the industry-baseline values from Section 4.1, refined by the user's self-assessment on the impact axis.</p>
+  <p>Topics are plotted on the two axes. The upper-right quadrant (material on both axes) represents the highest reporting and management priority. Upper-left is financially material only; lower-right is impact-material only; lower-left is lower priority. The matrix is rendered as a scatter plot with dots colour-coded by quadrant and labelled by ESRS topic code.</p>
+  <p><strong>Note on ESRS fidelity.</strong> A fully compliant ESRS double-materiality assessment additionally requires (a) a defined materiality threshold agreed and documented by the entity's governance body, and (b) stakeholder engagement informing the impact axis. The tool produces the prioritisation structure but does not replace either of these requirements. Both are stated on the cover and acknowledgment of every report.</p>
+  <div class="pagefoot"><span>ThemisIQ Compliance Inc.</span><span>4–5 · Scoring · Double-materiality matrix</span></div>
+</section>
+
+<!-- ===================== PAGE 8 — SECTION 6 ===================== -->
+<section class="page tight6">
+  <div class="section-tag">6 · Limitations, governance and next steps</div>
+  <h2>6. Limitations, governance and next steps</h2>
+  <p>The methodology is published to make defensibility easier, not to imply that the tool by itself satisfies the full requirements of either standard. The following are required to move from screening output to compliant disclosure:</p>
+  <ul>
+    <li>A defined materiality threshold agreed and documented by the entity's governance body (CSRD requirement).</li>
+    <li>Stakeholder engagement informing the impact-materiality axis (CSRD requirement). The tool scopes the assessment but does not replace stakeholder consultation.</li>
+    <li>Validation of starter scoring values (industry sensitivities, regional hazard intensities, jurisdictional policy weights, topic baselines) against the entity's own operations and supplementary data.</li>
+    <li>Resilience testing across a range of climate scenarios, not the central case alone. Both standards expect this.</li>
+    <li>Independent professional review of the determined material topics and associated disclosures prior to publication.</li>
+  </ul>
+
+  <h3>6.1 Independent-derivation control</h3>
+  <p>No input layer in the tool may be copied from, or structured to mirror, any licensed proprietary classification (e.g. SASB Standards / SICS). This document and the published source-credits within the tool serve as the record of independent sourcing. ThemisIQ retains the right to update the methodology as the underlying frameworks evolve and as calibration evidence accumulates; substantive changes are tracked through model versioning and documented in change logs.</p>
+
+  <h3>6.2 Version control</h3>
+  <p>Each material change to a scoring table, weighting, or methodology rule increments the model version and is logged with rationale and source. The model version active when an assessment is run is stamped on the resulting report. Reports do not silently re-score against later versions: a report generated under model version <span class="modelver">1.0</span> will continue to display as such, even after newer versions are released.</p>
+
+  <div class="disclaimer">
+    <p><strong>Disclaimer.</strong> This document is a published methodology specification describing the design of the ThemisIQ Materiality Assessment. It is provided for transparency and reference only. It is not legal, regulatory, financial, accounting, or assurance advice, and it does not in itself satisfy any obligation under IFRS S2, the CSRD/ESRS, or any other reporting framework.</p>
+    <p>The methodology relies on third-party public frameworks and datasets — including those published by the IPCC, the TCFD, the ISSB, the European Union (ESRS), and the NGFS — which are maintained by their respective bodies and may change without notice. ThemisIQ does not warrant the accuracy, completeness, or currency of any underlying framework, emission factor, scoring value, or input dataset, all of which are provided on an "as is" basis. Scoring values are starter calibrations pending entity-specific validation, as described in this document.</p>
+    <p>Outputs that depend on climate scenarios are illustrative projections, not forecasts or predictions of future conditions. Scenario analysis is inherently uncertain; results describe relative sensitivity across pathways and must not be relied upon as expected outcomes.</p>
+    <p>The ThemisIQ Materiality Assessment is a screening and prioritisation tool. It is not an accredited assurance service under any framework, and its outputs are not a substitute for the full assessment process, governance-set materiality thresholds, stakeholder engagement, or independent professional review that the applicable standards require prior to disclosure.</p>
+    <p style="margin-bottom:0;">ThemisIQ reserves the right to update this methodology as the underlying frameworks evolve and as calibration evidence accumulates; material changes are tracked through model versioning. ThemisIQ Compliance Inc. accepts no liability for regulatory filings, disclosures, or other decisions made on the basis of platform outputs without appropriate independent professional review.</p>
+  </div>
+  
+</section>
+
+<!-- ===================== PAGE 9 — COLOPHON ===================== -->
+<section class="page">
+  <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:230mm; text-align:center;">
+    <div class="wordmark" style="font-size:18pt;">Themis<span class="iq">IQ</span></div>
+    <hr class="grad" style="width:48mm; margin:10pt 0;">
+    <div class="small">ThemisIQ Compliance Inc. · www.themisiq.co · v1.0 · June 2026</div>
+  </div>
+</section>
+
+</body>
+</html>
