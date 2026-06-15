@@ -299,7 +299,7 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
               ))}
             </tbody>
           </table>
-          <p style={p}>This satisfies the explicit requirements of both frameworks: IFRS S2 paragraph 22 requires a diverse range of scenarios including one aligned with the latest international agreement (the Paris-aligned pathway above); CSRD/ESRS E1 requires consideration of at least a high-emissions scenario (the high-warming pathway above). Under both, the choice of scenarios and the rationale for that choice are themselves disclosable; this section documents that judgment.</p>
+          <p style={p}>This satisfies the explicit requirements of both frameworks: IFRS S2 paragraph 22(b)(i) requires disclosure of whether the scenario analysis used a diverse range of scenarios and one aligned with the latest international agreement on climate change (the Paris-aligned pathway above); CSRD/ESRS E1 requires consideration of at least a high-emissions scenario (the high-warming pathway above). Under both, the choice of scenarios and the rationale for that choice are themselves disclosable; this section documents that judgment.</p>
         </section>
 
         {/* PER-CHANNEL DETAIL */}
