@@ -148,6 +148,7 @@ export async function POST(req: NextRequest) {
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment', // one-time payment (not a subscription)
+      allow_promotion_codes: true,
       line_items: lineItems,
       customer_email: email,
       client_reference_id: userId,
