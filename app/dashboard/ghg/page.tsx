@@ -1688,10 +1688,10 @@ if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.uni
                   </div>
                 )}
                 {loc.state
-                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region auto-detected: <strong>{detectedRegion?.label}</strong> — {detectedRegion?.ef} kg CO₂e/kWh (eGRID 2023)</div>
+                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region auto-detected: <strong>{detectedRegion?.label}</strong> — {detectedRegion ? getGridFactor(detectedRegion.value, inventory.reporting_year).ef : "—"} kg CO₂e/kWh (eGRID 2023)</div>
                   : (loc.grid_region.startsWith('EU_') || loc.grid_region === 'UK')
                   ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{loc.grid_region}</strong> — {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh ({loc.grid_region === 'UK' ? 'DEFRA 2025' : 'EEA 2023'})</div>
-                  : <Field label="Grid region"><select value={loc.grid_region} onChange={e => updateLocation(activeLocation, 'grid_region', e.target.value)} style={inputStyle}><optgroup label="Canada">{GRID_REGIONS_CA.map(r => <option key={r.value} value={r.value}>{r.label} — {r.ef} kg CO₂e/kWh</option>)}</optgroup><optgroup label="United States">{GRID_REGIONS_US.map(r => <option key={r.value} value={r.value}>{r.label} — {r.ef} kg CO₂e/kWh</option>)}</optgroup></select></Field>
+                  : <Field label="Grid region"><select value={loc.grid_region} onChange={e => updateLocation(activeLocation, 'grid_region', e.target.value)} style={inputStyle}><optgroup label="Canada">{GRID_REGIONS_CA.map(r => <option key={r.value} value={r.value}>{r.label} — {getGridFactor(r.value, inventory.reporting_year).ef} kg CO₂e/kWh</option>)}</optgroup><optgroup label="United States">{GRID_REGIONS_US.map(r => <option key={r.value} value={r.value}>{r.label} — {getGridFactor(r.value, inventory.reporting_year).ef} kg CO₂e/kWh</option>)}</optgroup></select></Field>
                 }
                 {loc.country === 'US' && (
                   <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 8, padding: '12px 14px' }}>
