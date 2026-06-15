@@ -438,6 +438,7 @@ interface Location {
 // 12 (December) -> Jan 1 – Dec 31 of the reporting year (calendar year, the default).
 // Any other month -> the 12 months ENDING on the last day of that month in the reporting year.
 // The last day is computed leap-year-aware (e.g. a February end resolves to 28 or 29 correctly).
+const parseLocalDate = (s: string): Date => { const [y, m, d] = s.slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d) }
 function periodFromYearAndEnd(reportingYear: number, fiscalYearEndMonth: number = 12): { start: Date; end: Date; label: string } {
   const m = (fiscalYearEndMonth >= 1 && fiscalYearEndMonth <= 12) ? fiscalYearEndMonth : 12
   const end = new Date(reportingYear, m, 0) // day 0 of the next month = last day of month m (leap-aware)
@@ -481,8 +482,18 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
   if (periods.length === 0) {
     return { status: 'none', monthsCovered: 0, coverageRatio: 0, pctEstimated: 0, gaps: [], overlaps: [], straddles: [], summary: 'No dated bills yet.' }
   }
+  const DAY = 86400000
+  // Two extraction conventions appear for a bill's end date: last-day-of-month
+  // ("05-01 → 05-31") and first-of-next-month ("05-01 → 06-01"). Canonicalize BOTH
+  // to a half-open exclusive boundary (the first uncovered day) so coverage is
+  // convention-independent. This is the documented basis for the day-continuity check.
+  const isLastDayOfMonth = (d: Date): boolean => new Date(d.getTime() + DAY).getMonth() !== d.getMonth()
+  const exclusiveEnd = (end: Date): Date =>
+    isLastDayOfMonth(end)
+      ? new Date(end.getFullYear(), end.getMonth() + 1, 1)
+      : new Date(end.getFullYear(), end.getMonth(), end.getDate())
 
-  // Build the set of reporting-year months (month-level coverage).
+  // Reporting-year months (month-shaped reporting the strip/export expect).
   const reqMonths: string[] = []
   {
     const d = new Date(winStart.getFullYear(), winStart.getMonth(), 1)
@@ -490,13 +501,9 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
     while (d <= last) { reqMonths.push(monthKey(d)); d.setMonth(d.getMonth() + 1) }
   }
 
-  // Map each required month -> how many bills cover it (for gaps + overlaps).
-  const monthCount: Record<string, CoveragePeriod[]> = {}
-  reqMonths.forEach(mk => { monthCount[mk] = [] })
-
+  // Straddles: bills crossing the reporting-year boundary (disclosure %, raw ends).
   const straddles: CoverageResult['straddles'] = []
   periods.forEach(p => {
-    // Straddle: period crosses the reporting-year boundary.
     if (p.start < winStart || p.end > winEnd) {
       const overlapStart = p.start < winStart ? winStart : p.start
       const overlapEnd = p.end > winEnd ? winEnd : p.end
@@ -506,28 +513,47 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
         straddles.push({ p, daysInYear, totalDays, pctInYear: Math.round((daysInYear / totalDays) * 1000) / 10 })
       }
     }
-    // Month-level coverage tally (only for months inside the window).
-    const d = new Date(Math.max(p.start.getTime(), winStart.getTime()))
-    d.setDate(1)
-    // Utility bill periods are [start, end) — the end date is the first day of the NEXT period
-    // (e.g. "Apr 01 → May 01" covers April, not May). Treat the end as exclusive: the last
-    // covered day is end − 1, so consecutive monthly bills tile cleanly without false overlaps.
-    const effEnd = new Date(p.end.getTime() - 86400000)
-    const endCap = new Date(Math.min(effEnd.getTime(), winEnd.getTime()))
-    while (d <= endCap) {
-      const mk = monthKey(d)
-      if (mk in monthCount) monthCount[mk].push(p)
-      d.setMonth(d.getMonth() + 1)
-    }
   })
 
-  const covered = reqMonths.filter(mk => monthCount[mk].length >= 1)
-  const gaps = reqMonths.filter(mk => monthCount[mk].length === 0)
-    .map(mk => { const [y, m] = mk.split('-').map(Number); return { label: monthLabel(y, m - 1) } })
+  // ── DAY-LEVEL CONTINUITY (verifier-defensible primitive) ──
+  // Build a per-day coverage count across the window; a day is covered when ≥1 bill's
+  // canonical [start, exclusiveEnd) spans it. Gaps = uncovered days; overlaps = days
+  // covered by ≥2 bills. Month-level results below are derived from this day map, so
+  // the calendar-vs-billing-cycle artifact never produces false gaps or false overlaps.
+  const winS = new Date(winStart.getFullYear(), winStart.getMonth(), winStart.getDate())
+  const winEexcl = new Date(winEnd.getFullYear(), winEnd.getMonth(), winEnd.getDate() + 1)
+  const totalDaysInWin = Math.round((winEexcl.getTime() - winS.getTime()) / DAY)
+  const idxOf = (d: Date): number =>
+    Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - winS.getTime()) / DAY)
+  const coverCount: number[] = new Array(Math.max(0, totalDaysInWin)).fill(0)
+  periods.forEach(p => {
+    let i = Math.max(0, idxOf(p.start))
+    const jExcl = Math.min(totalDaysInWin, idxOf(exclusiveEnd(p.end)))
+    for (; i < jExcl; i++) coverCount[i]++
+  })
+
+  // Overlap pairs: any two bills sharing ≥1 in-window day.
   const overlapPairs: CoverageResult['overlaps'] = []
+  for (let a = 0; a < periods.length; a++) {
+    for (let b = a + 1; b < periods.length; b++) {
+      const aS = Math.max(0, idxOf(periods[a].start)), aE = Math.min(totalDaysInWin, idxOf(exclusiveEnd(periods[a].end)))
+      const bS = Math.max(0, idxOf(periods[b].start)), bE = Math.min(totalDaysInWin, idxOf(exclusiveEnd(periods[b].end)))
+      if (Math.max(aS, bS) < Math.min(aE, bE)) overlapPairs.push({ a: periods[a], b: periods[b] })
+    }
+  }
+
+  // Month is COVERED iff every in-window day of it is covered (conservative: a partial
+  // month is a gap, never silently claimed — fails toward honest gaps, not false coverage).
+  const covered: string[] = []
+  const gaps: CoverageResult['gaps'] = []
   reqMonths.forEach(mk => {
-    const ps = monthCount[mk]
-    if (ps.length >= 2) overlapPairs.push({ a: ps[0], b: ps[1] })
+    const [y, m] = mk.split('-').map(Number)
+    const lo = Math.max(0, idxOf(new Date(y, m - 1, 1)))
+    const hi = Math.min(totalDaysInWin, idxOf(new Date(y, m, 1)))
+    let allCovered = hi > lo
+    for (let i = lo; i < hi; i++) if (coverCount[i] === 0) { allCovered = false; break }
+    if (allCovered) covered.push(mk)
+    else gaps.push({ label: monthLabel(y, m - 1) })
   })
 
   const monthsCovered = covered.length
@@ -536,7 +562,6 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
   if (gaps.length > 0) status = 'gap'
   if (overlapPairs.length > 0) status = 'overlap'
   if (straddles.length > 0 && gaps.length === 0 && overlapPairs.length === 0) status = 'straddle'
-
   return {
     status,
     monthsCovered,
@@ -553,6 +578,7 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
       : `${monthsCovered}/${total} months covered.`,
   }
 }
+
 // A documented coverage resolution (gap/overlap/straddle), stored on the inventory.
 // Raw confirmed proposals stay untouched; this is the transparent, additive layer
 // the verifier sees (workings records method + basis). Spec: coverage-check addendum.
@@ -2217,7 +2243,7 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
         const periods: CoveragePeriod[] = docs.flatMap(d =>
           (d.extracted ?? []).map((p, pi) => ({ p, pi, docId: d.id }))
             .filter(x => x.p.status === 'confirmed' && x.p.periodStart && x.p.periodEnd)
-            .map(x => ({ docId: x.docId, pi: x.pi, start: new Date(x.p.periodStart as string), end: new Date(x.p.periodEnd as string) }))
+            .map(x => ({ docId: x.docId, pi: x.pi, start: parseLocalDate(x.p.periodStart as string), end: parseLocalDate(x.p.periodEnd as string) }))
         )
         if (periods.length === 0) return null
         const cov = analyzeCoverage(periods, win.start, win.end)
