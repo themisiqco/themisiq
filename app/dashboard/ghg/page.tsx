@@ -137,9 +137,9 @@ const EF_SOURCES = {
   electricity: 'US EPA eGRID2023 (US) / ECCC v3.0 (CA) / DEFRA 2025 (UK) / EEA 2023 (EU)',
   residual_us: 'Green-e Residual Mix 2025 (2023 data, publ. 2026-01-29, CRS) — residual CO₂; eGRID2023 Rev2 (publ. 2025-06-12) CH₄/N₂O. Green-e factors out Green-e-certified voluntary sales (the only published US residual source per CRS).',
   residual_eu: 'AIB European Residual Mixes 2024 (publ. 2025-05-30, Grexel/AIB; Ecoinvent CO₂ inputs) — combined CO₂e, gCO₂/kWh.',
-  gwp_ar4: 'IPCC AR4 (2007) — required by CARB SB 253 and CDP default',
-  gwp_ar5: 'IPCC AR5 (2014) — required by ESRS E1 and GRI 305',
-  gwp_ar6: 'IPCC AR6 (2021) — used by ESRS E1, GRI 305, CDP, EcoVadis, IFRS S2',
+  gwp_ar4: 'IPCC AR4 (2007) — applied for California SB 253, consistent with CARB AB 32 / Mandatory Reporting Regulation',
+  gwp_ar5: 'IPCC AR5 (2014) — GHG Protocol baseline; available for manual selection, not the default for any current framework',
+  gwp_ar6: 'IPCC AR6 (2021) — applied by default for CDP, ESRS E1, GRI 305, EcoVadis, IFRS S2',
 }
 
 const GRID_EF: Record<string, Record<number, number>> = {
