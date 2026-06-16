@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { startCheckout } from '../../lib/checkout'
-import { LEGACY_PRICING_PAGE_ID, tierPrice, tierStrikethrough, volumeDiscount, type Tier } from '../../lib/pricing'
+import { LEGACY_PRICING_PAGE_ID, tierPrice, tierStrikethrough, volumeDiscount, ADDONS, conciergeTierForLocations, type Tier, type AddOnKey } from '../../lib/pricing'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -155,6 +155,10 @@ function PricingPageInner() {
   const [tier, setTier] = useState<Tier>('starter')
   const [selected, setSelected] = useState<Set<ModuleId>>(initialModules)
   const [daysLeft, setDaysLeft] = useState(81)
+  // Add-on selection state
+  const [conciergeOn, setConciergeOn] = useState(false)
+  const [conciergeLocations, setConciergeLocations] = useState(1)
+  const [verificationOn, setVerificationOn] = useState(false)
 
   useEffect(() => {
     const deadline = new Date('2026-08-10')
@@ -169,10 +173,25 @@ function PricingPageInner() {
   const gross = count * unitPrice
   const discount = volumeDiscount(count)
   const net = Math.round(gross * (1 - discount))
+  // Add-on logic. Concierge tier is resolved from the location count; Verification
+  // is only available once Concierge is added (mirrors the server dependency rule).
+  const ghgSelected = selected.has('ghg')
+  const conciergeResolved = conciergeTierForLocations(conciergeLocations)
+  const conciergeActive = ghgSelected && conciergeOn
+  const verificationActive = conciergeActive && verificationOn && !conciergeResolved.isCustomQuote
+  const selectedAddOns: AddOnKey[] = [
+    ...(conciergeActive && !conciergeResolved.isCustomQuote ? [conciergeResolved.key] : []),
+    ...(verificationActive ? ['verification' as AddOnKey] : []),
+  ]
+  const addOnsTotal =
+    (conciergeActive && !conciergeResolved.isCustomQuote ? ADDONS[conciergeResolved.key].price : 0) +
+    (verificationActive ? ADDONS.verification.price : 0)
+  // Grand total shown in the panel/CTA = modules + add-ons (matches Stripe).
+  const totalNet = net + addOnsTotal
   const handleBuy = () => {
     const moduleKeys = Array.from(selected).map((id) => LEGACY_PRICING_PAGE_ID[id]).filter(Boolean)
     if (moduleKeys.length === 0) return
-    startCheckout({ tier, moduleKeys })
+    startCheckout({ tier, moduleKeys, ...(selectedAddOns.length > 0 ? { addOns: selectedAddOns } : {}) })
   }
 
   const toggleModule = (id: ModuleId) => {
@@ -520,7 +539,53 @@ function PricingPageInner() {
             )
           })}
         </div>
+        {/* Add-ons — appear once GHG is selected */}
+        {ghgSelected && (
+          <div style={{ marginTop: 24, padding: 20, background: '#f8f7f5', borderRadius: 12, border: '1px solid #e8e7e4' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#0d0d0d', marginBottom: 4 }}>Enhance your GHG inventory</div>
+            <div style={{ fontSize: 11, color: '#888784', marginBottom: 16 }}>Optional add-ons. We do the bill-reading; you confirm the numbers.</div>
 
+            {/* Concierge */}
+            <div style={{ padding: 14, background: '#fff', borderRadius: 10, border: conciergeOn ? '2px solid #7425e3' : '1px solid #e8e7e4', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>Concierge — we read your bills</div>
+                  <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, marginTop: 2 }}>Upload utility bills; ThemisIQ extracts the figures with source quotes for you to confirm. Priced by number of locations.</div>
+                </div>
+                <button onClick={() => setConciergeOn(v => !v)} style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', background: conciergeOn ? '#7425e3' : '#0d0d0d', color: '#fff' }}>{conciergeOn ? 'Added ✓' : 'Add'}</button>
+              </div>
+              {conciergeOn && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f0efed', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <label style={{ fontSize: 12, color: '#555553' }}>Locations:</label>
+                  <input type="number" min={1} value={conciergeLocations} onChange={e => setConciergeLocations(Math.max(1, Number(e.target.value) || 1))} style={{ width: 70, fontSize: 13, padding: '6px 8px', border: '1px solid #e8e7e4', borderRadius: 6 }} />
+                  <span style={{ fontSize: 12, color: '#0d0d0d', fontWeight: 600 }}>
+                    {conciergeResolved.isCustomQuote
+                      ? 'Enterprise (16+) — custom quote'
+                      : `${ADDONS[conciergeResolved.key].label.replace('Concierge — ', '')} · $${ADDONS[conciergeResolved.key].price.toLocaleString()}/yr`}
+                  </span>
+                  {conciergeResolved.isCustomQuote && (
+                    <a href="mailto:lisa.foster@themisiq.co?subject=Concierge%20Enterprise%20quote" style={{ fontSize: 12, fontWeight: 600, color: '#7425e3', textDecoration: 'none' }}>Request a quote →</a>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Verification — locked until Concierge added */}
+            <div style={{ padding: 14, background: '#fff', borderRadius: 10, border: verificationActive ? '2px solid #7425e3' : '1px solid #e8e7e4', opacity: conciergeActive && !conciergeResolved.isCustomQuote ? 1 : 0.55 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>Verification Readiness · $499/yr</div>
+                  <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, marginTop: 2 }}>Assurance-ready package built on your Concierge-reviewed data.</div>
+                </div>
+                {conciergeActive && !conciergeResolved.isCustomQuote ? (
+                  <button onClick={() => setVerificationOn(v => !v)} style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', background: verificationOn ? '#7425e3' : '#0d0d0d', color: '#fff' }}>{verificationOn ? 'Added ✓' : 'Add'}</button>
+                ) : (
+                  <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: '#888784', padding: '6px 10px', background: '#f0efed', borderRadius: 8 }}>🔒 Requires Concierge</span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         {/* Live price panel */}
         <div style={s.pricePanel}>
           <div style={s.pricePanelInner}>
@@ -533,6 +598,16 @@ function PricingPageInner() {
                   <div key={i}>{line}</div>
                 ))}
               </div>
+              {selectedAddOns.length > 0 && (
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8, marginBottom: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                  {selectedAddOns.map(k => (
+                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                      <span>{ADDONS[k].label}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap' }}>+${ADDONS[k].price.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
                   {count} module{count !== 1 ? 's' : ''} selected
@@ -547,11 +622,11 @@ function PricingPageInner() {
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
               {discount > 0 && (
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', textDecoration: 'line-through' }}>
-                  ${gross.toLocaleString()}
+                  ${(gross + addOnsTotal).toLocaleString()}
                 </div>
               )}
               <div style={{ ...gradText, fontSize: 36, fontWeight: 700, lineHeight: 1 }}>
-                ${net.toLocaleString()}
+                ${totalNet.toLocaleString()}
               </div>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>/year</div>
             </div>
@@ -588,7 +663,7 @@ function PricingPageInner() {
           <div style={s.ctaBtns}>
             {tier !== 'advisory' && (
               <button onClick={handleBuy} style={primaryBtn}>
-                Buy now — ${net.toLocaleString()}/yr →
+                Buy now — ${totalNet.toLocaleString()}/yr →
               </button>
             )}
             {cta.buttons.map((btn, i) => (
