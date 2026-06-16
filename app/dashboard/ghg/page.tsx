@@ -469,6 +469,7 @@ interface CoverageResult {
   gaps: { label: string }[]           // uncovered months, human-readable
   overlaps: { a: CoveragePeriod; b: CoveragePeriod }[]
   straddles: { p: CoveragePeriod; daysInYear: number; totalDays: number; pctInYear: number }[]
+  outOfWindow: { label: string }[]    // bills fully outside the reporting year (not counted)
   summary: string
 }
 
@@ -484,7 +485,7 @@ function daysBetween(a: Date, b: Date): number {
 
 function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date): CoverageResult {
   if (periods.length === 0) {
-    return { status: 'none', monthsCovered: 0, coverageRatio: 0, pctEstimated: 0, gaps: [], overlaps: [], straddles: [], summary: 'No dated bills yet.' }
+    return { status: 'none', monthsCovered: 0, coverageRatio: 0, pctEstimated: 0, gaps: [], overlaps: [], straddles: [], outOfWindow: [], summary: 'No dated bills yet.' }
   }
   const DAY = 86400000
   // Two extraction conventions appear for a bill's end date: last-day-of-month
@@ -506,7 +507,11 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
   }
 
   // Straddles: bills crossing the reporting-year boundary (disclosure %, raw ends).
+  // Out-of-window: bills entirely outside the reporting year (no in-window days) — not counted.
   const straddles: CoverageResult['straddles'] = []
+  const outOfWindow: CoverageResult['outOfWindow'] = []
+  const fmtPeriod = (p: CoveragePeriod) =>
+    `${p.start.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`
   periods.forEach(p => {
     if (p.start < winStart || p.end > winEnd) {
       const overlapStart = p.start < winStart ? winStart : p.start
@@ -515,6 +520,9 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
         const daysInYear = daysBetween(overlapStart, overlapEnd)
         const totalDays = daysBetween(p.start, p.end)
         straddles.push({ p, daysInYear, totalDays, pctInYear: Math.round((daysInYear / totalDays) * 1000) / 10 })
+      } else {
+        // No overlap with the window at all → fully outside the reporting year.
+        outOfWindow.push({ label: fmtPeriod(p) })
       }
     }
   })
@@ -574,6 +582,7 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
     gaps,
     overlaps: overlapPairs,
     straddles,
+    outOfWindow,
     summary:
       status === 'full' ? `Full year covered (${monthsCovered}/${total} months).`
       : status === 'gap' ? `${monthsCovered}/${total} months covered — missing: ${gaps.map(g => g.label).join(', ')}.`
@@ -2332,6 +2341,11 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
         return (
           <div style={{ marginTop: 8, background: tone.bg, borderRadius: 6, padding: '8px 10px', fontSize: 11, color: tone.fg, fontWeight: 600 }}>
             <div>{tone.icon} {resolved ? `${cov.monthsCovered}/12 months from bills; remaining estimated (${cov.pctEstimated}% estimated).` : cov.summary}</div>
+            {cov.outOfWindow.length > 0 && (
+              <div style={{ marginTop: 4, fontWeight: 400, color: '#555553' }}>
+                ℹ️ {cov.outOfWindow.length} bill{cov.outOfWindow.length > 1 ? 's' : ''} outside reporting year {reportingYear}, not counted: {cov.outOfWindow.map(o => o.label).join(', ')}.
+              </div>
+            )}
             {cov.status === 'gap' && !resolved && (
               <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <span style={{ fontWeight: 400, color: '#7c5a16' }}>Upload the missing bill above, or:</span>
