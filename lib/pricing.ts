@@ -197,7 +197,17 @@ verification: {
     requires: ['ghg'],
   },
 }
-
+// Resolve the Concierge tier from a location count. Single source of truth for the
+// location→tier bands (Basic ≤5, Standard 6–15, Enterprise 16+). Enterprise is a
+// custom quote (price 0 placeholder) — callers should route 16+ to a contact path.
+export function conciergeTierForLocations(locations: number): {
+  key: Extract<AddOnKey, 'concierge-basic' | 'concierge-standard' | 'concierge-enterprise'>
+  isCustomQuote: boolean
+} {
+  if (locations <= 5) return { key: 'concierge-basic', isCustomQuote: false }
+  if (locations <= 15) return { key: 'concierge-standard', isCustomQuote: false }
+  return { key: 'concierge-enterprise', isCustomQuote: true }
+}
 // Single authority on whether an add-on is allowed in a given cart/account.
 // `requires` lists prerequisite modules (ALL must be present).
 // `requiresAddOnAnyOf` lists prerequisite add-ons (at least one must be present).
