@@ -58,6 +58,7 @@ ${fuelLines}
 
 For EACH figure you report, also extract the billing/service period that the figure covers:
 - periodStart and periodEnd as ISO dates (yyyy-mm-dd).
+- If the bill prints explicit start and end dates for the period (e.g. "Dec 01, 2024 - Jan 01, 2025" or "Service period: ..."), use those exact dates VERBATIM, including the printed end date even when it falls on the 1st of the next month. Do NOT round, clamp, or normalize the end date to the last day of a month. Set periodConfidence: "high".
 - If the document shows an explicit date range (e.g. "Nov 1 - Nov 30, 2024"), use those exact dates.
 - If it shows only a month or month/year (e.g. "Nov 2024"), use the first and last calendar day of that month and set periodConfidence: "medium".
 - If no billing period is visible, return periodStart: null, periodEnd: null, periodConfidence: "low".
