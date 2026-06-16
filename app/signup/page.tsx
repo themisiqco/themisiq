@@ -38,7 +38,14 @@ export default function SignupPage() {
     if (error) {
       setError(error.message)
       setLoading(false)
+    } else if (data.session) {
+      // Email confirmation is off: signUp returned a live session, so the user
+      // is already authenticated. Resume their intended destination (e.g.
+      // /checkout for a buyer) instead of the dead-end "check your email" screen.
+      window.location.assign(nextUrl)
     } else {
+      // Email confirmation is on: no session yet. The confirmation link carries
+      // ?next=<nextUrl> back through /auth/callback, so checkout resumes then.
       setSuccess(true)
     }
   }
