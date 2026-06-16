@@ -8,6 +8,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  // Where to go after login. Only allow same-site relative paths (no open redirects).
+  const rawNext =
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('next')
+      : null
+  const nextUrl = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//')
+    ? rawNext
+    : '/dashboard'
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -20,7 +28,7 @@ export default function LoginPage() {
       setError(error.message)
       setLoading(false)
     } else {
-      window.location.href = '/dashboard'
+      window.location.href = nextUrl
     }
   }
 
@@ -32,7 +40,7 @@ export default function LoginPage() {
         <a href="/" style={{ textDecoration: 'none' }}>
           <img src="/logo.png" alt="ThemisIQ" style={{ height: 24, width: 'auto', display: 'block' }} />
         </a>
-        <span style={{ fontSize: 12, color: '#888784' }}>Don't have an account? <a href="/signup" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Create an account →</a></span>
+        <span style={{ fontSize: 12, color: '#888784' }}>Don't have an account? <a href={`/signup?next=${encodeURIComponent(nextUrl)}`} style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Create an account →</a></span>
       </nav>
 
       {/* MAIN */}
@@ -98,7 +106,7 @@ export default function LoginPage() {
           </div>
 
           <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: 13, color: '#888784' }}>
-            Don't have an account? <a href="/signup" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Create your account →</a>
+Don't have an account? <a href={`/signup?next=${encodeURIComponent(nextUrl)}`} style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Create your account →</a>
           </p>
 
         </div>

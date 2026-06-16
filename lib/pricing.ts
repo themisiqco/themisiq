@@ -169,13 +169,14 @@ export type AddOnKey = 'verification' | 'concierge-basic' | 'concierge-standard'
 
 export const ADDONS: Record<
   AddOnKey,
-  { key: AddOnKey; label: string; price: number; requires: ModuleKey[] }
+{ key: AddOnKey; label: string; price: number; requires: ModuleKey[]; requiresAddOnAnyOf?: AddOnKey[] }
 > = {
-  verification: {
+verification: {
     key: 'verification',
     label: 'Verification Readiness',
     price: 499,
     requires: ['ghg'],
+    requiresAddOnAnyOf: ['concierge-basic', 'concierge-standard', 'concierge-enterprise'],
   },
   'concierge-basic': {
     key: 'concierge-basic',
@@ -197,12 +198,34 @@ export const ADDONS: Record<
   },
 }
 
-// True when the customer's owned + in-cart modules satisfy an add-on's `requires`.
+// Single authority on whether an add-on is allowed in a given cart/account.
+// `requires` lists prerequisite modules (ALL must be present).
+// `requiresAddOnAnyOf` lists prerequisite add-ons (at least one must be present).
+// Returns ok=false with a human-readable reason the routes surface verbatim.
 export function addOnRequirementsMet(
   addOn: AddOnKey,
   modulesOwnedOrInCart: ModuleKey[],
-): boolean {
-  return ADDONS[addOn].requires.every((m) => modulesOwnedOrInCart.includes(m))
+  addOnsOwnedOrInCart: AddOnKey[] = [],
+): { ok: boolean; reason?: string } {
+  const def = ADDONS[addOn]
+  const missingModule = def.requires.find((m) => !modulesOwnedOrInCart.includes(m))
+  if (missingModule) {
+    return {
+      ok: false,
+      reason: `${def.label} requires ${def.requires.join(', ')}. Add it to your cart or purchase it first.`,
+    }
+  }
+  if (def.requiresAddOnAnyOf && def.requiresAddOnAnyOf.length > 0) {
+    const hasOne = def.requiresAddOnAnyOf.some((a) => addOnsOwnedOrInCart.includes(a))
+    if (!hasOne) {
+      const names = def.requiresAddOnAnyOf.map((a) => ADDONS[a].label).join(' or ')
+      return {
+        ok: false,
+        reason: `${def.label} requires ${names}. Add Concierge to your cart or purchase it first.`,
+      }
+    }
+  }
+  return { ok: true }
 }
 
 // ── Stripe helper ────────────────────────────────────────────────────────────

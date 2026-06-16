@@ -7,8 +7,15 @@ export default function SignupPage() {
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', company: '', role: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
-
+ const [success, setSuccess] = useState(false)
+  // Where to resume after email confirmation. Same-site relative paths only (no open redirects).
+  const rawNext =
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('next')
+      : null
+  const nextUrl = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//')
+    ? rawNext
+    : '/dashboard'
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -18,6 +25,7 @@ export default function SignupPage() {
       email: form.email,
       password: form.password,
       options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextUrl)}`,
         data: {
           first_name: form.firstName,
           last_name: form.lastName,

@@ -30,6 +30,7 @@ import {
   ALL_MODULE_KEYS,
   PACKS,
   ADDONS,
+  addOnRequirementsMet,
   configuratorPrice,
   type Tier,
   type ModuleKey,
@@ -121,12 +122,17 @@ export async function POST(req: NextRequest) {
         if (!addOn) {
           return NextResponse.json({ error: `Unknown add-on: ${addOnKey}` }, { status: 400 })
         }
-        const satisfied = addOn.requires.every((r) => entitlements.has(r))
-        if (!satisfied) {
-          return NextResponse.json(
-            { error: `${addOn.label} requires: ${addOn.requires.join(', ')}` },
-            { status: 400 },
-          )
+       // Requirement check (modules + add-on prerequisites) via single authority.
+        // `entitlements` holds both modules and add-on keys; split via ADDONS lookup.
+        const entArr = [...entitlements]
+        const moduleEnts = entArr.filter((k) => !(k in ADDONS)) as ModuleKey[]
+        const addOnEnts = [
+          ...entArr.filter((k) => k in ADDONS),
+          ...(body.addOns ?? []),
+        ] as AddOnKey[]
+        const check = addOnRequirementsMet(addOnKey, moduleEnts, addOnEnts)
+        if (!check.ok) {
+          return NextResponse.json({ error: check.reason }, { status: 400 })
         }
         lines.push({ label: addOn.label, amount: addOn.price })
         entitlements.add(addOn.key)

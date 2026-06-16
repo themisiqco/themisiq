@@ -24,15 +24,20 @@ export interface CheckoutSelection {
 }
 
 export async function startCheckout(selection: CheckoutSelection): Promise<void> {
-  // 1) Must be logged in (the route requires it; this is a friendlier early check).
+// 1) Must be logged in. If not, preserve the buy intent and send them to login,
+  //    with a `next` that returns to the resume route to finish checkout after auth.
   const {
     data: { session },
   } = await supabase.auth.getSession()
 
   if (!session) {
-    alert('Please sign in to continue to checkout.')
-    // Adjust this path if your login route differs (e.g. '/auth' or '/signup').
-    window.location.href = '/login'
+    try {
+      sessionStorage.setItem('themisiq:pendingCheckout', JSON.stringify(selection))
+    } catch {
+      // sessionStorage unavailable (rare) — fall through; resume route also reads the URL.
+    }
+    const next = `/checkout?intent=${encodeURIComponent(JSON.stringify(selection))}`
+    window.location.href = `/login?next=${encodeURIComponent(next)}`
     return
   }
 
@@ -68,4 +73,32 @@ export async function startCheckout(selection: CheckoutSelection): Promise<void>
   } else {
     alert('Could not get a checkout link. Please try again.')
   }
+}
+// Called by /checkout after the user returns from login. Reads the pending
+// selection (from sessionStorage, falling back to a URL-encoded intent) and
+// resumes checkout. Returns false if there was nothing to resume.
+export async function resumePendingCheckout(intentFromUrl?: string): Promise<boolean> {
+  let raw: string | null = null
+  try {
+    raw = sessionStorage.getItem('themisiq:pendingCheckout')
+  } catch {
+    /* ignore */
+  }
+  if (!raw && intentFromUrl) raw = intentFromUrl
+  if (!raw) return false
+
+  try {
+    sessionStorage.removeItem('themisiq:pendingCheckout')
+  } catch {
+    /* ignore */
+  }
+
+  let selection: CheckoutSelection
+  try {
+    selection = JSON.parse(raw)
+  } catch {
+    return false
+  }
+  await startCheckout(selection) // now authenticated → proceeds to Stripe
+  return true
 }

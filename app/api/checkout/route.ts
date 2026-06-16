@@ -21,6 +21,7 @@ import {
   TIER_PRICING,
   PACKS,
   ADDONS,
+  addOnRequirementsMet,
   configuratorPrice,
   toStripeAmount,
   type ModuleKey,
@@ -110,18 +111,18 @@ export async function POST(req: NextRequest) {
         if (!addOn) {
           return NextResponse.json({ error: 'Unknown add-on.' }, { status: 400 })
         }
-        // Requirement: every required module must be either already owned OR in
-        // this same cart. (e.g. Verification requires GHG.)
-        const requirementsMet = addOn.requires.every(
-          (m) => ownedKeys.has(m) || modulesInCart.has(m),
-        )
-        if (!requirementsMet) {
-          return NextResponse.json(
-            {
-              error: `${addOn.label} requires ${addOn.requires.join(', ')}. Add it to your cart or purchase it first.`,
-            },
-            { status: 400 },
-          )
+       // Requirement check (modules + add-on prerequisites) via single authority.
+        // ownedKeys holds BOTH modules and add-ons (webhook writes all to module_key),
+        // so derive each list by filtering against ADDONS.
+        const ownedAndCart = [...ownedKeys, ...modulesInCart]
+        const ownedModuleKeys = ownedAndCart.filter((k) => !(k in ADDONS)) as ModuleKey[]
+        const ownedOrCartAddOns = [
+          ...ownedAndCart.filter((k) => k in ADDONS),
+          ...(body.addOns ?? []),
+        ] as AddOnKey[]
+        const check = addOnRequirementsMet(addOnKey, ownedModuleKeys, ownedOrCartAddOns)
+        if (!check.ok) {
+          return NextResponse.json({ error: check.reason }, { status: 400 })
         }
         lineItems.push(priceLine(addOn.label, addOn.price))
         entitlementsToGrant.add(addOn.key)
@@ -155,7 +156,7 @@ export async function POST(req: NextRequest) {
       metadata,
       // Mirror metadata onto the PaymentIntent too, so it's available whichever
       // event the webhook ends up keying off.
-      payment_intent_data: { metadata },
+      payment_intent_data: { metadata, receipt_email: email },
       success_url: `${origin}/dashboard?purchase=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/pricing`,
     })

@@ -784,7 +784,7 @@ function calcInventory(locations: Location[], gwpVersion: GwpVersion = 'AR4', ye
   }, { s1_total: 0, s2_location: 0, s2_market: 0, co2: 0, ch4: 0, n2o: 0, biogenic: 0 })
 }
 
-function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR4', year: number = 2024) {
+function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR4', year: number = 2024, resolutions: CoverageResolution[] = []) {
   const rows: any[] = []
   const pushFuel = (loc: Location, source: string, scope: number, activity: number, unit: string, ef: { co2: number; ch4: number; n2o: number }) => {
     const g = calcGas(ef, activity, gwpVersion)
@@ -815,6 +815,28 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR4', ye
     if (loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0) {
       rows.push({ location: loc.name || 'Location', source: 'Purchased steam', scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: 'mmbtu', emission_factor: `${EF.steam_mmbtu} kg/mmbtu`, ef_source: EF_SOURCES.combustion, gwp_basis: 'location-based', result_tco2e: loc.purchased_steam_mmbtu * EF.steam_mmbtu / 1000 })
     }
+  }
+  // ── Coverage-resolution audit trail ──────────────────────────────────────
+  // Every gap/overlap/straddle the user resolved is recorded here so a verifier
+  // sees the method and basis behind any estimated or adjusted figure. Spec: line 462.
+  for (const r of resolutions) {
+    const method =
+      r.kind === 'extrapolate' ? `Extrapolation (×12/${r.monthsCovered}, ${r.pctEstimated}% estimated)`
+      : r.kind === 'duplicate' ? 'Overlap confirmed (no double-count adjustment)'
+      : r.kind === 'straddle' ? `Straddle — ${r.straddleChoice}${r.daysInYear != null && r.totalDays != null ? ` (${r.daysInYear}/${r.totalDays} days in year)` : ''}`
+      : r.kind
+    rows.push({
+      location: '—',
+      source: `Coverage resolution: ${r.fuelType || 'fuel'}`,
+      scope: 0,
+      activity_data: null,
+      activity_unit: r.kind,
+      emission_factor: method,
+      ef_source: r.note,
+      gwp_basis: 'coverage_resolution',
+      result_tco2e: null,
+      resolved_at: r.acknowledgedAt,
+    })
   }
   return rows
 }
@@ -1343,7 +1365,36 @@ if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.uni
   // Concierge export gate: block export while any proposal is unconfirmed ('extracted') or flagged ('needs_manual_review').
   // No proposals (manual-entry users) -> trivially ready. Coverage-completeness is a separate check (step 9b).
   const conciergePending = inventory.locations.flatMap(l => l.source_docs).flatMap(d => d.extracted ?? []).filter(p => p.status === 'extracted' || p.status === 'needs_manual_review')
-  const conciergeReady = conciergePending.length === 0
+  // Coverage gate (step 9b): mirror each DocUpload strip — per location × document_type,
+  // run analyzeCoverage and flag any gap/overlap/straddle lacking a matching resolution.
+  const coverageWin = periodFromYearAndEnd(inventory.reporting_year, inventory.fiscal_year_end_month)
+  const coverageResolutions = inventory.coverage_resolutions ?? []
+  const unresolvedCoverage = inventory.locations.flatMap(loc => {
+    const byType = new Map<string, SourceDoc[]>()
+    loc.source_docs.forEach(d => {
+      const arr = byType.get(d.document_type) ?? []
+      arr.push(d)
+      byType.set(d.document_type, arr)
+    })
+    return [...byType.values()].flatMap(docs => {
+      const periods: CoveragePeriod[] = docs.flatMap(d =>
+        (d.extracted ?? [])
+          .filter(p => p.status === 'confirmed' && p.periodStart && p.periodEnd)
+          .map(p => ({ docId: d.id, pi: 0, start: parseLocalDate(p.periodStart as string), end: parseLocalDate(p.periodEnd as string) }))
+      )
+      if (periods.length === 0) return []
+      const cov = analyzeCoverage(periods, coverageWin.start, coverageWin.end)
+      const fuelOfStrip = docs.flatMap(d => d.extracted ?? []).find(p => p.status === 'confirmed' && p.periodStart)?.fuelType ?? ''
+      const hasRes = (kind: CoverageResolution['kind']) =>
+        coverageResolutions.some(r => r.kind === kind && r.locId === loc.id && r.fuelType === fuelOfStrip)
+      const unresolved =
+        (cov.status === 'gap' && !hasRes('extrapolate')) ||
+        (cov.status === 'overlap' && !hasRes('duplicate')) ||
+        (cov.status === 'straddle' && !hasRes('straddle'))
+      return unresolved ? [{ locId: loc.id, fuelType: fuelOfStrip, status: cov.status }] : []
+    })
+  })
+  const conciergeReady = conciergePending.length === 0 && unresolvedCoverage.length === 0
   const needsPriorYear = inventory.selected_frameworks.includes('cdp')
   const needsEmployees = inventory.selected_frameworks.includes('ecovadis')
   const needsBiogenic = inventory.selected_frameworks.includes('esrs') || inventory.selected_frameworks.includes('gri')
@@ -1381,7 +1432,7 @@ if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.uni
       scope1_intensity: inventory.revenue_millions > 0 ? totals_ar4.s1_total / inventory.revenue_millions : 0,
       scope2_intensity: inventory.revenue_millions > 0 ? totals_ar4.s2_location / inventory.revenue_millions : 0,
       status: 'draft',
-      workings: buildWorkings(inventory.locations, 'AR4', inventory.reporting_year),
+workings: buildWorkings(inventory.locations, 'AR4', inventory.reporting_year, coverageResolutions),
       updated_at: new Date().toISOString(),
     }
     if (inventoryId) {
@@ -2033,8 +2084,13 @@ if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.uni
                     </div>
                     {!conciergeReady && (
                       <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.3)', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {conciergePending.length} uploaded figure{conciergePending.length > 1 ? 's' : ''} still need{conciergePending.length > 1 ? '' : 's'} your confirmation</div>
-                        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>Export is locked until every figure read from your bills is confirmed (or any flagged item is resolved). Check the Energy &amp; fuel data step.</div>
+                      {conciergePending.length > 0 && (
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {conciergePending.length} uploaded figure{conciergePending.length > 1 ? 's' : ''} still need{conciergePending.length > 1 ? '' : 's'} your confirmation</div>
+                        )}
+                        {unresolvedCoverage.length > 0 && (
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {unresolvedCoverage.length} coverage issue{unresolvedCoverage.length > 1 ? 's' : ''} need{unresolvedCoverage.length > 1 ? '' : 's'} resolving ({unresolvedCoverage.map(u => u.status).join(', ')})</div>
+                        )}
+                        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>Export is locked until every figure read from your bills is confirmed and every coverage gap, overlap, or boundary-straddle is resolved. Check the Energy &amp; fuel data step.</div>
                       </div>
                     )}
                     <button onClick={() => dataConfirmed && conciergeReady && generateExport(fw.id)} style={{ fontSize: 14, fontWeight: 500, opacity: (dataConfirmed && conciergeReady) ? 1 : 0.4, cursor: (dataConfirmed && conciergeReady) ? "pointer" : "not-allowed", padding: '12px 28px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', border: 'none', }}>
@@ -2259,8 +2315,17 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
         const cov = analyzeCoverage(periods, win.start, win.end)
  // Is there already an extrapolation resolution for this fuel at this location?
         const fuelOfStrip = periods.length > 0 ? (docs.flatMap(d => d.extracted ?? []).find(p => p.status === 'confirmed' && p.periodStart)?.fuelType ?? '') : ''
-        const existingRes = coverageResolutions.find(r => r.kind === 'extrapolate' && r.locId === locId && r.fuelType === fuelOfStrip)
-        const resolved = cov.status === 'gap' && !!existingRes
+        // Resolutions on file for this fuel+location, keyed by kind.
+        const resFor = (kind: CoverageResolution['kind']) =>
+          coverageResolutions.find(r => r.kind === kind && r.locId === locId && r.fuelType === fuelOfStrip)
+        const gapRes = resFor('extrapolate')
+        const dupRes = resFor('duplicate')
+        const strdRes = resFor('straddle')
+        // A condition is "resolved" when its matching resolution exists.
+        const resolved =
+          (cov.status === 'gap' && !!gapRes) ||
+          (cov.status === 'overlap' && !!dupRes) ||
+          (cov.status === 'straddle' && !!strdRes)
         const tone =
           (cov.status === 'full' || resolved) ? { bg: '#E1F5EE', fg: '#0F6E56', icon: '✓' }
           : { bg: '#FEF3E2', fg: '#ba7517', icon: '⚠' }
@@ -2282,6 +2347,48 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
                   })}
                   style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#ba7517', color: '#fff', border: 'none', cursor: 'pointer' }}
                 >Acknowledge &amp; estimate</button>
+              </div>
+            )}
+            {cov.status === 'overlap' && !resolved && (
+              <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 400, color: '#7c5a16' }}>Two bills cover the same period — remove the duplicate above, or:</span>
+                <button
+                  onClick={() => onAddCoverageResolution({
+                    locId,
+                    fuelType: fuelOfStrip,
+                    kind: 'duplicate',
+                    note: `Overlapping bills detected for ${fuelOfStrip || 'this fuel'}; user confirmed the overlap is intentional (e.g. corrected re-issue) and accepted the figures as-is. No double-count adjustment applied.`,
+                    acknowledgedAt: new Date().toISOString(),
+                  })}
+                  style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#ba7517', color: '#fff', border: 'none', cursor: 'pointer' }}
+                >Confirm not a duplicate</button>
+              </div>
+            )}
+            {cov.status === 'straddle' && !resolved && (
+              <div style={{ marginTop: 6 }}>
+                <div style={{ fontWeight: 400, color: '#7c5a16', marginBottom: 6 }}>A bill crosses the reporting-year boundary. How should the overlapping portion be counted?</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {([
+                    { choice: 'prorate' as const, label: 'Prorate by days', note: 'day-level proration: only the in-window portion is counted, split by day count across the boundary' },
+                    { choice: 'this_year' as const, label: 'Count in this year', note: 'the full straddling bill is attributed to this reporting year' },
+                    { choice: 'next_year' as const, label: 'Count in next year', note: 'the full straddling bill is attributed to the next reporting year (excluded here)' },
+                  ]).map(opt => (
+                    <button
+                      key={opt.choice}
+                      onClick={() => onAddCoverageResolution({
+                        locId,
+                        fuelType: fuelOfStrip,
+                        kind: 'straddle',
+                        straddleChoice: opt.choice,
+                        daysInYear: cov.straddles[0]?.daysInYear,
+                        totalDays: cov.straddles[0]?.totalDays,
+                        note: `Boundary-straddling bill for ${fuelOfStrip || 'this fuel'} resolved by "${opt.label}" — ${opt.note}.`,
+                        acknowledgedAt: new Date().toISOString(),
+                      })}
+                      style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: opt.choice === 'prorate' ? '#0F6E56' : '#fff', color: opt.choice === 'prorate' ? '#fff' : '#555553', border: opt.choice === 'prorate' ? 'none' : '0.5px solid #e8e7e4', cursor: 'pointer' }}
+                    >{opt.label}</button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
