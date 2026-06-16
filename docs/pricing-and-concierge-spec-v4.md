@@ -94,3 +94,36 @@ PHASE 5 — end-to-end + live smoke test.
 
 Fallback if time-tight: Phases 1–3 + manual invoicing (create-invoice route already grants
 entitlements) = launch-viable without self-serve checkout.
+## Coverage check — reporting-year boundary allocation
+
+`analyzeCoverage` (app/dashboard/ghg/page.tsx) classifies each dated bill against
+the reporting-year window and decides how it contributes to the inventory.
+
+**Day-level basis (no percentage threshold).** Allocation is emergent from a
+per-day coverage map, not a hard cutoff. Bill end dates arrive in two conventions
+— last-day-of-month (`05-01 → 05-31`) and first-of-next-month (`05-01 → 06-01`);
+both are canonicalized to a half-open exclusive boundary (`exclusiveEnd`) so the
+math is convention-independent. A reporting-year month counts as covered only when
+every in-window day of it is spanned by at least one bill (a partial month is a
+gap, never silently claimed).
+
+**Boundary-spanning bills (straddles).** A bill whose period starts before
+`winStart` or ends after `winEnd` is recorded in `straddles[]` with `daysInYear`,
+`totalDays`, and `pctInYear`. Only the in-window days enter the day map, so a bill
+sitting mostly outside the reporting year contributes only its in-window portion —
+e.g. a `Dec 01 → Jan 01` bill assessed against a calendar year contributes
+effectively zero days to that year and is reflected in the adjacent year. This is
+the intended behaviour: thin straddles are allocated to the dominant year
+automatically, without prompting the user.
+
+**Explicit resolution (material straddles).** Where a straddle represents a
+material share of the reporting year, the 3c resolver surfaces a choice —
+prorate by days, count this year, or count next year — and the chosen basis is
+written as a `CoverageResolution` (`kind: 'straddle'`, with `straddleChoice`,
+`daysInYear`, `totalDays`) that flows into the assurance workings.
+
+**Status precedence.** `status` resolves as `overlap` > `gap` > `straddle` >
+`full`: an inventory with uncovered months reports as `gap` even when a straddle
+is also present, because the gap is the actionable item. Bills with no in-window
+days at all are listed in `outOfWindow[]` (surfaced as a neutral "not counted"
+notice), not counted toward coverage.
