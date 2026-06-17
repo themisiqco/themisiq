@@ -63,6 +63,18 @@ export default function Page() {
         </div>
       </section>
 
+      {/* WALKTHROUGH BAND — links to /calculate-emissions */}
+      <section style={{ background: '#f8f7f5', borderBottom: '0.5px solid #e8e7e4', padding: '2.5rem' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', flexWrap: 'wrap' as const, alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
+          <div style={{ maxWidth: 640 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#7425e3', marginBottom: 6 }}>Just been asked for your carbon footprint?</div>
+            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.3 }}>See exactly how it works — from your bills to a submittable report.</div>
+            <p style={{ fontSize: 14, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginTop: 8 }}>A step-by-step walkthrough, transparent pricing, and answers to every question — whether the request comes from a customer, an investor, your board, or a regulator.</p>
+          </div>
+          <a href="/calculate-emissions" style={{ ...btnPrimary, textDecoration: 'none', whiteSpace: 'nowrap' as const }}>How it works →</a>
+        </div>
+      </section>
+
       {/* SB 253 CALLOUT */}
       <section style={{ background: '#0d0d0d', padding: '4rem 2.5rem' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
@@ -74,7 +86,7 @@ export default function Page() {
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
               SB 253 requires California-nexus companies with global revenue over $1B to disclose Scope 1 and 2 emissions by August 10, 2026. ThemisIQ can have your inventory complete and the CARB template pre-filled in days — not months.
             </p>
-            {['Guided inventory wizard — no spreadsheets', 'IPCC AR5 emission factors (AR4 on CARB export)', 'Pre-filled CARB SB 253 official template', 'Good-faith enforcement confirmed by CARB for year one', 'Scope 3 preparation for 2027 deadline'].map((item, i) => (
+            {['Guided inventory wizard — no spreadsheets', 'IPCC AR6 emission factors (AR4 on CARB export)', 'Pre-filled CARB SB 253 official template', 'Good-faith enforcement confirmed by CARB for year one', 'Scope 3 preparation for 2027 deadline'].map((item, i) => (
               <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8, alignItems: 'flex-start' }}>
                 <span style={{ color: '#64fe3e', flexShrink: 0, marginTop: 2 }}>✓</span>
                 <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 300, lineHeight: 1.5 }}>{item}</span>
@@ -112,7 +124,7 @@ export default function Page() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
           {[
             { icon: '', title: 'Guided inventory wizard', desc: 'Step-by-step data collection across all Scope 1, 2, and 3 categories. No blank spreadsheets. No guessing which sources to include.' },
-            { icon: '', title: 'Real emission factors', desc: 'IPCC AR5 GWP values throughout. IEA 2024 grid electricity factors. DEFRA 2024 travel and freight factors. Auto-converts to AR4 on CARB export.' },
+            { icon: '', title: 'Real emission factors', desc: 'IPCC AR6 GWP values throughout. IEA 2024 grid electricity factors. DEFRA 2024 travel and freight factors. Auto-converts to AR4 on CARB export.' },
             { icon: '', title: 'Immutable audit trail', desc: 'Every data entry, edit, and deletion is logged with user, timestamp, and previous value. Written by the database — not the application. Cannot be altered.' },
             { icon: '', title: 'Multi-framework export', desc: 'One inventory exports to: CARB SB 253 template, CDP C6 and C7, ESRS E1-6, EcoVadis, GRI 305, and IFRS S2 simultaneously.' },
             { icon: '', title: 'Scope 3 — all 15 categories', desc: 'Primary data collection, spend-based, hybrid, and supplier-specific methods. CDP C12 supplier engagement. CS3D value chain mapping.' },
@@ -204,7 +216,7 @@ export default function Page() {
           <p style={sectionSub}>The Starter plan covers everything you need for SB 253 year one. Upgrade to add Scope 3 and additional frameworks.</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: '2.5rem', textAlign: 'left' }}>
             {[
-              { plan: 'Starter', price: '$' + tierPrice('starter').toLocaleString(), cadence: '/yr · Climate GHG', features: ['Scope 1 + 2 · CARB SB 253 ready', 'IPCC AR5 · IEA 2024 factors', 'Audit trail + assurance package', 'CDP C6 · ESRS E1 · EcoVadis export', '1 entity · 3 users', 'Reports unlocked on paid plan'], featured: false },
+              { plan: 'Starter', price: '$' + tierPrice('starter').toLocaleString(), cadence: '/yr · Climate GHG', features: ['Scope 1 + 2 · CARB SB 253 ready', 'IPCC AR6 · IEA 2024 factors', 'Audit trail + assurance package', 'CDP C6 · ESRS E1 · EcoVadis export', '1 entity · 3 users', 'Reports unlocked on paid plan'], featured: false },
               { plan: 'Professional', price: '$' + tierPrice('professional').toLocaleString(), cadence: '/yr · Climate GHG', features: ['Everything in Starter', 'Scope 3 · all 15 categories', 'Climate Risk module included', 'CDP full suite · IFRS S2 scenarios', '10 entities · 10 users', 'Regulatory Monitor weekly alerts'], featured: true },
             ].map(({ plan, price, cadence, features, featured }) => (
               <div key={plan} style={{ background: featured ? '#0d0d0d' : '#fff', borderRadius: 12, padding: '2rem', border: featured ? 'none' : '0.5px solid #e8e7e4' }}>
