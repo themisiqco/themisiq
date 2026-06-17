@@ -11,8 +11,8 @@ const MODULES = [
   {
     id: 'ghg',
     name: 'GHG Inventory',
-    sub: 'Scope 1 & 2',
-    desc: 'Calculate your Scope 1 and Scope 2 emissions across all locations and frameworks.',
+    sub: 'Scope 1, 2 & 3',
+    desc: 'Calculate your full GHG inventory — Scope 1, 2 and 3 — across all locations and frameworks.',
     href: '/dashboard/ghg',
     color: '#0F6E56',
     bg: '#E1F5EE',
@@ -44,8 +44,8 @@ const MODULES = [
   {
     id: 'supply_chain',
     name: 'Supply Chain',
-    sub: 'Scope 3 Cat.1 · CS3D',
-    desc: 'Risk-score your suppliers and map your Scope 3 Category 1 emissions.',
+    sub: 'Supplier Portal · CS3D',
+    desc: 'Survey your suppliers, collect primary data, and risk-score your supply chain.',
     href: '/dashboard/supply-chain',
     color: '#7425e3',
     bg: '#EDE9FE',
@@ -325,7 +325,7 @@ export default function Dashboard() {
                           )}
                         </>
                       ) : (
-                        <span style={{ fontSize: 11, color: '#888784' }}>Preview free · <a href="/pricing" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>unlock for $999</a></span>
+                        <span style={{ fontSize: 11, color: '#888784' }}>Preview free · <span style={{ color: '#7425e3', fontWeight: 500 }}>unlock for $999</span></span>
                       )}
                     </div>
                   </a>
