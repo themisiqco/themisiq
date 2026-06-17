@@ -140,12 +140,12 @@ export default function Dashboard() {
         .select('module_key')
 
       // Map canonical module_key (entitlements) -> this dashboard's card id(s).
-      // Note: owning 'supply-chain' unlocks BOTH the Supply Chain and Scope 3 cards,
-      // mirroring how the scope3 page shares the 'supply-chain' entitlement key.
+      // Note: Scope 3 now lives under GHG -- the 'ghg' entitlement unlocks the Scope 3 card,
+      // while 'supply-chain' unlocks the Supply Chain + Supplier Portal cards.
       const KEY_TO_CARD_IDS: Record<string, string[]> = {
-        'ghg': ['ghg'],
+        'ghg': ['ghg', 'scope3'],
         'climate-risk': ['climate_risk'],
-        'supply-chain': ['supply_chain', 'scope3', 'portal'],
+        'supply-chain': ['supply_chain', 'portal'],
         'people': ['people'],
         'deals': ['deals'],
         'ai-governance': ['ai'],

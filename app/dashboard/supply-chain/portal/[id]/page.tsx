@@ -18,6 +18,8 @@ interface CampaignSupplier {
   invited_at: string
   completed_at: string | null
   reminder_sent_at: string | null
+  annual_spend: number | null
+  spend_currency: string | null
 }
 
 interface Campaign {
@@ -30,6 +32,8 @@ interface Campaign {
 }
 
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF']
+const GRID_COLS = '2fr 1fr 1fr 1fr 1fr auto'
 
 const STATUS_CONFIG = {
   invited:     { label: 'Invited', color: '#0C447C', bg: '#E6F1FB' },
@@ -52,6 +56,9 @@ export default function CampaignDetail() {
   const [newSupplier, setNewSupplier] = useState({ supplier_name: '', supplier_email: '', contact_name: '' })
   const [saving, setSaving] = useState(false)
   const [exporting, setExporting] = useState(false)
+  // Campaign-level currency for spend entry. Initialised from the first supplier
+  // that already has a currency saved; otherwise defaults to USD.
+  const [spendCurrency, setSpendCurrency] = useState('USD')
 
   const exportAllResponses = async () => {
     setExporting(true)
@@ -73,7 +80,7 @@ export default function CampaignDetail() {
 
     // Build CSV — one row per supplier, one column per question
     const allQuestionIds = [...new Set(Object.values(allResponses).flatMap(r => Object.keys(r)))]
-    const header = ['Supplier', 'Email', 'Contact', 'Status', 'Completed', ...allQuestionIds]
+    const header = ['Supplier', 'Email', 'Contact', 'Status', 'Completed', 'Annual spend', 'Spend currency', ...allQuestionIds]
     const rows = [
       [`ThemisIQ — Bulk Supplier Response Export`],
       [`Campaign: ${campaign?.name}`],
@@ -87,6 +94,8 @@ export default function CampaignDetail() {
         s.contact_name || '',
         s.status,
         s.completed_at ? new Date(s.completed_at).toLocaleDateString() : '',
+        s.annual_spend != null ? String(s.annual_spend) : '',
+        s.spend_currency || '',
         ...allQuestionIds.map(qid => allResponses[s.id]?.[qid] || ''),
       ]),
     ]
@@ -111,8 +120,35 @@ export default function CampaignDetail() {
     const { data: camp } = await supabase.from('supplier_campaigns').select('*').eq('id', id).single()
     const { data: sups } = await supabase.from('campaign_suppliers').select('*').eq('campaign_id', id).order('invited_at', { ascending: false })
     if (camp) setCampaign(camp)
-    if (sups) setSuppliers(sups)
+    if (sups) {
+      setSuppliers(sups)
+      // Adopt an already-saved currency if one exists, so the selector reflects reality.
+      const existing = sups.find((s: CampaignSupplier) => s.spend_currency)?.spend_currency
+      if (existing) setSpendCurrency(existing)
+    }
     setLoading(false)
+  }
+
+  // Save a supplier's annual spend (on blur) without a full reload, so the input
+  // keeps focus and the rest of the list doesn't flicker. Writes the current
+  // campaign-level currency alongside the figure.
+  const updateSpend = async (supplierId: string, raw: string) => {
+    const trimmed = raw.trim()
+    const value = trimmed === '' ? null : Number(trimmed)
+    if (value != null && (isNaN(value) || value < 0)) return
+    setSuppliers(prev => prev.map(s => s.id === supplierId ? { ...s, annual_spend: value, spend_currency: spendCurrency } : s))
+    await supabase.from('campaign_suppliers').update({ annual_spend: value, spend_currency: spendCurrency }).eq('id', supplierId)
+  }
+
+  // When the campaign currency changes, persist it across all suppliers that
+  // already have a spend recorded (keeps the basis consistent for the aggregate).
+  const changeCurrency = async (cur: string) => {
+    setSpendCurrency(cur)
+    const withSpend = suppliers.filter(s => s.annual_spend != null)
+    setSuppliers(prev => prev.map(s => s.annual_spend != null ? { ...s, spend_currency: cur } : s))
+    for (const s of withSpend) {
+      await supabase.from('campaign_suppliers').update({ spend_currency: cur }).eq('id', s.id)
+    }
   }
 
   const addSupplier = async () => {
@@ -142,8 +178,10 @@ export default function CampaignDetail() {
           const name = row['Supplier'] || row['supplier'] || row['Name'] || row['name'] || ''
           const email = row['Email'] || row['email'] || ''
           const contact = row['Contact'] || row['contact'] || ''
+          const spendRaw = row['Spend'] || row['spend'] || row['Annual spend'] || row['annual_spend'] || ''
+          const spend = spendRaw !== '' && !isNaN(Number(spendRaw)) ? Number(spendRaw) : null
           if (name && email) {
-            await supabase.from('campaign_suppliers').insert({ campaign_id: id, supplier_name: name, supplier_email: email, contact_name: contact || null, status: 'invited' })
+            await supabase.from('campaign_suppliers').insert({ campaign_id: id, supplier_name: name, supplier_email: email, contact_name: contact || null, status: 'invited', annual_spend: spend, spend_currency: spend != null ? spendCurrency : null })
           }
         }
         loadCampaign()
@@ -176,6 +214,7 @@ export default function CampaignDetail() {
 
   const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
   const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
+  const spendInputStyle: React.CSSProperties = { width: '100%', padding: '6px 8px', borderRadius: 6, border: '0.5px solid #e8e7e4', fontSize: 12, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
 
   const completed = suppliers.filter(s => s.status === 'completed').length
   const inProgress = suppliers.filter(s => s.status === 'in_progress').length
@@ -196,7 +235,7 @@ export default function CampaignDetail() {
 
       {/* Header */}
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <button onClick={() => router.push('/dashboard/supply-chain/portal')} style={{ fontSize: 12, color: '#888784', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>← All campaigns</button>
           </div>
@@ -205,7 +244,13 @@ export default function CampaignDetail() {
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{campaign?.name}</div>
               {campaign?.description && <div style={{ fontSize: 13, color: '#888784' }}>{campaign.description}</div>}
             </div>
-            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 11, color: '#888784' }}>Spend currency</span>
+                <select value={spendCurrency} onChange={e => changeCurrency(e.target.value)} style={{ fontSize: 12, padding: '7px 10px', borderRadius: 8, background: '#f8f7f5', border: '1px solid #e8e7e4', color: '#555553', cursor: 'pointer' }}>
+                  {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
               <input ref={fileRef} type="file" accept=".csv" onChange={handleCSVImport} style={{ display: 'none' }} />
               <button onClick={() => fileRef.current?.click()} style={{ fontSize: 12, padding: '8px 14px', borderRadius: 8, background: '#f8f7f5', border: '1px solid #e8e7e4', color: '#555553', cursor: 'pointer' }}>Import CSV</button>
               {suppliers.filter(s => s.status === 'completed').length > 0 && (
@@ -219,7 +264,7 @@ export default function CampaignDetail() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '2rem 2.5rem' }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '2rem 2.5rem' }}>
 
         {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
@@ -290,8 +335,8 @@ export default function CampaignDetail() {
           </div>
         ) : (
           <div style={{ border: '0.5px solid #e8e7e4', borderRadius: 14, overflow: 'hidden', background: '#fff' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', background: '#f8f7f5', padding: '10px 16px', borderBottom: '0.5px solid #e8e7e4' }}>
-              {['Supplier', 'Status', 'Invited', 'Completed', 'Actions'].map(h => (
+            <div style={{ display: 'grid', gridTemplateColumns: GRID_COLS, background: '#f8f7f5', padding: '10px 16px', borderBottom: '0.5px solid #e8e7e4' }}>
+              {['Supplier', 'Status', 'Invited', 'Annual spend', 'Completed', 'Actions'].map(h => (
                 <div key={h} style={{ fontSize: 10, fontWeight: 700, color: '#888784', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
               ))}
             </div>
@@ -300,7 +345,7 @@ export default function CampaignDetail() {
               const isSending = sending === s.id
               const sent = sentStatus[s.id]
               return (
-                <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', padding: '12px 16px', borderBottom: i < suppliers.length - 1 ? '0.5px solid #e8e7e4' : 'none', alignItems: 'center' }}>
+                <div key={s.id} style={{ display: 'grid', gridTemplateColumns: GRID_COLS, padding: '12px 16px', borderBottom: i < suppliers.length - 1 ? '0.5px solid #e8e7e4' : 'none', alignItems: 'center' }}>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{s.supplier_name}</div>
                     <div style={{ fontSize: 11, color: '#888784' }}>{s.supplier_email}</div>
@@ -310,6 +355,19 @@ export default function CampaignDetail() {
                     <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
                   </div>
                   <div style={{ fontSize: 11, color: '#888784' }}>{new Date(s.invited_at).toLocaleDateString()}</div>
+                  <div style={{ paddingRight: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 11, color: '#888784', flexShrink: 0 }}>{spendCurrency}</span>
+                      <input
+                        type="number"
+                        min="0"
+                        defaultValue={s.annual_spend ?? ''}
+                        onBlur={e => updateSpend(s.id, e.target.value)}
+                        placeholder="—"
+                        style={spendInputStyle}
+                      />
+                    </div>
+                  </div>
                   <div style={{ fontSize: 11, color: s.completed_at ? '#0F6E56' : '#888784' }}>
                     {s.completed_at ? new Date(s.completed_at).toLocaleDateString() : '—'}
                   </div>
@@ -344,7 +402,7 @@ export default function CampaignDetail() {
 
         {/* CSV template */}
         <div style={{ marginTop: 16, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '0.75rem 1rem', fontSize: 12, color: '#888784' }}>
-          CSV import format: <code style={{ background: '#fff', padding: '1px 6px', borderRadius: 4 }}>Supplier, Email, Contact</code>
+          CSV import format: <code style={{ background: '#fff', padding: '1px 6px', borderRadius: 4 }}>Supplier, Email, Contact, Spend</code> &mdash; Spend is optional; you can also enter it inline after import. Spend is recorded in the campaign currency selected above.
         </div>
       </div>
     </div>

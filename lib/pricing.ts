@@ -22,16 +22,16 @@ export const CURRENCY = 'usd'
 export type ModuleKey =
   | 'ghg'
   | 'climate-risk'   // includes the materiality wizard + report
-  | 'supply-chain'   // includes the scope3 page
+  | 'supply-chain'   // Supplier Portal (data collection)
   | 'people'
   | 'deals'
   | 'ai-governance'
   | 'cyber'
 
 export const MODULES: { key: ModuleKey; name: string }[] = [
-  { key: 'ghg',           name: 'GHG Inventory (Scope 1 & 2)' },
+  { key: 'ghg',           name: 'GHG Inventory (Scope 1, 2 & 3)' },
   { key: 'climate-risk',  name: 'Climate Risk' },
-  { key: 'supply-chain',  name: 'Supply Chain & Scope 3' },
+  { key: 'supply-chain',  name: 'Supply Chain' },
   { key: 'people',        name: 'People & Workforce' },
   { key: 'deals',         name: 'Deals & Investment' },
   { key: 'ai-governance', name: 'AI Governance' },

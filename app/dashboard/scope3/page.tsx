@@ -1,29 +1,31 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Nav from '../../components/Nav'
+import { supabase } from '../../../lib/supabase'
 import { useEntitlement } from '../../../lib/useEntitlement'
+import { EMISSION_FACTORS, DEFAULT_SPEND_EF } from '../../../lib/emissionFactors'
 
 // ─── Scope 3 Category Definitions ────────────────────────────────────────────
 
 const CATEGORIES = [
   // Upstream
-  { id: 'cat1', num: 1, name: 'Purchased goods & services', stream: 'Upstream', desc: 'Emissions from producing goods and services you purchase', method: 'spend', unit: 'spend', materialSectors: ['all'], typicalShare: 0.60 },
-  { id: 'cat2', num: 2, name: 'Capital goods', stream: 'Upstream', desc: 'Emissions from producing capital equipment and assets you buy', method: 'spend', unit: 'spend', materialSectors: ['Industrials & Manufacturing', 'Energy & Utilities', 'Mining & Metals'], typicalShare: 0.05 },
-  { id: 'cat3', num: 3, name: 'Fuel & energy related', stream: 'Upstream', desc: 'Upstream emissions from extraction and production of fuels and energy you use', method: 'activity', unit: 'kwh', materialSectors: ['all'], typicalShare: 0.03 },
-  { id: 'cat4', num: 4, name: 'Upstream transportation', stream: 'Upstream', desc: 'Emissions from transporting purchased goods to your facilities', method: 'activity', unit: 'tonne_km', materialSectors: ['Consumer & Retail', 'Agriculture & Food', 'Industrials & Manufacturing'], typicalShare: 0.04 },
-  { id: 'cat5', num: 5, name: 'Waste generated in operations', stream: 'Upstream', desc: 'Emissions from disposal and treatment of waste generated', method: 'activity', unit: 'tonnes', materialSectors: ['all'], typicalShare: 0.01 },
-  { id: 'cat6', num: 6, name: 'Business travel', stream: 'Upstream', desc: 'Emissions from employee travel for business purposes', method: 'activity', unit: 'mixed', materialSectors: ['Professional Services', 'Financial Services', 'Technology'], typicalShare: 0.05 },
-  { id: 'cat7', num: 7, name: 'Employee commuting', stream: 'Upstream', desc: 'Emissions from employees travelling to and from work', method: 'activity', unit: 'mixed', materialSectors: ['all'], typicalShare: 0.03 },
-  { id: 'cat8', num: 8, name: 'Upstream leased assets', stream: 'Upstream', desc: 'Emissions from assets leased by your organisation', method: 'activity', unit: 'kwh', materialSectors: ['Real Estate', 'Transport & Logistics'], typicalShare: 0.02 },
+  { id: 'cat1', num: 1, name: 'Purchased goods & services', stream: 'Upstream', desc: 'Emissions from producing goods and services you purchase', method: 'spend', unit: 'spend', materialSectors: ['all'], typicalShare: 0.60 , guidance: 'Emissions from producing everything you buy — raw materials, components, products and services — up to the point they reach you (cradle-to-gate). Usually the single largest Scope 3 category.', dataSource: 'Procurement / AP ledger: annual spend by supplier or category. Best: supplier-specific emissions via the Supplier Portal. Spend-based estimation is permitted for this category.' },
+  { id: 'cat2', num: 2, name: 'Capital goods', stream: 'Upstream', desc: 'Emissions from producing capital equipment and assets you buy', method: 'spend', unit: 'spend', materialSectors: ['Industrials & Manufacturing', 'Energy & Utilities', 'Mining & Metals'], typicalShare: 0.05 , guidance: 'Emissions from producing long-life assets you purchase — buildings, machinery, vehicles, IT equipment, infrastructure. Count the full cradle-to-gate footprint in the year acquired (not depreciated over time).', dataSource: 'Fixed-asset register / capital expenditure records for the reporting year. Spend-based estimation is permitted for this category.' },
+  { id: 'cat3', num: 3, name: 'Fuel & energy related', stream: 'Upstream', desc: 'Upstream emissions from extraction and production of fuels and energy you use', method: 'activity', unit: 'kwh', materialSectors: ['all'], typicalShare: 0.03 , guidance: 'Upstream emissions of the fuel and electricity you use that AREN\'T already in Scope 1 or 2 — i.e. extracting, producing and transporting those fuels, plus grid transmission & distribution (T&D) losses.', dataSource: 'Your Scope 1 & 2 energy consumption data (kWh, fuel volumes) — apply well-to-tank and T&D-loss factors. Source the consumption from utility bills / the GHG module.' },
+  { id: 'cat4', num: 4, name: 'Upstream transportation', stream: 'Upstream', desc: 'Emissions from transporting purchased goods to your facilities', method: 'activity', unit: 'tonne_km', materialSectors: ['Consumer & Retail', 'Agriculture & Food', 'Industrials & Manufacturing'], typicalShare: 0.04 , guidance: 'Emissions from transporting and distributing the goods you BUY, between your suppliers and you — plus third-party logistics you pay for (inbound freight and warehousing).', dataSource: 'Logistics/freight invoices, shipment records (tonne-km or mode/distance). Spend-based estimation is permitted for this category.' },
+  { id: 'cat5', num: 5, name: 'Waste generated in operations', stream: 'Upstream', desc: 'Emissions from disposal and treatment of waste generated', method: 'activity', unit: 'tonnes', materialSectors: ['all'], typicalShare: 0.01 , guidance: 'Emissions from third parties treating the waste your operations generate — landfill, incineration, recycling, wastewater.', dataSource: 'Waste contractor invoices / facilities team: tonnes by treatment type. Activity data (tonnes) is needed — spend-based is not appropriate here.' },
+  { id: 'cat6', num: 6, name: 'Business travel', stream: 'Upstream', desc: 'Emissions from employee travel for business purposes', method: 'activity', unit: 'mixed', materialSectors: ['Professional Services', 'Financial Services', 'Technology'], typicalShare: 0.05 , guidance: 'Emissions from employees travelling for business — flights, rail, hotels, rental cars — in vehicles not owned by your company.', dataSource: 'Travel & expense system or travel agency reports: flights (distance/class), hotel nights, rail. Spend-based estimation is permitted for this category.' },
+  { id: 'cat7', num: 7, name: 'Employee commuting', stream: 'Upstream', desc: 'Emissions from employees travelling to and from work', method: 'activity', unit: 'mixed', materialSectors: ['all'], typicalShare: 0.03 , guidance: 'Emissions from employees commuting between home and work, including remote-work energy use.', dataSource: 'HR headcount + a commuting survey or assumptions (distance, mode, WFH days). Activity-based; spend-based is not appropriate here.' },
+  { id: 'cat8', num: 8, name: 'Upstream leased assets', stream: 'Upstream', desc: 'Emissions from assets leased by your organisation', method: 'activity', unit: 'kwh', materialSectors: ['Real Estate', 'Transport & Logistics'], typicalShare: 0.02 , guidance: 'Emissions from assets you LEASE FROM others (as lessee) that aren\'t already in your Scope 1 & 2 — e.g. leased offices or equipment you don\'t operationally control.', dataSource: 'Lease agreements + energy use of leased assets (floor area or metered kWh). Activity-based; spend-based is not appropriate here.' },
   // Downstream
-  { id: 'cat9', num: 9, name: 'Downstream transportation', stream: 'Downstream', desc: 'Emissions from transporting and distributing sold products', method: 'activity', unit: 'tonne_km', materialSectors: ['Consumer & Retail', 'Agriculture & Food', 'Industrials & Manufacturing'], typicalShare: 0.03 },
-  { id: 'cat10', num: 10, name: 'Processing of sold products', stream: 'Downstream', desc: 'Emissions from processing your intermediate products by third parties', method: 'activity', unit: 'tonnes', materialSectors: ['Industrials & Manufacturing', 'Agriculture & Food'], typicalShare: 0.02 },
-  { id: 'cat11', num: 11, name: 'Use of sold products', stream: 'Downstream', desc: 'Emissions from end-users using your sold products', method: 'activity', unit: 'units', materialSectors: ['Technology', 'Energy & Utilities', 'Consumer & Retail', 'Industrials & Manufacturing'], typicalShare: 0.15 },
-  { id: 'cat12', num: 12, name: 'End-of-life treatment', stream: 'Downstream', desc: 'Emissions from disposal of your sold products at end of life', method: 'activity', unit: 'tonnes', materialSectors: ['Consumer & Retail', 'Industrials & Manufacturing', 'Technology'], typicalShare: 0.02 },
-  { id: 'cat13', num: 13, name: 'Downstream leased assets', stream: 'Downstream', desc: 'Emissions from assets owned and leased to others', method: 'activity', unit: 'kwh', materialSectors: ['Real Estate', 'Financial Services'], typicalShare: 0.01 },
-  { id: 'cat14', num: 14, name: 'Franchises', stream: 'Downstream', desc: 'Emissions from franchise operations', method: 'activity', unit: 'spend', materialSectors: ['Consumer & Retail'], typicalShare: 0.01 },
-  { id: 'cat15', num: 15, name: 'Investments', stream: 'Downstream', desc: 'Emissions associated with investments and lending (financed emissions)', method: 'pcaf', unit: 'spend', materialSectors: ['Financial Services'], typicalShare: 0.90 },
+  { id: 'cat9', num: 9, name: 'Downstream transportation', stream: 'Downstream', desc: 'Emissions from transporting and distributing sold products', method: 'activity', unit: 'tonne_km', materialSectors: ['Consumer & Retail', 'Agriculture & Food', 'Industrials & Manufacturing'], typicalShare: 0.03 , guidance: 'Emissions from transporting and distributing the products you SELL, after they leave you — outbound logistics, distribution centres, retail, paid for by others.', dataSource: 'Distribution/logistics records or modelled tonne-km of sold-product movement. Spend-based estimation is permitted for this category.' },
+  { id: 'cat10', num: 10, name: 'Processing of sold products', stream: 'Downstream', desc: 'Emissions from processing your intermediate products by third parties', method: 'activity', unit: 'tonnes', materialSectors: ['Industrials & Manufacturing', 'Agriculture & Food'], typicalShare: 0.02 , guidance: 'Emissions from third parties further PROCESSING your sold intermediate products before final use (e.g. you sell a component that\'s then assembled or refined).', dataSource: 'Production volumes of intermediate goods + processing energy assumptions. Activity-based; spend-based is not appropriate here.' },
+  { id: 'cat11', num: 11, name: 'Use of sold products', stream: 'Downstream', desc: 'Emissions from end-users using your sold products', method: 'activity', unit: 'units', materialSectors: ['Technology', 'Energy & Utilities', 'Consumer & Retail', 'Industrials & Manufacturing'], typicalShare: 0.15 , guidance: 'Emissions from customers USING the products you sell over their lifetime — often the largest category for energy-using or fuel products.', dataSource: 'Units sold + expected lifetime energy/fuel use per unit. Activity-based; spend-based is not appropriate here.' },
+  { id: 'cat12', num: 12, name: 'End-of-life treatment', stream: 'Downstream', desc: 'Emissions from disposal of your sold products at end of life', method: 'activity', unit: 'tonnes', materialSectors: ['Consumer & Retail', 'Industrials & Manufacturing', 'Technology'], typicalShare: 0.02 , guidance: 'Emissions from the end-of-life treatment of your sold products once customers dispose of them — landfill, incineration, recycling.', dataSource: 'Units / mass sold + end-of-life treatment assumptions by material. Activity-based; spend-based is not appropriate here.' },
+  { id: 'cat13', num: 13, name: 'Downstream leased assets', stream: 'Downstream', desc: 'Emissions from assets owned and leased to others', method: 'activity', unit: 'kwh', materialSectors: ['Real Estate', 'Financial Services'], typicalShare: 0.01 , guidance: 'Emissions from assets you OWN and LEASE OUT to others (as lessor) that aren\'t in your Scope 1 & 2 — e.g. property you rent to tenants.', dataSource: 'Your leased-out asset portfolio + tenants\' energy use (floor area or metered). Activity-based; spend-based is not appropriate here.' },
+  { id: 'cat14', num: 14, name: 'Franchises', stream: 'Downstream', desc: 'Emissions from franchise operations', method: 'activity', unit: 'spend', materialSectors: ['Consumer & Retail'], typicalShare: 0.01 , guidance: 'Emissions from the operations of your FRANCHISEES — relevant if you\'re a franchisor.', dataSource: 'Franchisee energy/activity data, or estimates from number and type of franchise outlets. Activity-based; spend-based is not appropriate here.' },
+  { id: 'cat15', num: 15, name: 'Investments', stream: 'Downstream', desc: 'Emissions associated with investments and lending (financed emissions)', method: 'pcaf', unit: 'spend', materialSectors: ['Financial Services'], typicalShare: 0.90 , guidance: 'Emissions associated with your investments and lending (financed emissions) — for investors, banks and asset owners. Uses the PCAF methodology.', dataSource: 'Portfolio holdings/loan book + investee emissions or PCAF data-quality-scored proxies. Specialised PCAF method, not spend-based.' },
 ]
 
 // Sector-based materiality
@@ -44,35 +46,6 @@ const SECTOR_MATERIAL: Record<string, number[]> = {
 }
 
 // Emission factors (kg CO2e per unit)
-const EMISSION_FACTORS = {
-  // Spend-based (kg CO2e per USD spent) by sector
-  spend: {
-    'Energy & Utilities': 0.85,
-    'Financial Services': 0.12,
-    'Real Estate': 0.45,
-    'Technology': 0.18,
-    'Healthcare & Pharma': 0.32,
-    'Industrials & Manufacturing': 1.10,
-    'Consumer & Retail': 0.42,
-    'Agriculture & Food': 2.80,
-    'Transport & Logistics': 0.90,
-    'Mining & Metals': 4.20,
-    'Construction & Materials': 3.10,
-    'Professional Services': 0.10,
-    'Other': 0.50,
-  } as Record<string, number>,
-  // Activity-based
-  flight_short: 0.255,    // kg CO2e per km per passenger (< 3hrs)
-  flight_long: 0.195,     // kg CO2e per km per passenger (> 3hrs)
-  hotel: 31.0,            // kg CO2e per night
-  rail: 0.041,            // kg CO2e per km
-  car_petrol: 0.170,      // kg CO2e per km
-  car_electric: 0.053,    // kg CO2e per km
-  bus: 0.089,             // kg CO2e per km
-  waste_landfill: 0.467,  // kg CO2e per tonne
-  waste_recycled: 0.021,  // kg CO2e per tonne
-  electricity: 0.000233,  // kg CO2e per kWh (UK average)
-}
 
 const SECTORS = [
   'Energy & Utilities', 'Financial Services', 'Real Estate', 'Technology',
@@ -125,7 +98,7 @@ interface CategoryData {
 }
 
 export default function Scope3Dashboard() {
-  const isPaid = useEntitlement('supply-chain')
+  const isPaid = useEntitlement('ghg')
   const [step, setStep] = useState(0)
   const [company, setCompany] = useState('')
   const [sector, setSector] = useState('')
@@ -134,7 +107,69 @@ export default function Scope3Dashboard() {
   const [revenue, setRevenue] = useState(0)
   const [materialCats, setMaterialCats] = useState<number[]>([])
   const [catData, setCatData] = useState<Record<string, CategoryData>>({})
+  const [openInfo, setOpenInfo] = useState<Record<string, boolean>>({})
   const [dataConfirmed, setDataConfirmed] = useState(false)
+
+  // ─── Supplier Portal bridge (pull allocated Cat 1 from campaigns) ────────────
+  interface CatOneLine { supplier_id: string; supplier_name: string; method: 'supplier-specific' | 'spend-based'; data_quality: string; value_mt: number; basis: string; allocation_method?: string }
+  interface CatOneResult {
+    campaign: { id: string; name: string; reporting_year: number }
+    total_mt: number; supplier_specific_mt: number; spend_based_mt: number
+    counts: { suppliers_total: number; supplier_specific: number; spend_based: number; uncovered: number }
+    lines: CatOneLine[]
+    uncovered: { supplier_id: string; supplier_name: string; reason: string }[]
+    currency_flags: { supplier_id: string; supplier_name: string; spend: number; currency: string; note: string }[]
+    method_note: string
+  }
+  const [campaigns, setCampaigns] = useState<{ id: string; name: string }[]>([])
+  const [selectedCampaign, setSelectedCampaign] = useState<string>('')
+  const [pulling, setPulling] = useState(false)
+  const [pullError, setPullError] = useState<string | null>(null)
+  const [catOneResult, setCatOneResult] = useState<CatOneResult | null>(null)
+
+  // Load this buyer's campaigns once, so the Cat 1 step can offer a "pull" source.
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      const uid = session?.user?.id
+      if (!uid) return
+      try {
+        const res = await fetch(`/api/campaigns?buyer_id=${uid}`)
+        const json = await res.json()
+        if (active && Array.isArray(json?.data)) {
+          const list = json.data.map((c: any) => ({ id: c.id, name: c.name }))
+          setCampaigns(list)
+          if (list.length === 1) setSelectedCampaign(list[0].id)
+        }
+      } catch { /* non-fatal: the manual entry path still works */ }
+    })()
+    return () => { active = false }
+  }, [])
+
+  const pullFromPortal = async (campaignId: string) => {
+    if (!campaignId) return
+    setPulling(true); setPullError(null); setCatOneResult(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) { setPullError('Please sign in again to pull supplier data.'); setPulling(false); return }
+      const res = await fetch(`/api/campaigns/${campaignId}/scope3-cat1`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const json = await res.json()
+      if (!res.ok) { setPullError(json?.error || 'Could not load supplier data.'); setPulling(false); return }
+      setCatOneResult(json as CatOneResult)
+    } catch {
+      setPullError('Could not reach the Supplier Portal. Try again.')
+    }
+    setPulling(false)
+  }
+
+  const useCatOneFigure = (mt: number) => {
+    updateCat('cat1', 'has_supplier_data', true)
+    updateCat('cat1', 'supplier_emissions', Number(mt.toFixed(3)))
+  }
 
   // Auto-detect material categories
   const autoDetect = () => {
@@ -171,7 +206,7 @@ export default function Scope3Dashboard() {
     if (!d?.included) return 0
     if (d.has_supplier_data && d.supplier_emissions) return d.supplier_emissions
     const spend = d.total_spend || 0
-    const ef = EMISSION_FACTORS.spend[d.supplier_sector || sector] || 0.5
+    const ef = EMISSION_FACTORS.spend[d.supplier_sector || sector] || DEFAULT_SPEND_EF
     return (spend * ef) / 1000 // convert kg to mt
   }
 
@@ -335,6 +370,9 @@ export default function Scope3Dashboard() {
     <div>
       <h2 style={sectionHead}>Materiality screening</h2>
       <p style={sectionSub}>ThemisIQ has identified the Scope 3 categories likely to be material for a {sector || 'company'} based on GHG Protocol guidance. Review and confirm.</p>
+      <div style={{ background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.2)', borderRadius: 10, padding: '0.75rem 1rem', marginBottom: 16, fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
+        These are suggestions, not limits — <strong>click any category to add or remove it</strong>. Under the GHG Protocol you may include any category you judge material, and you must briefly justify any you exclude. Tap a category in the Calculate step for what it means and where to find the data.
+      </div>
 
       {!sector ? (
         <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: '#888784' }}>Select your sector in Step 1 first.</div>
@@ -398,6 +436,20 @@ export default function Scope3Dashboard() {
                     <span style={{ fontSize: 11, fontWeight: 600, color: '#64fe3e' }}>{getCatEmissions(cat.id).toFixed(2)} mt CO₂e</span>
                   )}
                 </div>
+                {(cat as any).guidance && (
+                  <div style={{ borderBottom: '0.5px solid #e8e7e4' }}>
+                    <button onClick={() => setOpenInfo(p => ({ ...p, [cat.id]: !p[cat.id] }))} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 16px', background: '#fafafa', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#7425e3', display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 15, borderRadius: '50%', border: '1px solid #7425e3', fontSize: 9, fontWeight: 700 }}>i</span> What this is &amp; where to find the data</span>
+                      <span style={{ fontSize: 11, color: '#888784' }}>{openInfo[cat.id] ? '▲' : '▼'}</span>
+                    </button>
+                    {openInfo[cat.id] && (
+                      <div style={{ padding: '0 16px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{(cat as any).guidance}</div>
+                        <div style={{ fontSize: 11, color: '#0F6E56', lineHeight: 1.6, background: '#E1F5EE', borderRadius: 8, padding: '8px 10px' }}><strong>Where to find it:</strong> {(cat as any).dataSource}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
 
                   {/* Cat 1 — Purchased goods */}
@@ -427,8 +479,58 @@ export default function Scope3Dashboard() {
                         </select>
                       </div>
                     </>}
-                    <div style={{ gridColumn: '1 / -1', background: '#f8f7f5', borderRadius: 8, padding: '0.75rem', fontSize: 11, color: '#888784' }}>
-                      💡 For more accurate Cat 1 data, use the ThemisIQ Supplier Portal to collect primary emissions data from your suppliers directly.
+                    <div style={{ gridColumn: '1 / -1', background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 6 }}>Pull from Supplier Portal</div>
+                      <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.6, marginBottom: 10 }}>Bring in primary Cat 1 data you collected from suppliers. Supplier-allocated emissions are used directly; suppliers without an allocated figure are estimated from the spend you recorded (sector default). You review the full breakdown before it is applied.</div>
+                      {campaigns.length === 0 ? (
+                        <div style={{ fontSize: 11, color: '#888784' }}>No supplier campaigns found. <a href="/dashboard/supply-chain/portal" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 600 }}>Create one in the Supplier Portal →</a></div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                          {campaigns.length > 1 && (
+                            <select value={selectedCampaign} onChange={e => setSelectedCampaign(e.target.value)} style={{ ...inputStyle, width: 'auto', flex: 1, minWidth: 180 }}>
+                              <option value="">Select a campaign…</option>
+                              {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                          )}
+                          <button onClick={() => pullFromPortal(selectedCampaign || campaigns[0]?.id)} disabled={pulling || (campaigns.length > 1 && !selectedCampaign)} style={{ fontSize: 12, fontWeight: 500, padding: '8px 16px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: pulling ? 'wait' : 'pointer', opacity: pulling || (campaigns.length > 1 && !selectedCampaign) ? 0.5 : 1 }}>
+                            {pulling ? 'Pulling…' : 'Pull from Portal →'}
+                          </button>
+                        </div>
+                      )}
+                      {pullError && <div style={{ fontSize: 11, color: '#B91C1C', marginTop: 8 }}>{pullError}</div>}
+
+                      {catOneResult && (
+                        <div style={{ marginTop: 12, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '0.9rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{catOneResult.total_mt.toFixed(2)} mt CO₂e</div>
+                            <div style={{ fontSize: 10, color: '#888784' }}>{catOneResult.counts.supplier_specific} primary · {catOneResult.counts.spend_based} spend-based · {catOneResult.counts.uncovered} uncovered</div>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+                            {catOneResult.lines.map(l => (
+                              <div key={l.supplier_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 11, padding: '4px 0', borderBottom: '0.5px solid #f3f4f6' }}>
+                                <span style={{ color: '#0d0d0d', flex: 1 }}>{l.supplier_name}</span>
+                                <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: l.method === 'supplier-specific' ? '#E1F5EE' : '#FEF3E2', color: l.method === 'supplier-specific' ? '#0F6E56' : '#ba7517', whiteSpace: 'nowrap' }}>{l.method === 'supplier-specific' ? 'primary' : 'spend-based'}</span>
+                                <span style={{ color: '#555553', minWidth: 70, textAlign: 'right' }}>{l.value_mt.toFixed(2)} mt</span>
+                              </div>
+                            ))}
+                          </div>
+                          {catOneResult.uncovered.length > 0 && (
+                            <div style={{ fontSize: 10, color: '#888784', marginBottom: 8, lineHeight: 1.5 }}>
+                              <strong style={{ color: '#ba7517' }}>Not included:</strong> {catOneResult.uncovered.map(u => `${u.supplier_name} (${u.reason})`).join('; ')}
+                            </div>
+                          )}
+                          {catOneResult.currency_flags.length > 0 && (
+                            <div style={{ fontSize: 10, color: '#B91C1C', marginBottom: 8, lineHeight: 1.5 }}>
+                              ⚠ Currency: {catOneResult.currency_flags.map(c => `${c.supplier_name}: ${c.spend} ${c.currency} — convert to USD before including`).join('; ')}
+                            </div>
+                          )}
+                          <div style={{ fontSize: 9, color: '#888784', marginBottom: 10, lineHeight: 1.5, fontStyle: 'italic' }}>{catOneResult.method_note}</div>
+                          <button onClick={() => useCatOneFigure(catOneResult.total_mt)} style={{ fontSize: 12, fontWeight: 500, padding: '8px 16px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', cursor: 'pointer' }}>
+                            Use {catOneResult.total_mt.toFixed(2)} mt as Cat 1 →
+                          </button>
+                          <div style={{ fontSize: 10, color: '#888784', marginTop: 6 }}>You can still edit the figure after applying it.</div>
+                        </div>
+                      )}
                     </div>
                   </>}
 
