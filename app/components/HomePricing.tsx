@@ -8,9 +8,9 @@ type ModuleId = 'ghg' | 'risk' | 'supply' | 'people' | 'deals' | 'ai' | 'cyber'
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
 
 const MODULES: { id: ModuleId; name: string; frameworks: string; href: string }[] = [
-  { id: 'ghg', name: 'Climate — GHG Inventory · Scope 1 & 2', frameworks: 'SB 253 · CDP · ESRS E1 · GRI 305 · IFRS S2', href: '/climate-ghg' },
-  { id: 'risk', name: 'Climate Risk', frameworks: 'SB 261 · TCFD · IFRS S2 · scenario analysis', href: '/dashboard/ghg' },
-  { id: 'supply', name: 'Supply Chain & Scope 3', frameworks: 'CS3D · EcoVadis · CDP C12 · Modern Slavery Act', href: '/supply-chain' },
+  { id: 'ghg', name: 'Climate — GHG Inventory · Scope 1, 2 & 3', frameworks: 'SB 253 · CDP · ESRS E1 · GRI 305 · IFRS S2', href: '/climate-ghg' },
+  { id: 'risk', name: 'Climate Risk', frameworks: 'SB 261 · TCFD · IFRS S2 · scenario analysis', href: '/climate-risk' },
+  { id: 'supply', name: 'Supply Chain', frameworks: 'CS3D · EcoVadis · CDP C12 · Modern Slavery Act', href: '/supply-chain' },
   { id: 'people', name: 'People & Workforce', frameworks: 'EU Pay Transparency · ESRS S1 · GRI 401–410', href: '/people' },
   { id: 'deals', name: 'Deals & Investment', frameworks: 'TCFD · SFDR · ILPA · IFC Performance Standards', href: '/deals' },
   { id: 'ai', name: 'AI Governance', frameworks: 'EU AI Act · NIST AI RMF · ISO 42001', href: '/ai-governance' },

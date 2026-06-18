@@ -26,16 +26,16 @@ interface Module {
 const MODULES: Module[] = [
   {
     id: 'ghg',
-    name: 'Climate — GHG Inventory · Scope 1 & 2',
-    description: 'Scope 1 & 2 · SB 253 · CDP · ESRS E1 · GRI 305 · IFRS S2 · EcoVadis · GHG Protocol · SBTi · RE100',
+    name: 'Climate — GHG Inventory · Scope 1, 2 & 3',
+    description: 'Scope 1, 2 & 3 · SB 253 · CDP · ESRS E1 · GRI 305 · IFRS S2 · EcoVadis · GHG Protocol · SBTi · RE100',
     tags: [
-      { label: 'Scope 1 & 2', color: 'blue' },
+      { label: 'Scope 1, 2 & 3', color: 'blue' },
       { label: 'Live now', color: 'green' },
       { label: 'SB 253 · Aug 10', color: 'orange' },
     ],
     cta: {
       headline: 'Ready to see your emissions?',
-      sub: 'Your SB 253 Scope 1 & 2 inventory can be complete in days — not months.',
+      sub: 'Your SB 253 Scope 1, 2 & 3 inventory can be complete in days — not months.',
       btn: 'See your emissions instantly →',
       href: '/dashboard/ghg',
     },
@@ -54,10 +54,10 @@ const MODULES: Module[] = [
   },
   {
     id: 'supply',
-    name: 'Supply Chain & Scope 3',
-    description: 'Scope 3 · EcoVadis (Environment, Labour & Human Rights, Ethics, Procurement) · CDP C12 · EU CS3D · ESRS S2+G1 · Modern Slavery Act · GRI 308/414 · UN Guiding Principles · supplier portal',
+    name: 'Supply Chain',
+    description: 'Supplier portal · EcoVadis (Environment, Labour & Human Rights, Ethics, Procurement) · CDP C12 · EU CS3D · ESRS S2+G1 · Modern Slavery Act · GRI 308/414 · UN Guiding Principles · feeds Scope 3 Cat.1 in the GHG module',
     tags: [
-      { label: 'Scope 3', color: 'purple' },
+      { label: 'Supplier Portal', color: 'purple' },
       { label: 'CS3D · 2027', color: 'orange' },
     ],
     cta: {
