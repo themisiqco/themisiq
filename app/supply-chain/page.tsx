@@ -100,11 +100,11 @@ export default function Page() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
           {[
             { icon: '', title: 'Supplier portal', desc: 'Branded supplier sustainability data collection portal. Suppliers complete structured questionnaires on emissions, labour practices, and environmental performance — no spreadsheets.' },
-            { icon: '', title: 'Scope 3 Cat.1 primary data', desc: 'Collect spend data, activity data, and supplier-specific emission factors directly from your supply base. Supports all GHG Protocol Scope 3 Category 1 calculation methods.' },
+            { icon: '', title: 'Scope 3 Cat.1 primary data', desc: 'Collect spend data, activity data, and supplier-specific emission factors directly from your supply base — the primary supplier data that feeds your Scope 3 Category 1 calculation in the GHG module, across all GHG Protocol methods.' },
             { icon: '', title: 'Human rights risk mapping', desc: 'Risk-based HRDD across your value chain. Country and sector risk scoring. Supplier prioritisation for deeper assessment. Grievance mechanism management.' },
-            { icon: '🏆', title: 'EcoVadis integration', desc: 'EcoVadis scorecard tracking, improvement plan management, and CDP C12 supplier engagement programme documentation — all in one platform.' },
-            { icon: '🔍', title: 'Modern Slavery Act', desc: 'UK and Australia Modern Slavery Act statement preparation. Supply chain mapping, risk identification, and director sign-off workflow. Published to government registry.' },
-            { icon: '📋', title: 'ESRS S2 + G1 disclosure', desc: 'ESRS S2 (value chain workers) and G1 (business conduct) disclosure preparation. Supplier due diligence policy documentation and outcomes reporting.' },
+            { icon: '', title: 'EcoVadis integration', desc: 'EcoVadis scorecard tracking, improvement plan management, and CDP C12 supplier engagement programme documentation — all in one platform.' },
+            { icon: '', title: 'Modern Slavery Act', desc: 'UK and Australia Modern Slavery Act statement preparation. Supply chain mapping, risk identification, and director sign-off workflow. Published to government registry.' },
+            { icon: '', title: 'ESRS S2 + G1 disclosure', desc: 'ESRS S2 (value chain workers) and G1 (business conduct) disclosure preparation. Supplier due diligence policy documentation and outcomes reporting.' },
           ].map(({ icon, title, desc }) => (
             <div key={title} style={{ background: '#fff', padding: '2rem' }}>
               <div style={{ fontSize: 24, marginBottom: 12 }}>{icon}</div>
@@ -126,7 +126,7 @@ export default function Page() {
             {[
               ['01', 'Map your supply base', 'Upload your supplier list. ThemisIQ risk-scores each supplier by country, sector, and spend — prioritising who needs deep assessment first.'],
               ['02', 'Collect supplier data', 'Send branded data collection requests via the ThemisIQ supplier portal. Track completion status and chase non-responders automatically.'],
-              ['03', 'Calculate Scope 3 Cat.1', 'Primary data from suppliers flows directly into your Scope 3 Category 1 calculation. Spend-based estimates for non-respondents fill gaps.'],
+              ['03', 'Feed Scope 3 Cat.1', 'Primary supplier data flows into the GHG module, where your Scope 3 Category 1 calculation runs. Spend-based estimates for non-respondents fill the gaps.'],
               ['04', 'Generate disclosures', 'ESRS S2, CDP C12, Modern Slavery Act statement, and CS3D due diligence documentation — all generated from your supplier programme data.'],
             ].map(([num, title, desc]) => (
               <div key={num}>
@@ -150,7 +150,7 @@ export default function Page() {
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
           <a href="/dashboard/supply-chain" style={{ ...btnPrimary, textDecoration: 'none' }}>Map your supply chain →</a>
-          <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to a ssedialist</a>
+          <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to a specialist</a>
         </div>
       </section>
 
