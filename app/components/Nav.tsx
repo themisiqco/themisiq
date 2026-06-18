@@ -113,7 +113,7 @@ export default function Nav() {
           {[
             ['/climate-ghg', 'GHG Emissions', 'SB 253 · CDP · ESRS E1 · GHG Protocol · Scope 3'],
             ['/climate-risk', 'Climate Risk', 'TCFD · IFRS S2 · ESRS E1 · scenario analysis'],
-            ['/supply-chain', 'Supply Chain', 'Scope 3 Cat.1 · EcoVadis · CS3D · ESRS S2'],
+            ['/supply-chain', 'Supply Chain', 'Supplier Portal · CS3D · EcoVadis · ESRS S2'],
             ['/deals', 'Deals & Investment', 'M&A diligence · PE · IFRS S2 · LP ESG'],
             ['/people', 'People & Workforce', 'ESRS S1 · EU Pay Transparency · CA Pay Data'],
             ['/ai-governance', 'AI Governance', 'EU AI Act · NIST AI RMF · ISO 42001'],
