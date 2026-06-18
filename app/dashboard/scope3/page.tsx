@@ -646,6 +646,9 @@ export default function Scope3Dashboard() {
         <h2 style={sectionHead}>Scope 3 results</h2>
         <p style={sectionSub}>Your total Scope 3 inventory across all material categories — GHG Protocol aligned.</p>
 
+        <div style={{ position: 'relative' }}>
+          <div style={!isPaid ? { filter: 'blur(7px)', pointerEvents: 'none', userSelect: 'none' } : undefined}>
+
         {/* Total */}
         <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.5rem', marginBottom: 20, display: 'flex', alignItems: 'center', gap: '2rem' }}>
           <div style={{ textAlign: 'center', flexShrink: 0 }}>
@@ -709,6 +712,20 @@ export default function Scope3Dashboard() {
             </div>
           </div>
         )}
+
+          </div>
+          {!isPaid && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+              <div style={{ background: '#0d0d0d', borderRadius: 16, padding: '2rem', maxWidth: 420, textAlign: 'center', boxShadow: '0 8px 40px rgba(0,0,0,0.25)' }}>
+                <div style={{ fontSize: 26, marginBottom: 10 }}>🔒</div>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#fff', marginBottom: 8 }}>Unlock your full Scope 3 results</div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, marginBottom: 18 }}>Your complete inventory is ready — the total, the category-by-category breakdown, and the data-quality flags for every line. Unlock the GHG module to view and download it.</div>
+                <a href="/pricing" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>See pricing &amp; unlock →</a>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 12 }}>The calculator stays free — you only pay to unlock results &amp; export.</div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     )
   }
