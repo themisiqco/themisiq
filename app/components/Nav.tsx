@@ -66,6 +66,13 @@ export default function Nav() {
 
         {/* CTA BUTTONS */}
         <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
+          {isAuthed && (
+            <a href="/dashboard" style={{
+              fontSize: 12, fontWeight: 500, padding: '7px 10px',
+              color: '#0d0d0d', textDecoration: 'none',
+              display: 'inline-block', whiteSpace: 'nowrap',
+            }} className="desktop-only">Dashboard</a>
+          )}
           <a href={isAuthed ? '#' : '/login'} onClick={(e) => { if (isAuthed) { e.preventDefault(); supabase.auth.signOut() } }} style={{
             fontSize: 12, fontWeight: 500, padding: '7px 10px',
             color: '#555553', textDecoration: 'none',
@@ -121,7 +128,6 @@ export default function Nav() {
             ['/verification-readiness', 'Verification Readiness', 'ISO 14064-3 · ISAE 3410 · verifier-ready package'],
             ['/pricing', 'Pricing', 'Plans, tiers, and what each includes'],
             ['/assess', 'Free Assessment →', 'Check which regulations apply to you'],
-            ['/login', 'Log in', 'Access your dashboard'],
           ].map(([href, label, sub]) => (
             <a key={href} href={href} onClick={() => setMenuOpen(false)} style={{
               display: 'block', padding: '14px 0',
@@ -132,6 +138,31 @@ export default function Nav() {
               <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>{sub}</div>
             </a>
           ))}
+          {isAuthed && (
+            <a href="/dashboard" onClick={() => setMenuOpen(false)} style={{
+              display: 'block', padding: '14px 0',
+              borderBottom: '0.5px solid #e8e7e4',
+              textDecoration: 'none',
+            }}>
+              <div style={{ fontSize: 15, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }}>Dashboard</div>
+              <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>Your platform home</div>
+            </a>
+          )}
+          <a
+            href={isAuthed ? '#' : '/login'}
+            onClick={(e) => {
+              if (isAuthed) { e.preventDefault(); supabase.auth.signOut() }
+              setMenuOpen(false)
+            }}
+            style={{
+              display: 'block', padding: '14px 0',
+              borderBottom: '0.5px solid #e8e7e4',
+              textDecoration: 'none',
+            }}
+          >
+            <div style={{ fontSize: 15, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }}>{isAuthed ? 'Log out' : 'Log in'}</div>
+            <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>{isAuthed ? 'Sign out of your account' : 'Access your dashboard'}</div>
+          </a>
           <div style={{ marginTop: '1rem' }}>
             <a href="/pricing" style={{
               display: 'block', textAlign: 'center', padding: '13px',
