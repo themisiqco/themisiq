@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { supabase } from '../../../lib/supabase'
-import { useEntitlement, useHasConcierge } from '../../../lib/useEntitlement'
+import { useEntitlement, useHasConcierge, useGhgLocationAllowance } from '../../../lib/useEntitlement'
 import { generateAssurancePDF } from '../../../lib/assurancePdf'
 import { useSearchParams } from 'next/navigation'
 
@@ -1063,6 +1063,8 @@ const searchParams = useSearchParams()
   const [inventoryList, setInventoryList] = useState<Array<{ id: string; company_name: string; reporting_year: number; updated_at: string }>>([])
   const isPaid = useEntitlement('ghg')
   const CONCIERGE_DEV = useHasConcierge()   // concierge gate: true when the customer holds any concierge tier entitlement
+  const { allowance: locationAllowance, loading: allowanceLoading } = useGhgLocationAllowance()
+  const [showLocationWall, setShowLocationWall] = useState(false)
 
   // Decide initial view: ?id -> wizard (loads that one); else if user has inventories -> list; else -> blank wizard
   useEffect(() => {
@@ -1169,6 +1171,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   }
 
   const addLocation = () => {
+    if (locationAllowance != null && !allowanceLoading && inventory.locations.length >= locationAllowance) { setShowLocationWall(true); return }
     const id = String(inventory.locations.length + 1)
     setInventory(inv => ({ ...inv, locations: [...inv.locations, emptyLocation(id, `Location ${id}`)] }))
     setActiveLocation(inventory.locations.length)
@@ -1613,6 +1616,16 @@ workings: buildWorkings(inventory.locations, 'AR4', inventory.reporting_year, co
               </div>
             ))}
             <button onClick={addLocation} style={{ fontSize: 13, padding: '8px 16px', borderRadius: 8, background: 'none', border: '0.5px solid #7425e3', color: '#7425e3', cursor: 'pointer', alignSelf: 'flex-start' }}>+ Add location</button>
+            {showLocationWall && (
+              <div style={{ marginTop: 12, background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.3)', borderRadius: 10, padding: '0.9rem 1rem', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#7425e3', marginBottom: 3 }}>You&apos;ve reached your plan&apos;s location limit ({locationAllowance})</div>
+                  <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>Your current plan covers up to {locationAllowance} location{locationAllowance === 1 ? '' : 's'}. Upgrade to add more — your existing data stays exactly as it is.</div>
+                  <a href="/pricing" style={{ display: 'inline-block', marginTop: 8, fontSize: 12, fontWeight: 600, color: '#7425e3', textDecoration: 'none' }}>See plans &amp; upgrade →</a>
+                </div>
+                <button onClick={() => setShowLocationWall(false)} style={{ background: 'none', border: 'none', color: '#888784', cursor: 'pointer', fontSize: 16, lineHeight: 1, flexShrink: 0 }}>×</button>
+              </div>
+            )}
           </div>
         </Field>
       </div>
@@ -1634,6 +1647,16 @@ workings: buildWorkings(inventory.locations, 'AR4', inventory.reporting_year, co
             </button>
           ))}
           <button onClick={addLocation} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: 'none', border: '0.5px solid #7425e3', color: '#7425e3', }}>+ Add location</button>
+          {showLocationWall && (
+            <div style={{ width: '100%', marginTop: 8, background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.3)', borderRadius: 10, padding: '0.9rem 1rem', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#7425e3', marginBottom: 3 }}>You&apos;ve reached your plan&apos;s location limit ({locationAllowance})</div>
+                <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>Your current plan covers up to {locationAllowance} location{locationAllowance === 1 ? '' : 's'}. Upgrade to add more — your existing data stays exactly as it is.</div>
+                <a href="/pricing" style={{ display: 'inline-block', marginTop: 8, fontSize: 12, fontWeight: 600, color: '#7425e3', textDecoration: 'none' }}>See plans &amp; upgrade →</a>
+              </div>
+              <button onClick={() => setShowLocationWall(false)} style={{ background: 'none', border: 'none', color: '#888784', cursor: 'pointer', fontSize: 16, lineHeight: 1, flexShrink: 0 }}>×</button>
+            </div>
+          )}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '2rem', alignItems: 'start' }}>
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 20 }}>

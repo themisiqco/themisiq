@@ -67,3 +67,37 @@ export function useHasConcierge(): boolean {
   }, [])
   return hasConcierge
 }
+
+// GHG location allowance (spec: Model A hard enforcement). Reads the integer
+// ceiling written onto the customer's ghg entitlement row at checkout.
+// null = uncapped (pre-migration customers or sales-managed 20+ "contact us").
+// `loading` lets the wall avoid blocking while the value is still being fetched.
+export function useGhgLocationAllowance(): { allowance: number | null; loading: boolean } {
+  const [allowance, setAllowance] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    let cancelled = false
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) {
+        if (!cancelled) { setAllowance(null); setLoading(false) }
+        return
+      }
+      const { data, error } = await supabase
+        .from('entitlements')
+        .select('location_allowance')
+        .eq('module_key', 'ghg')
+        .eq('user_id', session.user.id)
+        .maybeSingle()
+      if (cancelled) return
+      if (error) {
+        console.error('[useGhgLocationAllowance] read failed:', error.message)
+        setAllowance(null); setLoading(false)
+        return
+      }
+      setAllowance(data?.location_allowance ?? null)
+      setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [])
+  return { allowance, loading }
+}

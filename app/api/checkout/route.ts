@@ -19,6 +19,7 @@ import {
   CURRENCY,
   ALL_MODULE_KEYS,
   TIER_PRICING,
+  locationAllowanceForTier,
   PACKS,
   ADDONS,
   addOnRequirementsMet,
@@ -58,6 +59,7 @@ export async function POST(req: NextRequest) {
     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = []
     const modulesInCart = new Set<ModuleKey>()
     const entitlementsToGrant = new Set<string>() // module keys + add-on keys
+    let ghgAllowance: number | null = null // GHG location ceiling to write onto the ghg entitlement row
     const sources: string[] = []
 
     // 2a) Fixed pack
@@ -72,6 +74,7 @@ export async function POST(req: NextRequest) {
         entitlementsToGrant.add(m)
       })
       sources.push(`pack:${body.packId}`)
+      if (pack.modules.includes('ghg')) ghgAllowance = 3 // packs have no tier; Starter floor
     }
 
     // 2b) Build-your-own (tier + modules)
@@ -96,6 +99,7 @@ export async function POST(req: NextRequest) {
         entitlementsToGrant.add(m)
       })
       sources.push('configurator')
+      if (moduleKeys.includes('ghg') && tier) ghgAllowance = locationAllowanceForTier(tier) // tier-based ceiling
     }
 
     // 2c) Add-ons (currently just Verification Readiness)
@@ -145,6 +149,7 @@ export async function POST(req: NextRequest) {
       user_id: userId,
       entitlements, // e.g. "ghg,supply-chain,verification"
       source: sources.join(' | '),
+      ghg_location_allowance: ghgAllowance != null ? String(ghgAllowance) : '',
     }
 
     const session = await stripe.checkout.sessions.create({

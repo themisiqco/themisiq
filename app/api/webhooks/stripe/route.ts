@@ -82,6 +82,8 @@ async function grantFromMetadata(
 ) {
   const userId = metadata?.user_id
   const entitlements = metadata?.entitlements
+  const ghgAllowanceRaw = metadata?.ghg_location_allowance
+  const ghgAllowance = ghgAllowanceRaw ? Number(ghgAllowanceRaw) : null
 
   if (!userId || !entitlements) {
     console.warn('[webhook] missing user_id/entitlements in metadata; nothing to grant')
@@ -99,6 +101,7 @@ async function grantFromMetadata(
     user_id: userId,
     module_key,
     source,
+    location_allowance: module_key === 'ghg' ? ghgAllowance : null,
   }))
 
   const supabaseAdmin = getSupabaseAdmin()

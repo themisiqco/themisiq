@@ -73,6 +73,13 @@ export const TIER_PRICING: Record<Tier, { full: number; early: number }> = {
   advisory:     { full: 4999, early: 4999 },
 }
 
+// GHG location allowance per tier (spec: Model A hard enforcement, Starter 3 / Pro 10 / Advisory 20).
+// Single source of truth — checkout writes this onto the ghg entitlement row; the GHG
+// wizard and server enforce against it. Packs (no tier) default to the Starter floor (3).
+export function locationAllowanceForTier(tier: Tier): number {
+  return ({ starter: 3, professional: 10, advisory: 20 } as Record<Tier, number>)[tier]
+}
+
 // The price actually charged right now for a given tier (respects the switch).
 export function tierPrice(tier: Tier): number {
   const p = TIER_PRICING[tier]
