@@ -1792,23 +1792,23 @@ workings: buildWorkings(inventory.locations, 'AR4', inventory.reporting_year, co
             </div>
           </div>
           <div style={{ position: 'sticky', top: 80 }}>
-            <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '1.5rem', marginBottom: 12 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 12 }}>{loc.name} — live results</div>
+            <div style={{ background: '#111827', borderRadius: 12, padding: '1.5rem', marginBottom: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: '#d1d5db', marginBottom: 12 }}>{loc.name} — live results</div>
               {[
-                { label: 'Heating & fuel', val: calc.s1_stationary, color: '#7425e3' },
+                { label: 'Heating & fuel', val: calc.s1_stationary, color: '#a78bfa' },
                 { label: 'Vehicles', val: calc.s1_mobile, color: '#1fb1ff' },
                 { label: 'Refrigerants', val: calc.s1_fugitive, color: '#ba7517' },
-                { label: 'Scope 1 total', val: calc.s1_total, color: '#fff', bold: true },
+                { label: 'Scope 1 total', val: calc.s1_total, color: '#f9fafb', bold: true },
                 { label: 'Scope 2 (electricity)', val: calc.s2_location, color: '#64fe3e', bold: true },
               ].map(({ label, val, color, bold }) => (
                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '0.5px solid rgba(255,255,255,0.07)' }}>
-                  <span style={{ fontSize: 12, color: bold ? '#fff' : 'rgba(255,255,255,0.5)', fontWeight: bold ? 600 : 300 }}>{label}</span>
+                  <span style={{ fontSize: 12, color: bold ? '#f9fafb' : '#d1d5db', fontWeight: bold ? 600 : 300 }}>{label}</span>
                   <span style={{ fontSize: 12, color, fontWeight: bold ? 700 : 400 }}>{val.toFixed(2)} mt</span>
                 </div>
               ))}
-              <div style={{ marginTop: 10, fontSize: 10, color: 'rgba(255,255,255,0.25)', lineHeight: 1.6 }}>EPA 2024 (US) · ECCC v3.0 (CA) · DEFRA 2025 (UK) · IPCC AR4 GWP · eGRID 2023</div>
+              <div style={{ marginTop: 10, fontSize: 11, color: '#9ca3af', lineHeight: 1.6 }}>EPA 2024 (US) · ECCC v3.0 (CA) · DEFRA 2025 (UK) · IPCC AR4 GWP · eGRID 2023</div>
               {validateCompleteness(loc).map((w, i) => (
-                <div key={i} style={{ marginTop: 8, background: "rgba(254,243,226,0.1)", border: "0.5px solid rgba(253,230,138,0.3)", borderRadius: 6, padding: "6px 10px", fontSize: 10, color: "#fde68a", lineHeight: 1.5 }}>{w}</div>
+                <div key={i} style={{ marginTop: 8, background: "rgba(254,243,226,0.1)", border: "0.5px solid #fcd34d", borderRadius: 6, padding: "6px 10px", fontSize: 10, color: "#fcd34d", lineHeight: 1.5 }}>{w}</div>
               ))}
             </div>
             <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem' }}>
