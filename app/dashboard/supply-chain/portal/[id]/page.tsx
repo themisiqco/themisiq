@@ -194,9 +194,13 @@ export default function CampaignDetail() {
 
   const sendInvite = async (s: CampaignSupplier, type: 'invite' | 'reminder') => {
     setSending(s.id)
+    const { data: { session } } = await supabase.auth.getSession()
     const res = await fetch('/api/supplier-invite', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session?.access_token ?? ''}`,
+      },
       body: JSON.stringify({ supplier_id: s.id, type, buyer_company: campaign?.name?.split(' ')[0] || 'ThemisIQ' }),
     })
     const data = await res.json()

@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const getSupabase = () => createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+import { getAuthedClient, bearerFrom, AuthError } from '../../../lib/supabaseAuthed'
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY!
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'noreply@themisiq.co'
@@ -160,7 +155,16 @@ const reminderEmailHtml = ({
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = getSupabase()
+  let authed
+  try {
+    authed = await getAuthedClient(bearerFrom(req))
+  } catch (e) {
+    if (e instanceof AuthError) {
+      return NextResponse.json({ error: e.message }, { status: 401 })
+    }
+    return NextResponse.json({ error: 'Invalid or expired session' }, { status: 401 })
+  }
+  const supabase = authed.supabase
   const body = await req.json()
   const { supplier_id, type = 'invite', buyer_company } = body
 

@@ -239,16 +239,13 @@ export default function SupplierQuestionnaire() {
 
   const loadSupplier = async () => {
     setLoading(true)
-    const { data: cs } = await supabase
-      .from('campaign_suppliers')
-      .select('*, supplier_campaigns(*)')
-      .eq('token', token)
-      .single()
+    const { data, error } = await supabase.rpc('portal_get', { p_token: token })
 
-    if (!cs) { setNotFound(true); setLoading(false); return }
+    if (error || !data) { setNotFound(true); setLoading(false); return }
 
+    const cs = data.supplier
+    const camp = data.campaign
     setCampaignSupplier(cs)
-    const camp = cs.supplier_campaigns
     setCampaign(camp)
 
     // Load template
@@ -257,20 +254,12 @@ export default function SupplierQuestionnaire() {
 
     if (cs.status === 'completed') setSubmitted(true)
 
-    // Load existing responses
-    const { data: existing } = await supabase
-      .from('supplier_responses')
-      .select('*')
-      .eq('campaign_supplier_id', cs.id)
-
+    // Existing responses (portal_get also bumps 'invited' -> 'in_progress' server-side)
+    const existing = data.responses as { question_id: string; response: string }[] | null
     if (existing) {
       const resp: Record<string, string> = {}
-      existing.forEach((r: any) => { resp[r.question_id] = r.response })
+      existing.forEach((r) => { resp[r.question_id] = r.response })
       setResponses(resp)
-    }
-
-    if (cs.status === 'invited') {
-      await supabase.from('campaign_suppliers').update({ status: 'in_progress' }).eq('id', cs.id)
     }
 
     setLoading(false)
@@ -280,18 +269,17 @@ export default function SupplierQuestionnaire() {
     setResponses(prev => ({ ...prev, [questionId]: value }))
     if (!campaignSupplier) return
     const sectionId = sections.find(s => s.questions.some(q => q.id === questionId))?.id || ''
-    await supabase.from('supplier_responses').upsert({
-      campaign_supplier_id: campaignSupplier.id,
-      section: sectionId,
-      question_id: questionId,
-      response: value,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'campaign_supplier_id,question_id' })
+    await supabase.rpc('portal_save_response', {
+      p_token: token,
+      p_section: sectionId,
+      p_question_id: questionId,
+      p_response: value,
+    })
   }
 
   const submit = async () => {
     setSaving(true)
-    await supabase.from('campaign_suppliers').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', campaignSupplier.id)
+    await supabase.rpc('portal_submit', { p_token: token })
     setSaving(false)
     setSubmitted(true)
   }
