@@ -44,13 +44,16 @@ export default function SupplierPortalDashboard() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) { router.push('/login'); return }
       setUser(session.user)
-      loadCampaigns(session.user.id)
+      loadCampaigns()
     })
   }, [])
 
-  const loadCampaigns = async (userId: string) => {
+  const loadCampaigns = async () => {
     setLoading(true)
-    const res = await fetch(`/api/campaigns?buyer_id=${userId}`)
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/campaigns', {
+      headers: { Authorization: `Bearer ${session?.access_token ?? ''}` },
+    })
     const { data: camps } = await res.json()
     if (camps) {
       const enriched = await Promise.all(camps.map(async (c: any) => {
@@ -66,11 +69,14 @@ export default function SupplierPortalDashboard() {
   const createCampaign = async () => {
     if (!newCampaign.name || !user) return
     setSaving(true)
+    const { data: { session } } = await supabase.auth.getSession()
     const res = await fetch('/api/campaigns', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session?.access_token ?? ''}`,
+      },
       body: JSON.stringify({
-        buyer_id: user.id,
         name: newCampaign.name,
         description: newCampaign.description,
         reporting_year: newCampaign.reporting_year,
