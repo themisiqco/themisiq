@@ -112,6 +112,7 @@ export default function Scope3Dashboard() {
   const [boundInventoryId, setBoundInventoryId] = useState<string | null>(null)
   const [inventoryList, setInventoryList] = useState<Array<{ id: string; company_name: string; reporting_year: number; updated_at: string }>>([])
   const [bindChecked, setBindChecked] = useState(false) // have we resolved bind status yet?
+  const [cameFromGhg, setCameFromGhg] = useState(false) // arrived via ?from=ghg (unsaved GHG wizard)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const justRestored = useRef(false) // suppress the saved-reset effect for one restore pass
@@ -206,7 +207,9 @@ export default function Scope3Dashboard() {
         if (data) setInventoryList(data)
       })()
       // Attempt the id-bind in parallel; failure (no row) falls through to picker.
-      const id = new URLSearchParams(window.location.search).get('inventoryId')
+      const params = new URLSearchParams(window.location.search)
+      setCameFromGhg(params.get('from') === 'ghg')
+      const id = params.get('inventoryId')
       const bind = id ? bindToInventory(id) : Promise.resolve()
       // Flip the gate only after BOTH resolve, so the picker never flashes empty.
       await Promise.all([loadList, bind])
@@ -883,22 +886,38 @@ export default function Scope3Dashboard() {
   const renderPicker = () => (
     <div style={{ maxWidth: 640, margin: '0 auto', padding: '3rem 2.5rem' }}>
       <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '2rem' }}>
-        <h2 style={sectionHead}>Which inventory is this Scope 3 for?</h2>
-        {inventoryList.length > 0 ? (
+        {cameFromGhg && inventoryList.length === 0 ? (
+          // Arrived from an UNSAVED GHG wizard — there's nothing to bind to yet.
           <>
-            <p style={sectionSub}>Your Scope 3 inventory links to one of your GHG inventories so the company and reporting year stay aligned across both records. Pick which one this is for.</p>
-            <label style={labelStyle}>GHG inventory</label>
-            <select style={inputStyle} defaultValue="" onChange={e => { if (e.target.value) bindToInventory(e.target.value) }}>
-              <option value="" disabled>Select an inventory…</option>
-              {inventoryList.map(inv => (
-                <option key={inv.id} value={inv.id}>{(inv.company_name || 'Untitled')} — {inv.reporting_year}</option>
-              ))}
-            </select>
+            <h2 style={sectionHead}>Save your GHG inventory first</h2>
+            <p style={sectionSub}>Your Scope 3 links to a saved GHG inventory so company and year stay aligned. Go back and save your inventory, then click Complete Scope 3 — or create a new inventory.</p>
+            <a href="/dashboard/ghg" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Go to your GHG inventory →</a>
           </>
         ) : (
           <>
-            <p style={sectionSub}>You need a saved GHG inventory first. The Scope 3 calculator links to a GHG inventory so your company and reporting year stay consistent across both records.</p>
-            <a href="/dashboard/ghg" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Create a GHG inventory →</a>
+            <h2 style={sectionHead}>Which inventory is this Scope 3 for?</h2>
+            {inventoryList.length > 0 ? (
+              <>
+                {cameFromGhg && (
+                  <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '0.75rem', marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, color: '#ba7517', lineHeight: 1.6 }}>Came from a GHG inventory? If you don&apos;t see it below, it isn&apos;t saved yet — <a href="/dashboard/ghg" style={{ color: '#ba7517', fontWeight: 600 }}>go back and save it first</a>.</div>
+                  </div>
+                )}
+                <p style={sectionSub}>Your Scope 3 inventory links to one of your GHG inventories so the company and reporting year stay aligned across both records. Pick which one this is for.</p>
+                <label style={labelStyle}>GHG inventory</label>
+                <select style={inputStyle} defaultValue="" onChange={e => { if (e.target.value) bindToInventory(e.target.value) }}>
+                  <option value="" disabled>Select an inventory…</option>
+                  {inventoryList.map(inv => (
+                    <option key={inv.id} value={inv.id}>{(inv.company_name || 'Untitled')} — {inv.reporting_year}</option>
+                  ))}
+                </select>
+              </>
+            ) : (
+              <>
+                <p style={sectionSub}>You need a saved GHG inventory first. The Scope 3 calculator links to a GHG inventory so your company and reporting year stay consistent across both records.</p>
+                <a href="/dashboard/ghg" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Create a GHG inventory →</a>
+              </>
+            )}
           </>
         )}
       </div>
