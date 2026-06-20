@@ -109,6 +109,7 @@ export default function Scope3Dashboard() {
   const [catData, setCatData] = useState<Record<string, CategoryData>>({})
   const [openInfo, setOpenInfo] = useState<Record<string, boolean>>({})
   const [dataConfirmed, setDataConfirmed] = useState(false)
+  const [boundInventoryId, setBoundInventoryId] = useState<string | null>(null)
 
   // ─── Supplier Portal bridge (pull allocated Cat 1 from campaigns) ────────────
   interface CatOneLine { supplier_id: string; supplier_name: string; method: 'supplier-specific' | 'spend-based'; data_quality: string; value_mt: number; basis: string; allocation_method?: string }
@@ -143,6 +144,29 @@ export default function Scope3Dashboard() {
           if (list.length === 1) setSelectedCampaign(list[0].id)
         }
       } catch { /* non-fatal: the manual entry path still works */ }
+    })()
+    return () => { active = false }
+  }, [])
+
+  // Bind to a GHG inventory when opened with ?inventoryId= (from the GHG wizard's
+  // export step). Prefills + locks company/year so the two records stay aligned.
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      const id = new URLSearchParams(window.location.search).get('inventoryId')
+      if (!id) return // no id -> no-id picker is a later edit; leave current behavior
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const { data: row } = await supabase
+        .from('ghg_inventories')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle()
+      if (!active || !row) return // no row -> treat as unbound, fields stay editable
+      setBoundInventoryId(id)
+      setCompany(row.company_name)
+      setReportingYear(row.reporting_year)
+      setRevenue((row.revenue_millions ?? 0) * 1_000_000) // millions -> raw
     })()
     return () => { active = false }
   }, [])
@@ -333,7 +357,8 @@ export default function Scope3Dashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={labelStyle}>Company name</label>
-          <input style={inputStyle} value={company} onChange={e => setCompany(e.target.value)} placeholder="Acme Corporation" />
+          <input style={boundInventoryId ? { ...inputStyle, background: '#f8f7f5', color: '#888784', cursor: 'not-allowed' } : inputStyle} value={company} onChange={e => setCompany(e.target.value)} placeholder="Acme Corporation" readOnly={!!boundInventoryId} />
+          {boundInventoryId && <div style={{ fontSize: 11, color: '#0F6E56', marginTop: 6 }}>🔗 Linked to your {company || 'GHG'} {reportingYear} GHG inventory — company and year are set there.</div>}
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={labelStyle}>Primary sector</label>
@@ -344,7 +369,7 @@ export default function Scope3Dashboard() {
         </div>
         <div>
           <label style={labelStyle}>Reporting year</label>
-          <select style={inputStyle} value={reportingYear} onChange={e => setReportingYear(Number(e.target.value))}>
+          <select style={boundInventoryId ? { ...inputStyle, background: '#f8f7f5', color: '#888784', cursor: 'not-allowed' } : inputStyle} value={reportingYear} onChange={e => setReportingYear(Number(e.target.value))} disabled={!!boundInventoryId}>
             {[2022, 2023, 2024, 2025].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
