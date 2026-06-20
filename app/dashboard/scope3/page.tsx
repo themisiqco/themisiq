@@ -112,6 +112,8 @@ export default function Scope3Dashboard() {
   const [boundInventoryId, setBoundInventoryId] = useState<string | null>(null)
   const [inventoryList, setInventoryList] = useState<Array<{ id: string; company_name: string; reporting_year: number; updated_at: string }>>([])
   const [bindChecked, setBindChecked] = useState(false) // have we resolved bind status yet?
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
 
   // ─── Supplier Portal bridge (pull allocated Cat 1 from campaigns) ────────────
   interface CatOneLine { supplier_id: string; supplier_name: string; method: 'supplier-specific' | 'spend-based'; data_quality: string; value_mt: number; basis: string; allocation_method?: string }
@@ -335,6 +337,35 @@ export default function Scope3Dashboard() {
     medium: { label: 'Activity data', color: '#0C447C', bg: '#E6F1FB' },
     low: { label: 'Spend-based', color: '#ba7517', bg: '#FEF3E2' },
   }
+
+  // Persist the bound Scope 3 record. Upsert on inventory_id so re-saves update
+  // the existing row rather than erroring on the unique FK.
+  const saveScope3 = async () => {
+    setSaving(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const uid = session?.user?.id
+      if (!uid || !boundInventoryId) return
+      const { error } = await supabase.from('scope3_inventories').upsert({
+        user_id: uid,
+        inventory_id: boundInventoryId,
+        sector,
+        currency,
+        revenue_millions: (revenue || 0) / 1_000_000, // raw -> millions
+        cat_data: catData,
+        total_scope3_tco2e: totalScope3,
+        factor_basis: 'DEFRA/Exiobase (spend-based) · GHG Protocol category methodologies (activity-based)',
+        status: 'confirmed',
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'inventory_id' })
+      if (error) { console.error('Scope 3 save failed:', error); alert('Save failed: ' + error.message); return }
+      setSaved(true)
+    } finally { setSaving(false) }
+  }
+
+  // Re-arm the Save button whenever saved inputs change after a save. Centralised
+  // here rather than scattered across every catData/sector/currency/revenue setter.
+  useEffect(() => { setSaved(false) }, [catData, sector, currency, revenue])
 
   const generateExport = () => {
     const rows = [
@@ -807,6 +838,9 @@ export default function Scope3Dashboard() {
               <span style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>I confirm that the data entered is accurate to the best of my knowledge. I understand that spend-based estimates carry inherent uncertainty and should be disclosed as such in external reports.</span>
             </label>
           </div>
+          <button onClick={() => dataConfirmed && saveScope3()} disabled={!dataConfirmed || !boundInventoryId || saving} style={{ fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', marginRight: 12, cursor: (dataConfirmed && boundInventoryId && !saving) ? 'pointer' : 'not-allowed', opacity: (dataConfirmed && boundInventoryId && !saving) ? 1 : 0.4 }}>
+            {saving ? 'Saving…' : saved ? '✓ Saved to your inventory' : 'Save Scope 3 to inventory'}
+          </button>
           <button onClick={() => dataConfirmed && generateExport()} style={{ fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: dataConfirmed ? 'pointer' : 'not-allowed', opacity: dataConfirmed ? 1 : 0.4 }}>
             ⬇ Download Scope 3 Inventory (CSV)
           </button>
