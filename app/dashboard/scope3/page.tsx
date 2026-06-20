@@ -110,6 +110,8 @@ export default function Scope3Dashboard() {
   const [openInfo, setOpenInfo] = useState<Record<string, boolean>>({})
   const [dataConfirmed, setDataConfirmed] = useState(false)
   const [boundInventoryId, setBoundInventoryId] = useState<string | null>(null)
+  const [inventoryList, setInventoryList] = useState<Array<{ id: string; company_name: string; reporting_year: number; updated_at: string }>>([])
+  const [bindChecked, setBindChecked] = useState(false) // have we resolved bind status yet?
 
   // ─── Supplier Portal bridge (pull allocated Cat 1 from campaigns) ────────────
   interface CatOneLine { supplier_id: string; supplier_name: string; method: 'supplier-specific' | 'spend-based'; data_quality: string; value_mt: number; basis: string; allocation_method?: string }
@@ -148,27 +150,47 @@ export default function Scope3Dashboard() {
     return () => { active = false }
   }, [])
 
-  // Bind to a GHG inventory when opened with ?inventoryId= (from the GHG wizard's
-  // export step). Prefills + locks company/year so the two records stay aligned.
+  // Load a GHG inventory and prefill + lock company/year so the two records stay
+  // aligned. Single code path used by both the ?inventoryId= URL effect and the
+  // manual picker. No navigation — just binds state in place.
+  const bindToInventory = async (id: string) => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    const { data: row } = await supabase
+      .from('ghg_inventories')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle()
+    if (!row) return // no row -> stays unbound; the picker gate handles it
+    setBoundInventoryId(id)
+    setCompany(row.company_name)
+    setReportingYear(row.reporting_year)
+    setRevenue((row.revenue_millions ?? 0) * 1_000_000) // millions -> raw
+  }
+
+  // On mount: if opened with ?inventoryId= (from the GHG wizard's export step),
+  // bind to it. Otherwise load the user's inventories so they can pick one — the
+  // calculator cannot be used unbound (option 2).
   useEffect(() => {
-    let active = true
     ;(async () => {
+      // Always load the user's inventories so the picker has its list ready even
+      // when an id-bind fails (bad/foreign/deleted id) — avoids an empty picker.
+      const loadList = (async () => {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
+        const { data } = await supabase
+          .from('ghg_inventories')
+          .select('id, company_name, reporting_year, updated_at')
+          .order('updated_at', { ascending: false })
+        if (data) setInventoryList(data)
+      })()
+      // Attempt the id-bind in parallel; failure (no row) falls through to picker.
       const id = new URLSearchParams(window.location.search).get('inventoryId')
-      if (!id) return // no id -> no-id picker is a later edit; leave current behavior
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
-      const { data: row } = await supabase
-        .from('ghg_inventories')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle()
-      if (!active || !row) return // no row -> treat as unbound, fields stay editable
-      setBoundInventoryId(id)
-      setCompany(row.company_name)
-      setReportingYear(row.reporting_year)
-      setRevenue((row.revenue_millions ?? 0) * 1_000_000) // millions -> raw
+      const bind = id ? bindToInventory(id) : Promise.resolve()
+      // Flip the gate only after BOTH resolve, so the picker never flashes empty.
+      await Promise.all([loadList, bind])
+      setBindChecked(true)
     })()
-    return () => { active = false }
   }, [])
 
   const pullFromPortal = async (campaignId: string) => {
@@ -800,6 +822,33 @@ export default function Scope3Dashboard() {
     </div>
   )
 
+  // Gate shown when no inventory is bound (no ?inventoryId= and nothing picked yet).
+  // The Scope 3 calculator must link to a GHG inventory before it can be used.
+  const renderPicker = () => (
+    <div style={{ maxWidth: 640, margin: '0 auto', padding: '3rem 2.5rem' }}>
+      <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '2rem' }}>
+        <h2 style={sectionHead}>Which inventory is this Scope 3 for?</h2>
+        {inventoryList.length > 0 ? (
+          <>
+            <p style={sectionSub}>Your Scope 3 inventory links to one of your GHG inventories so the company and reporting year stay aligned across both records. Pick which one this is for.</p>
+            <label style={labelStyle}>GHG inventory</label>
+            <select style={inputStyle} defaultValue="" onChange={e => { if (e.target.value) bindToInventory(e.target.value) }}>
+              <option value="" disabled>Select an inventory…</option>
+              {inventoryList.map(inv => (
+                <option key={inv.id} value={inv.id}>{(inv.company_name || 'Untitled')} — {inv.reporting_year}</option>
+              ))}
+            </select>
+          </>
+        ) : (
+          <>
+            <p style={sectionSub}>You need a saved GHG inventory first. The Scope 3 calculator links to a GHG inventory so your company and reporting year stay consistent across both records.</p>
+            <a href="/dashboard/ghg" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Create a GHG inventory →</a>
+          </>
+        )}
+      </div>
+    </div>
+  )
+
   const steps = [renderStep0, renderStep1, renderStep2, renderStep3, renderStep4]
   const activeCatCount = CATEGORIES.filter(c => catData[c.id]?.included).length
 
@@ -824,6 +873,11 @@ export default function Scope3Dashboard() {
           )}
         </div>
       </div>
+      {!bindChecked ? (
+        <div style={{ maxWidth: 900, margin: '0 auto', padding: '4rem 2.5rem', textAlign: 'center', color: '#888784', fontSize: 13 }}>Loading your inventory…</div>
+      ) : !boundInventoryId ? (
+        renderPicker()
+      ) : (<>
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2.5rem', overflowX: 'auto' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex' }}>
           {STEP_NAMES.map((name, i) => (
@@ -870,6 +924,7 @@ export default function Scope3Dashboard() {
           )}
         </div>
       </div>
+      </>)}
       <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
     </div>
   )
