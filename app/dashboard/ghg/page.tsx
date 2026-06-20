@@ -1062,6 +1062,8 @@ const searchParams = useSearchParams()
   const [dataConfirmed, setDataConfirmed] = useState(false)
   const [mode, setMode] = useState<'loading' | 'list' | 'wizard'>('loading')
   const [inventoryList, setInventoryList] = useState<Array<{ id: string; company_name: string; reporting_year: number; updated_at: string }>>([])
+  const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([])
+  const [addingNewCompany, setAddingNewCompany] = useState(false)
   const isPaid = useEntitlement('ghg')
   const CONCIERGE_DEV = useHasConcierge()   // concierge gate: true when the customer holds any concierge tier entitlement
   const { allowance: locationAllowance, loading: allowanceLoading } = useGhgLocationAllowance()
@@ -1085,6 +1087,15 @@ const searchParams = useSearchParams()
       }
     })
   }, [searchParams])
+
+  // Load the user's companies for the select-or-create company field.
+  const loadCompanies = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    const { data } = await supabase.from('companies').select('id, name').order('name')
+    setCompanies(data ?? [])
+  }
+  useEffect(() => { loadCompanies() }, [])
 
   const startNewInventory = () => {
     setInventoryId(null)
@@ -1420,6 +1431,8 @@ if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.uni
 
   const STEPS = ['Reporting frameworks', 'Company setup', 'Energy & fuel data', 'Additional data', 'Review & workings', 'Export reports', 'Audit trail']
   const activeFrameworks = FRAMEWORKS.filter(f => inventory.selected_frameworks.includes(f.id))
+  // Lock the company field once an inventory is saved AND linked to a company.
+  const companyLocked = !!inventoryId && !!inventory.company_id
 
   const handleSave = async () => {
     if (isSaving) return
@@ -1482,6 +1495,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
       if (dup) { alert(`You already have a ${inventory.reporting_year} inventory for "${inventory.company_name}". Open it from "Your inventories" instead of creating a duplicate.`); return }
       const { data, error } = await supabase.from('ghg_inventories').insert(payload).select().single(); if (error) { alert('Save failed: ' + error.message); console.error(error); return }
       if (data) setInventoryId(data.id)
+      loadCompanies() // refresh dropdown in case resolve-or-create added a new company
     }
     setSaved(true)
     } finally { setIsSaving(false) }
@@ -1535,7 +1549,39 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
       <p style={sectionSub}>This information appears across all your selected reports. Enter it once here.</p>
       <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 20, maxWidth: 560 }}>
         <Field label="Company legal name" hint="Appears on all report submissions">
-          <input value={inventory.company_name} onChange={e => setInventory(i => ({...i, company_name: e.target.value}))} placeholder="e.g. Acme Industries Inc." style={inputStyle} />
+          {companyLocked ? (
+            <>
+              <input value={inventory.company_name} readOnly style={{ ...inputStyle, background: '#f8f7f5', color: '#888784', cursor: 'not-allowed' }} />
+              <div style={{ fontSize: 11, color: '#888784', marginTop: 6 }}>Linked company — set when this inventory was created.</div>
+            </>
+          ) : (addingNewCompany || companies.length === 0) ? (
+            <>
+              <input value={inventory.company_name} onChange={e => setInventory(i => ({...i, company_name: e.target.value, company_id: null}))} placeholder="e.g. Acme Industries Inc." style={inputStyle} />
+              {companies.length > 0 && (
+                <div style={{ fontSize: 11, marginTop: 6 }}>
+                  <button
+            type="button"
+            onClick={() => setAddingNewCompany(false)}
+            style={{ background: 'none', border: 'none', padding: 0, color: '#0F6E56', cursor: 'pointer', fontSize: 11, font: 'inherit' }}
+          >← choose an existing company</button>
+                </div>
+              )}
+            </>
+          ) : (
+            <select
+              value={inventory.company_id ?? ''}
+              onChange={e => {
+                const v = e.target.value
+                if (v === '__new__') { setAddingNewCompany(true); setInventory(i => ({...i, company_id: null, company_name: ''})) }
+                else if (v) { const c = companies.find(c => c.id === v); if (c) setInventory(i => ({...i, company_id: c.id, company_name: c.name})) }
+              }}
+              style={inputStyle}
+            >
+              <option value="">Select a company…</option>
+              {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <option value="__new__">+ Add a new company</option>
+            </select>
+          )}
         </Field>
         <Field label="Reporting year">
           <select value={inventory.reporting_year} onChange={e => setInventory(i => ({...i, reporting_year: Number(e.target.value)}))} style={inputStyle}>
