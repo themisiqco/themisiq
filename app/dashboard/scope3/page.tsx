@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Nav from '../../components/Nav'
 import { supabase } from '../../../lib/supabase'
 import { useEntitlement } from '../../../lib/useEntitlement'
@@ -114,6 +114,7 @@ export default function Scope3Dashboard() {
   const [bindChecked, setBindChecked] = useState(false) // have we resolved bind status yet?
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const justRestored = useRef(false) // suppress the saved-reset effect for one restore pass
 
   // ─── Supplier Portal bridge (pull allocated Cat 1 from campaigns) ────────────
   interface CatOneLine { supplier_id: string; supplier_name: string; method: 'supplier-specific' | 'spend-based'; data_quality: string; value_mt: number; basis: string; allocation_method?: string }
@@ -168,6 +169,24 @@ export default function Scope3Dashboard() {
     setCompany(row.company_name)
     setReportingYear(row.reporting_year)
     setRevenue((row.revenue_millions ?? 0) * 1_000_000) // millions -> raw
+    // Restore any previously saved Scope 3 work for this inventory.
+    const { data: s3 } = await supabase
+      .from('scope3_inventories')
+      .select('*')
+      .eq('inventory_id', id)
+      .maybeSingle()
+    if (s3) {
+      justRestored.current = true
+      if (s3.sector) setSector(s3.sector)
+      if (s3.currency) setCurrency(s3.currency)
+      if (s3.revenue_millions != null) setRevenue(s3.revenue_millions * 1_000_000) // overrides ghg-derived revenue (user may have edited it)
+      if (s3.cat_data) setCatData(s3.cat_data as Record<string, CategoryData>)
+      setMaterialCats(
+        CATEGORIES.filter(c => (s3.cat_data as any)?.[c.id]?.included).map(c => c.num)
+      )
+      setSaved(true) // it IS saved
+      setStep(3)     // land on Results, not Setup
+    }
   }
 
   // On mount: if opened with ?inventoryId= (from the GHG wizard's export step),
@@ -365,7 +384,10 @@ export default function Scope3Dashboard() {
 
   // Re-arm the Save button whenever saved inputs change after a save. Centralised
   // here rather than scattered across every catData/sector/currency/revenue setter.
-  useEffect(() => { setSaved(false) }, [catData, sector, currency, revenue])
+  useEffect(() => {
+    if (justRestored.current) { justRestored.current = false; return }
+    setSaved(false)
+  }, [catData, sector, currency, revenue])
 
   const generateExport = () => {
     const rows = [
