@@ -612,7 +612,7 @@ interface CoverageResolution {
   acknowledgedAt: string          // ISO timestamp
 }
 interface Inventory {
-  company_name: string; reporting_year: number; revenue_millions: number
+  company_name: string; company_id?: string | null; reporting_year: number; revenue_millions: number
   employee_count: number; boundary_approach: string
   california_nexus: boolean
   fiscal_year_end_month: number
@@ -1043,7 +1043,7 @@ const searchParams = useSearchParams()
   }
   const defaultFrameworks = pack && packFrameworks[pack] ? packFrameworks[pack] : ['sb253']
   const [inventory, setInventory] = useState<Inventory>({
-    company_name: '', reporting_year: 2024, revenue_millions: 0, employee_count: 0,
+    company_name: '', company_id: null, reporting_year: 2024, revenue_millions: 0, employee_count: 0,
     boundary_approach: 'operational_control', california_nexus: false,
     fiscal_year_end_month: 12,
     coverage_resolutions: [],
@@ -1091,7 +1091,7 @@ const searchParams = useSearchParams()
     setSaved(false)
     setStep(0)
     setInventory({
-      company_name: '', reporting_year: 2024, revenue_millions: 0, employee_count: 0,
+      company_name: '', company_id: null, reporting_year: 2024, revenue_millions: 0, employee_count: 0,
       boundary_approach: 'operational_control', california_nexus: false,
       fiscal_year_end_month: 12,
       coverage_resolutions: [],
@@ -1129,6 +1129,7 @@ const searchParams = useSearchParams()
         setInventory(inv => ({
           ...inv,
           company_name: data.company_name || '',
+          company_id: data.company_id || null,
           reporting_year: data.reporting_year || inv.reporting_year,
           fiscal_year_end_month: data.fiscal_year_end_month || 12,
           coverage_resolutions: data.coverage_resolutions || [],
@@ -1426,11 +1427,35 @@ if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.uni
     try {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return
+    // Resolve the company_id for this inventory's company_name.
+    let resolvedCompanyId = inventory.company_id || null
+    const trimmedName = (inventory.company_name || '').trim()
+    if (!resolvedCompanyId && trimmedName) {
+      // look up an existing company by (user_id, name); reuse if present
+      const { data: existing } = await supabase
+        .from('companies')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .eq('name', trimmedName)
+        .maybeSingle()
+      if (existing) {
+        resolvedCompanyId = existing.id
+      } else {
+        const { data: created, error: cErr } = await supabase
+          .from('companies')
+          .insert({ user_id: session.user.id, name: trimmedName })
+          .select('id')
+          .single()
+        if (cErr) { alert('Could not save company: ' + cErr.message); return }
+        resolvedCompanyId = created.id
+      }
+    }
     const payload = {
       user_id: session.user.id,
       reporting_year: inventory.reporting_year,
       fiscal_year_end_month: inventory.fiscal_year_end_month,
       company_name: inventory.company_name,
+      company_id: resolvedCompanyId,
       revenue_millions: inventory.revenue_millions,
       employee_count: inventory.employee_count,
       boundary_approach: inventory.boundary_approach,
@@ -1452,7 +1477,8 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
     if (inventoryId) {
       const { error } = await supabase.from('ghg_inventories').update(payload).eq('id', inventoryId); if (error) { alert('Save failed: ' + error.message); console.error(error); return }
     } else {
-      const { data: dup } = await supabase.from('ghg_inventories').select('id').eq('company_name', inventory.company_name).eq('reporting_year', inventory.reporting_year).maybeSingle()
+      const dupQuery = supabase.from('ghg_inventories').select('id').eq('reporting_year', inventory.reporting_year)
+      const { data: dup } = await (resolvedCompanyId ? dupQuery.eq('company_id', resolvedCompanyId) : dupQuery.eq('company_name', inventory.company_name)).maybeSingle()
       if (dup) { alert(`You already have a ${inventory.reporting_year} inventory for "${inventory.company_name}". Open it from "Your inventories" instead of creating a duplicate.`); return }
       const { data, error } = await supabase.from('ghg_inventories').insert(payload).select().single(); if (error) { alert('Save failed: ' + error.message); console.error(error); return }
       if (data) setInventoryId(data.id)
