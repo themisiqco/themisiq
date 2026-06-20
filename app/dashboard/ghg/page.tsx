@@ -137,9 +137,9 @@ const EF_SOURCES = {
   electricity: 'US EPA eGRID2023 (US) / ECCC v3.0 (CA) / DEFRA 2025 (UK) / EEA 2023 (EU)',
   residual_us: 'Green-e Residual Mix 2025 (2023 data, publ. 2026-01-29, CRS) — residual CO₂; eGRID2023 Rev2 (publ. 2025-06-12) CH₄/N₂O. Green-e factors out Green-e-certified voluntary sales (the only published US residual source per CRS).',
   residual_eu: 'AIB European Residual Mixes 2024 (publ. 2025-05-30, Grexel/AIB; Ecoinvent CO₂ inputs) — combined CO₂e, gCO₂/kWh.',
-  gwp_ar4: 'IPCC AR4 (2007) — applied for California SB 253, consistent with CARB AB 32 / Mandatory Reporting Regulation',
-  gwp_ar5: 'IPCC AR5 (2014) — GHG Protocol baseline; available for manual selection, not the default for any current framework',
-  gwp_ar6: 'IPCC AR6 (2021) — applied by default for CDP, ESRS E1, GRI 305, EcoVadis, IFRS S2',
+  gwp_ar4: 'IPCC AR4 (2007) — selectable alternate; aligns with CARB AB 32 / Mandatory Reporting Regulation, but not the default for any current framework',
+  gwp_ar5: 'IPCC AR5 (2014) — GHG Protocol baseline; selectable alternate, not the default for any current framework',
+  gwp_ar6: 'IPCC AR6 (2021) — applied by default across all frameworks (SB 253, CDP, ESRS E1, GRI 305, EcoVadis, IFRS S2)',
 }
 
 const GRID_EF: Record<string, Record<number, number>> = {
@@ -351,7 +351,7 @@ const GRID_REGIONS_US = US_STATES.map(s => { const y = GRID_EF['US_' + s]; const
 const FRAMEWORKS = [
   {
     id: 'sb253', name: 'SB 253', full: 'California SB 253 — CARB', color: '#B91C1C', bg: '#FCEBEB',
-    gwp: 'AR4', deadline: 'August 10, 2026',
+    gwp: 'AR6', deadline: 'August 10, 2026',
     desc: 'Scope 1 + 2 disclosure for California-nexus companies with $1B+ global revenue',
     requires: ['revenue_millions', 'california_nexus'],
     intensity_denominator: 'revenue',
@@ -727,7 +727,7 @@ function calcGas(ef: { co2: number; ch4: number; n2o: number }, amount: number, 
   }
 }
 
-function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR4', year: number = 2024) {
+function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: number = 2024) {
   let s1_stationary = 0, s1_mobile = 0
   const gases = { co2: 0, ch4: 0, n2o: 0 }
   if (loc.has_natural_gas && loc.natural_gas_amount > 0) {
@@ -778,7 +778,7 @@ function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR4', year: numbe
   return { s1_stationary, s1_mobile, s1_fugitive, s1_total, s2_location, s2_market, gases, biogenic: loc.biogenic_co2_mt }
 }
 
-function calcInventory(locations: Location[], gwpVersion: GwpVersion = 'AR4', year: number = 2024) {
+function calcInventory(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024) {
   return locations.reduce((acc, loc) => {
     const c = calcLocation(loc, gwpVersion, year)
     return {
@@ -793,7 +793,7 @@ function calcInventory(locations: Location[], gwpVersion: GwpVersion = 'AR4', ye
   }, { s1_total: 0, s2_location: 0, s2_market: 0, co2: 0, ch4: 0, n2o: 0, biogenic: 0 })
 }
 
-function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR4', year: number = 2024, resolutions: CoverageResolution[] = []) {
+function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024, resolutions: CoverageResolution[] = []) {
   const rows: any[] = []
   const pushFuel = (loc: Location, source: string, scope: number, activity: number, unit: string, ef: { co2: number; ch4: number; n2o: number }) => {
     const g = calcGas(ef, activity, gwpVersion)
@@ -904,8 +904,9 @@ KEY TECHNICAL FACTS:
 - MMBtu = million British thermal units of natural gas
 - kWh = kilowatt hours of electricity (always shown on utility bills)
 - eGRID = US EPA electricity grid regions with different emission factors
-- AR4 GWP = IPCC 4th Assessment Report global warming potentials (used by CARB SB 253 and CDP)
-- AR5 GWP = IPCC 5th Assessment Report (used by ESRS E1 and GRI 305, slightly different values)
+- AR4 GWP = IPCC 4th Assessment Report global warming potentials (selectable alternate; not the default basis)
+- AR5 GWP = IPCC 5th Assessment Report (selectable alternate; not the default basis)
+- AR6 GWP = IPCC 6th Assessment Report global warming potentials (ThemisIQ's default basis, applied across all frameworks)
 - Location-based Scope 2 = uses grid average emission factors
 - Market-based Scope 2 = accounts for renewable energy certificates (RECs) and PPAs
 - PPA = Power Purchase Agreement (contract for renewable electricity)
@@ -925,7 +926,7 @@ COMMON QUESTIONS AND ANSWERS:
 - "What if I don't have 12 months of bills?" = Use what you have and annualize (e.g. 9 months of data × 12/9). Note this in your workings.
 - "Multiple meters at one location?" = Add them all together for that location's total.
 - "What's the difference between stationary and mobile diesel?" = Stationary = diesel in generators, boilers, heating equipment that doesn't move. Mobile = diesel in vehicles and mobile equipment.
-- "Why are AR4 and AR5 numbers different?" = The IPCC updated global warming potential values between reports. CH4 (methane) increased from 25x to 28x CO2e. For most companies the difference is small.
+- "Which GWP basis does ThemisIQ use?" = ThemisIQ applies IPCC AR6 (2021) global warming potentials by default across all frameworks; AR4 and AR5 remain available as selectable alternates. The IPCC revises these values between assessments — methane's 100-year GWP is 25 under AR4 and roughly 28-30 under AR5 and AR6 — but for most companies the difference is small.
 - "What's an intensity ratio?" = Emissions per unit of economic output (e.g. mtCO2e per $million revenue). Allows comparison across companies of different sizes.
 - "Do I need a third-party verifier?" = SB 253 requires limited assurance from an accredited verifier. ThemisIQ's assurance-ready export is designed to make that process faster and cheaper.
 - "Can I submit the CSV directly to CARB?" = The CSV is your working document. CARB will have a specific submission portal — ThemisIQ's export gives you all the data you need to complete that submission.
@@ -1438,13 +1439,14 @@ if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.uni
       prior_year_s2: inventory.prior_year_s2,
       selected_frameworks: inventory.selected_frameworks,
       locations_data: inventory.locations,
-      scope1_total: totals_ar4.s1_total,
-      scope2_location_total: totals_ar4.s2_location,
-      scope2_market_total: totals_ar4.s2_market,
-      scope1_intensity: inventory.revenue_millions > 0 ? totals_ar4.s1_total / inventory.revenue_millions : 0,
-      scope2_intensity: inventory.revenue_millions > 0 ? totals_ar4.s2_location / inventory.revenue_millions : 0,
+      scope1_total: totals_ar6.s1_total,
+      scope2_location_total: totals_ar6.s2_location,
+      scope2_market_total: totals_ar6.s2_market,
+      scope1_intensity: inventory.revenue_millions > 0 ? totals_ar6.s1_total / inventory.revenue_millions : 0,
+      scope2_intensity: inventory.revenue_millions > 0 ? totals_ar6.s2_location / inventory.revenue_millions : 0,
+      gwp_version: 'AR6',
       status: 'draft',
-workings: buildWorkings(inventory.locations, 'AR4', inventory.reporting_year, coverageResolutions),
+workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, coverageResolutions),
       updated_at: new Date().toISOString(),
     }
     if (inventoryId) {
@@ -1634,7 +1636,7 @@ workings: buildWorkings(inventory.locations, 'AR4', inventory.reporting_year, co
 
   const renderStep2 = () => {
     const loc = inventory.locations[activeLocation]
-    const calc = calcLocation(loc, 'AR4', inventory.reporting_year)
+    const calc = calcLocation(loc, 'AR6', inventory.reporting_year)
     const detectedRegion = [...GRID_REGIONS_CA, ...GRID_REGIONS_US].find(r => r.value === loc.grid_region)
     return (
       <div>
@@ -1806,15 +1808,15 @@ workings: buildWorkings(inventory.locations, 'AR4', inventory.reporting_year, co
                   <span style={{ fontSize: 12, color, fontWeight: bold ? 700 : 400 }}>{val.toFixed(2)} mt</span>
                 </div>
               ))}
-              <div style={{ marginTop: 10, fontSize: 11, color: '#9ca3af', lineHeight: 1.6 }}>EPA 2024 (US) · ECCC v3.0 (CA) · DEFRA 2025 (UK) · IPCC AR4 GWP · eGRID 2023</div>
+              <div style={{ marginTop: 10, fontSize: 11, color: '#9ca3af', lineHeight: 1.6 }}>EPA 2024 (US) · ECCC v3.0 (CA) · DEFRA 2025 (UK) · IPCC AR6 GWP · eGRID 2023</div>
               {validateCompleteness(loc).map((w, i) => (
                 <div key={i} style={{ marginTop: 8, background: "rgba(254,243,226,0.1)", border: "0.5px solid #fcd34d", borderRadius: 6, padding: "6px 10px", fontSize: 10, color: "#fcd34d", lineHeight: 1.5 }}>{w}</div>
               ))}
             </div>
             <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem' }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>All locations</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#7425e3' }}>{totals_ar4.s1_total.toFixed(2)} mt Scope 1</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#0F6E56', marginTop: 4 }}>{totals_ar4.s2_location.toFixed(2)} mt Scope 2</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#7425e3' }}>{totals_ar6.s1_total.toFixed(2)} mt Scope 1</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#0F6E56', marginTop: 4 }}>{totals_ar6.s2_location.toFixed(2)} mt Scope 2</div>
             </div>
           </div>
         </div>
