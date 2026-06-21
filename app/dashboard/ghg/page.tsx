@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { supabase } from '../../../lib/supabase'
+import { buildMonthlyEmissions } from '../../../lib/ghg/monthlyEmissions'
 import { useEntitlement, useHasConcierge, useGhgLocationAllowance } from '../../../lib/useEntitlement'
 import { generateAssurancePDF } from '../../../lib/assurancePdf'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -1489,15 +1490,58 @@ if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.uni
 workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, coverageResolutions),
       updated_at: new Date().toISOString(),
     }
+    let savedId: string | null = inventoryId
     if (inventoryId) {
-      const { error } = await supabase.from('ghg_inventories').update(payload).eq('id', inventoryId); if (error) { alert('Save failed: ' + error.message); console.error(error); return }
+      const { error } = await supabase.from('ghg_inventories').update(payload).eq('id', inventoryId)
+      if (error) { alert('Save failed: ' + error.message); console.error(error); return }
     } else {
       const dupQuery = supabase.from('ghg_inventories').select('id').eq('reporting_year', inventory.reporting_year)
       const { data: dup } = await (resolvedCompanyId ? dupQuery.eq('company_id', resolvedCompanyId) : dupQuery.eq('company_name', inventory.company_name)).maybeSingle()
       if (dup) { alert(`You already have a ${inventory.reporting_year} inventory for "${inventory.company_name}". Open it from "Your inventories" instead of creating a duplicate.`); return }
-      const { data, error } = await supabase.from('ghg_inventories').insert(payload).select().single(); if (error) { alert('Save failed: ' + error.message); console.error(error); return }
-      if (data) setInventoryId(data.id)
+      const { data, error } = await supabase.from('ghg_inventories').insert(payload).select().single()
+      if (error) { alert('Save failed: ' + error.message); console.error(error); return }
+      if (data) { savedId = data.id; setInventoryId(data.id) }
       loadCompanies() // refresh dropdown in case resolve-or-create added a new company
+    }
+    // Additive monthly-emissions write. Annual save above is already committed and
+    // authoritative; a monthly failure here must NOT escape or skip setSaved(true).
+    try {
+      if (savedId) {
+        const { slices } = buildMonthlyEmissions(
+          inventory.locations as any,   // source_docs[].extracted[] live on these
+          inventory.reporting_year,
+          { calcGas, pickEF, getGridFactor },
+          'AR6'
+        )
+        // idempotent: replace this inventory's monthly rows
+        const del = await supabase.from('ghg_monthly_emissions').delete().eq('inventory_id', savedId)
+        if (del.error) throw del.error
+        if (slices.length > 0) {
+          const rows = slices.map(s => ({
+            user_id: session.user.id,
+            inventory_id: savedId,
+            company_id: resolvedCompanyId,
+            reporting_year: s.reporting_year,
+            period_month: s.period_month,
+            scope: s.scope,
+            location_name: s.location_name,
+            fuel_type: s.fuel_type,
+            activity_value: s.activity_value,
+            activity_unit: s.activity_unit,
+            tco2e: s.tco2e,
+            gwp_version: s.gwp_version,
+            ef_source: s.ef_source,
+            source_doc_id: null,
+            period_start: s.period_start,
+            period_end: s.period_end,
+            pct_in_month: s.pct_in_month,
+          }))
+          const ins = await supabase.from('ghg_monthly_emissions').insert(rows)
+          if (ins.error) throw ins.error
+        }
+      }
+    } catch (e) {
+      console.error('Monthly emissions write failed (annual save committed, unaffected):', e)
     }
     setSaved(true)
     } finally { setIsSaving(false) }
