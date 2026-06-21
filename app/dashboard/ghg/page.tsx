@@ -2368,7 +2368,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
         <div style={{ maxWidth: 760, margin: '0 auto', padding: '3rem 1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: 12 }}>
             <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', fontWeight: 400, color: '#0d0d0d', margin: 0 }}>Your inventories</h1>
-            <button onClick={startNewInventory} style={{ fontSize: 13, fontWeight: 500, padding: '10px 20px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', cursor: 'pointer' }}>+ New inventory</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <a href="/dashboard/ghg/trends" style={{ fontSize: 14, fontWeight: 600, color: '#7425e3', textDecoration: 'none', whiteSpace: 'nowrap' }}>View trends →</a>
+              <button onClick={startNewInventory} style={{ fontSize: 13, fontWeight: 500, padding: '10px 20px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', cursor: 'pointer' }}>+ New inventory</button>
+            </div>
           </div>
           {inventoryList.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem', color: '#888784', fontSize: 14 }}>No inventories yet. Click &ldquo;New inventory&rdquo; to begin.</div>
@@ -2400,9 +2403,12 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           <span style={{ fontSize: 12, color: '#888784' }}>/ GHG Inventory</span>
           {activeFrameworks.length > 0 && <span style={{ fontSize: 11, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 99, padding: '2px 10px', color: '#555553' }}>{activeFrameworks.map(f => f.name).join(' · ')}</span>}
         </div>
-        <button onClick={handleSave} disabled={isSaving} style={{ fontSize: 14, padding: '10px 24px', borderRadius: 8, background: saved ? '#E1F5EE' : 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', border: saved ? '1px solid #0F6E56' : 'none', cursor: 'pointer', color: saved ? '#0F6E56' : '#0d0d0d', fontWeight: saved ? 500 : 700 }}>
-          {isSaving ? 'Saving…' : saved ? '✓ Saved' : 'Save draft'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <a href="/dashboard/ghg/trends" style={{ fontSize: 13, fontWeight: 600, color: '#7425e3', textDecoration: 'none', marginRight: 16, whiteSpace: 'nowrap' }}>View trends →</a>
+          <button onClick={handleSave} disabled={isSaving} style={{ fontSize: 14, padding: '10px 24px', borderRadius: 8, background: saved ? '#E1F5EE' : 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', border: saved ? '1px solid #0F6E56' : 'none', cursor: 'pointer', color: saved ? '#0F6E56' : '#0d0d0d', fontWeight: saved ? 500 : 700 }}>
+            {isSaving ? 'Saving…' : saved ? '✓ Saved' : 'Save draft'}
+          </button>
+        </div>
       </nav>
 
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2rem', display: 'flex', overflowX: 'auto' as const }}>

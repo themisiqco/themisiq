@@ -93,6 +93,7 @@ export default function TrendsPage() {
 
   return (
     <div style={{ padding: '2rem', maxWidth: 960, margin: '0 auto' }}>
+      <a href="/dashboard/ghg" style={{ fontSize: 13, fontWeight: 600, color: '#7425e3', textDecoration: 'none', display: 'inline-block', marginBottom: 12 }}>← Back to GHG inventory</a>
       <h1 style={{ fontFamily: 'Georgia, serif', marginBottom: 4 }}>GHG Trends</h1>
       <p style={{ color: '#666', fontSize: 13, marginBottom: 20 }}>
         Emissions over time by scope. Location-based Scope 2.
