@@ -17,6 +17,7 @@
 import { useEffect, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer } from 'recharts'
 import { loadCompanySeries, type LoadSeriesResult } from '../../../../lib/ghg/loadSeries'
+import { loadMonthly, type LoadMonthlyResult } from '../../../../lib/ghg/loadMonthly'
 import { useEntitlement } from '../../../../lib/useEntitlement'
 
 // Brand palette for the three scopes.
@@ -27,6 +28,9 @@ export default function TrendsPage() {
   const [result, setResult] = useState<LoadSeriesResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null)
+  const [selectedYear, setSelectedYear] = useState<number | null>(null)
+  const [monthly, setMonthly] = useState<LoadMonthlyResult | null>(null)
+  const [monthlyLoading, setMonthlyLoading] = useState(false)
 
   useEffect(() => {
     loadCompanySeries().then((r) => {
@@ -35,6 +39,28 @@ export default function TrendsPage() {
       setLoading(false)
     })
   }, [])
+
+  // Resolve the in-scope company the same way the render does (find by id, else
+  // first). Done here (not via the `selected` const) because that const lives
+  // after the isPaid early-return, so an effect can't reference it (rules of hooks).
+  const selectedSeries =
+    result?.series.find((s) => s.companyId === selectedCompanyId) ?? result?.series[0] ?? null
+
+  // Default / reset the year to the company's latest annual year on company change.
+  useEffect(() => {
+    if (selectedSeries) setSelectedYear(selectedSeries.years.at(-1)?.year ?? null)
+  }, [selectedSeries?.companyId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch monthly rows for the selected company + year.
+  useEffect(() => {
+    if (selectedSeries?.companyId && selectedYear != null) {
+      setMonthlyLoading(true)
+      loadMonthly(selectedSeries.companyId, selectedYear).then((r) => {
+        setMonthly(r)
+        setMonthlyLoading(false)
+      })
+    }
+  }, [selectedSeries?.companyId, selectedYear])
 
   if (!isPaid) {
     return (
@@ -146,6 +172,60 @@ export default function TrendsPage() {
               <a href="/dashboard/scope3" style={{ color: '#ba7517', fontWeight: 600 }}>Complete Scope 3</a> to include it.
             </div>
           )}
+
+          {/* Monthly drill-down (concierge bill data) */}
+          <div style={{ marginTop: 28 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+              <h3 style={{ fontFamily: 'Georgia, serif', fontSize: 18, margin: 0 }}>Monthly detail</h3>
+              <select
+                value={selectedYear ?? ''}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                style={{ fontSize: 13, padding: '8px 12px', border: '0.5px solid #e8e7e4', borderRadius: 8, outline: 'none', boxSizing: 'border-box', background: '#fff' }}
+              >
+                {selected.years.map((y) => (
+                  <option key={y.year} value={y.year}>{y.year}</option>
+                ))}
+              </select>
+            </div>
+
+            {monthlyLoading && <p style={{ color: '#888', fontSize: 13 }}>Loading monthly data…</p>}
+
+            {!monthlyLoading && monthly && monthly.error && (
+              <p style={{ color: '#b91c1c', fontSize: 13 }}>Couldn&apos;t load monthly data: {monthly.error}</p>
+            )}
+
+            {!monthlyLoading && monthly && !monthly.error && monthly.buckets.length === 0 && (
+              <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 8, padding: '14px 16px', fontSize: 13, color: '#555' }}>
+                No monthly (utility-bill) data for {selectedYear}. Monthly detail appears
+                when you upload dated utility bills via the Concierge flow. Manually-entered
+                annual figures show in the yearly chart above.
+              </div>
+            )}
+
+            {!monthlyLoading && monthly && !monthly.error && monthly.buckets.length > 0 && (
+              <>
+                <div style={{ width: '100%', height: 300 }}>
+                  <ResponsiveContainer>
+                    <BarChart data={monthly.buckets} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e8e7e4" />
+                      <XAxis dataKey="monthLabel" tick={{ fontSize: 12, fill: '#555' }} />
+                      <YAxis tick={{ fontSize: 12, fill: '#555' }} label={{ value: 'tCO₂e', angle: -90, position: 'insideLeft', style: { fontSize: 12, fill: '#888' } }} />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="scope1" stackId="m" name="Scope 1" fill={COLORS.scope1} />
+                      <Bar dataKey="scope2" stackId="m" name="Scope 2 (location)" fill={COLORS.scope2} />
+                      <Bar dataKey="scope3" stackId="m" name="Scope 3" fill={COLORS.scope3} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <p style={{ marginTop: 8, fontSize: 11, color: '#888784', lineHeight: 1.6 }}>
+                  {monthly.measuredMonths} month{monthly.measuredMonths === 1 ? '' : 's'} with utility-bill data ·{' '}
+                  {monthly.totalTco2e.toLocaleString()} tCO₂e total. Months without dated bills are omitted —
+                  this is a partial, concierge-sourced view; the yearly chart above is authoritative.
+                </p>
+              </>
+            )}
+          </div>
         </>
       )}
     </div>
