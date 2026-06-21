@@ -197,7 +197,7 @@ export default function TrendsPage() {
                 />
                 <Tooltip />
                 <Legend />
-                <ReferenceLine y={selected.baselineScope12Total} stroke="#BA7517" strokeDasharray="4 4" label={{ value: 'baseline', position: 'right', fontSize: 11, fill: '#854F0B' }} />
+                <ReferenceLine y={selected.baselineScope12Total} stroke="#BA7517" strokeDasharray="4 4" label={{ value: 'baseline', position: 'insideTopRight', fontSize: 11, fill: '#854F0B' }} />
                 <Bar dataKey="scope1" stackId="emissions" name="Scope 1" fill={COLORS.scope1} />
                 <Bar dataKey="scope2" stackId="emissions" name="Scope 2 (location)" fill={COLORS.scope2} />
                 <Bar dataKey="scope3" stackId="emissions" name="Scope 3" fill={COLORS.scope3} />
@@ -230,7 +230,7 @@ export default function TrendsPage() {
                     <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#888784' }} />
                     <YAxis hide domain={['dataMin', 'dataMax']} />
                     <Tooltip />
-                    <Line type="monotone" dataKey="perRevenue" stroke="#7425e3" strokeWidth={2} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="perRevenue" stroke="#7425e3" strokeWidth={2} dot={{ r: 3 }} label={{ position: 'top', fontSize: 11, fill: '#7425e3', formatter: (v) => (typeof v === 'number' ? v.toFixed(1) : v) }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
