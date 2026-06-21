@@ -1507,12 +1507,17 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
     // authoritative; a monthly failure here must NOT escape or skip setSaved(true).
     try {
       if (savedId) {
-        const { slices } = buildMonthlyEmissions(
+        const { slices, skipped } = buildMonthlyEmissions(
           inventory.locations as any,   // source_docs[].extracted[] live on these
           inventory.reporting_year,
           { calcGas, pickEF, getGridFactor },
           'AR6'
         )
+        console.log('[monthly debug] savedId:', savedId)
+        console.log('[monthly debug] locations count:', inventory.locations?.length)
+        console.log('[monthly debug] slices produced:', slices.length)
+        console.log('[monthly debug] skipped:', JSON.stringify(skipped, null, 2))
+        console.log('[monthly debug] first slice:', slices[0] ? JSON.stringify(slices[0]) : 'none')
         // idempotent: replace this inventory's monthly rows
         const del = await supabase.from('ghg_monthly_emissions').delete().eq('inventory_id', savedId)
         if (del.error) throw del.error
@@ -1537,6 +1542,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             pct_in_month: s.pct_in_month,
           }))
           const ins = await supabase.from('ghg_monthly_emissions').insert(rows)
+          console.log('[monthly debug] insert error:', ins.error ? JSON.stringify(ins.error) : 'none', 'rows attempted:', rows.length)
           if (ins.error) throw ins.error
         }
       }
