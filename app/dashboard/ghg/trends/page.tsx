@@ -1,31 +1,37 @@
 'use client'
 
 /**
- * GHG multi-year trends — VERIFICATION SCAFFOLD (Phase 1 skeleton).
- * Calls loadCompanySeries() and dumps the assembled result as raw JSON so we can
- * confirm the data assembles correctly (grouping by company_id, year order,
- * baseline/YoY/vs-baseline, mixed Scope 3) BEFORE building charts on top.
+ * GHG multi-year trends — Phase 2 (chart view).
+ * Calls loadCompanySeries() and renders an emissions-over-time stacked bar chart
+ * per company (Scope 1 / 2 location-based / 3). Scope 3 is shown as a true gap
+ * (no segment) for years with no Scope 3 record — never a zero bar.
  *
  * 'use client' is required: the loader uses the browser supabase singleton and
  * relies on the user's auth session for RLS. A server component would see no
  * session and RLS would filter everything out.
  *
  * This is the real route (/dashboard/ghg/trends), gated on the ghg entitlement.
- * Phase 2 replaces the <pre> JSON dump with actual trend visuals.
+ * Trend view only — no target/pathway line (SBTi pathway is a later phase).
  */
 
 import { useEffect, useState } from 'react'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer } from 'recharts'
 import { loadCompanySeries, type LoadSeriesResult } from '../../../../lib/ghg/loadSeries'
 import { useEntitlement } from '../../../../lib/useEntitlement'
+
+// Brand palette for the three scopes.
+const COLORS = { scope1: '#7425e3', scope2: '#22ACFE', scope3: '#64FE3E' }
 
 export default function TrendsPage() {
   const isPaid = useEntitlement('ghg')
   const [result, setResult] = useState<LoadSeriesResult | null>(null)
   const [loading, setLoading] = useState(true)
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null)
 
   useEffect(() => {
     loadCompanySeries().then((r) => {
       setResult(r)
+      setSelectedCompanyId(r.series[0]?.companyId ?? null)
       setLoading(false)
     })
   }, [])
@@ -39,13 +45,31 @@ export default function TrendsPage() {
     )
   }
 
+  const selected =
+    result?.series.find((s) => s.companyId === selectedCompanyId) ?? result?.series[0] ?? null
+
+  // One row per year. scope3 stays null (NOT 0) when the year has no Scope 3
+  // record, so recharts renders a true gap rather than a zero-height segment.
+  const chartData = selected
+    ? selected.years.map((y) => ({
+        year: y.year,
+        scope1: y.scope1,
+        scope2: y.scope2Location,
+        scope3: y.scope3,
+      }))
+    : []
+
+  const missingS3Years = selected
+    ? selected.years.filter((y) => y.scope3 === null).map((y) => y.year)
+    : []
+
+  const gwpVersion = selected?.years[0]?.gwpVersion ?? 'AR6'
+
   return (
     <div style={{ padding: '2rem', maxWidth: 960, margin: '0 auto' }}>
-      <h1 style={{ fontFamily: 'Georgia, serif', marginBottom: 4 }}>
-        GHG Trends — verification
-      </h1>
+      <h1 style={{ fontFamily: 'Georgia, serif', marginBottom: 4 }}>GHG Trends</h1>
       <p style={{ color: '#666', fontSize: 13, marginBottom: 20 }}>
-        Raw assembled series (Phase 1 scaffold). Charts replace this next.
+        Emissions over time by scope. Location-based Scope 2.
       </p>
 
       {loading && <p>Loading…</p>}
@@ -56,26 +80,72 @@ export default function TrendsPage() {
         </div>
       )}
 
-      {!loading && result && !result.error && (
+      {!loading && result && !result.error && result.series.length === 0 && (
+        <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.5rem', color: '#555553', fontSize: 14 }}>
+          No inventories yet — <a href="/dashboard/ghg" style={{ color: '#7425e3', fontWeight: 600, textDecoration: 'none' }}>create a GHG inventory</a> to see trends.
+        </div>
+      )}
+
+      {!loading && result && !result.error && selected && (
         <>
-          <p style={{ fontSize: 13, marginBottom: 8 }}>
-            <strong>{result.series.length}</strong> compan
-            {result.series.length === 1 ? 'y' : 'ies'} ·{' '}
-            <strong>{result.skippedUnlinked}</strong> unlinked row(s) skipped
-          </p>
-          <pre
-            style={{
-              background: '#0f172a',
-              color: '#e2e8f0',
-              padding: '1rem',
-              borderRadius: 8,
-              fontSize: 12,
-              overflow: 'auto',
-              maxHeight: '70vh',
-            }}
-          >
-            {JSON.stringify(result.series, null, 2)}
-          </pre>
+          {/* Company selector */}
+          <div style={{ marginBottom: 20, maxWidth: 420 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }}>
+              Company
+            </label>
+            <select
+              value={selected.companyId}
+              onChange={(e) => setSelectedCompanyId(e.target.value)}
+              style={{ width: '100%', fontSize: 13, padding: '9px 12px', border: '0.5px solid #e8e7e4', borderRadius: 8, outline: 'none', boxSizing: 'border-box', background: '#fff' }}
+            >
+              {result.series.map((s) => (
+                <option key={s.companyId} value={s.companyId}>
+                  {s.company} ({s.years.length} year{s.years.length === 1 ? '' : 's'})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Header: company, baseline, GWP basis */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: '#0d0d0d' }}>{selected.company}</div>
+            <div style={{ fontSize: 12, color: '#888784', marginTop: 4 }}>
+              Baseline year {selected.baselineYear}
+              {' · '}
+              {selected.gwpConsistent ? (
+                <span>GWP basis: {gwpVersion}</span>
+              ) : (
+                <span style={{ color: '#ba7517', fontWeight: 600 }}>Mixed GWP basis — comparison may not be valid</span>
+              )}
+            </div>
+          </div>
+
+          {/* Stacked bar chart: Scope 1 / 2 (location) / 3 */}
+          <div style={{ width: '100%', height: 380 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e8e7e4" />
+                <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#555553' }} />
+                <YAxis
+                  tick={{ fontSize: 12, fill: '#555553' }}
+                  label={{ value: 'tCO₂e', angle: -90, position: 'insideLeft', style: { fontSize: 12, fill: '#888784' } }}
+                />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="scope1" stackId="emissions" name="Scope 1" fill={COLORS.scope1} />
+                <Bar dataKey="scope2" stackId="emissions" name="Scope 2 (location)" fill={COLORS.scope2} />
+                <Bar dataKey="scope3" stackId="emissions" name="Scope 3" fill={COLORS.scope3} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Scope 3 not reported marker */}
+          {missingS3Years.length > 0 && (
+            <div style={{ marginTop: 12, fontSize: 12, color: '#ba7517', lineHeight: 1.6 }}>
+              Scope 3 not reported for: {missingS3Years.join(', ')}.{' '}
+              <a href="/dashboard/scope3" style={{ color: '#ba7517', fontWeight: 600 }}>Complete Scope 3</a> to include it.
+            </div>
+          )}
         </>
       )}
     </div>
