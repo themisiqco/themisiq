@@ -1665,11 +1665,12 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             )}
           </div>
         </Field>
-        <Field label="Global annual revenue (USD millions)" hint="Required by CARB SB 253, CDP, ESRS E1, EcoVadis, and IFRS S2 for emission intensity calculations">
+        <Field label="Global annual revenue (USD)" hint="Required by CARB SB 253, CDP, ESRS E1, EcoVadis, and IFRS S2 for emission intensity calculations">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 14, color: '#555553' }}>$</span>
-            <input type="number" value={inventory.revenue_millions || ''} onChange={e => setInventory(i => ({...i, revenue_millions: Number(e.target.value)}))} placeholder="1000" style={{ ...inputStyle, flex: 1 }} />
-            <span style={{ fontSize: 13, color: '#555553', whiteSpace: 'nowrap' }}>million USD</span>
+            {/* User types RAW dollars; we store millions (revenue_millions stays millions for all consumers). Round the display to kill float artifacts on sub-million values (e.g. 0.4 * 1e6). */}
+            <input type="number" value={inventory.revenue_millions ? Math.round(inventory.revenue_millions * 1_000_000) : ''} onChange={e => { const raw = Number(e.target.value); setInventory(i => ({...i, revenue_millions: isNaN(raw) ? 0 : raw / 1_000_000})) }} placeholder="1000000" style={{ ...inputStyle, flex: 1 }} />
+            <span style={{ fontSize: 13, color: '#555553', whiteSpace: 'nowrap' }}>USD</span>
           </div>
         </Field>
         {needsEmployees && (
