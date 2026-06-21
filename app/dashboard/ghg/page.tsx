@@ -1055,6 +1055,7 @@ const searchParams = useSearchParams()
   })
   const [activeLocation, setActiveLocation] = useState(0)
   const [saved, setSaved] = useState(false)
+  const [dirty, setDirty] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const skipSavedReset = useRef(true)
   const [inventoryId, setInventoryId] = useState<string | null>(null)
@@ -1103,6 +1104,7 @@ const searchParams = useSearchParams()
     router.replace('/dashboard/ghg') // clear any stale ?id= so the load-by-id effect can't re-apply it
     setInventoryId(null)
     setSaved(false)
+    setDirty(false) // fresh inventory is pristine until the user types
     setStep(0)
     setInventory({
       company_name: '', company_id: null, reporting_year: 2024, revenue_millions: 0, employee_count: 0,
@@ -1119,13 +1121,14 @@ const searchParams = useSearchParams()
   useEffect(() => {
     if (skipSavedReset.current) { skipSavedReset.current = false; return }
     setSaved(false)
+    setDirty(true)
   }, [inventory])
   useEffect(() => {
-    if (saved) return
+    if (mode !== 'wizard' || !dirty) return
     const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
-  }, [saved])
+  }, [dirty, mode])
   useEffect(() => {
     const loadId = searchParams.get('id')
     if (!loadId) return  // no id -> start clean (no auto-load of a random inventory)
@@ -1157,6 +1160,7 @@ const searchParams = useSearchParams()
           locations: data.locations_data || inv.locations,
         }))
         setSaved(true)
+        setDirty(false)
       }
     })
   }, [searchParams])
@@ -1544,6 +1548,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
       console.error('Monthly emissions write failed (annual save committed, unaffected):', e)
     }
     setSaved(true)
+    setDirty(false)
     } finally { setIsSaving(false) }
   }
 
