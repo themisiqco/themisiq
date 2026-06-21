@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, Suspense } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useEntitlement, useHasConcierge, useGhgLocationAllowance } from '../../../lib/useEntitlement'
 import { generateAssurancePDF } from '../../../lib/assurancePdf'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 
 // AR4/AR5 do not distinguish fossil vs biogenic methane — both keys carry the single published GWP100.
 // AR6 is the first IPCC set to split them (fossil 29.8 incl. oxidation; biogenic/non-fossil 27.0). N2O AR6 = 273.
@@ -1028,6 +1028,7 @@ function LockedDocUpload({ label }: { label: string }) {
 function GHGPage() {
   const [step, setStep] = useState(0)
 const searchParams = useSearchParams()
+  const router = useRouter()
   const pack = searchParams.get('pack')
   const packFrameworks: Record<string, string[]> = {
     supplier: ['gri', 'ecovadis'],
@@ -1098,6 +1099,7 @@ const searchParams = useSearchParams()
   useEffect(() => { loadCompanies() }, [])
 
   const startNewInventory = () => {
+    router.replace('/dashboard/ghg') // clear any stale ?id= so the load-by-id effect can't re-apply it
     setInventoryId(null)
     setSaved(false)
     setStep(0)
