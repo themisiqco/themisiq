@@ -28,7 +28,7 @@ export interface EFFactor { co2: number; ch4: number; n2o: number }
 /** Live factor functions, passed in from the page so we reuse the real tables. */
 export interface MonthlyDeps {
   calcGas: (ef: EFFactor, amount: number, gwp: GwpVersion, biogenic?: boolean) => { total: number };
-  pickEF: (loc: any, key: string) => EFFactor;        // accept caller's Location
+  pickEF: (loc: any, key: any) => EFFactor;        // accept caller's Location + literal-union key
   getGridFactor: (region: string, year: number) => { ef: number; usedRegion: string; usedYear: number };
 }
 
