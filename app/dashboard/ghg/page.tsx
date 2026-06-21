@@ -1075,6 +1075,7 @@ const searchParams = useSearchParams()
   // Decide initial view: ?id -> wizard (loads that one); else if user has inventories -> list; else -> blank wizard
   useEffect(() => {
     const loadId = searchParams.get('id')
+    const viewParam = searchParams.get('view')
     if (loadId) { setMode('wizard'); return }
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) { setMode('wizard'); return }
@@ -1083,8 +1084,16 @@ const searchParams = useSearchParams()
         .select('id, company_name, reporting_year, updated_at')
         .order('updated_at', { ascending: false })
       if (data && data.length > 0) {
-        setInventoryList(data)
-        setMode('list')
+        // Trends-first: existing inventories land on trends, UNLESS ?view=list
+        // (the explicit "manage inventories" escape hatch — avoids a redirect
+        // loop with the trends page's back-to-inventory link).
+        if (viewParam === 'list') {
+          setInventoryList(data)
+          setMode('list')
+        } else {
+          router.replace('/dashboard/ghg/trends')
+          return
+        }
       } else {
         setMode('wizard')
       }
