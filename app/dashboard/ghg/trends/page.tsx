@@ -224,9 +224,9 @@ export default function TrendsPage() {
           {/* Intensity strip — only when every year has a revenue intensity */}
           {allHavePerRevenue && (
             <div style={{ marginTop: 20 }}>
-              <div style={{ width: '100%', height: 70 }}>
+              <div style={{ width: '100%', height: 96 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={selected.years.map((y) => ({ year: y.year, perRevenue: y.perRevenue }))} margin={{ top: 6, right: 16, bottom: 0, left: 8 }}>
+                  <LineChart data={selected.years.map((y) => ({ year: y.year, perRevenue: y.perRevenue }))} margin={{ top: 18, right: 24, bottom: 4, left: 8 }}>
                     <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#888784' }} />
                     <YAxis hide domain={['dataMin', 'dataMax']} />
                     <Tooltip />
