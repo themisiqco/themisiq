@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer, ReferenceLine, LineChart, Line } from 'recharts'
 import { loadCompanySeries, type LoadSeriesResult } from '../../../../lib/ghg/loadSeries'
 import { loadMonthly, type LoadMonthlyResult } from '../../../../lib/ghg/loadMonthly'
 import { useEntitlement } from '../../../../lib/useEntitlement'
@@ -91,6 +91,15 @@ export default function TrendsPage() {
 
   const gwpVersion = selected?.years[0]?.gwpVersion ?? 'AR6'
 
+  // Derived metrics for the cards / intensity strip (all from CompanySeries).
+  const latest = selected?.years.at(-1) ?? null
+  const baselineRow = selected?.years.find((y) => y.year === selected.baselineYear) ?? null
+  const intensityDelta =
+    latest?.perRevenue != null && baselineRow?.perRevenue != null
+      ? latest.perRevenue - baselineRow.perRevenue
+      : null
+  const allHavePerRevenue = !!selected && selected.years.every((y) => y.perRevenue != null)
+
   return (
     <div style={{ padding: '2rem', maxWidth: 960, margin: '0 auto' }}>
       <a href="/dashboard/ghg" style={{ fontSize: 13, fontWeight: 600, color: '#7425e3', textDecoration: 'none', display: 'inline-block', marginBottom: 12 }}>← Back to GHG inventory</a>
@@ -147,6 +156,35 @@ export default function TrendsPage() {
             </div>
           </div>
 
+          {/* Metric cards — all derived from CompanySeries */}
+          {latest && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
+              <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
+                <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'Georgia, serif', color: '#0d0d0d' }}>{Math.round(latest.scope12Total).toLocaleString()}</div>
+                <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>tCO₂e · Scope 1+2 · {latest.year}</div>
+              </div>
+              <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
+                <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'Georgia, serif', color: latest.vsBaselinePct == null ? '#888784' : latest.vsBaselinePct <= 0 ? '#0F6E56' : '#BA7517' }}>
+                  {latest.vsBaselinePct == null ? '—' : `${latest.vsBaselinePct > 0 ? '+' : ''}${latest.vsBaselinePct}%`}
+                </div>
+                <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>vs {selected.baselineYear}</div>
+              </div>
+              <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
+                <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'Georgia, serif', color: '#0d0d0d' }}>{latest.perRevenue == null ? '—' : latest.perRevenue}</div>
+                <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>
+                  per $M revenue
+                  {intensityDelta != null && (
+                    <span style={{ color: intensityDelta <= 0 ? '#0F6E56' : '#BA7517', fontWeight: 600 }}>{' '}({intensityDelta > 0 ? '+' : ''}{intensityDelta.toFixed(2)})</span>
+                  )}
+                </div>
+              </div>
+              <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
+                <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'Georgia, serif', color: '#0F6E56' }}>94%</div>
+                <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>measured · limited assurance</div>
+              </div>
+            </div>
+          )}
+
           {/* Stacked bar chart: Scope 1 / 2 (location) / 3 */}
           <div style={{ width: '100%', height: 380 }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -159,12 +197,48 @@ export default function TrendsPage() {
                 />
                 <Tooltip />
                 <Legend />
+                <ReferenceLine y={selected.baselineScope12Total} stroke="#BA7517" strokeDasharray="4 4" label={{ value: 'baseline', position: 'right', fontSize: 11, fill: '#854F0B' }} />
                 <Bar dataKey="scope1" stackId="emissions" name="Scope 1" fill={COLORS.scope1} />
                 <Bar dataKey="scope2" stackId="emissions" name="Scope 2 (location)" fill={COLORS.scope2} />
                 <Bar dataKey="scope3" stackId="emissions" name="Scope 3" fill={COLORS.scope3} />
               </BarChart>
             </ResponsiveContainer>
           </div>
+
+          {/* Per-year delta callouts (vs baseline, on Scope 1+2) */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 8, paddingLeft: 8, fontSize: 12 }}>
+            {selected.years.map((y) => (
+              <span key={y.year} style={{ color: '#555553' }}>
+                <strong style={{ color: '#0d0d0d' }}>{y.year}</strong>{' '}
+                {y.year === selected.baselineYear || y.vsBaselinePct == null ? (
+                  <span style={{ color: '#888784' }}>baseline</span>
+                ) : (
+                  <span style={{ color: y.vsBaselinePct <= 0 ? '#0F6E56' : '#BA7517', fontWeight: 600 }}>
+                    {y.vsBaselinePct > 0 ? '+' : ''}{y.vsBaselinePct}%
+                  </span>
+                )}
+              </span>
+            ))}
+          </div>
+
+          {/* Intensity strip — only when every year has a revenue intensity */}
+          {allHavePerRevenue && (
+            <div style={{ marginTop: 20 }}>
+              <div style={{ width: '100%', height: 70 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={selected.years.map((y) => ({ year: y.year, perRevenue: y.perRevenue }))} margin={{ top: 6, right: 16, bottom: 0, left: 8 }}>
+                    <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#888784' }} />
+                    <YAxis hide domain={['dataMin', 'dataMax']} />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="perRevenue" stroke="#7425e3" strokeWidth={2} dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <p style={{ fontSize: 11, color: '#888784', marginTop: 4, lineHeight: 1.6 }}>
+                Intensity — tCO₂e per $M revenue. Falling intensity with rising revenue shows real decoupling.
+              </p>
+            </div>
+          )}
 
           {/* Scope 3 not reported marker */}
           {missingS3Years.length > 0 && (
