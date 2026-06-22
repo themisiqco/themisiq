@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { tierPrice, tierStrikethrough, volumeDiscount, type Tier } from '@/lib/pricing'
+import { tierPrice, tierStrikethrough, volumeDiscount, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, FLAT_MODULE_PRICES, FULL_PLATFORM_PRICE, LEGACY_PRICING_PAGE_ID, type Tier, type GhgTier, type ModuleKey } from '@/lib/pricing'
 
 type ModuleId = 'ghg' | 'risk' | 'supply' | 'people' | 'deals' | 'ai' | 'cyber'
 
@@ -53,6 +53,15 @@ export default function HomePricing() {
   const gross = count * tierPrice(tier)
   const discount = volumeDiscount(count)
   const net = Math.round(gross * (1 - discount))
+
+  // NEW-MODEL preview (behind NEW_PRICING_ACTIVE) — total from the shared cartQuote().
+  const canonicalKeys = Array.from(selected).map(id => LEGACY_PRICING_PAGE_ID[id]).filter(Boolean) as ModuleKey[]
+  const quote = cartQuote({ modules: canonicalKeys, ghgTier: tier as GhgTier })
+  const newModulePrice = (id: ModuleId): number | null => {
+    const key = LEGACY_PRICING_PAGE_ID[id]
+    return key === 'ghg' ? GHG_TIERS[tier as GhgTier].priceUSD : FLAT_MODULE_PRICES[key as Exclude<ModuleKey, 'ghg'>]
+  }
+  const selectAllSeven = () => { setSelected(new Set<ModuleId>(MODULES.map(m => m.id))); setTier('professional') }
 
   const toggleModule = (id: ModuleId) => {
     setSelected(prev => {
@@ -107,7 +116,26 @@ export default function HomePricing() {
           </div>
         </div>
 
-        {/* Tier cards */}
+        {/* Full Platform hero (NEW model) */}
+        {NEW_PRICING_ACTIVE && (
+          <div style={{ background: GRAD, borderRadius: 14, padding: 1, marginBottom: 16 }}>
+            <div style={{ background: '#0d0d0d', borderRadius: 13, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#64fe3e', marginBottom: 4 }}>Most popular</div>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, color: '#fff' }}>All 7 modules — Full Platform</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>Every compliance domain. Best all-in price (GHG Professional).</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 30, fontWeight: 700, lineHeight: 1, background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>${FULL_PLATFORM_PRICE.toLocaleString()}</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>/year</div>
+                <button onClick={selectAllSeven} style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', background: GRAD, color: '#0d0d0d' }}>Select all 7 →</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tier cards (OLD model) */}
+        {!NEW_PRICING_ACTIVE && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
 
           {/* Starter */}
@@ -161,13 +189,15 @@ export default function HomePricing() {
           </div>
 
         </div>
+        )}
 
         {/* Custom / more organizations note */}
         <div style={{ textAlign: 'center', fontSize: 11, color: '#888784', lineHeight: 1.6, marginBottom: 16, maxWidth: 600, marginLeft: 'auto', marginRight: 'auto' }}>
           * Need more than 10 organizations or have additional subsidiaries? <a href="/advisory" style={{ color: '#1fb1ff', textDecoration: 'none' }}>Contact us for custom pricing.</a>
         </div>
 
-        {/* Module rows */}
+        {/* Module rows (OLD model) */}
+        {!NEW_PRICING_ACTIVE && (
         <div style={{ border: '1px solid #e8e7e4', borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', background: '#f8f7f5', padding: '10px 16px', borderBottom: '1px solid #e8e7e4', alignItems: 'center' }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784' }}>Select your compliance modules</div>
@@ -192,8 +222,57 @@ export default function HomePricing() {
             )
           })}
         </div>
+        )}
 
-        {/* Live price panel */}
+        {/* Module rows (NEW model) — per-module pricing, GHG inline tier picker */}
+        {NEW_PRICING_ACTIVE && (
+          <div style={{ border: '1px solid #e8e7e4', borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', background: '#f8f7f5', padding: '10px 16px', borderBottom: '1px solid #e8e7e4', alignItems: 'center' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784' }}>Select your compliance modules</div>
+              <div style={{ fontSize: 10, color: '#888784', fontWeight: 300 }}>Click any row to add or remove</div>
+            </div>
+            {MODULES.map((mod, i) => {
+              const isSelected = selected.has(mod.id)
+              const isGhg = mod.id === 'ghg'
+              const price = newModulePrice(mod.id)
+              return (
+                <div key={mod.id} style={{ borderBottom: i < MODULES.length - 1 ? '1px solid #e8e7e4' : 'none', background: isSelected ? '#fff' : '#f8f7f5', opacity: isSelected ? 1 : 0.7, transition: 'all 0.15s' }}>
+                  <div onClick={() => toggleModule(mod.id)} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 12, alignItems: 'center', padding: '12px 16px', cursor: 'pointer' }}>
+                    <div style={{ width: 18, height: 18, borderRadius: 4, border: `1.5px solid ${isSelected ? '#7425e3' : '#e8e7e4'}`, background: isSelected ? '#7425e3' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {isSelected && <span style={{ color: '#fff', fontSize: 10, fontWeight: 700 }}>✓</span>}
+                    </div>
+                    <div>
+                      <a href={mod.href} onClick={e => e.stopPropagation()} style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', textDecoration: 'none' }}>{mod.name} ↗</a>
+                      <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{mod.frameworks}</div>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: isSelected ? '#0d0d0d' : '#888784' }}>{isGhg ? `from $${(GHG_TIERS.starter.priceUSD as number).toLocaleString()}` : `$${(price as number).toLocaleString()}`}</div>
+                      <div style={{ fontSize: 10, color: '#888784' }}>/yr</div>
+                    </div>
+                  </div>
+                  {isGhg && isSelected && (
+                    <div style={{ display: 'flex', gap: 8, padding: '0 16px 12px', flexWrap: 'wrap' }}>
+                      {(['starter', 'professional', 'advisory'] as GhgTier[]).map(t => {
+                        const tp = GHG_TIERS[t].priceUSD
+                        const label = t === 'starter' ? 'Essentials' : t === 'professional' ? 'Professional' : 'Advisory'
+                        const active = tier === t
+                        return (
+                          <button key={t} onClick={(e) => { e.stopPropagation(); setTier(t) }} style={{ flex: 1, minWidth: 130, textAlign: 'left', padding: '8px 10px', borderRadius: 8, cursor: 'pointer', background: active ? '#0d0d0d' : '#fff', color: active ? '#fff' : '#0d0d0d', border: active ? '2px solid #7425e3' : '1px solid #e8e7e4' }}>
+                            <div style={{ fontSize: 11, fontWeight: 700 }}>{label}</div>
+                            <div style={{ fontSize: 12, marginTop: 2 }}>{tp == null ? 'Contact us' : `$${tp.toLocaleString()}/yr`}</div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Live price panel (OLD model) */}
+        {!NEW_PRICING_ACTIVE && (
         <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.25rem 1.5rem', marginBottom: 14 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'center' }}>
             <div>
@@ -217,6 +296,37 @@ export default function HomePricing() {
             </div>
           </div>
         </div>
+        )}
+
+        {/* Live price panel (NEW model) */}
+        {NEW_PRICING_ACTIVE && (
+          <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.25rem 1.5rem', marginBottom: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>Your platform — live estimate</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8, marginBottom: 8 }}>
+                  {MODULES.filter(m => selected.has(m.id)).map(m => <div key={m.id}>{m.name}</div>)}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{count} module{count !== 1 ? 's' : ''} selected</div>
+                  {volumeDiscount(count) > 0 && !quote.requiresQuote && (
+                    <div style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(100,254,62,0.15)', color: '#64fe3e', border: '1px solid rgba(100,254,62,0.3)' }}>{volumeDiscount(count) * 100}% bundle discount applied</div>
+                  )}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                {quote.requiresQuote ? (
+                  <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.1, background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Contact us</div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 36, fontWeight: 700, lineHeight: 1, background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>${quote.totalUSD.toLocaleString()}</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>/year</div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Bundle hints */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>

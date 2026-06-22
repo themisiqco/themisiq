@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { startCheckout } from '../../lib/checkout'
-import { LEGACY_PRICING_PAGE_ID, tierPrice, tierStrikethrough, volumeDiscount, ADDONS, conciergeTierForLocations, type Tier, type AddOnKey } from '../../lib/pricing'
+import { LEGACY_PRICING_PAGE_ID, tierPrice, tierStrikethrough, volumeDiscount, ADDONS, conciergeTierForLocations, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, FLAT_MODULE_PRICES, FULL_PLATFORM_PRICE, type Tier, type GhgTier, type ModuleKey, type AddOnKey } from '../../lib/pricing'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -192,6 +192,26 @@ function PricingPageInner() {
     const moduleKeys = Array.from(selected).map((id) => LEGACY_PRICING_PAGE_ID[id]).filter(Boolean)
     if (moduleKeys.length === 0) return
     startCheckout({ tier, moduleKeys, ...(selectedAddOns.length > 0 ? { addOns: selectedAddOns } : {}) })
+  }
+
+  // ── NEW-MODEL pricing (behind NEW_PRICING_ACTIVE) — DISPLAY ONLY. The module
+  // total comes solely from the shared cartQuote(), so the preview equals exactly
+  // what the server charges. handleBuy still sends { tier, moduleKeys, addOns }.
+  const canonicalKeys = Array.from(selected).map((id) => LEGACY_PRICING_PAGE_ID[id]).filter(Boolean) as ModuleKey[]
+  // TODO(checkout-consent sub-step): quote.requiresInvoice gates on the MODULE total
+  // only (cartQuote), NOT module + add-ons. Add a grand-total card-threshold guard there.
+  const quote = cartQuote({ modules: canonicalKeys, ghgTier: tier as GhgTier })
+  const newGrandTotal = quote.totalUSD + addOnsTotal
+  const advisoryHref = `/advisory?modules=${Array.from(selected).join(',')}&tier=${tier}`
+  const newModulePrice = (id: ModuleId): number | null => {
+    const key = LEGACY_PRICING_PAGE_ID[id]
+    return key === 'ghg'
+      ? GHG_TIERS[tier as GhgTier].priceUSD
+      : FLAT_MODULE_PRICES[key as Exclude<ModuleKey, 'ghg'>]
+  }
+  const selectAllSeven = () => {
+    setSelected(new Set<ModuleId>(MODULES.map((m) => m.id)))
+    setTier('professional') // hero advertises $24,900 = all-7 at GHG Professional
   }
 
   const toggleModule = (id: ModuleId) => {
@@ -435,7 +455,26 @@ function PricingPageInner() {
           <div style={{ fontSize: 12, color: '#555553', fontWeight: 300 }}>Start with one module. Build your compliance platform as you grow.</div>
         </div>
 
-        {/* Tier cards */}
+        {/* Full Platform hero (NEW model) */}
+        {NEW_PRICING_ACTIVE && (
+          <div style={{ background: GRAD, borderRadius: 14, padding: 1, marginBottom: 24 }}>
+            <div style={{ background: '#0d0d0d', borderRadius: 13, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#64fe3e', marginBottom: 4 }}>Most popular</div>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, color: '#fff' }}>All 7 modules — Full Platform</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>Every compliance domain. Best all-in price (GHG Professional).</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ ...gradText, fontSize: 30, fontWeight: 700, lineHeight: 1 }}>${FULL_PLATFORM_PRICE.toLocaleString()}</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>/year</div>
+                <button onClick={selectAllSeven} style={{ ...primaryBtn, fontSize: 12 }}>Select all 7 →</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tier cards (OLD model) */}
+        {!NEW_PRICING_ACTIVE && (
         <div style={s.tierGrid}>
 
           {/* Starter */}
@@ -500,8 +539,10 @@ function PricingPageInner() {
           </div>
 
         </div>
+        )}
 
-        {/* Module selector */}
+        {/* Module selector (OLD model) */}
+        {!NEW_PRICING_ACTIVE && (
         <div style={s.moduleWrap}>
           <div style={s.moduleHeader}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784' }}>Select your compliance modules</div>
@@ -539,6 +580,67 @@ function PricingPageInner() {
             )
           })}
         </div>
+        )}
+
+        {/* Module selector (NEW model) — per-module pricing, GHG inline tier picker */}
+        {NEW_PRICING_ACTIVE && (
+          <div style={s.moduleWrap}>
+            <div style={s.moduleHeader}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784' }}>Select your compliance modules</div>
+              <div style={{ fontSize: 10, color: '#888784', fontWeight: 300 }}>Click any row to add or remove</div>
+            </div>
+            {MODULES.map((mod, i) => {
+              const isSelected = selected.has(mod.id)
+              const isLast = i === MODULES.length - 1
+              const isGhg = mod.id === 'ghg'
+              const price = newModulePrice(mod.id)
+              return (
+                <div key={mod.id} style={{ ...moduleRow(isSelected), display: 'block', ...(isLast ? { borderBottom: 'none' } : {}) }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 12, alignItems: 'start' }} onClick={() => toggleModule(mod.id)}>
+                    <div style={checkbox(isSelected)}>
+                      {isSelected && <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>✓</span>}
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{mod.name}</span>
+                        {mod.tags.map(t => (
+                          <span key={t.label} style={tag(t.label, t.color)}>{t.label}</span>
+                        ))}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.6 }}>{mod.description}</div>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: isSelected ? '#0d0d0d' : '#888784' }}>
+                        {isGhg
+                          ? `from $${(GHG_TIERS.starter.priceUSD as number).toLocaleString()}`
+                          : `$${(price as number).toLocaleString()}`}
+                      </div>
+                      <div style={{ fontSize: 10, color: '#888784' }}>/yr</div>
+                    </div>
+                  </div>
+                  {/* GHG inline tier picker — only when GHG is selected */}
+                  {isGhg && isSelected && (
+                    <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                      {(['starter', 'professional', 'advisory'] as GhgTier[]).map(t => {
+                        const tp = GHG_TIERS[t].priceUSD
+                        const label = t === 'starter' ? 'Essentials' : t === 'professional' ? 'Professional' : 'Advisory'
+                        const cap = t === 'starter' ? '≤3 locations' : t === 'professional' ? '≤15 locations' : 'unlimited'
+                        const active = tier === t
+                        return (
+                          <button key={t} onClick={(e) => { e.stopPropagation(); setTier(t) }} style={{ flex: 1, minWidth: 130, textAlign: 'left', padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: active ? '#0d0d0d' : '#fff', color: active ? '#fff' : '#0d0d0d', border: active ? '2px solid #7425e3' : '1px solid #e8e7e4' }}>
+                            <div style={{ fontSize: 11, fontWeight: 700 }}>{label}</div>
+                            <div style={{ fontSize: 12, marginTop: 2 }}>{tp == null ? 'Contact us' : `$${tp.toLocaleString()}/yr`}</div>
+                            <div style={{ fontSize: 9, color: active ? 'rgba(255,255,255,0.5)' : '#888784', marginTop: 2 }}>{cap}</div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
         {/* Add-ons — appear once GHG is selected */}
         {ghgSelected && (
           <div style={{ marginTop: 24, padding: 20, background: '#f8f7f5', borderRadius: 12, border: '1px solid #e8e7e4' }}>
@@ -586,7 +688,8 @@ function PricingPageInner() {
             </div>
           </div>
         )}
-        {/* Live price panel */}
+        {/* Live price panel (OLD model) */}
+        {!NEW_PRICING_ACTIVE && (
         <div style={s.pricePanel}>
           <div style={s.pricePanelInner}>
             <div>
@@ -632,6 +735,54 @@ function PricingPageInner() {
             </div>
           </div>
         </div>
+        )}
+
+        {/* Live price panel (NEW model) */}
+        {NEW_PRICING_ACTIVE && (
+          <div style={s.pricePanel}>
+            <div style={s.pricePanelInner}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>Your platform — live estimate</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8, marginBottom: 8 }}>
+                  {MODULES.filter(m => selected.has(m.id)).map(m => <div key={m.id}>{m.name}</div>)}
+                </div>
+                {selectedAddOns.length > 0 && (
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8, marginBottom: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                    {selectedAddOns.map(k => (
+                      <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                        <span>{ADDONS[k].label}</span>
+                        <span style={{ color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap' }}>+${ADDONS[k].price.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{count} module{count !== 1 ? 's' : ''} selected</div>
+                  {volumeDiscount(count) > 0 && !quote.requiresQuote && (
+                    <div style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(100,254,62,0.15)', color: '#64fe3e', border: '1px solid rgba(100,254,62,0.3)' }}>
+                      {volumeDiscount(count) * 100}% bundle discount applied
+                    </div>
+                  )}
+                  {quote.requiresInvoice && (
+                    <div style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(31,177,255,0.15)', color: '#1fb1ff', border: '1px solid rgba(31,177,255,0.3)' }}>
+                      Over $10k — completed by invoice
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                {quote.requiresQuote ? (
+                  <div style={{ ...gradText, fontSize: 28, fontWeight: 700, lineHeight: 1.1 }}>Contact us</div>
+                ) : (
+                  <>
+                    <div style={{ ...gradText, fontSize: 36, fontWeight: 700, lineHeight: 1 }}>${newGrandTotal.toLocaleString()}</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>/year</div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Bundle hints */}
         <div style={s.hintGrid}>
@@ -661,10 +812,20 @@ function PricingPageInner() {
           <div style={s.ctaHeadline}>{cta.headline}</div>
           <div style={s.ctaSub}>{cta.sub}</div>
           <div style={s.ctaBtns}>
-            {tier !== 'advisory' && (
+            {NEW_PRICING_ACTIVE ? (
+              quote.requiresQuote ? (
+                <Link href={advisoryHref} style={primaryBtn}>Talk to a specialist →</Link>
+              ) : quote.requiresInvoice ? (
+                <Link href={advisoryHref} style={primaryBtn}>Request an invoice →</Link>
+              ) : (
+                <button onClick={handleBuy} style={primaryBtn}>Buy now — ${newGrandTotal.toLocaleString()}/yr →</button>
+              )
+            ) : (
+              tier !== 'advisory' && (
               <button onClick={handleBuy} style={primaryBtn}>
                 Buy now — ${totalNet.toLocaleString()}/yr →
               </button>
+            )
             )}
             {cta.buttons.map((btn, i) => (
               <Link key={i} href={btn.href} style={btn.primary ? primaryBtn : ghostBtn}>
