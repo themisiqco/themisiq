@@ -1,4 +1,7 @@
 import PackFlow from '../_pack/PackFlow'
+import { redirect } from 'next/navigation'
+import { NEW_PRICING_ACTIVE } from '../../../lib/pricing'
+import { PACK_SLUG_MODULES } from '../../../lib/packEntryPoints'
 
 export const metadata = {
   title: 'Supplier Readiness Pack — ThemisIQ',
@@ -6,5 +9,6 @@ export const metadata = {
 }
 
 export default function Page() {
+  if (NEW_PRICING_ACTIVE) redirect(`/pricing?modules=${PACK_SLUG_MODULES.supplier}`)
   return <PackFlow slug="supplier" />
 }

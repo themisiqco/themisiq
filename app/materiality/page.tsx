@@ -11,7 +11,7 @@
 // has a dedicated sustainability lead.
 
 import Link from 'next/link'
-import { PACKS } from '@/lib/pricing'
+import { PACKS, NEW_PRICING_ACTIVE, cartQuote, type ModuleKey } from '@/lib/pricing'
 
 const GRAD = 'linear-gradient(135deg, #7425e3, #1fb1ff, #64fe3e)'
 
@@ -298,7 +298,12 @@ export default function MaterialityMarketingPage() {
             <div style={{ background: '#E6F1FB', border: '1.5px solid #0C447C', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0C447C', marginBottom: 4 }}>IFRS S2 / ISSB</div>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 4 }}>IFRS S2 Compliance Pack</div>
-              <div style={{ fontSize: 13, color: '#555553', marginBottom: 12 }}>From <strong>${PACKS['ifrs-s2-compliance'].price.toLocaleString()}</strong> /year</div>
+              {!NEW_PRICING_ACTIVE && (
+                <div style={{ fontSize: 13, color: '#555553', marginBottom: 12 }}>From <strong>${PACKS['ifrs-s2-compliance'].price.toLocaleString()}</strong> /year</div>
+              )}
+              {NEW_PRICING_ACTIVE && (
+                <div style={{ fontSize: 13, color: '#555553', marginBottom: 12 }}>From <strong>${cartQuote({ modules: ['ghg', 'climate-risk'] as ModuleKey[], ghgTier: 'starter' }).totalUSD.toLocaleString()}</strong> /year</div>
+              )}
               <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.7, marginBottom: 12 }}>
                 IFRS S2 single materiality · climate risk · scenario analysis · GHG inventory · TCFD-aligned narrative.
               </div>
@@ -307,7 +312,12 @@ export default function MaterialityMarketingPage() {
             <div style={{ background: '#eef2ff', border: '1.5px solid #1e1b4b', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1e1b4b', marginBottom: 4 }}>CSRD / ESRS</div>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 4 }}>CSRD Compliance Pack</div>
-              <div style={{ fontSize: 13, color: '#555553', marginBottom: 12 }}>From <strong>${PACKS['csrd-compliance'].price.toLocaleString()}</strong> /year</div>
+              {!NEW_PRICING_ACTIVE && (
+                <div style={{ fontSize: 13, color: '#555553', marginBottom: 12 }}>From <strong>${PACKS['csrd-compliance'].price.toLocaleString()}</strong> /year</div>
+              )}
+              {NEW_PRICING_ACTIVE && (
+                <div style={{ fontSize: 13, color: '#555553', marginBottom: 12 }}>From <strong>${cartQuote({ modules: ['ghg', 'climate-risk', 'supply-chain', 'people'] as ModuleKey[], ghgTier: 'starter' }).totalUSD.toLocaleString()}</strong> /year</div>
+              )}
               <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.7, marginBottom: 12 }}>
                 CSRD double materiality · climate risk · supply chain · people &amp; workforce · governance · GHG.
               </div>

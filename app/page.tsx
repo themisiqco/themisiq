@@ -1,7 +1,8 @@
 'use client'
 import HomePricing from './components/HomePricing'
 import { useState, useEffect } from 'react'
-import { PACKS } from '../lib/pricing'
+import { PACKS, NEW_PRICING_ACTIVE } from '../lib/pricing'
+import { PACK_SLUG_MODULES } from '../lib/packEntryPoints'
 import Nav from './components/Nav'
 import Footer from './components/Footer'
 
@@ -226,6 +227,8 @@ export default function Home() {
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Built for who's asking.</h2>
             <p style={{ fontSize: 15, color: '#555553', maxWidth: 520, margin: '0 auto', fontWeight: 300 }}>Whether it's a customer, your bank, your board or your investor — we've bundled exactly what you need.</p>
           </div>
+          {/* Use-case pack cards (OLD model) */}
+          {!NEW_PRICING_ACTIVE && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
             {[
               { name: 'Supplier Readiness', driver: 'A customer is asking', price: '$' + PACKS['supplier-readiness'].price.toLocaleString(), color: '#0F6E56', bg: '#E1F5EE', href: '/get-started/supplier', items: ['GHG Inventory', 'Supply Chain risk register', 'Supplier questionnaire'] },
@@ -249,6 +252,34 @@ export default function Home() {
               </a>
             ))}
           </div>
+          )}
+
+          {/* Use-case pack cards (NEW model) — configurator entry points, no price */}
+          {NEW_PRICING_ACTIVE && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+            {[
+              { slug: 'supplier', name: 'Supplier Readiness', driver: 'A customer is asking', color: '#0F6E56', items: ['GHG Inventory', 'Supply Chain risk register', 'Supplier questionnaire'] },
+              { slug: 'climate', name: 'Climate Readiness', driver: 'Your bank is asking', color: '#0C447C', items: ['GHG Inventory', 'Climate Risk assessment', 'TCFD / IFRS S2 output'] },
+              { slug: 'foundation', name: 'ESG Foundation', driver: 'Your board wants it', color: '#7425e3', items: ['GHG Inventory', 'People & Workforce', 'Climate Risk'] },
+              { slug: 'investor', name: 'Investor ESG', driver: 'Your investor requires it', color: '#B91C1C', items: ['GHG Inventory', 'Climate Risk', 'Supply Chain', 'Deals & Investment'] },
+            ].map(pack => (
+              <a key={pack.name} href={`/pricing?modules=${PACK_SLUG_MODULES[pack.slug]}`} style={{ background: '#fff', border: `1.5px solid ${pack.color}25`, borderRadius: 14, padding: '1.5rem', textDecoration: 'none', display: 'block', transition: 'all 0.15s' }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = pack.color}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = pack.color + '25'}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: pack.color, marginBottom: 6 }}>{pack.driver}</div>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>{pack.name}</div>
+                {pack.items.map(item => (
+                  <div key={item} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                    <span style={{ color: pack.color, flexShrink: 0, fontSize: 12 }}>✓</span>
+                    <span style={{ fontSize: 12, color: '#555553' }}>{item}</span>
+                  </div>
+                ))}
+                <div style={{ fontSize: 11, color: '#888784', marginTop: 12 }}>Multi-module — priced in the configurator</div>
+                <div style={{ marginTop: 8, fontSize: 12, fontWeight: 600, color: pack.color }}>Configure →</div>
+              </a>
+            ))}
+          </div>
+          )}
         </div>
       </section>
       <HomePricing />
