@@ -24,9 +24,12 @@ import {
   ADDONS,
   addOnRequirementsMet,
   configuratorPrice,
+  cartQuote,
+  NEW_PRICING_ACTIVE,
   toStripeAmount,
   type ModuleKey,
   type Tier,
+  type GhgTier,
   type PackId,
   type AddOnKey,
 } from '../../../lib/pricing'
@@ -64,6 +67,9 @@ export async function POST(req: NextRequest) {
 
     // 2a) Fixed pack
     if (body.packId) {
+      if (NEW_PRICING_ACTIVE) {
+        return NextResponse.json({ error: 'Packs are no longer sold directly — configure your modules instead.' }, { status: 400 })
+      }
       const pack = PACKS[body.packId]
       if (!pack) {
         return NextResponse.json({ error: 'Unknown pack.' }, { status: 400 })
@@ -91,9 +97,23 @@ export async function POST(req: NextRequest) {
       if (!allValid) {
         return NextResponse.json({ error: 'Unknown module in selection.' }, { status: 400 })
       }
-      const price = configuratorPrice(tier, moduleKeys)
-      const label = `ThemisIQ — ${moduleKeys.length} module${moduleKeys.length > 1 ? 's' : ''} (${tier})`
-      lineItems.push(priceLine(label, price))
+      if (NEW_PRICING_ACTIVE) {
+        // New model: GHG by tier, others flat (shared cartQuote — same number the
+        // configurator previews). tier is validated by the guard above.
+        const q = cartQuote({ modules: moduleKeys, ghgTier: tier as GhgTier })
+        if (q.requiresQuote) {
+          return NextResponse.json({ error: 'GHG Advisory is quote-only — please contact us.', requiresQuote: true }, { status: 400 })
+        }
+        if (q.requiresInvoice) {
+          return NextResponse.json({ error: 'Orders over $10,000 are completed by invoice. Please request an invoice.', requiresInvoice: true }, { status: 400 })
+        }
+        const label = `ThemisIQ — ${moduleKeys.length} module${moduleKeys.length > 1 ? 's' : ''}`
+        lineItems.push(priceLine(label, q.totalUSD))
+      } else {
+        const price = configuratorPrice(tier, moduleKeys)
+        const label = `ThemisIQ — ${moduleKeys.length} module${moduleKeys.length > 1 ? 's' : ''} (${tier})`
+        lineItems.push(priceLine(label, price))
+      }
       moduleKeys.forEach((m) => {
         modulesInCart.add(m)
         entitlementsToGrant.add(m)

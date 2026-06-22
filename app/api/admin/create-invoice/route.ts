@@ -28,11 +28,15 @@ import { getSupabaseAdmin } from '../../../../lib/supabaseAdmin'
 import { getAuthedClient, bearerFrom, AuthError } from '../../../../lib/supabaseAuthed'
 import {
   ALL_MODULE_KEYS,
+  TIER_PRICING,
   PACKS,
   ADDONS,
   addOnRequirementsMet,
   configuratorPrice,
+  cartQuote,
+  NEW_PRICING_ACTIVE,
   type Tier,
+  type GhgTier,
   type ModuleKey,
   type PackId,
   type AddOnKey,
@@ -89,6 +93,9 @@ export async function POST(req: NextRequest) {
     const sources: string[] = []
 
     if (body.packId) {
+      if (NEW_PRICING_ACTIVE) {
+        return NextResponse.json({ error: 'Packs are no longer sold directly — invoice the modules individually.' }, { status: 400 })
+      }
       const pack = PACKS[body.packId]
       if (!pack) return NextResponse.json({ error: 'Unknown pack.' }, { status: 400 })
       lines.push({ label: pack.label, amount: pack.price })
@@ -109,9 +116,24 @@ export async function POST(req: NextRequest) {
       if (!allValid) {
         return NextResponse.json({ error: 'Unknown module in selection.' }, { status: 400 })
       }
-      const price = configuratorPrice(tier, moduleKeys)
-      const label = `ThemisIQ — ${moduleKeys.length} module${moduleKeys.length > 1 ? 's' : ''} (${tier})`
-      lines.push({ label, amount: price })
+      if (NEW_PRICING_ACTIVE) {
+        // admin guard above is `!tier` only — validate the tier here (inside the
+        // flag-on branch, so the old path stays byte-unchanged) before cartQuote.
+        if (!TIER_PRICING[tier]) {
+          return NextResponse.json({ error: 'Invalid tier.' }, { status: 400 })
+        }
+        const q = cartQuote({ modules: moduleKeys, ghgTier: tier as GhgTier })
+        if (q.requiresQuote) {
+          return NextResponse.json({ error: 'GHG Advisory is a custom quote — add a manual line item in Stripe instead.' }, { status: 400 })
+        }
+        // This route IS the invoice path, so requiresInvoice (>$10k) does NOT block here.
+        const label = `ThemisIQ — ${moduleKeys.length} module${moduleKeys.length > 1 ? 's' : ''}`
+        lines.push({ label, amount: q.totalUSD })
+      } else {
+        const price = configuratorPrice(tier, moduleKeys)
+        const label = `ThemisIQ — ${moduleKeys.length} module${moduleKeys.length > 1 ? 's' : ''} (${tier})`
+        lines.push({ label, amount: price })
+      }
       moduleKeys.forEach((m) => entitlements.add(m))
       sources.push('configurator')
     }
