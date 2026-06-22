@@ -93,6 +93,49 @@ export function tierStrikethrough(tier: Tier): number | null {
   return FOUNDING_OFFER_ACTIVE && p.early < p.full ? p.full : null
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// NEW PRICING MODEL (June 2026 rescope) — ADDITIVE. Nothing above is changed yet.
+// These exports are INERT until consumers are cut over in later steps:
+//   (2) display pages → (3) PACKS rework → (4) checkout cutover (cart math + caps).
+// Until then the live site keeps charging via the OLD model above. Do NOT wire
+// locationAllowanceForTier() to GHG_TIERS yet — that moves in Step 4 alongside the
+// (value-agnostic, NULL=uncapped) DB trigger already confirmed compatible.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Reuse the existing tier union under the name the rescope spec references.
+export type GhgTier = Tier
+
+// GHG is the only multi-tier module. priceUSD null = "Contact us" (quote path);
+// locationAllowance null = uncapped (matches the trigger's NULL = uncapped rule).
+export const GHG_TIERS: Record<GhgTier, { priceUSD: number | null; locationAllowance: number | null }> = {
+  starter:      { priceUSD: 4900,  locationAllowance: 3 },    // UI label: "Essentials"
+  professional: { priceUSD: 11900, locationAllowance: 15 },
+  advisory:     { priceUSD: null,  locationAllowance: null }, // Contact us / uncapped
+}
+
+// Flat single-tier modules (USD / year). Keyed on every non-GHG module so the
+// type fails to compile if a module is ever added without a price.
+export const FLAT_MODULE_PRICES: Record<Exclude<ModuleKey, 'ghg'>, number> = {
+  'climate-risk':  4900,
+  'deals':         4900,
+  'supply-chain':  2900,
+  'cyber':         2900,
+  'ai-governance': 2900,
+  'people':        1499,
+}
+
+// All-7 hero bundle (priced at GHG Professional). The all-7 cart will use
+// min(discounted sum, FULL_PLATFORM_PRICE) — wired in the Step 4 checkout cutover.
+export const FULL_PLATFORM_PRICE = 24900
+
+// Self-serve card is disabled ABOVE this; larger orders route to request-an-invoice
+// (admin-invoice draft: card or manual wire — Canadian account has no Stripe ACH).
+export const CARD_THRESHOLD_USD = 10000
+
+export function requiresInvoice(orderTotalUSD: number): boolean {
+  return orderTotalUSD > CARD_THRESHOLD_USD
+}
+
 // ── Volume discount (matches the pricing page exactly) ───────────────────────
 //   1 module  → 0%
 //   2 modules → 10%
