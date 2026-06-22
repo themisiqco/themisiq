@@ -73,11 +73,16 @@ export const TIER_PRICING: Record<Tier, { full: number; early: number }> = {
   advisory:     { full: 4999, early: 4999 },
 }
 
-// GHG location allowance per tier (spec: Model A hard enforcement, Starter 3 / Pro 10 / Advisory 20).
-// Single source of truth — checkout writes this onto the ghg entitlement row; the GHG
-// wizard and server enforce against it. Packs (no tier) default to the Starter floor (3).
-export function locationAllowanceForTier(tier: Tier): number {
-  return ({ starter: 3, professional: 10, advisory: 20 } as Record<Tier, number>)[tier]
+// GHG location allowance per tier. Single source of truth — checkout writes this onto
+// the ghg entitlement row; the GHG wizard + server (NULL = uncapped trigger) enforce it.
+// Behind NEW_PRICING_ACTIVE: live/old model = Starter 3 / Pro 10 / Advisory 20; new model =
+// Essentials 3 / Pro 15 / Advisory null (uncapped), sourced from GHG_TIERS. While the flag
+// is false this is byte-for-byte the old behaviour. Packs (no tier) still default to the
+// Starter/Essentials floor (3) at their call sites.
+export function locationAllowanceForTier(tier: Tier): number | null {
+  return NEW_PRICING_ACTIVE
+    ? GHG_TIERS[tier].locationAllowance
+    : ({ starter: 3, professional: 10, advisory: 20 } as Record<Tier, number>)[tier]
 }
 
 // The price actually charged right now for a given tier (respects the switch).
@@ -94,13 +99,18 @@ export function tierStrikethrough(tier: Tier): number | null {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// NEW PRICING MODEL (June 2026 rescope) — ADDITIVE. Nothing above is changed yet.
-// These exports are INERT until consumers are cut over in later steps:
-//   (2) display pages → (3) PACKS rework → (4) checkout cutover (cart math + caps).
-// Until then the live site keeps charging via the OLD model above. Do NOT wire
-// locationAllowanceForTier() to GHG_TIERS yet — that moves in Step 4 alongside the
-// (value-agnostic, NULL=uncapped) DB trigger already confirmed compatible.
+// NEW PRICING MODEL (June 2026 rescope). Gated behind NEW_PRICING_ACTIVE (below):
+// while false, every consumer keeps the OLD model and the live site is unchanged.
+// Flip to true in the final cutover push — instant rollback = revert that one line.
+// The shared cartQuote() below is consumed by BOTH the configurator (display) and the
+// checkout/admin-invoice routes (charge), so displayed price == charged price by
+// construction in both flag states.
 // ─────────────────────────────────────────────────────────────────────────────
+
+// THE CUTOVER SWITCH. false = live/old model everywhere; true = new model everywhere.
+// (Build-time const, not an env var, so client + server read the identical value —
+// no client/server drift that could let display and charge diverge.)
+export const NEW_PRICING_ACTIVE = false
 
 // Reuse the existing tier union under the name the rescope spec references.
 export type GhgTier = Tier
@@ -154,6 +164,51 @@ export function configuratorPrice(tier: Tier, moduleKeys: ModuleKey[]): number {
   const gross = tierPrice(tier) * count
   const net = gross * (1 - volumeDiscount(count))
   return Math.round(net)
+}
+
+// ── NEW-MODEL cart math (shared by display + charge) ─────────────────────────
+// The single source of truth for the rescoped model. Both the configurator
+// (price preview) and the server routes (actual charge) call this, so the number
+// shown can never differ from the number charged.
+//   - GHG priced by chosen tier (GHG_TIERS); the other six are flat (FLAT_MODULE_PRICES).
+//   - Existing volume discount applies to multi-module carts (2 → −10%, 3+ → −20%).
+//   - All 7 selected → total = min(discounted sum, FULL_PLATFORM_PRICE) so the
+//     Full Platform bundle is always the best all-in price.
+//   - GHG Advisory (priceUSD null) has no self-serve price → requiresQuote=true,
+//     totalUSD=0; the caller routes the whole selection to the contact/quote path
+//     (never sum a null).
+//   - totalUSD > CARD_THRESHOLD_USD → requiresInvoice=true (self-serve card off).
+export interface CartSelection {
+  modules: ModuleKey[]
+  ghgTier?: GhgTier // only consulted when 'ghg' is in modules; defaults to Essentials
+}
+export interface CartQuote {
+  totalUSD: number          // 0 when requiresQuote (no self-serve total)
+  requiresQuote: boolean    // GHG Advisory in cart → contact/quote path
+  requiresInvoice: boolean  // total over the card threshold → invoice/wire
+}
+export function cartQuote(sel: CartSelection): CartQuote {
+  const modules = sel.modules
+  if (modules.length === 0) {
+    return { totalUSD: 0, requiresQuote: false, requiresInvoice: false }
+  }
+  const ghgTier: GhgTier = sel.ghgTier ?? 'starter'
+  // GHG Advisory has no self-serve price → the whole selection goes to quote.
+  if (modules.includes('ghg') && GHG_TIERS[ghgTier].priceUSD == null) {
+    return { totalUSD: 0, requiresQuote: true, requiresInvoice: false }
+  }
+  let sum = 0
+  for (const m of modules) {
+    if (m === 'ghg') {
+      sum += GHG_TIERS[ghgTier].priceUSD as number // non-null guaranteed above
+    } else {
+      sum += FLAT_MODULE_PRICES[m as Exclude<ModuleKey, 'ghg'>]
+    }
+  }
+  const discounted = Math.round(sum * (1 - volumeDiscount(modules.length)))
+  const allSeven = ALL_MODULE_KEYS.every((k) => modules.includes(k))
+  const totalUSD = allSeven ? Math.min(discounted, FULL_PLATFORM_PRICE) : discounted
+  return { totalUSD, requiresQuote: false, requiresInvoice: requiresInvoice(totalUSD) }
 }
 
 // ── Fixed packs (homepage entry points) ──────────────────────────────────────
