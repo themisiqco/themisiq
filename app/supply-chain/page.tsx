@@ -35,7 +35,7 @@ export default function Page() {
               { val: '70%', unit: 'of emissions', label: 'typically in Scope 3 Cat.1 for manufacturers', color: '#7425e3', bg: '#EDE9FE' },
               { val: 'CS3D', unit: '2027', label: 'EU supply chain due diligence — civil liability for failures', color: '#B91C1C', bg: '#FCEBEB' },
               { val: '5+', unit: 'frameworks', label: 'CS3D · EcoVadis · Modern Slavery · CDP C12 · ESRS S2 — one platform', color: '#0F6E56', bg: '#E1F5EE' },
-              { val: '$999', unit: 'portal/yr', label: 'vs $15,000–$50,000 for EcoVadis supplier outreach — same outcome', color: '#0C447C', bg: '#E6F1FB' },
+              { val: '$2,900', unit: 'portal/yr', label: 'vs $15,000–$50,000 for EcoVadis supplier outreach — same outcome', color: '#0C447C', bg: '#E6F1FB' },
             ].map(({ val, unit, label, color, bg }) => (
               <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid ${color}22` }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
