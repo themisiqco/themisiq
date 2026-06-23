@@ -11,6 +11,23 @@ function daysUntil(dateStr: string): number {
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
 }
 
+// Single source of truth for the header's module links — consumed by BOTH the
+// desktop nav and the mobile overlay (previously two drifting arrays).
+// `label` = full wording (mobile overlay; future desktop Platform ▾ dropdown);
+// `labelShort` = current short desktop wording, so the desktop bar stays
+// byte-identical to pre-refactor. For modules where the two surfaces agreed,
+// labelShort === label. Pricing is NOT a module and is kept separate per render site.
+const MODULES_NAV: { href: string; label: string; labelShort: string; sub: string }[] = [
+  { href: '/climate-ghg', label: 'GHG Emissions', labelShort: 'GHG Emissions', sub: 'SB 253 · CDP · ESRS E1 · GHG Protocol · Scope 3' },
+  { href: '/climate-risk', label: 'Climate Risk', labelShort: 'Climate Risk', sub: 'TCFD · IFRS S2 · ESRS E1 · scenario analysis' },
+  { href: '/supply-chain', label: 'Supply Chain', labelShort: 'Supply Chain', sub: 'Supplier Portal · CS3D · EcoVadis · ESRS S2' },
+  { href: '/deals', label: 'Deals & Investment', labelShort: 'Deals', sub: 'M&A diligence · PE · IFRS S2 · LP ESG' },
+  { href: '/people', label: 'People & Workforce', labelShort: 'People', sub: 'ESRS S1 · EU Pay Transparency · CA Pay Data' },
+  { href: '/ai-governance', label: 'AI Governance', labelShort: 'AI Governance', sub: 'EU AI Act · NIST AI RMF · ISO 42001' },
+  { href: '/cyber', label: 'Cyber Governance', labelShort: 'Cyber', sub: 'NIS2 · DORA · SEC cyber · ISO 27001' },
+  { href: '/verification-readiness', label: 'Verification Readiness', labelShort: 'Verification', sub: 'ISO 14064-3 · ISAE 3410 · verifier-ready package' },
+]
+
 export default function Nav() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [days, setDays] = useState(0)
@@ -46,22 +63,16 @@ export default function Nav() {
           flex: 1, justifyContent: 'center',
           overflow: 'hidden',
         }} className="desktop-nav">
-          {[
-           ['/climate-ghg', 'GHG Emissions'],
-            ['/climate-risk', 'Climate Risk'],
-            ['/supply-chain', 'Supply Chain'],
-            ['/deals', 'Deals'],
-            ['/people', 'People'],
-            ['/ai-governance', 'AI Governance'],
-            ['/cyber', 'Cyber'],
-            ['/verification-readiness', 'Verification'],
-            ['/pricing', 'Pricing'],
-          ].map(([href, label]) => (
+          {MODULES_NAV.map(({ href, labelShort }) => (
             <a key={href} href={href} style={{
               fontSize: 12, color: '#555553', textDecoration: 'none',
               whiteSpace: 'nowrap', fontWeight: 400,
-            }}>{label}</a>
+            }}>{labelShort}</a>
           ))}
+          <a href="/pricing" style={{
+            fontSize: 12, color: '#555553', textDecoration: 'none',
+            whiteSpace: 'nowrap', fontWeight: 400,
+          }}>Pricing</a>
         </div>
 
         {/* CTA BUTTONS */}
@@ -118,17 +129,10 @@ export default function Nav() {
           borderTop: '0.5px solid #e8e7e4', overflowY: 'auto',
         }}>
           {[
-            ['/climate-ghg', 'GHG Emissions', 'SB 253 · CDP · ESRS E1 · GHG Protocol · Scope 3'],
-            ['/climate-risk', 'Climate Risk', 'TCFD · IFRS S2 · ESRS E1 · scenario analysis'],
-            ['/supply-chain', 'Supply Chain', 'Supplier Portal · CS3D · EcoVadis · ESRS S2'],
-            ['/deals', 'Deals & Investment', 'M&A diligence · PE · IFRS S2 · LP ESG'],
-            ['/people', 'People & Workforce', 'ESRS S1 · EU Pay Transparency · CA Pay Data'],
-            ['/ai-governance', 'AI Governance', 'EU AI Act · NIST AI RMF · ISO 42001'],
-            ['/cyber', 'Cyber Governance', 'NIS2 · DORA · SEC cyber · ISO 27001'],
-            ['/verification-readiness', 'Verification Readiness', 'ISO 14064-3 · ISAE 3410 · verifier-ready package'],
-            ['/pricing', 'Pricing', 'Plans, tiers, and what each includes'],
-            ['/assess', 'Free Assessment →', 'Check which regulations apply to you'],
-          ].map(([href, label, sub]) => (
+            ...MODULES_NAV,
+            { href: '/pricing', label: 'Pricing', sub: 'Plans, tiers, and what each includes' },
+            { href: '/assess', label: 'Free Assessment →', sub: 'Check which regulations apply to you' },
+          ].map(({ href, label, sub }) => (
             <a key={href} href={href} onClick={() => setMenuOpen(false)} style={{
               display: 'block', padding: '14px 0',
               borderBottom: '0.5px solid #e8e7e4',
