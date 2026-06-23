@@ -9,6 +9,7 @@ export const metadata = {
 };
 
 import { tierPrice, ADDONS } from '../../lib/pricing'
+import Nav from '../components/Nav'
 const css = `
   .vr{
     --ink:#0d0d0d;--body:#555553;--muted:#888784;--wash:#f8f7f5;--hair:#e8e7e4;--white:#ffffff;
@@ -158,12 +159,7 @@ export default function VerificationReadinessPage() {
     <div className="vr">
       <style dangerouslySetInnerHTML={{ __html: css }} />
 
-      <div className="bar">
-        <div className="wrap">
-          <span className="wordmark">Themis<span className="iq">IQ</span></span>
-          <span className="crumbs">Climate-GHG &nbsp;›&nbsp; <b>Verification Readiness</b></span>
-        </div>
-      </div>
+      <Nav />
 
       <div className="entry-zone">
         <div className="wrap">
