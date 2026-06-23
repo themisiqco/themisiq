@@ -43,12 +43,12 @@ const CONFIG = {
 export const metadata: Metadata = {
   title: "Calculate Your GHG Emissions | SB 253, CSRD, IFRS S2 | ThemisIQ",
   description:
-    "Asked for your carbon footprint? ThemisIQ calculates Scope 1 & 2 emissions in real time on the GHG Protocol and produces a report ready for SB 253, CSRD (ESRS E1), IFRS S2 and more. From $999 USD.",
+    "Asked for your carbon footprint? ThemisIQ calculates Scope 1 & 2 emissions in real time on the GHG Protocol and produces a report ready for SB 253, CSRD (ESRS E1), IFRS S2 and more. From $4,900 USD.",
   alternates: { canonical: "/calculate-emissions" },
   openGraph: {
     title: "Calculate Your GHG Emissions in Real Time | ThemisIQ",
     description:
-      "See your Scope 1 & 2 emissions instantly, free. Download a report ready for SB 253, CSRD, IFRS S2 and more. From $999 USD.",
+      "See your Scope 1 & 2 emissions instantly, free. Download a report ready for SB 253, CSRD, IFRS S2 and more. From $4,900 USD.",
     url: "/calculate-emissions",
     type: "website",
   },
@@ -427,7 +427,7 @@ export default function CalculateEmissionsPage() {
               <a className="btn btn-ghost" href={CONFIG.CONTACT_HREF}>Get in touch</a>
             </div>
             <p className="reassure">Explore the calculator free* &mdash; you only pay when you&rsquo;re ready to download your report.</p>
-            <p className="hero-foot">*GHG emissions calculated from your totals via our platform, instantly and at no cost. For $999 USD, unlock platform access to download your report under any GHG framework you need &mdash; SB&nbsp;253, CSRD&nbsp;(ESRS&nbsp;E1), IFRS&nbsp;S2, and more.</p>
+            <p className="hero-foot">*GHG emissions calculated from your totals via our platform, instantly and at no cost. For $4,900 USD, unlock platform access to download your report under any GHG framework you need &mdash; SB&nbsp;253, CSRD&nbsp;(ESRS&nbsp;E1), IFRS&nbsp;S2, and more.</p>
           </div>
         </section>
 
@@ -498,7 +498,7 @@ export default function CalculateEmissionsPage() {
                     <span className="fwk">GRI 305</span>
                     <span className="fwk">EcoVadis</span>
                   </div>
-                  <span className="hint">$999 USD unlocks platform access &mdash; download your report under any framework you need</span>
+                  <span className="hint">$4,900 USD unlocks platform access &mdash; download your report under any framework you need</span>
                 </div>
               </div>
 
@@ -529,7 +529,7 @@ export default function CalculateEmissionsPage() {
                 <div className="vnum">05</div>
                 <div className="vstep-body">
                   <div className="vstep-title">Unlock &amp; download your report</div>
-                  <p className="vstep-desc">Our Scope 1 &amp; Scope 2 GHG module is priced at <strong>$999 USD</strong> &mdash; simply create an account and pay securely by credit card, or on invoice, via <strong>Stripe</strong>. Then download your selected report, ready to <strong>submit for California&rsquo;s SB 253, or any other global GHG reporting framework</strong>, or hand straight to your customer or investor.</p>
+                  <p className="vstep-desc">Our Scope 1 &amp; Scope 2 GHG module is priced at <strong>$4,900 USD</strong> &mdash; simply create an account and pay securely by credit card, or on invoice, via <strong>Stripe</strong>. Then download your selected report, ready to <strong>submit for California&rsquo;s SB 253, or any other global GHG reporting framework</strong>, or hand straight to your customer or investor.</p>
                   <span className="hint">Need Scope 3 emissions calculated too? <Link href={CONFIG.SUPPLY_CHAIN_URL}>Add our Scope 3 &amp; Supply Chain module &rarr;</Link></span>
                 </div>
               </div>
@@ -552,7 +552,7 @@ export default function CalculateEmissionsPage() {
             <div className="tier-grid">
               <div className="tier">
                 <div className="tier-name">GHG Module</div>
-                <div className="tier-price">$999*</div>
+                <div className="tier-price">$4,900*</div>
                 <p>The core, self-serve product. Calculate your Scope 1 &amp; 2 emissions and download a report ready for SB 253 &mdash; or any global GHG framework &mdash; built on the GHG Protocol and methodology that holds up to a verifier.</p>
                 <div className="tier-when">Start here &mdash; the core Scope 1 &amp; 2 report. Everything else is an optional add-on.</div>
               </div>
