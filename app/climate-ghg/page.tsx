@@ -1,6 +1,6 @@
 'use client'
 import Nav from '../components/Nav'
-import { tierPrice } from '@/lib/pricing'
+import { GHG_TIERS } from '@/lib/pricing'
 import { useState, useEffect } from 'react'
 import Footer from '@/app/components/Footer'
 export default function Page() {
@@ -213,11 +213,11 @@ export default function Page() {
         <div style={{ maxWidth: 800, margin: '0 auto', textAlign: 'center' }}>
           <div style={eyebrow}>Pricing</div>
           <h2 style={sectionTitle}>Start with Climate · GHG Emissions.</h2>
-          <p style={sectionSub}>The Starter plan covers everything you need for SB 253 year one. Upgrade to add Scope 3 and additional frameworks.</p>
+          <p style={sectionSub}>Essentials covers your full GHG inventory — Scope 1, 2 &amp; 3 across all frameworks — everything you need for SB 253. Step up to Professional for more locations and hands-on advisory.</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: '2.5rem', textAlign: 'left' }}>
             {[
-              { plan: 'Starter', price: '$' + tierPrice('starter').toLocaleString(), cadence: '/yr · Climate GHG', features: ['Scope 1 + 2 · CARB SB 253 ready', 'IPCC AR6 · IEA 2024 factors', 'Audit trail + assurance package', 'CDP C6 · ESRS E1 · EcoVadis export', '1 entity · 3 users', 'Reports unlocked on paid plan'], featured: false },
-              { plan: 'Professional', price: '$' + tierPrice('professional').toLocaleString(), cadence: '/yr · Climate GHG', features: ['Everything in Starter', 'Scope 3 · all 15 categories', 'Climate Risk module included', 'CDP full suite · IFRS S2 scenarios', '10 entities · 10 users', 'Regulatory Monitor weekly alerts'], featured: true },
+              { plan: 'Essentials', price: '$' + GHG_TIERS.starter.priceUSD?.toLocaleString(), cadence: '/ reporting year', features: ['Scope 1 + 2 · CARB SB 253 ready', 'Scope 3 · all 15 categories', 'IPCC AR6 · IEA 2024 factors', 'Audit trail + assurance package', 'All reporting frameworks included', 'Multi-year trends dashboard', 'Up to 3 locations'], featured: false },
+              { plan: 'Professional', price: '$' + GHG_TIERS.professional.priceUSD?.toLocaleString(), cadence: '/ reporting year', features: ['Everything in Essentials', 'Up to 15 locations', '10 hours of expert advisory / year', 'Quarterly sector roundtables', 'Regulatory Monitor — weekly alerts'], featured: true },
             ].map(({ plan, price, cadence, features, featured }) => (
               <div key={plan} style={{ background: featured ? '#0d0d0d' : '#fff', borderRadius: 12, padding: '2rem', border: featured ? 'none' : '0.5px solid #e8e7e4' }}>
                 <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: featured ? 'rgba(255,255,255,0.4)' : '#888784', marginBottom: 8 }}>{plan}</div>
