@@ -8,7 +8,7 @@ export const metadata = {
     "Turn your completed GHG inventory into a verifier-ready evidence package, and give your chosen verifier secure access.",
 };
 
-import { tierPrice, ADDONS } from '../../lib/pricing'
+import { GHG_TIERS, ADDONS } from '../../lib/pricing'
 import Nav from '../components/Nav'
 const css = `
   .vr{
@@ -287,15 +287,15 @@ export default function VerificationReadinessPage() {
           </div>
           <div className="price-grid">
             <div className="price">
-              <div className="tier">Your current plan</div>
-              <div className="amt">${tierPrice('starter').toLocaleString()} <small>/ year</small></div>
+              <div className="tier">Climate-GHG · Essentials</div>
+              <div className="amt"><small>from</small> ${GHG_TIERS.starter.priceUSD?.toLocaleString()} <small>/ year</small></div>
               <p className="desc">Climate-GHG — your Scope 1 &amp; 2 inventory engine.</p>
               <ul>
                 <li><span className="c">✓</span> Scope 1 &amp; 2 calculation</li>
                 <li><span className="c">✓</span> Emission factors &amp; methodology</li>
                 <li><span className="c">✓</span> Standard emissions report</li>
               </ul>
-              <a href="#" className="btn btn-ghost" style={{ justifyContent: "center" }}>Current plan</a>
+              <a href="/pricing" className="btn btn-ghost" style={{ justifyContent: "center" }}>See GHG plans →</a>
             </div>
             <div className="price add">
               <span className="ribbon">Add-on</span>
