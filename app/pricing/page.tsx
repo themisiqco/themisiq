@@ -706,7 +706,7 @@ function PricingPageInner() {
             <div style={{ padding: 14, background: '#fff', borderRadius: 10, border: verificationActive ? '2px solid #7425e3' : '1px solid #e8e7e4', opacity: conciergeActive && !conciergeResolved.isCustomQuote ? 1 : 0.55 }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>Verification Readiness · $499/yr</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>Verification Readiness · $1,499/yr</div>
                   <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, marginTop: 2 }}>Assurance-ready package built on your Concierge-reviewed data.</div>
                 </div>
                 {conciergeActive && !conciergeResolved.isCustomQuote ? (

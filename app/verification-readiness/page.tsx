@@ -288,10 +288,10 @@ export default function VerificationReadinessPage() {
           <div className="price-grid">
             <div className="price">
               <div className="tier">Climate-GHG · Essentials</div>
-              <div className="amt"><small>from</small> ${GHG_TIERS.starter.priceUSD?.toLocaleString()} <small>/ year</small></div>
-              <p className="desc">Climate-GHG — your Scope 1 &amp; 2 inventory engine.</p>
+              <div className="amt"><small>from</small> ${GHG_TIERS.starter.priceUSD?.toLocaleString()} <small>/ reporting year</small></div>
+              <p className="desc">Climate-GHG — your Scope 1, 2 &amp; 3 inventory engine.</p>
               <ul>
-                <li><span className="c">✓</span> Scope 1 &amp; 2 calculation</li>
+                <li><span className="c">✓</span> Scope 1, 2 &amp; 3 calculation</li>
                 <li><span className="c">✓</span> Emission factors &amp; methodology</li>
                 <li><span className="c">✓</span> Standard emissions report</li>
               </ul>

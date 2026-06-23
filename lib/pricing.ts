@@ -262,12 +262,12 @@ export const PACKS: Record<
 
 // ── Add-ons ──────────────────────────────────────────────────────────────────
 // Add-ons are extras that attach to a module — they are NOT modules themselves.
-// Verification Readiness ($499/yr) layers on top of GHG: it requires the `ghg`
+// Verification Readiness ($1,499/yr) layers on top of GHG: it requires the `ghg`
 // module, and can be bought either on its own (if GHG is already owned) or
 // bundled with a fresh GHG purchase in the same checkout.
 //
 // Design decisions (confirmed with Lisa):
-//  - Flat $499 — does NOT follow the founding-offer switch.
+//  - Flat $1,499 — does NOT follow the founding-offer switch.
 //  - Does NOT count toward the 2-/3-module volume discount.
 //  - Its own entitlement key `verification`, gated separately from `ghg`.
 export type AddOnKey = 'verification' | 'concierge-basic' | 'concierge-standard' | 'concierge-enterprise'
@@ -279,7 +279,7 @@ export const ADDONS: Record<
 verification: {
     key: 'verification',
     label: 'Verification Readiness',
-    price: 499,
+    price: 1499,
     requires: ['ghg'],
     requiresAddOnAnyOf: ['concierge-basic', 'concierge-standard', 'concierge-enterprise'],
   },

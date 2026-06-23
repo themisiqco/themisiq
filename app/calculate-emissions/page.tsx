@@ -125,7 +125,7 @@ const FAQ_LD = {
       name: "What does it cost?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Calculating and previewing your Scope 1 and 2 emissions is free. The GHG module is $999 USD; Concierge from $799; Verification Readiness $499; Advisory is custom; Scope 3 is available via the Scope 3 & Supply Chain module. All prices in USD.",
+        text: "Calculating and previewing your Scope 1 and 2 emissions is free. The GHG module is $4,900 USD; Concierge from $799; Verification Readiness $1,499; Advisory is custom; Scope 3 is available via the Scope 3 & Supply Chain module. All prices in USD.",
       },
     },
     {
@@ -564,7 +564,7 @@ export default function CalculateEmissionsPage() {
               </div>
               <div className="tier">
                 <div className="tier-name">Verification Readiness</div>
-                <div className="tier-price">$499</div>
+                <div className="tier-price">$1,499</div>
                 <p>Need your GHG emissions verified by a third party? Verification Readiness opens full audit-trail access with a unique verifier log-in to the back end, so they can validate your numbers against our GHG-Protocol methodology &mdash; the gold standard for emissions accounting.</p>
                 <div className="tier-when">Best when a customer, investor, or regulator requires independent verification.</div>
               </div>
@@ -671,9 +671,9 @@ export default function CalculateEmissionsPage() {
                   A fraction of what consultants and legacy platforms charge. Seeing your emissions is free &mdash; you only pay when you&rsquo;re ready to download a report or add support:
                   <ul className="price-list">
                     <li><span className="pl-name">Calculate &amp; preview your Scope 1 &amp; 2 emissions</span><span className="pl-price">Free</span></li>
-                    <li><span className="pl-name">GHG module &mdash; Scope 1 &amp; 2 report, any framework</span><span className="pl-price">$999*</span></li>
+                    <li><span className="pl-name">GHG module &mdash; Scope 1 &amp; 2 report, any framework</span><span className="pl-price">$4,900*</span></li>
                     <li><span className="pl-name">Concierge &mdash; we tabulate the data from your bills</span><span className="pl-price">from $799</span></li>
-                    <li><span className="pl-name">Verification Readiness &mdash; third-party verifier access</span><span className="pl-price">$499</span></li>
+                    <li><span className="pl-name">Verification Readiness &mdash; third-party verifier access</span><span className="pl-price">$1,499</span></li>
                     <li><span className="pl-name">Advisory &mdash; dedicated specialists guide you</span><span className="pl-price">Custom</span></li>
                     <li><span className="pl-name">Scope 3 &mdash; full value chain, via our Scope 3 &amp; Supply Chain module</span><span className="pl-price"><Link href={CONFIG.SUPPLY_CHAIN_URL}>See module &rarr;</Link></span></li>
                   </ul>

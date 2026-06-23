@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cartQuote, type ModuleKey } from './pricing'
+import { cartQuote, ADDONS, type ModuleKey } from './pricing'
 
 // Regression guard for the new-model cart math (June 2026 rescope). cartQuote is
 // the single source of truth shared by the configurator (display) and the server
@@ -42,5 +42,14 @@ describe('cartQuote — new pricing model', () => {
     const q = cartQuote({ modules: ['ghg'], ghgTier: 'advisory' })
     expect(q.requiresQuote).toBe(true)
     expect(q.totalUSD).toBe(0)
+  })
+})
+
+describe('add-on pricing', () => {
+  // Locks the Verification Readiness add-on price at the source of truth. ADDONS
+  // .verification.price is charged directly by /api/checkout + /api/admin/create-invoice
+  // (it does NOT flow through cartQuote), so this guards what customers actually pay.
+  it('Verification Readiness add-on = $1,499', () => {
+    expect(ADDONS.verification.price).toBe(1499)
   })
 })
