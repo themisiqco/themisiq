@@ -110,7 +110,7 @@ export function tierStrikethrough(tier: Tier): number | null {
 // THE CUTOVER SWITCH. false = live/old model everywhere; true = new model everywhere.
 // (Build-time const, not an env var, so client + server read the identical value —
 // no client/server drift that could let display and charge diverge.)
-export const NEW_PRICING_ACTIVE = false
+export const NEW_PRICING_ACTIVE = true
 
 // Reuse the existing tier union under the name the rescope spec references.
 export type GhgTier = Tier
