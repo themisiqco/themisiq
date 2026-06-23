@@ -79,6 +79,13 @@ create policy purchase_consents_delete on public.purchase_consents
 -- scope3_inventories, companies, ghg_monthly_emissions).
 grant select, insert, update, delete on table public.purchase_consents to authenticated;
 
+-- Required for the webhook's writer: it persists consent rows via the service_role
+-- client. service_role is NOT a member of `authenticated`, so the grant above does
+-- not cover it — without this line the upsert fails with Postgres 42501
+-- (insufficient_privilege) and consent rows silently never land. (Applied live
+-- 2026-06-22 after the sandbox test surfaced the gap; this file now matches reality.)
+grant select, insert, update on table public.purchase_consents to service_role;
+
 -- ── VERIFY AFTER RUNNING (paste in the SQL editor; do not trust the GRANT line) ──
 -- 1) RLS on?
 --    select relrowsecurity from pg_class where relname = 'purchase_consents';   -- expect: t
