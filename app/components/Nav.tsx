@@ -80,7 +80,7 @@ export default function Nav() {
   const ghgVerification = MODULES_NAV.find(m => m.href === '/verification-readiness')!
   const otherModules = MODULES_NAV.filter(m => m.href !== '/climate-ghg' && m.href !== '/verification-readiness')
 
-  const navLinkStyle: React.CSSProperties = { fontSize: 12, color: '#555553', textDecoration: 'none', whiteSpace: 'nowrap', fontWeight: 400 }
+  const navLinkStyle: React.CSSProperties = { fontSize: 15, color: '#555553', textDecoration: 'none', whiteSpace: 'nowrap', fontWeight: 400 }
   const platformItemStyle: React.CSSProperties = { display: 'block', padding: '9px 12px', borderRadius: 8, textDecoration: 'none' }
   const ghostBtn: React.CSSProperties = { fontSize: 12, fontWeight: 400, padding: '7px 14px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', textDecoration: 'none', display: 'inline-block', whiteSpace: 'nowrap' }
   const primaryBtn: React.CSSProperties = { fontSize: 12, fontWeight: 500, padding: '7px 14px', borderRadius: 8, background: GRAD, color: '#fff', textDecoration: 'none', display: 'inline-block', whiteSpace: 'nowrap' }
@@ -117,7 +117,7 @@ export default function Nav() {
                 aria-expanded={platformOpen}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', gap: 4, ...navLinkStyle }}
               >
-                Platform <span style={{ fontSize: 9, color: '#888784' }}>▾</span>
+                Solutions <span style={{ fontSize: 12, color: '#555553' }}>▼</span>
               </button>
               {platformOpen && (
                 <div style={{
