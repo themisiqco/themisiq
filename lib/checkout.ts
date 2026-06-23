@@ -21,6 +21,12 @@ export interface CheckoutSelection {
   tier?: Tier
   moduleKeys?: ModuleKey[]
   addOns?: AddOnKey[]
+  // New-model B2B consent (collected in the configurator modal; rides through the
+  // resume-after-login bounce because the whole selection is stored + replayed).
+  // email/ip are captured server-side at /api/checkout, NOT here.
+  business?: { name: string; regNumber: string }
+  purchaser?: { name: string }
+  consent?: { businessCapacity: boolean; digitalAccess: boolean; dataAuthority: boolean; atISO: string; version: string }
 }
 
 export async function startCheckout(selection: CheckoutSelection): Promise<void> {

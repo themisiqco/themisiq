@@ -49,7 +49,10 @@ export async function POST(req: NextRequest) {
         const session = event.data.object as Stripe.Checkout.Session
         // Only act on actually-paid sessions.
         if (session.payment_status === 'paid') {
-          await grantFromMetadata(session.metadata, 'stripe:checkout')
+          await grantFromMetadata(session.metadata, 'stripe:checkout', {
+            sessionId: session.id,
+            paymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id ?? null,
+          })
         }
         break
       }
@@ -79,6 +82,7 @@ export async function POST(req: NextRequest) {
 async function grantFromMetadata(
   metadata: Stripe.Metadata | null | undefined,
   source: string,
+  stripeRef?: { sessionId: string; paymentIntentId: string | null },
 ) {
   const userId = metadata?.user_id
   const entitlements = metadata?.entitlements
@@ -115,4 +119,31 @@ async function grantFromMetadata(
   }
 
   console.log(`[webhook] granted [${keys.join(', ')}] to user ${userId}`)
+
+  // Additive: persist the purchase-consent record (self-serve checkout only — present
+  // when consent metadata was attached at checkout). The PRIMARY durable record is the
+  // Stripe charge metadata; this is the queryable mirror. Best-effort: a failure here is
+  // LOGGED, not thrown, so it never blocks the (already-committed) entitlement grant nor
+  // triggers webhook-retry storms. Idempotent on stripe_session_id.
+  if (metadata?.consent_version && stripeRef?.sessionId) {
+    const { error: cErr } = await supabaseAdmin.from('purchase_consents').upsert(
+      {
+        user_id: userId,
+        stripe_session_id: stripeRef.sessionId,
+        payment_intent_id: stripeRef.paymentIntentId ?? null,
+        business_name: metadata.business_name ?? '',
+        business_reg_number: metadata.business_reg_number ?? '',
+        purchaser_name: metadata.purchaser_name ?? '',
+        purchaser_email: metadata.purchaser_email || null,
+        ip_address: metadata.ip_address || null,
+        consent_business_capacity: metadata.consent_business_capacity === 'true',
+        consent_digital_access: metadata.consent_digital_access === 'true',
+        consent_data_authority: metadata.consent_data_authority === 'true',
+        consent_version: metadata.consent_version,
+      },
+      { onConflict: 'stripe_session_id' },
+    )
+    if (cErr) console.error('[webhook] purchase_consents write failed (consent also lives in Stripe metadata):', cErr)
+    else console.log(`[webhook] recorded purchase consent for session ${stripeRef.sessionId}`)
+  }
 }

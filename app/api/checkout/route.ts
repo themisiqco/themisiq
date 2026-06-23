@@ -45,6 +45,9 @@ interface CheckoutBody {
   tier?: Tier
   moduleKeys?: ModuleKey[]
   addOns?: AddOnKey[]
+  business?: { name?: string; regNumber?: string }
+  purchaser?: { name?: string }
+  consent?: { businessCapacity?: boolean; digitalAccess?: boolean; dataAuthority?: boolean; atISO?: string; version?: string }
 }
 
 export async function POST(req: NextRequest) {
@@ -163,6 +166,33 @@ export async function POST(req: NextRequest) {
     const origin =
       req.headers.get('origin') ?? new URL(req.url).origin
 
+    // 4.5) Consent + business-ID enforcement (NEW model only). Old path unaffected:
+    // when the flag is off, consentMeta is {} and the metadata below is byte-identical.
+    let consentMeta: Record<string, string> = {}
+    if (NEW_PRICING_ACTIVE) {
+      const b = body.business, p = body.purchaser, c = body.consent
+      const ok =
+        !!b?.name?.trim() && !!b?.regNumber?.trim() && !!p?.name?.trim() &&
+        c?.businessCapacity === true && c?.digitalAccess === true && c?.dataAuthority === true
+      if (!ok) {
+        return NextResponse.json({ error: 'Business details and all required confirmations are needed before payment.' }, { status: 400 })
+      }
+      // Best-effort server captures (never block the consent record if absent).
+      const ip = (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim()
+      consentMeta = {
+        business_name: b!.name!.trim(),
+        business_reg_number: b!.regNumber!.trim(),
+        purchaser_name: p!.name!.trim(),
+        purchaser_email: email ?? '',
+        ip_address: ip,
+        consent_business_capacity: 'true',
+        consent_digital_access: 'true',
+        consent_data_authority: 'true',
+        consent_at: c!.atISO ?? new Date().toISOString(),
+        consent_version: c!.version ?? '2026-06-v2-final',
+      }
+    }
+
     // 5) Create the Checkout Session. Metadata travels to the webhook.
     const entitlements = Array.from(entitlementsToGrant).join(',')
     const metadata = {
@@ -170,6 +200,7 @@ export async function POST(req: NextRequest) {
       entitlements, // e.g. "ghg,supply-chain,verification"
       source: sources.join(' | '),
       ghg_location_allowance: ghgAllowance != null ? String(ghgAllowance) : '',
+      ...consentMeta,
     }
 
     const session = await stripe.checkout.sessions.create({
