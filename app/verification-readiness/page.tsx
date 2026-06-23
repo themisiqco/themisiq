@@ -147,10 +147,7 @@ function Icon({ d }: { d: string }) {
 }
 
 // ── Wire your CTAs here ───────────────────────────────────────────────
-// BUY_URL:     where the purchase buttons go. Start with a Stripe Payment
-//              Link (fastest), or your in-app checkout/upgrade route.
 // CONTACT_HREF: where "Talk to our team" goes — a contact page or mailto.
-const BUY_URL = "mailto:hello@themisiq.co?subject=Verification Readiness add-on"; // temporary — swap for Stripe checkout link when ready
 const CONTACT_HREF = "mailto:hello@themisiq.co"; // TODO: replace with your real contact route
 // ──────────────────────────────────────────────────────────────────────
 
@@ -309,7 +306,7 @@ export default function VerificationReadinessPage() {
                 <li><span className="c">✓</span> Management assertion sign-off workflow</li>
                 <li><span className="c">✓</span> Secure verifier access to your account &amp; sampling register</li>
               </ul>
-              <a href={BUY_URL} className="btn btn-primary" style={{ justifyContent: "center" }}>Add to your plan →</a>
+              <a href="/pricing" className="btn btn-primary" style={{ justifyContent: "center" }}>Add to your plan →</a>
             </div>
           </div>
         </div>
@@ -322,7 +319,7 @@ export default function VerificationReadinessPage() {
             <h2 style={{ marginTop: ".5rem" }}>Make your next inventory <span className="grad-text">verification-ready.</span></h2>
             <p>Turn the number you already have into a package a verifier can test efficiently — and shorten the engagement that follows.</p>
             <div className="cta">
-              <a href={BUY_URL} className="btn btn-grad">Add Verification Readiness →</a>
+              <a href="/pricing" className="btn btn-grad">Add Verification Readiness →</a>
               <a href={CONTACT_HREF} className="btn btn-ghost">Talk to our team</a>
             </div>
           </div>
