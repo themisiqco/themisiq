@@ -125,7 +125,7 @@ const FAQ_LD = {
       name: "What does it cost?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Calculating and previewing your Scope 1 and 2 emissions is free. The GHG module is $4,900 USD; Concierge from $799; Verification Readiness $1,499; Advisory is custom; Scope 3 is available via the Scope 3 & Supply Chain module. All prices in USD.",
+        text: "Calculating and previewing your Scope 1 and 2 emissions is free. The GHG module is $4,900 USD; Concierge from $799; Verification Readiness $1,499; Advisory is custom; Scope 3 (all 15 categories) is included in the GHG module; the Supply Chain module adds primary supplier data collection for Category 1. All prices in USD.",
       },
     },
     {
@@ -530,7 +530,7 @@ export default function CalculateEmissionsPage() {
                 <div className="vstep-body">
                   <div className="vstep-title">Unlock &amp; download your report</div>
                   <p className="vstep-desc">Our Scope 1 &amp; Scope 2 GHG module is priced at <strong>$4,900 USD</strong> &mdash; simply create an account and pay securely by credit card, or on invoice, via <strong>Stripe</strong>. Then download your selected report, ready to <strong>submit for California&rsquo;s SB 253, or any other global GHG reporting framework</strong>, or hand straight to your customer or investor.</p>
-                  <span className="hint">Need Scope 3 emissions calculated too? <Link href={CONFIG.SUPPLY_CHAIN_URL}>Add our Scope 3 &amp; Supply Chain module &rarr;</Link></span>
+                  <span className="hint">Scope 3 is included in the GHG module. <Link href={CONFIG.SUPPLY_CHAIN_URL}>Add Supply Chain for primary supplier data on Category 1 &rarr;</Link></span>
                 </div>
               </div>
             </div>
@@ -618,7 +618,7 @@ export default function CalculateEmissionsPage() {
                   <p className="qa-subhead">Which scopes apply to you?</p>
                   <p><strong>Scope 1 &amp; 2 only, for now:</strong> California&rsquo;s SB 253 requires just Scope 1 and Scope 2 for its first reports, due August 10, 2026.</p>
                   <p><strong>Scope 3 required:</strong> SB 253 adds Scope 3 from 2027 (covering fiscal-year 2026 data), with CARB still finalizing the details. The EU&rsquo;s CSRD (ESRS&nbsp;E1) requires your material Scope 3 categories, and IFRS&nbsp;S2 requires Scope 3 as well &mdash; with first-year transition relief in many adopting jurisdictions.</p>
-                  <p>If you need it, we&rsquo;ve got it. ThemisIQ covers the full <strong>GHG Protocol Scope 3 Value Chain standard</strong> across all 15 categories &mdash; including PCAF-based financed emissions &mdash; with supplier data collected directly through our portal. <Link href={CONFIG.SUPPLY_CHAIN_URL}>See our Scope&nbsp;3 &amp; Supply Chain module &rarr;</Link></p>
+                  <p>If you need it, we&rsquo;ve got it. ThemisIQ covers the full <strong>GHG Protocol Scope 3 Value Chain standard</strong> across all 15 categories &mdash; including PCAF-based financed emissions &mdash; with supplier data collected directly through our portal. <Link href={CONFIG.SUPPLY_CHAIN_URL}>See the Supply Chain module for primary supplier data &rarr;</Link></p>
                 </div>
               </details>
 
@@ -661,7 +661,7 @@ export default function CalculateEmissionsPage() {
                     <li><strong>SBTi</strong> &mdash; a Scope 3 target is required where Scope 3 is a significant share of your total (over 40% under current criteria).</li>
                   </ul>
                   <p><strong>EcoVadis</strong> rates you across all three scopes &mdash; reporting Scope 3 strengthens your score rather than being a hard requirement.</p>
-                  <p>Need Scope 3? Add our <Link href={CONFIG.SUPPLY_CHAIN_URL}>Scope 3 &amp; Supply Chain module</Link> &mdash; the full GHG Protocol Scope 3 Value Chain standard across all 15 categories. Because these frameworks&rsquo; thresholds and timelines shift often, we keep the mappings current and stamp the exact basis used on every export.</p>
+                  <p>Scope 3 is part of the GHG module &mdash; the full GHG Protocol Value Chain standard across all 15 categories. The <Link href={CONFIG.SUPPLY_CHAIN_URL}>Supply Chain module</Link> adds primary supplier data collection for Category 1. Because these frameworks&rsquo; thresholds and timelines shift often, we keep the mappings current and stamp the exact basis used on every export.</p>
                 </div>
               </details>
 
@@ -675,7 +675,7 @@ export default function CalculateEmissionsPage() {
                     <li><span className="pl-name">Concierge &mdash; we tabulate the data from your bills</span><span className="pl-price">from $799</span></li>
                     <li><span className="pl-name">Verification Readiness &mdash; third-party verifier access</span><span className="pl-price">$1,499</span></li>
                     <li><span className="pl-name">Advisory &mdash; dedicated specialists guide you</span><span className="pl-price">Custom</span></li>
-                    <li><span className="pl-name">Scope 3 &mdash; full value chain, via our Scope 3 &amp; Supply Chain module</span><span className="pl-price"><Link href={CONFIG.SUPPLY_CHAIN_URL}>See module &rarr;</Link></span></li>
+                    <li><span className="pl-name">Scope 3 &mdash; full value chain, included in the GHG module</span><span className="pl-price"><Link href={CONFIG.CLIMATE_GHG_URL}>See module &rarr;</Link></span></li>
                   </ul>
                   <p className="usd-note">* All prices shown in USD.</p>
                 </div>
