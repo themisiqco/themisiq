@@ -110,7 +110,7 @@ const MODULES = [
 ]
 
 const TIER_CONFIG = {
-  starter:      { label: 'Starter', color: '#0F6E56', bg: '#E1F5EE' },
+  starter:      { label: 'Essentials', color: '#0F6E56', bg: '#E1F5EE' },
   professional: { label: 'Professional', color: '#7425e3', bg: '#EDE9FE' },
   advisory:     { label: 'Advisory', color: '#0C447C', bg: '#E6F1FB' },
 }
@@ -342,10 +342,10 @@ export default function Dashboard() {
               Ready to unlock your compliance programme?
             </div>
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 20, lineHeight: 1.6, maxWidth: 500, margin: '0 auto 20px' }}>
-              All 7 modules are available for $999/module/year. Or choose a starter pack built for your specific situation.
+              Each module is an annual license. See current pricing for every module and GHG tier.
             </div>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <a href="/pricing" style={{ fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', textDecoration: 'none' }}>See pricing & starter packs →</a>
+              <a href="/pricing" style={{ fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', textDecoration: 'none' }}>See current pricing →</a>
               <a href="/assess" style={{ fontSize: 13, padding: '11px 24px', borderRadius: 8, background: 'none', color: 'rgba(255,255,255,0.6)', border: '0.5px solid rgba(255,255,255,0.2)', textDecoration: 'none' }}>Check my obligations first →</a>
             </div>
           </div>
