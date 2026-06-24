@@ -1,6 +1,6 @@
 'use client'
 import Nav from '../components/Nav'
-import { tierPrice } from '@/lib/pricing'
+import { FLAT_MODULE_PRICES } from '@/lib/pricing'
 import Footer from '@/app/components/Footer'
 export default function Page() {
   return (
@@ -196,11 +196,10 @@ export default function Page() {
         <div style={{ maxWidth: 800, margin: '0 auto', textAlign: 'center' }}>
           <div style={eyebrow}>Pricing</div>
           <h2 style={sectionTitle}>Start with Climate Risk.</h2>
-          <p style={sectionSub}>The Starter plan covers a complete TCFD-aligned risk assessment. Add modules and bundle to save — 10% off two, 15% off three or more.</p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: '2.5rem', textAlign: 'left' }}>
+          <p style={sectionSub}>A complete TCFD-aligned climate risk assessment — one flat annual price. Add modules and bundle to save: 10% off two, 20% off three or more.</p>
+          <div style={{ maxWidth: 400, margin: '2.5rem auto 0', textAlign: 'left' }}>
             {[
-              { plan: 'Starter', price: '$' + tierPrice('starter').toLocaleString(), cadence: '/yr · Climate Risk', features: ['Physical & transition risk assessment', '3 IPCC scenario pathways', 'TCFD-aligned report structure', 'IFRS S2 · CSRD ESRS E1 · SB 261 mapping', 'Audit trail — every entry logged', 'Report unlocked on paid plan'], featured: false },
-              { plan: 'Professional', price: '$' + tierPrice('professional').toLocaleString(), cadence: '/yr · Climate Risk', features: ['Everything in Starter', 'Multi-entity · 10 entities · 10 users', 'Verifier & third-party access role', 'Regulatory Monitor — weekly alerts', 'Priority framework updates', 'All reporting frameworks'], featured: true },
+              { plan: 'Climate Risk', price: '$' + FLAT_MODULE_PRICES['climate-risk'].toLocaleString(), cadence: '/ reporting year', features: ['Physical & transition risk assessment', 'Single + double materiality (IFRS S2 · CSRD/ESRS)', '3 IPCC scenario pathways', 'TCFD-aligned report structure', 'IFRS S2 · CSRD ESRS E1 · SB 261 mapping'], featured: true },
             ].map(({ plan, price, cadence, features, featured }) => (
               <div key={plan} style={{ background: featured ? '#0d0d0d' : '#fff', borderRadius: 12, padding: '2rem', border: featured ? 'none' : '0.5px solid #e8e7e4' }}>
                 <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: featured ? 'rgba(255,255,255,0.4)' : '#888784', marginBottom: 8 }}>{plan}</div>
