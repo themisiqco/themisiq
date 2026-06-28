@@ -6,7 +6,7 @@ import Footer from '@/app/components/Footer'
 export default function Page() {
   const [daysLeft, setDaysLeft] = useState(83)
   useEffect(() => {
-    const deadline = new Date('2026-08-10')
+    const deadline = new Date('2026-11-10')
     const today = new Date()
     const diff = Math.ceil((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
     setDaysLeft(Math.max(0, diff))
@@ -18,7 +18,7 @@ export default function Page() {
       {/* URGENCY BANNER */}
       <div style={{ background: '#B91C1C', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, position: 'sticky', top: 64, zIndex: 99 }}>
         <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff', animation: 'pulse 1.5s infinite' }} />
-        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>SB 253 first-year deadline: August 10, 2026 —  {daysLeft} days away. Scope 1 + 2 disclosure required.</span>
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>SB 253 first-year deadline: November 10, 2026 —  {daysLeft} days away. Scope 1 + 2 disclosure required.</span>
         <a href="/dashboard/ghg" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>Check if SB 253 applies to you →</a>
       </div>
 
@@ -48,7 +48,7 @@ export default function Page() {
           {/* STAT CARDS */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {[
-              { val: 'Aug 10', unit: '2026', label: 'SB 253 first deadline', color: '#B91C1C', bg: '#FCEBEB' },
+              { val: 'Nov 10', unit: '2026', label: 'SB 253 first deadline', color: '#B91C1C', bg: '#FCEBEB' },
               { val: '15', unit: 'Scope 3', label: 'categories covered', color: '#7425e3', bg: '#EDE9FE' },
               { val: '100%', unit: 'audit', label: 'trail — every edit logged', color: '#0F6E56', bg: '#E1F5EE' },
               { val: '5+', unit: 'frameworks', label: 'from one inventory', color: '#0C447C', bg: '#E6F1FB' },
@@ -81,10 +81,10 @@ export default function Page() {
           <div>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>SB 253 — California</div>
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
-              August 10 is  {daysLeft} days away.<br />Are you ready?
+              November 10 is  {daysLeft} days away.<br />Are you ready?
             </h2>
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
-              SB 253 requires California-nexus companies with global revenue over $1B to disclose Scope 1 and 2 emissions by August 10, 2026. ThemisIQ can have your inventory complete and the CARB template pre-filled in days — not months.
+              SB 253 requires California-nexus companies with global revenue over $1B to disclose Scope 1 and 2 emissions by November 10, 2026. ThemisIQ can have your inventory complete and the CARB template pre-filled in days — not months.
             </p>
             {['Guided inventory wizard — no spreadsheets', 'IPCC AR6 emission factors (AR4 on CARB export)', 'Pre-filled CARB SB 253 official template', 'Good-faith enforcement confirmed by CARB for year one', 'Scope 3 preparation for 2027 deadline'].map((item, i) => (
               <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8, alignItems: 'flex-start' }}>
@@ -96,7 +96,7 @@ export default function Page() {
           <div style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: '2rem' }}>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 12 }}>SB 253 timeline</div>
             {[
-              { date: 'Aug 10, 2026', event: 'Scope 1 + 2 first disclosure', status: 'critical', days: `${daysLeft} days` },
+              { date: 'Nov 10, 2026', event: 'Scope 1 + 2 first disclosure', status: 'critical', days: `${daysLeft} days` },
               { date: '2027', event: 'Scope 3 disclosure begins', status: 'upcoming', days: '~1 year' },
               { date: '2027+', event: 'Limited assurance required (Scope 1 + 2)', status: 'upcoming', days: 'Plan now' },
               { date: '2030+', event: 'Reasonable assurance (Scope 1 + 2)', status: 'future', days: 'Build toward' },
@@ -189,7 +189,7 @@ export default function Page() {
           </thead>
           <tbody>
             {[
-              ['SB 253 · CARB template', 'California, USA', '$1B+ global revenue', 'Aug 10, 2026', '✓ Full — pre-filled export'],
+              ['SB 253 · CARB template', 'California, USA', '$1B+ global revenue', 'Nov 10, 2026', '✓ Full — pre-filled export'],
               ['CDP Climate (C6, C7, C11)', 'Global', 'Investor-requested', 'Annual · July', '✓ Full — direct mapping'],
               ['ESRS E1 · CSRD', 'European Union', '500+ employees (large)', 'FY2024 reporting', '✓ Full — ESRS E1-6'],
               ['IFRS S2', '30+ jurisdictions', 'Adopted by jurisdiction', 'Jurisdiction-dependent', '✓ Full — scenario analysis'],

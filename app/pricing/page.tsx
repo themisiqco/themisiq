@@ -31,7 +31,7 @@ const MODULES: Module[] = [
     tags: [
       { label: 'Scope 1, 2 & 3', color: 'blue' },
       { label: 'Live now', color: 'green' },
-      { label: 'SB 253 · Aug 10', color: 'orange' },
+      { label: 'SB 253 · Nov 10', color: 'orange' },
     ],
     cta: {
       headline: 'Ready to see your emissions?',
@@ -161,7 +161,7 @@ function PricingPageInner() {
   const [verificationOn, setVerificationOn] = useState(false)
 
   useEffect(() => {
-    const deadline = new Date('2026-08-10')
+    const deadline = new Date('2026-11-10')
     const today = new Date()
     const diff = Math.ceil((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
     setDaysLeft(Math.max(0, diff))
@@ -470,7 +470,7 @@ function PricingPageInner() {
             { label: 'Methodology', val: 'EPA 2024 · IPCC AR4+AR5 · ISO 14064-3 · GHG Protocol' },
             { label: 'Frameworks', val: 'SB 253 · CDP · ESRS E1 · GRI 305 · IFRS S2 · EcoVadis' },
             { label: 'Built by', val: 'Practitioners with Big 4 & climate consulting experience' },
-            { label: 'Next Reporting Deadline', val: `SB 253 · Aug 10, 2026 · ${daysLeft} days`, red: true },
+            { label: 'Next Reporting Deadline', val: `SB 253 · Nov 10, 2026 · ${daysLeft} days`, red: true },
           ].map((item, i) => (
             <div key={i} style={{ ...s.credItem, ...(i > 0 ? { borderLeft: '1px solid #e8e7e4', paddingLeft: 12 } : {}) }}>
               <div style={s.credLabel}>{item.label}</div>

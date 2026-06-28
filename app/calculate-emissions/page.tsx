@@ -36,7 +36,7 @@ const CONFIG = {
   TRUST_URL: "/trust",
   PRICING_URL: "/pricing",
   // SB 253 first-report deadline (drives the countdown chip).
-  DEADLINE_ISO: "2026-08-10T00:00:00",
+  DEADLINE_ISO: "2026-11-10T00:00:00",
 };
 
 // --- SEO ---------------------------------------------------------
@@ -69,7 +69,7 @@ const FAQ_LD = {
       name: "What is SB 253, and does it apply to me?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "SB 253 (the Climate Corporate Data Accountability Act) requires entities doing business in California with at least $1 billion in annual revenue to disclose Scope 1 and Scope 2 emissions, with the first reports due August 10, 2026 and Scope 3 from 2027. If you are under that threshold it may not apply to you directly, but larger customers and investors who are in scope will often ask you for your emissions to complete their own value-chain reporting.",
+        text: "SB 253 (the Climate Corporate Data Accountability Act) requires entities doing business in California with at least $1 billion in annual revenue to disclose Scope 1 and Scope 2 emissions, with the first reports due November 10, 2026 and Scope 3 from 2027. If you are under that threshold it may not apply to you directly, but larger customers and investors who are in scope will often ask you for your emissions to complete their own value-chain reporting.",
       },
     },
     {
@@ -85,7 +85,7 @@ const FAQ_LD = {
       name: "Scope 1, 2 & 3: what they are and which you need",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Scope 1 is direct emissions from sources you own or control; Scope 2 is indirect emissions from purchased energy; Scope 3 is all other value-chain emissions across 15 categories. SB 253's first reports require only Scope 1 and 2 (due August 10, 2026), with Scope 3 from 2027. CSRD (ESRS E1) and IFRS S2 require material Scope 3 as well.",
+        text: "Scope 1 is direct emissions from sources you own or control; Scope 2 is indirect emissions from purchased energy; Scope 3 is all other value-chain emissions across 15 categories. SB 253's first reports require only Scope 1 and 2 (due November 10, 2026), with Scope 3 from 2027. CSRD (ESRS E1) and IFRS S2 require material Scope 3 as well.",
       },
     },
     {
@@ -391,8 +391,8 @@ export default function CalculateEmissionsPage() {
   const daysLeft = Math.ceil((deadline.getTime() - Date.now()) / 86400000);
   const chipText =
     daysLeft > 0
-      ? `${daysLeft} days to the SB 253 reporting deadline (Aug 10, 2026)`
-      : "SB 253 reporting is now due (Aug 10, 2026)";
+      ? `${daysLeft} days to the SB 253 reporting deadline (Nov 10, 2026)`
+      : "SB 253 reporting is now due (Nov 10, 2026)";
   const ctaText =
     daysLeft > 0
       ? `Only ${daysLeft} days until the SB 253 deadline. See your Scope 1 & 2 emissions in minutes and download a report you can submit or share today.`
@@ -453,7 +453,7 @@ export default function CalculateEmissionsPage() {
               <div className="trigger-card">
                 <div className="tag">Government regulation</div>
                 <h3>Regulators now require it</h3>
-                <p>In the US, California&rsquo;s SB 253 is law today &mdash; Scope 1 &amp; 2 due Aug&nbsp;10,&nbsp;2026 &mdash; with New&nbsp;York, Illinois, New&nbsp;Jersey, and Washington advancing similar bills. Internationally, the EU&rsquo;s CSRD requires it through the ESRS standards, and IFRS&nbsp;S2 is being adopted by regulators in markets worldwide.</p>
+                <p>In the US, California&rsquo;s SB 253 is law today &mdash; Scope 1 &amp; 2 due Nov&nbsp;10,&nbsp;2026 &mdash; with New&nbsp;York, Illinois, New&nbsp;Jersey, and Washington advancing similar bills. Internationally, the EU&rsquo;s CSRD requires it through the ESRS standards, and IFRS&nbsp;S2 is being adopted by regulators in markets worldwide.</p>
               </div>
               <div className="trigger-card">
                 <div className="tag">Investor</div>
@@ -595,7 +595,7 @@ export default function CalculateEmissionsPage() {
               <details className="qa">
                 <summary>What is SB 253, and does it apply to me?</summary>
                 <div className="qa-body">
-                  SB 253 (the Climate Corporate Data Accountability Act) requires entities that do business in California with at least <strong>$1 billion in annual revenue</strong> to disclose their Scope 1 and Scope 2 greenhouse-gas emissions, with the first reports due <strong>August 10, 2026</strong>. Scope 3 reporting follows in 2027. If you&rsquo;re under that threshold, SB 253 may not apply to you directly &mdash; but your larger customers and investors who <em>are</em> in scope will often ask you for your emissions so they can complete their own value-chain reporting.
+                  SB 253 (the Climate Corporate Data Accountability Act) requires entities that do business in California with at least <strong>$1 billion in annual revenue</strong> to disclose their Scope 1 and Scope 2 greenhouse-gas emissions, with the first reports due <strong>November 10, 2026</strong>. Scope 3 reporting follows in 2027. If you&rsquo;re under that threshold, SB 253 may not apply to you directly &mdash; but your larger customers and investors who <em>are</em> in scope will often ask you for your emissions so they can complete their own value-chain reporting.
                 </div>
               </details>
 
@@ -616,7 +616,7 @@ export default function CalculateEmissionsPage() {
                     <li><strong>Scope 3</strong> &mdash; all other indirect emissions across your value chain, organized into 15 categories: purchased goods and services, business travel, transportation, use of sold products, financed emissions, and more.</li>
                   </ul>
                   <p className="qa-subhead">Which scopes apply to you?</p>
-                  <p><strong>Scope 1 &amp; 2 only, for now:</strong> California&rsquo;s SB 253 requires just Scope 1 and Scope 2 for its first reports, due August 10, 2026.</p>
+                  <p><strong>Scope 1 &amp; 2 only, for now:</strong> California&rsquo;s SB 253 requires just Scope 1 and Scope 2 for its first reports, due November 10, 2026.</p>
                   <p><strong>Scope 3 required:</strong> SB 253 adds Scope 3 from 2027 (covering fiscal-year 2026 data), with CARB still finalizing the details. The EU&rsquo;s CSRD (ESRS&nbsp;E1) requires your material Scope 3 categories, and IFRS&nbsp;S2 requires Scope 3 as well &mdash; with first-year transition relief in many adopting jurisdictions.</p>
                   <p>If you need it, we&rsquo;ve got it. ThemisIQ covers the full <strong>GHG Protocol Scope 3 Value Chain standard</strong> across all 15 categories &mdash; including PCAF-based financed emissions &mdash; with supplier data collected directly through our portal. <Link href={CONFIG.SUPPLY_CHAIN_URL}>See the Supply Chain module for primary supplier data &rarr;</Link></p>
                 </div>
@@ -649,7 +649,7 @@ export default function CalculateEmissionsPage() {
                   Build your inventory once, and ThemisIQ produces the report for whichever framework you&rsquo;re asked for &mdash; with full coverage for SB&nbsp;253, CDP, ESRS&nbsp;E1 (under the EU&rsquo;s CSRD), IFRS&nbsp;S2, the GHG Protocol Corporate Standard, EcoVadis, and GRI&nbsp;305, plus SBTi for inventory and target tracking. What each one asks for differs:
                   <p className="qa-subhead">Frameworks that start with Scope 1 &amp; 2</p>
                   <ul className="scope-list">
-                    <li><strong>SB 253</strong> &mdash; Scope 1 &amp; 2 for the first reports (due Aug&nbsp;10,&nbsp;2026); Scope 3 phases in from 2027.</li>
+                    <li><strong>SB 253</strong> &mdash; Scope 1 &amp; 2 for the first reports (due Nov&nbsp;10,&nbsp;2026); Scope 3 phases in from 2027.</li>
                     <li><strong>GHG Protocol Corporate Standard</strong> &mdash; Scope 1 &amp; 2 required; Scope 3 is reported under the separate Corporate Value Chain (Scope 3) Standard.</li>
                   </ul>
                   <p className="qa-subhead">Frameworks that require Scope 1, 2 &amp; 3</p>

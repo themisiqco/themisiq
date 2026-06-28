@@ -9,7 +9,7 @@ import Footer from './components/Footer'
 export default function Home() {
   const [daysLeft, setDaysLeft] = useState(81)
   useEffect(() => {
-    const deadline = new Date('2026-08-10')
+    const deadline = new Date('2026-11-10')
     const today = new Date()
     const diff = Math.ceil((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
     setDaysLeft(Math.max(0, diff))
@@ -40,7 +40,7 @@ export default function Home() {
           </div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#555553', background: '#f8f7f5', border: '0.5px solid #e8e7e4', padding: '8px 16px', borderRadius: 99 }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#B91C1C', display: 'inline-block', animation: 'pulse 1.8s infinite' }} />
-            SB 253 first-year deadline: August 10, 2026 — {daysLeft} days away
+            SB 253 first-year deadline: November 10, 2026 — {daysLeft} days away
           </div>
         </div>
       </section>

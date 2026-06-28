@@ -352,7 +352,7 @@ const GRID_REGIONS_US = US_STATES.map(s => { const y = GRID_EF['US_' + s]; const
 const FRAMEWORKS = [
   {
     id: 'sb253', name: 'SB 253', full: 'California SB 253 — CARB', color: '#B91C1C', bg: '#FCEBEB',
-    gwp: 'AR6', deadline: 'August 10, 2026',
+    gwp: 'AR6', deadline: 'November 10, 2026',
     desc: 'Scope 1 + 2 disclosure for California-nexus companies with $1B+ global revenue',
     requires: ['revenue_millions', 'california_nexus'],
     intensity_denominator: 'revenue',
@@ -888,7 +888,7 @@ function GHGBot({ currentStep }: { currentStep: number }) {
 ABOUT THEMISIQ: ThemisIQ is a compliance platform that helps companies complete GHG inventories for multiple frameworks at once — enter data once, get all reports automatically. The assessment at www.themisiq.co/assess helps companies determine which frameworks apply to them.
 
 FRAMEWORK GUIDANCE:
-- SB 253 (CARB): Required for companies with $1B+ global annual revenue AND California nexus (operations, employees, or sales in California). Deadline: August 10, 2026. If unsure whether they qualify, direct them to www.themisiq.co/assess.
+- SB 253 (CARB): Required for companies with $1B+ global annual revenue AND California nexus (operations, employees, or sales in California). Deadline: November 10, 2026. If unsure whether they qualify, direct them to www.themisiq.co/assess.
 - CDP: Voluntary but widely requested by investors and large customers. If a customer or investor has asked them to complete CDP, they need this. Direct undecided users to www.themisiq.co/assess.
 - ESRS E1: Mandatory for large EU-incorporated companies under EU CSRD. Deadline was FY2024 for the largest companies. If they have EU operations or are incorporated in the EU, they likely need this.
 - GRI 305: Most widely used voluntary emissions standard globally. Used for sustainability reports, supply chain questionnaires, and stakeholder communications. Not mandatory but widely expected by customers and ESG raters.
@@ -917,7 +917,7 @@ KEY TECHNICAL FACTS:
 COMMON QUESTIONS AND ANSWERS:
 - "What's California nexus?" = Having operations, employees, customers, or sales in California. Even one employee working remotely in California can create nexus.
 - "Our revenue is just under $1B" = SB 253 threshold is $1B+ global revenue. If under, you likely don't need to file but should monitor as thresholds may change.
-- "What if I miss the August 10 deadline?" = CARB can impose penalties. ThemisIQ can help you file on time — the wizard takes about 20 minutes with bills in hand.
+- "What if I miss the November 10 deadline?" = CARB can impose penalties. ThemisIQ can help you file on time — the wizard takes about 20 minutes with bills in hand.
 - "Operational vs financial control?" = Operational control means you include facilities where you control operations. Financial control means you include entities where you have financial control. Most companies use operational control.
 - "Do I include subsidiaries?" = Under operational control, yes — include any facility your company operates. Under equity share, include proportional to ownership.
 - "What if our landlord pays electricity?" = If you don't pay the utility bill directly, you may not have access to the data. Request consumption data from your landlord or property manager — this is increasingly common and often required.

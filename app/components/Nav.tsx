@@ -51,7 +51,7 @@ export default function Nav() {
   }, [])
 
   useEffect(() => {
-    setDays(daysUntil('2026-08-10'))
+    setDays(daysUntil('2026-11-10'))
   }, [])
 
   // Close the Platform / avatar menus on outside-click and on Escape.
@@ -265,7 +265,7 @@ export default function Nav() {
               padding: '12px 14px', textAlign: 'center',
             }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#B91C1C' }}>
-                SB 253 deadline: August 10, 2026
+                SB 253 deadline: November 10, 2026
               </div>
               <div style={{ fontSize: 12, color: '#888784', marginTop: 2 }}>
                 {days} days away
