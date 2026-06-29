@@ -5,7 +5,7 @@ import Nav from '../../components/Nav'
 import { supabase } from '../../../lib/supabase'
 import { useEntitlement } from '../../../lib/useEntitlement'
 import PaywallCard from '../../components/PaywallCard'
-import { categorize, validateTargetConfig, type CategoryResult, type Scope, type TargetConfig } from '../../../lib/sbti'
+import { categorize, validateTargetConfig, acaSuggestedReductionPct, type CategoryResult, type Scope, type TargetConfig } from '../../../lib/sbti'
 import { loadCompanySeries } from '../../../lib/ghg/loadSeries'
 import { VERSION_DATES } from '../../../lib/sbti/params'
 
@@ -54,13 +54,20 @@ const SCOPE_LABEL: Record<Scope, string> = {
 }
 const SCOPE_ORDER: Scope[] = ['s1', 's2_location', 's3']
 
+// Step 3 (near-term target cards) helpers.
+type Draft = { baseYear: number; targetYear: number; reductionPct: number }
+const round1 = (n: number): number => Math.round(n * 10) / 10
+// ACA rate bucket: S1 and S2 both use 's1s2' (shared RATE only — never merges emissions); S3 uses 's3'.
+const bucketFor = (sc: Scope): 's1s2' | 's3' => (sc === 's3' ? 's3' : 's1s2')
+const cardStyle: React.CSSProperties = { background: '#fff', border: '1px solid #e8e7e4', borderRadius: 14, padding: '1.4rem 1.6rem' }
+
 export default function SbtiDashboard() {
   // Gated on the GHG entitlement — SBTi is part of the GHG module (same precedent
   // as the Scope 3 Calculator, which is also unlocked by 'ghg').
   const isPaid = useEntitlement('ghg')
 
   // ─── Wizard shell (GHG STEPS pattern) ───────────────────────────────────────
-  const STEPS = ['Company profile', 'Standard & scope']
+  const STEPS = ['Company profile', 'Standard & scope', 'Near-term targets']
   const [step, setStep] = useState(0)
 
   const [loading, setLoading] = useState(true)
@@ -84,6 +91,11 @@ export default function SbtiDashboard() {
   const [standardVersion, setStandardVersion] = useState<'v1_3_1' | 'v2_0'>('v2_0')
   const [selectedScopes, setSelectedScopes] = useState<Scope[]>([])
 
+  // Step 3 state — baseline figures (captured from the same series) + per-scope target drafts.
+  const [baselineYear, setBaselineYear] = useState<number | null>(null)
+  const [baselineByScope, setBaselineByScope] = useState<{ scope1: number; scope2Location: number; scope3: number | null } | null>(null)
+  const [targetDrafts, setTargetDrafts] = useState<Partial<Record<Scope, Draft>>>({})
+
   // Resolve the active company (via the GHG series) + prefill any existing profile.
   useEffect(() => {
     if (!isPaid) return
@@ -105,6 +117,11 @@ export default function SbtiDashboard() {
       setCompanyName(series.company)
       const latest = series.years[series.years.length - 1] // years ascending → last = latest
       if (latest && Number.isFinite(latest.scope12Total)) setGhgScope12(latest.scope12Total)
+
+      // Baseline-year per-scope figures for Step 3 (reuse this series; no second fetch).
+      setBaselineYear(series.baselineYear)
+      const baseYr = series.years.find(y => y.year === series.baselineYear) ?? latest
+      if (baseYr) setBaselineByScope({ scope1: baseYr.scope1, scope2Location: baseYr.scope2Location, scope3: baseYr.scope3 })
 
       const { data: profile } = await supabase
         .from('sbti_company_profile')
@@ -164,6 +181,47 @@ export default function SbtiDashboard() {
     const probe: TargetConfig = { standardVersion, scope: sc, method: 'absolute_aca', baseYear: 2022, targetYear: 2030, reductionPct: 1 }
     return { scope: sc, ...validateTargetConfig(probe, {}) }
   }), [selectedScopes, standardVersion])
+
+  // Lazily create a default draft per selected scope (fires as scopes are toggled in Step 2,
+  // so drafts exist by the time Step 3 renders). Default reductionPct = the ACA suggestion.
+  useEffect(() => {
+    setTargetDrafts(prev => {
+      let changed = false
+      const next: Partial<Record<Scope, Draft>> = { ...prev }
+      for (const sc of selectedScopes) {
+        if (!next[sc]) {
+          const by = baselineYear ?? 2022
+          const ty = 2035
+          next[sc] = { baseYear: by, targetYear: ty, reductionPct: round1(acaSuggestedReductionPct({ bucket: bucketFor(sc), baseYear: by, targetYear: ty })) }
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [selectedScopes, baselineYear])
+
+  // Baseline emissions for a scope (S1/S2 separate; combined = S1+S2 sum for V1.3.1).
+  const baseEmissionsFor = (sc: Scope): number | null => {
+    if (!baselineByScope) return null
+    switch (sc) {
+      case 's1': return baselineByScope.scope1
+      case 's2_location': return baselineByScope.scope2Location
+      case 's3': return baselineByScope.scope3
+      case 's1s2_combined': return baselineByScope.scope1 + baselineByScope.scope2Location
+    }
+  }
+  const updateDraft = (sc: Scope, field: keyof Draft, value: number) => {
+    setTargetDrafts(prev => {
+      const cur = prev[sc] ?? { baseYear: baselineYear ?? 2022, targetYear: 2035, reductionPct: 0 }
+      return { ...prev, [sc]: { ...cur, [field]: value } }
+    })
+    setDirty(true)
+  }
+  const resetToSuggested = (sc: Scope) => {
+    const d = targetDrafts[sc]
+    if (!d) return
+    updateDraft(sc, 'reductionPct', round1(acaSuggestedReductionPct({ bucket: bucketFor(sc), baseYear: d.baseYear, targetYear: d.targetYear })))
+  }
 
   const save = async () => {
     if (!companyId || !userId) return
@@ -352,6 +410,90 @@ export default function SbtiDashboard() {
                 )}
 
                 <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 18 }}>Targets are created in the next step.</div>
+              </>
+            )}
+
+            {/* ── Step 3 · Near-term targets (cards + ACA-suggested + live validation; NO persist/trajectory) ── */}
+            {step === 2 && (
+              <>
+                <div style={eyebrow}>Step 3 · Near-term targets</div>
+                <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '1.5rem' }}>
+                  One near-term target per selected scope. The reduction % is pre-filled with the SBTi ACA-suggested rate; edit any field and it re-validates live.
+                </p>
+
+                {selectedScopes.length === 0 ? (
+                  <div style={{ fontSize: 13, color: '#888784', fontWeight: 300 }}>No scopes selected — go back to Step 2 to choose scopes.</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {selectedScopes.map(sc => {
+                      const base = baseEmissionsFor(sc)
+
+                      // S3 with no Scope 3 inventory → routing empty-state (no editable inputs).
+                      if (sc === 's3' && base === null) {
+                        return (
+                          <div key={sc} style={cardStyle}>
+                            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', fontWeight: 400, marginBottom: 8 }}>{SCOPE_LABEL[sc]}</div>
+                            <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: 12 }}>
+                              To set a Scope 3 target, complete your Scope 3 inventory first. Your near-term submission can proceed on Scope 1 + 2 alone.
+                            </p>
+                            <a href="/dashboard/scope3" style={{ display: 'inline-block', padding: '9px 18px', borderRadius: 8, background: '#0d0d0d', color: '#fff', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>Go to Scope 3 Calculator →</a>
+                          </div>
+                        )
+                      }
+
+                      const d = targetDrafts[sc]
+                      if (!d) return null // draft is created by the lazy-init effect
+
+                      const suggested = round1(acaSuggestedReductionPct({ bucket: bucketFor(sc), baseYear: d.baseYear, targetYear: d.targetYear }))
+                      const v = validateTargetConfig({ standardVersion, scope: sc, method: 'absolute_aca', baseYear: d.baseYear, targetYear: d.targetYear, reductionPct: d.reductionPct, isNetZero: false }, {})
+
+                      return (
+                        <div key={sc} style={cardStyle}>
+                          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', fontWeight: 400, marginBottom: 6 }}>{SCOPE_LABEL[sc]}</div>
+                          {base != null && (
+                            <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginBottom: 14 }}>
+                              Base: {base.toLocaleString(undefined, { maximumFractionDigits: 1 })} tCO₂e{baselineYear != null ? ` (${baselineYear})` : ''}
+                            </div>
+                          )}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                            <div>
+                              <label style={labelStyle}>Base year</label>
+                              <input style={inputStyle} type="number" value={d.baseYear} onChange={e => updateDraft(sc, 'baseYear', Number(e.target.value))} />
+                            </div>
+                            <div>
+                              <label style={labelStyle}>Target year</label>
+                              <input style={inputStyle} type="number" value={d.targetYear} onChange={e => updateDraft(sc, 'targetYear', Number(e.target.value))} />
+                            </div>
+                            <div>
+                              <label style={labelStyle}>Reduction %</label>
+                              <input style={inputStyle} type="number" value={d.reductionPct} onChange={e => updateDraft(sc, 'reductionPct', Number(e.target.value))} />
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 8 }}>
+                            ACA-suggested: {suggested}%
+                            {Math.abs(d.reductionPct - suggested) > 0.05 && (
+                              <button onClick={() => resetToSuggested(sc)} style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: '#7425e3', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>reset to suggested</button>
+                            )}
+                          </div>
+                          <div style={{ marginTop: 12, fontSize: 13 }}>
+                            {v.ok ? (
+                              <span style={{ color: '#0F6E56', fontWeight: 600 }}>✓ Valid target</span>
+                            ) : (
+                              <div style={{ color: '#B91C1C' }}>
+                                <span style={{ fontWeight: 600 }}>✗ Invalid</span>
+                                <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontWeight: 300, color: '#555553' }}>
+                                  {v.reasons.map((r, i) => <li key={i}>{r}</li>)}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 18 }}>Trajectory preview and saving come next.</div>
               </>
             )}
 
