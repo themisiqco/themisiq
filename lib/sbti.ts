@@ -4,9 +4,9 @@
 // from ./sbti/params — nothing is hardcoded here.
 // ThemisIQ prepares & monitors targets; it does not validate them (SBTi Services does).
 //
-// Engine build is incremental. THIS step ships categorize() + validateTargetConfig().
-// acaSuggestedReductionPct / computeTrajectory / progress / renewal / etc. land later.
-import { CATEGORY_A_THRESHOLDS, NET_ZERO, ELEC_GROWTH_ABSOLUTE_THRESHOLD_PCT } from './sbti/params';
+// Engine build is incremental. THIS step ships categorize() + validateTargetConfig()
+// + acaSuggestedReductionPct(). computeTrajectory / progress / renewal / etc. land later.
+import { CATEGORY_A_THRESHOLDS, NET_ZERO, ELEC_GROWTH_ABSOLUTE_THRESHOLD_PCT, ACA } from './sbti/params';
 
 // ── Company categorization (CNZS V2.0, Table 1) ────────────────────────
 export interface CategorizeInput {
@@ -165,4 +165,33 @@ export function validateTargetConfig(config: TargetConfig, profile: SbtiProfile)
   }
 
   return { ok: reasons.length === 0, reasons };
+}
+
+// ── ACA suggested reduction % (anchored linear, floored) ───────────────
+// `bucket` is the ACA RATE BUCKET ('s1s2' = the combined S1+S2 floor, 's3' =
+// the Scope-3 floor) — NOT a persisted DB scope. This function has no business
+// knowing how the result later splits into separate s1 / s2_location rows.
+// Floors and the default net-zero year come ONLY from params (never hardcoded).
+//
+// Anchored linear: ambition is linear-to-zero (100%) by the net-zero year, so the
+// raw slope = 100 / yearsToNetZero. max(rawSlope, floor) means "at least the SBTi
+// floor rate, but steeper if linear-to-zero is steeper" — one expression, no branch.
+export function acaSuggestedReductionPct(input: {
+  bucket: 's1s2' | 's3';      // rate bucket — NOT a persisted scope
+  baseYear: number;
+  targetYear: number;
+  netZeroYear?: number;       // defaults to NET_ZERO.latestNetZeroYear
+}): number {
+  const nzYear = input.netZeroYear ?? NET_ZERO.latestNetZeroYear;
+
+  // Guard first: no reduction span.
+  if (input.targetYear <= input.baseYear) return 0;
+
+  const floor = input.bucket === 's1s2'
+    ? ACA.v2_0.annualLinearReductionPct
+    : ACA.v2_0.scope3AnnualLinearReductionPct;
+
+  const slope = Math.max(100 / (nzYear - input.baseYear), floor);
+  const raw = slope * (input.targetYear - input.baseYear);
+  return Math.min(100, Math.max(0, raw));
 }

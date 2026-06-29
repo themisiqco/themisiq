@@ -2,8 +2,8 @@
 // Engine tests — step 1: categorize() only. Assertions read thresholds from params
 // (not hardcoded), so a §12 criteria change to params re-points them automatically.
 import { describe, it, expect } from 'vitest';
-import { categorize, validateTargetConfig, type TargetConfig, type SbtiProfile } from './sbti';
-import { CATEGORY_A_THRESHOLDS as T, NET_ZERO, ELEC_GROWTH_ABSOLUTE_THRESHOLD_PCT } from './sbti/params';
+import { categorize, validateTargetConfig, acaSuggestedReductionPct, type TargetConfig, type SbtiProfile } from './sbti';
+import { CATEGORY_A_THRESHOLDS as T, NET_ZERO, ELEC_GROWTH_ABSOLUTE_THRESHOLD_PCT, ACA } from './sbti/params';
 
 describe('categorize — Route 1 (any country)', () => {
   it('net turnover AT threshold (€450M) → A / route1', () => {
@@ -220,5 +220,52 @@ describe('validateTargetConfig', () => {
     // R1 (combined) + R2 (year<=base) + R3 (<=0) + R5 (net-zero<floor) + R9 (net-zero intensity)
     expect(r.ok).toBe(false);
     expect(r.reasons).toHaveLength(5);
+  });
+});
+
+describe('acaSuggestedReductionPct', () => {
+  it('s1s2 2025→2030: floor binds (anchored 4.0 < 4.2) → floor × years', () => {
+    // slope = max(100/(2050-2025)=4.0, 4.2) = 4.2; 4.2 × 5 = 21.
+    expect(acaSuggestedReductionPct({ bucket: 's1s2', baseYear: 2025, targetYear: 2030 }))
+      .toBeCloseTo(ACA.v2_0.annualLinearReductionPct * (2030 - 2025), 6);
+  });
+
+  it('s3 2025→2030: anchored binds (4.0 > 2.5 floor) → anchored slope × years (= 20, NOT the floor)', () => {
+    const anchoredSlope = 100 / (NET_ZERO.latestNetZeroYear - 2025); // 100/25 = 4.0
+    expect(acaSuggestedReductionPct({ bucket: 's3', baseYear: 2025, targetYear: 2030 }))
+      .toBeCloseTo(anchoredSlope * (2030 - 2025), 6);
+  });
+
+  it('s3 floor-binding on a long horizon (nz 2075: anchored 2.0 < 2.5) → floor × years = 12.5', () => {
+    // anchored = 100/(2075-2025) = 2.0 < 2.5 floor ⇒ floor binds.
+    expect(acaSuggestedReductionPct({ bucket: 's3', baseYear: 2025, targetYear: 2030, netZeroYear: 2075 }))
+      .toBeCloseTo(ACA.v2_0.scope3AnnualLinearReductionPct * (2030 - 2025), 6);
+  });
+
+  it('s1s2 short span 2040→2045 (nz 2050): anchored 10 binds → 50', () => {
+    const anchoredSlope = 100 / (2050 - 2040); // 10
+    expect(acaSuggestedReductionPct({ bucket: 's1s2', baseYear: 2040, targetYear: 2045, netZeroYear: 2050 }))
+      .toBeCloseTo(anchoredSlope * (2045 - 2040), 6);
+  });
+
+  it('targetYear === baseYear → 0 (no span)', () => {
+    expect(acaSuggestedReductionPct({ bucket: 's1s2', baseYear: 2030, targetYear: 2030 })).toBe(0);
+  });
+
+  it('targetYear < baseYear → 0 (guard)', () => {
+    expect(acaSuggestedReductionPct({ bucket: 's3', baseYear: 2030, targetYear: 2025 })).toBe(0);
+  });
+
+  it('clamps to exactly 100 when raw exceeds 100', () => {
+    // s1s2 2025→2050, default nz 2050: floor 4.2 binds; 4.2 × 25 = 105 → clamp 100.
+    expect(acaSuggestedReductionPct({ bucket: 's1s2', baseYear: 2025, targetYear: 2050 })).toBe(100);
+  });
+
+  it('custom netZeroYear=2040 flows through (steeper than default 2050)', () => {
+    // anchored = 100/(2040-2025) = 6.667 > 4.2 floor ⇒ anchored binds; ≈ 33.33,
+    // distinct from the default-2050 result (4.2 × 5 = 21), proving the param is used.
+    const anchored2040 = 100 / (2040 - 2025);
+    expect(acaSuggestedReductionPct({ bucket: 's1s2', baseYear: 2025, targetYear: 2030, netZeroYear: 2040 }))
+      .toBeCloseTo(anchored2040 * (2030 - 2025), 6);
   });
 });

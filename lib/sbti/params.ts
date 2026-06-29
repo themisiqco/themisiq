@@ -54,6 +54,19 @@ export const ACA = {
   },
 } as const;
 
+// ── ACA scope boundary (Phase-2 deferrals — do NOT fold into the slope) ──
+// The ACA above models ONE thing: an emissions-reduction slope. Three related
+// but DISTINCT concepts are deliberately OUT of it; a future reader must not
+// merge any of them into acaSuggestedReductionPct's rate/slope:
+//   (a) Location-based Scope 2 ABSOLUTE target = the ACA emissions slope itself
+//       (the 's1s2' rate bucket). IN scope — this is what the ACA models today.
+//   (b) Low-carbon-electricity (LCE) alignment target = a SHARE / coverage target
+//       (% of electricity that is low-carbon), NOT an emissions slope — different
+//       unit, different math. DEFERRED to Phase 2; not represented here.
+//   (c) Power / maritime sector 2040 net-zero = a SECTOR OVERLAY (long-term SBTs
+//       anchored to a 2040 net-zero year, not 2050) — a per-sector netZeroYear
+//       override, not a rate change. DEFERRED to Phase 2+.
+
 // ── Net-zero target requirements ───────────────────────────────────────
 export const NET_ZERO = {
   minAbsoluteReductionPct: 90,   // ≥90% absolute reduction across S1-3 before neutralization
