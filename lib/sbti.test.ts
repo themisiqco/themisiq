@@ -2,7 +2,7 @@
 // Engine tests — step 1: categorize() only. Assertions read thresholds from params
 // (not hardcoded), so a §12 criteria change to params re-points them automatically.
 import { describe, it, expect } from 'vitest';
-import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, progressStatus, type TargetConfig, type SbtiProfile } from './sbti';
+import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, progressStatus, trajectoryPointForYear, type TargetConfig, type SbtiProfile } from './sbti';
 import { CATEGORY_A_THRESHOLDS as T, NET_ZERO, ELEC_GROWTH_ABSOLUTE_THRESHOLD_PCT, ACA } from './sbti/params';
 
 describe('categorize — Route 1 (any country)', () => {
@@ -342,5 +342,36 @@ describe('progressStatus', () => {
   it('non-finite guard: actual NaN throws; trajectoryEmissions Infinity throws', () => {
     expect(() => progressStatus({ actual: NaN, trajectoryEmissions: 1000, effortEvidence: false })).toThrow();
     expect(() => progressStatus({ actual: 100, trajectoryEmissions: Infinity, effortEvidence: false })).toThrow();
+  });
+});
+
+describe('trajectoryPointForYear', () => {
+  const traj = computeTrajectory({ baseYear: 2025, baseEmissions: 1000, targetYear: 2030, reductionPct: 21, method: 'absolute_aca' });
+
+  it('year present (2027) → that exact point', () => {
+    const expected = traj.find(p => p.year === 2027)!;
+    expect(trajectoryPointForYear(traj, 2027)).toEqual(expected);
+    expect(trajectoryPointForYear(traj, 2027).year).toBe(2027);
+  });
+  it('base year (2025) → { year: 2025, emissions: 1000 }', () => {
+    expect(trajectoryPointForYear(traj, 2025)).toEqual({ year: 2025, emissions: 1000 });
+  });
+  it('target year (2030) → final point', () => {
+    expect(trajectoryPointForYear(traj, 2030)).toEqual(traj[traj.length - 1]);
+  });
+  it('year below range (2024) → throws', () => {
+    expect(() => trajectoryPointForYear(traj, 2024)).toThrow();
+  });
+  it('year above range (2031) → throws', () => {
+    expect(() => trajectoryPointForYear(traj, 2031)).toThrow();
+  });
+  it('empty trajectory ([]) → throws', () => {
+    expect(() => trajectoryPointForYear([], 2027)).toThrow();
+  });
+  it('non-finite year (NaN) → throws', () => {
+    expect(() => trajectoryPointForYear(traj, NaN)).toThrow();
+  });
+  it('duplicate-year input → throws', () => {
+    expect(() => trajectoryPointForYear([{ year: 2027, emissions: 900 }, { year: 2027, emissions: 800 }], 2027)).toThrow();
   });
 });

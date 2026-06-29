@@ -257,3 +257,31 @@ export function progressStatus(input: {
   if (input.actual <= input.trajectoryEmissions) return 'on_track';
   return input.effortEvidence ? 'best_efforts' : 'off_track';
 }
+
+// ── Trajectory point selector (exact-match-or-throw) ───────────────────
+// The SAFE selector callers use to pick the current-year Point off
+// computeTrajectory()'s Point[] before handing `.emissions` to progressStatus.
+// It exists so a wrong-year or missing-year pull can NEVER happen silently:
+// exact-match-or-throw. It never returns the nearest point and never returns
+// undefined. The thrown condition is what the Phase-2 dashboard surfaces as a
+// "confirm the reporting year" warning — this function is the guarantee under it.
+// Pure; params-free. Reuses the existing Point interface.
+export function trajectoryPointForYear(trajectory: Point[], year: number): Point {
+  if (!Number.isFinite(year)) {
+    throw new Error(`trajectoryPointForYear: year must be a finite number (got ${year}).`);
+  }
+  if (trajectory.length === 0) {
+    throw new Error('trajectoryPointForYear: trajectory is empty — no path to select from (e.g. a deferred intensity trajectory).');
+  }
+
+  const matches = trajectory.filter(p => p.year === year);
+  if (matches.length === 0) {
+    const first = trajectory[0].year;
+    const last = trajectory[trajectory.length - 1].year;
+    throw new Error(`trajectoryPointForYear: no point for year ${year} (available range ${first}–${last}).`);
+  }
+  if (matches.length > 1) {
+    throw new Error(`trajectoryPointForYear: ${matches.length} points found for year ${year} — duplicate-year data integrity violation.`);
+  }
+  return matches[0];
+}
