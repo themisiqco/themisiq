@@ -5,7 +5,7 @@
 // ThemisIQ prepares & monitors targets; it does not validate them (SBTi Services does).
 //
 // Engine build is incremental. THIS step ships categorize() + validateTargetConfig()
-// + acaSuggestedReductionPct() + computeTrajectory(). progress / renewal / cycle land later.
+// + acaSuggestedReductionPct() + computeTrajectory() + progressStatus(). renewal / cycle land later.
 import { CATEGORY_A_THRESHOLDS, NET_ZERO, ELEC_GROWTH_ABSOLUTE_THRESHOLD_PCT, ACA } from './sbti/params';
 
 // ── Company categorization (CNZS V2.0, Table 1) ────────────────────────
@@ -231,4 +231,29 @@ export function computeTrajectory(input: {
     points.push({ year: y, emissions });
   }
   return points;
+}
+
+// ── Progress status (current-year actual vs trajectory) ────────────────
+// Turns this year's actual emissions vs this year's trajectory point into the
+// dashboard status chip. `best_efforts` is the SBTi V2.0 concept: a company that
+// has exhausted all available decarbonisation options AND stayed transparent
+// about the barriers stays IN the programme despite being over its trajectory —
+// it is NOT the same as off-track. Pure; params-free. The caller picks the right
+// year's Point off computeTrajectory()'s output and passes its `.emissions` here.
+export type PerformanceStatus = 'on_track' | 'off_track' | 'best_efforts';
+
+export function progressStatus(input: {
+  actual: number;              // current-year actual emissions, tCO2e
+  trajectoryEmissions: number; // current-year trajectory point (.emissions from computeTrajectory)
+  effortEvidence: boolean;     // documented best-efforts evidence
+}): PerformanceStatus {
+  // Minimal guard: emissions must be finite (reject NaN / ±Infinity). Deliberately
+  // NOT re-validating ranges — that is validateTargetConfig's job, not this one's.
+  if (!Number.isFinite(input.actual) || !Number.isFinite(input.trajectoryEmissions)) {
+    throw new Error('progressStatus: actual and trajectoryEmissions must be finite numbers.');
+  }
+
+  // Boundary is <= : exactly on the line counts as on-track.
+  if (input.actual <= input.trajectoryEmissions) return 'on_track';
+  return input.effortEvidence ? 'best_efforts' : 'off_track';
 }

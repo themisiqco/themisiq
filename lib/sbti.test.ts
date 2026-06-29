@@ -2,7 +2,7 @@
 // Engine tests — step 1: categorize() only. Assertions read thresholds from params
 // (not hardcoded), so a §12 criteria change to params re-points them automatically.
 import { describe, it, expect } from 'vitest';
-import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, type TargetConfig, type SbtiProfile } from './sbti';
+import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, progressStatus, type TargetConfig, type SbtiProfile } from './sbti';
 import { CATEGORY_A_THRESHOLDS as T, NET_ZERO, ELEC_GROWTH_ABSOLUTE_THRESHOLD_PCT, ACA } from './sbti/params';
 
 describe('categorize — Route 1 (any country)', () => {
@@ -314,5 +314,33 @@ describe('computeTrajectory', () => {
     const pts = computeTrajectory({ baseYear: 2025, baseEmissions: 1000, targetYear: 2030, reductionPct: 0, method: ABS });
     expect(pts).toHaveLength(6);
     for (const p of pts) expect(p.emissions).toBe(1000);
+  });
+});
+
+describe('progressStatus', () => {
+  it('under the line (actual < trajectory) → on_track', () => {
+    expect(progressStatus({ actual: 900, trajectoryEmissions: 1000, effortEvidence: false })).toBe('on_track');
+  });
+  it('exactly on the line (actual === trajectory) → on_track (boundary)', () => {
+    expect(progressStatus({ actual: 1000, trajectoryEmissions: 1000, effortEvidence: false })).toBe('on_track');
+  });
+  it('over + effortEvidence true → best_efforts', () => {
+    expect(progressStatus({ actual: 1100, trajectoryEmissions: 1000, effortEvidence: true })).toBe('best_efforts');
+  });
+  it('over + effortEvidence false → off_track', () => {
+    expect(progressStatus({ actual: 1100, trajectoryEmissions: 1000, effortEvidence: false })).toBe('off_track');
+  });
+  it('zero-zero edge (actual 0, trajectory 0) → on_track', () => {
+    expect(progressStatus({ actual: 0, trajectoryEmissions: 0, effortEvidence: false })).toBe('on_track');
+  });
+  it('net-zero year: trajectory 0, actual 0.5, no effort → off_track', () => {
+    expect(progressStatus({ actual: 0.5, trajectoryEmissions: 0, effortEvidence: false })).toBe('off_track');
+  });
+  it('net-zero year: trajectory 0, actual 0.5, effort → best_efforts', () => {
+    expect(progressStatus({ actual: 0.5, trajectoryEmissions: 0, effortEvidence: true })).toBe('best_efforts');
+  });
+  it('non-finite guard: actual NaN throws; trajectoryEmissions Infinity throws', () => {
+    expect(() => progressStatus({ actual: NaN, trajectoryEmissions: 1000, effortEvidence: false })).toThrow();
+    expect(() => progressStatus({ actual: 100, trajectoryEmissions: Infinity, effortEvidence: false })).toThrow();
   });
 });
