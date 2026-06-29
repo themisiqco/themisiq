@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import Nav from '../../components/Nav'
 import { supabase } from '../../../lib/supabase'
 import { useEntitlement } from '../../../lib/useEntitlement'
@@ -86,6 +86,7 @@ export default function SbtiDashboard() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [dirty, setDirty] = useState(false) // unsaved edits → beforeunload guard
+  const navIntentRef = useRef(false) // set true on a deliberate in-app navigation so the guard doesn't fire
 
   // Step 2 state (held in wizard state only — NOT persisted here; Step 3 creates targets).
   const [standardVersion, setStandardVersion] = useState<'v1_3_1' | 'v2_0'>('v2_0')
@@ -156,7 +157,10 @@ export default function SbtiDashboard() {
   // Warn on unload while there are unsaved edits (mirrors the GHG wizard guard).
   useEffect(() => {
     if (!dirty) return
-    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    const handler = (e: BeforeUnloadEvent) => {
+      if (navIntentRef.current) return // deliberate in-app navigation → don't warn
+      e.preventDefault(); e.returnValue = ''
+    }
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [dirty])
@@ -436,7 +440,7 @@ export default function SbtiDashboard() {
                             <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: 12 }}>
                               To set a Scope 3 target, complete your Scope 3 inventory first. Your near-term submission can proceed on Scope 1 + 2 alone.
                             </p>
-                            <a href="/dashboard/scope3" style={{ display: 'inline-block', padding: '9px 18px', borderRadius: 8, background: '#0d0d0d', color: '#fff', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>Go to Scope 3 Calculator →</a>
+                            <a href="/dashboard/scope3" onClick={() => { navIntentRef.current = true }} style={{ display: 'inline-block', padding: '9px 18px', borderRadius: 8, background: '#0d0d0d', color: '#fff', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>Go to Scope 3 Calculator →</a>
                           </div>
                         )
                       }
