@@ -2,7 +2,7 @@
 // Engine tests — step 1: categorize() only. Assertions read thresholds from params
 // (not hardcoded), so a §12 criteria change to params re-points them automatically.
 import { describe, it, expect } from 'vitest';
-import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, progressStatus, trajectoryPointForYear, requiredScope3Categories, type TargetConfig, type SbtiProfile } from './sbti';
+import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, progressStatus, trajectoryPointForYear, requiredScope3Categories, cycleState, type TargetConfig, type SbtiProfile } from './sbti';
 import { CATEGORY_A_THRESHOLDS as T, NET_ZERO, ELEC_GROWTH_ABSOLUTE_THRESHOLD_PCT, ACA, SCOPE3_SIGNIFICANCE_PCT } from './sbti/params';
 
 describe('categorize — Route 1 (any country)', () => {
@@ -439,5 +439,58 @@ describe('requiredScope3Categories', () => {
   it('pct precision: [{1,1},{2,2}] → cat 1 ≈ 33.33%', () => {
     const out = requiredScope3Categories([{ category: 1, emissions: 1 }, { category: 2, emissions: 2 }]);
     expect(out.find(r => r.category === 1)!.pct).toBeCloseTo(100 / 3);
+  });
+});
+
+describe('cycleState', () => {
+  const baseCycle = {
+    cycleStart: '2027-02-01', cycleEnd: '2032-02-01', renewalDue: '2032-08-01',
+    transitionPlanDue: '2028-02-01', transitionPlanPublished: false,
+  };
+  const at = (today: string, category: 'A' | 'B' = 'A') => cycleState({ cycle: baseCycle, category, today });
+
+  it("today before cycleStart → 'pending'", () => {
+    expect(at('2027-01-01').phase).toBe('pending');
+  });
+  it("today === cycleStart → 'active' (inclusive boundary)", () => {
+    expect(at('2027-02-01').phase).toBe('active');
+  });
+  it("mid-cycle → 'active'", () => {
+    expect(at('2029-06-01').phase).toBe('active');
+  });
+  it("today === cycleEnd → 'review_due' (boundary)", () => {
+    expect(at('2032-02-01').phase).toBe('review_due');
+  });
+  it("in review window → 'review_due'", () => {
+    expect(at('2032-05-01').phase).toBe('review_due');
+  });
+  it("today === renewalDue → 'overdue' (inclusive boundary)", () => {
+    expect(at('2032-08-01').phase).toBe('overdue');
+  });
+  it("after renewalDue → 'overdue'", () => {
+    expect(at('2033-01-01').phase).toBe('overdue');
+  });
+
+  it('echoes renewalDue in the result', () => {
+    expect(at('2029-06-01').renewalDue).toBe('2032-08-01');
+  });
+
+  it('transitionPlanDue: Cat A, unpublished, date present → echoes the date', () => {
+    expect(at('2029-06-01', 'A').transitionPlanDue).toBe('2028-02-01');
+  });
+  it('transitionPlanDue: Cat A, transitionPlanPublished true → null', () => {
+    expect(cycleState({ cycle: { ...baseCycle, transitionPlanPublished: true }, category: 'A', today: '2029-06-01' }).transitionPlanDue).toBeNull();
+  });
+  it('transitionPlanDue: Cat B (date present) → null', () => {
+    expect(at('2029-06-01', 'B').transitionPlanDue).toBeNull();
+  });
+  it('transitionPlanDue: Cat A, input transitionPlanDue null → null', () => {
+    expect(cycleState({ cycle: { ...baseCycle, transitionPlanDue: null }, category: 'A', today: '2029-06-01' }).transitionPlanDue).toBeNull();
+  });
+
+  it('throws: malformed today / missing cycleEnd / out-of-order boundaries', () => {
+    expect(() => at('2027-2-1')).toThrow();                                                                   // malformed today
+    expect(() => cycleState({ cycle: { ...baseCycle, cycleEnd: undefined as unknown as string }, category: 'A', today: '2029-06-01' })).toThrow(); // missing cycleEnd
+    expect(() => cycleState({ cycle: { ...baseCycle, cycleStart: '2027-02-01', cycleEnd: '2026-01-01' }, category: 'A', today: '2029-06-01' })).toThrow(); // cycleEnd before cycleStart
   });
 });

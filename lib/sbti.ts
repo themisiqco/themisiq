@@ -6,7 +6,7 @@
 //
 // Engine build is incremental. THIS step ships categorize() + validateTargetConfig()
 // + acaSuggestedReductionPct() + computeTrajectory() + progressStatus()
-// + requiredScope3Categories(). renewalTightening / cycleState land later.
+// + requiredScope3Categories() + cycleState() — the final engine function.
 import { CATEGORY_A_THRESHOLDS, NET_ZERO, ELEC_GROWTH_ABSOLUTE_THRESHOLD_PCT, ACA, SCOPE3_SIGNIFICANCE_PCT } from './sbti/params';
 
 // ── Company categorization (CNZS V2.0, Table 1) ────────────────────────
@@ -335,4 +335,82 @@ export function requiredScope3Categories(
       return { category: r.category, pct, required: pct >= SCOPE3_SIGNIFICANCE_PCT };
     })
     .sort((a, b) => a.category - b.category);
+}
+
+// ── SBTi V2.0 accountability-cycle classifier ──────────────────────────
+// Classifies where a company sits in its SBTi V2.0 5-year accountability cycle.
+// PURE date classifier over ALREADY-STORED dates: cycle_end, renewal_due and
+// transition_plan_due are computed at write-time and stored on sbti_cycle — this
+// function reads and compares them, it does NOT derive them.
+//
+// Dates are YYYY-MM-DD strings compared AS STRINGS: lexicographic order equals
+// calendar order for that fixed format, with zero timezone surface. This
+// deliberately avoids new Date('YYYY-MM-DD'), which parses as UTC midnight and
+// shifts the day in negative-offset zones. The caller MUST pass `today` as a
+// LOCAL calendar date — NOT new Date().toISOString().slice(0,10), which is the
+// UTC date and can be a day off near midnight.
+//
+// `phase` tracks the RENEWAL cycle only. `transitionPlanDue` is an orthogonal
+// Category-A output and is NEVER folded into phase.
+export type CyclePhase = 'pending' | 'active' | 'review_due' | 'overdue';
+export interface CycleState {
+  phase: CyclePhase;
+  renewalDue: string;               // YYYY-MM-DD, echoed from input
+  transitionPlanDue: string | null; // YYYY-MM-DD for Category A with an unpublished plan; else null
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function cycleState(input: {
+  cycle: {
+    cycleStart: string;                // YYYY-MM-DD
+    cycleEnd: string;                  // YYYY-MM-DD
+    renewalDue: string;                // YYYY-MM-DD
+    transitionPlanDue?: string | null; // YYYY-MM-DD or null
+    transitionPlanPublished: boolean;
+  };
+  category: 'A' | 'B';
+  today: string;                       // YYYY-MM-DD — caller supplies the LOCAL calendar date
+}): CycleState {
+  const { cycle, category, today } = input;
+
+  // Format guard: the four required dates must each be YYYY-MM-DD.
+  const required: [string, unknown][] = [
+    ['cycleStart', cycle.cycleStart],
+    ['cycleEnd', cycle.cycleEnd],
+    ['renewalDue', cycle.renewalDue],
+    ['today', today],
+  ];
+  for (const [field, value] of required) {
+    if (typeof value !== 'string' || !ISO_DATE.test(value)) {
+      throw new Error(`cycleState: ${field} must be a YYYY-MM-DD date (got ${JSON.stringify(value)}).`);
+    }
+  }
+  // transitionPlanDue is optional; if present it must be well-formed.
+  if (cycle.transitionPlanDue != null && !ISO_DATE.test(cycle.transitionPlanDue)) {
+    throw new Error(`cycleState: transitionPlanDue must be a YYYY-MM-DD date or null (got ${JSON.stringify(cycle.transitionPlanDue)}).`);
+  }
+
+  // Integrity guard: cycleStart <= cycleEnd <= renewalDue (string compare = calendar order).
+  if (cycle.cycleStart > cycle.cycleEnd) {
+    throw new Error(`cycleState: cycleStart (${cycle.cycleStart}) is after cycleEnd (${cycle.cycleEnd}) — upstream write bug.`);
+  }
+  if (cycle.cycleEnd > cycle.renewalDue) {
+    throw new Error(`cycleState: cycleEnd (${cycle.cycleEnd}) is after renewalDue (${cycle.renewalDue}) — upstream write bug.`);
+  }
+
+  // Phase — mutually exclusive, evaluated in order (pure string comparison).
+  let phase: CyclePhase;
+  if (today < cycle.cycleStart) phase = 'pending';
+  else if (today < cycle.cycleEnd) phase = 'active';
+  else if (today < cycle.renewalDue) phase = 'review_due';
+  else phase = 'overdue';
+
+  // transitionPlanDue: Category-A only, only while unpublished and a date exists.
+  const transitionPlanDue =
+    category === 'A' && !cycle.transitionPlanPublished && cycle.transitionPlanDue != null
+      ? cycle.transitionPlanDue
+      : null;
+
+  return { phase, renewalDue: cycle.renewalDue, transitionPlanDue };
 }
