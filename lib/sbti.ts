@@ -5,7 +5,7 @@
 // ThemisIQ prepares & monitors targets; it does not validate them (SBTi Services does).
 //
 // Engine build is incremental. THIS step ships categorize() + validateTargetConfig()
-// + acaSuggestedReductionPct(). computeTrajectory / progress / renewal / etc. land later.
+// + acaSuggestedReductionPct() + computeTrajectory(). progress / renewal / cycle land later.
 import { CATEGORY_A_THRESHOLDS, NET_ZERO, ELEC_GROWTH_ABSOLUTE_THRESHOLD_PCT, ACA } from './sbti/params';
 
 // ── Company categorization (CNZS V2.0, Table 1) ────────────────────────
@@ -194,4 +194,41 @@ export function acaSuggestedReductionPct(input: {
   const slope = Math.max(100 / (nzYear - input.baseYear), floor);
   const raw = slope * (input.targetYear - input.baseYear);
   return Math.min(100, Math.max(0, raw));
+}
+
+// ── Target trajectory (linear path, base→target inclusive) ─────────────
+export interface Point { year: number; emissions: number; }  // emissions in absolute tCO2e
+
+// DOWNSTREAM of acaSuggestedReductionPct: the caller computes the cumulative
+// reduction % first, then passes it here. This draws the USER'S ACTUAL TARGET
+// line (the reductionPct they committed to) — NOT the floor or the suggested
+// default. Pure arithmetic; intentionally params-free (base emissions and the %
+// are all caller-supplied — there is nothing to read from params).
+//
+// Phase-1 scope: ABSOLUTE-emissions lines only. An intensity target is per-unit-
+// of-output and needs a projected output denominator this signature does NOT
+// carry; drawing it as an absolute line would put a wrong number on a
+// verifier-facing chart. So method 'intensity' returns [] — a deliberate
+// Phase-2 deferral, NOT a silent zero.
+export function computeTrajectory(input: {
+  baseYear: number;
+  baseEmissions: number;        // absolute tCO2e at base year
+  targetYear: number;
+  reductionPct: number;         // cumulative % reduction at targetYear (caller-supplied)
+  method: 'absolute_aca' | 'intensity';
+}): Point[] {
+  // Method guard first: intensity paths are deferred to Phase 2 (see comment above).
+  if (input.method === 'intensity') return [];
+
+  // Span guard: no span to draw.
+  if (input.targetYear <= input.baseYear) return [];
+
+  const span = input.targetYear - input.baseYear;
+  const points: Point[] = [];
+  for (let y = input.baseYear; y <= input.targetYear; y++) {
+    const fraction = (y - input.baseYear) / span;
+    const emissions = input.baseEmissions * (1 - (input.reductionPct * fraction) / 100);
+    points.push({ year: y, emissions });
+  }
+  return points;
 }

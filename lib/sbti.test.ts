@@ -2,7 +2,7 @@
 // Engine tests — step 1: categorize() only. Assertions read thresholds from params
 // (not hardcoded), so a §12 criteria change to params re-points them automatically.
 import { describe, it, expect } from 'vitest';
-import { categorize, validateTargetConfig, acaSuggestedReductionPct, type TargetConfig, type SbtiProfile } from './sbti';
+import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, type TargetConfig, type SbtiProfile } from './sbti';
 import { CATEGORY_A_THRESHOLDS as T, NET_ZERO, ELEC_GROWTH_ABSOLUTE_THRESHOLD_PCT, ACA } from './sbti/params';
 
 describe('categorize — Route 1 (any country)', () => {
@@ -267,5 +267,52 @@ describe('acaSuggestedReductionPct', () => {
     const anchored2040 = 100 / (2040 - 2025);
     expect(acaSuggestedReductionPct({ bucket: 's1s2', baseYear: 2025, targetYear: 2030, netZeroYear: 2040 }))
       .toBeCloseTo(anchored2040 * (2030 - 2025), 6);
+  });
+});
+
+describe('computeTrajectory', () => {
+  const ABS = 'absolute_aca' as const;
+
+  it('absolute_aca 2025→2030, base 1000, reductionPct 21: 6 inclusive points, ends at 790', () => {
+    const pts = computeTrajectory({ baseYear: 2025, baseEmissions: 1000, targetYear: 2030, reductionPct: 21, method: ABS });
+    expect(pts).toHaveLength(6);                              // 2025..2030 inclusive
+    expect(pts[0]).toEqual({ year: 2025, emissions: 1000 });  // fraction 0 → exact base
+    expect(pts[5].year).toBe(2030);
+    expect(pts[5].emissions).toBeCloseTo(1000 * (1 - 21 / 100)); // 790
+  });
+
+  it('midpoint 2027 (fraction 2/5): 1000 × (1 − 21×0.4/100) = 916.0', () => {
+    const pts = computeTrajectory({ baseYear: 2025, baseEmissions: 1000, targetYear: 2030, reductionPct: 21, method: ABS });
+    const p2027 = pts.find(p => p.year === 2027)!;
+    expect(p2027.emissions).toBeCloseTo(916); // brief said 915.8 — arithmetic slip; correct is 916.0
+  });
+
+  it('monotonic decreasing (linear decline)', () => {
+    const pts = computeTrajectory({ baseYear: 2025, baseEmissions: 1000, targetYear: 2035, reductionPct: 42, method: ABS });
+    for (let i = 1; i < pts.length; i++) {
+      expect(pts[i].emissions).toBeLessThanOrEqual(pts[i - 1].emissions);
+    }
+  });
+
+  it("method 'intensity' → [] (Phase-2 deferral)", () => {
+    expect(computeTrajectory({ baseYear: 2025, baseEmissions: 1000, targetYear: 2030, reductionPct: 21, method: 'intensity' })).toEqual([]);
+  });
+
+  it('targetYear === baseYear → []', () => {
+    expect(computeTrajectory({ baseYear: 2030, baseEmissions: 1000, targetYear: 2030, reductionPct: 21, method: ABS })).toEqual([]);
+  });
+  it('targetYear < baseYear → []', () => {
+    expect(computeTrajectory({ baseYear: 2030, baseEmissions: 1000, targetYear: 2025, reductionPct: 21, method: ABS })).toEqual([]);
+  });
+
+  it('reductionPct 100 → final point ≈ 0', () => {
+    const pts = computeTrajectory({ baseYear: 2025, baseEmissions: 1000, targetYear: 2030, reductionPct: 100, method: ABS });
+    expect(pts[pts.length - 1].emissions).toBeCloseTo(0);
+  });
+
+  it('reductionPct 0 → flat line, every point === baseEmissions', () => {
+    const pts = computeTrajectory({ baseYear: 2025, baseEmissions: 1000, targetYear: 2030, reductionPct: 0, method: ABS });
+    expect(pts).toHaveLength(6);
+    for (const p of pts) expect(p.emissions).toBe(1000);
   });
 });
