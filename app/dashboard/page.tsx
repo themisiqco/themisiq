@@ -31,6 +31,17 @@ const MODULES = [
     urgency: null,
   },
   {
+    id: 'sbti',
+    name: 'SBTi Targets',
+    sub: 'Corporate Net-Zero V2.0',
+    desc: 'Set and monitor science-based targets under the SBTi Corporate Net-Zero Standard V2.0.',
+    href: '/dashboard/sbti',
+    color: '#0F6E56',
+    bg: '#E1F5EE',
+    frameworks: ['SBTi', 'Net-Zero V2.0', 'ACA'],
+    urgency: null,
+  },
+  {
     id: 'climate_risk',
     name: 'Climate Risk',
     sub: 'Physical & transition',
@@ -143,7 +154,7 @@ export default function Dashboard() {
       // Note: Scope 3 now lives under GHG -- the 'ghg' entitlement unlocks the Scope 3 card,
       // while 'supply-chain' unlocks the Supply Chain + Supplier Portal cards.
       const KEY_TO_CARD_IDS: Record<string, string[]> = {
-        'ghg': ['ghg', 'scope3'],
+        'ghg': ['ghg', 'scope3', 'sbti'],
         'climate-risk': ['climate_risk'],
         'supply-chain': ['supply_chain', 'portal'],
         'people': ['people'],
