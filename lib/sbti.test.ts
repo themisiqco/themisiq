@@ -2,8 +2,8 @@
 // Engine tests — step 1: categorize() only. Assertions read thresholds from params
 // (not hardcoded), so a §12 criteria change to params re-points them automatically.
 import { describe, it, expect } from 'vitest';
-import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, progressStatus, trajectoryPointForYear, type TargetConfig, type SbtiProfile } from './sbti';
-import { CATEGORY_A_THRESHOLDS as T, NET_ZERO, ELEC_GROWTH_ABSOLUTE_THRESHOLD_PCT, ACA } from './sbti/params';
+import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, progressStatus, trajectoryPointForYear, requiredScope3Categories, type TargetConfig, type SbtiProfile } from './sbti';
+import { CATEGORY_A_THRESHOLDS as T, NET_ZERO, ELEC_GROWTH_ABSOLUTE_THRESHOLD_PCT, ACA, SCOPE3_SIGNIFICANCE_PCT } from './sbti/params';
 
 describe('categorize — Route 1 (any country)', () => {
   it('net turnover AT threshold (€450M) → A / route1', () => {
@@ -373,5 +373,71 @@ describe('trajectoryPointForYear', () => {
   });
   it('duplicate-year input → throws', () => {
     expect(() => trajectoryPointForYear([{ year: 2027, emissions: 900 }, { year: 2027, emissions: 800 }], 2027)).toThrow();
+  });
+});
+
+describe('requiredScope3Categories', () => {
+  it('typical mix → 60/30/10%, all required, sorted ascending', () => {
+    const out = requiredScope3Categories([{ category: 6, emissions: 300 }, { category: 1, emissions: 600 }, { category: 7, emissions: 100 }]);
+    expect(out.map(r => r.category)).toEqual([1, 6, 7]);          // sorted ascending
+    expect(out.map(r => r.required)).toEqual([true, true, true]);
+    expect(out[0].pct).toBeCloseTo(60);
+    expect(out[1].pct).toBeCloseTo(30);
+    expect(out[2].pct).toBeCloseTo(10);
+  });
+
+  it('sub-threshold 4% → not required', () => {
+    const out = requiredScope3Categories([{ category: 1, emissions: 4 }, { category: 2, emissions: 96 }]);
+    const c1 = out.find(r => r.category === 1)!;
+    expect(c1.pct).toBeCloseTo(4);
+    expect(c1.required).toBe(false);
+  });
+
+  it('exactly at the threshold → required (>= boundary)', () => {
+    const out = requiredScope3Categories([
+      { category: 1, emissions: SCOPE3_SIGNIFICANCE_PCT },
+      { category: 2, emissions: 100 - SCOPE3_SIGNIFICANCE_PCT },
+    ]);
+    const c1 = out.find(r => r.category === 1)!;
+    expect(c1.pct).toBeCloseTo(SCOPE3_SIGNIFICANCE_PCT);
+    expect(c1.required).toBe(true);
+  });
+
+  it('denominator EXCLUDES cat 15: [{1,50},{15,50}] → only cat 1, pct 100', () => {
+    // If cat 15 were in the denominator, cat 1 would be 50% — proving the 1–14-only denominator.
+    expect(requiredScope3Categories([{ category: 1, emissions: 50 }, { category: 15, emissions: 50 }]))
+      .toEqual([{ category: 1, pct: 100, required: true }]);
+  });
+
+  it('cat 15 alone → [] (nothing 1–14)', () => {
+    expect(requiredScope3Categories([{ category: 15, emissions: 100 }])).toEqual([]);
+  });
+
+  it('zero-present 1–14 category stays in output (pct 0, not required)', () => {
+    expect(requiredScope3Categories([{ category: 1, emissions: 100 }, { category: 2, emissions: 0 }]))
+      .toEqual([
+        { category: 1, pct: 100, required: true },
+        { category: 2, pct: 0, required: false },
+      ]);
+  });
+
+  it('empty input → []', () => {
+    expect(requiredScope3Categories([])).toEqual([]);
+  });
+  it('all-zero → [] (total 0)', () => {
+    expect(requiredScope3Categories([{ category: 1, emissions: 0 }, { category: 2, emissions: 0 }])).toEqual([]);
+  });
+
+  it('throws on category 16 / 0 / non-integer / negative emissions / duplicate', () => {
+    expect(() => requiredScope3Categories([{ category: 16, emissions: 10 }])).toThrow();
+    expect(() => requiredScope3Categories([{ category: 0, emissions: 10 }])).toThrow();
+    expect(() => requiredScope3Categories([{ category: 1.5, emissions: 10 }])).toThrow();
+    expect(() => requiredScope3Categories([{ category: 1, emissions: -5 }])).toThrow();
+    expect(() => requiredScope3Categories([{ category: 1, emissions: 10 }, { category: 1, emissions: 20 }])).toThrow();
+  });
+
+  it('pct precision: [{1,1},{2,2}] → cat 1 ≈ 33.33%', () => {
+    const out = requiredScope3Categories([{ category: 1, emissions: 1 }, { category: 2, emissions: 2 }]);
+    expect(out.find(r => r.category === 1)!.pct).toBeCloseTo(100 / 3);
   });
 });

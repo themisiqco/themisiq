@@ -5,8 +5,9 @@
 // ThemisIQ prepares & monitors targets; it does not validate them (SBTi Services does).
 //
 // Engine build is incremental. THIS step ships categorize() + validateTargetConfig()
-// + acaSuggestedReductionPct() + computeTrajectory() + progressStatus(). renewal / cycle land later.
-import { CATEGORY_A_THRESHOLDS, NET_ZERO, ELEC_GROWTH_ABSOLUTE_THRESHOLD_PCT, ACA } from './sbti/params';
+// + acaSuggestedReductionPct() + computeTrajectory() + progressStatus()
+// + requiredScope3Categories(). renewalTightening / cycleState land later.
+import { CATEGORY_A_THRESHOLDS, NET_ZERO, ELEC_GROWTH_ABSOLUTE_THRESHOLD_PCT, ACA, SCOPE3_SIGNIFICANCE_PCT } from './sbti/params';
 
 // ── Company categorization (CNZS V2.0, Table 1) ────────────────────────
 export interface CategorizeInput {
@@ -284,4 +285,54 @@ export function trajectoryPointForYear(trajectory: Point[], year: number): Point
     throw new Error(`trajectoryPointForYear: ${matches.length} points found for year ${year} — duplicate-year data integrity violation.`);
   }
   return matches[0];
+}
+
+// ── Scope 3 significance (≥5% of total S3 → must carry a target) ────────
+// The SBTi Corporate Net-Zero Standard V2.0 ≥5%-of-total-S3 significance rule
+// applies to Scope 3 categories 1–14 ONLY. Category 15 (financed emissions) is
+// governed by the separate SBTi Financial Institutions Net-Zero Standard (FINZ)
+// on a portfolio-alignment basis — it is NOT part of this engine's near-term
+// coverage rule. So this function works strictly on 1–14: cat 15 is filtered out
+// of BOTH the output AND the denominator. The "total S3" here is the 1–14 sum —
+// the exact denominator the Corporate ≥5% rule is defined over. This engine's
+// total can therefore legitimately differ from the Scope-3 module's full 1–15
+// totalScope3 for a customer with financed emissions; that divergence is correct.
+// Pure; reads only SCOPE3_SIGNIFICANCE_PCT from params.
+export interface Scope3CategoryResult {
+  category: number;   // GHG Protocol S3 category, 1–14
+  pct: number;        // % of total 1–14 S3 emissions (0–100)
+  required: boolean;  // true if pct >= SCOPE3_SIGNIFICANCE_PCT
+}
+
+export function requiredScope3Categories(
+  scope3Breakdown: { category: number; emissions: number }[],
+): Scope3CategoryResult[] {
+  // Guards: validate every row before any maths (surface upstream mapping bugs loud).
+  const seen = new Set<number>();
+  for (const row of scope3Breakdown) {
+    if (!Number.isInteger(row.category) || row.category < 1 || row.category > 15) {
+      throw new Error(`requiredScope3Categories: invalid category ${row.category} — must be an integer GHG Protocol Scope 3 category (1–15).`);
+    }
+    if (!(row.emissions >= 0) || !Number.isFinite(row.emissions)) {
+      throw new Error(`requiredScope3Categories: category ${row.category} has invalid emissions ${row.emissions} — must be a finite, non-negative number.`);
+    }
+    if (seen.has(row.category)) {
+      throw new Error(`requiredScope3Categories: duplicate category ${row.category} — data-integrity violation (input must have one row per category).`);
+    }
+    seen.add(row.category);
+  }
+
+  // Drop cat 15 silently (valid input, but FINZ's domain — see comment above).
+  const inScope = scope3Breakdown.filter(r => r.category <= 14);
+
+  // Denominator = the 1–14 sum. Empty / all-zero ⇒ nothing required (no divide-by-zero).
+  const total = inScope.reduce((sum, r) => sum + r.emissions, 0);
+  if (total <= 0) return [];
+
+  return inScope
+    .map(r => {
+      const pct = (r.emissions / total) * 100;
+      return { category: r.category, pct, required: pct >= SCOPE3_SIGNIFICANCE_PCT };
+    })
+    .sort((a, b) => a.category - b.category);
 }
