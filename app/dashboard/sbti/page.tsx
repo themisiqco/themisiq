@@ -5,8 +5,9 @@ import Nav from '../../components/Nav'
 import { supabase } from '../../../lib/supabase'
 import { useEntitlement } from '../../../lib/useEntitlement'
 import PaywallCard from '../../components/PaywallCard'
-import { categorize, type CategoryResult } from '../../../lib/sbti'
+import { categorize, validateTargetConfig, type CategoryResult, type Scope, type TargetConfig } from '../../../lib/sbti'
 import { loadCompanySeries } from '../../../lib/ghg/loadSeries'
+import { VERSION_DATES } from '../../../lib/sbti/params'
 
 // ─── Design tokens (mirroring the climate-risk dashboard) ─────────────────────
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
@@ -44,10 +45,23 @@ const toggleBtn = (active: boolean): React.CSSProperties => ({
   background: active ? '#E1F5EE' : '#fff', color: active ? '#0F6E56' : '#555553',
 })
 
+// Scope display labels. s1s2_combined is V1.3.1-only (the engine rejects it for v2_0).
+const SCOPE_LABEL: Record<Scope, string> = {
+  s1: 'Scope 1',
+  s2_location: 'Scope 2 (location-based)',
+  s3: 'Scope 3',
+  s1s2_combined: 'Scope 1+2 combined (V1.3.1 only)',
+}
+const SCOPE_ORDER: Scope[] = ['s1', 's2_location', 's3']
+
 export default function SbtiDashboard() {
   // Gated on the GHG entitlement — SBTi is part of the GHG module (same precedent
   // as the Scope 3 Calculator, which is also unlocked by 'ghg').
   const isPaid = useEntitlement('ghg')
+
+  // ─── Wizard shell (GHG STEPS pattern) ───────────────────────────────────────
+  const STEPS = ['Company profile', 'Standard & scope']
+  const [step, setStep] = useState(0)
 
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
@@ -55,7 +69,7 @@ export default function SbtiDashboard() {
   const [companyName, setCompanyName] = useState('')
   const [ghgScope12, setGhgScope12] = useState<number | null>(null) // latest-year Scope 1+2 prefill
 
-  // Form state (strings for inputs; high-income tri-state: null = undeclared).
+  // Step 1 form state (strings for inputs; high-income tri-state: null = undeclared).
   const [netTurnover, setNetTurnover] = useState('')
   const [employeeCount, setEmployeeCount] = useState('')
   const [balanceSheet, setBalanceSheet] = useState('')
@@ -64,6 +78,11 @@ export default function SbtiDashboard() {
 
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [dirty, setDirty] = useState(false) // unsaved edits → beforeunload guard
+
+  // Step 2 state (held in wizard state only — NOT persisted here; Step 3 creates targets).
+  const [standardVersion, setStandardVersion] = useState<'v1_3_1' | 'v2_0'>('v2_0')
+  const [selectedScopes, setSelectedScopes] = useState<Scope[]>([])
 
   // Resolve the active company (via the GHG series) + prefill any existing profile.
   useEffect(() => {
@@ -117,6 +136,35 @@ export default function SbtiDashboard() {
   // Any field edit clears the saved badge.
   useEffect(() => { setSaved(false) }, [netTurnover, employeeCount, balanceSheet, totalEmissions, highIncome])
 
+  // Warn on unload while there are unsaved edits (mirrors the GHG wizard guard).
+  useEffect(() => {
+    if (!dirty) return
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [dirty])
+
+  // Offered scopes: s1s2_combined only under V1.3.1 (engine rejects it for v2_0).
+  const scopeOptions: Scope[] = standardVersion === 'v1_3_1' ? [...SCOPE_ORDER, 's1s2_combined'] : SCOPE_ORDER
+
+  const pickStandard = (v: 'v1_3_1' | 'v2_0') => {
+    setStandardVersion(v)
+    if (v === 'v2_0') setSelectedScopes(prev => prev.filter(s => s !== 's1s2_combined')) // drop combined on V2.0
+    setDirty(true)
+  }
+  const toggleScope = (sc: Scope) => {
+    setSelectedScopes(prev => prev.includes(sc) ? prev.filter(x => x !== sc) : [...prev, sc])
+    setDirty(true)
+  }
+
+  // Legality PREVIEW per selected scope — a minimal probe config (passes R2/R3) so the
+  // only thing that can flag is the version/scope rule (e.g. s1s2_combined under v2_0).
+  // Real per-target validation happens in Step 3.
+  const scopeLegality = useMemo(() => selectedScopes.map(sc => {
+    const probe: TargetConfig = { standardVersion, scope: sc, method: 'absolute_aca', baseYear: 2022, targetYear: 2030, reductionPct: 1 }
+    return { scope: sc, ...validateTargetConfig(probe, {}) }
+  }), [selectedScopes, standardVersion])
+
   const save = async () => {
     if (!companyId || !userId) return
     setSaving(true)
@@ -136,6 +184,7 @@ export default function SbtiDashboard() {
       }, { onConflict: 'company_id' })
       if (error) { console.error('SBTi profile save failed:', error); alert('Save failed: ' + error.message); return }
       setSaved(true)
+      setDirty(false)
     } finally { setSaving(false) }
   }
 
@@ -159,6 +208,7 @@ export default function SbtiDashboard() {
         <h1 style={sectionHead}>SBTi Targets</h1>
         <p style={sectionSub}>Set and monitor your science-based targets under the Corporate Net-Zero Standard V2.0.</p>
 
+        {/* Loading + empty-state live ABOVE the step shell — no steps until a company exists. */}
         {loading ? (
           <div style={{ fontSize: 13, color: '#888784', fontWeight: 300 }}>Loading…</div>
         ) : !companyId ? (
@@ -172,70 +222,152 @@ export default function SbtiDashboard() {
           </div>
         ) : (
           <>
-            <div style={eyebrow}>Step 1 · Company profile</div>
-            <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '1.5rem' }}>
-              Categorising <strong style={{ fontWeight: 600, color: '#0d0d0d' }}>{companyName}</strong> under the Corporate Net-Zero Standard V2.0 (Category A vs B).
-            </p>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              <div>
-                <label style={labelStyle}>Net turnover (EUR)</label>
-                <input style={inputStyle} type="number" min={0} value={netTurnover} onChange={e => setNetTurnover(e.target.value)} placeholder="e.g. 500000000" />
-              </div>
-              <div>
-                <label style={labelStyle}>Full-time employees (FTE)</label>
-                <input style={inputStyle} type="number" min={0} value={employeeCount} onChange={e => setEmployeeCount(e.target.value)} placeholder="e.g. 1200" />
-              </div>
-              <div>
-                <label style={labelStyle}>Balance-sheet total (EUR)</label>
-                <input style={inputStyle} type="number" min={0} value={balanceSheet} onChange={e => setBalanceSheet(e.target.value)} placeholder="e.g. 30000000" />
-              </div>
-              <div>
-                <label style={labelStyle}>Scope 1+2 emissions (tCO₂e)</label>
-                <input style={inputStyle} type="number" min={0} value={totalEmissions} onChange={e => setTotalEmissions(e.target.value)} placeholder="e.g. 12000" />
-                {ghgScope12 != null && (
-                  <button
-                    onClick={() => setTotalEmissions(String(Math.round(ghgScope12 * 100) / 100))}
-                    style={{ marginTop: 6, fontSize: 11, fontWeight: 600, color: '#7425e3', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
-                  >
-                    Use GHG figure ({ghgScope12.toLocaleString(undefined, { maximumFractionDigits: 1 })} tCO₂e)
-                  </button>
-                )}
-              </div>
+            {/* Step-tab header (mirrors the GHG wizard tab bar) */}
+            <div style={{ display: 'flex', borderBottom: '0.5px solid #e8e7e4', marginBottom: 24, overflowX: 'auto' as const }}>
+              {STEPS.map((s, i) => (
+                <button
+                  key={s}
+                  onClick={() => setStep(i)}
+                  style={{ fontSize: 12, padding: '12px 16px', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? '#7425e3' : 'transparent'}`, color: step === i ? '#7425e3' : '#888784', cursor: 'pointer', fontWeight: step === i ? 500 : 400, whiteSpace: 'nowrap' as const }}
+                >
+                  {i + 1}. {s}
+                </button>
+              ))}
             </div>
 
-            <div style={{ marginTop: 18 }}>
-              <label style={labelStyle}>Is your ultimate-parent company headquartered in a World Bank high-income country?</label>
-              <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.5, marginBottom: 8 }}>
-                Gates the high-income categorisation route (Route 2 — the emissions / two-of-three thresholds).
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => setHighIncome(true)} style={toggleBtn(highIncome === true)}>Yes</button>
-                <button onClick={() => setHighIncome(false)} style={toggleBtn(highIncome === false)}>No</button>
-              </div>
-            </div>
+            {/* ── Step 1 · Company profile (unchanged behaviour, now gated on step 0) ── */}
+            {step === 0 && (
+              <>
+                <div style={eyebrow}>Step 1 · Company profile</div>
+                <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '1.5rem' }}>
+                  Categorising <strong style={{ fontWeight: 600, color: '#0d0d0d' }}>{companyName}</strong> under the Corporate Net-Zero Standard V2.0 (Category A vs B).
+                </p>
 
-            <div style={{ marginTop: 24, background: catBg, border: `1px solid ${catColor}22`, borderRadius: 14, padding: '1.6rem 1.8rem' }}>
-              <div style={eyebrow}>Live categorisation</div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color: catColor, lineHeight: 1.1 }}>
-                Category {result.category}
-              </div>
-              <div style={{ fontSize: 13, color: '#555553', fontWeight: 300, marginTop: 6 }}>{basisLabel(result.matchedRoute)}</div>
-              {highIncome === null && (
-                <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 10 }}>
-                  Declare high-income status to evaluate the high-income route.
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div>
+                    <label style={labelStyle}>Net turnover (EUR)</label>
+                    <input style={inputStyle} type="number" min={0} value={netTurnover} onChange={e => { setNetTurnover(e.target.value); setDirty(true) }} placeholder="e.g. 500000000" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Full-time employees (FTE)</label>
+                    <input style={inputStyle} type="number" min={0} value={employeeCount} onChange={e => { setEmployeeCount(e.target.value); setDirty(true) }} placeholder="e.g. 1200" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Balance-sheet total (EUR)</label>
+                    <input style={inputStyle} type="number" min={0} value={balanceSheet} onChange={e => { setBalanceSheet(e.target.value); setDirty(true) }} placeholder="e.g. 30000000" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Scope 1+2 emissions (tCO₂e)</label>
+                    <input style={inputStyle} type="number" min={0} value={totalEmissions} onChange={e => { setTotalEmissions(e.target.value); setDirty(true) }} placeholder="e.g. 12000" />
+                    {ghgScope12 != null && (
+                      <button
+                        onClick={() => { setTotalEmissions(String(Math.round(ghgScope12 * 100) / 100)); setDirty(true) }}
+                        style={{ marginTop: 6, fontSize: 11, fontWeight: 600, color: '#7425e3', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                      >
+                        Use GHG figure ({ghgScope12.toLocaleString(undefined, { maximumFractionDigits: 1 })} tCO₂e)
+                      </button>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
 
-            <div style={{ marginTop: 24, display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{ marginTop: 18 }}>
+                  <label style={labelStyle}>Is your ultimate-parent company headquartered in a World Bank high-income country?</label>
+                  <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.5, marginBottom: 8 }}>
+                    Gates the high-income categorisation route (Route 2 — the emissions / two-of-three thresholds).
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => { setHighIncome(true); setDirty(true) }} style={toggleBtn(highIncome === true)}>Yes</button>
+                    <button onClick={() => { setHighIncome(false); setDirty(true) }} style={toggleBtn(highIncome === false)}>No</button>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 24, background: catBg, border: `1px solid ${catColor}22`, borderRadius: 14, padding: '1.6rem 1.8rem' }}>
+                  <div style={eyebrow}>Live categorisation</div>
+                  <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color: catColor, lineHeight: 1.1 }}>
+                    Category {result.category}
+                  </div>
+                  <div style={{ fontSize: 13, color: '#555553', fontWeight: 300, marginTop: 6 }}>{basisLabel(result.matchedRoute)}</div>
+                  {highIncome === null && (
+                    <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 10 }}>
+                      Declare high-income status to evaluate the high-income route.
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ marginTop: 24, display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <button
+                    onClick={save}
+                    disabled={saving}
+                    style={{ fontSize: 14, fontWeight: 600, padding: '11px 28px', borderRadius: 8, border: 'none', cursor: saving ? 'not-allowed' : 'pointer', background: saved ? '#E1F5EE' : GRAD, color: saved ? '#0F6E56' : '#0d0d0d' }}
+                  >
+                    {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save profile'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* ── Step 2 · Standard & scope (selection only — no DB write) ── */}
+            {step === 1 && (
+              <>
+                <div style={eyebrow}>Step 2 · Standard &amp; scope</div>
+                <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '1.5rem' }}>
+                  Pick the standard version and the scopes <strong style={{ fontWeight: 600, color: '#0d0d0d' }}>{companyName}</strong> will set targets for.
+                </p>
+
+                <div style={{ marginBottom: 24 }}>
+                  <label style={labelStyle}>Standard version</label>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' as const }}>
+                    <button onClick={() => pickStandard('v2_0')} style={toggleBtn(standardVersion === 'v2_0')}>Corporate Net-Zero V2.0</button>
+                    <button onClick={() => pickStandard('v1_3_1')} style={toggleBtn(standardVersion === 'v1_3_1')}>V1.3.1</button>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.5 }}>
+                    V2.0 is effective {VERSION_DATES.v2_0EffectiveDate}, mandatory {VERSION_DATES.v2_0MandatoryDate}; V1.3.1 accepted through {VERSION_DATES.v1_3_1AcceptedUntil}.
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 18 }}>
+                  <label style={labelStyle}>Scopes to set targets for</label>
+                  <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.5, marginBottom: 8 }}>
+                    Under V2.0, Scope 1 and Scope 2 are set as separate targets.
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
+                    {scopeOptions.map(sc => (
+                      <button key={sc} onClick={() => toggleScope(sc)} style={toggleBtn(selectedScopes.includes(sc))}>{SCOPE_LABEL[sc]}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {selectedScopes.length > 0 && (
+                  <div style={{ marginTop: 8, background: '#f8f7f5', border: '1px solid #e8e7e4', borderRadius: 14, padding: '1.2rem 1.4rem' }}>
+                    <div style={eyebrow}>Legality check</div>
+                    {scopeLegality.map(({ scope, ok, reasons }) => (
+                      <div key={scope} style={{ display: 'flex', gap: 8, fontSize: 13, marginBottom: 6, alignItems: 'baseline' }}>
+                        <span style={{ color: ok ? '#0F6E56' : '#B91C1C', fontWeight: 700, flexShrink: 0 }}>{ok ? '✓' : '✗'}</span>
+                        <span style={{ color: '#555553', fontWeight: 300 }}>
+                          {SCOPE_LABEL[scope]}{!ok && reasons.length > 0 ? ` — ${reasons.join('; ')}` : ''}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 18 }}>Targets are created in the next step.</div>
+              </>
+            )}
+
+            {/* Back / Continue nav (mirrors the GHG wizard) */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
               <button
-                onClick={save}
-                disabled={saving}
-                style={{ fontSize: 14, fontWeight: 600, padding: '11px 28px', borderRadius: 8, border: 'none', cursor: saving ? 'not-allowed' : 'pointer', background: saved ? '#E1F5EE' : GRAD, color: saved ? '#0F6E56' : '#0d0d0d' }}
-              >
-                {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save profile'}
-              </button>
+                onClick={() => setStep(s => Math.max(0, s - 1))}
+                disabled={step === 0}
+                style={{ fontSize: 13, padding: '10px 24px', borderRadius: 8, background: 'none', border: '0.5px solid #e8e7e4', cursor: step === 0 ? 'not-allowed' : 'pointer', color: '#555553', opacity: step === 0 ? 0.4 : 1 }}
+              >← Back</button>
+              {step < STEPS.length - 1 && (
+                <button
+                  onClick={() => setStep(s => s + 1)}
+                  style={{ fontSize: 13, fontWeight: 500, padding: '10px 28px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none' }}
+                >Continue →</button>
+              )}
             </div>
           </>
         )}
