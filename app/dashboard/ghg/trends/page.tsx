@@ -38,9 +38,11 @@ type TargetRow = {
   method: 'absolute_aca' | 'intensity'
 }
 
-// Combined Scope 1 + Scope 2 SBTi target pathway. For each scope, stitch the near-term path
-// (base_year → its target_year) into the net-zero path (→2050: near-term points up to the
-// near-term target year, then net-zero points strictly after), then SUM the two scopes by year.
+// Combined Scope 1 + Scope 2 SBTi target pathway. For each scope, the binding obligation at each
+// year is the LOWER (more ambitious) of its near-term path (base_year → target_year) and its
+// net-zero path (base_year → 2050) — min-of-trajectories, NOT concatenation at the handover. Then
+// SUM the two scopes by year. The min draws the true binding constraint and never ascends: the
+// net-zero path only governs once it has descended below the near-term path (so no 2035 seam bump).
 // Each scope's path is computed INDEPENDENTLY from its own saved row — base emissions are never
 // merged; only the resulting per-year emissions are added. So the combined value at the base year
 // equals (S1 saved base emissions + S2 saved base emissions), which is intended to sit at the GHG
@@ -56,9 +58,15 @@ function buildCombinedTargetSeries(rows: TargetRow[]): { year: number; target: n
   for (const sc of ['s1', 's2_location'] as const) {
     const near = rows.find((r) => r.scope === sc && r.target_type === 'near_term')
     const nz = rows.find((r) => r.scope === sc && r.target_type === 'net_zero')
-    const nearEnd = near?.target_year ?? -Infinity
-    const pts = [...traj(near), ...traj(nz).filter((p) => p.year > nearEnd)]
-    for (const p of pts) byYear.set(p.year, (byYear.get(p.year) ?? 0) + p.emissions)
+    // Binding obligation per year = the LOWER of whichever trajectory defines it (min, not concat).
+    const nearMap = new Map(traj(near).map((p) => [p.year, p.emissions]))
+    const nzMap = new Map(traj(nz).map((p) => [p.year, p.emissions]))
+    for (const y of new Set<number>([...nearMap.keys(), ...nzMap.keys()])) {
+      const a = nearMap.get(y)
+      const b = nzMap.get(y)
+      const v = a != null && b != null ? Math.min(a, b) : (a ?? b!) // only one defined ⇒ use it
+      byYear.set(y, (byYear.get(y) ?? 0) + v)
+    }
   }
   return Array.from(byYear.entries())
     .map(([year, target]) => ({ year, target }))
