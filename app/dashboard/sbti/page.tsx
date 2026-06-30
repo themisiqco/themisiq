@@ -102,6 +102,9 @@ export default function SbtiDashboard() {
   // The near-term scope SET that gates Step 4 is derived reactively below (nearTermTargetScopes),
   // not stored — so it stays in sync with in-session Step-3 saves/edits.
   const [netZeroDrafts, setNetZeroDrafts] = useState<Partial<Record<Scope, Draft>>>({})
+  // SEPARATE from Step 3's savingTargets/savedTargets — net-zero persists independently.
+  const [savingNetZero, setSavingNetZero] = useState(false)
+  const [savedNetZero, setSavedNetZero] = useState(false)
   const [savingTargets, setSavingTargets] = useState(false)
   const [savedTargets, setSavedTargets] = useState(false)
 
@@ -169,6 +172,26 @@ export default function SbtiDashboard() {
         setTargetDrafts(prev => ({ ...prev, ...seeded })) // saved values overwrite any ACA default
         setSelectedScopes(prev => Array.from(new Set([...prev, ...savedScopes])))
         // Step 4 reads saved near-term scopes via the nearTermTargetScopes memo (selectedScopes ∩ targetDrafts).
+      }
+
+      // Load existing NET-ZERO targets → seed netZeroDrafts. Saved values WIN over the 90/2050
+      // defaults (the net-zero lazy-init effect only fills MISSING drafts, so these survive).
+      const { data: nzRows } = await supabase
+        .from('sbti_targets')
+        .select('scope, base_year, target_year, reduction_pct')
+        .eq('company_id', series.companyId)
+        .eq('target_type', 'net_zero')
+      if (cancelled) return
+      if (nzRows && nzRows.length > 0) {
+        const seededNz: Partial<Record<Scope, Draft>> = {}
+        for (const row of nzRows) {
+          seededNz[row.scope as Scope] = {
+            baseYear: row.base_year ?? (series.baselineYear ?? 2022),
+            targetYear: row.target_year ?? NET_ZERO.latestNetZeroYear,
+            reductionPct: row.reduction_pct ?? NET_ZERO.minAbsoluteReductionPct,
+          }
+        }
+        setNetZeroDrafts(prev => ({ ...prev, ...seededNz })) // saved values overwrite the 90/2050 default
       }
       setLoading(false)
     })()
@@ -292,6 +315,7 @@ export default function SbtiDashboard() {
       return { ...prev, [sc]: { ...cur, [field]: value } }
     })
     setDirty(true)
+    setSavedNetZero(false)
   }
 
   const save = async () => {
@@ -365,6 +389,51 @@ export default function SbtiDashboard() {
       setSavedTargets(true)
       setDirty(false)
     } finally { setSavingTargets(false) }
+  }
+
+  // Persist NET-ZERO targets — one sbti_targets row per net-zero card (target_type:'net_zero').
+  // SEPARATE from saveTargets: net_zero rows coexist with near_term rows for the same scope, so
+  // target_type:'net_zero' in BOTH the row AND the onConflict key means this CANNOT clobber the
+  // near-term rows (the unique key is company_id+scope+target_type).
+  const saveNetZero = async () => {
+    if (!companyId || !userId) return
+
+    // One card per near-term scope that has a net-zero draft.
+    const cards = nearTermTargetScopes
+      .filter(sc => netZeroDrafts[sc])
+      .map(sc => ({ sc, d: netZeroDrafts[sc]! }))
+
+    // Gate: every card must pass NET-ZERO validation (isNetZero:true ⇒ R5/R6/R9 fire). Name + block.
+    const invalid = cards.filter(({ sc, d }) =>
+      !validateTargetConfig({ standardVersion, scope: sc, method: 'absolute_aca', baseYear: d.baseYear, targetYear: d.targetYear, reductionPct: d.reductionPct, isNetZero: true }, {}).ok)
+    if (invalid.length > 0) {
+      alert('Cannot save — fix the invalid net-zero target(s): ' + invalid.map(({ sc }) => SCOPE_LABEL[sc]).join(', '))
+      return
+    }
+    if (cards.length === 0) { alert('No valid net-zero targets to save.'); return }
+
+    setSavingNetZero(true)
+    try {
+      const now = new Date().toISOString()
+      const rows = cards.map(({ sc, d }) => ({
+        company_id: companyId,
+        user_id: userId, // denormalized for the RLS gate
+        standard_version: standardVersion,
+        target_type: 'net_zero', // ⚠️ net_zero — coexists with this scope's near_term row; must NOT be 'near_term'
+        scope: sc,
+        s3_category: null,
+        method: 'absolute_aca',
+        base_year: d.baseYear,
+        base_year_emissions_tco2e: baseEmissionsFor(sc),
+        target_year: d.targetYear,
+        reduction_pct: d.reductionPct,
+        updated_at: now,
+      }))
+      const { error } = await supabase.from('sbti_targets').upsert(rows, { onConflict: 'company_id,scope,target_type' })
+      if (error) { console.error('SBTi net-zero save failed:', error); alert('Save failed: ' + error.message); return }
+      setSavedNetZero(true)
+      setDirty(false)
+    } finally { setSavingNetZero(false) }
   }
 
   if (!isPaid) {
@@ -732,7 +801,16 @@ export default function SbtiDashboard() {
                       </div>
                     </div>
 
-                    <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 18 }}>Net-zero targets save in the next move.</div>
+                    <div style={{ marginTop: 24, display: 'flex', alignItems: 'center', gap: 14 }}>
+                      <button
+                        onClick={saveNetZero}
+                        disabled={savingNetZero}
+                        style={{ fontSize: 14, fontWeight: 600, padding: '11px 28px', borderRadius: 8, border: 'none', cursor: savingNetZero ? 'not-allowed' : 'pointer', background: savedNetZero ? '#E1F5EE' : GRAD, color: savedNetZero ? '#0F6E56' : '#0d0d0d' }}
+                      >
+                        {savingNetZero ? 'Saving…' : savedNetZero ? '✓ Saved' : 'Save net-zero targets'}
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 12 }}>Net-zero targets save to your account here, alongside your near-term targets.</div>
                   </>
                 )}
               </>
