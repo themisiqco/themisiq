@@ -15,13 +15,55 @@
  */
 
 import { useEffect, useState } from 'react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer, ReferenceLine, LineChart, Line } from 'recharts'
+import { BarChart, ComposedChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer, ReferenceLine, LineChart, Line } from 'recharts'
 import { loadCompanySeries, type LoadSeriesResult } from '../../../../lib/ghg/loadSeries'
+import { supabase } from '../../../../lib/supabase'
+import { computeTrajectory } from '../../../../lib/sbti'
 import { loadMonthly, type LoadMonthlyResult } from '../../../../lib/ghg/loadMonthly'
 import { useEntitlement } from '../../../../lib/useEntitlement'
 
 // Brand palette for the three scopes.
 const COLORS = { scope1: '#7425e3', scope2: '#22ACFE', scope3: '#64FE3E' }
+
+const NET_ZERO_END_YEAR = 2050
+
+// An sbti_targets row as read for the trends overlay (S1 / S2 only). Fields nullable to match the DB.
+type TargetRow = {
+  scope: string
+  target_type: string
+  base_year: number | null
+  base_year_emissions_tco2e: number | null
+  target_year: number | null
+  reduction_pct: number | null
+  method: 'absolute_aca' | 'intensity'
+}
+
+// Combined Scope 1 + Scope 2 SBTi target pathway. For each scope, stitch the near-term path
+// (base_year → its target_year) into the net-zero path (→2050: near-term points up to the
+// near-term target year, then net-zero points strictly after), then SUM the two scopes by year.
+// Each scope's path is computed INDEPENDENTLY from its own saved row — base emissions are never
+// merged; only the resulting per-year emissions are added. So the combined value at the base year
+// equals (S1 saved base emissions + S2 saved base emissions), which is intended to sit at the GHG
+// baselineScope12Total level. We do NOT rescale to force that match — real differences stay visible.
+// Intensity rows contribute no points (computeTrajectory returns [] for them). Years where only one
+// scope has a point use that scope's value alone (per the agreed construction rule).
+function buildCombinedTargetSeries(rows: TargetRow[]): { year: number; target: number }[] {
+  const traj = (r: TargetRow | undefined) =>
+    r && r.base_year != null && r.base_year_emissions_tco2e != null && r.target_year != null && r.reduction_pct != null
+      ? computeTrajectory({ baseYear: r.base_year, baseEmissions: r.base_year_emissions_tco2e, targetYear: r.target_year, reductionPct: r.reduction_pct, method: r.method })
+      : []
+  const byYear = new Map<number, number>()
+  for (const sc of ['s1', 's2_location'] as const) {
+    const near = rows.find((r) => r.scope === sc && r.target_type === 'near_term')
+    const nz = rows.find((r) => r.scope === sc && r.target_type === 'net_zero')
+    const nearEnd = near?.target_year ?? -Infinity
+    const pts = [...traj(near), ...traj(nz).filter((p) => p.year > nearEnd)]
+    for (const p of pts) byYear.set(p.year, (byYear.get(p.year) ?? 0) + p.emissions)
+  }
+  return Array.from(byYear.entries())
+    .map(([year, target]) => ({ year, target }))
+    .sort((a, b) => a.year - b.year)
+}
 
 export default function TrendsPage() {
   const isPaid = useEntitlement('ghg')
@@ -31,6 +73,7 @@ export default function TrendsPage() {
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
   const [monthly, setMonthly] = useState<LoadMonthlyResult | null>(null)
   const [monthlyLoading, setMonthlyLoading] = useState(false)
+  const [targetRows, setTargetRows] = useState<TargetRow[]>([]) // S1/S2 sbti_targets for the SBTi overlay
 
   useEffect(() => {
     loadCompanySeries().then((r) => {
@@ -62,6 +105,25 @@ export default function TrendsPage() {
     }
   }, [selectedSeries?.companyId, selectedYear])
 
+  // Fetch S1/S2 sbti_targets (both near_term + net_zero) for the SBTi target overlay.
+  // RLS scopes to the logged-in user. On error / no rows → empty → no overlay (chart = Move 1).
+  useEffect(() => {
+    const cid = selectedSeries?.companyId
+    if (!cid) { setTargetRows([]); return }
+    let cancelled = false
+    supabase
+      .from('sbti_targets')
+      .select('scope, target_type, base_year, base_year_emissions_tco2e, target_year, reduction_pct, method')
+      .eq('company_id', cid)
+      .in('scope', ['s1', 's2_location']) // S1 + S2 only — never S3 in the target line
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) { console.error('SBTi targets fetch (trends overlay) failed:', error); setTargetRows([]); return }
+        setTargetRows((data as TargetRow[]) ?? [])
+      })
+    return () => { cancelled = true }
+  }, [selectedSeries?.companyId])
+
   if (!isPaid) {
     return (
       <div style={{ padding: '2rem', maxWidth: 720, margin: '0 auto' }}>
@@ -84,6 +146,32 @@ export default function TrendsPage() {
         scope3: y.scope3,
       }))
     : []
+
+  // ── SBTi target overlay (combined S1+S2 pathway, base→2035 near-term stitched into →2050 net-zero) ──
+  const targetSeries = selected ? buildCombinedTargetSeries(targetRows) : []
+  const hasTarget = targetSeries.length > 0
+
+  // Merge actuals (bars) with the target pathway. Actual years keep their bar values + (if present)
+  // the target value; future years (beyond the latest actual) carry the target only, bars null.
+  type ChartRow = { year: number; scope1: number | null; scope2: number | null; scope3: number | null; target: number | null }
+  const targetByYear = new Map(targetSeries.map((p) => [p.year, p.target]))
+  const lastActualYear = chartData.length ? chartData[chartData.length - 1].year : null
+  const mergedData: ChartRow[] = [
+    ...chartData.map((d) => ({ year: d.year, scope1: d.scope1, scope2: d.scope2, scope3: d.scope3, target: targetByYear.get(d.year) ?? null })),
+    ...targetSeries
+      .filter((p) => lastActualYear == null || p.year > lastActualYear)
+      .map((p) => ({ year: p.year, scope1: null, scope2: null, scope3: null, target: p.target })),
+  ].sort((a, b) => a.year - b.year)
+
+  // Widen the numeric x-axis to baseline→2050 ONLY when a target exists (else identical to Move 1).
+  const xDomain: [number | string, number | string] =
+    hasTarget && selected ? [selected.baselineYear, NET_ZERO_END_YEAR] : ['dataMin', 'dataMax']
+  const xTicks =
+    hasTarget && selected
+      ? Array.from({ length: Math.floor((NET_ZERO_END_YEAR - selected.baselineYear) / 5) + 1 }, (_, i) => selected.baselineYear + i * 5)
+          .concat(NET_ZERO_END_YEAR)
+          .filter((v, i, a) => a.indexOf(v) === i)
+      : undefined
 
   const missingS3Years = selected
     ? selected.years.filter((y) => y.scope3 === null).map((y) => y.year)
@@ -188,9 +276,9 @@ export default function TrendsPage() {
           {/* Stacked bar chart: Scope 1 / 2 (location) / 3 */}
           <div style={{ width: '100%', height: 380 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
+              <ComposedChart data={mergedData} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e8e7e4" />
-                <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#555553' }} />
+                <XAxis dataKey="year" type="number" domain={xDomain} allowDecimals={false} ticks={xTicks} tickCount={chartData.length} tick={{ fontSize: 12, fill: '#555553' }} />
                 <YAxis
                   tick={{ fontSize: 12, fill: '#555553' }}
                   label={{ value: 'tCO₂e', angle: -90, position: 'insideLeft', style: { fontSize: 12, fill: '#888784' } }}
@@ -198,10 +286,13 @@ export default function TrendsPage() {
                 <Tooltip />
                 <Legend />
                 <ReferenceLine y={selected.baselineScope12Total} stroke="#BA7517" strokeDasharray="4 4" label={{ value: 'baseline', position: 'insideTopRight', fontSize: 11, fill: '#854F0B' }} />
-                <Bar dataKey="scope1" stackId="emissions" name="Scope 1" fill={COLORS.scope1} />
-                <Bar dataKey="scope2" stackId="emissions" name="Scope 2 (location)" fill={COLORS.scope2} />
-                <Bar dataKey="scope3" stackId="emissions" name="Scope 3" fill={COLORS.scope3} />
-              </BarChart>
+                <Bar dataKey="scope1" stackId="emissions" name="Scope 1" fill={COLORS.scope1} barSize={hasTarget ? 22 : undefined} />
+                <Bar dataKey="scope2" stackId="emissions" name="Scope 2 (location)" fill={COLORS.scope2} barSize={hasTarget ? 22 : undefined} />
+                <Bar dataKey="scope3" stackId="emissions" name="Scope 3" fill={COLORS.scope3} barSize={hasTarget ? 22 : undefined} />
+                {hasTarget && (
+                  <Line type="monotone" dataKey="target" name="SBTi target pathway" stroke="#0d0d0d" strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
+                )}
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
 
