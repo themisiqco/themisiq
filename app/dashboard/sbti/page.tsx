@@ -7,7 +7,7 @@ import { useEntitlement } from '../../../lib/useEntitlement'
 import PaywallCard from '../../components/PaywallCard'
 import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, type CategoryResult, type Scope, type TargetConfig } from '../../../lib/sbti'
 import { loadCompanySeries } from '../../../lib/ghg/loadSeries'
-import { VERSION_DATES } from '../../../lib/sbti/params'
+import { VERSION_DATES, NET_ZERO } from '../../../lib/sbti/params'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts'
 
 // ─── Design tokens (mirroring the climate-risk dashboard) ─────────────────────
@@ -68,7 +68,7 @@ export default function SbtiDashboard() {
   const isPaid = useEntitlement('ghg')
 
   // ─── Wizard shell (GHG STEPS pattern) ───────────────────────────────────────
-  const STEPS = ['Company profile', 'Standard & scope', 'Near-term targets']
+  const STEPS = ['Company profile', 'Standard & scope', 'Near-term targets', 'Net-zero targets']
   const [step, setStep] = useState(0)
 
   const [loading, setLoading] = useState(true)
@@ -97,6 +97,11 @@ export default function SbtiDashboard() {
   const [baselineYear, setBaselineYear] = useState<number | null>(null)
   const [baselineByScope, setBaselineByScope] = useState<{ scope1: number; scope2Location: number; scope3: number | null } | null>(null)
   const [targetDrafts, setTargetDrafts] = useState<Partial<Record<Scope, Draft>>>({})
+
+  // Step 4 (net-zero) state — SEPARATE from near-term targetDrafts (a scope has both targets).
+  // The near-term scope SET that gates Step 4 is derived reactively below (nearTermTargetScopes),
+  // not stored — so it stays in sync with in-session Step-3 saves/edits.
+  const [netZeroDrafts, setNetZeroDrafts] = useState<Partial<Record<Scope, Draft>>>({})
   const [savingTargets, setSavingTargets] = useState(false)
   const [savedTargets, setSavedTargets] = useState(false)
 
@@ -163,6 +168,7 @@ export default function SbtiDashboard() {
         }
         setTargetDrafts(prev => ({ ...prev, ...seeded })) // saved values overwrite any ACA default
         setSelectedScopes(prev => Array.from(new Set([...prev, ...savedScopes])))
+        // Step 4 reads saved near-term scopes via the nearTermTargetScopes memo (selectedScopes ∩ targetDrafts).
       }
       setLoading(false)
     })()
@@ -253,6 +259,39 @@ export default function SbtiDashboard() {
     const d = targetDrafts[sc]
     if (!d) return
     updateDraft(sc, 'reductionPct', round1(acaSuggestedReductionPct({ bucket: bucketFor(sc), baseYear: d.baseYear, targetYear: d.targetYear })))
+  }
+
+  // Scopes that ACTUALLY have a near-term target right now — the single source for Step 4.
+  // Mirrors Step 3 saveTargets' `cards` filter (a usable draft AND not the null-S3 routing case),
+  // derived REACTIVELY from current state. Reflects in-session Step-3 saves/edits without a reload,
+  // and the DB-load path too (the load seeds both selectedScopes and targetDrafts).
+  const nearTermTargetScopes = useMemo(
+    () => selectedScopes.filter(sc => targetDrafts[sc] && !(sc === 's3' && baseEmissionsFor(sc) === null)),
+    [selectedScopes, targetDrafts, baselineByScope],
+  )
+
+  // Step 4 — lazily seed a net-zero draft per near-term scope. Net-zero defaults to the
+  // 90% floor by 2050 (NOT an ACA suggestion). Separate state from targetDrafts.
+  useEffect(() => {
+    setNetZeroDrafts(prev => {
+      let changed = false
+      const next: Partial<Record<Scope, Draft>> = { ...prev }
+      for (const sc of nearTermTargetScopes) {
+        if (!next[sc]) {
+          next[sc] = { baseYear: baselineYear ?? 2022, targetYear: NET_ZERO.latestNetZeroYear, reductionPct: NET_ZERO.minAbsoluteReductionPct }
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [nearTermTargetScopes, baselineYear])
+
+  const updateNetZeroDraft = (sc: Scope, field: keyof Draft, value: number) => {
+    setNetZeroDrafts(prev => {
+      const cur = prev[sc] ?? { baseYear: baselineYear ?? 2022, targetYear: NET_ZERO.latestNetZeroYear, reductionPct: NET_ZERO.minAbsoluteReductionPct }
+      return { ...prev, [sc]: { ...cur, [field]: value } }
+    })
+    setDirty(true)
   }
 
   const save = async () => {
@@ -609,6 +648,93 @@ export default function SbtiDashboard() {
                   </div>
                 )}
                 <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 12 }}>Targets save to your account here; the trajectory previews update live as you edit.</div>
+              </>
+            )}
+
+            {/* ── Step 4 · Net-zero targets (cards + 90%/2050 defaults + isNetZero validation; NO persist/chart) ── */}
+            {step === 3 && (
+              <>
+                <div style={eyebrow}>Step 4 · Net-zero targets</div>
+
+                {nearTermTargetScopes.length === 0 ? (
+                  <div style={{ background: '#f8f7f5', border: '1px solid #e8e7e4', borderRadius: 14, padding: '2.5rem 2rem', textAlign: 'center' }}>
+                    <div style={eyebrow}>Near-term first</div>
+                    <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, marginBottom: 6 }}>Set your near-term targets first</div>
+                    <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, maxWidth: 460, margin: '0 auto 18px' }}>
+                      Net-zero builds on your near-term targets. Save at least one near-term target, then come back.
+                    </p>
+                    <button onClick={() => setStep(2)} style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: '#0d0d0d', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer' }}>← Back to near-term targets</button>
+                  </div>
+                ) : (
+                  <>
+                    <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '1.5rem' }}>
+                      A net-zero target per scope that has a near-term target. Defaults to the {NET_ZERO.minAbsoluteReductionPct}% floor by {NET_ZERO.latestNetZeroYear}; edit and it re-validates live.
+                    </p>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                      {nearTermTargetScopes.map(sc => {
+                        const base = baseEmissionsFor(sc)
+                        const d = netZeroDrafts[sc]
+                        if (!d) return null // seeded by the net-zero lazy-init effect
+
+                        // isNetZero: true ⇒ R5 (≥90%) / R6 (≤2050) / R9 (absolute) fire.
+                        const v = validateTargetConfig({ standardVersion, scope: sc, method: 'absolute_aca', baseYear: d.baseYear, targetYear: d.targetYear, reductionPct: d.reductionPct, isNetZero: true }, {})
+
+                        return (
+                          <div key={sc} style={cardStyle}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', fontWeight: 400 }}>{SCOPE_LABEL[sc]}</div>
+                              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#7425e3', background: '#EDE9FE', borderRadius: 99, padding: '2px 8px' }}>Net-zero</span>
+                            </div>
+                            {base != null && (
+                              <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginBottom: 14 }}>
+                                Base: {base.toLocaleString(undefined, { maximumFractionDigits: 1 })} tCO₂e{baselineYear != null ? ` (${baselineYear})` : ''}
+                              </div>
+                            )}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                              <div>
+                                <label style={labelStyle}>Base year</label>
+                                <input style={inputStyle} type="number" value={d.baseYear} onChange={e => updateNetZeroDraft(sc, 'baseYear', Number(e.target.value))} />
+                              </div>
+                              <div>
+                                <label style={labelStyle}>Target year</label>
+                                <input style={inputStyle} type="number" value={d.targetYear} onChange={e => updateNetZeroDraft(sc, 'targetYear', Number(e.target.value))} />
+                              </div>
+                              <div>
+                                <label style={labelStyle}>Reduction %</label>
+                                <input style={inputStyle} type="number" value={d.reductionPct} onChange={e => updateNetZeroDraft(sc, 'reductionPct', Number(e.target.value))} />
+                              </div>
+                            </div>
+                            <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 8 }}>
+                              Net-zero requires ≥{NET_ZERO.minAbsoluteReductionPct}% reduction by ≤{NET_ZERO.latestNetZeroYear}, absolute method.
+                            </div>
+                            <div style={{ marginTop: 12, fontSize: 13 }}>
+                              {v.ok ? (
+                                <span style={{ color: '#0F6E56', fontWeight: 600 }}>✓ Valid net-zero target</span>
+                              ) : (
+                                <div style={{ color: '#B91C1C' }}>
+                                  <span style={{ fontWeight: 600 }}>✗ Invalid</span>
+                                  <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontWeight: 300, color: '#555553' }}>
+                                    {v.reasons.map((r, i) => <li key={i}>{r}</li>)}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* Honest-scoping note — a per-target ✓ is NOT full net-zero compliance. */}
+                    <div style={{ marginTop: 20, background: '#FEF3E2', border: '1px solid #ba751733', borderRadius: 12, padding: '1rem 1.2rem' }}>
+                      <div style={{ fontSize: 12, color: '#555553', fontWeight: 300, lineHeight: 1.65 }}>
+                        <strong style={{ fontWeight: 600, color: '#0d0d0d' }}>These checks are per-target only.</strong> A ✓ confirms this scope&rsquo;s net-zero rules (≥{NET_ZERO.minAbsoluteReductionPct}% reduction, ≤{NET_ZERO.latestNetZeroYear}, absolute method). It does <strong style={{ fontWeight: 600 }}>not</strong> confirm full net-zero compliance, which also requires aggregate coverage of ≥90% of total emissions across all scopes, ≥90% Scope 3 coverage, and neutralisation of residual emissions via permanent removals — all assessed separately in a later step.
+                      </div>
+                    </div>
+
+                    <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 18 }}>Net-zero targets save in the next move.</div>
+                  </>
+                )}
               </>
             )}
 
