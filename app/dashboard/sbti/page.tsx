@@ -5,9 +5,10 @@ import Nav from '../../components/Nav'
 import { supabase } from '../../../lib/supabase'
 import { useEntitlement } from '../../../lib/useEntitlement'
 import PaywallCard from '../../components/PaywallCard'
-import { categorize, validateTargetConfig, acaSuggestedReductionPct, type CategoryResult, type Scope, type TargetConfig } from '../../../lib/sbti'
+import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, type CategoryResult, type Scope, type TargetConfig } from '../../../lib/sbti'
 import { loadCompanySeries } from '../../../lib/ghg/loadSeries'
 import { VERSION_DATES } from '../../../lib/sbti/params'
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts'
 
 // ─── Design tokens (mirroring the climate-risk dashboard) ─────────────────────
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
@@ -96,6 +97,8 @@ export default function SbtiDashboard() {
   const [baselineYear, setBaselineYear] = useState<number | null>(null)
   const [baselineByScope, setBaselineByScope] = useState<{ scope1: number; scope2Location: number; scope3: number | null } | null>(null)
   const [targetDrafts, setTargetDrafts] = useState<Partial<Record<Scope, Draft>>>({})
+  const [savingTargets, setSavingTargets] = useState(false)
+  const [savedTargets, setSavedTargets] = useState(false)
 
   // Resolve the active company (via the GHG series) + prefill any existing profile.
   useEffect(() => {
@@ -136,6 +139,30 @@ export default function SbtiDashboard() {
         if (profile.balance_sheet_eur != null) setBalanceSheet(String(profile.balance_sheet_eur))
         if (profile.total_emissions_tco2e != null) setTotalEmissions(String(profile.total_emissions_tco2e))
         setHighIncome(profile.high_income_country ?? null)
+      }
+
+      // Load existing NEAR-TERM targets → seed cards. Saved values WIN over ACA defaults;
+      // the rendered scopes are the union of (saved rows) ∪ (Step-2 selection).
+      const { data: targetRows } = await supabase
+        .from('sbti_targets')
+        .select('scope, base_year, target_year, reduction_pct')
+        .eq('company_id', series.companyId)
+        .eq('target_type', 'near_term')
+      if (cancelled) return
+      if (targetRows && targetRows.length > 0) {
+        const seeded: Partial<Record<Scope, Draft>> = {}
+        const savedScopes: Scope[] = []
+        for (const row of targetRows) {
+          const sc = row.scope as Scope
+          seeded[sc] = {
+            baseYear: row.base_year ?? (series.baselineYear ?? 2022),
+            targetYear: row.target_year ?? 2035,
+            reductionPct: row.reduction_pct ?? 0,
+          }
+          savedScopes.push(sc)
+        }
+        setTargetDrafts(prev => ({ ...prev, ...seeded })) // saved values overwrite any ACA default
+        setSelectedScopes(prev => Array.from(new Set([...prev, ...savedScopes])))
       }
       setLoading(false)
     })()
@@ -220,6 +247,7 @@ export default function SbtiDashboard() {
       return { ...prev, [sc]: { ...cur, [field]: value } }
     })
     setDirty(true)
+    setSavedTargets(false)
   }
   const resetToSuggested = (sc: Scope) => {
     const d = targetDrafts[sc]
@@ -248,6 +276,56 @@ export default function SbtiDashboard() {
       setSaved(true)
       setDirty(false)
     } finally { setSaving(false) }
+  }
+
+  // Persist near-term targets — one sbti_targets row per scope card with a usable draft.
+  const saveTargets = async () => {
+    if (!companyId || !userId) return
+
+    // Cards to save: selected scopes WITH a draft, excluding the S3 routing card (no base data).
+    const cards = selectedScopes
+      .filter(sc => targetDrafts[sc] && !(sc === 's3' && baseEmissionsFor(sc) === null))
+      .map(sc => ({ sc, d: targetDrafts[sc]! }))
+
+    // Gate: every card must pass validation — name the invalid scope(s) and block.
+    const invalid = cards.filter(({ sc, d }) =>
+      !validateTargetConfig({ standardVersion, scope: sc, method: 'absolute_aca', baseYear: d.baseYear, targetYear: d.targetYear, reductionPct: d.reductionPct, isNetZero: false }, {}).ok)
+    if (invalid.length > 0) {
+      alert('Cannot save — fix the invalid target(s): ' + invalid.map(({ sc }) => SCOPE_LABEL[sc]).join(', '))
+      return
+    }
+    if (cards.length === 0) { alert('No valid targets to save.'); return }
+
+    setSavingTargets(true)
+    try {
+      // Atomic per-row upsert on the unique (company_id, scope, target_type) key
+      // (migration 20260629_sbti_targets_unique_constraint.sql). Replaces the prior
+      // non-atomic delete-then-insert, where a failed insert after a successful delete
+      // would wipe the saved targets.
+      // NOTE: upsert does NOT prune rows for scopes the user DE-SELECTED in Step 2 — an old
+      // row for a removed scope survives. A "delete targets for de-selected scopes" refinement
+      // is backlogged; not built here.
+      const now = new Date().toISOString()
+      const rows = cards.map(({ sc, d }) => ({
+        company_id: companyId,
+        user_id: userId, // denormalized for the RLS gate
+        standard_version: standardVersion,
+        target_type: 'near_term',
+        scope: sc,
+        s3_category: null, // total-S3 near-term target; no specific category in this step
+        method: 'absolute_aca',
+        base_year: d.baseYear,
+        base_year_emissions_tco2e: baseEmissionsFor(sc),
+        target_year: d.targetYear,
+        reduction_pct: d.reductionPct,
+        updated_at: now,
+        // net-zero is encoded in target_type (no isNetZero column); ambition/status use column defaults.
+      }))
+      const { error } = await supabase.from('sbti_targets').upsert(rows, { onConflict: 'company_id,scope,target_type' })
+      if (error) { console.error('SBTi targets save failed:', error); alert('Save failed: ' + error.message); return }
+      setSavedTargets(true)
+      setDirty(false)
+    } finally { setSavingTargets(false) }
   }
 
   if (!isPaid) {
@@ -450,6 +528,10 @@ export default function SbtiDashboard() {
 
                       const suggested = round1(acaSuggestedReductionPct({ bucket: bucketFor(sc), baseYear: d.baseYear, targetYear: d.targetYear }))
                       const v = validateTargetConfig({ standardVersion, scope: sc, method: 'absolute_aca', baseYear: d.baseYear, targetYear: d.targetYear, reductionPct: d.reductionPct, isNetZero: false }, {})
+                      // Live trajectory from the CURRENT draft (not the DB); empty for invalid configs.
+                      const traj = (v.ok && base != null)
+                        ? computeTrajectory({ baseYear: d.baseYear, baseEmissions: base, targetYear: d.targetYear, reductionPct: d.reductionPct, method: 'absolute_aca' })
+                        : []
 
                       return (
                         <div key={sc} style={cardStyle}>
@@ -491,13 +573,42 @@ export default function SbtiDashboard() {
                               </div>
                             )}
                           </div>
+
+                          {/* Live trajectory preview (computeTrajectory) — base year → target year */}
+                          <div style={{ marginTop: 14, height: 160 }}>
+                            {v.ok && base != null && traj.length > 0 ? (
+                              <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={traj} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="#e8e7e4" />
+                                  <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#888784' }} />
+                                  <YAxis tick={{ fontSize: 11, fill: '#888784' }} width={52} tickFormatter={(val) => Number(val).toLocaleString(undefined, { maximumFractionDigits: 0 })} />
+                                  <Line type="monotone" dataKey="emissions" stroke="#7425e3" strokeWidth={2} dot={false} />
+                                </LineChart>
+                              </ResponsiveContainer>
+                            ) : (
+                              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#888784', fontWeight: 300, background: '#f8f7f5', borderRadius: 8 }}>
+                                Fix the target to preview the trajectory.
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )
                     })}
                   </div>
                 )}
 
-                <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 18 }}>Trajectory preview and saving come next.</div>
+                {selectedScopes.length > 0 && (
+                  <div style={{ marginTop: 24, display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <button
+                      onClick={saveTargets}
+                      disabled={savingTargets}
+                      style={{ fontSize: 14, fontWeight: 600, padding: '11px 28px', borderRadius: 8, border: 'none', cursor: savingTargets ? 'not-allowed' : 'pointer', background: savedTargets ? '#E1F5EE' : GRAD, color: savedTargets ? '#0F6E56' : '#0d0d0d' }}
+                    >
+                      {savingTargets ? 'Saving…' : savedTargets ? '✓ Saved' : 'Save targets'}
+                    </button>
+                  </div>
+                )}
+                <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 12 }}>Targets save to your account here; the trajectory previews update live as you edit.</div>
               </>
             )}
 
