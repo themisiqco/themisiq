@@ -196,7 +196,7 @@ export default function Page() {
               ['GHG Protocol Corporate', 'Global', 'Voluntary + mandatory base', 'Ongoing', '✓ Full — methodology base'],
               ['EcoVadis', 'Global', 'Customer-requested', 'Annual', '✓ Full — E1 module maps directly'],
               ['GRI 305', 'Global', 'Voluntary', 'Annual', '✓ Full — GRI 305-1, 305-2, 305-3'],
-              ['SBTi', 'Global', 'Voluntary commitment', 'Ongoing', '✓ Partial — inventory + target tracking'],
+              ['SBTi', 'Global', 'Voluntary commitment', 'Ongoing', '✓ Full — near-term & net-zero target setting'],
             ].map((row, i) => (
               <tr key={i}>
                 {row.map((cell, j) => (
