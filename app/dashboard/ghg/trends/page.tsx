@@ -320,6 +320,19 @@ export default function TrendsPage() {
             ))}
           </div>
 
+          {/* SBTi discovery CTA — shown ONLY with a loaded inventory AND no saved targets (so the
+              pathway line isn't rendering). Rides the page's existing GHG gating — no extra check. */}
+          {selected && !hasTarget && (
+            <div style={{ marginTop: 24, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '1.5rem 1.75rem' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Science-based targets</div>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.25rem', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.25, marginBottom: 8 }}>You&rsquo;ve mapped your emissions. Now set your targets.</div>
+              <p style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, marginBottom: 16, maxWidth: 620 }}>
+                Set near-term and net-zero targets under the SBTi Corporate Net-Zero Standard V2.0 — your baseline is already here. Your target pathway will appear on this chart.
+              </p>
+              <a href="/dashboard/sbti" style={{ display: 'inline-block', fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none' }}>Set science-based targets →</a>
+            </div>
+          )}
+
           {/* Intensity strip — only when every year has a revenue intensity */}
           {allHavePerRevenue && (
             <div style={{ marginTop: 20 }}>
