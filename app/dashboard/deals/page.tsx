@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Nav from '../../components/Nav'
 import { useEntitlement } from '../../../lib/useEntitlement'
+import { supabase } from '../../../lib/supabase'
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -185,6 +186,43 @@ export default function DealsDashboard() {
   })
   const [frameworks, setFrameworks] = useState<string[]>([])
   const [dataConfirmed, setDataConfirmed] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [dealId, setDealId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  // Load the user's most recent saved deal on mount so a saved deal round-trips.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (cancelled || !session) return
+      setUserId(session.user.id)
+      const { data, error } = await supabase
+        .from('deals')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (cancelled || error || !data) return
+      setDealId(data.id)
+      setDeal({
+        target_name: data.target_name ?? '',
+        sector: data.sector ?? '',
+        revenue: Number(data.revenue) || 0,
+        jurisdiction: data.jurisdiction ?? 'USA',
+        deal_type: data.deal_type ?? 'ma',
+        deal_value: Number(data.deal_value) || 0,
+        currency: data.currency ?? 'USD',
+        has_ghg_data: !!data.has_ghg_data,
+        has_esg_report: !!data.has_esg_report,
+        notes: data.notes ?? '',
+      })
+      if (Array.isArray(data.frameworks)) setFrameworks(data.frameworks) // derive effect reconciles anyway
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   // Auto-detect frameworks when deal changes
   useEffect(() => {
@@ -196,7 +234,41 @@ export default function DealsDashboard() {
     }
   }, [deal.sector, deal.jurisdiction, deal.revenue, deal.deal_type])
 
-  const update = (field: string, value: any) => setDeal(prev => ({ ...prev, [field]: value }))
+  const update = (field: string, value: any) => { setDeal(prev => ({ ...prev, [field]: value })); setSaved(false) }
+
+  // Persist the deal for this user. token/share_enabled are intentionally NOT written —
+  // the DB defaults own them (Build-C shareable link; unused this build).
+  const handleSave = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { alert('Please log in to save your deal.'); return }
+    setSaving(true)
+    try {
+      const row = {
+        user_id: session.user.id,
+        target_name: deal.target_name,
+        sector: deal.sector,
+        revenue: deal.revenue,
+        jurisdiction: deal.jurisdiction,
+        deal_type: deal.deal_type,
+        deal_value: deal.deal_value,
+        currency: deal.currency,
+        has_ghg_data: deal.has_ghg_data,
+        has_esg_report: deal.has_esg_report,
+        notes: deal.notes,
+        frameworks, // derived list persisted as jsonb for the future shared view
+        updated_at: new Date().toISOString(),
+      }
+      if (dealId) {
+        const { error } = await supabase.from('deals').update(row).eq('id', dealId)
+        if (error) { console.error('Deal save failed:', error); alert('Save failed: ' + error.message); return }
+      } else {
+        const { data, error } = await supabase.from('deals').insert(row).select('id').single()
+        if (error) { console.error('Deal save failed:', error); alert('Save failed: ' + error.message); return }
+        if (data) setDealId(data.id)
+      }
+      setSaved(true)
+    } finally { setSaving(false) }
+  }
 
   const risks = SECTOR_RISKS[deal.sector] || []
   // Rewrite generic disclosure-regime labels (SB 253, bare CSRD) to the jurisdiction's actual regime.
@@ -550,6 +622,7 @@ export default function DealsDashboard() {
             {steps[step]()}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
               <button onClick={() => setStep(s => Math.max(0, s - 1))} style={{ fontSize: 13, padding: '9px 20px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: step === 0 ? 'not-allowed' : 'pointer', opacity: step === 0 ? 0.4 : 1 }}>← Back</button>
+              <button onClick={handleSave} disabled={saving} style={{ fontSize: 13, fontWeight: saved ? 500 : 600, padding: '9px 20px', borderRadius: 8, background: saved ? '#E1F5EE' : GRAD, border: saved ? '1px solid #0F6E56' : 'none', color: saved ? '#0F6E56' : '#0d0d0d', cursor: saving ? 'not-allowed' : 'pointer' }}>{saving ? 'Saving…' : saved ? '✓ Saved' : 'Save deal'}</button>
               {step < STEP_NAMES.length - 1 && <button onClick={() => setStep(s => Math.min(STEP_NAMES.length - 1, s + 1))} style={{ fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>Next →</button>}
             </div>
           </div>
