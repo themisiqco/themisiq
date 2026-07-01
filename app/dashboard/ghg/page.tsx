@@ -2285,6 +2285,18 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             })}
           </div>
           <VerifierInvite inventoryId={inventoryId} />
+          {/* SBTi nudge — shown once the inventory is saved AND its figures confirmed (a settled
+              baseline). Affirmative next-step, not a warning. Always shows when gated (no sbti_targets
+              read); copy reads fine whether or not targets already exist. GHG-gated page ⇒ no entitlement check. */}
+          {inventoryId && dataConfirmed && (
+            <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.25)', borderRadius: 10, padding: '1.25rem', marginTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' as const }}>
+              <div style={{ flex: 1, minWidth: 280 }}>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Your inventory is the baseline for science-based targets.</div>
+                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6 }}>Set near-term and net-zero targets under the SBTi Corporate Net-Zero Standard V2.0 — built directly on the figures you just confirmed.</div>
+              </div>
+              <a href="/dashboard/sbti" style={{ fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>Set science-based targets →</a>
+            </div>
+          )}
         </div>
       </div>
     )
