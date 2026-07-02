@@ -12,6 +12,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase' // anon public client (NEXT_PUBLIC_SUPABASE_ANON_KEY)
 import { getObligations, SECTOR_RISKS, type SectorRisk } from '../../../lib/deals/assessment'
+import { GHG_TIERS, type Tier } from '../../../lib/pricing'
 
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
 
@@ -105,9 +106,16 @@ export default function DealAssessmentPage() {
   const consultantRange = `$${Math.round(obligations.consultantLow / 1000)}k–$${Math.round(obligations.consultantHigh / 1000)}k`
   const includedModulesLabel = obligations.included.map(o => o.short).join(' + ') + ' modules'
 
-  // CTA pre-selects the identified modules on /pricing (ids: ghg / supply / risk).
+  // CTA → the pre-configured /order screen. modules = pricing-page ids (/order converts them);
+  // tier = GHG tier from the deal's location_count using the SAME GHG_TIERS allowance thresholds
+  // getObligations uses (so /order's price matches this assessment's cost card); ref = deal token.
   const ctaModules = ['ghg', ...(obligations.included.some(o => o.short === 'supply chain') ? ['supply'] : [])].join(',')
-  const ctaHref = `/pricing?modules=${ctaModules}`
+  const lc = data.location_count ?? 0
+  const ghgTier: Tier =
+    lc <= (GHG_TIERS.starter.locationAllowance ?? 3) ? 'starter'
+    : lc <= (GHG_TIERS.professional.locationAllowance ?? 15) ? 'professional'
+    : 'advisory'
+  const ctaHref = `/order?modules=${ctaModules}&tier=${ghgTier}&ref=${encodeURIComponent(token)}`
 
   const sectorJur = [data.sector, data.jurisdiction].filter(Boolean).join(' · ')
 
