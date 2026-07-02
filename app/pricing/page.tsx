@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { startCheckout } from '../../lib/checkout'
+import ConsentForm, { type ConsentPayload } from '../components/ConsentForm'
 import { LEGACY_PRICING_PAGE_ID, tierPrice, tierStrikethrough, volumeDiscount, ADDONS, conciergeTierForLocations, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, FLAT_MODULE_PRICES, FULL_PLATFORM_PRICE, type Tier, type GhgTier, type ModuleKey, type AddOnKey } from '../../lib/pricing'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -216,24 +217,15 @@ function PricingPageInner() {
 
   // Consent modal (new-model self-serve B2B checkout) — gates the Buy-now button.
   const [consentOpen, setConsentOpen] = useState(false)
-  const [bizName, setBizName] = useState('')
-  const [bizReg, setBizReg] = useState('')
-  const [purchaserName, setPurchaserName] = useState('')
-  const [cBiz, setCBiz] = useState(false)
-  const [cAccess, setCAccess] = useState(false)
-  const [cData, setCData] = useState(false)
-  const consentReady = !!bizName.trim() && !!bizReg.trim() && !!purchaserName.trim() && cBiz && cAccess && cData
-  const submitConsentAndPay = () => {
-    if (!consentReady) return
+  // ConsentForm assembles + validates { business, purchaser, consent }; we attach the cart and pay.
+  const submitConsentAndPay = (payload: ConsentPayload) => {
     const moduleKeys = Array.from(selected).map((id) => LEGACY_PRICING_PAGE_ID[id]).filter(Boolean)
     if (moduleKeys.length === 0) return
     startCheckout({
       tier,
       moduleKeys,
       ...(selectedAddOns.length > 0 ? { addOns: selectedAddOns } : {}),
-      business: { name: bizName.trim(), regNumber: bizReg.trim() },
-      purchaser: { name: purchaserName.trim() },
-      consent: { businessCapacity: cBiz, digitalAccess: cAccess, dataAuthority: cData, atISO: new Date().toISOString(), version: '2026-06-v2-final' },
+      ...payload,
     })
   }
 
@@ -417,11 +409,6 @@ function PricingPageInner() {
   }
 
   // Consent-modal styles
-  const consentLabel: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', display: 'block', marginBottom: 4, marginTop: 12 }
-  const consentInput: React.CSSProperties = { width: '100%', fontSize: 13, padding: '9px 12px', border: '1px solid #e8e7e4', borderRadius: 8, outline: 'none', boxSizing: 'border-box' }
-  const consentCheckRow: React.CSSProperties = { display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer' }
-  const consentCheckText: React.CSSProperties = { fontSize: 12, color: '#555553', lineHeight: 1.6 }
-  const consentLink: React.CSSProperties = { color: '#7425e3', textDecoration: 'underline' }
 
   return (
     <div style={s.page}>
@@ -870,35 +857,7 @@ function PricingPageInner() {
       {/* Consent modal (NEW model) — B2B capacity + digital-content + data-authority */}
       {NEW_PRICING_ACTIVE && consentOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(13,13,13,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }} onClick={() => setConsentOpen(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, maxWidth: 560, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '1.75rem' }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, color: '#0d0d0d', marginBottom: 4 }}>Confirm your purchase</div>
-            <div style={{ fontSize: 12, color: '#888784', marginBottom: 8 }}>ThemisIQ sells to businesses only. Please confirm the details below to continue to secure payment.</div>
-            <label style={consentLabel}>Business legal name</label>
-            <input value={bizName} onChange={e => setBizName(e.target.value)} placeholder="Acme Industries Inc." style={consentInput} />
-            <label style={consentLabel}>Registration / VAT / Tax ID</label>
-            <input value={bizReg} onChange={e => setBizReg(e.target.value)} placeholder="e.g. 12-3456789" style={consentInput} />
-            <label style={consentLabel}>Your name</label>
-            <input value={purchaserName} onChange={e => setPurchaserName(e.target.value)} placeholder="Full name" style={consentInput} />
-            {/* Consent wording — Terms/Refund/Consent Part C; counsel-final (2026-06-v2-final) */}
-            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <label style={consentCheckRow}>
-                <input type="checkbox" checked={cBiz} onChange={e => setCBiz(e.target.checked)} style={{ marginTop: 3, flexShrink: 0 }} />
-                <span style={consentCheckText}>I confirm that I am purchasing on behalf of a business or organization, and not as a consumer. I represent that I have authority to bind the organization to these <a href="/terms" target="_blank" rel="noopener noreferrer" style={consentLink}>Terms of Service</a>.</span>
-              </label>
-              <label style={consentCheckRow}>
-                <input type="checkbox" checked={cAccess} onChange={e => setCAccess(e.target.checked)} style={{ marginTop: 3, flexShrink: 0 }} />
-                <span style={consentCheckText}>I request immediate access to the Service. I understand that performance begins upon first login or the generation of any report and that, to the extent permitted by applicable law, applicable cancellation or withdrawal rights may cease once performance begins. I acknowledge that I have read and agree to the <a href="/refund-policy" target="_blank" rel="noopener noreferrer" style={consentLink}>Refund Policy</a>.</span>
-              </label>
-              <label style={consentCheckRow}>
-                <input type="checkbox" checked={cData} onChange={e => setCData(e.target.checked)} style={{ marginTop: 3, flexShrink: 0 }} />
-                <span style={consentCheckText}>I represent that I have authority to provide any information uploaded to the Service and that my use of the Service complies with applicable laws and my organization&apos;s internal policies.</span>
-              </label>
-            </div>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
-              <button onClick={() => setConsentOpen(false)} style={ghostBtn}>Cancel</button>
-              <button onClick={submitConsentAndPay} disabled={!consentReady} style={{ ...primaryBtn, opacity: consentReady ? 1 : 0.4, cursor: consentReady ? 'pointer' : 'not-allowed' }}>Continue to payment →</button>
-            </div>
-          </div>
+          <ConsentForm onCancel={() => setConsentOpen(false)} onSubmit={submitConsentAndPay} />
         </div>
       )}
 
