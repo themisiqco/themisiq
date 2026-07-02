@@ -70,6 +70,12 @@ export default function DealsDashboard() {
   const [dealId, setDealId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  // Share-link state (C4) — kept SEPARATE from the deal object so they never enter handleSave's
+  // row payload; token/share_enabled are DB-owned (token auto-generated, share_enabled toggled here).
+  const [dealToken, setDealToken] = useState<string | null>(null)
+  const [shareEnabled, setShareEnabled] = useState(false)
+  const [shareSaving, setShareSaving] = useState(false)
+  const [copiedShare, setCopiedShare] = useState(false)
 
   // Load the user's most recent saved deal on mount so a saved deal round-trips.
   useEffect(() => {
@@ -87,6 +93,8 @@ export default function DealsDashboard() {
         .maybeSingle()
       if (cancelled || error || !data) return
       setDealId(data.id)
+      setDealToken(data.token ?? null)      // token isn't secret to the owner; drives the share UI
+      setShareEnabled(!!data.share_enabled)
       setDeal({
         target_name: data.target_name ?? '',
         sector: data.sector ?? '',
@@ -144,9 +152,9 @@ export default function DealsDashboard() {
         const { error } = await supabase.from('deals').update(row).eq('id', dealId)
         if (error) { console.error('Deal save failed:', error); alert('Save failed: ' + error.message); return }
       } else {
-        const { data, error } = await supabase.from('deals').insert(row).select('id').single()
+        const { data, error } = await supabase.from('deals').insert(row).select('id, token, share_enabled').single()
         if (error) { console.error('Deal save failed:', error); alert('Save failed: ' + error.message); return }
-        if (data) setDealId(data.id)
+        if (data) { setDealId(data.id); setDealToken(data.token ?? null); setShareEnabled(!!data.share_enabled) }
       }
       setSaved(true)
     } finally { setSaving(false) }
@@ -181,6 +189,27 @@ export default function DealsDashboard() {
     : obligations.themisIqHasCustom
       ? (obligations.themisIqTotal != null ? `~${deal.currency} ${obligations.themisIqTotal.toLocaleString()} + custom` : 'Custom quote')
       : `~${deal.currency} ${(obligations.themisIqTotal ?? 0).toLocaleString()}`
+
+  // Absolute public URL for the target-facing route (matches the verifier linkFor pattern).
+  const shareUrl = dealToken ? `${typeof window !== 'undefined' ? window.location.origin : 'https://www.themisiq.co'}/deals/${dealToken}` : ''
+
+  // Flip share_enabled — a normal owner-gated update (existing RLS covers it); no RPC, no policy change.
+  const toggleShare = async (enabled: boolean) => {
+    if (!dealId) return
+    setShareSaving(true)
+    try {
+      const { error } = await supabase.from('deals').update({ share_enabled: enabled }).eq('id', dealId)
+      if (error) { console.error('Share toggle failed:', error); alert('Could not update sharing: ' + error.message); return }
+      setShareEnabled(enabled) // only reflect state on a successful write
+    } finally { setShareSaving(false) }
+  }
+
+  const copyShareLink = () => {
+    if (!shareUrl) return
+    navigator.clipboard.writeText(shareUrl)
+    setCopiedShare(true)
+    setTimeout(() => setCopiedShare(false), 2000)
+  }
 
   const generateExport = () => {
     const rows = [
@@ -503,6 +532,31 @@ export default function DealsDashboard() {
           <button onClick={() => dataConfirmed && generateExport()} style={{ fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: dataConfirmed ? 'pointer' : 'not-allowed', opacity: dataConfirmed ? 1 : 0.4 }}>
             ⬇ Download ESG Diligence Report (CSV)
           </button>
+
+          {/* Share with target — public /deals/[token] link. Gated on a saved deal with a token. */}
+          <div style={{ marginTop: 24, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.25rem' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#0d0d0d', marginBottom: 4 }}>Share with target company</div>
+            <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, marginBottom: 14 }}>
+              Share this assessment with the target company. They&rsquo;ll see the compliance findings and cost estimate — not your deal economics.
+            </div>
+            {!dealId || !dealToken ? (
+              <div style={{ fontSize: 12, color: '#888784', fontStyle: 'italic' }}>Save the deal to generate a shareable link.</div>
+            ) : shareEnabled ? (
+              <>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#0F6E56', marginBottom: 12 }}>🟢 Link active — anyone with this URL can view this assessment.</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
+                  <input readOnly value={shareUrl} onFocus={e => e.currentTarget.select()} style={{ flex: 1, minWidth: 220, fontSize: 12, padding: '9px 12px', borderRadius: 8, border: '0.5px solid #e8e7e4', background: '#fff', color: '#555553' }} />
+                  <button onClick={copyShareLink} style={{ fontSize: 12, fontWeight: 500, padding: '9px 16px', borderRadius: 8, background: copiedShare ? '#E1F5EE' : '#fff', border: `0.5px solid ${copiedShare ? '#0F6E56' : '#e8e7e4'}`, color: copiedShare ? '#0F6E56' : '#555553', cursor: 'pointer', whiteSpace: 'nowrap' }}>{copiedShare ? '✓ Copied!' : 'Copy link'}</button>
+                </div>
+                <button onClick={() => toggleShare(false)} disabled={shareSaving} style={{ fontSize: 13, fontWeight: 600, padding: '10px 22px', borderRadius: 8, background: '#fff', border: '1px solid #B91C1C', color: '#B91C1C', cursor: shareSaving ? 'not-allowed' : 'pointer' }}>{shareSaving ? 'Updating…' : 'Revoke access'}</button>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 12, color: '#888784', marginBottom: 12 }}>🔒 Not shared — only you can see this assessment.</div>
+                <button onClick={() => toggleShare(true)} disabled={shareSaving} style={{ fontSize: 13, fontWeight: 600, padding: '10px 22px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: shareSaving ? 'not-allowed' : 'pointer' }}>{shareSaving ? 'Generating…' : 'Generate share link'}</button>
+              </>
+            )}
+          </div>
         </div>
       ) : (
         <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
