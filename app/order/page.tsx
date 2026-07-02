@@ -38,6 +38,9 @@ const TIER_LABEL: Record<Tier, string> = { starter: 'Essentials', professional: 
 
 const usd = (n: number) => `$${n.toLocaleString()}`
 
+const orderLabel: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', display: 'block', marginBottom: 4, marginTop: 12 }
+const orderInput: React.CSSProperties = { width: '100%', fontSize: 13, padding: '9px 12px', border: '1px solid #e8e7e4', borderRadius: 8, outline: 'none', boxSizing: 'border-box', background: '#fff' }
+
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh', color: '#0d0d0d' }}>
@@ -55,6 +58,9 @@ function Shell({ children }: { children: React.ReactNode }) {
 function OrderInner() {
   const searchParams = useSearchParams()
   const [submitting, setSubmitting] = useState(false)
+  // Quote-request form (>$10k / Advisory path) — email-only, no payment.
+  const [q, setQ] = useState({ name: '', email: '', company: '', phone: '' })
+  const [quoteStatus, setQuoteStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle')
 
   // ── Params → canonical keys + validated tier ──────────────────────────────────
   const rawTier = searchParams.get('tier')
@@ -107,6 +113,26 @@ function OrderInner() {
     }
   }
 
+  // Quote path: email-only request (no Stripe). Enabled once name + valid email + company filled.
+  const qReady = !!q.name.trim() && q.email.includes('@') && !!q.company.trim()
+  const submitQuote = async () => {
+    if (!qReady || quoteStatus === 'sending') return
+    setQuoteStatus('sending')
+    try {
+      const res = await fetch('/api/order/quote-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contact: { name: q.name.trim(), email: q.email.trim(), company: q.company.trim(), phone: q.phone.trim() || undefined },
+          order: { modules: keys, tier, totalUSD: quote.totalUSD, ref: ref ?? undefined },
+        }),
+      })
+      setQuoteStatus(res.ok ? 'done' : 'error')
+    } catch {
+      setQuoteStatus('error')
+    }
+  }
+
   return (
     <Shell>
       <div data-ref={ref ?? undefined}>
@@ -155,10 +181,39 @@ function OrderInner() {
             <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>This configuration needs a custom quote</div>
             <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: 16 }}>
               {quote.requiresQuote
-                ? 'GHG Advisory (uncapped locations) is tailored to your footprint, so it&rsquo;s priced individually.'
+                ? 'GHG Advisory (uncapped locations) is tailored to your footprint, so it’s priced individually.'
                 : 'Orders above $10,000 are completed by invoice rather than card.'} Our team will prepare a quote and walk you through next steps.
             </div>
-            <button disabled style={{ fontSize: 14, fontWeight: 600, padding: '12px 26px', borderRadius: 8, background: '#fff', border: '1px solid #7425e3', color: '#7425e3', cursor: 'not-allowed', opacity: 0.7 }}>Request a quote — coming soon</button>
+
+            {quoteStatus === 'done' ? (
+              <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.25)', borderRadius: 10, padding: '1.25rem' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#0F6E56', marginBottom: 4 }}>Thanks — we&rsquo;ve received your request.</div>
+                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7 }}>Our team will prepare your quote and follow up at <strong>{q.email}</strong>.</div>
+              </div>
+            ) : (
+              <div>
+                <label style={orderLabel}>Your name</label>
+                <input value={q.name} onChange={e => setQ(v => ({ ...v, name: e.target.value }))} placeholder="Full name" style={orderInput} />
+                <label style={orderLabel}>Work email</label>
+                <input value={q.email} onChange={e => setQ(v => ({ ...v, email: e.target.value }))} placeholder="you@company.com" type="email" style={orderInput} />
+                <label style={orderLabel}>Company</label>
+                <input value={q.company} onChange={e => setQ(v => ({ ...v, company: e.target.value }))} placeholder="Acme Industries Inc." style={orderInput} />
+                <label style={orderLabel}>Phone <span style={{ color: '#888784', fontWeight: 400 }}>(optional)</span></label>
+                <input value={q.phone} onChange={e => setQ(v => ({ ...v, phone: e.target.value }))} placeholder="+1 555 000 0000" style={orderInput} />
+
+                {quoteStatus === 'error' && (
+                  <div style={{ fontSize: 12, color: '#B91C1C', marginTop: 12 }}>Something went wrong sending your request. Please try again.</div>
+                )}
+
+                <button
+                  onClick={submitQuote}
+                  disabled={!qReady || quoteStatus === 'sending'}
+                  style={{ marginTop: 18, fontSize: 14, fontWeight: 600, padding: '12px 26px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: (qReady && quoteStatus !== 'sending') ? 'pointer' : 'not-allowed', opacity: (qReady && quoteStatus !== 'sending') ? 1 : 0.4 }}
+                >
+                  {quoteStatus === 'sending' ? 'Sending…' : 'Request your quote'}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
