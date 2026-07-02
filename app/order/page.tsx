@@ -59,7 +59,7 @@ function OrderInner() {
   const searchParams = useSearchParams()
   const [submitting, setSubmitting] = useState(false)
   // Quote-request form (>$10k / Advisory path) — email-only, no payment.
-  const [q, setQ] = useState({ name: '', email: '', company: '', phone: '' })
+  const [q, setQ] = useState({ name: '', email: '', company: '', phone: '', hp: '' }) // hp = honeypot (bots fill it)
   const [quoteStatus, setQuoteStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle')
 
   // ── Params → canonical keys + validated tier ──────────────────────────────────
@@ -123,7 +123,7 @@ function OrderInner() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contact: { name: q.name.trim(), email: q.email.trim(), company: q.company.trim(), phone: q.phone.trim() || undefined },
+          contact: { name: q.name.trim(), email: q.email.trim(), company: q.company.trim(), phone: q.phone.trim() || undefined, hp: q.hp || undefined },
           order: { modules: keys, tier, totalUSD: quote.totalUSD, ref: ref ?? undefined },
         }),
       })
@@ -200,6 +200,10 @@ function OrderInner() {
                 <input value={q.company} onChange={e => setQ(v => ({ ...v, company: e.target.value }))} placeholder="Acme Industries Inc." style={orderInput} />
                 <label style={orderLabel}>Phone <span style={{ color: '#888784', fontWeight: 400 }}>(optional)</span></label>
                 <input value={q.phone} onChange={e => setQ(v => ({ ...v, phone: e.target.value }))} placeholder="+1 555 000 0000" style={orderInput} />
+                {/* Honeypot — visually hidden; real users never fill it, bots do → server silently drops. */}
+                <div aria-hidden="true" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', left: '-9999px' }}>
+                  <label>Website<input type="text" tabIndex={-1} autoComplete="off" value={q.hp} onChange={e => setQ(v => ({ ...v, hp: e.target.value }))} /></label>
+                </div>
 
                 {quoteStatus === 'error' && (
                   <div style={{ fontSize: 12, color: '#B91C1C', marginTop: 12 }}>Something went wrong sending your request. Please try again.</div>
