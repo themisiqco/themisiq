@@ -356,6 +356,13 @@ export default function DealsDashboard() {
   const mediumRisks = risks.filter(r => r.severity === 'medium')
   const complianceCost = deal.deal_value > 0 ? getComplianceCost(deal.deal_value, deal.sector, frameworks) : null
   const obligations = getObligations(deal.location_count, frameworks)
+  // Compact ThemisIQ summed figure (included tier only) — shared by the Cost Estimate card,
+  // the Export "Report summary", and the sticky "Deal summary" so all three stay consistent.
+  const themisIqFigure = obligations.locationUnset
+    ? 'Enter locations →'
+    : obligations.themisIqHasCustom
+      ? (obligations.themisIqTotal != null ? `~${deal.currency} ${obligations.themisIqTotal.toLocaleString()} + custom` : 'Custom quote')
+      : `~${deal.currency} ${(obligations.themisIqTotal ?? 0).toLocaleString()}`
 
   const generateExport = () => {
     const rows = [
@@ -561,11 +568,6 @@ export default function DealsDashboard() {
   const renderStep3 = () => {
     const cur = deal.currency
     const consultantRange = `${cur} ${Math.round(obligations.consultantLow / 1000)}k–${Math.round(obligations.consultantHigh / 1000)}k`
-    const themisIqFigure = obligations.locationUnset
-      ? 'Enter locations →'
-      : obligations.themisIqHasCustom
-        ? (obligations.themisIqTotal != null ? `~${cur} ${obligations.themisIqTotal.toLocaleString()} + custom` : 'Custom quote')
-        : `~${cur} ${(obligations.themisIqTotal ?? 0).toLocaleString()}`
     const includedModulesLabel = obligations.included.map(o => o.short).join(' + ') + ' modules'
     return (
     <div>
@@ -657,7 +659,7 @@ export default function DealsDashboard() {
             { label: 'Target', val: deal.target_name || '—' },
             { label: 'ESG risks', val: risks.length, urgent: criticalRisks.length > 0 },
             { label: 'Frameworks', val: frameworks.length },
-            { label: 'Compliance est.', val: complianceCost ? `${deal.currency}${Math.round(complianceCost.low / 1000)}k+` : '—' },
+            { label: 'ThemisIQ est.', val: themisIqFigure },
           ].map(({ label, val, urgent }) => (
             <div key={label}>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>{label}</div>
@@ -737,7 +739,7 @@ export default function DealsDashboard() {
                     { label: 'Deal type', val: DEAL_TYPES.find(d => d.id === deal.deal_type)?.label.split(' —')[0] || '—' },
                     { label: 'Critical risks', val: criticalRisks.length, urgent: criticalRisks.length > 0 },
                     { label: 'Frameworks', val: frameworks.length },
-                    { label: 'Compliance est.', val: complianceCost ? `${deal.currency}${Math.round(complianceCost.low / 1000)}k+` : '—' },
+                    { label: 'ThemisIQ est.', val: themisIqFigure },
                   ].map(({ label, val, urgent }) => (
                     <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{label}</span>
