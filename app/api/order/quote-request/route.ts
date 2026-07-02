@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { checkAndRecordRateLimit, ipFromHeaders } from '../../../../lib/rateLimit'
+import { createDraftInvoiceForOrder } from '../../../../lib/order/invoice'
+import type { Tier } from '../../../../lib/pricing'
 
 // Quote-request capture for /order carts that exceed the card threshold (>$10k) or are
 // GHG Advisory. Email-only — NO payment, NO DB table. Clones the /api/assessment/submit
@@ -23,22 +26,55 @@ const esc = (s: unknown) => String(s ?? '').replace(/[<>&]/g, c => ({ '<': '&lt;
 
 export async function POST(req: NextRequest) {
   try {
-    const { contact, order } = await req.json()
+    let body: unknown
+    try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 }) }
+    const { contact, order } = (body ?? {}) as { contact?: Record<string, unknown>; order?: Record<string, unknown> }
 
-    // Validate like the assessment route: name + a plausible email, else 400.
-    if (!contact?.name?.trim() || !contact?.email || !String(contact.email).includes('@')) {
-      return NextResponse.json({ error: 'Name and a valid email are required.' }, { status: 400 })
+    // Honeypot: bots fill the hidden field; real users leave it empty. Silently accept + drop
+    // (return ok so the bot believes it succeeded, but send nothing and record nothing).
+    if (contact?.hp && String(contact.hp).trim()) {
+      return NextResponse.json({ ok: true })
+    }
+
+    // ── Validate + harden: required fields, email format, length caps ──────────
+    const vName    = String(contact?.name ?? '').trim()
+    const vEmail   = String(contact?.email ?? '').trim().toLowerCase()
+    const vCompany = String(contact?.company ?? '').trim()
+    const vPhone   = contact?.phone ? String(contact.phone).trim() : ''
+    if (!vName || !vEmail || !vCompany) {
+      return NextResponse.json({ error: 'Name, email, and company are required.' }, { status: 400 })
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(vEmail)) {
+      return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 })
+    }
+    if (vName.length > 200 || vEmail.length > 320 || vCompany.length > 200 || vPhone.length > 50) {
+      return NextResponse.json({ error: 'One or more fields are too long.' }, { status: 400 })
+    }
+    const vModules = Array.isArray(order?.modules) ? (order.modules as unknown[]).slice(0, 20).map(m => String(m).slice(0, 50)) : []
+    const vTier    = order?.tier ? String(order.tier).slice(0, 30) : ''
+    const vRef     = order?.ref ? String(order.ref).slice(0, 200) : ''
+    const tierParam: Tier | undefined =
+      vTier === 'starter' || vTier === 'professional' || vTier === 'advisory' ? vTier : undefined
+
+    // ── Rate limit (Supabase-backed; per IP + per email). 429 when exceeded ────
+    const ip = ipFromHeaders(req)
+    const rl = await checkAndRecordRateLimit({ bucket: 'order-quote-request', ip, email: vEmail, ipLimit: 8, emailLimit: 3, windowMs: 60 * 60 * 1000 })
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later, or email hello@themisiq.co.' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } },
+      )
     }
 
     const date    = new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })
-    const name    = esc(contact.name)
-    const email   = esc(contact.email)
-    const company = esc(contact.company || '—')
-    const phone   = contact.phone ? esc(contact.phone) : '—'
-    const modules = Array.isArray(order?.modules) && order.modules.length ? esc(order.modules.join(', ')) : '—'
-    const tier    = esc(order?.tier || '—')
-    const total   = typeof order?.totalUSD === 'number' && order.totalUSD > 0 ? `$${order.totalUSD.toLocaleString()}` : 'Custom / Advisory'
-    const ref     = order?.ref ? esc(order.ref) : null
+    const name    = esc(vName)
+    const email   = esc(vEmail)
+    const company = esc(vCompany || '—')
+    const phone   = vPhone ? esc(vPhone) : '—'
+    const modules = vModules.length ? esc(vModules.join(', ')) : '—'
+    const tier    = esc(vTier || '—')
+    const total   = typeof order?.totalUSD === 'number' && (order.totalUSD as number) > 0 ? `$${(order.totalUSD as number).toLocaleString()}` : 'Custom / Advisory'
+    const ref     = vRef ? esc(vRef) : null
 
     // ── Internal notification (the one we act on) ──────────────────────────────
     const notifyHtml = `<!DOCTYPE html><html><body style="font-family:sans-serif;background:#f8f7f5;padding:24px;">
@@ -71,7 +107,7 @@ export async function POST(req: NextRequest) {
       MONITOR_EMAIL,
       `Quote request — ${company}`,
       notifyHtml,
-      `Quote request from ${contact.name} (${contact.email}) · ${company} · modules: ${modules} · tier: ${tier} · total: ${total}${ref ? ` · ref: ${ref}` : ''}`,
+      `Quote request from ${vName} (${vEmail}) · ${company} · modules: ${modules} · tier: ${tier} · total: ${total}${ref ? ` · ref: ${ref}` : ''}`,
     )
 
     // ── Confirmation to the prospect (mirror assessment route emailing the lead) ──
@@ -92,11 +128,79 @@ export async function POST(req: NextRequest) {
 </body></html>`
 
     await sendEmail(
-      contact.email,
+      vEmail,
       'We received your ThemisIQ quote request',
       confirmHtml,
-      `Thanks — we received your request and will prepare a quote for ${modules}, following up shortly at ${contact.email}.`,
+      `Thanks — we received your request and will prepare a quote for ${modules}, following up shortly at ${vEmail}.`,
     )
+
+    // ── DRAFT-HOLD invoice (invoice-eligible path only) ────────────────────────
+    // The prospect has ALREADY been confirmed above. This step auto-creates a DRAFT invoice
+    // (I2: server-priced, metadata.{user_id,entitlements}, idempotent, auto_advance:false — nothing
+    // sends) and notifies the monitor to review-and-send from Stripe with one click. It is wrapped so
+    // that NO invoice-side fault can turn the prospect's submission into a visible failure, and it
+    // NEVER finalizes/sends. Advisory & card-eligible are excluded by the helper's own guards.
+    try {
+      const inv = await createDraftInvoiceForOrder({ email: vEmail, modules: vModules, tier: tierParam, ref: vRef || undefined })
+      if (inv.ok) {
+        const link = `https://dashboard.stripe.com/invoices/${inv.invoiceId}`
+        await sendEmail(
+          MONITOR_EMAIL,
+          `📝 Draft invoice ready — ${company} · $${inv.amount.toLocaleString()}`,
+          `<!DOCTYPE html><html><body style="font-family:sans-serif;background:#f8f7f5;padding:24px;">
+<div style="max-width:560px;background:#fff;border-radius:8px;border:1px solid #e8e7e4;overflow:hidden;">
+  <div style="background:#0d0d0d;padding:16px 20px;color:#fff;font-weight:700;font-size:14px;">ThemisIQ · Draft invoice — review &amp; send</div>
+  <div style="padding:20px;">
+    <table width="100%" style="margin-bottom:14px;">
+      <tr><td width="120" style="font-size:12px;color:#888;padding:3px 0;">Customer</td><td style="font-size:12px;color:#0d0d0d;font-weight:600;">${name} · ${company}</td></tr>
+      <tr><td style="font-size:12px;color:#888;padding:3px 0;">Email</td><td style="font-size:12px;color:#7425e3;">${email}</td></tr>
+      <tr><td style="font-size:12px;color:#888;padding:3px 0;">Modules</td><td style="font-size:12px;color:#0d0d0d;">${modules}</td></tr>
+      <tr><td style="font-size:12px;color:#888;padding:3px 0;">Amount</td><td style="font-size:12px;color:#0d0d0d;font-weight:600;">$${inv.amount.toLocaleString()}</td></tr>
+      <tr><td style="font-size:12px;color:#888;padding:3px 0;">Invoice</td><td style="font-size:12px;color:#0d0d0d;">${esc(inv.invoiceId)}</td></tr>
+      ${ref ? `<tr><td style="font-size:12px;color:#888;padding:3px 0;">Referral</td><td style="font-size:12px;color:#0d0d0d;">${ref}</td></tr>` : ''}
+    </table>
+    <div style="background:#EDE9FE;border-radius:6px;padding:12px 14px;font-size:12px;color:#555;line-height:1.6;margin-bottom:14px;">
+      A <strong>draft</strong> invoice has been created (nothing sent). Review it in Stripe and click <strong>Send</strong> to bill the customer. On payment, their modules unlock automatically.
+    </div>
+    <a href="${link}" style="display:inline-block;font-size:13px;font-weight:600;color:#0d0d0d;background:linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e);padding:10px 22px;border-radius:8px;text-decoration:none;">Review &amp; send in Stripe →</a>
+  </div>
+</div>
+</body></html>`,
+          `Draft invoice created — ${vName} (${vEmail}) · ${company} · $${inv.amount.toLocaleString()} · invoice ${inv.invoiceId}. Review & send: ${link}`,
+        )
+      } else if (inv.reason === 'requires_quote') {
+        // Advisory — not auto-priced. Human builds a custom quote in Stripe.
+        await sendEmail(
+          MONITOR_EMAIL,
+          `Manual quote needed — ${company}`,
+          `<p style="font-family:sans-serif;font-size:13px;color:#0d0d0d;">Manual quote needed for <strong>${name}</strong> (${email}) · ${company} · ${modules}.<br>Reason: ${esc(inv.message)}<br>Build a custom quote/invoice in Stripe manually.</p>`,
+          `Manual quote needed for ${vName} (${vEmail}) · ${company} · ${modules}. ${inv.message}`,
+        )
+      } else if (inv.reason === 'card_eligible') {
+        // Defensive: a ≤$10k order shouldn't reach the quote form. Do NOT invoice.
+        console.warn(`[quote-request] card-eligible order reached quote path for ${vEmail}; no invoice created.`)
+      } else {
+        // empty / error — invoice NOT created. Alert the monitor to handle it manually.
+        await sendEmail(
+          MONITOR_EMAIL,
+          `⚠ Invoice creation FAILED — ${company}`,
+          `<p style="font-family:sans-serif;font-size:13px;color:#0d0d0d;">Automatic draft-invoice creation FAILED for <strong>${name}</strong> (${email}) · ${company} · ${modules}.<br>Reason: ${esc(inv.reason)} — ${esc(inv.message)}<br><strong>Create the invoice manually in Stripe.</strong> The prospect was still confirmed normally.</p>`,
+          `Invoice creation FAILED for ${vName} (${vEmail}) · ${company} · ${modules}. Reason: ${inv.reason} — ${inv.message}. Create manually.`,
+        )
+      }
+    } catch (invErr) {
+      // The helper returns structured results (shouldn't throw), but be defensive: an invoice-side
+      // fault must NEVER surface as a failed submission. Prospect already confirmed above.
+      console.error('[quote-request] invoice step error (prospect already confirmed):', invErr)
+      try {
+        await sendEmail(
+          MONITOR_EMAIL,
+          `⚠ Invoice step error — ${company}`,
+          `<p style="font-family:sans-serif;font-size:13px;color:#0d0d0d;">The invoice step threw for <strong>${name}</strong> (${email}) · ${company}. Create the invoice manually in Stripe. The prospect was confirmed normally.</p>`,
+          `Invoice step threw for ${vName} (${vEmail}) · ${company}. Create manually.`,
+        )
+      } catch { /* monitor alert is best-effort */ }
+    }
 
     return NextResponse.json({ ok: true })
   } catch (error) {
