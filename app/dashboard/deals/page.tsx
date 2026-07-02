@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Nav from '../../components/Nav'
 import { useEntitlement } from '../../../lib/useEntitlement'
 import { supabase } from '../../../lib/supabase'
+import { GHG_TIERS, FLAT_MODULE_PRICES } from '../../../lib/pricing'
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -114,6 +115,66 @@ const getComplianceCost = (dealValue: number, sector: string, frameworks: string
   return { low, high, pctLow, pctHigh, items }
 }
 
+// ─── Module-aware obligation engine ─────────────────────────────────────────────
+// Consultant first-year cost ranges (USD) — 2026 cited market ranges; refresh periodically.
+const CONSULTANT_RANGES = {
+  ghg:         { low: 15000, high: 50000 }, // GHG inventory & Scope 3 assessment
+  supplyChain: { low: 10000, high: 25000 }, // Supply-chain / Scope 3 value-chain
+  climateRisk: { low: 15000, high: 30000 }, // Climate risk — physical & transition
+}
+
+// Detected frameworks whose presence implies a value-chain / Scope 3 supply-chain obligation.
+// VERIFIED strings only (getApplicableFrameworks emits these) — no phantoms.
+const SUPPLY_CHAIN_TRIGGERS = ['CS3D', 'CSRD', 'SFDR', 'PCAF']
+
+type ObligationTier = { label: string; short: string; themisIqPrice: number | null; consultantLow: number; consultantHigh: number }
+type Obligations = {
+  included: ObligationTier[]      // summed into the headline (both sides)
+  recommended: ObligationTier[]   // shown separately, NOT summed
+  themisIqTotal: number | null    // sum of non-null included ThemisIQ prices; null when nothing summable
+  themisIqHasCustom: boolean       // an included price is null (Advisory GHG, 16+ locations)
+  consultantLow: number           // sum of included consultant lows
+  consultantHigh: number          // sum of included consultant highs
+  locationUnset: boolean          // location_count unset/0 → prompt for the ThemisIQ figure
+}
+
+// Pure: deal location count + detected frameworks → scope-matched obligations & prices.
+// ThemisIQ prices come from lib/pricing.ts (single source of truth); consultant = cited ranges.
+function getObligations(locationCount: number, frameworks: string[]): Obligations {
+  const locationUnset = !locationCount || locationCount <= 0
+
+  // GHG — ALWAYS included. Tier by location count (GHG_TIERS is the authority).
+  const ghgPrice: number | null =
+    locationUnset ? null
+    : locationCount <= (GHG_TIERS.starter.locationAllowance ?? 3)      ? GHG_TIERS.starter.priceUSD
+    : locationCount <= (GHG_TIERS.professional.locationAllowance ?? 15) ? GHG_TIERS.professional.priceUSD
+    : GHG_TIERS.advisory.priceUSD // null → Advisory / custom quote (16+)
+
+  const included: ObligationTier[] = [
+    { label: 'GHG inventory & Scope 3', short: 'GHG', themisIqPrice: ghgPrice, consultantLow: CONSULTANT_RANGES.ghg.low, consultantHigh: CONSULTANT_RANGES.ghg.high },
+  ]
+
+  // Supply chain — included when any value-chain framework is detected.
+  if (SUPPLY_CHAIN_TRIGGERS.some(f => frameworks.includes(f))) {
+    included.push({ label: 'Supply chain / Scope 3', short: 'supply chain', themisIqPrice: FLAT_MODULE_PRICES['supply-chain'], consultantLow: CONSULTANT_RANGES.supplyChain.low, consultantHigh: CONSULTANT_RANGES.supplyChain.high })
+  }
+
+  // Recommended (NOT summed) — Climate Risk is always relevant (IFRS S2 / TCFD always emitted).
+  const recommended: ObligationTier[] = [
+    { label: 'Climate risk assessment — physical & transition (IFRS S2 / TCFD)', short: 'climate risk', themisIqPrice: FLAT_MODULE_PRICES['climate-risk'], consultantLow: CONSULTANT_RANGES.climateRisk.low, consultantHigh: CONSULTANT_RANGES.climateRisk.high },
+  ]
+
+  const nonNull = included.filter(o => o.themisIqPrice != null).map(o => o.themisIqPrice as number)
+  return {
+    included, recommended,
+    themisIqTotal: nonNull.length ? nonNull.reduce((a, b) => a + b, 0) : null,
+    themisIqHasCustom: included.some(o => o.themisIqPrice == null),
+    consultantLow: included.reduce((a, o) => a + o.consultantLow, 0),
+    consultantHigh: included.reduce((a, o) => a + o.consultantHigh, 0),
+    locationUnset,
+  }
+}
+
 // Framework applicability
 const getApplicableFrameworks = (jurisdiction: string, revenue: number, sector: string, dealType: string): string[] => {
   const fw: string[] = []
@@ -179,6 +240,7 @@ export default function DealsDashboard() {
     jurisdiction: 'USA',
     deal_type: 'ma',
     deal_value: 0,
+    location_count: 0,
     currency: 'USD',
     has_ghg_data: false,
     has_esg_report: false,
@@ -214,6 +276,7 @@ export default function DealsDashboard() {
         jurisdiction: data.jurisdiction ?? 'USA',
         deal_type: data.deal_type ?? 'ma',
         deal_value: Number(data.deal_value) || 0,
+        location_count: Number(data.location_count) || 0,
         currency: data.currency ?? 'USD',
         has_ghg_data: !!data.has_ghg_data,
         has_esg_report: !!data.has_esg_report,
@@ -251,6 +314,7 @@ export default function DealsDashboard() {
         jurisdiction: deal.jurisdiction,
         deal_type: deal.deal_type,
         deal_value: deal.deal_value,
+        location_count: deal.location_count,
         currency: deal.currency,
         has_ghg_data: deal.has_ghg_data,
         has_esg_report: deal.has_esg_report,
@@ -291,6 +355,7 @@ export default function DealsDashboard() {
   const highRisks = risks.filter(r => r.severity === 'high')
   const mediumRisks = risks.filter(r => r.severity === 'medium')
   const complianceCost = deal.deal_value > 0 ? getComplianceCost(deal.deal_value, deal.sector, frameworks) : null
+  const obligations = getObligations(deal.location_count, frameworks)
 
   const generateExport = () => {
     const rows = [
@@ -366,6 +431,10 @@ export default function DealsDashboard() {
         <div>
           <label style={labelStyle}>Deal / investment value ({deal.currency})</label>
           <input style={inputStyle} type="number" value={deal.deal_value || ''} onChange={e => update('deal_value', Number(e.target.value))} placeholder="0" />
+        </div>
+        <div>
+          <label style={labelStyle}>Number of locations / sites</label>
+          <input style={inputStyle} type="number" value={deal.location_count || ''} onChange={e => update('location_count', Number(e.target.value))} placeholder="0" />
         </div>
         <div>
           <label style={labelStyle}>Primary jurisdiction</label>
@@ -489,7 +558,16 @@ export default function DealsDashboard() {
     </div>
   )
 
-  const renderStep3 = () => (
+  const renderStep3 = () => {
+    const cur = deal.currency
+    const consultantRange = `${cur} ${Math.round(obligations.consultantLow / 1000)}k–${Math.round(obligations.consultantHigh / 1000)}k`
+    const themisIqFigure = obligations.locationUnset
+      ? 'Enter locations →'
+      : obligations.themisIqHasCustom
+        ? (obligations.themisIqTotal != null ? `~${cur} ${obligations.themisIqTotal.toLocaleString()} + custom` : 'Custom quote')
+        : `~${cur} ${(obligations.themisIqTotal ?? 0).toLocaleString()}`
+    const includedModulesLabel = obligations.included.map(o => o.short).join(' + ') + ' modules'
+    return (
     <div>
       <h2 style={sectionHead}>Compliance cost estimate</h2>
       <p style={sectionSub}>Estimated cost to bring {deal.target_name || 'the target'} into ESG compliance — for your IC memo and deal valuation adjustment.</p>
@@ -500,50 +578,72 @@ export default function DealsDashboard() {
         </div>
       ) : (
         <>
+          {/* Black hero — consultant vs ThemisIQ, summed over the INCLUDED obligations only */}
           <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.5rem', marginBottom: 20 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Estimated ESG compliance cost — {deal.target_name || 'Target'}</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 8 }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color: '#64fe3e' }}>
-                {(complianceCost.pctLow * 100).toFixed(2)}% – {(complianceCost.pctHigh * 100).toFixed(2)}% of deal value
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 16 }}>Estimated ESG compliance cost — {deal.target_name || 'Target'}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>Traditional consultant</div>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.9rem', fontWeight: 400, color: '#fff', lineHeight: 1.1 }}>{consultantRange}</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>first-year, billed by the hour</div>
+              </div>
+              <div style={{ borderLeft: '0.5px solid rgba(255,255,255,0.12)', paddingLeft: 16 }}>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>With ThemisIQ</div>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.9rem', fontWeight: 400, color: '#64fe3e', lineHeight: 1.1 }}>{themisIqFigure}</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>{includedModulesLabel}</div>
               </div>
             </div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', marginBottom: 8 }}>
-              ≈ {deal.currency} {Math.round(complianceCost.low / 1000)}k – {Math.round(complianceCost.high / 1000)}k consultant-led first-year cost
-            </div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', lineHeight: 1.6 }}>
-              ESG due diligence — a focused slice of all-in transaction DD ({deal.sector} sector, {deal.jurisdiction}, {frameworks.length} applicable frameworks) · Indicative only — requires specialist confirmation
-            </div>
-            <div style={{ marginTop: 14, paddingTop: 14, borderTop: '0.5px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Platform-led ESG screening with ThemisIQ</div>
-              <div style={{ fontSize: 13, color: '#64fe3e', fontWeight: 600 }}>from ~{deal.currency} 5k</div>
+            <div style={{ marginTop: 16, paddingTop: 14, borderTop: '0.5px solid rgba(255,255,255,0.1)', fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+              Priced like sustainability software, scoped like a consultant&rsquo;s engagement. The difference is automation, not depth: traditional fees are dominated by manual data-collection and review hours — the platform handles those directly, without cutting the deliverable.
             </div>
           </div>
 
-          <div style={{ border: '0.5px solid #e8e7e4', borderRadius: 12, overflow: 'hidden' }}>
-            <div style={{ background: '#f8f7f5', padding: '10px 16px', borderBottom: '0.5px solid #e8e7e4' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#888784', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cost breakdown</div>
-                <div style={{ fontSize: 10, fontWeight: 500, color: '#888784' }}>Typical consultant project costs (USD)</div>
-              </div>
-            </div>
-            {complianceCost.items.map((item, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: i < complianceCost.items.length - 1 ? '0.5px solid #f3f4f6' : 'none' }}>
-                <div style={{ fontSize: 13, color: '#555553' }}>{item.item}</div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d', flexShrink: 0, marginLeft: 16 }}>{item.cost}</div>
-              </div>
+          {/* Included for this deal */}
+          <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.25)', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#0F6E56', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Included for this deal</div>
+            {obligations.included.map((o, i) => (
+              <div key={i} style={{ fontSize: 13, color: '#0d0d0d', marginBottom: 6 }}>✓ {o.label}</div>
             ))}
+            <div style={{ fontSize: 13, color: '#0d0d0d', marginBottom: 6 }}>✓ Immutable audit trail</div>
+            <div style={{ fontSize: 13, color: '#0d0d0d', marginBottom: 6 }}>✓ SBTi science-based target setting</div>
+            <div style={{ fontSize: 13, color: '#0d0d0d', marginBottom: 10 }}>✓ Assurance-ready verification package</div>
+            {frameworks.length > 0 && (
+              <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, borderTop: '0.5px solid rgba(15,110,86,0.15)', paddingTop: 8 }}>
+                Frameworks detected for this deal: {frameworks.join(', ')}.
+              </div>
+            )}
           </div>
 
-          <div style={{ marginTop: 16, background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.2)', borderRadius: 10, padding: '1rem' }}>
+          {/* Also recommended — NOT summed into the headline */}
+          {obligations.recommended.map((o, i) => (
+            <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '0.85rem 1.25rem', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Also recommended</div>
+                <div style={{ fontSize: 13, color: '#555553' }}>{o.label}</div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d' }}>{o.themisIqPrice != null ? `+ ${cur} ${o.themisIqPrice.toLocaleString()}` : '+ Custom'}</div>
+                <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>consultant {cur} {Math.round(o.consultantLow / 1000)}k–{Math.round(o.consultantHigh / 1000)}k</div>
+              </div>
+            </div>
+          ))}
+
+          {/* % context line — from getComplianceCost */}
+          <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.6, marginBottom: 16 }}>
+            ~{(complianceCost.pctLow * 100).toFixed(2)}%–{(complianceCost.pctHigh * 100).toFixed(2)}% of deal value, typical ESG-DD range · {deal.sector || '—'}, {deal.jurisdiction}, {frameworks.length} applicable frameworks · indicative, scope-matched to the obligations detected for this deal · requires specialist confirmation
+          </div>
+
+          <div style={{ background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.2)', borderRadius: 10, padding: '1rem' }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#7425e3', marginBottom: 4 }}>Deal structuring note</div>
             <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
-              Consider including ESG compliance costs in purchase price adjustment mechanics, or structuring an escrow/holdback for regulatory compliance. ThemisIQ Advisory can provide a detailed compliance roadmap for IC approval.
+              Consider including ESG compliance costs in purchase price adjustment mechanics, or structuring an escrow/holdback for regulatory compliance. ThemisIQ Advisory can provide a detailed compliance roadmap for IC approval. If the deal proceeds, ThemisIQ can complete the target&rsquo;s compliance work directly — share this assessment with the target from the Export step.
             </div>
           </div>
         </>
       )}
     </div>
-  )
+    )
+  }
 
   const renderStep4 = () => (
     <div>
