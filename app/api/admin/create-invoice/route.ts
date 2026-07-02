@@ -182,6 +182,8 @@ export async function POST(req: NextRequest) {
     //    won't be swept onto it — which would leave a $0 invoice.)
     const invoice = await stripe.invoices.create({
       customer: customerId,
+      currency: 'usd', // MUST match the USD invoice items — the Stripe account default is CAD,
+                       // and an unset invoice currency falls back to CAD → currency-conflict error.
       collection_method: 'send_invoice',
       days_until_due: body.daysUntilDue ?? 30,
       auto_advance: false, // stays a DRAFT — review & send manually
