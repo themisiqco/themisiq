@@ -748,6 +748,11 @@ export default function SbtiDashboard() {
 
                         // isNetZero: true ⇒ R5 (≥90%) / R6 (≤2050) / R9 (absolute) fire.
                         const v = validateTargetConfig({ standardVersion, scope: sc, method: 'absolute_aca', baseYear: d.baseYear, targetYear: d.targetYear, reductionPct: d.reductionPct, isNetZero: true }, {})
+                        // Live net-zero trajectory from the CURRENT draft; net-zero year defaults to 2050 if unset.
+                        const nzTargetYear = d.targetYear || NET_ZERO.latestNetZeroYear
+                        const traj = (v.ok && base != null)
+                          ? computeTrajectory({ baseYear: d.baseYear, baseEmissions: base, targetYear: nzTargetYear, reductionPct: d.reductionPct, method: 'absolute_aca' })
+                          : []
 
                         return (
                           <div key={sc} style={cardStyle}>
@@ -786,6 +791,24 @@ export default function SbtiDashboard() {
                                   <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontWeight: 300, color: '#555553' }}>
                                     {v.reasons.map((r, i) => <li key={i}>{r}</li>)}
                                   </ul>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Live trajectory preview (computeTrajectory) — base year → net-zero year */}
+                            <div style={{ marginTop: 14, height: 160 }}>
+                              {v.ok && base != null && traj.length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <LineChart data={traj} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#e8e7e4" />
+                                    <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#888784' }} />
+                                    <YAxis tick={{ fontSize: 11, fill: '#888784' }} width={52} tickFormatter={(val) => Number(val).toLocaleString(undefined, { maximumFractionDigits: 0 })} />
+                                    <Line type="monotone" dataKey="emissions" stroke="#7425e3" strokeWidth={2} dot={false} />
+                                  </LineChart>
+                                </ResponsiveContainer>
+                              ) : (
+                                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#888784', fontWeight: 300, background: '#f8f7f5', borderRadius: 8 }}>
+                                  Fix the target to preview the trajectory.
                                 </div>
                               )}
                             </div>
