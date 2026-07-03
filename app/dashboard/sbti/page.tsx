@@ -5,9 +5,9 @@ import Nav from '../../components/Nav'
 import { supabase } from '../../../lib/supabase'
 import { useEntitlement } from '../../../lib/useEntitlement'
 import PaywallCard from '../../components/PaywallCard'
-import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, type CategoryResult, type Scope, type TargetConfig } from '../../../lib/sbti'
+import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, progressForTarget, scopeActualField, type CategoryResult, type Scope, type TargetConfig, type TargetProgress, type Point } from '../../../lib/sbti'
 import { loadCompanySeries } from '../../../lib/ghg/loadSeries'
-import type { CompanySeries } from '../../../lib/ghg/series'
+import type { CompanySeries, SeriesYear } from '../../../lib/ghg/series'
 import { VERSION_DATES, NET_ZERO } from '../../../lib/sbti/params'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts'
 
@@ -62,6 +62,56 @@ const round1 = (n: number): number => Math.round(n * 10) / 10
 // ACA rate bucket: S1 and S2 both use 's1s2' (shared RATE only — never merges emissions); S3 uses 's3'.
 const bucketFor = (sc: Scope): 's1s2' | 's3' => (sc === 's3' ? 's3' : 's1s2')
 const cardStyle: React.CSSProperties = { background: '#fff', border: '1px solid #e8e7e4', borderRadius: 14, padding: '1.4rem 1.6rem' }
+
+// ─── Progress-summary helpers (pure, module-level) ────────────────────────────
+function scopeLabel(sc: Scope): string {
+  switch (sc) {
+    case 's1': return 'Scope 1'
+    case 's2_location': return 'Scope 2 (location-based)'
+    case 's3': return 'Scope 3'
+    case 's1s2_combined': return 'Scope 1 + 2'
+  }
+}
+
+// Merge the required trajectory with per-year actuals for the chart. required comes from the
+// trajectory (base→target inclusive); actual is the scope's value in the matching SeriesYear
+// (null when that year has no inventory, or the scope's field is null — e.g. S3 in an S3-less year).
+function buildChartData(
+  traj: Point[],
+  years: SeriesYear[],
+  sc: Scope,
+): Array<{ year: number; required: number; actual: number | null }> {
+  const field = scopeActualField(sc)
+  return traj.map(p => {
+    const yr = years.find(y => y.year === p.year)
+    const actual = yr ? (yr[field] ?? null) : null
+    return { year: p.year, required: p.emissions, actual }
+  })
+}
+
+// The most recent reporting year with a non-null actual for this scope — the year the badge
+// grades against. null when the scope has no actual in any year (e.g. S3 never reported).
+function latestActualYear(years: SeriesYear[], sc: Scope): number | null {
+  const field = scopeActualField(sc)
+  let latest: number | null = null
+  for (const y of years) {
+    if (y[field] != null && (latest === null || y.year > latest)) latest = y.year
+  }
+  return latest
+}
+
+// Progress / long-term badge palette (matches the existing token set).
+const PILL: Record<'on_track' | 'off_track' | 'best_efforts' | 'no_actual' | 'long_term', { label: string; color: string; bg: string }> = {
+  on_track:     { label: 'On track',         color: '#0F6E56', bg: '#ECFDF5' },
+  off_track:    { label: 'Off track',        color: '#B91C1C', bg: '#FEF2F2' },
+  best_efforts: { label: 'Best efforts',     color: '#92600A', bg: '#FEF3C7' },
+  no_actual:    { label: 'No actuals yet',   color: '#555553', bg: '#f8f7f5' },
+  long_term:    { label: 'Long-term target', color: '#555553', bg: '#f3f0ff' },
+}
+const pillStyle = (k: keyof typeof PILL): React.CSSProperties => ({
+  fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+  color: PILL[k].color, background: PILL[k].bg, borderRadius: 99, padding: '2px 8px',
+})
 
 export default function SbtiDashboard() {
   // Gated on the GHG entitlement — SBTi is part of the GHG module (same precedent
@@ -440,6 +490,110 @@ export default function SbtiDashboard() {
       setSavedNetZero(true)
       setDirty(false)
     } finally { setSavingNetZero(false) }
+  }
+
+  // ─── Read-only progress summary (defined here so it closes over series / targetDrafts /
+  // netZeroDrafts / baseEmissionsFor / nearTermTargetScopes — avoids threading ~5 props;
+  // it is stateless & read-only, so the define-inside render-identity concern is moot).
+  // NOT rendered from the top-level return yet — 3d wires the summary-vs-wizard fork. ───
+  function SbtiSummary({ onEdit }: { onEdit: () => void }) {
+    const nearTerm = nearTermTargetScopes
+    const netZero = (Object.keys(netZeroDrafts) as Scope[]).filter(sc => netZeroDrafts[sc])
+    if (nearTerm.length === 0 && netZero.length === 0) return null   // defensive; 3d gates on hasSavedTargets
+    const years = series?.years ?? []
+
+    // The shared 160px required+actual chart (required = violet line, actual = sky dots).
+    const chart = (data: Array<{ year: number; required: number; actual: number | null }>) => (
+      <div style={{ marginTop: 14, height: 160 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e8e7e4" />
+            <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#888784' }} />
+            <YAxis tick={{ fontSize: 11, fill: '#888784' }} width={52} tickFormatter={(val) => Number(val).toLocaleString(undefined, { maximumFractionDigits: 0 })} />
+            <Line type="monotone" dataKey="required" stroke="#7425e3" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="actual" stroke="#1fb1ff" strokeWidth={2} dot={true} connectNulls={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    )
+
+    const mutedCard = (sc: Scope, note: string) => (
+      <div key={sc} style={cardStyle}>
+        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', fontWeight: 400, marginBottom: 6 }}>{scopeLabel(sc)}</div>
+        <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>{note}</div>
+      </div>
+    )
+
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 18 }}>
+          <div style={eyebrow}>Your SBTi progress</div>
+          <button onClick={onEdit} style={{ fontSize: 13, fontWeight: 600, color: '#7425e3', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>Edit targets →</button>
+        </div>
+
+        {/* NEAR-TERM — required + actual + progress badge */}
+        {nearTerm.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: netZero.length > 0 ? 28 : 0 }}>
+            {nearTerm.map(sc => {
+              const d = targetDrafts[sc]
+              const base = baseEmissionsFor(sc)
+              if (!d) return null
+              if (base == null) return mutedCard(sc, 'No baseline emissions for this scope.')
+              const traj = computeTrajectory({ baseYear: d.baseYear, baseEmissions: base, targetYear: d.targetYear, reductionPct: d.reductionPct, method: 'absolute_aca' })
+              if (traj.length === 0) return mutedCard(sc, 'Trajectory unavailable for this target.')
+
+              // BADGE: grade the latest actual against the required line — but ONLY when that actual year
+              // falls within the target's [baseYear, targetYear] span (progressForTarget/trajectoryPointForYear
+              // throw for an out-of-range year). Otherwise treat as no_actual — show the path, not a verdict.
+              const assessedYear = latestActualYear(years, sc)
+              let status: TargetProgress['status'] = 'no_actual'
+              if (assessedYear != null && assessedYear >= d.baseYear && assessedYear <= d.targetYear) {
+                const yr = years.find(y => y.year === assessedYear)
+                const actual = yr ? (yr[scopeActualField(sc)] ?? null) : null
+                const prog: TargetProgress = progressForTarget({
+                  baseYear: d.baseYear, baseEmissions: base, targetYear: d.targetYear, reductionPct: d.reductionPct,
+                  method: 'absolute_aca', scope: sc, assessedYear, actual, effortEvidence: false,
+                })
+                status = prog.status
+              }
+
+              return (
+                <div key={sc} style={cardStyle}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                    <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', fontWeight: 400 }}>{scopeLabel(sc)}</div>
+                    <span style={pillStyle(status)}>{PILL[status].label}</span>
+                  </div>
+                  {chart(buildChartData(traj, years, sc))}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* NET-ZERO — required + actual, "Long-term target" label, NO on/off-track badge */}
+        {netZero.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {netZero.map(sc => {
+              const d = netZeroDrafts[sc]
+              const base = baseEmissionsFor(sc)
+              if (!d) return null
+              if (base == null) return mutedCard(sc, 'No baseline emissions for this scope.')
+              const traj = computeTrajectory({ baseYear: d.baseYear, baseEmissions: base, targetYear: d.targetYear, reductionPct: d.reductionPct, method: 'absolute_aca' })
+              if (traj.length === 0) return mutedCard(sc, 'Trajectory unavailable for this target.')
+              return (
+                <div key={sc} style={cardStyle}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                    <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', fontWeight: 400 }}>{scopeLabel(sc)}</div>
+                    <span style={pillStyle('long_term')}>{PILL.long_term.label}</span>
+                  </div>
+                  {chart(buildChartData(traj, years, sc))}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
   }
 
   if (!isPaid) {
