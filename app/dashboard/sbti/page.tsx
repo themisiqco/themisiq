@@ -7,6 +7,7 @@ import { useEntitlement } from '../../../lib/useEntitlement'
 import PaywallCard from '../../components/PaywallCard'
 import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, type CategoryResult, type Scope, type TargetConfig } from '../../../lib/sbti'
 import { loadCompanySeries } from '../../../lib/ghg/loadSeries'
+import type { CompanySeries } from '../../../lib/ghg/series'
 import { VERSION_DATES, NET_ZERO } from '../../../lib/sbti/params'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts'
 
@@ -70,6 +71,7 @@ export default function SbtiDashboard() {
   // ─── Wizard shell (GHG STEPS pattern) ───────────────────────────────────────
   const STEPS = ['Company profile', 'Standard & scope', 'Near-term targets', 'Net-zero targets']
   const [step, setStep] = useState(0)
+  const [view, setView] = useState<'summary' | 'wizard'>('wizard')
 
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
@@ -96,6 +98,8 @@ export default function SbtiDashboard() {
   // Step 3 state — baseline figures (captured from the same series) + per-scope target drafts.
   const [baselineYear, setBaselineYear] = useState<number | null>(null)
   const [baselineByScope, setBaselineByScope] = useState<{ scope1: number; scope2Location: number; scope3: number | null } | null>(null)
+  const [series, setSeries] = useState<CompanySeries | null>(null)   // retain full series (per-year actuals) for the progress view
+  const [hasSavedTargets, setHasSavedTargets] = useState(false)      // load-time routing signal (true when saved rows existed)
   const [targetDrafts, setTargetDrafts] = useState<Partial<Record<Scope, Draft>>>({})
 
   // Step 4 (net-zero) state — SEPARATE from near-term targetDrafts (a scope has both targets).
@@ -134,6 +138,7 @@ export default function SbtiDashboard() {
       setBaselineYear(series.baselineYear)
       const baseYr = series.years.find(y => y.year === series.baselineYear) ?? latest
       if (baseYr) setBaselineByScope({ scope1: baseYr.scope1, scope2Location: baseYr.scope2Location, scope3: baseYr.scope3 })
+      setSeries(res.series[0] ?? null) // persist the full series alongside the baseline figures
 
       const { data: profile } = await supabase
         .from('sbti_company_profile')
@@ -193,6 +198,7 @@ export default function SbtiDashboard() {
         }
         setNetZeroDrafts(prev => ({ ...prev, ...seededNz })) // saved values overwrite the 90/2050 default
       }
+      setHasSavedTargets((targetRows?.length ?? 0) > 0 || (nzRows?.length ?? 0) > 0)
       setLoading(false)
     })()
     return () => { cancelled = true }
