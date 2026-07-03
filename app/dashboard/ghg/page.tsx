@@ -2288,7 +2288,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           {/* SBTi nudge — shown once the inventory is saved AND its figures confirmed (a settled
               baseline). Affirmative next-step, not a warning. Always shows when gated (no sbti_targets
               read); copy reads fine whether or not targets already exist. GHG-gated page ⇒ no entitlement check. */}
-          {inventoryId && dataConfirmed && (
+          {inventoryId && dataConfirmed && conciergeReady && (
             <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.25)', borderRadius: 10, padding: '1.25rem', marginTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' as const }}>
               <div style={{ flex: 1, minWidth: 280 }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Your inventory is the baseline for science-based targets.</div>
