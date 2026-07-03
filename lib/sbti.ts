@@ -287,6 +287,98 @@ export function trajectoryPointForYear(trajectory: Point[], year: number): Point
   return matches[0];
 }
 
+// ── Target progress (join a saved target to its actual for a reporting year) ──
+// Pure. DB-agnostic: NO Supabase, NO snake_case, NO SeriesYear import. The caller maps
+// the stored row → these camelCase inputs and resolves `actual` (the SeriesYear field
+// named by scopeActualField). This helper only computes the required path, grades the
+// actual against it, and packages the result for the dashboard.
+
+// Superset of PerformanceStatus adding the "no actual for this scope/year yet" state —
+// distinct from off_track (which means we DO have an actual and it is over the line).
+export type TargetProgressStatus = PerformanceStatus | 'no_actual';
+
+// Pure mapper: target scope → the SeriesYear field the caller reads the actual from.
+// Documents the join WITHOUT importing SeriesYear. s1s2_combined reads the precomputed
+// scope12Total (= scope1 + location-based scope2); s2_location is location-based by design.
+export function scopeActualField(
+  scope: Scope
+): 'scope1' | 'scope2Location' | 'scope3' | 'scope12Total' {
+  switch (scope) {
+    case 's1': return 'scope1';
+    case 's2_location': return 'scope2Location';
+    case 's3': return 'scope3';
+    case 's1s2_combined': return 'scope12Total';
+  }
+}
+
+export interface TargetProgress {
+  scope: Scope;
+  assessedYear: number;          // the reporting year assessed
+  requiredEmissions: number;     // trajectory point for assessedYear (tCO2e)
+  actualEmissions: number | null;// null → no actual for that scope/year
+  status: TargetProgressStatus;  // 'no_actual' when actualEmissions is null
+  trajectory: Point[];           // full base→target path, for charting
+}
+
+// Grade ONE saved target against its actual for a given reporting year. Throws (loud,
+// like trajectoryPointForYear) when there is no drawable path — the UI gates on
+// traj.length before calling, so reaching here with no path is a caller bug, not a state.
+export function progressForTarget(input: {
+  baseYear: number;
+  baseEmissions: number;         // tCO2e at base year (stored base_year_emissions_tco2e or series)
+  targetYear: number;
+  reductionPct: number;
+  method: Method;                // 'absolute_aca' | 'intensity'
+  scope: Scope;
+  assessedYear: number;          // reporting year to grade against
+  actual: number | null;         // caller-resolved actual for this scope+year (null if none)
+  effortEvidence: boolean;       // pass false for v1
+}): TargetProgress {
+  const trajectory = computeTrajectory({
+    baseYear: input.baseYear,
+    baseEmissions: input.baseEmissions,
+    targetYear: input.targetYear,
+    reductionPct: input.reductionPct,
+    method: input.method,
+  });
+
+  // No drawable path (deferred intensity method or targetYear <= baseYear). Throw loud,
+  // mirroring trajectoryPointForYear — a caller must gate on traj.length before asking.
+  if (trajectory.length === 0) {
+    throw new Error('progressForTarget: no trajectory (deferred intensity or invalid span).');
+  }
+
+  // Throws if assessedYear is outside base..target — intended (see trajectoryPointForYear).
+  const requiredEmissions = trajectoryPointForYear(trajectory, input.assessedYear).emissions;
+
+  // No actual → report the gap explicitly; never hand null to progressStatus (non-finite throws).
+  if (input.actual === null) {
+    return {
+      scope: input.scope,
+      assessedYear: input.assessedYear,
+      requiredEmissions,
+      actualEmissions: null,
+      status: 'no_actual',
+      trajectory,
+    };
+  }
+
+  const status = progressStatus({
+    actual: input.actual,
+    trajectoryEmissions: requiredEmissions,
+    effortEvidence: input.effortEvidence,
+  });
+
+  return {
+    scope: input.scope,
+    assessedYear: input.assessedYear,
+    requiredEmissions,
+    actualEmissions: input.actual,
+    status,
+    trajectory,
+  };
+}
+
 // ── Scope 3 significance (≥5% of total S3 → must carry a target) ────────
 // The SBTi Corporate Net-Zero Standard V2.0 ≥5%-of-total-S3 significance rule
 // applies to Scope 3 categories 1–14 ONLY. Category 15 (financed emissions) is

@@ -2,7 +2,7 @@
 // Engine tests — step 1: categorize() only. Assertions read thresholds from params
 // (not hardcoded), so a §12 criteria change to params re-points them automatically.
 import { describe, it, expect } from 'vitest';
-import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, progressStatus, trajectoryPointForYear, requiredScope3Categories, cycleState, type TargetConfig, type SbtiProfile } from './sbti';
+import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, progressStatus, progressForTarget, scopeActualField, trajectoryPointForYear, requiredScope3Categories, cycleState, type TargetConfig, type SbtiProfile } from './sbti';
 import { CATEGORY_A_THRESHOLDS as T, NET_ZERO, ELEC_GROWTH_ABSOLUTE_THRESHOLD_PCT, ACA, SCOPE3_SIGNIFICANCE_PCT } from './sbti/params';
 
 describe('categorize — Route 1 (any country)', () => {
@@ -342,6 +342,75 @@ describe('progressStatus', () => {
   it('non-finite guard: actual NaN throws; trajectoryEmissions Infinity throws', () => {
     expect(() => progressStatus({ actual: NaN, trajectoryEmissions: 1000, effortEvidence: false })).toThrow();
     expect(() => progressStatus({ actual: 100, trajectoryEmissions: Infinity, effortEvidence: false })).toThrow();
+  });
+});
+
+describe('scopeActualField', () => {
+  it("'s1' → 'scope1'", () => { expect(scopeActualField('s1')).toBe('scope1'); });
+  it("'s2_location' → 'scope2Location'", () => { expect(scopeActualField('s2_location')).toBe('scope2Location'); });
+  it("'s3' → 'scope3'", () => { expect(scopeActualField('s3')).toBe('scope3'); });
+  it("'s1s2_combined' → 'scope12Total'", () => { expect(scopeActualField('s1s2_combined')).toBe('scope12Total'); });
+});
+
+describe('progressForTarget', () => {
+  // Shared base case: 2020→2030, base 1000, 50% cumulative (absolute_aca), scope s1, assessed 2025.
+  // required(2025) = baseEmissions * (1 - reductionPct * fraction / 100),
+  //   fraction = (2025-2020)/(2030-2020) = 5/10 = 0.5  →  1000 * (1 - 50*0.5/100) = 750.
+  const base = {
+    baseYear: 2020, baseEmissions: 1000, targetYear: 2030, reductionPct: 50,
+    method: 'absolute_aca' as const, scope: 's1' as const, assessedYear: 2025, effortEvidence: false,
+  };
+  const REQ_2025 = 1000 * (1 - (50 * (5 / 10)) / 100); // 750
+
+  it('actual under the line (700 < 750) → on_track, actual echoed', () => {
+    const r = progressForTarget({ ...base, actual: 700 });
+    expect(r.status).toBe('on_track');
+    expect(r.actualEmissions).toBe(700);
+    expect(r.requiredEmissions).toBeCloseTo(REQ_2025);
+  });
+
+  it('actual over the line (800 > 750), effortEvidence false → off_track', () => {
+    expect(progressForTarget({ ...base, actual: 800 }).status).toBe('off_track');
+  });
+
+  it('actual over the line (800 > 750), effortEvidence true → best_efforts', () => {
+    expect(progressForTarget({ ...base, actual: 800, effortEvidence: true }).status).toBe('best_efforts');
+  });
+
+  it('actual null → no_actual, actualEmissions null, requiredEmissions still the 2025 point (750)', () => {
+    const r = progressForTarget({ ...base, actual: null });
+    expect(r.status).toBe('no_actual');
+    expect(r.actualEmissions).toBeNull();
+    expect(r.requiredEmissions).toBeCloseTo(REQ_2025);
+  });
+
+  it('assessedYear === baseYear → required === baseEmissions (fraction 0); actual at base → on_track', () => {
+    const r = progressForTarget({ ...base, assessedYear: 2020, actual: 1000 });
+    expect(r.requiredEmissions).toBeCloseTo(1000);
+    expect(r.status).toBe('on_track');
+  });
+
+  it('trajectory returned is non-empty and length === targetYear - baseYear + 1 (11 inclusive)', () => {
+    const r = progressForTarget({ ...base, actual: 700 });
+    expect(r.trajectory.length).toBe(2030 - 2020 + 1);
+    expect(r.trajectory.length).toBeGreaterThan(0);
+  });
+
+  it("method 'intensity' → throws (no drawable trajectory)", () => {
+    expect(() => progressForTarget({ ...base, method: 'intensity', actual: 700 })).toThrow();
+  });
+
+  it('assessedYear outside base..target range → throws (propagated from trajectoryPointForYear)', () => {
+    expect(() => progressForTarget({ ...base, assessedYear: 2031, actual: 700 })).toThrow();
+  });
+
+  it('realistic: 2025→2050, base 1000, 90%, s1, assessed 2030 → required 1000*(1-90*(5/25)/100)=820; actual 800 under → on_track', () => {
+    const r = progressForTarget({
+      baseYear: 2025, baseEmissions: 1000, targetYear: 2050, reductionPct: 90,
+      method: 'absolute_aca', scope: 's1', assessedYear: 2030, actual: 800, effortEvidence: false,
+    });
+    expect(r.requiredEmissions).toBeCloseTo(1000 * (1 - (90 * (5 / 25)) / 100)); // 820
+    expect(r.status).toBe('on_track');
   });
 });
 
