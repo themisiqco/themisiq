@@ -249,6 +249,9 @@ export default function SbtiDashboard() {
         setNetZeroDrafts(prev => ({ ...prev, ...seededNz })) // saved values overwrite the 90/2050 default
       }
       setHasSavedTargets((targetRows?.length ?? 0) > 0 || (nzRows?.length ?? 0) > 0)
+      // One-shot initial view: a returning user with saved targets lands on the summary.
+      // Runs once on load (NOT a reactive effect), so a later "Edit targets →" is never overridden.
+      if ((targetRows?.length ?? 0) > 0 || (nzRows?.length ?? 0) > 0) setView('summary')
       setLoading(false)
     })()
     return () => { cancelled = true }
@@ -628,6 +631,8 @@ export default function SbtiDashboard() {
             </p>
             <a href="/dashboard/ghg" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: '#0d0d0d', color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Go to GHG inventory →</a>
           </div>
+        ) : view === 'summary' ? (
+          <SbtiSummary onEdit={() => setView('wizard')} />
         ) : (
           <>
             {/* Step-tab header (mirrors the GHG wizard tab bar) */}
