@@ -4,7 +4,8 @@
 import { describe, it, expect } from 'vitest';
 import { attributionFactor, financedEmissions } from './pcaf/attribution';
 import { estimateInvesteeEmissions, portfolioProxyEstimate } from './pcaf/estimate';
-import type { PcafAsset } from './pcaf/types';
+import { assessAsset, assessPortfolio, portfolioFromProxy } from './pcaf/engine';
+import type { PcafAsset, PcafPortfolioAsset } from './pcaf/types';
 
 const asset = (over: Partial<PcafAsset>): PcafAsset => ({
   id: 'a1',
@@ -201,5 +202,103 @@ describe('PCAF estimation — portfolioProxyEstimate (score 5, legacy calcCat15)
 
   it('negative portfolioValue → throws', () => {
     expect(() => portfolioProxyEstimate({ portfolioValue: -100 })).toThrow();
+  });
+});
+
+describe('PCAF engine — assessAsset / assessPortfolio (decomposed)', () => {
+  const A: PcafPortfolioAsset = {
+    id: 'A',
+    assetClass: 'business_loans_unlisted_equity',
+    outstandingAmount: 10_000_000,
+    denominator: 100_000_000,
+    emissions: { reportedEmissions: 50_000, verified: true },
+  };
+  const B: PcafPortfolioAsset = {
+    id: 'B',
+    assetClass: 'listed_equity_corp_bonds',
+    outstandingAmount: 50_000_000,
+    denominator: 500_000_000,
+    emissions: { revenue: 100_000_000, sector: 'Financial Services' },
+  };
+
+  it('assessAsset composes estimate → attribution', () => {
+    const a = assessAsset(A);
+    expect(a.financedEmissions).toBe(5_000); // 0.10 × 50_000
+    expect(a.dqScore).toBe(1);
+    expect(a.attributionFactor).toBe(0.1);
+    expect(a.gwpBasis).toBe('AR6');
+    const b = assessAsset(B);
+    expect(b.financedEmissions).toBe(1_200); // 0.10 × 12_000 (investee)
+    expect(b.dqScore).toBe(4);
+  });
+
+  it('two-asset portfolio → total, weighted DQ, breakdown, coverage', () => {
+    const r = assessPortfolio([A, B]);
+    expect(r.mode).toBe('decomposed');
+    expect(r.assetCount).toBe(2);
+    expect(r.totalFinancedEmissions).toBe(6_200); // 5_000 + 1_200
+    // (1×5_000 + 4×1_200) / 6_200 = 9_800/6_200 ≈ 1.5806
+    expect(r.weightedDataQualityScore).toBeCloseTo(1.5806, 3);
+    expect(r.byAssetClass.business_loans_unlisted_equity).toBe(5_000);
+    expect(r.byAssetClass.listed_equity_corp_bonds).toBe(1_200);
+    expect(r.coverageByScore).toEqual({ 1: 1, 2: 0, 3: 0, 4: 1, 5: 0 });
+    expect(r.gwpBasis).toBe('AR6');
+  });
+
+  it('all-zero emissions → outstanding-amount fallback, no NaN', () => {
+    const z1: PcafPortfolioAsset = {
+      id: 'Z1',
+      assetClass: 'business_loans_unlisted_equity',
+      outstandingAmount: 10_000_000,
+      denominator: 100_000_000,
+      emissions: { reportedEmissions: 0, verified: true }, // score 1
+    };
+    const z2: PcafPortfolioAsset = {
+      id: 'Z2',
+      assetClass: 'business_loans_unlisted_equity',
+      outstandingAmount: 30_000_000,
+      denominator: 100_000_000,
+      emissions: { reportedEmissions: 0 }, // score 2
+    };
+    const r = assessPortfolio([z1, z2]);
+    expect(r.totalFinancedEmissions).toBe(0);
+    // (10M×1 + 30M×2) / 40M = 70M/40M = 1.75
+    expect(r.weightedDataQualityScore).toBe(1.75);
+    expect(Number.isNaN(r.weightedDataQualityScore)).toBe(false);
+  });
+
+  it('empty portfolio → throws', () => {
+    expect(() => assessPortfolio([])).toThrow();
+  });
+
+  it('asset with unusable emission inputs → assessPortfolio throws (fail loud)', () => {
+    const bad: PcafPortfolioAsset = {
+      id: 'bad',
+      assetClass: 'mortgages',
+      outstandingAmount: 100,
+      denominator: 200,
+      emissions: {}, // no usable inputs
+    };
+    expect(() => assessPortfolio([bad])).toThrow();
+  });
+});
+
+describe('PCAF engine — portfolioFromProxy (score-5 regime, same shape)', () => {
+  it('portfolio value proxy → mode portfolio_proxy, score 5', () => {
+    const r = portfolioFromProxy({ portfolioValue: 100_000_000, sector: 'Financial Services' });
+    expect(r.mode).toBe('portfolio_proxy');
+    expect(r.totalFinancedEmissions).toBe(12_000);
+    expect(r.weightedDataQualityScore).toBe(5);
+    expect(r.assetCount).toBe(1);
+    expect(r.perAsset).toEqual([]);
+    expect(r.coverageByScore).toEqual({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 1 });
+    expect(r.gwpBasis).toBe('AR6');
+  });
+
+  it('manual override proxy → score 2', () => {
+    const r = portfolioFromProxy({ emissionsOverride: 8_500 });
+    expect(r.totalFinancedEmissions).toBe(8_500);
+    expect(r.weightedDataQualityScore).toBe(2);
+    expect(r.coverageByScore).toEqual({ 1: 0, 2: 1, 3: 0, 4: 0, 5: 0 });
   });
 });

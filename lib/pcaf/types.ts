@@ -75,3 +75,38 @@ export interface EmissionEstimate {
   dqScore: DataQualityScore;
   basis: string; // human-readable provenance
 }
+
+// High-level asset: attribution inputs + raw estimator inputs (scores 1–4 path).
+// Distinct from PcafAsset (which carries a pre-computed investeeEmissions number).
+export interface PcafPortfolioAsset {
+  id: string;
+  assetClass: PcafAssetClass;
+  outstandingAmount: number;
+  denominator: number;
+  emissions: EmissionInputs; // fed to estimateInvesteeEmissions
+}
+
+// Per-asset outcome after composing estimation → attribution.
+export interface AssetAssessment {
+  assetId: string;
+  assetClass: PcafAssetClass;
+  attributionFactor: number;
+  capped: boolean;
+  financedEmissions: number; // tCO2e
+  dqScore: DataQualityScore;
+  basis: string;
+  gwpBasis: GwpVersion;
+}
+
+// Portfolio-level result — one honest shape for both the decomposed and the
+// lumped-proxy regimes (mode tags which one produced it).
+export interface PortfolioResult {
+  mode: 'decomposed' | 'portfolio_proxy';
+  totalFinancedEmissions: number; // tCO2e
+  weightedDataQualityScore: number; // the verifier headline
+  assetCount: number;
+  perAsset: AssetAssessment[]; // decomposed: one per asset; proxy: []
+  byAssetClass: Partial<Record<PcafAssetClass, number>>; // decomposed only
+  coverageByScore: Record<DataQualityScore, number>; // count at each tier
+  gwpBasis: GwpVersion;
+}
