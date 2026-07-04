@@ -5,7 +5,8 @@ import Nav from '../../components/Nav'
 import { supabase } from '../../../lib/supabase'
 import { useEntitlement } from '../../../lib/useEntitlement'
 import { EMISSION_FACTORS, DEFAULT_SPEND_EF } from '../../../lib/emissionFactors'
-import { portfolioFromProxy } from '../../../lib/pcaf/engine'
+import { resolvePcafResult } from '../../../lib/pcaf/engine'
+import type { PcafPortfolioAsset } from '../../../lib/pcaf/types'
 
 // ─── Scope 3 Category Definitions ────────────────────────────────────────────
 
@@ -91,6 +92,9 @@ interface CategoryData {
   // Cat 15
   portfolio_value?: number
   portfolio_sector?: string
+  // Cat 15 — detailed (per-asset PCAF) mode; dormant until the input UI (next step)
+  pcafMode?: 'proxy' | 'detailed'
+  pcafAssets?: PcafPortfolioAsset[]
   // Generic spend
   annual_spend?: number
   // Generic activity
@@ -321,10 +325,13 @@ export default function Scope3Dashboard() {
     return (spend * 0.5) / 1000
   }
 
-  // Full PCAF result for cat 15 (score-5 lumped portfolio proxy). Returns the whole
-  // PortfolioResult so a later step can read mode/dqScore without re-plumbing.
+  // Full PCAF result for cat 15. Delegates to the engine orchestrator, which chooses the
+  // decomposed per-asset assessment (detailed mode) or the lumped score-5 proxy. Returns
+  // the whole PortfolioResult so render can read mode/dqScore without re-plumbing.
   const cat15PcafResult = (d: CategoryData) =>
-    portfolioFromProxy({
+    resolvePcafResult({
+      mode: d.pcafMode,
+      assets: d.pcafAssets,
       portfolioValue: d.portfolio_value,
       sector: d.portfolio_sector,
       emissionsOverride: d.emissions_override,
