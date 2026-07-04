@@ -5,8 +5,8 @@ import Nav from '../../components/Nav'
 import { supabase } from '../../../lib/supabase'
 import { useEntitlement } from '../../../lib/useEntitlement'
 import { EMISSION_FACTORS, DEFAULT_SPEND_EF } from '../../../lib/emissionFactors'
-import { resolvePcafResult } from '../../../lib/pcaf/engine'
-import type { PcafPortfolioAsset } from '../../../lib/pcaf/types'
+import { resolvePcafResult, assessAsset } from '../../../lib/pcaf/engine'
+import type { PcafPortfolioAsset, PcafAssetClass, EmissionInputs } from '../../../lib/pcaf/types'
 
 // ─── Scope 3 Category Definitions ────────────────────────────────────────────
 
@@ -54,6 +54,18 @@ const SECTORS = [
   'Healthcare & Pharma', 'Industrials & Manufacturing', 'Consumer & Retail',
   'Agriculture & Food', 'Transport & Logistics', 'Mining & Metals',
   'Construction & Materials', 'Professional Services', 'Other',
+]
+
+// PCAF Phase-1 asset classes for cat 15 detailed mode. denominatorLabel is the
+// correctness-critical piece — the denominator MEANS a different thing per class, so the
+// input label must track the selected asset class (EVIC vs property value vs vehicle value).
+const PCAF_ASSET_CLASSES: { value: PcafAssetClass; label: string; denominatorLabel: string }[] = [
+  { value: 'listed_equity_corp_bonds',        label: 'Listed equity & corporate bonds', denominatorLabel: 'Enterprise value incl. cash (EVIC)' },
+  { value: 'business_loans_unlisted_equity',  label: 'Business loans & unlisted equity', denominatorLabel: 'Total equity + debt' },
+  { value: 'project_finance',                 label: 'Project finance',                  denominatorLabel: 'Total project value (equity + debt)' },
+  { value: 'commercial_real_estate',          label: 'Commercial real estate',           denominatorLabel: 'Property value at origination' },
+  { value: 'mortgages',                       label: 'Mortgages',                        denominatorLabel: 'Property value at origination' },
+  { value: 'motor_vehicle_loans',             label: 'Motor vehicle loans',              denominatorLabel: 'Vehicle value at origination' },
 ]
 
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
@@ -273,6 +285,27 @@ export default function Scope3Dashboard() {
   const updateCat = (id: string, field: string, value: any) => {
     setCatData(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }))
   }
+
+  // ─── Cat 15 detailed (per-asset PCAF) row helpers ────────────────────────────
+  // Mirrors the supply-chain add/update/remove row pattern, one spread deeper into
+  // catData['cat15'].pcafAssets. All immutable via setCatData.
+  const newPcafAsset = (): PcafPortfolioAsset => ({
+    id: Math.random().toString(36).slice(2),
+    assetClass: 'listed_equity_corp_bonds',
+    outstandingAmount: 0,
+    denominator: 0,
+    emissions: {}, // EmissionInputs — empty until the user fills a path
+  })
+  const cat15Assets = () => catData['cat15']?.pcafAssets ?? []
+  const setCat15Assets = (next: PcafPortfolioAsset[]) =>
+    setCatData(prev => ({ ...prev, cat15: { ...prev.cat15, pcafAssets: next } }))
+  const addPcafAsset = () => setCat15Assets([...cat15Assets(), newPcafAsset()])
+  const removePcafAsset = (idx: number) => setCat15Assets(cat15Assets().filter((_, i) => i !== idx))
+  const updatePcafAsset = (idx: number, patch: Partial<PcafPortfolioAsset>) => {
+    const next = [...cat15Assets()]; next[idx] = { ...next[idx], ...patch }; setCat15Assets(next)
+  }
+  const updatePcafEmissions = (idx: number, patch: Partial<EmissionInputs>) =>
+    updatePcafAsset(idx, { emissions: { ...cat15Assets()[idx].emissions, ...patch } })
 
   // ─── Calculations ────────────────────────────────────────────────────────────
 
@@ -759,6 +792,90 @@ export default function Scope3Dashboard() {
                         </div>
                       )
                     })()}
+
+                    {/* Estimation-method toggle: proxy (default) vs detailed per-asset PCAF */}
+                    <div style={{ gridColumn: '1 / -1', marginTop: 4 }}>
+                      <label style={labelStyle}>Estimation method</label>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {[{ mode: 'proxy' as const, label: 'Portfolio proxy (quick)' }, { mode: 'detailed' as const, label: 'Itemise by asset (PCAF)' }].map(opt => {
+                          const active = (catData['cat15']?.pcafMode ?? 'proxy') === opt.mode
+                          return (
+                            <button key={opt.mode} onClick={() => updateCat('cat15', 'pcafMode', opt.mode)} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, background: active ? '#0d0d0d' : '#f8f7f5', color: active ? '#fff' : '#555553', border: `0.5px solid ${active ? '#0d0d0d' : '#e8e7e4'}`, cursor: 'pointer' }}>{opt.label}</button>
+                          )
+                        })}
+                      </div>
+                      <div style={{ fontSize: 10, color: '#888784', marginTop: 6, lineHeight: 1.5 }}>Itemise holdings to raise data quality above the tier-5 spend proxy.</div>
+                    </div>
+
+                    {/* Detailed mode — per-asset PCAF rows (Option-2 emissions paths: reported + economic) */}
+                    {catData['cat15']?.pcafMode === 'detailed' && <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {cat15Assets().length === 0 && (
+                        <div style={{ fontSize: 11, color: '#888784', background: '#f8f7f5', borderRadius: 8, padding: '0.75rem', lineHeight: 1.5 }}>No holdings yet — add your first to itemise the portfolio by asset class.</div>
+                      )}
+                      {cat15Assets().map((row, idx) => {
+                        const meta = PCAF_ASSET_CLASSES.find(c => c.value === row.assetClass) ?? PCAF_ASSET_CLASSES[0]
+                        return (
+                          <div key={row.id} style={{ border: '1px solid #e8e7e4', borderRadius: 10, padding: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: '#555553' }}>Holding {idx + 1}</span>
+                              <button onClick={() => removePcafAsset(idx)} style={{ fontSize: 11, color: '#B91C1C', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Remove</button>
+                            </div>
+                            <div style={{ gridColumn: '1 / -1' }}>
+                              <label style={labelStyle}>Asset class</label>
+                              <select style={inputStyle} value={row.assetClass} onChange={e => updatePcafAsset(idx, { assetClass: e.target.value as PcafAssetClass })}>
+                                {PCAF_ASSET_CLASSES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label style={labelStyle}>Outstanding amount ({currency})</label>
+                              <input style={inputStyle} type="number" value={row.outstandingAmount || ''} onChange={e => updatePcafAsset(idx, { outstandingAmount: Number(e.target.value) })} placeholder="0" />
+                            </div>
+                            <div>
+                              {/* Correctness-critical: denominator label tracks the selected asset class */}
+                              <label style={labelStyle}>{meta.denominatorLabel} ({currency})</label>
+                              <input style={inputStyle} type="number" value={row.denominator || ''} onChange={e => updatePcafAsset(idx, { denominator: Number(e.target.value) })} placeholder="0" />
+                            </div>
+                            <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#888784', lineHeight: 1.5 }}>Enter the investee&apos;s reported emissions where available (best data quality). Otherwise provide revenue + sector for an estimate.</div>
+                            <div>
+                              <label style={labelStyle}>Investee emissions (tCO₂e)</label>
+                              <input style={inputStyle} type="number" value={row.emissions.reportedEmissions ?? ''} onChange={e => updatePcafEmissions(idx, { reportedEmissions: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="Reported" />
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#555553', marginTop: 6, cursor: 'pointer' }}>
+                                <input type="checkbox" checked={row.emissions.verified ?? false} onChange={e => updatePcafEmissions(idx, { verified: e.target.checked })} />
+                                Third-party verified
+                              </label>
+                            </div>
+                            <div>
+                              <label style={labelStyle}>or Investee revenue ({currency})</label>
+                              <input style={inputStyle} type="number" value={row.emissions.revenue ?? ''} onChange={e => updatePcafEmissions(idx, { revenue: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="For estimate" />
+                              <select style={{ ...inputStyle, marginTop: 6 }} value={row.emissions.sector ?? ''} onChange={e => updatePcafEmissions(idx, { sector: e.target.value === '' ? undefined : e.target.value })}>
+                                <option value="">Sector for estimate…</option>
+                                {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
+                              </select>
+                            </div>
+                            <div style={{ gridColumn: '1 / -1' }}>
+                              {(() => {
+                                try {
+                                  const a = assessAsset(row)
+                                  return <div style={{ fontSize: 11, color: '#0F6E56', fontWeight: 600 }}>Financed: {a.financedEmissions.toFixed(1)} tCO₂e · PCAF DQ {a.dqScore}</div>
+                                } catch {
+                                  return <div style={{ fontSize: 11, color: '#888784' }}>Complete this row to compute</div>
+                                }
+                              })()}
+                            </div>
+                          </div>
+                        )
+                      })}
+                      <button onClick={addPcafAsset} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: 'none', border: '0.5px solid #7425e3', color: '#7425e3', cursor: 'pointer', alignSelf: 'flex-start' }}>+ Add holding</button>
+                      {(() => {
+                        const c15 = catData['cat15']
+                        if (!c15) return null
+                        const r = cat15PcafResult(c15)
+                        if (r.mode === 'portfolio_proxy' && cat15Assets().length >= 1) {
+                          return <div style={{ fontSize: 10, color: '#92660A', lineHeight: 1.5 }}>Some holdings are incomplete — showing the spend proxy until every row computes.</div>
+                        }
+                        return null
+                      })()}
+                    </div>}
                   </>}
 
                   {/* Generic spend-based for other categories */}
