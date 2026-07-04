@@ -2486,14 +2486,31 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
   const ref = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState<string | null>(null)   // `${docId}:${propIdx}` being edited
   const [editVal, setEditVal] = useState<string>('')
+  const [dragActive, setDragActive] = useState(false)
+  const hasConcierge = useHasConcierge()   // concierge tier held → auto-extraction; else manual entry
   return (
-    <div style={{ background: '#f8f7f5', border: '0.5px dashed #e8e7e4', borderRadius: 8, padding: '10px 14px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: docs.length > 0 ? 8 : 0 }}>
-        <span style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>📎 {label}</span>
-        <button onClick={() => ref.current?.click()} disabled={uploading} style={{ fontSize: 11, padding: '4px 12px', borderRadius: 6, background: '#fff', border: '0.5px solid #e8e7e4', cursor: 'pointer', color: '#555553' }}>{uploading ? 'Uploading...' : '+ Upload'}</button>
-        <input ref={ref} type="file" multiple accept=".pdf,.xlsx,.csv,.jpg,.png" style={{ display: 'none' }} onChange={e => e.target.files && onUpload(e.target.files, locIdx, docType)} />
+    <div
+      onDragOver={e => { e.preventDefault(); setDragActive(true) }}
+      onDragLeave={e => { e.preventDefault(); setDragActive(false) }}
+      onDrop={e => { e.preventDefault(); setDragActive(false); if (e.dataTransfer.files && e.dataTransfer.files.length > 0) onUpload(e.dataTransfer.files, locIdx, docType) }}
+      style={{ background: dragActive ? '#F3EEFF' : '#f8f7f5', border: dragActive ? '1px solid #7425e3' : '0.5px dashed #e8e7e4', borderRadius: 12, padding: '10px 14px', transition: 'background 0.12s ease, border-color 0.12s ease' }}
+    >
+      {/* Click-to-pick region (drop works anywhere on the card above). Same picker as before. */}
+      <div onClick={() => !uploading && ref.current?.click()} style={{ cursor: uploading ? 'default' : 'pointer', marginBottom: docs.length > 0 ? 8 : 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+          <span style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>📎 {label}</span>
+          <span style={{ fontSize: 11, padding: '4px 12px', borderRadius: 6, background: '#fff', border: '0.5px solid #e8e7e4', color: '#555553' }}>{uploading ? 'Uploading…' : '+ Upload'}</span>
+        </div>
+        <div style={{ fontSize: 13, color: '#0d0d0d', fontWeight: 500 }}>
+          {hasConcierge ? 'Drag & drop your bill here, or click to upload' : 'Drag & drop your documents here, or click to upload'}
+        </div>
+        <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 4, lineHeight: 1.5 }}>
+          {hasConcierge
+            ? 'We’ll read the consumption figures automatically — you confirm before anything’s saved. PDF or photo (JPG, PNG) — large phone photos are fine.'
+            : 'PDF, image, XLSX or CSV. Enter figures manually after uploading — large files are fine.'}
+        </div>
       </div>
-      <div style={{ fontSize: 10, color: '#888784', fontWeight: 300, marginTop: 4 }}>Accepted: PDF, Excel, CSV, JPG, PNG · max 50 MB</div>
+      <input ref={ref} type="file" multiple accept=".pdf,.xlsx,.csv,.jpg,.png" style={{ display: 'none' }} onChange={e => e.target.files && onUpload(e.target.files, locIdx, docType)} />
       {(() => {
         // Coverage strip: aggregate this fuel's CONFIRMED proposals at this location, classify completeness.
         const win = periodFromYearAndEnd(reportingYear, fiscalYearEndMonth)
