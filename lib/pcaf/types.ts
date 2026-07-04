@@ -53,3 +53,25 @@ export interface FinancedEmissionsResult {
   financedEmissions: number; // tCO2e
   gwpBasis: GwpVersion; // cite 'AR6'
 }
+
+// PCAF data-quality score. 1 = highest fidelity (reported, verified),
+// 5 = lowest (lumped portfolio spend proxy).
+export type DataQualityScore = 1 | 2 | 3 | 4 | 5;
+
+// Candidate inputs for estimating a single investee's emissions. The estimator
+// picks the highest-fidelity tier for which inputs are present.
+export interface EmissionInputs {
+  reportedEmissions?: number; // tCO2e (investee's own)
+  verified?: boolean; // true → score 1; else score 2
+  physicalActivity?: number; // activity amount
+  physicalEmissionFactor?: number; // tCO2e per activity unit
+  revenue?: number; // investee revenue, USD (score 4)
+  sector?: string; // key into EMISSION_FACTORS.spend
+}
+
+// One emissions estimate with its data-quality score and human-readable provenance.
+export interface EmissionEstimate {
+  emissions: number; // tCO2e
+  dqScore: DataQualityScore;
+  basis: string; // human-readable provenance
+}

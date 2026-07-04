@@ -3,6 +3,7 @@
 // Exact-number assertions: factor = outstanding/denominator, financed = factor × investee tCO2e.
 import { describe, it, expect } from 'vitest';
 import { attributionFactor, financedEmissions } from './pcaf/attribution';
+import { estimateInvesteeEmissions, portfolioProxyEstimate } from './pcaf/estimate';
 import type { PcafAsset } from './pcaf/types';
 
 const asset = (over: Partial<PcafAsset>): PcafAsset => ({
@@ -104,5 +105,101 @@ describe('PCAF attribution — attributionFactor + financedEmissions', () => {
       expect(r.gwpBasis).toBe('AR6');
       expect(r.financedEmissions).toBe(5);
     }
+  });
+});
+
+describe('PCAF estimation — estimateInvesteeEmissions (scores 1–4)', () => {
+  it('reported + verified → score 1', () => {
+    const r = estimateInvesteeEmissions({ reportedEmissions: 12_345, verified: true });
+    expect(r.dqScore).toBe(1);
+    expect(r.emissions).toBe(12_345);
+    expect(r.basis).toBe('reported, verified');
+  });
+
+  it('reported, no verified → score 2', () => {
+    const r = estimateInvesteeEmissions({ reportedEmissions: 12_345 });
+    expect(r.dqScore).toBe(2);
+    expect(r.emissions).toBe(12_345);
+    expect(r.basis).toBe('reported, unverified');
+  });
+
+  it('reported 0 + verified → score 1, emissions 0 (0 is valid)', () => {
+    const r = estimateInvesteeEmissions({ reportedEmissions: 0, verified: true });
+    expect(r.dqScore).toBe(1);
+    expect(r.emissions).toBe(0);
+  });
+
+  it('physical activity 1_000 × EF 0.5 → score 3, emissions 500', () => {
+    const r = estimateInvesteeEmissions({ physicalActivity: 1_000, physicalEmissionFactor: 0.5 });
+    expect(r.dqScore).toBe(3);
+    expect(r.emissions).toBe(500);
+    expect(r.basis).toBe('physical activity-based');
+  });
+
+  it('revenue 100M + sector → score 4, emissions 12_000 (× 0.12 / 1000)', () => {
+    const r = estimateInvesteeEmissions({ revenue: 100_000_000, sector: 'Financial Services' });
+    expect(r.dqScore).toBe(4);
+    expect(r.emissions).toBe(12_000);
+    expect(r.basis).toContain('proxy');
+  });
+
+  it('reported -1 → throws', () => {
+    expect(() => estimateInvesteeEmissions({ reportedEmissions: -1 })).toThrow();
+  });
+
+  it('revenue -1 (+ sector) → throws', () => {
+    expect(() => estimateInvesteeEmissions({ revenue: -1, sector: 'Financial Services' })).toThrow();
+  });
+
+  it('no usable inputs → throws', () => {
+    expect(() => estimateInvesteeEmissions({})).toThrow();
+  });
+});
+
+describe('PCAF estimation — portfolioProxyEstimate (score 5, legacy calcCat15)', () => {
+  it('portfolio 100M, Financial Services → score 5, 12_000', () => {
+    const r = portfolioProxyEstimate({ portfolioValue: 100_000_000, sector: 'Financial Services' });
+    expect(r.dqScore).toBe(5);
+    expect(r.emissions).toBe(12_000);
+    expect(r.basis).toBe('economic/spend proxy on portfolio value (legacy)');
+  });
+
+  it('portfolio 50M, Mining & Metals → score 5, 210_000', () => {
+    const r = portfolioProxyEstimate({ portfolioValue: 50_000_000, sector: 'Mining & Metals' });
+    expect(r.dqScore).toBe(5);
+    expect(r.emissions).toBe(210_000);
+  });
+
+  it('portfolio 10M, sector undefined → 1_200 (Financial Services default → 0.12)', () => {
+    const r = portfolioProxyEstimate({ portfolioValue: 10_000_000 });
+    expect(r.dqScore).toBe(5);
+    expect(r.emissions).toBe(1_200);
+  });
+
+  it('portfolio 10M, nonexistent sector → 1_200 (?? 0.12 fallback, NOT 0.5)', () => {
+    const r = portfolioProxyEstimate({ portfolioValue: 10_000_000, sector: 'Nonexistent' });
+    expect(r.dqScore).toBe(5);
+    expect(r.emissions).toBe(1_200); // 0.5 would give 5_000 — proves the 0.12 fallback
+  });
+
+  it('emissionsOverride 8_500 → score 2, emissions 8_500', () => {
+    const r = portfolioProxyEstimate({ emissionsOverride: 8_500 });
+    expect(r.dqScore).toBe(2);
+    expect(r.emissions).toBe(8_500);
+    expect(r.basis).toBe('manual entry (tCO2e, unverified)');
+  });
+
+  it('emissionsOverride 0 (falsy) falls through to proxy → score 5, 1_200', () => {
+    const r = portfolioProxyEstimate({ emissionsOverride: 0, portfolioValue: 10_000_000, sector: 'Financial Services' });
+    expect(r.dqScore).toBe(5);
+    expect(r.emissions).toBe(1_200);
+  });
+
+  it('emissionsOverride -1 → throws', () => {
+    expect(() => portfolioProxyEstimate({ emissionsOverride: -1 })).toThrow();
+  });
+
+  it('negative portfolioValue → throws', () => {
+    expect(() => portfolioProxyEstimate({ portfolioValue: -100 })).toThrow();
   });
 });
