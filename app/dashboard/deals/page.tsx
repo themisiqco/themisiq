@@ -181,7 +181,7 @@ export default function DealsDashboard() {
   const highRisks = risks.filter(r => r.severity === 'high')
   const mediumRisks = risks.filter(r => r.severity === 'medium')
   const complianceCost = deal.deal_value > 0 ? getComplianceCost(deal.deal_value, deal.sector, frameworks) : null
-  const obligations = getObligations(deal.location_count, frameworks)
+  const obligations = getObligations(deal.location_count, frameworks, deal.sector)
   // Compact ThemisIQ summed figure (included tier only) — shared by the Cost Estimate card,
   // the Export "Report summary", and the sticky "Deal summary" so all three stay consistent.
   const themisIqFigure = obligations.locationUnset
@@ -233,10 +233,17 @@ export default function DealsDashboard() {
       ['Traditional consultant (first-year)', `${deal.currency} ${Math.round(obligations.consultantLow / 1000)}k–${Math.round(obligations.consultantHigh / 1000)}k`],
       [],
       ['Included obligation', 'ThemisIQ', 'Consultant (reference)'],
-      ...obligations.included.map(o => [o.label, o.themisIqPrice != null ? `${deal.currency} ${o.themisIqPrice.toLocaleString()}` : 'Custom quote', `${deal.currency} ${Math.round(o.consultantLow / 1000)}k–${Math.round(o.consultantHigh / 1000)}k`]),
+      ...obligations.included.map(o => [
+        o.scopeNote ? `${o.label} — ${o.scopeNote}` : o.label,
+        o.themisIqPrice == null ? 'Custom quote' : o.themisIqPrice === 0 ? 'Included (GHG module)' : `${deal.currency} ${o.themisIqPrice.toLocaleString()}`,
+        `${deal.currency} ${Math.round(o.consultantLow / 1000)}k–${Math.round(o.consultantHigh / 1000)}k`,
+      ]),
       [],
       ['Also recommended (not in ThemisIQ total)', 'ThemisIQ', 'Consultant (reference)'],
       ...obligations.recommended.map(o => [o.label, o.themisIqPrice != null ? `${deal.currency} ${o.themisIqPrice.toLocaleString()}` : 'Custom quote', `${deal.currency} ${Math.round(o.consultantLow / 1000)}k–${Math.round(o.consultantHigh / 1000)}k`]),
+      [],
+      ['Flagged — separate specialist (in neither total)', 'ThemisIQ', 'Consultant (reference)'],
+      ...obligations.flagged.map(o => [o.scopeNote ? `${o.label} — ${o.scopeNote}` : o.label, 'Not included', 'Not included']),
       ...(complianceCost ? [[`Indicative ESG-DD range: ~${(complianceCost.pctLow * 100).toFixed(2)}%–${(complianceCost.pctHigh * 100).toFixed(2)}% of deal value; requires specialist confirmation`]] : []),
       [],
       ['DATA ROOM GAPS'],
@@ -456,7 +463,12 @@ export default function DealsDashboard() {
           <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.25)', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#0F6E56', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Included for this deal</div>
             {obligations.included.map((o, i) => (
-              <div key={i} style={{ fontSize: 13, color: '#0d0d0d', marginBottom: 6 }}>✓ {o.label}</div>
+              <div key={i} style={{ marginBottom: 6 }}>
+                <div style={{ fontSize: 13, color: '#0d0d0d' }}>✓ {o.label}</div>
+                {o.scopeNote && (
+                  <div style={{ fontSize: 11, color: '#888784', marginLeft: 18, marginTop: 1, lineHeight: 1.5 }}>{o.scopeNote}</div>
+                )}
+              </div>
             ))}
             <div style={{ fontSize: 13, color: '#0d0d0d', marginBottom: 6 }}>✓ Immutable audit trail</div>
             <div style={{ fontSize: 13, color: '#0d0d0d', marginBottom: 6 }}>✓ SBTi science-based target setting</div>
@@ -479,6 +491,15 @@ export default function DealsDashboard() {
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d' }}>{o.themisIqPrice != null ? `+ ${cur} ${o.themisIqPrice.toLocaleString()}` : '+ Custom'}</div>
                 <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>consultant {cur} {Math.round(o.consultantLow / 1000)}k–{Math.round(o.consultantHigh / 1000)}k</div>
               </div>
+            </div>
+          ))}
+
+          {/* Flagged — honest caveat, summed into NEITHER figure */}
+          {obligations.flagged.map((o, i) => (
+            <div key={i} style={{ background: '#FBF3E2', border: '0.5px solid rgba(146,102,10,0.25)', borderRadius: 10, padding: '0.85rem 1.25rem', marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#92660A', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Not included — separate specialist</div>
+              <div style={{ fontSize: 13, color: '#555553' }}>{o.label}</div>
+              {o.scopeNote && <div style={{ fontSize: 11, color: '#888784', marginTop: 3, lineHeight: 1.5 }}>{o.scopeNote}</div>}
             </div>
           ))}
 

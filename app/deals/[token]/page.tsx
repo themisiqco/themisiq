@@ -95,7 +95,7 @@ export default function DealAssessmentPage() {
   // ── Recompute the assessment from the safe fields via the shared C1 lib (no drift) ──
   const frameworks = Array.isArray(data.frameworks) ? data.frameworks : []
   const risks: SectorRisk[] = (data.sector && SECTOR_RISKS[data.sector]) || []
-  const obligations = getObligations(data.location_count ?? 0, frameworks)
+  const obligations = getObligations(data.location_count ?? 0, frameworks, data.sector ?? undefined)
 
   const fmt = (n: number) => `$${n.toLocaleString()}`
   const themisIqFigure = obligations.locationUnset
@@ -194,7 +194,12 @@ export default function DealAssessmentPage() {
         <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.25)', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#0F6E56', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Included for this deal</div>
           {obligations.included.map((o, i) => (
-            <div key={i} style={{ fontSize: 13, marginBottom: 6 }}>✓ {o.label}</div>
+            <div key={i} style={{ marginBottom: 6 }}>
+              <div style={{ fontSize: 13 }}>✓ {o.label}</div>
+              {o.scopeNote && (
+                <div style={{ fontSize: 11, color: '#888784', marginLeft: 18, marginTop: 1, lineHeight: 1.5 }}>{o.scopeNote}</div>
+              )}
+            </div>
           ))}
           <div style={{ fontSize: 13, marginBottom: 6 }}>✓ Immutable audit trail</div>
           <div style={{ fontSize: 13, marginBottom: 6 }}>✓ SBTi science-based target setting</div>
@@ -212,6 +217,15 @@ export default function DealAssessmentPage() {
               <div style={{ fontSize: 14, fontWeight: 600 }}>{o.themisIqPrice != null ? `+ ${fmt(o.themisIqPrice)}` : '+ Custom'}</div>
               <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>consultant ${Math.round(o.consultantLow / 1000)}k–${Math.round(o.consultantHigh / 1000)}k</div>
             </div>
+          </div>
+        ))}
+
+        {/* Flagged — honest caveat, summed into NEITHER figure */}
+        {obligations.flagged.map((o, i) => (
+          <div key={i} style={{ background: '#FBF3E2', border: '0.5px solid rgba(146,102,10,0.25)', borderRadius: 10, padding: '0.85rem 1.25rem', marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#92660A', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Not included — separate specialist</div>
+            <div style={{ fontSize: 13, color: '#555553' }}>{o.label}</div>
+            {o.scopeNote && <div style={{ fontSize: 11, color: '#888784', marginTop: 3, lineHeight: 1.5 }}>{o.scopeNote}</div>}
           </div>
         ))}
       </section>
