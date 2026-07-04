@@ -110,21 +110,36 @@ export const getComplianceCost = (dealValue: number, sector: string, frameworks:
 }
 
 // ─── Module-aware obligation engine ─────────────────────────────────────────────
-// Consultant first-year cost ranges (USD) — 2026 cited market ranges; refresh periodically.
+// Consultant first-year cost ranges (USD) — 2026 cited market ranges, anchored
+// conservative; refresh periodically. Highs tightened so the platform reads as a
+// credible alternative, not a basement bargain.
 export const CONSULTANT_RANGES = {
-  ghg:         { low: 15000, high: 50000 }, // GHG inventory & Scope 3 assessment
-  supplyChain: { low: 10000, high: 25000 }, // Supply-chain / Scope 3 value-chain
-  climateRisk: { low: 15000, high: 30000 }, // Climate risk — physical & transition
+  ghg:              { low: 15000, high: 30000 }, // GHG inventory & Scope 3 assessment
+  supplyChain:      { low: 10000, high: 20000 }, // Supply-chain / Scope 3 value-chain
+  climateRisk:      { low: 12000, high: 24000 }, // Climate risk — physical & transition
+  financedEmissions:{ low: 12000, high: 20000 }, // Financed emissions (PCAF Cat.15) — FS only
 }
 
 // Detected frameworks whose presence implies a value-chain / Scope 3 supply-chain obligation.
 // VERIFIED strings only (getApplicableFrameworks emits these) — no phantoms.
-export const SUPPLY_CHAIN_TRIGGERS = ['CS3D', 'CSRD', 'SFDR', 'PCAF']
+// PCAF is NOT here: financed emissions (Cat.15) is its own obligation, not supply chain.
+export const SUPPLY_CHAIN_TRIGGERS = ['CS3D', 'CSRD', 'SFDR']
 
-export type ObligationTier = { label: string; short: string; themisIqPrice: number | null; consultantLow: number; consultantHigh: number }
+// Consultant benchmarks scale with engagement complexity. ThemisIQ price also
+// scales (GHG_TIERS), so the GAP narrows at high facility counts — intentional.
+const CONSULTANT_LOCATION_FACTOR = (locationCount: number): number =>
+  locationCount <= 3 ? 1.0 : locationCount <= 15 ? 1.5 : 2.0   // reuse GHG_TIERS thresholds
+const HEAVY_SECTORS = ['Energy & Utilities', 'Industrials & Manufacturing', 'Mining & Metals', 'Transport & Logistics', 'Agriculture & Food']
+const CONSULTANT_SECTOR_FACTOR = (sector?: string): number =>
+  sector && HEAVY_SECTORS.includes(sector) ? 1.25 : 1.0
+// Round a scaled consultant figure to the nearest 1000 so the "k" display stays clean.
+const roundK = (x: number): number => Math.round(x / 1000) * 1000
+
+export type ObligationTier = { label: string; short: string; themisIqPrice: number | null; consultantLow: number; consultantHigh: number; scopeNote?: string }
 export type Obligations = {
   included: ObligationTier[]      // summed into the headline (both sides)
   recommended: ObligationTier[]   // shown separately, NOT summed
+  flagged: ObligationTier[]       // honest caveats — summed into NEITHER figure
   themisIqTotal: number | null    // sum of non-null included ThemisIQ prices; null when nothing summable
   themisIqHasCustom: boolean       // an included price is null (Advisory GHG, 16+ locations)
   consultantLow: number           // sum of included consultant lows
@@ -132,10 +147,14 @@ export type Obligations = {
   locationUnset: boolean          // location_count unset/0 → prompt for the ThemisIQ figure
 }
 
-// Pure: deal location count + detected frameworks → scope-matched obligations & prices.
+// Pure: deal location count + detected frameworks (+ sector) → scope-matched obligations & prices.
 // ThemisIQ prices come from lib/pricing.ts (single source of truth); consultant = cited ranges.
-export function getObligations(locationCount: number, frameworks: string[]): Obligations {
+// Consultant ranges scale PER OBLIGATION (location × sector, independently) before summing —
+// never one blended factor on the total.
+export function getObligations(locationCount: number, frameworks: string[], sector?: string): Obligations {
   const locationUnset = !locationCount || locationCount <= 0
+  const loc = CONSULTANT_LOCATION_FACTOR(locationCount)
+  const sec = CONSULTANT_SECTOR_FACTOR(sector)
 
   // GHG — ALWAYS included. Tier by location count (GHG_TIERS is the authority).
   const ghgPrice: number | null =
@@ -145,22 +164,50 @@ export function getObligations(locationCount: number, frameworks: string[]): Obl
     : GHG_TIERS.advisory.priceUSD // null → Advisory / custom quote (16+)
 
   const included: ObligationTier[] = [
-    { label: 'GHG inventory & Scope 3', short: 'GHG', themisIqPrice: ghgPrice, consultantLow: CONSULTANT_RANGES.ghg.low, consultantHigh: CONSULTANT_RANGES.ghg.high },
+    // GHG consultant range scales by location AND sector (a heavy-sector inventory is more work).
+    { label: 'GHG inventory & Scope 3', short: 'GHG', themisIqPrice: ghgPrice,
+      consultantLow: roundK(CONSULTANT_RANGES.ghg.low * loc * sec),
+      consultantHigh: roundK(CONSULTANT_RANGES.ghg.high * loc * sec) },
   ]
 
-  // Supply chain — included when any value-chain framework is detected.
+  // Supply chain — included when a genuine value-chain framework is detected (PCAF no longer triggers this).
+  // Consultant range scales by location only (value-chain breadth), not sector.
   if (SUPPLY_CHAIN_TRIGGERS.some(f => frameworks.includes(f))) {
-    included.push({ label: 'Supply chain / Scope 3', short: 'supply chain', themisIqPrice: FLAT_MODULE_PRICES['supply-chain'], consultantLow: CONSULTANT_RANGES.supplyChain.low, consultantHigh: CONSULTANT_RANGES.supplyChain.high })
+    included.push({ label: 'Supply chain / Scope 3', short: 'supply chain', themisIqPrice: FLAT_MODULE_PRICES['supply-chain'],
+      consultantLow: roundK(CONSULTANT_RANGES.supplyChain.low * loc),
+      consultantHigh: roundK(CONSULTANT_RANGES.supplyChain.high * loc) })
+  }
+
+  // Financed emissions (PCAF, Scope 3 Cat.15) — Financial Services. Now a REAL included ThemisIQ
+  // scope bundled in the GHG module (price 0), replacing the old mislabelled supply-chain trigger.
+  // Portfolio-driven: consultant range scales by NEITHER location nor sector.
+  if (frameworks.includes('PCAF')) {
+    included.push({ label: 'Financed emissions (PCAF, Scope 3 Cat.15)', short: 'financed emissions', themisIqPrice: 0,
+      consultantLow: roundK(CONSULTANT_RANGES.financedEmissions.low),
+      consultantHigh: roundK(CONSULTANT_RANGES.financedEmissions.high),
+      scopeNote: 'Included in the GHG module (PCAF-aligned engine); consultants bill this separately.' })
   }
 
   // Recommended (NOT summed) — Climate Risk is always relevant (IFRS S2 / TCFD always emitted).
+  // Consultant range scales by location only, not sector.
   const recommended: ObligationTier[] = [
-    { label: 'Climate risk assessment — physical & transition (IFRS S2 / TCFD)', short: 'climate risk', themisIqPrice: FLAT_MODULE_PRICES['climate-risk'], consultantLow: CONSULTANT_RANGES.climateRisk.low, consultantHigh: CONSULTANT_RANGES.climateRisk.high },
+    { label: 'Climate risk assessment — physical & transition (IFRS S2 / TCFD)', short: 'climate risk', themisIqPrice: FLAT_MODULE_PRICES['climate-risk'],
+      consultantLow: roundK(CONSULTANT_RANGES.climateRisk.low * loc),
+      consultantHigh: roundK(CONSULTANT_RANGES.climateRisk.high * loc) },
   ]
 
+  // Flagged (NOT summed into either figure) — honest caveats for scopes needing a separate specialist.
+  const flagged: ObligationTier[] = []
+  if (sector === 'Agriculture & Food') {
+    flagged.push({ label: 'Land-sector (FLAG) emissions', short: 'FLAG', themisIqPrice: null, consultantLow: 0, consultantHigh: 0,
+      scopeNote: 'Requires separate specialist land-sector (FLAG) assessment — not included in either figure.' })
+  }
+
+  // themisIqPrice 0 is a REAL (free/bundled) price — kept by the != null filter, adds nothing to the
+  // sum, and does NOT set themisIqHasCustom (only null prices do).
   const nonNull = included.filter(o => o.themisIqPrice != null).map(o => o.themisIqPrice as number)
   return {
-    included, recommended,
+    included, recommended, flagged,
     themisIqTotal: nonNull.length ? nonNull.reduce((a, b) => a + b, 0) : null,
     themisIqHasCustom: included.some(o => o.themisIqPrice == null),
     consultantLow: included.reduce((a, o) => a + o.consultantLow, 0),
