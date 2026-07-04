@@ -5,6 +5,7 @@ import Nav from '../../components/Nav'
 import { supabase } from '../../../lib/supabase'
 import { useEntitlement } from '../../../lib/useEntitlement'
 import { EMISSION_FACTORS, DEFAULT_SPEND_EF } from '../../../lib/emissionFactors'
+import { portfolioFromProxy } from '../../../lib/pcaf/engine'
 
 // ─── Scope 3 Category Definitions ────────────────────────────────────────────
 
@@ -320,13 +321,28 @@ export default function Scope3Dashboard() {
     return (spend * 0.5) / 1000
   }
 
+  // Full PCAF result for cat 15 (score-5 lumped portfolio proxy). Returns the whole
+  // PortfolioResult so a later step can read mode/dqScore without re-plumbing.
+  const cat15PcafResult = (d: CategoryData) =>
+    portfolioFromProxy({
+      portfolioValue: d.portfolio_value,
+      sector: d.portfolio_sector,
+      emissionsOverride: d.emissions_override,
+    })
+
   const calcCat15 = (): number => {
     const d = catData['cat15']
-    if (!d?.included) return 0
-    if (d.emissions_override) return d.emissions_override
-    const portfolio = d.portfolio_value || 0
-    const ef = EMISSION_FACTORS.spend[d.portfolio_sector || 'Financial Services'] || 0.12
-    return (portfolio * ef) / 1000
+    if (!d?.included) return 0                // preserve the included gate exactly
+    // portfolioFromProxy wraps the same portfolioProxyEstimate that is regression-tested
+    // to equal the legacy portfolio×spend/1000 formula (and the emissions_override path).
+    // The try/catch only guards invalid inputs (e.g. a negative value) the engine throws
+    // on — it must never crash the dashboard render.
+    try {
+      return cat15PcafResult(d).totalFinancedEmissions
+    } catch (err) {
+      console.error('PCAF cat15 proxy estimate failed (invalid input); showing 0', err)
+      return 0
+    }
   }
 
   const getCatEmissions = (id: string): number => {
