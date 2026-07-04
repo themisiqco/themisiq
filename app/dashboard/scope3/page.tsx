@@ -869,11 +869,47 @@ export default function Scope3Dashboard() {
                       {(() => {
                         const c15 = catData['cat15']
                         if (!c15) return null
-                        const r = cat15PcafResult(c15)
-                        if (r.mode === 'portfolio_proxy' && cat15Assets().length >= 1) {
-                          return <div style={{ fontSize: 10, color: '#92660A', lineHeight: 1.5 }}>Some holdings are incomplete — showing the spend proxy until every row computes.</div>
+                        const r = cat15PcafResult(c15) // single call — reused for the fallback line AND the decomposed summary
+                        // Proxy / fallback mode: keep the existing incomplete-rows note, nothing decomposed.
+                        if (r.mode === 'portfolio_proxy') {
+                          return cat15Assets().length >= 1
+                            ? <div style={{ fontSize: 10, color: '#92660A', lineHeight: 1.5 }}>Some holdings are incomplete — showing the spend proxy until every row computes.</div>
+                            : null
                         }
-                        return null
+                        // Decomposed mode: weighted DQ + coverage spread, by-asset-class breakdown, capped flag.
+                        const cappedCount = r.perAsset.filter(a => a.capped).length
+                        const classRows = Object.entries(r.byAssetClass).sort((a, b) => (b[1] as number) - (a[1] as number))
+                        const coverageTiers = ([1, 2, 3, 4, 5] as const).filter(t => r.coverageByScore[t] > 0)
+                        return (
+                          <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
+                            {/* 1. Weighted DQ shown WITH its coverage spread (never the number alone) */}
+                            <div>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d' }}>Portfolio PCAF data quality: {r.weightedDataQualityScore.toFixed(1)} of 5 (emissions-weighted)</div>
+                              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+                                {coverageTiers.map(t => (
+                                  <span key={t} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#555553', fontWeight: 600 }}>DQ{t} · {r.coverageByScore[t]}</span>
+                                ))}
+                              </div>
+                              <div style={{ fontSize: 10, color: '#888784', marginTop: 6, lineHeight: 1.5 }}>Distribution across holdings — a low weighted score can hide high-tier outliers, so the spread is shown alongside.</div>
+                            </div>
+                            {/* 2. Financed emissions by asset class (descending) */}
+                            <div style={{ border: '0.5px solid #e8e7e4', borderRadius: 10, overflow: 'hidden' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', background: '#f8f7f5', padding: '8px 12px', borderBottom: '0.5px solid #e8e7e4' }}>
+                                {['Asset class', 'Financed'].map(h => <div key={h} style={{ fontSize: 10, fontWeight: 700, color: '#888784', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>)}
+                              </div>
+                              {classRows.map(([key, val], i) => (
+                                <div key={key} style={{ display: 'grid', gridTemplateColumns: '1fr 120px', padding: '8px 12px', borderBottom: i < classRows.length - 1 ? '0.5px solid #f3f4f6' : 'none', alignItems: 'center' }}>
+                                  <div style={{ fontSize: 12, color: '#0d0d0d' }}>{PCAF_ASSET_CLASSES.find(c => c.value === key)?.label ?? key}</div>
+                                  <div style={{ fontSize: 12, fontWeight: 600, color: '#0F6E56' }}>{(val as number).toFixed(1)} tCO₂e</div>
+                                </div>
+                              ))}
+                            </div>
+                            {/* 3. Capped-holdings data-error flag (derived — no lib field) */}
+                            {cappedCount > 0 && (
+                              <div style={{ fontSize: 11, color: '#B91C1C', lineHeight: 1.5 }}>{cappedCount} holding(s) have exposure exceeding the asset value — attribution capped at 100%. Check outstanding amount vs denominator.</div>
+                            )}
+                          </div>
+                        )
                       })()}
                     </div>}
                   </>}
