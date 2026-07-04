@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { attributionFactor, financedEmissions } from './pcaf/attribution';
 import { estimateInvesteeEmissions, portfolioProxyEstimate } from './pcaf/estimate';
-import { assessAsset, assessPortfolio, portfolioFromProxy } from './pcaf/engine';
+import { assessAsset, assessPortfolio, portfolioFromProxy, resolvePcafResult } from './pcaf/engine';
 import type { PcafAsset, PcafPortfolioAsset } from './pcaf/types';
 
 const asset = (over: Partial<PcafAsset>): PcafAsset => ({
@@ -300,5 +300,70 @@ describe('PCAF engine — portfolioFromProxy (score-5 regime, same shape)', () =
     expect(r.totalFinancedEmissions).toBe(8_500);
     expect(r.weightedDataQualityScore).toBe(2);
     expect(r.coverageByScore).toEqual({ 1: 0, 2: 1, 3: 0, 4: 0, 5: 0 });
+  });
+});
+
+describe('PCAF engine — resolvePcafResult (proxy vs detailed switch)', () => {
+  const A: PcafPortfolioAsset = {
+    id: 'A',
+    assetClass: 'business_loans_unlisted_equity',
+    outstandingAmount: 10_000_000,
+    denominator: 100_000_000,
+    emissions: { reportedEmissions: 50_000, verified: true },
+  };
+  const B: PcafPortfolioAsset = {
+    id: 'B',
+    assetClass: 'listed_equity_corp_bonds',
+    outstandingAmount: 50_000_000,
+    denominator: 500_000_000,
+    emissions: { revenue: 100_000_000, sector: 'Financial Services' },
+  };
+
+  it('no mode, no assets → proxy', () => {
+    const r = resolvePcafResult({ portfolioValue: 100_000_000, sector: 'Financial Services' });
+    expect(r.mode).toBe('portfolio_proxy');
+    expect(r.totalFinancedEmissions).toBe(12_000);
+    expect(r.weightedDataQualityScore).toBe(5);
+  });
+
+  it("mode 'detailed' + undefined assets → proxy fallback", () => {
+    const r = resolvePcafResult({ mode: 'detailed', portfolioValue: 100_000_000, sector: 'Financial Services' });
+    expect(r.mode).toBe('portfolio_proxy');
+    expect(r.totalFinancedEmissions).toBe(12_000);
+  });
+
+  it("mode 'detailed' + empty assets → proxy fallback", () => {
+    const r = resolvePcafResult({ mode: 'detailed', assets: [], portfolioValue: 100_000_000, sector: 'Financial Services' });
+    expect(r.mode).toBe('portfolio_proxy');
+    expect(r.totalFinancedEmissions).toBe(12_000);
+  });
+
+  it('assets present but mode omitted → still proxy (explicit detailed required)', () => {
+    const r = resolvePcafResult({ assets: [A, B], portfolioValue: 100_000_000, sector: 'Financial Services' });
+    expect(r.mode).toBe('portfolio_proxy');
+    expect(r.totalFinancedEmissions).toBe(12_000);
+  });
+
+  it("mode 'detailed' + two valid assets → decomposed", () => {
+    const r = resolvePcafResult({ mode: 'detailed', assets: [A, B] });
+    expect(r.mode).toBe('decomposed');
+    expect(r.totalFinancedEmissions).toBe(6_200);
+    expect(r.weightedDataQualityScore).toBeCloseTo(1.5806, 3);
+  });
+
+  it("mode 'detailed' + invalid asset (denominator 0) → does not throw, falls back to proxy", () => {
+    const bad: PcafPortfolioAsset = {
+      id: 'bad',
+      assetClass: 'mortgages',
+      outstandingAmount: 100,
+      denominator: 0, // assessPortfolio → assessAsset → attributionFactor throws
+      emissions: { reportedEmissions: 10 },
+    };
+    let r: ReturnType<typeof resolvePcafResult>;
+    expect(() => {
+      r = resolvePcafResult({ mode: 'detailed', assets: [bad], portfolioValue: 100_000_000, sector: 'Financial Services' });
+    }).not.toThrow();
+    expect(r!.mode).toBe('portfolio_proxy');
+    expect(r!.totalFinancedEmissions).toBe(12_000);
   });
 });

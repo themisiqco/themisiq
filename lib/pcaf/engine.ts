@@ -114,3 +114,34 @@ export function portfolioFromProxy(input: {
     gwpBasis: 'AR6',
   };
 }
+
+// Resolve cat-15 financed emissions to a single PortfolioResult, choosing between
+// the decomposed per-asset assessment and the lumped score-5 proxy.
+//
+// Clean switch (v1): detailed mode is active ONLY when mode === 'detailed' AND at
+// least one asset is present. Any failure of the decomposed path (invalid/empty
+// assets — assessPortfolio throws by contract) falls back to the proxy so the caller
+// NEVER receives a throw and never shows 0 for a data-entry slip. The returned
+// result.mode ('decomposed' | 'portfolio_proxy') always reflects what ACTUALLY
+// computed, so any label driven off it stays honest.
+export function resolvePcafResult(input: {
+  mode?: 'proxy' | 'detailed';
+  assets?: PcafPortfolioAsset[];
+  portfolioValue?: number;
+  sector?: string;
+  emissionsOverride?: number;
+}): PortfolioResult {
+  if (input.mode === 'detailed' && input.assets && input.assets.length > 0) {
+    try {
+      return assessPortfolio(input.assets);
+    } catch (err) {
+      // Invalid/empty rows — fall back to the honest proxy; caller's UI surfaces why.
+      console.error('resolvePcafResult: detailed assessment failed, using proxy', err);
+    }
+  }
+  return portfolioFromProxy({
+    portfolioValue: input.portfolioValue,
+    sector: input.sector,
+    emissionsOverride: input.emissionsOverride,
+  });
+}
