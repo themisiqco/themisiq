@@ -26,7 +26,7 @@ const CATEGORIES = [
   { id: 'cat12', num: 12, name: 'End-of-life treatment', stream: 'Downstream', desc: 'Emissions from disposal of your sold products at end of life', method: 'activity', unit: 'tonnes', materialSectors: ['Consumer & Retail', 'Industrials & Manufacturing', 'Technology'], typicalShare: 0.02 , guidance: 'Emissions from the end-of-life treatment of your sold products once customers dispose of them — landfill, incineration, recycling.', dataSource: 'Units / mass sold + end-of-life treatment assumptions by material. Activity-based; spend-based is not appropriate here.' },
   { id: 'cat13', num: 13, name: 'Downstream leased assets', stream: 'Downstream', desc: 'Emissions from assets owned and leased to others', method: 'activity', unit: 'kwh', materialSectors: ['Real Estate', 'Financial Services'], typicalShare: 0.01 , guidance: 'Emissions from assets you OWN and LEASE OUT to others (as lessor) that aren\'t in your Scope 1 & 2 — e.g. property you rent to tenants.', dataSource: 'Your leased-out asset portfolio + tenants\' energy use (floor area or metered). Activity-based; spend-based is not appropriate here.' },
   { id: 'cat14', num: 14, name: 'Franchises', stream: 'Downstream', desc: 'Emissions from franchise operations', method: 'activity', unit: 'spend', materialSectors: ['Consumer & Retail'], typicalShare: 0.01 , guidance: 'Emissions from the operations of your FRANCHISEES — relevant if you\'re a franchisor.', dataSource: 'Franchisee energy/activity data, or estimates from number and type of franchise outlets. Activity-based; spend-based is not appropriate here.' },
-  { id: 'cat15', num: 15, name: 'Investments', stream: 'Downstream', desc: 'Emissions associated with investments and lending (financed emissions)', method: 'pcaf', unit: 'spend', materialSectors: ['Financial Services'], typicalShare: 0.90 , guidance: 'Emissions associated with your investments and lending (financed emissions) — for investors, banks and asset owners. Uses the PCAF methodology.', dataSource: 'Portfolio holdings/loan book + investee emissions or PCAF data-quality-scored proxies. Specialised PCAF method, not spend-based.' },
+  { id: 'cat15', num: 15, name: 'Investments', stream: 'Downstream', desc: 'Emissions associated with investments and lending (financed emissions)', method: 'pcaf', unit: 'spend', materialSectors: ['Financial Services'], typicalShare: 0.90 , guidance: 'Emissions associated with your investments and lending (financed emissions) — for investors, banks and asset owners. ThemisIQ estimates this with a PCAF-aligned spend-based portfolio proxy — PCAF data-quality tier 5, the weakest tier — not a full asset-class-decomposed PCAF assessment. ThemisIQ is not PCAF-certified or a PCAF signatory.', dataSource: 'Total portfolio / loan-book value × an openly-sourced sector factor (non-PCAF). A per-asset assessment (asset class + attribution factors) is the higher-fidelity path — if you already hold a computed figure, enter known financed emissions directly.' },
 ]
 
 // Sector-based materiality
@@ -518,7 +518,17 @@ export default function Scope3Dashboard() {
                           <span style={{ fontSize: 10, fontWeight: 700, color: '#888784', minWidth: 40 }}>Cat {cat.num}</span>
                           <span style={{ fontSize: 13, fontWeight: included ? 600 : 400, color: included ? '#7425e3' : '#0d0d0d' }}>{cat.name}</span>
                           {isMaterial && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: '#E1F5EE', color: '#0F6E56' }}>LIKELY MATERIAL</span>}
-                          {cat.num === 15 && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: '#FCEBEB', color: '#B91C1C' }}>PCAF METHOD</span>}
+                          {cat.num === 15 && (() => {
+                            const c15 = catData['cat15']
+                            const dq = c15 ? cat15PcafResult(c15).weightedDataQualityScore : 5
+                            const reported = dq === 2
+                            return (
+                              <span
+                                title={reported ? 'PCAF-aligned · data quality 2 of 5' : 'PCAF-aligned · data quality 5 of 5 — weakest tier'}
+                                style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: '#FCEBEB', color: '#B91C1C' }}
+                              >{reported ? 'Reported · unverified' : 'Spend-based estimate'}</span>
+                            )
+                          })()}
                         </div>
                         <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{cat.desc}</div>
                       </div>
@@ -715,7 +725,7 @@ export default function Scope3Dashboard() {
                   {/* Cat 15 — Investments */}
                   {cat.id === 'cat15' && <>
                     <div style={{ gridColumn: '1 / -1', background: '#E6F1FB', borderRadius: 8, padding: '0.75rem', fontSize: 11, color: '#0C447C', marginBottom: 8 }}>
-                      Cat 15 uses the PCAF (Partnership for Carbon Accounting Financials) methodology. Enter your total investment/loan portfolio value and primary sector exposure.
+                      Cat 15 is estimated with a PCAF-aligned spend-based portfolio proxy (PCAF data-quality tier 5 — the weakest tier), not a full asset-class-decomposed PCAF assessment. Enter your total investment/loan portfolio value and primary sector exposure — or, for a stronger figure, enter known financed emissions directly below.
                     </div>
                     <div>
                       <label style={labelStyle}>Total portfolio value ({currency})</label>
@@ -731,6 +741,17 @@ export default function Scope3Dashboard() {
                       <label style={labelStyle}>Or enter known financed emissions directly (mt CO₂e)</label>
                       <input style={inputStyle} type="number" value={catData['cat15']?.emissions_override || ''} onChange={e => updateCat('cat15', 'emissions_override', Number(e.target.value))} placeholder="Override with primary data" />
                     </div>
+                    {(() => {
+                      const c15 = catData['cat15']
+                      const dq = c15 ? cat15PcafResult(c15).weightedDataQualityScore : 5
+                      return (
+                        <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#888784', lineHeight: 1.5, marginTop: 2 }}>
+                          This estimate: PCAF data quality {dq} of 5 ({dq === 2 ? 'reported, unverified' : 'spend-based proxy'}).<br />
+                          PCAF-aligned methodology · not PCAF-certified · estimates use non-PCAF sector factors.<br />
+                          PCAF data quality: 1 = verified (best) … 5 = spend estimate (weakest).
+                        </div>
+                      )
+                    })()}
                   </>}
 
                   {/* Generic spend-based for other categories */}

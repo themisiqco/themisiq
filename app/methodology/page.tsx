@@ -49,7 +49,7 @@ const METHODOLOGIES = [
       },
       {
         title: 'Category 15 — Financed emissions',
-        content: 'Category 15 financed emissions follow the Partnership for Carbon Accounting Financials (PCAF) Global GHG Accounting and Reporting Standard for the Financial Industry.',
+        content: 'Category 15 financed emissions use a PCAF-aligned methodology (Partnership for Carbon Accounting Financials). Current estimates are spend-based (PCAF data-quality tier 5); ThemisIQ is not a PCAF signatory or PCAF-accredited.',
       },
       {
         title: 'Materiality',
@@ -241,7 +241,7 @@ export default function MethodologyPage() {
             Every number ThemisIQ produces is grounded in a recognised international standard or regulatory framework. We don&apos;t invent methodologies — we implement the ones that matter, correctly, and keep them current.
           </p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' as const }}>
-            {['GHG Protocol', 'IPCC AR6', 'TCFD', 'IFRS S2', 'CSRD ESRS', 'EU AI Act', 'NIST CSF 2.0', 'PCAF', 'CS3D'].map(tag => (
+            {['GHG Protocol', 'IPCC AR6', 'TCFD', 'IFRS S2', 'CSRD ESRS', 'EU AI Act', 'NIST CSF 2.0', 'PCAF-aligned', 'CS3D'].map(tag => (
               <span key={tag} style={{ fontSize: 12, padding: '5px 14px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#555553' }}>{tag}</span>
             ))}
           </div>
