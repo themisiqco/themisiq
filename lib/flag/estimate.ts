@@ -9,8 +9,8 @@
 // Manure, fertiliser, and LUC estimators are SEPARATE later tasks.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { ENTERIC_CATTLE, ENTERIC_OTHER, FLAG_GWP_AR6, MANURE_VS, MANURE_WEIGHT, MANURE_FACTOR, SYSTEM_VALIDITY, MANURE_LIQUID_FACTOR, LIQUID_SYSTEM_VALIDITY, MANURE_BIOGAS_FACTOR, MANURE_N_RATE, MANURE_N2O_EF3 } from './params';
-import type { EmissionFactor, ManureSpecies, ManureSubcategory, ManureSystem, ManureClimate, ManureClimateZone, ManureLiquidSystem, DigesterQuality, ManureN2OSystem, ManureActivityTable } from './params';
+import { ENTERIC_CATTLE, ENTERIC_OTHER, FLAG_GWP_AR6, MANURE_VS, MANURE_WEIGHT, MANURE_FACTOR, SYSTEM_VALIDITY, MANURE_LIQUID_FACTOR, LIQUID_SYSTEM_VALIDITY, MANURE_BIOGAS_FACTOR, MANURE_N_RATE, MANURE_N2O_EF3, N2O_EF4, N2O_EF5, FRACGAS_MS, FRACLEACH_MS } from './params';
+import type { EmissionFactor, ManureSpecies, ManureSubcategory, ManureSystem, ManureClimate, ManureClimateZone, ManureLiquidSystem, DigesterQuality, ManureN2OSystem, ManureN2OIndirectSystem, ManureSpeciesGroup, IndirectClimate, ManureActivityTable } from './params';
 import type { EmissionEstimate } from './types';
 
 // Cattle & buffalo are region-keyed (Table 10.11); everything else is global (Table 10.10).
@@ -392,5 +392,84 @@ export function estimateManureN2O(input: {
     gas: 'N2O',
     factor: ef3Factor,
     basis: 'IPCC 2019 Tier 1 direct manure N2O (Eq.10.25; EF3 Table 10.21; N Table 10.19), screening-grade',
+  };
+}
+
+// ── Indirect manure N2O (volatilisation Eq. 10.26 + leaching Eq. 10.27) ──────────
+// The 13 species collapse to 5 Table 10.22 groups for FracGas/FracLeach lookup ONLY;
+// N_ex still uses the full species N-rate/weight.
+function speciesGroup(species: ManureSpecies): ManureSpeciesGroup {
+  if (species === 'dairy_cattle') return 'dairy_cow';
+  if (species === 'other_cattle' || species === 'buffalo') return 'other_cattle'; // buffalo→other_cattle (footnote-6 consistency)
+  if (species === 'swine') return 'swine';
+  if (species === 'poultry') return 'poultry'; // hens/pullets/broilers/turkeys/ducks
+  return 'other_animals'; // sheep/goats/horses/mules_asses/camels
+}
+
+export function estimateManureN2OIndirect(input: {
+  animal: ManureSpecies;
+  region: string;
+  headcount: number;
+  system: ManureN2OIndirectSystem;
+  climate: IndirectClimate;              // REQUIRED — selects EF4 AND gates leaching
+  subcategory?: ManureSubcategory;
+  digesterFracGasOverride?: number;      // anaerobic_digester only (0.05–0.50)
+}): EmissionEstimate {
+  const { animal, region, headcount, system, climate, subcategory } = input;
+
+  if (headcount < 0) {
+    throw new Error(`manure N2O (indirect): headcount must be >= 0 (animal ${animal}, got ${headcount})`);
+  }
+  // Climate is required — it selects EF4 and gates leaching; there is no honest default.
+  if (climate !== 'wet' && climate !== 'dry') {
+    throw new Error('manure N2O (indirect): climate (wet|dry) is required — it selects EF4 and gates leaching');
+  }
+
+  // Swine/poultry require a sub-category (N-rate & weight are per sub-category).
+  if ((animal === 'swine' || animal === 'poultry') && !subcategory) {
+    throw new Error(`manure N2O (indirect): subcategory required for ${animal}; refusing to estimate`);
+  }
+
+  const group = speciesGroup(animal);
+
+  // FracGas — four-way: numeric (incl. 0) → compute; 'NA' → not applicable; 'NODATA' → country-specific required.
+  const fracGasCell = FRACGAS_MS[system][group];
+  if (fracGasCell === 'NA') {
+    throw new Error(`manure N2O (indirect): system ${system} not applicable for ${group} (Table 10.22: NA)`);
+  }
+  if (fracGasCell === 'NODATA') {
+    throw new Error(`manure N2O (indirect): no IPCC default volatilisation fraction for ${group}/${system} (Table 10.22: no data); country-specific value required`);
+  }
+  let fracGas: number = fracGasCell;
+  if (system === 'anaerobic_digester' && input.digesterFracGasOverride != null) {
+    const ov = input.digesterFracGasOverride;
+    if (ov < 0.05 || ov > 0.50) {
+      throw new Error(`manure N2O (indirect): digester FracGas override must be within 0.05–0.50 (got ${ov})`);
+    }
+    fracGas = ov;
+  }
+  const fracLeach = FRACLEACH_MS[system]?.[group] ?? 0;
+
+  // N_ex_annual (REUSE the direct-N2O N-rate + weight, SAME region resolution).
+  const nRate = resolveNRate(animal, subcategory, region);
+  const wt = lookupActivity(MANURE_WEIGHT, animal, subcategory, region);
+  if (!nRate || !wt) {
+    throw new Error(`manure N2O (indirect): no verified IPCC N-rate/weight for ${animal}${subcategory ? '/' + subcategory : ''} in region ${region}; refusing to estimate`);
+  }
+  const nExAnnual = ((nRate.value * wt.value) / 1000) * 365;
+
+  const ef4 = N2O_EF4[climate];
+  const CONV = (44 / 28) * FLAG_GWP_AR6.N2O / 1000; // 44/28 (N→N2O) × GWP / 1000 → tCO2e per kg N-source
+  const volatilisation = headcount * nExAnnual * fracGas * ef4.value * CONV;
+  // Leaching applies ONLY in wet climates (Table 11.3 note); dry → 0.
+  const leaching = climate === 'wet' ? headcount * nExAnnual * fracLeach * N2O_EF5.value * CONV : 0;
+
+  return {
+    emissions: volatilisation + leaching,
+    dataQuality: 'secondary',
+    gas: 'N2O',
+    factor: ef4, // primary indirect factor (EF4, climate-selected); FracGas/FracLeach in the basis
+    basis: 'IPCC 2019 Tier 1 indirect manure N2O (volatilisation Eq.10.26 + leaching Eq.10.27; FracGas/FracLeach Table 10.22; EF4/EF5 Table 11.3; leaching wet-climate only), screening-grade',
+    breakdown: { volatilisation, leaching },
   };
 }

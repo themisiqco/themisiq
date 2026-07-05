@@ -130,6 +130,17 @@ export type ManureN2OSystem =
   | 'composting_in_vessel' | 'composting_static_pile' | 'composting_intensive_windrow'
   | 'composting_passive_windrow' | 'aerobic_treatment';
 
+// Indirect N2O (volatilisation + leaching). Species collapse to 5 groups for the
+// FracGas/FracLeach lookup (Table 10.22); climate is a 2-way wet/dry (Table 11.3).
+export type ManureSpeciesGroup = 'swine' | 'dairy_cow' | 'poultry' | 'other_cattle' | 'other_animals';
+export type IndirectClimate = 'wet' | 'dry';
+export type ManureN2OIndirectSystem =
+  | 'uncovered_anaerobic_lagoon' | 'liquid_slurry_crust' | 'liquid_slurry_no_crust' | 'liquid_slurry_cover'
+  | 'pit_storage' | 'daily_spread' | 'solid_storage_covered' | 'solid_storage_bulking' | 'solid_storage_additives'
+  | 'solid_storage' | 'dry_lot' | 'anaerobic_digester' | 'deep_bedding'
+  | 'composting_in_vessel' | 'composting_static' | 'composting_intensive' | 'composting_passive'
+  | 'poultry_litter' | 'poultry_no_litter' | 'aerobic_natural' | 'aerobic_forced' | 'burned_for_fuel';
+
 // Activity-data keying differs by species (Table 10.14 footnote 1 region resolution):
 //   cattle/buffalo   → [region] (9-region)
 //   swine/poultry    → [subcategory][region]
@@ -610,6 +621,73 @@ export const MANURE_N2O_EF3: Partial<Record<ManureN2OSystem, EmissionFactor>> = 
   poultry_litter: ef3(0.001),
   poultry_no_litter: ef3(0.001),
 };
+
+// ── Indirect manure N2O — volatilisation (Eq. 10.26) + leaching (Eq. 10.27) ──────
+// EF4/EF5 from Table 11.3. EF4 is disaggregated by wet/dry climate; EF5 is a single value.
+const EF4_SRC = 'IPCC 2019 Table 11.3 (EF4 volatilisation, disaggregated by climate)';
+const EF5_SRC = 'IPCC 2019 Table 11.3 (EF5 leaching)';
+export const N2O_EF4: Record<IndirectClimate, EmissionFactor> = {
+  wet: { value: 0.014, unit: 'kgN2O-N/kgN', source: EF4_SRC, tier: 1 },
+  dry: { value: 0.005, unit: 'kgN2O-N/kgN', source: EF4_SRC, tier: 1 },
+};
+export const N2O_EF5: EmissionFactor = { value: 0.011, unit: 'kgN2O-N/kgN', source: EF5_SRC, tier: 1 };
+
+// FracGas_MS — Table 10.22 volatilisation fraction, by species-group × system. Cells are a
+// FRACTION (incl. a legitimate 0), or a SENTINEL: 'NA' (system not applicable to this group)
+// or 'NODATA' (no IPCC default — country-specific value required). The two throw DISTINCT messages.
+export type FracCell = number | 'NA' | 'NODATA';
+const GROUP_ORDER: ManureSpeciesGroup[] = ['swine', 'dairy_cow', 'poultry', 'other_cattle', 'other_animals'];
+const fg = (arr: FracCell[]): Record<ManureSpeciesGroup, FracCell> => {
+  const out = {} as Record<ManureSpeciesGroup, FracCell>;
+  GROUP_ORDER.forEach((g, i) => { out[g] = arr[i]; });
+  return out;
+};
+export const FRACGAS_MS: Record<ManureN2OIndirectSystem, Record<ManureSpeciesGroup, FracCell>> = {
+  // [swine, dairy_cow, poultry, other_cattle, other_animals]
+  uncovered_anaerobic_lagoon: fg([0.40, 0.35, 0.40, 0.35, 0.35]),
+  liquid_slurry_crust:        fg([0.30, 0.30, 'NODATA', 0.30, 0.09]),
+  liquid_slurry_no_crust:     fg([0.48, 0.48, 0.40, 0.48, 0.15]),
+  liquid_slurry_cover:        fg([0.10, 0.10, 0.08, 0.10, 0.03]),
+  pit_storage:                fg([0.25, 0.28, 0.28, 0.25, 0.25]),
+  daily_spread:               fg([0.07, 0.07, 0.07, 0.07, 0.07]),
+  solid_storage_covered:      fg([0.22, 0.14, 0.20, 0.22, 0.05]),
+  solid_storage_bulking:      fg([0.58, 0.38, 0.54, 0.58, 0.15]),
+  solid_storage_additives:    fg([0.17, 0.11, 0.16, 0.17, 0.04]),
+  solid_storage:              fg([0.45, 0.30, 0.40, 0.45, 0.12]),
+  dry_lot:                    fg([0.45, 0.30, 'NA', 0.30, 0.30]),
+  anaerobic_digester:         fg([0.50, 0.50, 0.50, 0.50, 0.50]), // range 0.05–0.50; default 0.50 (conservative), overridable
+  deep_bedding:               fg([0.40, 0.25, 'NA', 0.25, 'NA']),
+  composting_in_vessel:       fg([0.60, 0.45, 0.60, 0.60, 0.18]),
+  composting_static:          fg([0.65, 0.50, 0.65, 0.65, 0.20]),
+  composting_intensive:       fg([0.65, 0.50, 0.65, 0.65, 0.20]),
+  composting_passive:         fg([0.60, 0.45, 0.60, 0.60, 0.18]),
+  poultry_litter:             fg(['NA', 'NA', 0.40, 'NA', 'NA']),
+  poultry_no_litter:          fg(['NA', 'NA', 0.48, 'NA', 'NA']),
+  aerobic_natural:            fg(['NODATA', 'NODATA', 'NODATA', 'NODATA', 'NODATA']),
+  aerobic_forced:             fg([0.85, 0.85, 'NODATA', 0.85, 0.27]),
+  burned_for_fuel:            fg(['NA', 'NA', 'NA', 'NA', 'NA']),
+};
+
+// FracLeach_MS — Table 10.22 leaching fraction. MOST systems are 0; only these are nonzero.
+// The lookup returns 0 for any absent system. (NA cells here are unreachable — FracGas gates them.)
+const fl = (arr: number[]): Record<ManureSpeciesGroup, number> => {
+  const out = {} as Record<ManureSpeciesGroup, number>;
+  GROUP_ORDER.forEach((g, i) => { out[g] = arr[i]; });
+  return out;
+};
+export const FRACLEACH_MS: Partial<Record<ManureN2OIndirectSystem, Record<ManureSpeciesGroup, number>>> = {
+  solid_storage_bulking:   fl([0.02, 0.02, 0.02, 0.02, 0.02]),
+  solid_storage_additives: fl([0.02, 0.02, 0.02, 0.02, 0.02]),
+  solid_storage:           fl([0.02, 0.02, 0.02, 0.02, 0.02]),
+  dry_lot:                 fl([0.035, 0.035, 0, 0.035, 0.035]),  // poultry gated by FracGas NA
+  deep_bedding:            fl([0.035, 0.035, 0, 0.035, 0]),      // poultry/other_animals gated by FracGas NA
+  composting_static:       fl([0.06, 0.06, 0.06, 0.06, 0.06]),
+  composting_intensive:    fl([0.06, 0.06, 0.06, 0.06, 0.06]),
+  composting_passive:      fl([0.04, 0.04, 0.04, 0.04, 0.04]),
+};
+const FRACGAS_SRC = 'IPCC 2019 Refinement Vol.4 Ch.10 Table 10.22 (FracGas_MS)';
+const FRACLEACH_SRC = 'IPCC 2019 Refinement Vol.4 Ch.10 Table 10.22 (FracLeach_MS)';
+export const INDIRECT_FRAC_SOURCES = { fracGas: FRACGAS_SRC, fracLeach: FRACLEACH_SRC };
 
 // (Fertiliser and LUC factor sets — enteric's/manure's siblings — are SEPARATE later
 //  tasks, each with its own cited provenance. Intentionally absent for now.)

@@ -4,7 +4,7 @@
 // separately and removals are NEVER netted into gross emissions.
 import { describe, it, expect } from 'vitest';
 import { computeFlag } from './flag/engine';
-import { estimateEnteric, estimateManureCH4, estimateManureN2O } from './flag/estimate';
+import { estimateEnteric, estimateManureCH4, estimateManureN2O, estimateManureN2OIndirect } from './flag/estimate';
 import type { FlagActivity } from './flag/types';
 
 const line = (over: Partial<FlagActivity>): FlagActivity => ({
@@ -705,5 +705,65 @@ describe('estimateManureN2O — direct manure-management N2O (Eq. 10.25)', () =>
     expect(na.emissions).toBeCloseTo(0.156, 3);
     expect(na.emissions).toBe(asia.emissions); // region ignored (fully global)
     expect(na.factor.value).toBe(0.010);
+  });
+});
+
+describe('estimateManureN2OIndirect — volatilisation (Eq.10.26) + leaching (Eq.10.27)', () => {
+  it('1. dairy NA solid_storage WET, 100 head → vol 25.221 + leach 1.321 = 26.542', () => {
+    // N_ex 139.9775 ; FracGas(dairy_cow,solid_storage)=0.30, EF4(wet)=0.014 ; FracLeach=0.02, EF5=0.011
+    const e = estimateManureN2OIndirect({ animal: 'dairy_cattle', region: 'north_america', headcount: 100, system: 'solid_storage', climate: 'wet' });
+    expect(e.emissions).toBeCloseTo(26.542, 2);
+    expect(e.breakdown!.volatilisation).toBeCloseTo(25.221, 2);
+    expect(e.breakdown!.leaching).toBeCloseTo(1.321, 2);
+    expect(e.gas).toBe('N2O');
+    expect(e.dataQuality).toBe('secondary');
+    expect(e.factor.value).toBe(0.014); // EF4 wet
+    expect(e.factor.source).toContain('Table 11.3');
+  });
+
+  it('2. dairy NA solid_storage DRY → EF4 0.005, leaching EXACTLY 0', () => {
+    const e = estimateManureN2OIndirect({ animal: 'dairy_cattle', region: 'north_america', headcount: 100, system: 'solid_storage', climate: 'dry' });
+    expect(e.breakdown!.leaching).toBe(0);          // dry-climate leaching gate
+    expect(e.breakdown!.volatilisation).toBeCloseTo(9.008, 2);
+    expect(e.emissions).toBeCloseTo(9.008, 2);
+    expect(e.factor.value).toBe(0.005);             // EF4 dry
+  });
+
+  it('3. poultry broilers dry_lot WET → THROWS (dry_lot poultry = NA)', () => {
+    expect(() => estimateManureN2OIndirect({ animal: 'poultry', subcategory: 'broilers', region: 'north_america', headcount: 1, system: 'dry_lot', climate: 'wet' })).toThrow(/not applicable.*NA/);
+  });
+
+  it('4. poultry liquid_slurry_crust → THROWS "no data / country-specific" (NODATA, not NA)', () => {
+    expect(() => estimateManureN2OIndirect({ animal: 'poultry', subcategory: 'hens', region: 'north_america', headcount: 1, system: 'liquid_slurry_crust', climate: 'wet' }))
+      .toThrow(/no IPCC default.*country-specific/);
+  });
+
+  it('5. buffalo WEu → other_cattle group; solid_storage WET computes (FracGas 0.45)', () => {
+    // buffalo Nrate WEu 0.45 × wt 509 → N_ex 83.60325 ; FracGas(other_cattle,solid_storage)=0.45
+    const e = estimateManureN2OIndirect({ animal: 'buffalo', region: 'western_europe', headcount: 1, system: 'solid_storage', climate: 'wet' });
+    expect(e.emissions).toBeCloseTo(0.234, 2);
+  });
+
+  it('6. digester default 0.50 vs override 0.10; override out of range throws', () => {
+    const def = estimateManureN2OIndirect({ animal: 'dairy_cattle', region: 'north_america', headcount: 1, system: 'anaerobic_digester', climate: 'wet' });
+    expect(def.emissions).toBeCloseTo(0.42035, 3);       // FracGas 0.50, FracLeach 0
+    expect(def.breakdown!.leaching).toBe(0);
+    const ov = estimateManureN2OIndirect({ animal: 'dairy_cattle', region: 'north_america', headcount: 1, system: 'anaerobic_digester', climate: 'wet', digesterFracGasOverride: 0.10 });
+    expect(ov.emissions).toBeCloseTo(0.08407, 3);
+    expect(() => estimateManureN2OIndirect({ animal: 'dairy_cattle', region: 'north_america', headcount: 1, system: 'anaerobic_digester', climate: 'wet', digesterFracGasOverride: 0.6 })).toThrow();
+  });
+
+  it('7. lagoon WET → FracGas computes, FracLeach 0 → leaching 0 even in wet', () => {
+    const e = estimateManureN2OIndirect({ animal: 'dairy_cattle', region: 'north_america', headcount: 1, system: 'uncovered_anaerobic_lagoon', climate: 'wet' });
+    expect(e.breakdown!.leaching).toBe(0);
+    expect(e.breakdown!.volatilisation).toBeGreaterThan(0);
+  });
+
+  it('8. climate omitted → throws; headcount 0 → 0; negative → throws', () => {
+    // @ts-expect-error climate is required
+    expect(() => estimateManureN2OIndirect({ animal: 'dairy_cattle', region: 'north_america', headcount: 1, system: 'solid_storage' })).toThrow();
+    const e0 = estimateManureN2OIndirect({ animal: 'dairy_cattle', region: 'north_america', headcount: 0, system: 'solid_storage', climate: 'wet' });
+    expect(e0.emissions).toBe(0);
+    expect(() => estimateManureN2OIndirect({ animal: 'dairy_cattle', region: 'north_america', headcount: -1, system: 'solid_storage', climate: 'wet' })).toThrow();
   });
 });

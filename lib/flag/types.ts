@@ -49,6 +49,8 @@ export interface EmissionEstimate {
   gas: 'CH4' | 'N2O' | 'CO2';
   factor: import('./params').EmissionFactor;   // provenance travels with the estimate
   basis: string;
+  // Optional sub-amounts (indirect N2O splits into volatilisation + leaching).
+  breakdown?: { volatilisation: number; leaching: number };
 }
 
 // The whole land-sector inventory — three categories always distinct.
