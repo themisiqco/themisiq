@@ -9,8 +9,8 @@
 // Manure, fertiliser, and LUC estimators are SEPARATE later tasks.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { ENTERIC_CATTLE, ENTERIC_OTHER, FLAG_GWP_AR6, MANURE_VS, MANURE_WEIGHT, MANURE_FACTOR, SYSTEM_VALIDITY } from './params';
-import type { EmissionFactor, ManureSpecies, ManureSubcategory, ManureSystem, ManureClimate, ManureActivityTable } from './params';
+import { ENTERIC_CATTLE, ENTERIC_OTHER, FLAG_GWP_AR6, MANURE_VS, MANURE_WEIGHT, MANURE_FACTOR, SYSTEM_VALIDITY, MANURE_LIQUID_FACTOR, LIQUID_SYSTEM_VALIDITY } from './params';
+import type { EmissionFactor, ManureSpecies, ManureSubcategory, ManureSystem, ManureClimate, ManureClimateZone, ManureLiquidSystem, ManureActivityTable } from './params';
 import type { EmissionEstimate } from './types';
 
 // Cattle & buffalo are region-keyed (Table 10.11); everything else is global (Table 10.10).
@@ -71,13 +71,13 @@ function classifyDeveloped(region: string): 'developed' | 'developing' {
   return DEVELOPED_REGIONS.includes(region) ? 'developed' : 'developing';
 }
 
-// Productivity default (footnote 1): developed → high, developing → low. Cattle/buffalo keep
-// their M1 'low' default (unchanged). Overridable via the caller's `productivity`.
-function defaultProductivity(animal: ManureSpecies, region: string): 'high' | 'low' {
-  if (animal === 'dairy_cattle' || animal === 'other_cattle' || animal === 'buffalo') {
-    return 'low'; // unchanged from M1
-  }
-  return classifyDeveloped(region) === 'developed' ? 'high' : 'low';
+// Productivity default = LOW for ALL species, regions, and systems (dry AND liquid). The
+// Table 10.14 high/low split is a Tier 1a construct ("omitted if using a simple Tier 1
+// approach"); simple Tier 1 uses the conservative low-productivity EFs. HIGH is an explicit
+// Tier 1a opt-in the caller chooses via `productivity`. Buffalo is force-routed to
+// other_cattle LOW in the factor resolvers (footnote 6) regardless.
+function defaultProductivity(): 'high' | 'low' {
+  return 'low';
 }
 
 // VS/weight lookup across all region-resolution strategies:
@@ -162,26 +162,71 @@ function resolveManureFactor(
     : base;
 }
 
+// Liquid systems (M3a+). Distinct from dry systems: they use the 10-zone climateZone.
+const LIQUID_SYSTEMS: readonly ManureLiquidSystem[] = ['uncovered_anaerobic_lagoon'];
+function isLiquid(system: ManureSystem | ManureLiquidSystem): system is ManureLiquidSystem {
+  return (LIQUID_SYSTEMS as readonly string[]).includes(system);
+}
+
+// Resolve the Table 10.14 liquid CH4 factor (10-zone). Poultry LOW → the all-systems 2.4
+// scalar (applies to liquid too). Buffalo → other_cattle.low liquid factors (footnote 6).
+function resolveLiquidFactor(
+  animal: ManureSpecies,
+  productivity: 'high' | 'low',
+  liquidSystem: ManureLiquidSystem,
+  climateZone: ManureClimateZone,
+): EmissionFactor {
+  if (animal === 'poultry') {
+    if (productivity === 'low') return MANURE_FACTOR.poultry.low; // all-systems 2.4, even for lagoon
+    const cz = MANURE_LIQUID_FACTOR.poultry.high[liquidSystem]?.[climateZone];
+    if (!cz) throw new Error(`manure CH4: ${liquidSystem} not applicable for poultry (IPCC Table 10.14); check input`);
+    return cz;
+  }
+  if (animal === 'dairy_cattle' || animal === 'other_cattle' || animal === 'swine' || animal === 'buffalo') {
+    const isBuffalo = animal === 'buffalo';
+    const factorSpecies: 'dairy_cattle' | 'other_cattle' | 'swine' = isBuffalo ? 'other_cattle' : animal;
+    const factorProd: 'high' | 'low' = isBuffalo ? 'low' : productivity;
+    const cz = MANURE_LIQUID_FACTOR[factorSpecies][factorProd][liquidSystem]?.[climateZone];
+    if (!cz) throw new Error(`manure CH4: ${liquidSystem} not applicable for ${animal} (IPCC Table 10.14); check input`);
+    return isBuffalo
+      ? { ...cz, note: 'buffalo uses other_cattle low-productivity factors (Table 10.14 footnote 6)' }
+      : cz;
+  }
+  // sheep/goats/horses/mules_asses/camels — no liquid systems (already blocked by validity).
+  throw new Error(`manure CH4: ${liquidSystem} not applicable for ${animal} (IPCC Table 10.14); check input`);
+}
+
 // Manure CH4 for one line (tCO2e). Cattle/buffalo use a species regional Mean for VS/weight;
-// swine/poultry use a per-sub-category regional value. Fails loud for any inapplicable
-// (species, system) combo or any species/region without a verified VS/weight — never guesses.
+// swine/poultry use a per-sub-category regional value. Dry systems use the 3-zone `climate`;
+// liquid systems use the 10-zone `climateZone`. Fails loud for any inapplicable (species,
+// system) combo, wrong/missing climate vocabulary, or unverified VS/weight — never guesses.
 export function estimateManureCH4(input: {
   animal: ManureSpecies;
   headcount: number;
-  region: string;                     // required — VS & weight are regional
-  system: ManureSystem;
-  climate?: ManureClimate;            // required for climate-keyed systems
-  productivity?: 'high' | 'low';      // default: cattle/buffalo 'low'; swine/poultry region-based
-  subcategory?: ManureSubcategory;    // REQUIRED for swine/poultry; cattle/buffalo ignore it
+  region: string;                          // required — VS & weight are regional
+  system: ManureSystem | ManureLiquidSystem;
+  climate?: ManureClimate;                 // required for climate-keyed DRY systems
+  climateZone?: ManureClimateZone;         // required for LIQUID systems (10-zone)
+  productivity?: 'high' | 'low';           // default: cattle/buffalo 'low'; others region-based
+  subcategory?: ManureSubcategory;         // REQUIRED for swine/poultry; cattle/buffalo ignore it
 }): EmissionEstimate {
-  const { animal, headcount, region, system, climate, subcategory } = input;
+  const { animal, headcount, region, system, climate, climateZone, subcategory } = input;
 
   if (headcount < 0) {
     throw new Error(`manure: headcount must be >= 0 (animal ${animal}, got ${headcount})`);
   }
 
-  // System applicability per species — fail loud on inapplicable combos (e.g. poultry pasture).
-  if (!SYSTEM_VALIDITY[animal].includes(system)) {
+  const liquid = isLiquid(system);
+
+  // System applicability per species — fail loud (e.g. poultry pasture, sheep lagoon).
+  if (liquid) {
+    if (!LIQUID_SYSTEM_VALIDITY[animal].includes(system)) {
+      throw new Error(`manure CH4: ${system} not applicable for ${animal} (IPCC Table 10.14); check input`);
+    }
+    if (!climateZone) {
+      throw new Error(`manure CH4: climateZone (10-zone) required for liquid system ${system}; refusing to estimate`);
+    }
+  } else if (!SYSTEM_VALIDITY[animal].includes(system)) {
     throw new Error(`manure CH4: system ${system} not applicable for ${animal} (IPCC Table 10.14); check input`);
   }
 
@@ -190,7 +235,7 @@ export function estimateManureCH4(input: {
     throw new Error(`manure CH4: subcategory required for ${animal}; refusing to estimate`);
   }
 
-  const productivity = input.productivity ?? defaultProductivity(animal, region);
+  const productivity = input.productivity ?? defaultProductivity();
 
   const vsFactor = lookupActivity(MANURE_VS, animal, subcategory, region);
   const wtFactor = lookupActivity(MANURE_WEIGHT, animal, subcategory, region);
@@ -198,20 +243,29 @@ export function estimateManureCH4(input: {
     throw new Error(`manure: no verified IPCC VS/weight for ${animal}${subcategory ? '/' + subcategory : ''} in region ${region}; refusing to estimate`);
   }
 
-  const factor = resolveManureFactor(animal, productivity, system, climate);
+  // Dry climate-keyed systems still require `climate` (the needClimate throw inside
+  // resolveManureFactor fires if it is missing — so a climateZone passed to a dry system
+  // never silently substitutes for the 3-zone climate).
+  const factor = isLiquid(system)
+    ? resolveLiquidFactor(animal, productivity, system, climateZone as ManureClimateZone)
+    : resolveManureFactor(animal, productivity, system, climate);
 
   // VS_annual = VS_mean × weight_mean / 1000 × 365  (kg VS/head/yr).
   const vsAnnual = ((vsFactor.value * wtFactor.value) / 1000) * 365;
   // tCO2e = head × VS_annual × factor(gCH4/kgVS) × GWP / 1e6  (the /1e6 folds both /1000s).
   const emissions = (headcount * vsAnnual * factor.value * FLAG_GWP_AR6.CH4_biogenic) / 1e6;
 
+  // Tier 1a (explicit high-productivity opt-in) vs simple Tier 1 (low-productivity default).
+  const tierLabel = productivity === 'high'
+    ? 'Tier 1a manure CH4 (high-productivity, caller-specified)'
+    : 'simple Tier 1 manure CH4 (low-productivity default)';
+  const ctx = isLiquid(system) ? ` (liquid, ${climateZone})` : subcategory ? ` (${subcategory})` : '';
+
   return {
     emissions,
     dataQuality: 'secondary',
     gas: 'CH4',
     factor,
-    basis: subcategory
-      ? `IPCC 2019 Tier 1 manure CH4 (${subcategory}), screening-grade`
-      : 'IPCC 2019 Tier 1 manure CH4 (screening-grade default)',
+    basis: `IPCC 2019 ${tierLabel}${ctx}, screening-grade`,
   };
 }

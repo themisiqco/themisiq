@@ -219,24 +219,24 @@ describe('estimateManureCH4 — IPCC 2019 Tier 1 manure CH4 (biogenic GWP 27.0)'
 });
 
 describe('estimateManureCH4 — swine & poultry (M2a)', () => {
-  it('swine finishing NA (→high) temperate solid_storage, 100 head, factor 12.1', () => {
+  it('swine finishing NA, HIGH (Tier 1a explicit) temperate solid_storage, 100 head, factor 12.1', () => {
     // VS_annual = 3.9 × 61 / 1000 × 365 = 86.8335 (NOT 86.8635 — brief's intermediate slipped) ;
-    // 100 × 86.8335 × 12.1 × 27 / 1e6 = 2.836850445. Brief's "0.2838 for 100 head" = the 10-head value.
-    const e = estimateManureCH4({ animal: 'swine', subcategory: 'finishing', headcount: 100, region: 'north_america', system: 'solid_storage', climate: 'temperate' });
+    // 100 × 86.8335 × 12.1 × 27 / 1e6 = 2.836850445. HIGH is now an explicit Tier 1a opt-in.
+    const e = estimateManureCH4({ animal: 'swine', subcategory: 'finishing', headcount: 100, region: 'north_america', system: 'solid_storage', climate: 'temperate', productivity: 'high' });
     expect(e.emissions).toBeCloseTo(2.836850445, 6);
     expect(e.factor.value).toBe(12.1);
     expect(e.dataQuality).toBe('secondary');
     expect(e.gas).toBe('CH4');
     expect(e.factor.source).toContain('Table 10.14');
-    // 10 head → 0.28368 (≈ the brief's stated 0.284)
-    const e10 = estimateManureCH4({ animal: 'swine', subcategory: 'finishing', headcount: 10, region: 'north_america', system: 'solid_storage', climate: 'temperate' });
+    // 10 head → 0.28368
+    const e10 = estimateManureCH4({ animal: 'swine', subcategory: 'finishing', headcount: 10, region: 'north_america', system: 'solid_storage', climate: 'temperate', productivity: 'high' });
     expect(e10.emissions).toBeCloseTo(0.2836850445, 6);
     expect(e10.emissions).toBeCloseTo(0.284, 3);
   });
 
-  it('poultry broilers NA (→high) warm solid_storage, 10000 head, factor 13.1', () => {
+  it('poultry broilers NA, HIGH (Tier 1a explicit) warm solid_storage, 10000 head, factor 13.1', () => {
     // VS 16.8 × wt 1.4 /1000 ×365 = 8.5848 ; ×10000 × 13.1 × 27 /1e6 ≈ 30.36
-    const e = estimateManureCH4({ animal: 'poultry', subcategory: 'broilers', headcount: 10000, region: 'north_america', system: 'solid_storage', climate: 'warm' });
+    const e = estimateManureCH4({ animal: 'poultry', subcategory: 'broilers', headcount: 10000, region: 'north_america', system: 'solid_storage', climate: 'warm', productivity: 'high' });
     expect(e.emissions).toBeCloseTo(30.35, 1);
     expect(e.factor.value).toBe(13.1);
   });
@@ -269,10 +269,11 @@ describe('estimateManureCH4 — swine & poultry (M2a)', () => {
     expect(() => estimateManureCH4({ animal: 'swine', subcategory: 'finishing', headcount: 1, region: 'north_america', system: 'solid_storage' })).toThrow();
   });
 
-  it('headcount 0 → 0 no throw; negative → throws', () => {
+  it('headcount 0 → 0 no throw; negative → throws (default LOW factor 7.8)', () => {
+    // No explicit productivity → simple Tier 1 low default → swine.low.solid_storage.temperate = 7.8.
     const e = estimateManureCH4({ animal: 'swine', subcategory: 'finishing', headcount: 0, region: 'north_america', system: 'solid_storage', climate: 'temperate' });
     expect(e.emissions).toBe(0);
-    expect(e.factor.value).toBe(12.1);
+    expect(e.factor.value).toBe(7.8);
     expect(() => estimateManureCH4({ animal: 'poultry', subcategory: 'hens', headcount: -1, region: 'africa', system: 'dry_lot' })).toThrow();
   });
 
@@ -284,9 +285,9 @@ describe('estimateManureCH4 — swine & poultry (M2a)', () => {
 });
 
 describe('estimateManureCH4 — sheep/goats/horses/mules_asses/camels (M2b)', () => {
-  it('1. sheep developed (→high) temperate solid_storage, 1000 head, factor 5.1', () => {
+  it('1. sheep developed, HIGH (Tier 1a explicit) temperate solid_storage, 1000 head, factor 5.1', () => {
     // VS_annual = 8.2 × 40 / 1000 × 365 = 119.72 ; 1000 × 119.72 × 5.1 × 27 / 1e6 = 16.485444
-    const e = estimateManureCH4({ animal: 'sheep', headcount: 1000, region: 'developed', system: 'solid_storage', climate: 'temperate' });
+    const e = estimateManureCH4({ animal: 'sheep', headcount: 1000, region: 'developed', system: 'solid_storage', climate: 'temperate', productivity: 'high' });
     expect(e.emissions).toBeCloseTo(16.49, 1);
     expect(e.factor.value).toBe(5.1);
     expect(e.dataQuality).toBe('secondary');
@@ -343,16 +344,109 @@ describe('estimateManureCH4 — sheep/goats/horses/mules_asses/camels (M2b)', ()
     expect(() => estimateManureCH4({ animal: 'sheep', headcount: -1, region: 'developed', system: 'solid_storage', climate: 'temperate' })).toThrow();
   });
 
-  it('9. (brief truncated) region resolution: 9-region key maps to developed/developing', () => {
-    // goats: developed wt 40, developing wt 24 → different VS_annual, so different emissions.
+  it('9. region resolution: 9-region key maps VS/weight two-way (default low factor for both)', () => {
+    // Under the unified LOW default, factor is 3.5 for BOTH regions; but VS/weight two-way
+    // resolution still differs (developed 9/40 vs developing 10.4/24) → emissions differ.
     const dev = estimateManureCH4({ animal: 'goats', headcount: 100, region: 'western_europe', system: 'solid_storage', climate: 'temperate' });
     const devg = estimateManureCH4({ animal: 'goats', headcount: 100, region: 'africa', system: 'solid_storage', climate: 'temperate' });
-    // western_europe → developed → high (factor 4.8); africa → developing → low (factor 3.5)
-    expect(dev.factor.value).toBe(4.8);
+    expect(dev.factor.value).toBe(3.5);   // simple Tier 1 low default (was 4.8 under old developed→high)
     expect(devg.factor.value).toBe(3.5);
-    expect(dev.emissions).not.toBe(devg.emissions);
-    // provenance travels
+    expect(dev.emissions).not.toBe(devg.emissions); // VS/weight two-way still differ
     expect(dev.factor.unit).toBe('gCH4/kgVS');
     expect(dev.factor.tier).toBe(1);
+    // explicit high still selects the high column (Tier 1a)
+    const devHigh = estimateManureCH4({ animal: 'goats', headcount: 100, region: 'western_europe', system: 'solid_storage', climate: 'temperate', productivity: 'high' });
+    expect(devHigh.factor.value).toBe(4.8);
+  });
+});
+
+describe('estimateManureCH4 — liquid: uncovered_anaerobic_lagoon (M3a, 10-zone)', () => {
+  it('1. swine finishing NA lagoon tropical_wet — HIGH explicit → 241.2; default LOW → 155.4', () => {
+    // HIGH (Tier 1a): VS_annual 86.8335 ; 100 × 86.8335 × 241.2 × 27 / 1e6 = 56.549
+    const hi = estimateManureCH4({ animal: 'swine', subcategory: 'finishing', headcount: 100, region: 'north_america', system: 'uncovered_anaerobic_lagoon', climateZone: 'tropical_wet', productivity: 'high' });
+    expect(hi.emissions).toBeCloseTo(56.55, 1);
+    expect(hi.factor.value).toBe(241.2);
+    expect(hi.factor.source).toContain('Table 10.14');
+    // DEFAULT (no productivity) → simple Tier 1 low → swine.low lagoon tropical_wet = 155.4
+    // 100 × 86.8335 × 155.4 × 27 / 1e6 = 36.4336
+    const lo = estimateManureCH4({ animal: 'swine', subcategory: 'finishing', headcount: 100, region: 'north_america', system: 'uncovered_anaerobic_lagoon', climateZone: 'tropical_wet' });
+    expect(lo.emissions).toBeCloseTo(36.43, 1);
+    expect(lo.factor.value).toBe(155.4);
+  });
+
+  it('2. dairy NA cool_temp_moist lagoon, 1 head, HIGH explicit → factor 96.5', () => {
+    // VS_annual = 9.2 × 650 / 1000 × 365 = 2182.7 ; 2182.7 × 96.5 × 27 / 1e6 = 5.687
+    const e = estimateManureCH4({ animal: 'dairy_cattle', headcount: 1, region: 'north_america', system: 'uncovered_anaerobic_lagoon', climateZone: 'cool_temp_moist', productivity: 'high' });
+    expect(e.emissions).toBeCloseTo(5.687, 2);
+    expect(e.factor.value).toBe(96.5);
+  });
+
+  it('3. poultry broilers Africa (→low) tropical_dry lagoon → factor 2.4 (poultry-LP, NOT lagoon value)', () => {
+    // VS 15.9 × wt 0.8 /1000 ×365 = 4.6428 ; 1000 × 4.6428 × 2.4 × 27 / 1e6 = 0.30085
+    const e = estimateManureCH4({ animal: 'poultry', subcategory: 'broilers', headcount: 1000, region: 'africa', system: 'uncovered_anaerobic_lagoon', climateZone: 'tropical_dry' });
+    expect(e.emissions).toBeCloseTo(0.301, 3);
+    expect(e.factor.value).toBe(2.4);
+  });
+
+  it('4. other_cattle LP lagoon cool_temp_moist == dairy LP lagoon (both 52.3)', () => {
+    const other = estimateManureCH4({ animal: 'other_cattle', headcount: 1, region: 'north_america', system: 'uncovered_anaerobic_lagoon', climateZone: 'cool_temp_moist', productivity: 'low' });
+    const dairy = estimateManureCH4({ animal: 'dairy_cattle', headcount: 1, region: 'north_america', system: 'uncovered_anaerobic_lagoon', climateZone: 'cool_temp_moist', productivity: 'low' });
+    expect(other.factor.value).toBe(52.3);
+    expect(dairy.factor.value).toBe(52.3);
+  });
+
+  it('5. buffalo western_europe warm_temp_dry lagoon → other_cattle.low factor 66.2 (footnote 6), buffalo own VS/wt', () => {
+    // buffalo VS 7.7 × wt 509 /1000 ×365 = 1430.5445 ; 10 × 1430.5445 × 66.2 × 27 / 1e6 = 25.564
+    const e = estimateManureCH4({ animal: 'buffalo', headcount: 10, region: 'western_europe', system: 'uncovered_anaerobic_lagoon', climateZone: 'warm_temp_dry' });
+    expect(e.emissions).toBeCloseTo(25.6, 1);
+    expect(e.factor.value).toBe(66.2);
+    expect(e.factor.note).toMatch(/footnote 6/);
+  });
+
+  it('6. sheep + lagoon → throws (no liquid systems for sheep)', () => {
+    expect(() => estimateManureCH4({ animal: 'sheep', headcount: 1, region: 'developed', system: 'uncovered_anaerobic_lagoon', climateZone: 'cool_temp_moist' })).toThrow();
+  });
+
+  it('7. lagoon with NO climateZone → throws; dry solid_storage still works with 3-zone climate', () => {
+    expect(() => estimateManureCH4({ animal: 'dairy_cattle', headcount: 1, region: 'north_america', system: 'uncovered_anaerobic_lagoon' })).toThrow();
+    // dry path unchanged: dairy NA solid_storage temperate HP, 1 head → 0.37717056
+    const dry = estimateManureCH4({ animal: 'dairy_cattle', headcount: 1, region: 'north_america', system: 'solid_storage', climate: 'temperate', productivity: 'high' });
+    expect(dry.emissions).toBeCloseTo(0.37717056, 8);
+    expect(dry.factor.value).toBe(6.4);
+  });
+
+  it('8. headcount 0 → 0 (no throw, default LOW factor 52.3); negative → throws', () => {
+    // No explicit productivity → simple Tier 1 low → dairy.low lagoon cool_temp_moist = 52.3.
+    const e0 = estimateManureCH4({ animal: 'dairy_cattle', headcount: 0, region: 'north_america', system: 'uncovered_anaerobic_lagoon', climateZone: 'cool_temp_moist' });
+    expect(e0.emissions).toBe(0);
+    expect(e0.factor.value).toBe(52.3);
+    expect(() => estimateManureCH4({ animal: 'dairy_cattle', headcount: -1, region: 'north_america', system: 'uncovered_anaerobic_lagoon', climateZone: 'cool_temp_moist' })).toThrow();
+  });
+});
+
+describe('estimateManureCH4 — productivity default = simple Tier 1 low (Tier 1a is opt-in)', () => {
+  it('dairy NA solid_storage temperate, NO productivity → LOW factor 3.5 + simple-Tier-1 basis', () => {
+    const e = estimateManureCH4({ animal: 'dairy_cattle', headcount: 1, region: 'north_america', system: 'solid_storage', climate: 'temperate' });
+    expect(e.factor.value).toBe(3.5); // dairy.low.solid_storage.temperate (NOT high 6.4)
+    expect(e.factor.tier).toBe(1);
+    expect(e.basis).toContain('simple Tier 1');
+    expect(e.basis).toContain('low-productivity default');
+  });
+
+  it("dairy NA solid_storage temperate, productivity:'high' → Tier 1a factor 6.4 + Tier-1a basis", () => {
+    const e = estimateManureCH4({ animal: 'dairy_cattle', headcount: 1, region: 'north_america', system: 'solid_storage', climate: 'temperate', productivity: 'high' });
+    expect(e.factor.value).toBe(6.4); // Tier 1a opt-in
+    expect(e.factor.tier).toBe(1);    // shared tier field stays 1; basis carries the 1a distinction
+    expect(e.basis).toContain('Tier 1a');
+    expect(e.basis).toContain('caller-specified');
+  });
+
+  it('swine developed tropical_wet lagoon: default LOW 155.4 vs explicit HIGH 241.2', () => {
+    const lo = estimateManureCH4({ animal: 'swine', subcategory: 'finishing', headcount: 1, region: 'north_america', system: 'uncovered_anaerobic_lagoon', climateZone: 'tropical_wet' });
+    const hi = estimateManureCH4({ animal: 'swine', subcategory: 'finishing', headcount: 1, region: 'north_america', system: 'uncovered_anaerobic_lagoon', climateZone: 'tropical_wet', productivity: 'high' });
+    expect(lo.factor.value).toBe(155.4);
+    expect(hi.factor.value).toBe(241.2);
+    expect(lo.basis).toContain('simple Tier 1');
+    expect(hi.basis).toContain('Tier 1a');
   });
 });

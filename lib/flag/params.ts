@@ -97,6 +97,13 @@ export type ManureSubcategory = 'finishing' | 'breeding' | 'hens' | 'pullets' | 
 export type ManureSystem =
   | 'solid_storage' | 'dry_lot' | 'daily_spread' | 'pasture_range_paddock' | 'burned_for_fuel';
 export type ManureClimate = 'cool' | 'temperate' | 'warm';
+// Liquid systems use a SEPARATE, finer 10-zone climate vocabulary (Table 10.14), distinct
+// from the dry-system 3-zone `ManureClimate`.
+export type ManureClimateZone =
+  | 'cool_temp_moist' | 'cool_temp_dry' | 'boreal_moist' | 'boreal_dry'
+  | 'warm_temp_moist' | 'warm_temp_dry'
+  | 'tropical_montane' | 'tropical_wet' | 'tropical_moist' | 'tropical_dry';
+export type ManureLiquidSystem = 'uncovered_anaerobic_lagoon'; // more added in M3b/M3c
 
 // Activity-data keying differs by species (Table 10.14 footnote 1 region resolution):
 //   cattle/buffalo   → [region] (9-region)
@@ -376,6 +383,56 @@ export const SYSTEM_VALIDITY: Record<ManureSpecies, ManureSystem[]> = {
   horses:       ['solid_storage', 'dry_lot', 'pasture_range_paddock'],
   mules_asses:  ['solid_storage', 'dry_lot', 'pasture_range_paddock'],
   camels:       ['solid_storage', 'dry_lot', 'pasture_range_paddock'],
+};
+
+// ── Liquid manure systems (M3a) — Table 10.14, gCH4/kgVS, keyed by the 10-zone climate ──
+// [species][productivity][liquidSystem][climateZone]. Zone order in each source array:
+const ZONE_ORDER: ManureClimateZone[] = [
+  'cool_temp_moist', 'cool_temp_dry', 'boreal_moist', 'boreal_dry',
+  'warm_temp_moist', 'warm_temp_dry', 'tropical_montane', 'tropical_wet', 'tropical_moist', 'tropical_dry',
+];
+// Build a fully-keyed, self-citing climate-zone factor set from a 10-value source array.
+const lf = (arr: number[]): Record<ManureClimateZone, EmissionFactor> => {
+  const out = {} as Record<ManureClimateZone, EmissionFactor>;
+  ZONE_ORDER.forEach((z, i) => { out[z] = mf(arr[i]); });
+  return out;
+};
+
+type ClimateZoneFactors = Record<ManureClimateZone, EmissionFactor>;
+type LiquidSystemFactors = Partial<Record<ManureLiquidSystem, ClimateZoneFactors>>;
+export interface ManureLiquidFactorTable {
+  dairy_cattle: { high: LiquidSystemFactors; low: LiquidSystemFactors };
+  other_cattle: { high: LiquidSystemFactors; low: LiquidSystemFactors };
+  swine: { high: LiquidSystemFactors; low: LiquidSystemFactors };
+  poultry: { high: LiquidSystemFactors }; // poultry LOW routes to the all-systems 2.4 scalar
+}
+export const MANURE_LIQUID_FACTOR: ManureLiquidFactorTable = {
+  dairy_cattle: {
+    high: { uncovered_anaerobic_lagoon: lf([96.5, 107.7, 80.4, 78.8, 117.4, 122.2, 122.2, 128.6, 128.6, 128.6]) },
+    low:  { uncovered_anaerobic_lagoon: lf([52.3, 58.4, 43.6, 42.7, 63.6, 66.2, 66.2, 69.7, 69.7, 69.7]) },
+  },
+  other_cattle: {
+    high: { uncovered_anaerobic_lagoon: lf([72.4, 80.8, 60.3, 59.1, 88.0, 91.7, 91.7, 96.5, 96.5, 96.5]) },
+    low:  { uncovered_anaerobic_lagoon: lf([52.3, 58.4, 43.6, 42.7, 63.6, 66.2, 66.2, 69.7, 69.7, 69.7]) },
+  },
+  swine: {
+    high: { uncovered_anaerobic_lagoon: lf([180.9, 202.0, 150.8, 147.7, 220.1, 229.1, 229.1, 241.2, 241.2, 241.2]) },
+    low:  { uncovered_anaerobic_lagoon: lf([116.6, 130.2, 97.2, 95.2, 141.8, 147.7, 147.7, 155.4, 155.4, 155.4]) },
+  },
+  poultry: {
+    high: { uncovered_anaerobic_lagoon: lf([156.8, 175.1, 130.7, 128.0, 190.7, 198.6, 198.6, 209.0, 209.0, 209.0]) },
+    // poultry LOW → no lagoon array; routes to the All-Systems 2.4 scalar (see estimate.ts).
+  },
+};
+
+// Which species support which liquid systems (anything else THROWS).
+export const LIQUID_SYSTEM_VALIDITY: Record<ManureSpecies, ManureLiquidSystem[]> = {
+  dairy_cattle: ['uncovered_anaerobic_lagoon'],
+  other_cattle: ['uncovered_anaerobic_lagoon'],
+  buffalo:      ['uncovered_anaerobic_lagoon'], // via other_cattle.low (footnote 6)
+  swine:        ['uncovered_anaerobic_lagoon'],
+  poultry:      ['uncovered_anaerobic_lagoon'],
+  sheep: [], goats: [], horses: [], mules_asses: [], camels: [], // no liquid systems
 };
 
 // (Fertiliser and LUC factor sets — enteric's/manure's siblings — are SEPARATE later
