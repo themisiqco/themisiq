@@ -450,3 +450,63 @@ describe('estimateManureCH4 — productivity default = simple Tier 1 low (Tier 1
     expect(hi.basis).toContain('Tier 1a');
   });
 });
+
+describe('estimateManureCH4 — liquid: slurry/pit >1mo & <1mo (M3b, 10-zone)', () => {
+  it('1. dairy NA default-low tropical_wet gt_1_month, 1 head → factor 66.2', () => {
+    // VS_annual 2182.7 ; 2182.7 × 66.2 × 27 / 1e6 = 3.9014
+    const e = estimateManureCH4({ animal: 'dairy_cattle', headcount: 1, region: 'north_america', system: 'liquid_slurry_pit_gt_1_month', climateZone: 'tropical_wet' });
+    expect(e.emissions).toBeCloseTo(3.901, 2);
+    expect(e.factor.value).toBe(66.2);
+    expect(e.factor.source).toContain('Table 10.14');
+  });
+
+  it('2. swine finishing NA tropical_dry lt_1_month, HIGH explicit, 100 head → factor 126.6', () => {
+    // VS_annual 86.8335 ; 100 × 86.8335 × 126.6 × 27 / 1e6 = 29.681
+    const e = estimateManureCH4({ animal: 'swine', subcategory: 'finishing', headcount: 100, region: 'north_america', system: 'liquid_slurry_pit_lt_1_month', climateZone: 'tropical_dry', productivity: 'high' });
+    expect(e.emissions).toBeCloseTo(29.68, 1);
+    expect(e.factor.value).toBe(126.6);
+  });
+
+  it('3. swine finishing NA tropical_dry lt_1_month, default LOW, 100 head → factor 81.6', () => {
+    // 100 × 86.8335 × 81.6 × 27 / 1e6 = 19.131
+    const e = estimateManureCH4({ animal: 'swine', subcategory: 'finishing', headcount: 100, region: 'north_america', system: 'liquid_slurry_pit_lt_1_month', climateZone: 'tropical_dry' });
+    expect(e.emissions).toBeCloseTo(19.13, 1);
+    expect(e.factor.value).toBe(81.6);
+  });
+
+  it('4. dairy + lt_1_month → throws (no <1 month row for dairy)', () => {
+    expect(() => estimateManureCH4({ animal: 'dairy_cattle', headcount: 1, region: 'north_america', system: 'liquid_slurry_pit_lt_1_month', climateZone: 'tropical_dry' })).toThrow();
+  });
+
+  it('5. buffalo WE warm_temp_dry gt_1_month → other_cattle.low factor 35.7 (footnote 6), 10 head', () => {
+    // buffalo VS 7.7 × wt 509 /1000 ×365 = 1430.5445 ; 10 × 1430.5445 × 35.7 × 27 / 1e6 = 13.789
+    const e = estimateManureCH4({ animal: 'buffalo', headcount: 10, region: 'western_europe', system: 'liquid_slurry_pit_gt_1_month', climateZone: 'warm_temp_dry' });
+    expect(e.emissions).toBeCloseTo(13.8, 1);
+    expect(e.factor.value).toBe(35.7);
+    expect(e.factor.note).toMatch(/footnote 6/);
+  });
+
+  it('6. buffalo + lt_1_month → throws (no other_cattle source row)', () => {
+    expect(() => estimateManureCH4({ animal: 'buffalo', headcount: 1, region: 'western_europe', system: 'liquid_slurry_pit_lt_1_month', climateZone: 'warm_temp_dry' })).toThrow();
+  });
+
+  it('7. sheep + gt_1_month throws; poultry LOW + gt_1_month → 2.4 (not the gt_1_month value)', () => {
+    expect(() => estimateManureCH4({ animal: 'sheep', headcount: 1, region: 'developed', system: 'liquid_slurry_pit_gt_1_month', climateZone: 'cool_temp_moist' })).toThrow();
+    const p = estimateManureCH4({ animal: 'poultry', subcategory: 'hens', headcount: 1, region: 'africa', system: 'liquid_slurry_pit_gt_1_month', climateZone: 'tropical_wet' });
+    expect(p.factor.value).toBe(2.4);
+  });
+
+  it('8. other_cattle.low gt_1_month == dairy.low gt_1_month at cool_temp_moist (both 18.3)', () => {
+    const other = estimateManureCH4({ animal: 'other_cattle', headcount: 1, region: 'north_america', system: 'liquid_slurry_pit_gt_1_month', climateZone: 'cool_temp_moist', productivity: 'low' });
+    const dairy = estimateManureCH4({ animal: 'dairy_cattle', headcount: 1, region: 'north_america', system: 'liquid_slurry_pit_gt_1_month', climateZone: 'cool_temp_moist', productivity: 'low' });
+    expect(other.factor.value).toBe(18.3);
+    expect(dairy.factor.value).toBe(18.3);
+  });
+
+  it('9. gt_1_month with no climateZone → throws; headcount 0 → 0', () => {
+    expect(() => estimateManureCH4({ animal: 'dairy_cattle', headcount: 1, region: 'north_america', system: 'liquid_slurry_pit_gt_1_month' })).toThrow();
+    const e0 = estimateManureCH4({ animal: 'dairy_cattle', headcount: 0, region: 'north_america', system: 'liquid_slurry_pit_gt_1_month', climateZone: 'tropical_wet' });
+    expect(e0.emissions).toBe(0);
+    expect(e0.factor.value).toBe(66.2); // default low
+  });
+});

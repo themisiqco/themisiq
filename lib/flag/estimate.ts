@@ -163,7 +163,7 @@ function resolveManureFactor(
 }
 
 // Liquid systems (M3a+). Distinct from dry systems: they use the 10-zone climateZone.
-const LIQUID_SYSTEMS: readonly ManureLiquidSystem[] = ['uncovered_anaerobic_lagoon'];
+const LIQUID_SYSTEMS: readonly ManureLiquidSystem[] = ['uncovered_anaerobic_lagoon', 'liquid_slurry_pit_gt_1_month', 'liquid_slurry_pit_lt_1_month'];
 function isLiquid(system: ManureSystem | ManureLiquidSystem): system is ManureLiquidSystem {
   return (LIQUID_SYSTEMS as readonly string[]).includes(system);
 }

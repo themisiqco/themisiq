@@ -103,7 +103,10 @@ export type ManureClimateZone =
   | 'cool_temp_moist' | 'cool_temp_dry' | 'boreal_moist' | 'boreal_dry'
   | 'warm_temp_moist' | 'warm_temp_dry'
   | 'tropical_montane' | 'tropical_wet' | 'tropical_moist' | 'tropical_dry';
-export type ManureLiquidSystem = 'uncovered_anaerobic_lagoon'; // more added in M3b/M3c
+export type ManureLiquidSystem =
+  | 'uncovered_anaerobic_lagoon'
+  | 'liquid_slurry_pit_gt_1_month'
+  | 'liquid_slurry_pit_lt_1_month'; // lt_1_month is SWINE-only (Table 10.14)
 
 // Activity-data keying differs by species (Table 10.14 footnote 1 region resolution):
 //   cattle/buffalo   → [region] (9-region)
@@ -408,30 +411,54 @@ export interface ManureLiquidFactorTable {
 }
 export const MANURE_LIQUID_FACTOR: ManureLiquidFactorTable = {
   dairy_cattle: {
-    high: { uncovered_anaerobic_lagoon: lf([96.5, 107.7, 80.4, 78.8, 117.4, 122.2, 122.2, 128.6, 128.6, 128.6]) },
-    low:  { uncovered_anaerobic_lagoon: lf([52.3, 58.4, 43.6, 42.7, 63.6, 66.2, 66.2, 69.7, 69.7, 69.7]) },
+    high: {
+      uncovered_anaerobic_lagoon:   lf([96.5, 107.7, 80.4, 78.8, 117.4, 122.2, 122.2, 128.6, 128.6, 128.6]),
+      liquid_slurry_pit_gt_1_month: lf([33.8, 41.8, 22.5, 22.5, 59.5, 65.9, 94.9, 122.2, 117.4, 119.0]),
+    },
+    low: {
+      uncovered_anaerobic_lagoon:   lf([52.3, 58.4, 43.6, 42.7, 63.6, 66.2, 66.2, 69.7, 69.7, 69.7]),
+      liquid_slurry_pit_gt_1_month: lf([18.3, 22.6, 12.2, 12.2, 32.2, 35.7, 51.4, 66.2, 63.6, 64.5]),
+    },
   },
   other_cattle: {
-    high: { uncovered_anaerobic_lagoon: lf([72.4, 80.8, 60.3, 59.1, 88.0, 91.7, 91.7, 96.5, 96.5, 96.5]) },
-    low:  { uncovered_anaerobic_lagoon: lf([52.3, 58.4, 43.6, 42.7, 63.6, 66.2, 66.2, 69.7, 69.7, 69.7]) },
+    high: {
+      uncovered_anaerobic_lagoon:   lf([72.4, 80.8, 60.3, 59.1, 88.0, 91.7, 91.7, 96.5, 96.5, 96.5]),
+      liquid_slurry_pit_gt_1_month: lf([25.3, 31.4, 16.9, 16.9, 44.6, 49.4, 71.2, 91.7, 88.0, 89.2]),
+    },
+    low: {
+      uncovered_anaerobic_lagoon:   lf([52.3, 58.4, 43.6, 42.7, 63.6, 66.2, 66.2, 69.7, 69.7, 69.7]),
+      liquid_slurry_pit_gt_1_month: lf([18.3, 22.6, 12.2, 12.2, 32.2, 35.7, 51.4, 66.2, 63.6, 64.5]),
+    },
   },
   swine: {
-    high: { uncovered_anaerobic_lagoon: lf([180.9, 202.0, 150.8, 147.7, 220.1, 229.1, 229.1, 241.2, 241.2, 241.2]) },
-    low:  { uncovered_anaerobic_lagoon: lf([116.6, 130.2, 97.2, 95.2, 141.8, 147.7, 147.7, 155.4, 155.4, 155.4]) },
+    high: {
+      uncovered_anaerobic_lagoon:   lf([180.9, 202.0, 150.8, 147.7, 220.1, 229.1, 229.1, 241.2, 241.2, 241.2]),
+      liquid_slurry_pit_gt_1_month: lf([63.3, 78.4, 42.2, 42.2, 111.6, 123.6, 177.9, 229.1, 220.1, 223.1]),
+      liquid_slurry_pit_lt_1_month: lf([18.1, 24.1, 12.1, 12.1, 39.2, 45.2, 75.4, 114.6, 108.5, 126.6]),
+    },
+    low: {
+      uncovered_anaerobic_lagoon:   lf([116.6, 130.2, 97.2, 95.2, 141.8, 147.7, 147.7, 155.4, 155.4, 155.4]),
+      liquid_slurry_pit_gt_1_month: lf([40.8, 50.5, 27.2, 27.2, 71.9, 79.7, 114.6, 147.7, 141.8, 143.8]),
+      liquid_slurry_pit_lt_1_month: lf([11.7, 15.5, 7.8, 7.8, 25.3, 29.1, 48.6, 73.8, 69.9, 81.6]),
+    },
   },
   poultry: {
-    high: { uncovered_anaerobic_lagoon: lf([156.8, 175.1, 130.7, 128.0, 190.7, 198.6, 198.6, 209.0, 209.0, 209.0]) },
-    // poultry LOW → no lagoon array; routes to the All-Systems 2.4 scalar (see estimate.ts).
+    high: {
+      uncovered_anaerobic_lagoon:   lf([156.8, 175.1, 130.7, 128.0, 190.7, 198.6, 198.6, 209.0, 209.0, 209.0]),
+      liquid_slurry_pit_gt_1_month: lf([54.9, 67.9, 36.6, 36.6, 96.7, 107.1, 154.2, 198.6, 190.7, 193.4]),
+    },
+    // poultry LOW → no liquid arrays; routes to the All-Systems 2.4 scalar (see estimate.ts).
   },
 };
 
 // Which species support which liquid systems (anything else THROWS).
 export const LIQUID_SYSTEM_VALIDITY: Record<ManureSpecies, ManureLiquidSystem[]> = {
-  dairy_cattle: ['uncovered_anaerobic_lagoon'],
-  other_cattle: ['uncovered_anaerobic_lagoon'],
-  buffalo:      ['uncovered_anaerobic_lagoon'], // via other_cattle.low (footnote 6)
-  swine:        ['uncovered_anaerobic_lagoon'],
-  poultry:      ['uncovered_anaerobic_lagoon'],
+  dairy_cattle: ['uncovered_anaerobic_lagoon', 'liquid_slurry_pit_gt_1_month'],
+  other_cattle: ['uncovered_anaerobic_lagoon', 'liquid_slurry_pit_gt_1_month'],
+  // buffalo routes to other_cattle.low; lt_1_month has no other_cattle source row → NOT allowed.
+  buffalo:      ['uncovered_anaerobic_lagoon', 'liquid_slurry_pit_gt_1_month'],
+  swine:        ['uncovered_anaerobic_lagoon', 'liquid_slurry_pit_gt_1_month', 'liquid_slurry_pit_lt_1_month'],
+  poultry:      ['uncovered_anaerobic_lagoon', 'liquid_slurry_pit_gt_1_month'],
   sheep: [], goats: [], horses: [], mules_asses: [], camels: [], // no liquid systems
 };
 
