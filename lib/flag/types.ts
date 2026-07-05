@@ -41,6 +41,16 @@ export interface CategoryResult {
   lineCount: number;
 }
 
+// One estimator output — a derived per-line emissions figure with the exact factor
+// (and its provenance) that produced it, so the audit trail travels with the number.
+export interface EmissionEstimate {
+  emissions: number;            // tCO2e
+  dataQuality: 'primary' | 'secondary';
+  gas: 'CH4' | 'N2O' | 'CO2';
+  factor: import('./params').EmissionFactor;   // provenance travels with the estimate
+  basis: string;
+}
+
 // The whole land-sector inventory — three categories always distinct.
 export interface FlagResult {
   landUseChange: CategoryResult;

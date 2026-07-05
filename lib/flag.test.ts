@@ -4,6 +4,7 @@
 // separately and removals are NEVER netted into gross emissions.
 import { describe, it, expect } from 'vitest';
 import { computeFlag } from './flag/engine';
+import { estimateEnteric } from './flag/estimate';
 import type { FlagActivity } from './flag/types';
 
 const line = (over: Partial<FlagActivity>): FlagActivity => ({
@@ -76,5 +77,69 @@ describe('computeFlag — three-category separation + LSRS invariants', () => {
 
   it('gwpBasis passthrough: AR5 → result.gwpBasis AR5', () => {
     expect(computeFlag([], 'AR5').gwpBasis).toBe('AR5');
+  });
+});
+
+describe('estimateEnteric — IPCC 2019 Tier 1 enteric CH4 (biogenic GWP 27.0)', () => {
+  it('NA dairy cow, 1 head → 138 × 27.0 / 1000 = 3.726 tCO2e', () => {
+    const e = estimateEnteric({ animal: 'dairy_cattle', headcount: 1, region: 'north_america' });
+    expect(e.emissions).toBeCloseTo(3.726, 6);
+    expect(e.dataQuality).toBe('secondary');
+    expect(e.gas).toBe('CH4');
+    expect(e.factor.source).toContain('Table 10.11');
+    expect(e.factor.value).toBe(138);
+  });
+
+  it('Indian subcontinent buffalo, 100 head → 100 × 85 × 27.0 / 1000 = 229.5 tCO2e', () => {
+    const e = estimateEnteric({ animal: 'buffalo', headcount: 100, region: 'indian_subcontinent' });
+    expect(e.emissions).toBe(229.5);
+    expect(e.factor.value).toBe(85);
+  });
+
+  it('sheep (low default), 1000 head → 1000 × 5 × 27.0 / 1000 = 135 tCO2e', () => {
+    const e = estimateEnteric({ animal: 'sheep', headcount: 1000 });
+    expect(e.emissions).toBe(135);
+    expect(e.factor.value).toBe(5);
+    expect(e.factor.source).toContain('Table 10.10');
+  });
+
+  it('sheep high productivity, 1000 head → 1000 × 9 × 27.0 / 1000 = 243 tCO2e', () => {
+    const e = estimateEnteric({ animal: 'sheep', headcount: 1000, productivity: 'high' });
+    expect(e.emissions).toBe(243);
+    expect(e.factor.value).toBe(9);
+  });
+
+  it('headcount 0 → 0 tCO2e, no throw, factor provenance still present', () => {
+    const e = estimateEnteric({ animal: 'dairy_cattle', headcount: 0, region: 'north_america' });
+    expect(e.emissions).toBe(0);
+    expect(e.factor.source).toContain('Table 10.11');
+    expect(e.factor.value).toBe(138);
+  });
+
+  it('cattle with NO region → throws (refuses to guess)', () => {
+    expect(() => estimateEnteric({ animal: 'dairy_cattle', headcount: 10 })).toThrow();
+  });
+
+  it('cattle in a region with no buffalo herd (north_america buffalo) → throws', () => {
+    expect(() => estimateEnteric({ animal: 'buffalo', headcount: 10, region: 'north_america' })).toThrow();
+  });
+
+  it('unknown animal → throws', () => {
+    expect(() => estimateEnteric({ animal: 'llama', headcount: 10 })).toThrow();
+  });
+
+  it('negative headcount → throws', () => {
+    expect(() => estimateEnteric({ animal: 'sheep', headcount: -1 })).toThrow();
+  });
+
+  it('provenance: factor carries unit kgCH4/head/yr, tier 1, and a Table 10.10/10.11 source', () => {
+    const cow = estimateEnteric({ animal: 'other_cattle', headcount: 1, region: 'africa' });
+    expect(cow.factor.unit).toBe('kgCH4/head/yr');
+    expect(cow.factor.tier).toBe(1);
+    expect(cow.factor.source).toMatch(/Table 10\.11/);
+    const goat = estimateEnteric({ animal: 'goats', headcount: 1 });
+    expect(goat.factor.unit).toBe('kgCH4/head/yr');
+    expect(goat.factor.tier).toBe(1);
+    expect(goat.factor.source).toMatch(/Table 10\.10/);
   });
 });
