@@ -510,3 +510,68 @@ describe('estimateManureCH4 — liquid: slurry/pit >1mo & <1mo (M3b, 10-zone)', 
     expect(e0.factor.value).toBe(66.2); // default low
   });
 });
+
+describe('estimateManureCH4 — biogas: anaerobic_digestion (M3c, 3-zone + digester quality)', () => {
+  it('1. dairy NA temperate biogas gas_tight, 1 head → factor 3.7', () => {
+    // VS_annual 2182.7 ; 2182.7 × 3.7 × 27 / 1e6 = 0.2181
+    const e = estimateManureCH4({ animal: 'dairy_cattle', headcount: 1, region: 'north_america', system: 'anaerobic_digestion_biogas', climate: 'temperate', digesterQuality: 'gas_tight' });
+    expect(e.emissions).toBeCloseTo(0.218, 3);
+    expect(e.factor.value).toBe(3.7);
+    expect(e.basis).toContain('gas_tight');
+    expect(e.basis).toContain('footnote 8');
+  });
+
+  it('2. dairy NA temperate biogas, NO digesterQuality (default leaky) → factor 9.5 (> gas_tight)', () => {
+    // 2182.7 × 9.5 × 27 / 1e6 = 0.5599
+    const e = estimateManureCH4({ animal: 'dairy_cattle', headcount: 1, region: 'north_america', system: 'anaerobic_digestion_biogas', climate: 'temperate' });
+    expect(e.emissions).toBeCloseTo(0.560, 3);
+    expect(e.factor.value).toBe(9.5);          // inversion: leaky default > gas_tight
+    expect(e.basis).toContain('leaky');
+    expect(e.basis).toContain('conservative default');
+  });
+
+  it('3. swine finishing NA warm biogas (default leaky), 100 head → factor 21.2', () => {
+    // VS_annual 86.8335 ; 100 × 86.8335 × 21.2 × 27 / 1e6 = 4.9703
+    const e = estimateManureCH4({ animal: 'swine', subcategory: 'finishing', headcount: 100, region: 'north_america', system: 'anaerobic_digestion_biogas', climate: 'warm' });
+    expect(e.emissions).toBeCloseTo(4.97, 2);
+    expect(e.factor.value).toBe(21.2);
+  });
+
+  it('4. poultry broilers NA cool biogas gas_tight, 1000 head → factor 5.2', () => {
+    // VS 16.8 × wt 1.4 /1000 ×365 = 8.5848 ; 1000 × 8.5848 × 5.2 × 27 / 1e6 = 1.2053
+    const e = estimateManureCH4({ animal: 'poultry', subcategory: 'broilers', headcount: 1000, region: 'north_america', system: 'anaerobic_digestion_biogas', climate: 'cool', digesterQuality: 'gas_tight' });
+    expect(e.emissions).toBeCloseTo(1.205, 3);
+    expect(e.factor.value).toBe(5.2);
+  });
+
+  it('5. poultry leaky biogas → 2.4 (no poultry.leaky row)', () => {
+    const e = estimateManureCH4({ animal: 'poultry', subcategory: 'hens', headcount: 1, region: 'north_america', system: 'anaerobic_digestion_biogas', climate: 'warm', digesterQuality: 'leaky' });
+    expect(e.factor.value).toBe(2.4);
+  });
+
+  it('6. buffalo WE cool biogas gas_tight → other_cattle.gas_tight[cool] 2.4 (footnote 6)', () => {
+    // buffalo VS 7.7 × wt 509 /1000 ×365 = 1430.5445 ; 1 × 1430.5445 × 2.4 × 27 / 1e6 = 0.09270
+    const e = estimateManureCH4({ animal: 'buffalo', headcount: 1, region: 'western_europe', system: 'anaerobic_digestion_biogas', climate: 'cool', digesterQuality: 'gas_tight' });
+    expect(e.emissions).toBeCloseTo(0.093, 3);
+    expect(e.factor.value).toBe(2.4);
+    expect(e.factor.note).toMatch(/footnote 6/);
+  });
+
+  it('7. sheep + biogas throws; biogas with climateZone (no climate) throws', () => {
+    expect(() => estimateManureCH4({ animal: 'sheep', headcount: 1, region: 'developed', system: 'anaerobic_digestion_biogas', climate: 'temperate' })).toThrow();
+    expect(() => estimateManureCH4({ animal: 'dairy_cattle', headcount: 1, region: 'north_america', system: 'anaerobic_digestion_biogas', climateZone: 'tropical_wet' })).toThrow();
+  });
+
+  it('8. biogas IGNORES productivity — same result with/without productivity set', () => {
+    const withProd = estimateManureCH4({ animal: 'dairy_cattle', headcount: 5, region: 'north_america', system: 'anaerobic_digestion_biogas', climate: 'temperate', digesterQuality: 'gas_tight', productivity: 'high' });
+    const noProd = estimateManureCH4({ animal: 'dairy_cattle', headcount: 5, region: 'north_america', system: 'anaerobic_digestion_biogas', climate: 'temperate', digesterQuality: 'gas_tight' });
+    expect(withProd.factor.value).toBe(3.7);
+    expect(withProd.emissions).toBe(noProd.emissions);
+  });
+
+  it('9. headcount 0 → 0', () => {
+    const e = estimateManureCH4({ animal: 'dairy_cattle', headcount: 0, region: 'north_america', system: 'anaerobic_digestion_biogas', climate: 'temperate' });
+    expect(e.emissions).toBe(0);
+    expect(e.factor.value).toBe(9.5); // default leaky
+  });
+});

@@ -106,7 +106,11 @@ export type ManureClimateZone =
 export type ManureLiquidSystem =
   | 'uncovered_anaerobic_lagoon'
   | 'liquid_slurry_pit_gt_1_month'
-  | 'liquid_slurry_pit_lt_1_month'; // lt_1_month is SWINE-only (Table 10.14)
+  | 'liquid_slurry_pit_lt_1_month'  // lt_1_month is SWINE-only (Table 10.14)
+  | 'anaerobic_digestion_biogas';   // 3-zone climate + digester-quality axis (footnote 8)
+// Biogas High/Low is DIGESTER QUALITY (not herd productivity) and it INVERTS: leaky emits
+// MORE than gas-tight. Conservative default = 'leaky'.
+export type DigesterQuality = 'gas_tight' | 'leaky';
 
 // Activity-data keying differs by species (Table 10.14 footnote 1 region resolution):
 //   cattle/buffalo   → [region] (9-region)
@@ -453,13 +457,35 @@ export const MANURE_LIQUID_FACTOR: ManureLiquidFactorTable = {
 
 // Which species support which liquid systems (anything else THROWS).
 export const LIQUID_SYSTEM_VALIDITY: Record<ManureSpecies, ManureLiquidSystem[]> = {
-  dairy_cattle: ['uncovered_anaerobic_lagoon', 'liquid_slurry_pit_gt_1_month'],
-  other_cattle: ['uncovered_anaerobic_lagoon', 'liquid_slurry_pit_gt_1_month'],
-  // buffalo routes to other_cattle.low; lt_1_month has no other_cattle source row → NOT allowed.
-  buffalo:      ['uncovered_anaerobic_lagoon', 'liquid_slurry_pit_gt_1_month'],
-  swine:        ['uncovered_anaerobic_lagoon', 'liquid_slurry_pit_gt_1_month', 'liquid_slurry_pit_lt_1_month'],
-  poultry:      ['uncovered_anaerobic_lagoon', 'liquid_slurry_pit_gt_1_month'],
+  dairy_cattle: ['uncovered_anaerobic_lagoon', 'liquid_slurry_pit_gt_1_month', 'anaerobic_digestion_biogas'],
+  other_cattle: ['uncovered_anaerobic_lagoon', 'liquid_slurry_pit_gt_1_month', 'anaerobic_digestion_biogas'],
+  // buffalo routes to other_cattle; lt_1_month has no other_cattle source row → NOT allowed.
+  buffalo:      ['uncovered_anaerobic_lagoon', 'liquid_slurry_pit_gt_1_month', 'anaerobic_digestion_biogas'],
+  swine:        ['uncovered_anaerobic_lagoon', 'liquid_slurry_pit_gt_1_month', 'liquid_slurry_pit_lt_1_month', 'anaerobic_digestion_biogas'],
+  poultry:      ['uncovered_anaerobic_lagoon', 'liquid_slurry_pit_gt_1_month', 'anaerobic_digestion_biogas'],
   sheep: [], goats: [], horses: [], mules_asses: [], camels: [], // no liquid systems
+};
+
+// ── Anaerobic digestion — biogas (Table 10.14, footnote 8) ──────────────────────
+// Structurally distinct: 3-zone climate [cool, temperate, warm] and a DIGESTER-QUALITY axis
+// (gas_tight vs leaky) that INVERTS the usual split — leaky emits more. NOT the herd
+// productivity axis. Poultry has no leaky row (poultry LOW routes to the all-systems 2.4).
+const BIOGAS_SRC = 'IPCC 2019 Refinement Vol.4 Ch.10 Table 10.14 (Anaerobic Digestion–Biogas; footnote 8: High=gas-tight, Low=leaky)';
+const bf = (value: number): EmissionFactor => ({ value, unit: 'gCH4/kgVS', source: BIOGAS_SRC, tier: 1 });
+const bc3 = (arr: number[]): Record<ManureClimate, EmissionFactor> =>
+  ({ cool: bf(arr[0]), temperate: bf(arr[1]), warm: bf(arr[2]) });
+
+export interface ManureBiogasFactorTable {
+  dairy_cattle: { gas_tight: ClimateFactors; leaky: ClimateFactors };
+  other_cattle: { gas_tight: ClimateFactors; leaky: ClimateFactors };
+  swine: { gas_tight: ClimateFactors; leaky: ClimateFactors };
+  poultry: { gas_tight: ClimateFactors }; // no leaky row
+}
+export const MANURE_BIOGAS_FACTOR: ManureBiogasFactorTable = {
+  dairy_cattle: { gas_tight: bc3([3.2, 3.7, 3.7]),  leaky: bc3([9.2, 9.5, 9.5]) },
+  other_cattle: { gas_tight: bc3([2.4, 2.7, 2.8]),  leaky: bc3([9.2, 9.5, 9.5]) },
+  swine:        { gas_tight: bc3([6.0, 6.8, 7.0]),  leaky: bc3([20.6, 21.1, 21.2]) },
+  poultry:      { gas_tight: bc3([5.2, 10.5, 13.1]) }, // leaky → all-systems 2.4 (see estimate.ts)
 };
 
 // (Fertiliser and LUC factor sets — enteric's/manure's siblings — are SEPARATE later
