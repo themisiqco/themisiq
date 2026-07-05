@@ -282,3 +282,77 @@ describe('estimateManureCH4 — swine & poultry (M2a)', () => {
     expect(e.factor.value).toBe(6.4);
   });
 });
+
+describe('estimateManureCH4 — sheep/goats/horses/mules_asses/camels (M2b)', () => {
+  it('1. sheep developed (→high) temperate solid_storage, 1000 head, factor 5.1', () => {
+    // VS_annual = 8.2 × 40 / 1000 × 365 = 119.72 ; 1000 × 119.72 × 5.1 × 27 / 1e6 = 16.485444
+    const e = estimateManureCH4({ animal: 'sheep', headcount: 1000, region: 'developed', system: 'solid_storage', climate: 'temperate' });
+    expect(e.emissions).toBeCloseTo(16.49, 1);
+    expect(e.factor.value).toBe(5.1);
+    expect(e.dataQuality).toBe('secondary');
+    expect(e.gas).toBe('CH4');
+    expect(e.factor.source).toContain('Table 10.14');
+  });
+
+  it('2. camels HIGH warm dry_lot, 100 head, factor 0.0 → exactly 0 (legit zero, not throw)', () => {
+    const e = estimateManureCH4({ animal: 'camels', headcount: 100, region: 'developed', system: 'dry_lot', climate: 'warm', productivity: 'high' });
+    expect(e.emissions).toBe(0);
+    expect(e.factor.value).toBe(0);
+  });
+
+  it('3. camels HIGH warm solid_storage, 100 head, factor 8.7 (global VS 11.5/wt 217)', () => {
+    // VS_annual = 11.5 × 217 / 1000 × 365 = 910.8575 ; 100 × 910.8575 × 8.7 × 27 / 1e6 = 21.396
+    const e = estimateManureCH4({ animal: 'camels', headcount: 100, region: 'developed', system: 'solid_storage', climate: 'warm', productivity: 'high' });
+    expect(e.emissions).toBeCloseTo(21.4, 1);
+    expect(e.factor.value).toBe(8.7);
+  });
+
+  it('4. horses developing (→low) cool solid_storage, 10 head, factor 3.5', () => {
+    // VS_annual = 7.2 × 238 / 1000 × 365 = 625.464 ; 10 × 625.464 × 3.5 × 27 / 1e6 = 0.5910635
+    const e = estimateManureCH4({ animal: 'horses', headcount: 10, region: 'developing', system: 'solid_storage', climate: 'cool' });
+    expect(e.emissions).toBeCloseTo(0.591, 3);
+    expect(e.factor.value).toBe(3.5);
+  });
+
+  it('5. sheep + daily_spread throws; goats + burned_for_fuel throws', () => {
+    expect(() => estimateManureCH4({ animal: 'sheep', headcount: 1, region: 'developed', system: 'daily_spread', climate: 'temperate' })).toThrow();
+    expect(() => estimateManureCH4({ animal: 'goats', headcount: 1, region: 'developed', system: 'burned_for_fuel' })).toThrow();
+  });
+
+  it('6. sheep developed pasture_range_paddock, 100 head → factor 0.6 (climate ignored)', () => {
+    // VS_annual 119.72 ; 100 × 119.72 × 0.6 × 27 / 1e6 = 0.1939464
+    const e = estimateManureCH4({ animal: 'sheep', headcount: 100, region: 'developed', system: 'pasture_range_paddock' });
+    expect(e.emissions).toBeCloseTo(0.194, 3);
+    expect(e.factor.value).toBe(0.6);
+  });
+
+  it('7. mules_asses global: any region → same VS 7.2 / wt 130; temperate high solid_storage, 50 head, factor 8.8', () => {
+    // VS_annual = 7.2 × 130 / 1000 × 365 = 341.64 ; 50 × 341.64 × 8.8 × 27 / 1e6 = 4.0586832
+    const e = estimateManureCH4({ animal: 'mules_asses', headcount: 50, region: 'north_america', system: 'solid_storage', climate: 'temperate', productivity: 'high' });
+    expect(e.emissions).toBeCloseTo(4.06, 2);
+    expect(e.factor.value).toBe(8.8);
+    // region-invariant VS/weight: a different region yields the identical emissions.
+    const e2 = estimateManureCH4({ animal: 'mules_asses', headcount: 50, region: 'africa', system: 'solid_storage', climate: 'temperate', productivity: 'high' });
+    expect(e2.emissions).toBeCloseTo(4.06, 2);
+  });
+
+  it('8. climate omitted on solid_storage throws; headcount 0 → 0; negative → throws', () => {
+    expect(() => estimateManureCH4({ animal: 'sheep', headcount: 1, region: 'developed', system: 'solid_storage' })).toThrow();
+    const e0 = estimateManureCH4({ animal: 'sheep', headcount: 0, region: 'developed', system: 'solid_storage', climate: 'temperate' });
+    expect(e0.emissions).toBe(0);
+    expect(() => estimateManureCH4({ animal: 'sheep', headcount: -1, region: 'developed', system: 'solid_storage', climate: 'temperate' })).toThrow();
+  });
+
+  it('9. (brief truncated) region resolution: 9-region key maps to developed/developing', () => {
+    // goats: developed wt 40, developing wt 24 → different VS_annual, so different emissions.
+    const dev = estimateManureCH4({ animal: 'goats', headcount: 100, region: 'western_europe', system: 'solid_storage', climate: 'temperate' });
+    const devg = estimateManureCH4({ animal: 'goats', headcount: 100, region: 'africa', system: 'solid_storage', climate: 'temperate' });
+    // western_europe → developed → high (factor 4.8); africa → developing → low (factor 3.5)
+    expect(dev.factor.value).toBe(4.8);
+    expect(devg.factor.value).toBe(3.5);
+    expect(dev.emissions).not.toBe(devg.emissions);
+    // provenance travels
+    expect(dev.factor.unit).toBe('gCH4/kgVS');
+    expect(dev.factor.tier).toBe(1);
+  });
+});

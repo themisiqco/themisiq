@@ -62,18 +62,28 @@ export function estimateEnteric(input: {
   };
 }
 
-// Regions where swine/poultry default to HIGH productivity (Table 10.14 footnote 1).
-// Cattle/buffalo keep their existing LOW default (unchanged) — see defaultProductivity.
-const HIGH_PRODUCTIVITY_REGIONS = ['north_america', 'western_europe', 'eastern_europe', 'oceania'];
-function defaultProductivity(animal: ManureSpecies, region: string): 'high' | 'low' {
-  if (animal === 'swine' || animal === 'poultry') {
-    return HIGH_PRODUCTIVITY_REGIONS.includes(region) ? 'high' : 'low';
-  }
-  return 'low'; // cattle/buffalo — unchanged from M1
+// Table 10.14 footnote 1: North America, Europe, Oceania = developed; all others = developing.
+// Callers may also pass 'developed'/'developing' directly (two-way species).
+const DEVELOPED_REGIONS = ['north_america', 'western_europe', 'eastern_europe', 'oceania'];
+function classifyDeveloped(region: string): 'developed' | 'developing' {
+  if (region === 'developed') return 'developed';
+  if (region === 'developing') return 'developing';
+  return DEVELOPED_REGIONS.includes(region) ? 'developed' : 'developing';
 }
 
-// VS/weight lookup handling both shapes: cattle/buffalo are [region]; swine/poultry are
-// [subcategory][region]. Returns undefined for any absent cell (caller fails loud).
+// Productivity default (footnote 1): developed → high, developing → low. Cattle/buffalo keep
+// their M1 'low' default (unchanged). Overridable via the caller's `productivity`.
+function defaultProductivity(animal: ManureSpecies, region: string): 'high' | 'low' {
+  if (animal === 'dairy_cattle' || animal === 'other_cattle' || animal === 'buffalo') {
+    return 'low'; // unchanged from M1
+  }
+  return classifyDeveloped(region) === 'developed' ? 'high' : 'low';
+}
+
+// VS/weight lookup across all region-resolution strategies:
+//   cattle/buffalo → [region] ; swine/poultry → [subcategory][region] ;
+//   sheep/goats/horses → two-way (developed/developing) ; mules_asses/camels → single global.
+// Returns undefined for any absent cell (caller fails loud).
 function lookupActivity(
   table: ManureActivityTable,
   animal: ManureSpecies,
@@ -84,8 +94,16 @@ function lookupActivity(
     if (!subcategory) return undefined;
     return table[animal][subcategory]?.[region];
   }
+  if (animal === 'sheep' || animal === 'goats' || animal === 'horses') {
+    return table[animal][classifyDeveloped(region)];
+  }
+  if (animal === 'mules_asses' || animal === 'camels') {
+    return table[animal]; // single global value — region ignored
+  }
+  // dairy_cattle / other_cattle / buffalo
   return table[animal][region];
 }
+// (animal is narrowed to the cattle/buffalo triple by the returns above.)
 
 // Resolve the Table 10.14 CH4 factor. Poultry & swine have their own grids; buffalo has no
 // own grid → routes to other_cattle.low (footnote 6). Pasture is cattle/buffalo-only.
@@ -118,6 +136,14 @@ function resolveManureFactor(
     if (system === 'burned_for_fuel') return s.burned_for_fuel;
     if (system === 'solid_storage' || system === 'dry_lot' || system === 'daily_spread') return s[system][needClimate()];
     throw new Error(`manure CH4: system ${system} not applicable for swine (IPCC Table 10.14); check input`);
+  }
+
+  // Small ruminants & equids: solid_storage / dry_lot only (climate-keyed). No daily_spread /
+  // burned_for_fuel (pasture handled above). A camels warm dry_lot factor of 0.0 is a REAL value.
+  if (animal === 'sheep' || animal === 'goats' || animal === 'horses' || animal === 'mules_asses' || animal === 'camels') {
+    const g = MANURE_FACTOR[animal][productivity];
+    if (system === 'solid_storage' || system === 'dry_lot') return g[system][needClimate()];
+    throw new Error(`manure CH4: system ${system} not applicable for ${animal} (IPCC Table 10.14); check input`);
   }
 
   // Cattle / buffalo. Buffalo uses other_cattle LOW factors everywhere (footnote 6).

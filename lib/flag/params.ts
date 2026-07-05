@@ -89,23 +89,34 @@ export const ENTERIC_OTHER: Record<string, { high: EmissionFactor; low: Emission
 // selects ONLY the Table 10.14 factor. B0 is already baked into the 10.14 factor
 // (factor = MCF×B0×0.67) — never re-applied.
 
-export type ManureSpecies = 'dairy_cattle' | 'other_cattle' | 'buffalo' | 'swine' | 'poultry';
+export type ManureSpecies =
+  | 'dairy_cattle' | 'other_cattle' | 'buffalo' | 'swine' | 'poultry'
+  | 'sheep' | 'goats' | 'horses' | 'mules_asses' | 'camels';
 // Swine/poultry carry NO species Mean — VS & weight are per sub-category.
 export type ManureSubcategory = 'finishing' | 'breeding' | 'hens' | 'pullets' | 'broilers';
 export type ManureSystem =
   | 'solid_storage' | 'dry_lot' | 'daily_spread' | 'pasture_range_paddock' | 'burned_for_fuel';
 export type ManureClimate = 'cool' | 'temperate' | 'warm';
 
-// Cattle & buffalo activity data is keyed [region]; swine & poultry are keyed
-// [subcategory][region] (no species Mean). One table type spans both shapes.
+// Activity-data keying differs by species (Table 10.14 footnote 1 region resolution):
+//   cattle/buffalo   → [region] (9-region)
+//   swine/poultry    → [subcategory][region]
+//   sheep/goats/horses → two-way {developed, developing}
+//   mules_asses/camels → single global value
 type RegionFactorMap = Partial<Record<string, EmissionFactor>>;
 type SubcategoryFactorMap = Partial<Record<ManureSubcategory, RegionFactorMap>>;
+type TwoWayFactorMap = { developed: EmissionFactor; developing: EmissionFactor };
 export interface ManureActivityTable {
   dairy_cattle: RegionFactorMap;
   other_cattle: RegionFactorMap;
   buffalo: RegionFactorMap;
   swine: SubcategoryFactorMap;
   poultry: SubcategoryFactorMap;
+  sheep: TwoWayFactorMap;
+  goats: TwoWayFactorMap;
+  horses: TwoWayFactorMap;
+  mules_asses: EmissionFactor; // single global
+  camels: EmissionFactor;      // single global
 }
 
 const VS_SRC = 'IPCC 2019 Refinement Vol.4 Ch.10 Table 10.13a';
@@ -167,6 +178,12 @@ export const MANURE_VS: ManureActivityTable = {
       middle_east: vs(17.7, 'middle_east'), asia: vs(15.7, 'asia'), indian_subcontinent: vs(17.7, 'indian_subcontinent'),
     },
   },
+  // Small ruminants & equids — two-way (developed/developing) or single global (Table 10.13a).
+  sheep:  { developed: vs(8.2, 'developed'),  developing: vs(8.3, 'developing') },
+  goats:  { developed: vs(9, 'developed'),    developing: vs(10.4, 'developing') },
+  horses: { developed: vs(5.65, 'developed'), developing: vs(7.2, 'developing') },
+  mules_asses: vs(7.2, 'global'),
+  camels:      vs(11.5, 'global'),
 };
 
 // Live weight — Table 10A.5, regional Mean (kg). Same buffalo NA omissions.
@@ -216,6 +233,14 @@ export const MANURE_WEIGHT: ManureActivityTable = {
       middle_east: wt(0.7, 'middle_east'), asia: wt(0.8, 'asia'), indian_subcontinent: wt(0.8, 'indian_subcontinent'),
     },
   },
+  // Small ruminants & equids — two-way (developed/developing) or single global (Table 10A.5).
+  // goats developed = 40 (western_europe representative; 10A.5 lists 41/40/36/33 across the
+  // four developed regions) — see report note.
+  sheep:  { developed: wt(40, 'developed'),  developing: wt(31, 'developing') },
+  goats:  { developed: wt(40, 'developed'),  developing: wt(24, 'developing') },
+  horses: { developed: wt(377, 'developed'), developing: wt(238, 'developing') },
+  mules_asses: wt(130, 'global'),
+  camels:      wt(217, 'global'),
 };
 
 // Manure CH4 factor — Table 10.14 (g CH4/kg VS), species × productivity × system × climate.
@@ -241,12 +266,27 @@ interface PoultryFactors {
   high: PoultryHighFactors;
   low: EmissionFactor; // ALL_SYSTEMS single scalar
 }
+// Sheep/goats/horses/mules_asses/camels: solid_storage + dry_lot only (NO daily_spread,
+// NO burned_for_fuel); pasture_range_paddock (0.6, "All Animals") DOES apply to them.
+interface TwoSystemFactors {
+  solid_storage: ClimateFactors;
+  dry_lot: ClimateFactors;
+}
+interface SmallRuminantFactors {
+  high: TwoSystemFactors;
+  low: TwoSystemFactors;
+}
 export interface ManureFactorTable {
   dairy_cattle: { high: ManureProductivityFactors; low: ManureProductivityFactors };
   other_cattle: { high: ManureProductivityFactors; low: ManureProductivityFactors };
   swine: { high: ManureProductivityFactors; low: ManureProductivityFactors };
   poultry: PoultryFactors;
-  pasture_range_paddock: EmissionFactor; // cattle/buffalo only
+  sheep: SmallRuminantFactors;
+  goats: SmallRuminantFactors;
+  horses: SmallRuminantFactors;
+  mules_asses: SmallRuminantFactors;
+  camels: SmallRuminantFactors;
+  pasture_range_paddock: EmissionFactor; // cattle/buffalo AND small ruminants/equids (0.6)
 }
 export const MANURE_FACTOR: ManureFactorTable = {
   dairy_cattle: {
@@ -300,7 +340,27 @@ export const MANURE_FACTOR: ManureFactorTable = {
     },
     low: mf(2.4), // ALL_SYSTEMS, climate-invariant
   },
-  pasture_range_paddock: mf(0.6), // cattle/buffalo only (SYSTEM_VALIDITY blocks swine/poultry)
+  sheep: {
+    high: { solid_storage: { cool: mf(2.5), temperate: mf(5.1), warm: mf(6.4) }, dry_lot: { cool: mf(1.3), temperate: mf(1.9), warm: mf(2.5) } },
+    low:  { solid_storage: { cool: mf(1.7), temperate: mf(3.5), warm: mf(4.4) }, dry_lot: { cool: mf(0.9), temperate: mf(1.3), warm: mf(1.7) } },
+  },
+  goats: {
+    high: { solid_storage: { cool: mf(2.4), temperate: mf(4.8), warm: mf(6.0) }, dry_lot: { cool: mf(1.2), temperate: mf(1.8), warm: mf(2.4) } },
+    low:  { solid_storage: { cool: mf(1.7), temperate: mf(3.5), warm: mf(4.4) }, dry_lot: { cool: mf(0.9), temperate: mf(1.3), warm: mf(1.7) } },
+  },
+  horses: {
+    high: { solid_storage: { cool: mf(4.0), temperate: mf(8.0), warm: mf(10.1) }, dry_lot: { cool: mf(2.0), temperate: mf(3.0), warm: mf(4.0) } },
+    low:  { solid_storage: { cool: mf(3.5), temperate: mf(7.0), warm: mf(8.7) },  dry_lot: { cool: mf(1.7), temperate: mf(2.6), warm: mf(3.5) } },
+  },
+  mules_asses: {
+    high: { solid_storage: { cool: mf(4.4), temperate: mf(8.8), warm: mf(11.1) }, dry_lot: { cool: mf(2.2), temperate: mf(3.3), warm: mf(4.4) } },
+    low:  { solid_storage: { cool: mf(3.5), temperate: mf(7.0), warm: mf(8.7) },  dry_lot: { cool: mf(1.7), temperate: mf(2.6), warm: mf(3.5) } },
+  },
+  camels: {
+    high: { solid_storage: { cool: mf(3.5), temperate: mf(7.0), warm: mf(8.7) }, dry_lot: { cool: mf(1.7), temperate: mf(2.6), warm: mf(0.0) } }, // warm dry_lot = 0.0 is REAL (Table 10.14)
+    low:  { solid_storage: { cool: mf(2.8), temperate: mf(5.6), warm: mf(7.0) }, dry_lot: { cool: mf(1.4), temperate: mf(2.1), warm: mf(2.8) } },
+  },
+  pasture_range_paddock: mf(0.6), // cattle/buffalo + small ruminants/equids (SYSTEM_VALIDITY blocks swine/poultry)
 };
 
 // Per-species applicable manure systems — anything else is an input error (THROWS).
@@ -310,6 +370,12 @@ export const SYSTEM_VALIDITY: Record<ManureSpecies, ManureSystem[]> = {
   buffalo:      ['solid_storage', 'dry_lot', 'daily_spread', 'pasture_range_paddock', 'burned_for_fuel'],
   swine:        ['solid_storage', 'dry_lot', 'daily_spread', 'burned_for_fuel'], // NO pasture
   poultry:      ['solid_storage', 'dry_lot', 'burned_for_fuel'],                 // NO daily_spread, NO pasture
+  // Small ruminants & equids: solid_storage, dry_lot, pasture (NO daily_spread, NO burned_for_fuel).
+  sheep:        ['solid_storage', 'dry_lot', 'pasture_range_paddock'],
+  goats:        ['solid_storage', 'dry_lot', 'pasture_range_paddock'],
+  horses:       ['solid_storage', 'dry_lot', 'pasture_range_paddock'],
+  mules_asses:  ['solid_storage', 'dry_lot', 'pasture_range_paddock'],
+  camels:       ['solid_storage', 'dry_lot', 'pasture_range_paddock'],
 };
 
 // (Fertiliser and LUC factor sets — enteric's/manure's siblings — are SEPARATE later
