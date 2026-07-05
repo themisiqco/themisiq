@@ -4,7 +4,7 @@
 // separately and removals are NEVER netted into gross emissions.
 import { describe, it, expect } from 'vitest';
 import { computeFlag } from './flag/engine';
-import { estimateEnteric, estimateManureCH4 } from './flag/estimate';
+import { estimateEnteric, estimateManureCH4, estimateManureN2O } from './flag/estimate';
 import type { FlagActivity } from './flag/types';
 
 const line = (over: Partial<FlagActivity>): FlagActivity => ({
@@ -630,5 +630,80 @@ describe('estimateManureCH4 — turkeys & ducks (M2c poultry sub-categories, glo
     const hens = estimateManureCH4({ animal: 'poultry', subcategory: 'hens', headcount: 1000, region: 'africa', system: 'dry_lot' });
     expect(hens.factor.value).toBe(2.4);
     expect(hens.emissions).toBeCloseTo(0.338, 3);
+  });
+});
+
+describe('estimateManureN2O — direct manure-management N2O (Eq. 10.25)', () => {
+  it('1. dairy NA solid_storage, 100 head → ~60.05 tCO2e (44/28 chain)', () => {
+    // N_ex = 0.59×650/1000×365 = 139.9775 ; 100 × 139.9775 × 0.010 × 44/28 × 273 / 1000 = 60.0503
+    const e = estimateManureN2O({ animal: 'dairy_cattle', region: 'north_america', headcount: 100, system: 'solid_storage' });
+    expect(e.emissions).toBeCloseTo(60.05, 1);
+    expect(e.gas).toBe('N2O');
+    expect(e.dataQuality).toBe('secondary');
+    expect(e.factor.value).toBe(0.010);
+    expect(e.factor.unit).toBe('kgN2O-N/kgN');
+    expect(e.factor.source).toContain('Table 10.21');
+  });
+
+  it('2. dairy NA uncovered_anaerobic_lagoon → EF3 0 → 0 tCO2e (legit zero, factor present)', () => {
+    const e = estimateManureN2O({ animal: 'dairy_cattle', region: 'north_america', headcount: 100, system: 'uncovered_anaerobic_lagoon' });
+    expect(e.emissions).toBe(0);
+    expect(e.factor.value).toBe(0);
+    expect(e.factor.source).toContain('Table 10.21');
+  });
+
+  it('3. dairy NA daily_spread → 0 (legit zero, no throw)', () => {
+    const e = estimateManureN2O({ animal: 'dairy_cattle', region: 'north_america', headcount: 100, system: 'daily_spread' });
+    expect(e.emissions).toBe(0);
+  });
+
+  it('4. dairy NA pasture_range_paddock → THROWS (Chapter 11 redirect)', () => {
+    expect(() => estimateManureN2O({ animal: 'dairy_cattle', region: 'north_america', headcount: 1, system: 'pasture_range_paddock' })).toThrow(/Chapter 11/);
+  });
+
+  it('5. dairy NA burned_for_fuel → THROWS (Fuel Combustion redirect)', () => {
+    expect(() => estimateManureN2O({ animal: 'dairy_cattle', region: 'north_america', headcount: 1, system: 'burned_for_fuel' })).toThrow(/Fuel Combustion/);
+  });
+
+  it('6. buffalo north_america solid_storage → THROWS (NA region absent)', () => {
+    expect(() => estimateManureN2O({ animal: 'buffalo', region: 'north_america', headcount: 1, system: 'solid_storage' })).toThrow();
+  });
+
+  it('7. swine finishing WEu deep_bedding_active_mix (EF3 0.07), 100 head → ~50.81', () => {
+    // N_ex = 0.76×61/1000×365 = 16.9214 ; 100 × 16.9214 × 0.07 × 44/28 × 273 / 1000 = 50.8150
+    const e = estimateManureN2O({ animal: 'swine', subcategory: 'finishing', region: 'western_europe', headcount: 100, system: 'deep_bedding_active_mix' });
+    expect(e.emissions).toBeCloseTo(50.81, 1);
+    expect(e.factor.value).toBe(0.07);
+  });
+
+  it('8. turkeys (global Nrate 0.74/wt 6.8) solid_storage, 1000 head → ~7.879', () => {
+    const e = estimateManureN2O({ animal: 'poultry', subcategory: 'turkeys', region: 'north_america', headcount: 1000, system: 'solid_storage' });
+    expect(e.emissions).toBeCloseTo(7.879, 2);
+    expect(e.factor.value).toBe(0.010);
+  });
+
+  it('9. sheep developed uses TWO-WAY N-rate (0.35) — differs from developing (0.32)', () => {
+    // developed: 0.35×40/1000×365 → 21.9219 ; developing: 0.32×31/1000×365 → 15.5332
+    const dev = estimateManureN2O({ animal: 'sheep', region: 'developed', headcount: 1000, system: 'solid_storage' });
+    const devg = estimateManureN2O({ animal: 'sheep', region: 'developing', headcount: 1000, system: 'solid_storage' });
+    expect(dev.emissions).toBeCloseTo(21.92, 1);
+    expect(devg.emissions).toBeCloseTo(15.53, 1);
+    expect(dev.emissions).not.toBe(devg.emissions);
+  });
+
+  it('10. headcount 0 → 0; negative → throws; niche system (composting_in_vessel) → throws', () => {
+    const e0 = estimateManureN2O({ animal: 'dairy_cattle', region: 'north_america', headcount: 0, system: 'solid_storage' });
+    expect(e0.emissions).toBe(0);
+    expect(() => estimateManureN2O({ animal: 'dairy_cattle', region: 'north_america', headcount: -1, system: 'solid_storage' })).toThrow();
+    expect(() => estimateManureN2O({ animal: 'dairy_cattle', region: 'north_america', headcount: 1, system: 'composting_in_vessel' })).toThrow();
+  });
+
+  it('camels use GLOBAL N-rate (0.46) and GLOBAL weight (217) — region ignored', () => {
+    // N_ex = 0.46×217/1000×365 = 36.4343 ; 1 × 36.4343 × 0.010 × 44/28 × 273 / 1000 = 0.15630
+    const na = estimateManureN2O({ animal: 'camels', region: 'north_america', headcount: 1, system: 'solid_storage' });
+    const asia = estimateManureN2O({ animal: 'camels', region: 'asia', headcount: 1, system: 'solid_storage' });
+    expect(na.emissions).toBeCloseTo(0.156, 3);
+    expect(na.emissions).toBe(asia.emissions); // region ignored (fully global)
+    expect(na.factor.value).toBe(0.010);
   });
 });

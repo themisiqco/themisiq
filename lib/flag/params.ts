@@ -22,7 +22,9 @@ export interface EmissionFactor {
   unit: 'kgCH4/head/yr'       // enteric EF
       | 'kgVS/1000kg/day'     // manure volatile-solids excretion rate
       | 'kg'                  // live weight
-      | 'gCH4/kgVS';          // manure CH4 factor (Table 10.14)
+      | 'gCH4/kgVS'           // manure CH4 factor (Table 10.14)
+      | 'kgN/1000kg/day'      // manure N excretion rate (Table 10.19)
+      | 'kgN2O-N/kgN';        // direct N2O EF3 (Table 10.21)
   source: string;             // exact table citation
   tier: 1 | 2;
   region?: string;
@@ -113,6 +115,20 @@ export type ManureLiquidSystem =
 // Biogas High/Low is DIGESTER QUALITY (not herd productivity) and it INVERTS: leaky emits
 // MORE than gas-tight. Conservative default = 'leaky'.
 export type DigesterQuality = 'gas_tight' | 'leaky';
+
+// N2O has its OWN management-system enum (Table 10.21 EF3 systems ≠ CH4 Table 10.14 systems).
+export type ManureN2OSystem =
+  // Computed (EF3 in MANURE_N2O_EF3); several are a legitimate assessed ZERO, not a throw.
+  | 'solid_storage' | 'dry_lot' | 'pit_storage' | 'anaerobic_digester'
+  | 'liquid_slurry_crust' | 'liquid_slurry_no_crust' | 'liquid_slurry_cover'
+  | 'uncovered_anaerobic_lagoon' | 'daily_spread'
+  | 'deep_bedding_no_mix' | 'deep_bedding_active_mix'
+  | 'poultry_litter' | 'poultry_no_litter'
+  // Redirect (throw — assessed elsewhere in the inventory).
+  | 'pasture_range_paddock' | 'burned_for_fuel'
+  // Deferred niche variants (throw — not yet implemented).
+  | 'composting_in_vessel' | 'composting_static_pile' | 'composting_intensive_windrow'
+  | 'composting_passive_windrow' | 'aerobic_treatment';
 
 // Activity-data keying differs by species (Table 10.14 footnote 1 region resolution):
 //   cattle/buffalo   → [region] (9-region)
@@ -499,6 +515,100 @@ export const MANURE_BIOGAS_FACTOR: ManureBiogasFactorTable = {
   other_cattle: { gas_tight: bc3([2.4, 2.7, 2.8]),  leaky: bc3([9.2, 9.5, 9.5]) },
   swine:        { gas_tight: bc3([6.0, 6.8, 7.0]),  leaky: bc3([20.6, 21.1, 21.2]) },
   poultry:      { gas_tight: bc3([5.2, 10.5, 13.1]) }, // leaky → all-systems 2.4 (see estimate.ts)
+};
+
+// ── Direct manure-management N2O (Eq. 10.25) ────────────────────────────────────
+// N excretion rate — Table 10.19, regional MEAN (kg N/1000 kg mass/day). Region resolution
+// mirrors the CH4 build per species (unified): camels & mules_asses global, sheep/goats/horses
+// two-way, cattle/swine/poultry region/sub-category.
+const NRATE_SRC = 'IPCC 2019 Refinement Vol.4 Ch.10 Table 10.19';
+const nr = (value: number, region: string): EmissionFactor => ({ value, unit: 'kgN/1000kg/day', source: NRATE_SRC, tier: 1, region });
+
+export interface ManureNRateTable {
+  dairy_cattle: RegionFactorMap;
+  other_cattle: RegionFactorMap;
+  buffalo: RegionFactorMap;
+  swine: SubcategoryFactorMap;
+  poultry: SubcategoryFactorMap;
+  sheep: TwoWayFactorMap;
+  goats: TwoWayFactorMap;
+  horses: TwoWayFactorMap;
+  camels: EmissionFactor;        // GLOBAL 0.46 — unified with CH4's global camels (region-resolution unification)
+  mules_asses: EmissionFactor;   // global 0.46
+}
+export const MANURE_N_RATE: ManureNRateTable = {
+  dairy_cattle: {
+    north_america: nr(0.59, 'north_america'), western_europe: nr(0.54, 'western_europe'), eastern_europe: nr(0.42, 'eastern_europe'),
+    oceania: nr(0.72, 'oceania'), latin_america: nr(0.39, 'latin_america'), africa: nr(0.44, 'africa'),
+    middle_east: nr(0.50, 'middle_east'), asia: nr(0.44, 'asia'), indian_subcontinent: nr(0.65, 'indian_subcontinent'),
+  },
+  other_cattle: {
+    north_america: nr(0.40, 'north_america'), western_europe: nr(0.42, 'western_europe'), eastern_europe: nr(0.47, 'eastern_europe'),
+    oceania: nr(0.46, 'oceania'), latin_america: nr(0.31, 'latin_america'), africa: nr(0.45, 'africa'),
+    middle_east: nr(0.56, 'middle_east'), asia: nr(0.38, 'asia'), indian_subcontinent: nr(0.44, 'indian_subcontinent'),
+  },
+  buffalo: {
+    western_europe: nr(0.45, 'western_europe'), eastern_europe: nr(0.35, 'eastern_europe'), latin_america: nr(0.41, 'latin_america'),
+    africa: nr(0.42, 'africa'), middle_east: nr(0.39, 'middle_east'), asia: nr(0.44, 'asia'), indian_subcontinent: nr(0.58, 'indian_subcontinent'),
+    // north_america, oceania: not farmed — omitted (throw).
+  },
+  swine: {
+    finishing: {
+      north_america: nr(0.46, 'north_america'), western_europe: nr(0.76, 'western_europe'), eastern_europe: nr(0.77, 'eastern_europe'),
+      oceania: nr(0.72, 'oceania'), latin_america: nr(0.73, 'latin_america'), africa: nr(0.49, 'africa'),
+      middle_east: nr(0.73, 'middle_east'), asia: nr(0.70, 'asia'), indian_subcontinent: nr(0.76, 'indian_subcontinent'),
+    },
+    breeding: {
+      north_america: nr(0.24, 'north_america'), western_europe: nr(0.38, 'western_europe'), eastern_europe: nr(0.36, 'eastern_europe'),
+      oceania: nr(0.31, 'oceania'), latin_america: nr(0.35, 'latin_america'), africa: nr(0.29, 'africa'),
+      middle_east: nr(0.40, 'middle_east'), asia: nr(0.37, 'asia'), indian_subcontinent: nr(0.43, 'indian_subcontinent'),
+    },
+  },
+  poultry: {
+    hens: {
+      north_america: nr(1.13, 'north_america'), western_europe: nr(0.87, 'western_europe'), eastern_europe: nr(0.81, 'eastern_europe'),
+      oceania: nr(1.04, 'oceania'), latin_america: nr(1.17, 'latin_america'), africa: nr(1.20, 'africa'),
+      middle_east: nr(1.11, 'middle_east'), asia: nr(1.00, 'asia'), indian_subcontinent: nr(1.65, 'indian_subcontinent'),
+    },
+    pullets: {
+      north_america: nr(0.77, 'north_america'), western_europe: nr(0.58, 'western_europe'), eastern_europe: nr(0.58, 'eastern_europe'),
+      oceania: nr(0.76, 'oceania'), latin_america: nr(0.95, 'latin_america'), africa: nr(1.29, 'africa'),
+      middle_east: nr(0.85, 'middle_east'), asia: nr(0.83, 'asia'), indian_subcontinent: nr(1.63, 'indian_subcontinent'),
+    },
+    broilers: {
+      north_america: nr(1.59, 'north_america'), western_europe: nr(1.14, 'western_europe'), eastern_europe: nr(1.12, 'eastern_europe'),
+      oceania: nr(1.59, 'oceania'), latin_america: nr(1.23, 'latin_america'), africa: nr(1.40, 'africa'),
+      middle_east: nr(1.43, 'middle_east'), asia: nr(1.35, 'asia'), indian_subcontinent: nr(1.58, 'indian_subcontinent'),
+    },
+    turkeys: { global: nr(0.74, 'global') },
+    ducks:   { global: nr(0.83, 'global') },
+  },
+  sheep:  { developed: nr(0.35, 'developed'), developing: nr(0.32, 'developing') },
+  goats:  { developed: nr(0.46, 'developed'), developing: nr(0.34, 'developing') },
+  horses: { developed: nr(0.30, 'developed'), developing: nr(0.46, 'developing') },
+  camels: nr(0.46, 'global'),       // GLOBAL (unified with CH4); developing representative
+  mules_asses: nr(0.46, 'global'),
+};
+
+// Direct N2O emission factor EF3 — Table 10.21 (kg N2O-N / kg N), per management system, NO
+// climate axis. Several systems are a legitimate assessed ZERO. pasture/burned are redirected
+// (throw) in the estimator; niche composting/aerobic variants are deferred (throw).
+const EF3_SRC = 'IPCC 2019 Refinement Vol.4 Ch.10 Table 10.21 (EF3 direct N2O)';
+const ef3 = (value: number): EmissionFactor => ({ value, unit: 'kgN2O-N/kgN', source: EF3_SRC, tier: 1 });
+export const MANURE_N2O_EF3: Partial<Record<ManureN2OSystem, EmissionFactor>> = {
+  solid_storage: ef3(0.010),
+  dry_lot: ef3(0.02),
+  pit_storage: ef3(0.002),
+  anaerobic_digester: ef3(0.0006),
+  liquid_slurry_crust: ef3(0.005),
+  liquid_slurry_no_crust: ef3(0.0),
+  liquid_slurry_cover: ef3(0.005),
+  uncovered_anaerobic_lagoon: ef3(0.0),
+  daily_spread: ef3(0.0),
+  deep_bedding_no_mix: ef3(0.01),
+  deep_bedding_active_mix: ef3(0.07),
+  poultry_litter: ef3(0.001),
+  poultry_no_litter: ef3(0.001),
 };
 
 // (Fertiliser and LUC factor sets — enteric's/manure's siblings — are SEPARATE later

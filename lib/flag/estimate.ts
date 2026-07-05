@@ -9,8 +9,8 @@
 // Manure, fertiliser, and LUC estimators are SEPARATE later tasks.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { ENTERIC_CATTLE, ENTERIC_OTHER, FLAG_GWP_AR6, MANURE_VS, MANURE_WEIGHT, MANURE_FACTOR, SYSTEM_VALIDITY, MANURE_LIQUID_FACTOR, LIQUID_SYSTEM_VALIDITY, MANURE_BIOGAS_FACTOR } from './params';
-import type { EmissionFactor, ManureSpecies, ManureSubcategory, ManureSystem, ManureClimate, ManureClimateZone, ManureLiquidSystem, DigesterQuality, ManureActivityTable } from './params';
+import { ENTERIC_CATTLE, ENTERIC_OTHER, FLAG_GWP_AR6, MANURE_VS, MANURE_WEIGHT, MANURE_FACTOR, SYSTEM_VALIDITY, MANURE_LIQUID_FACTOR, LIQUID_SYSTEM_VALIDITY, MANURE_BIOGAS_FACTOR, MANURE_N_RATE, MANURE_N2O_EF3 } from './params';
+import type { EmissionFactor, ManureSpecies, ManureSubcategory, ManureSystem, ManureClimate, ManureClimateZone, ManureLiquidSystem, DigesterQuality, ManureN2OSystem, ManureActivityTable } from './params';
 import type { EmissionEstimate } from './types';
 
 // Cattle & buffalo are region-keyed (Table 10.11); everything else is global (Table 10.10).
@@ -314,5 +314,83 @@ export function estimateManureCH4(input: {
     gas: 'CH4',
     factor,
     basis,
+  };
+}
+
+// ── Direct manure-management N2O (IPCC Eq. 10.25) ───────────────────────────────
+// N-rate region resolution mirrors CH4 per species (region-resolution unification): camels &
+// mules_asses are global; sheep/goats/horses two-way; cattle/swine/poultry region/sub-category.
+function resolveNRate(
+  animal: ManureSpecies,
+  subcategory: ManureSubcategory | undefined,
+  region: string,
+): EmissionFactor | undefined {
+  if (animal === 'swine' || animal === 'poultry') {
+    if (!subcategory) return undefined;
+    const key = subcategory === 'turkeys' || subcategory === 'ducks' ? 'global' : region;
+    return MANURE_N_RATE[animal][subcategory]?.[key];
+  }
+  if (animal === 'sheep' || animal === 'goats' || animal === 'horses') {
+    return MANURE_N_RATE[animal][classifyDeveloped(region)];
+  }
+  if (animal === 'mules_asses' || animal === 'camels') {
+    return MANURE_N_RATE[animal]; // global — camels unified with CH4 (region ignored)
+  }
+  return MANURE_N_RATE[animal][region]; // dairy_cattle / other_cattle / buffalo
+}
+
+// Direct manure-management N2O for one line (tCO2e). Eq. 10.25: N_ex × EF3 × 44/28 × GWP.
+// pasture → managed soils (Ch.11); burned-for-fuel → Fuel Combustion; niche/aerobic/composting
+// → deferred. Legit-zero EF3 systems compute normally and return 0 (NOT a throw).
+export function estimateManureN2O(input: {
+  animal: ManureSpecies;
+  region: string;
+  headcount: number;
+  system: ManureN2OSystem;
+  subcategory?: ManureSubcategory;
+  productivity?: 'high' | 'low'; // parallel to CH4; N-rate uses the MEAN column, so it never
+                                 // changes the result — kept only for signature symmetry.
+}): EmissionEstimate {
+  const { animal, region, headcount, system, subcategory } = input;
+
+  if (headcount < 0) {
+    throw new Error(`manure N2O: headcount must be >= 0 (animal ${animal}, got ${headcount})`);
+  }
+
+  // Three-way system handling.
+  if (system === 'pasture_range_paddock') {
+    throw new Error('manure N2O: direct manure N2O for pasture/range/paddock is assessed under managed soils (IPCC Chapter 11), not here');
+  }
+  if (system === 'burned_for_fuel') {
+    throw new Error('manure N2O: burned-for-fuel N2O is reported under Fuel Combustion, not manure management');
+  }
+  const ef3Factor = MANURE_N2O_EF3[system];
+  if (!ef3Factor) {
+    throw new Error(`manure N2O: system ${system} not supported (niche/deferred EF3, e.g. composting/aerobic); refusing to estimate`);
+  }
+
+  // Swine/poultry require a sub-category (N-rate & weight are per sub-category).
+  if ((animal === 'swine' || animal === 'poultry') && !subcategory) {
+    throw new Error(`manure N2O: subcategory required for ${animal}; refusing to estimate`);
+  }
+
+  const nRate = resolveNRate(animal, subcategory, region);
+  const wt = lookupActivity(MANURE_WEIGHT, animal, subcategory, region); // weight uses CH4 resolution
+  if (!nRate || !wt) {
+    throw new Error(`manure N2O: no verified IPCC N-rate/weight for ${animal}${subcategory ? '/' + subcategory : ''} in region ${region}; refusing to estimate`);
+  }
+
+  // N_ex_annual = Nrate × weight / 1000 × 365  (kg N/head/yr).
+  const nExAnnual = ((nRate.value * wt.value) / 1000) * 365;
+  // tCO2e = head × N_ex × EF3(kgN2O-N/kgN) × 44/28 × N2O_GWP / 1000.
+  // (No extra /1e6 — N_ex is already kg, unlike the g-based CH4 factors.)
+  const emissions = (headcount * nExAnnual * ef3Factor.value * (44 / 28) * FLAG_GWP_AR6.N2O) / 1000;
+
+  return {
+    emissions,
+    dataQuality: 'secondary',
+    gas: 'N2O',
+    factor: ef3Factor,
+    basis: 'IPCC 2019 Tier 1 direct manure N2O (Eq.10.25; EF3 Table 10.21; N Table 10.19), screening-grade',
   };
 }
