@@ -217,3 +217,68 @@ describe('estimateManureCH4 — IPCC 2019 Tier 1 manure CH4 (biogenic GWP 27.0)'
     expect(e.factor.value).toBe(3.5);
   });
 });
+
+describe('estimateManureCH4 — swine & poultry (M2a)', () => {
+  it('swine finishing NA (→high) temperate solid_storage, 100 head, factor 12.1', () => {
+    // VS_annual = 3.9 × 61 / 1000 × 365 = 86.8335 (NOT 86.8635 — brief's intermediate slipped) ;
+    // 100 × 86.8335 × 12.1 × 27 / 1e6 = 2.836850445. Brief's "0.2838 for 100 head" = the 10-head value.
+    const e = estimateManureCH4({ animal: 'swine', subcategory: 'finishing', headcount: 100, region: 'north_america', system: 'solid_storage', climate: 'temperate' });
+    expect(e.emissions).toBeCloseTo(2.836850445, 6);
+    expect(e.factor.value).toBe(12.1);
+    expect(e.dataQuality).toBe('secondary');
+    expect(e.gas).toBe('CH4');
+    expect(e.factor.source).toContain('Table 10.14');
+    // 10 head → 0.28368 (≈ the brief's stated 0.284)
+    const e10 = estimateManureCH4({ animal: 'swine', subcategory: 'finishing', headcount: 10, region: 'north_america', system: 'solid_storage', climate: 'temperate' });
+    expect(e10.emissions).toBeCloseTo(0.2836850445, 6);
+    expect(e10.emissions).toBeCloseTo(0.284, 3);
+  });
+
+  it('poultry broilers NA (→high) warm solid_storage, 10000 head, factor 13.1', () => {
+    // VS 16.8 × wt 1.4 /1000 ×365 = 8.5848 ; ×10000 × 13.1 × 27 /1e6 ≈ 30.36
+    const e = estimateManureCH4({ animal: 'poultry', subcategory: 'broilers', headcount: 10000, region: 'north_america', system: 'solid_storage', climate: 'warm' });
+    expect(e.emissions).toBeCloseTo(30.35, 1);
+    expect(e.factor.value).toBe(13.1);
+  });
+
+  it('poultry LOW → all-systems 2.4, climate ignored (hens Africa dry_lot, 1000 head)', () => {
+    // Africa → low; poultry.low = 2.4 flat. VS 10.2 × 1.4 /1000×365 = 5.2122 ; ×1000 ×2.4 ×27 /1e6 ≈ 0.3378
+    const e = estimateManureCH4({ animal: 'poultry', subcategory: 'hens', headcount: 1000, region: 'africa', system: 'dry_lot' });
+    expect(e.emissions).toBeCloseTo(0.338, 3);
+    expect(e.factor.value).toBe(2.4);
+  });
+
+  it('poultry + pasture_range_paddock → throws (not applicable)', () => {
+    expect(() => estimateManureCH4({ animal: 'poultry', subcategory: 'hens', headcount: 1, region: 'north_america', system: 'pasture_range_paddock' })).toThrow();
+  });
+
+  it('swine + pasture_range_paddock → throws (not applicable)', () => {
+    expect(() => estimateManureCH4({ animal: 'swine', subcategory: 'finishing', headcount: 1, region: 'north_america', system: 'pasture_range_paddock', climate: 'temperate' })).toThrow();
+  });
+
+  it('poultry + daily_spread → throws (no daily_spread row for poultry)', () => {
+    expect(() => estimateManureCH4({ animal: 'poultry', subcategory: 'broilers', headcount: 1, region: 'north_america', system: 'daily_spread', climate: 'warm' })).toThrow();
+  });
+
+  it('swine / poultry with NO subcategory → throws', () => {
+    expect(() => estimateManureCH4({ animal: 'swine', headcount: 1, region: 'north_america', system: 'solid_storage', climate: 'temperate' })).toThrow();
+    expect(() => estimateManureCH4({ animal: 'poultry', headcount: 1, region: 'north_america', system: 'solid_storage', climate: 'warm' })).toThrow();
+  });
+
+  it('swine finishing NA solid_storage with NO climate → throws (HP, climate required)', () => {
+    expect(() => estimateManureCH4({ animal: 'swine', subcategory: 'finishing', headcount: 1, region: 'north_america', system: 'solid_storage' })).toThrow();
+  });
+
+  it('headcount 0 → 0 no throw; negative → throws', () => {
+    const e = estimateManureCH4({ animal: 'swine', subcategory: 'finishing', headcount: 0, region: 'north_america', system: 'solid_storage', climate: 'temperate' });
+    expect(e.emissions).toBe(0);
+    expect(e.factor.value).toBe(12.1);
+    expect(() => estimateManureCH4({ animal: 'poultry', subcategory: 'hens', headcount: -1, region: 'africa', system: 'dry_lot' })).toThrow();
+  });
+
+  it('cattle path unchanged: dairy NA solid_storage temperate HP, 1 head → 0.37717056', () => {
+    const e = estimateManureCH4({ animal: 'dairy_cattle', headcount: 1, region: 'north_america', system: 'solid_storage', climate: 'temperate', productivity: 'high' });
+    expect(e.emissions).toBeCloseTo(0.37717056, 8);
+    expect(e.factor.value).toBe(6.4);
+  });
+});

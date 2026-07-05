@@ -89,10 +89,24 @@ export const ENTERIC_OTHER: Record<string, { high: EmissionFactor; low: Emission
 // selects ONLY the Table 10.14 factor. B0 is already baked into the 10.14 factor
 // (factor = MCF×B0×0.67) — never re-applied.
 
-export type ManureSpecies = 'dairy_cattle' | 'other_cattle' | 'buffalo';
+export type ManureSpecies = 'dairy_cattle' | 'other_cattle' | 'buffalo' | 'swine' | 'poultry';
+// Swine/poultry carry NO species Mean — VS & weight are per sub-category.
+export type ManureSubcategory = 'finishing' | 'breeding' | 'hens' | 'pullets' | 'broilers';
 export type ManureSystem =
   | 'solid_storage' | 'dry_lot' | 'daily_spread' | 'pasture_range_paddock' | 'burned_for_fuel';
 export type ManureClimate = 'cool' | 'temperate' | 'warm';
+
+// Cattle & buffalo activity data is keyed [region]; swine & poultry are keyed
+// [subcategory][region] (no species Mean). One table type spans both shapes.
+type RegionFactorMap = Partial<Record<string, EmissionFactor>>;
+type SubcategoryFactorMap = Partial<Record<ManureSubcategory, RegionFactorMap>>;
+export interface ManureActivityTable {
+  dairy_cattle: RegionFactorMap;
+  other_cattle: RegionFactorMap;
+  buffalo: RegionFactorMap;
+  swine: SubcategoryFactorMap;
+  poultry: SubcategoryFactorMap;
+}
 
 const VS_SRC = 'IPCC 2019 Refinement Vol.4 Ch.10 Table 10.13a';
 const WEIGHT_SRC = 'IPCC 2019 Refinement Vol.4 Ch.10 Table 10A.5';
@@ -107,7 +121,7 @@ const mf = (value: number): EmissionFactor =>
 // Volatile-solids excretion — Table 10.13a, regional Mean (kg VS/1000 kg mass/day).
 // Buffalo north_america / oceania are NOT farmed there — keys OMITTED (never 0-filled;
 // a missing lookup makes the estimator refuse rather than guess).
-export const MANURE_VS: Record<ManureSpecies, Partial<Record<string, EmissionFactor>>> = {
+export const MANURE_VS: ManureActivityTable = {
   dairy_cattle: {
     north_america: vs(9.2, 'north_america'), western_europe: vs(8.4, 'western_europe'), eastern_europe: vs(6.7, 'eastern_europe'),
     oceania: vs(6.0, 'oceania'), latin_america: vs(7.9, 'latin_america'), africa: vs(18.2, 'africa'),
@@ -123,10 +137,40 @@ export const MANURE_VS: Record<ManureSpecies, Partial<Record<string, EmissionFac
     africa: vs(12.9, 'africa'), middle_east: vs(9.8, 'middle_east'), asia: vs(13.5, 'asia'), indian_subcontinent: vs(15.2, 'indian_subcontinent'),
     // north_america, oceania: not farmed — omitted.
   },
+  // Swine & poultry — per sub-category, all 9 regions (Table 10.13a).
+  swine: {
+    finishing: {
+      north_america: vs(3.9, 'north_america'), western_europe: vs(5.3, 'western_europe'), eastern_europe: vs(4.9, 'eastern_europe'),
+      oceania: vs(5.6, 'oceania'), latin_america: vs(6.4, 'latin_america'), africa: vs(8.2, 'africa'),
+      middle_east: vs(4.9, 'middle_east'), asia: vs(6.8, 'asia'), indian_subcontinent: vs(8.6, 'indian_subcontinent'),
+    },
+    breeding: {
+      north_america: vs(1.8, 'north_america'), western_europe: vs(2.4, 'western_europe'), eastern_europe: vs(2.0, 'eastern_europe'),
+      oceania: vs(2.1, 'oceania'), latin_america: vs(2.7, 'latin_america'), africa: vs(4.4, 'africa'),
+      middle_east: vs(2.5, 'middle_east'), asia: vs(3.4, 'asia'), indian_subcontinent: vs(4.6, 'indian_subcontinent'),
+    },
+  },
+  poultry: {
+    hens: {
+      north_america: vs(9.4, 'north_america'), western_europe: vs(8.6, 'western_europe'), eastern_europe: vs(9.4, 'eastern_europe'),
+      oceania: vs(8.6, 'oceania'), latin_america: vs(10.1, 'latin_america'), africa: vs(10.2, 'africa'),
+      middle_east: vs(9.0, 'middle_east'), asia: vs(9.3, 'asia'), indian_subcontinent: vs(13.2, 'indian_subcontinent'),
+    },
+    pullets: {
+      north_america: vs(5.9, 'north_america'), western_europe: vs(5.3, 'western_europe'), eastern_europe: vs(5.9, 'eastern_europe'),
+      oceania: vs(6.2, 'oceania'), latin_america: vs(7.6, 'latin_america'), africa: vs(12.0, 'africa'),
+      middle_east: vs(6.8, 'middle_east'), asia: vs(7.5, 'asia'), indian_subcontinent: vs(13.2, 'indian_subcontinent'),
+    },
+    broilers: {
+      north_america: vs(16.8, 'north_america'), western_europe: vs(16.1, 'western_europe'), eastern_europe: vs(16.0, 'eastern_europe'),
+      oceania: vs(18.3, 'oceania'), latin_america: vs(15.6, 'latin_america'), africa: vs(15.9, 'africa'),
+      middle_east: vs(17.7, 'middle_east'), asia: vs(15.7, 'asia'), indian_subcontinent: vs(17.7, 'indian_subcontinent'),
+    },
+  },
 };
 
 // Live weight — Table 10A.5, regional Mean (kg). Same buffalo NA omissions.
-export const MANURE_WEIGHT: Record<ManureSpecies, Partial<Record<string, EmissionFactor>>> = {
+export const MANURE_WEIGHT: ManureActivityTable = {
   dairy_cattle: {
     north_america: wt(650, 'north_america'), western_europe: wt(600, 'western_europe'), eastern_europe: wt(550, 'eastern_europe'),
     oceania: wt(488, 'oceania'), latin_america: wt(508, 'latin_america'), africa: wt(260, 'africa'),
@@ -142,6 +186,36 @@ export const MANURE_WEIGHT: Record<ManureSpecies, Partial<Record<string, Emissio
     africa: wt(339, 'africa'), middle_east: wt(381, 'middle_east'), asia: wt(336, 'asia'), indian_subcontinent: wt(321, 'indian_subcontinent'),
     // north_america, oceania: not farmed — omitted.
   },
+  // Swine & poultry — per sub-category, all 9 regions (Table 10A.5).
+  swine: {
+    finishing: {
+      north_america: wt(61, 'north_america'), western_europe: wt(61, 'western_europe'), eastern_europe: wt(59, 'eastern_europe'),
+      oceania: wt(41, 'oceania'), latin_america: wt(51, 'latin_america'), africa: wt(41, 'africa'),
+      middle_east: wt(52, 'middle_east'), asia: wt(49, 'asia'), indian_subcontinent: wt(51, 'indian_subcontinent'),
+    },
+    breeding: {
+      north_america: wt(184, 'north_america'), western_europe: wt(190, 'western_europe'), eastern_europe: wt(204, 'eastern_europe'),
+      oceania: wt(163, 'oceania'), latin_america: wt(143, 'latin_america'), africa: wt(100, 'africa'),
+      middle_east: wt(118, 'middle_east'), asia: wt(122, 'asia'), indian_subcontinent: wt(121, 'indian_subcontinent'),
+    },
+  },
+  poultry: {
+    hens: {
+      north_america: wt(1.5, 'north_america'), western_europe: wt(1.9, 'western_europe'), eastern_europe: wt(1.9, 'eastern_europe'),
+      oceania: wt(2.0, 'oceania'), latin_america: wt(1.4, 'latin_america'), africa: wt(1.4, 'africa'),
+      middle_east: wt(1.2, 'middle_east'), asia: wt(1.5, 'asia'), indian_subcontinent: wt(1.3, 'indian_subcontinent'),
+    },
+    pullets: {
+      north_america: wt(1.2, 'north_america'), western_europe: wt(1.5, 'western_europe'), eastern_europe: wt(1.3, 'eastern_europe'),
+      oceania: wt(1.4, 'oceania'), latin_america: wt(0.7, 'latin_america'), africa: wt(0.7, 'africa'),
+      middle_east: wt(0.6, 'middle_east'), asia: wt(0.8, 'asia'), indian_subcontinent: wt(0.6, 'indian_subcontinent'),
+    },
+    broilers: {
+      north_america: wt(1.4, 'north_america'), western_europe: wt(1.2, 'western_europe'), eastern_europe: wt(1.1, 'eastern_europe'),
+      oceania: wt(1.2, 'oceania'), latin_america: wt(0.9, 'latin_america'), africa: wt(0.8, 'africa'),
+      middle_east: wt(0.7, 'middle_east'), asia: wt(0.8, 'asia'), indian_subcontinent: wt(0.8, 'indian_subcontinent'),
+    },
+  },
 };
 
 // Manure CH4 factor — Table 10.14 (g CH4/kg VS), species × productivity × system × climate.
@@ -156,10 +230,23 @@ interface ManureProductivityFactors {
   daily_spread: ClimateFactors;
   burned_for_fuel: EmissionFactor;
 }
+// Poultry has NO daily_spread / pasture, and its LOW productivity collapses to a single
+// "all systems" scalar (system- and climate-invariant).
+interface PoultryHighFactors {
+  solid_storage: ClimateFactors;
+  dry_lot: ClimateFactors;
+  burned_for_fuel: EmissionFactor;
+}
+interface PoultryFactors {
+  high: PoultryHighFactors;
+  low: EmissionFactor; // ALL_SYSTEMS single scalar
+}
 export interface ManureFactorTable {
   dairy_cattle: { high: ManureProductivityFactors; low: ManureProductivityFactors };
   other_cattle: { high: ManureProductivityFactors; low: ManureProductivityFactors };
-  pasture_range_paddock: EmissionFactor;
+  swine: { high: ManureProductivityFactors; low: ManureProductivityFactors };
+  poultry: PoultryFactors;
+  pasture_range_paddock: EmissionFactor; // cattle/buffalo only
 }
 export const MANURE_FACTOR: ManureFactorTable = {
   dairy_cattle: {
@@ -190,7 +277,39 @@ export const MANURE_FACTOR: ManureFactorTable = {
       burned_for_fuel: mf(8.7),
     },
   },
-  pasture_range_paddock: mf(0.6), // all species/productivity/climate
+  swine: {
+    high: {
+      solid_storage: { cool: mf(6.0), temperate: mf(12.1), warm: mf(15.1) },
+      dry_lot:       { cool: mf(3.0), temperate: mf(4.5),  warm: mf(6.0) },
+      daily_spread:  { cool: mf(0.3), temperate: mf(1.5),  warm: mf(3.0) },
+      burned_for_fuel: mf(30.2),
+    },
+    low: {
+      solid_storage: { cool: mf(3.9), temperate: mf(7.8),  warm: mf(9.7) },
+      dry_lot:       { cool: mf(1.9), temperate: mf(2.9),  warm: mf(3.9) },
+      daily_spread:  { cool: mf(0.2), temperate: mf(1.0),  warm: mf(1.9) },
+      burned_for_fuel: mf(19.4),
+    },
+  },
+  poultry: {
+    high: {
+      solid_storage: { cool: mf(5.2), temperate: mf(10.5), warm: mf(13.1) },
+      dry_lot:       { cool: mf(2.6), temperate: mf(3.9),  warm: mf(5.2) },
+      burned_for_fuel: mf(2.6),
+      // NO daily_spread, NO pasture for poultry.
+    },
+    low: mf(2.4), // ALL_SYSTEMS, climate-invariant
+  },
+  pasture_range_paddock: mf(0.6), // cattle/buffalo only (SYSTEM_VALIDITY blocks swine/poultry)
+};
+
+// Per-species applicable manure systems — anything else is an input error (THROWS).
+export const SYSTEM_VALIDITY: Record<ManureSpecies, ManureSystem[]> = {
+  dairy_cattle: ['solid_storage', 'dry_lot', 'daily_spread', 'pasture_range_paddock', 'burned_for_fuel'],
+  other_cattle: ['solid_storage', 'dry_lot', 'daily_spread', 'pasture_range_paddock', 'burned_for_fuel'],
+  buffalo:      ['solid_storage', 'dry_lot', 'daily_spread', 'pasture_range_paddock', 'burned_for_fuel'],
+  swine:        ['solid_storage', 'dry_lot', 'daily_spread', 'burned_for_fuel'], // NO pasture
+  poultry:      ['solid_storage', 'dry_lot', 'burned_for_fuel'],                 // NO daily_spread, NO pasture
 };
 
 // (Fertiliser and LUC factor sets — enteric's/manure's siblings — are SEPARATE later

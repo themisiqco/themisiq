@@ -9,8 +9,8 @@
 // Manure, fertiliser, and LUC estimators are SEPARATE later tasks.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { ENTERIC_CATTLE, ENTERIC_OTHER, FLAG_GWP_AR6, MANURE_VS, MANURE_WEIGHT, MANURE_FACTOR } from './params';
-import type { EmissionFactor, ManureSpecies, ManureSystem, ManureClimate } from './params';
+import { ENTERIC_CATTLE, ENTERIC_OTHER, FLAG_GWP_AR6, MANURE_VS, MANURE_WEIGHT, MANURE_FACTOR, SYSTEM_VALIDITY } from './params';
+import type { EmissionFactor, ManureSpecies, ManureSubcategory, ManureSystem, ManureClimate, ManureActivityTable } from './params';
 import type { EmissionEstimate } from './types';
 
 // Cattle & buffalo are region-keyed (Table 10.11); everything else is global (Table 10.10).
@@ -62,62 +62,114 @@ export function estimateEnteric(input: {
   };
 }
 
-// Resolve the Table 10.14 CH4 factor for a manure line. Buffalo has no own grid → routes
-// to other_cattle.low (footnote 6). Pasture is a global scalar; burned_for_fuel is a
-// per-species-productivity scalar; the other three systems are climate-keyed.
+// Regions where swine/poultry default to HIGH productivity (Table 10.14 footnote 1).
+// Cattle/buffalo keep their existing LOW default (unchanged) — see defaultProductivity.
+const HIGH_PRODUCTIVITY_REGIONS = ['north_america', 'western_europe', 'eastern_europe', 'oceania'];
+function defaultProductivity(animal: ManureSpecies, region: string): 'high' | 'low' {
+  if (animal === 'swine' || animal === 'poultry') {
+    return HIGH_PRODUCTIVITY_REGIONS.includes(region) ? 'high' : 'low';
+  }
+  return 'low'; // cattle/buffalo — unchanged from M1
+}
+
+// VS/weight lookup handling both shapes: cattle/buffalo are [region]; swine/poultry are
+// [subcategory][region]. Returns undefined for any absent cell (caller fails loud).
+function lookupActivity(
+  table: ManureActivityTable,
+  animal: ManureSpecies,
+  subcategory: ManureSubcategory | undefined,
+  region: string,
+): EmissionFactor | undefined {
+  if (animal === 'swine' || animal === 'poultry') {
+    if (!subcategory) return undefined;
+    return table[animal][subcategory]?.[region];
+  }
+  return table[animal][region];
+}
+
+// Resolve the Table 10.14 CH4 factor. Poultry & swine have their own grids; buffalo has no
+// own grid → routes to other_cattle.low (footnote 6). Pasture is cattle/buffalo-only.
 function resolveManureFactor(
   animal: ManureSpecies,
   productivity: 'high' | 'low',
   system: ManureSystem,
   climate?: ManureClimate,
 ): EmissionFactor {
-  // Pasture is productivity/species/climate-invariant.
+  const needClimate = (): ManureClimate => {
+    if (!climate) throw new Error(`manure CH4: climate (cool|temperate|warm) required for system ${system}; refusing to estimate`);
+    return climate;
+  };
+
+  // Pasture — cattle/buffalo only (SYSTEM_VALIDITY blocks swine/poultry upstream).
   if (system === 'pasture_range_paddock') return MANURE_FACTOR.pasture_range_paddock;
 
-  // Buffalo uses other_cattle LOW factors in every region (Table 10.14 footnote 6).
+  // Poultry: LOW collapses to a single all-systems scalar; HIGH is solid_storage/dry_lot by
+  // climate + a burned_for_fuel scalar (no daily_spread).
+  if (animal === 'poultry') {
+    if (productivity === 'low') return MANURE_FACTOR.poultry.low;
+    if (system === 'burned_for_fuel') return MANURE_FACTOR.poultry.high.burned_for_fuel;
+    if (system === 'solid_storage' || system === 'dry_lot') return MANURE_FACTOR.poultry.high[system][needClimate()];
+    throw new Error(`manure CH4: system ${system} not applicable for poultry (IPCC Table 10.14); check input`);
+  }
+
+  // Swine: solid_storage/dry_lot/daily_spread by climate + a burned_for_fuel scalar.
+  if (animal === 'swine') {
+    const s = MANURE_FACTOR.swine[productivity];
+    if (system === 'burned_for_fuel') return s.burned_for_fuel;
+    if (system === 'solid_storage' || system === 'dry_lot' || system === 'daily_spread') return s[system][needClimate()];
+    throw new Error(`manure CH4: system ${system} not applicable for swine (IPCC Table 10.14); check input`);
+  }
+
+  // Cattle / buffalo. Buffalo uses other_cattle LOW factors everywhere (footnote 6).
   const isBuffalo = animal === 'buffalo';
   const factorSpecies: 'dairy_cattle' | 'other_cattle' = isBuffalo ? 'other_cattle' : animal;
   const factorProd: 'high' | 'low' = isBuffalo ? 'low' : productivity;
   const grid = MANURE_FACTOR[factorSpecies][factorProd];
 
   let base: EmissionFactor;
-  if (system === 'burned_for_fuel') {
-    base = grid.burned_for_fuel; // climate-invariant scalar
-  } else {
-    if (!climate) {
-      throw new Error(`manure: climate (cool|temperate|warm) required for system ${system}; refusing to estimate`);
-    }
-    base = grid[system][climate];
-  }
+  if (system === 'burned_for_fuel') base = grid.burned_for_fuel;
+  else if (system === 'solid_storage' || system === 'dry_lot' || system === 'daily_spread') base = grid[system][needClimate()];
+  else throw new Error(`manure CH4: system ${system} not applicable for ${animal} (IPCC Table 10.14); check input`);
 
-  // Surface footnote 6 on the estimate when buffalo borrowed the other_cattle-LP factor.
   return isBuffalo
     ? { ...base, note: 'buffalo uses other_cattle low-productivity factors (Table 10.14 footnote 6)' }
     : base;
 }
 
-// Manure CH4 for one line (tCO2e). VS & live weight use the ACTUAL animal's regional Mean
-// (buffalo uses buffalo's own VS/weight); only the CH4 factor borrows other_cattle-LP.
-// Fails loud for any species/region without a verified VS/weight — never guesses.
+// Manure CH4 for one line (tCO2e). Cattle/buffalo use a species regional Mean for VS/weight;
+// swine/poultry use a per-sub-category regional value. Fails loud for any inapplicable
+// (species, system) combo or any species/region without a verified VS/weight — never guesses.
 export function estimateManureCH4(input: {
   animal: ManureSpecies;
   headcount: number;
-  region: string;                 // required — VS & weight are regional
+  region: string;                     // required — VS & weight are regional
   system: ManureSystem;
-  climate?: ManureClimate;        // required for solid_storage/dry_lot/daily_spread
-  productivity?: 'high' | 'low';  // default 'low' (screening-grade, matches enteric)
+  climate?: ManureClimate;            // required for climate-keyed systems
+  productivity?: 'high' | 'low';      // default: cattle/buffalo 'low'; swine/poultry region-based
+  subcategory?: ManureSubcategory;    // REQUIRED for swine/poultry; cattle/buffalo ignore it
 }): EmissionEstimate {
-  const { animal, headcount, region, system, climate } = input;
-  const productivity = input.productivity ?? 'low';
+  const { animal, headcount, region, system, climate, subcategory } = input;
 
   if (headcount < 0) {
     throw new Error(`manure: headcount must be >= 0 (animal ${animal}, got ${headcount})`);
   }
 
-  const vsFactor = MANURE_VS[animal]?.[region];
-  const wtFactor = MANURE_WEIGHT[animal]?.[region];
+  // System applicability per species — fail loud on inapplicable combos (e.g. poultry pasture).
+  if (!SYSTEM_VALIDITY[animal].includes(system)) {
+    throw new Error(`manure CH4: system ${system} not applicable for ${animal} (IPCC Table 10.14); check input`);
+  }
+
+  // Swine/poultry require a sub-category (VS & weight are per sub-category, not a species Mean).
+  if ((animal === 'swine' || animal === 'poultry') && !subcategory) {
+    throw new Error(`manure CH4: subcategory required for ${animal}; refusing to estimate`);
+  }
+
+  const productivity = input.productivity ?? defaultProductivity(animal, region);
+
+  const vsFactor = lookupActivity(MANURE_VS, animal, subcategory, region);
+  const wtFactor = lookupActivity(MANURE_WEIGHT, animal, subcategory, region);
   if (!vsFactor || !wtFactor) {
-    throw new Error(`manure: no verified IPCC VS/weight for ${animal} in region ${region}; refusing to estimate`);
+    throw new Error(`manure: no verified IPCC VS/weight for ${animal}${subcategory ? '/' + subcategory : ''} in region ${region}; refusing to estimate`);
   }
 
   const factor = resolveManureFactor(animal, productivity, system, climate);
@@ -132,6 +184,8 @@ export function estimateManureCH4(input: {
     dataQuality: 'secondary',
     gas: 'CH4',
     factor,
-    basis: 'IPCC 2019 Tier 1 manure CH4 (screening-grade default)',
+    basis: subcategory
+      ? `IPCC 2019 Tier 1 manure CH4 (${subcategory}), screening-grade`
+      : 'IPCC 2019 Tier 1 manure CH4 (screening-grade default)',
   };
 }
