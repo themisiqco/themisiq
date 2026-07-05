@@ -93,7 +93,9 @@ export type ManureSpecies =
   | 'dairy_cattle' | 'other_cattle' | 'buffalo' | 'swine' | 'poultry'
   | 'sheep' | 'goats' | 'horses' | 'mules_asses' | 'camels';
 // Swine/poultry carry NO species Mean — VS & weight are per sub-category.
-export type ManureSubcategory = 'finishing' | 'breeding' | 'hens' | 'pullets' | 'broilers';
+// turkeys/ducks are POULTRY sub-categories: own global VS/weight, but the shared poultry
+// Table 10.14 factor grids (factor lookup keys on species 'poultry', not the sub-category).
+export type ManureSubcategory = 'finishing' | 'breeding' | 'hens' | 'pullets' | 'broilers' | 'turkeys' | 'ducks';
 export type ManureSystem =
   | 'solid_storage' | 'dry_lot' | 'daily_spread' | 'pasture_range_paddock' | 'burned_for_fuel';
 export type ManureClimate = 'cool' | 'temperate' | 'warm';
@@ -142,6 +144,11 @@ const wt = (value: number, region: string): EmissionFactor =>
   ({ value, unit: 'kg', source: WEIGHT_SRC, tier: 1, region });
 const mf = (value: number): EmissionFactor =>
   ({ value, unit: 'gCH4/kgVS', source: MANURE_SRC, tier: 1 });
+// Global (region-independent) VS/weight for turkeys & ducks — stored under a single 'global' key.
+const VS_GLOBAL_SRC = 'IPCC 2019 Refinement Vol.4 Ch.10 Table 10.13a (turkeys/ducks, global)';
+const WEIGHT_GLOBAL_SRC = 'IPCC 2019 Refinement Vol.4 Ch.10 Table 10A.5 (turkeys/ducks, global)';
+const vsg = (value: number): EmissionFactor => ({ value, unit: 'kgVS/1000kg/day', source: VS_GLOBAL_SRC, tier: 1, region: 'global' });
+const wtg = (value: number): EmissionFactor => ({ value, unit: 'kg', source: WEIGHT_GLOBAL_SRC, tier: 1, region: 'global' });
 
 // Volatile-solids excretion — Table 10.13a, regional Mean (kg VS/1000 kg mass/day).
 // Buffalo north_america / oceania are NOT farmed there — keys OMITTED (never 0-filled;
@@ -191,6 +198,9 @@ export const MANURE_VS: ManureActivityTable = {
       oceania: vs(18.3, 'oceania'), latin_america: vs(15.6, 'latin_america'), africa: vs(15.9, 'africa'),
       middle_east: vs(17.7, 'middle_east'), asia: vs(15.7, 'asia'), indian_subcontinent: vs(17.7, 'indian_subcontinent'),
     },
+    // Turkeys & ducks — single GLOBAL value (region ignored).
+    turkeys: { global: vsg(10.3) },
+    ducks:   { global: vsg(7.4) },
   },
   // Small ruminants & equids — two-way (developed/developing) or single global (Table 10.13a).
   sheep:  { developed: vs(8.2, 'developed'),  developing: vs(8.3, 'developing') },
@@ -246,6 +256,9 @@ export const MANURE_WEIGHT: ManureActivityTable = {
       oceania: wt(1.2, 'oceania'), latin_america: wt(0.9, 'latin_america'), africa: wt(0.8, 'africa'),
       middle_east: wt(0.7, 'middle_east'), asia: wt(0.8, 'asia'), indian_subcontinent: wt(0.8, 'indian_subcontinent'),
     },
+    // Turkeys & ducks — single GLOBAL value (region ignored).
+    turkeys: { global: wtg(6.8) },
+    ducks:   { global: wtg(2.7) },
   },
   // Small ruminants & equids — two-way (developed/developing) or single global (Table 10A.5).
   // goats developed = 40 (western_europe representative; 10A.5 lists 41/40/36/33 across the

@@ -92,7 +92,10 @@ function lookupActivity(
 ): EmissionFactor | undefined {
   if (animal === 'swine' || animal === 'poultry') {
     if (!subcategory) return undefined;
-    return table[animal][subcategory]?.[region];
+    // Turkeys & ducks carry a single GLOBAL value (region ignored); chicken sub-categories
+    // (hens/pullets/broilers) and swine keep their 9-region lookup.
+    const key = subcategory === 'turkeys' || subcategory === 'ducks' ? 'global' : region;
+    return table[animal][subcategory]?.[key];
   }
   if (animal === 'sheep' || animal === 'goats' || animal === 'horses') {
     return table[animal][classifyDeveloped(region)];
@@ -287,17 +290,22 @@ export function estimateManureCH4(input: {
   // tCO2e = head × VS_annual × factor(gCH4/kgVS) × GWP / 1e6  (the /1e6 folds both /1000s).
   const emissions = (headcount * vsAnnual * factor.value * FLAG_GWP_AR6.CH4_biogenic) / 1e6;
 
+  // Turkeys/ducks reuse the poultry factor grids with their own global VS/weight — make that explicit.
+  const poultrySubNote = subcategory === 'turkeys' || subcategory === 'ducks'
+    ? ` · poultry (${subcategory}) sub-category — VS/weight Tables 10.13a/10A.5 (global), manure CH4 factor Table 10.14 Poultry block`
+    : '';
+
   let basis: string;
   if (biogas) {
     // Digester-quality basis — kept EXPLICIT so it is never confused with herd productivity.
-    basis = `IPCC 2019 Tier 1 manure CH4, anaerobic digestion–biogas, ${digesterQuality} digester (footnote 8; leaky = conservative default), screening-grade`;
+    basis = `IPCC 2019 Tier 1 manure CH4, anaerobic digestion–biogas, ${digesterQuality} digester (footnote 8; leaky = conservative default)${poultrySubNote}, screening-grade`;
   } else {
     // Tier 1a (explicit high-productivity opt-in) vs simple Tier 1 (low-productivity default).
     const tierLabel = productivity === 'high'
       ? 'Tier 1a manure CH4 (high-productivity, caller-specified)'
       : 'simple Tier 1 manure CH4 (low-productivity default)';
     const ctx = isLiquid(system) ? ` (liquid, ${climateZone})` : subcategory ? ` (${subcategory})` : '';
-    basis = `IPCC 2019 ${tierLabel}${ctx}, screening-grade`;
+    basis = `IPCC 2019 ${tierLabel}${ctx}${poultrySubNote}, screening-grade`;
   }
 
   return {

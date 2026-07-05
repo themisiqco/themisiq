@@ -575,3 +575,60 @@ describe('estimateManureCH4 — biogas: anaerobic_digestion (M3c, 3-zone + diges
     expect(e.factor.value).toBe(9.5); // default leaky
   });
 });
+
+describe('estimateManureCH4 — turkeys & ducks (M2c poultry sub-categories, global VS/weight)', () => {
+  it('1. turkeys (global VS 10.3/wt 6.8) temperate solid_storage HIGH, 1000 head → poultry.high 10.5', () => {
+    // VS_annual = 10.3 × 6.8 / 1000 × 365 = 25.5646 ; 1000 × 25.5646 × 10.5 × 27 / 1e6 = 7.2476
+    const e = estimateManureCH4({ animal: 'poultry', subcategory: 'turkeys', headcount: 1000, region: 'north_america', system: 'solid_storage', climate: 'temperate', productivity: 'high' });
+    expect(e.emissions).toBeCloseTo(7.247, 2);
+    expect(e.factor.value).toBe(10.5);
+    expect(e.factor.source).toContain('Table 10.14'); // shared poultry factor block
+  });
+
+  it('2. ducks (global VS 7.4/wt 2.7) warm solid_storage, default LOW → poultry-LOW 2.4, 5000 head', () => {
+    // VS_annual = 7.4 × 2.7 / 1000 × 365 = 7.2927 ; 5000 × 7.2927 × 2.4 × 27 / 1e6 = 2.3628
+    const e = estimateManureCH4({ animal: 'poultry', subcategory: 'ducks', headcount: 5000, region: 'north_america', system: 'solid_storage', climate: 'warm' });
+    expect(e.emissions).toBeCloseTo(2.363, 2);
+    expect(e.factor.value).toBe(2.4); // inherits poultry-LOW all-systems collapse
+  });
+
+  it('3. turkeys: region IGNORED (global) — NA vs asia give identical result', () => {
+    const na = estimateManureCH4({ animal: 'poultry', subcategory: 'turkeys', headcount: 100, region: 'north_america', system: 'solid_storage', climate: 'temperate', productivity: 'high' });
+    const asia = estimateManureCH4({ animal: 'poultry', subcategory: 'turkeys', headcount: 100, region: 'asia', system: 'solid_storage', climate: 'temperate', productivity: 'high' });
+    expect(na.emissions).toBe(asia.emissions);
+    expect(na.factor.value).toBe(asia.factor.value);
+  });
+
+  it('4. turkeys tropical_wet lagoon HIGH, 100 head → poultry.high lagoon 209.0', () => {
+    // VS_annual 25.5646 ; 100 × 25.5646 × 209.0 × 27 / 1e6 = 14.4283
+    const e = estimateManureCH4({ animal: 'poultry', subcategory: 'turkeys', headcount: 100, region: 'north_america', system: 'uncovered_anaerobic_lagoon', climateZone: 'tropical_wet', productivity: 'high' });
+    expect(e.emissions).toBeCloseTo(14.43, 1);
+    expect(e.factor.value).toBe(209.0);
+  });
+
+  it('5. ducks cool biogas gas_tight → poultry.gas_tight[cool] 5.2, 1000 head', () => {
+    // VS_annual 7.2927 ; 1000 × 7.2927 × 5.2 × 27 / 1e6 = 1.0239
+    const e = estimateManureCH4({ animal: 'poultry', subcategory: 'ducks', headcount: 1000, region: 'north_america', system: 'anaerobic_digestion_biogas', climate: 'cool', digesterQuality: 'gas_tight' });
+    expect(e.emissions).toBeCloseTo(1.024, 3);
+    expect(e.factor.value).toBe(5.2);
+  });
+
+  it('6. ducks biogas leaky (default) → 2.4 (poultry-leaky all-systems)', () => {
+    const e = estimateManureCH4({ animal: 'poultry', subcategory: 'ducks', headcount: 1, region: 'north_america', system: 'anaerobic_digestion_biogas', climate: 'warm' });
+    expect(e.factor.value).toBe(2.4);
+  });
+
+  it('7. turkeys + a system poultry does not support (daily_spread / pasture) → throws', () => {
+    expect(() => estimateManureCH4({ animal: 'poultry', subcategory: 'turkeys', headcount: 1, region: 'north_america', system: 'daily_spread', climate: 'warm' })).toThrow();
+    expect(() => estimateManureCH4({ animal: 'poultry', subcategory: 'turkeys', headcount: 1, region: 'north_america', system: 'pasture_range_paddock' })).toThrow();
+  });
+
+  it('8. headcount 0 → 0; existing chicken (hens) vector unchanged', () => {
+    const t0 = estimateManureCH4({ animal: 'poultry', subcategory: 'turkeys', headcount: 0, region: 'north_america', system: 'solid_storage', climate: 'temperate', productivity: 'high' });
+    expect(t0.emissions).toBe(0);
+    // chicken path unchanged: hens africa dry_lot default low → 2.4
+    const hens = estimateManureCH4({ animal: 'poultry', subcategory: 'hens', headcount: 1000, region: 'africa', system: 'dry_lot' });
+    expect(hens.factor.value).toBe(2.4);
+    expect(hens.emissions).toBeCloseTo(0.338, 3);
+  });
+});
