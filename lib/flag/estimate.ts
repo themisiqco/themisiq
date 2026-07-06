@@ -9,8 +9,8 @@
 // Manure, fertiliser, and LUC estimators are SEPARATE later tasks.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { ENTERIC_CATTLE, ENTERIC_OTHER, FLAG_GWP_AR6, MANURE_VS, MANURE_WEIGHT, MANURE_FACTOR, SYSTEM_VALIDITY, MANURE_LIQUID_FACTOR, LIQUID_SYSTEM_VALIDITY, MANURE_BIOGAS_FACTOR, MANURE_N_RATE, MANURE_N2O_EF3, N2O_EF4, N2O_EF5, FRACGAS_MS, FRACLEACH_MS, N2O_EF1_SYNTH, FRACGASF, FRACLEACH_H, N2O_EF1_OTHER, FRACGASM, N2O_EF3PRP, CROP_RESIDUE_PARAMS } from './params';
-import type { EmissionFactor, ManureSpecies, ManureSubcategory, ManureSystem, ManureClimate, ManureClimateZone, ManureLiquidSystem, DigesterQuality, ManureN2OSystem, ManureN2OIndirectSystem, ManureSpeciesGroup, IndirectClimate, FertiliserType, CropType, CropResidueParams, ManureActivityTable } from './params';
+import { ENTERIC_CATTLE, ENTERIC_OTHER, FLAG_GWP_AR6, MANURE_VS, MANURE_WEIGHT, MANURE_FACTOR, SYSTEM_VALIDITY, MANURE_LIQUID_FACTOR, LIQUID_SYSTEM_VALIDITY, MANURE_BIOGAS_FACTOR, MANURE_N_RATE, MANURE_N2O_EF3, N2O_EF4, N2O_EF5, FRACGAS_MS, FRACLEACH_MS, N2O_EF1_SYNTH, FRACGASF, FRACLEACH_H, N2O_EF1_OTHER, FRACGASM, N2O_EF3PRP, CROP_RESIDUE_PARAMS, LUC_CARBON_FRACTION, LUC_CARBON_FRACTION_SRC, C_TO_CO2, DELTA_CG, FOREST_AGB, ROOT_SHOOT } from './params';
+import type { EmissionFactor, ManureSpecies, ManureSubcategory, ManureSystem, ManureClimate, ManureClimateZone, ManureLiquidSystem, DigesterQuality, ManureN2OSystem, ManureN2OIndirectSystem, ManureSpeciesGroup, IndirectClimate, FertiliserType, CropType, CropResidueParams, CropConversionType, ForestZone, ForestContinent, ManureActivityTable } from './params';
 import type { EmissionEstimate } from './types';
 
 // Cattle & buffalo are region-keyed (Table 10.11); everything else is global (Table 10.10).
@@ -650,5 +650,62 @@ export function estimateCropResidueN2O(input: {
     basis: `IPCC 2019 Tier 1 crop-residue N2O (Eq.11.6/11.7 residue-N derivation + EF1-other + FracGASM×EF4 + FracLEACH×EF5; Frac_Remove/Burnt exclude residue counted under manure/biomass-burning to avoid double-counting)${isKnown ? '' : ' [generic crop default]'}, screening-grade`,
     breakdown: { direct, volatilisation, leaching },
     fCrKgN: fCr,
+  };
+}
+
+// ── Land Use Change → Cropland: biomass carbon stock change (Ch.5 §5.3.1, Tier 1) ───
+// STRUCTURALLY NEW: not activity×factor but (B_before − ΔC_G) × area × 44/12, booked whole in
+// the conversion year (instantaneous). SCREENING-GRADE, biomass pool only (soil pending LUC-2).
+function rootShoot(zone: ForestZone, agb: number): number {
+  const spec = ROOT_SHOOT[zone];
+  if (spec == null) throw new Error(`LUC: no root:shoot R for ${zone}`);
+  if (typeof spec === 'number') return spec;
+  return agb < spec.threshold ? spec.below : spec.above;
+}
+
+// Forest biomass carbon B_before (t C/ha) = AGB × (1 + R) × CF(0.5). Table 4.7 × 4.4 × 5.8.
+export function forestBiomassCarbon(zone: ForestZone, continent: ForestContinent): number {
+  const zoneTable = FOREST_AGB[zone];
+  if (!zoneTable) {
+    throw new Error(`LUC: no point default for ${zone} (range/age-split zone omitted); supply bBefore directly`);
+  }
+  const agb = zoneTable[continent];
+  if (agb == null) {
+    throw new Error(`LUC: no Table 4.7 default for ${zone}/${continent}; supply bBefore directly`);
+  }
+  return agb * (1 + rootShoot(zone, agb)) * LUC_CARBON_FRACTION;
+}
+
+export function estimateLUCtoCropland(input: {
+  bBefore_tCha: number;        // biomass C before conversion (t C/ha)
+  area_ha: number;
+  cropType: CropConversionType;
+  originLandType?: 'forest' | 'grassland';
+}): EmissionEstimate {
+  const { bBefore_tCha, area_ha, cropType, originLandType } = input;
+  if (bBefore_tCha < 0 || area_ha < 0) {
+    throw new Error(`LUC to cropland: bBefore_tCha and area_ha must be >= 0 (got ${bBefore_tCha}, ${area_ha})`);
+  }
+
+  const deltaCG = DELTA_CG[cropType];
+  const netLoss_tCha = bBefore_tCha - deltaCG; // may be negative (regrowth > loss) — allowed, not clamped
+  const emissions_tCO2 = netLoss_tCha * area_ha * C_TO_CO2;
+
+  // The carbon fraction (CF 0.5, Table 5.8) is the cited constant surfaced as the estimate's factor.
+  const factor: EmissionFactor = { value: LUC_CARBON_FRACTION, unit: 'tC/t-dm', source: LUC_CARBON_FRACTION_SRC, tier: 1 };
+
+  const soilFlag = originLandType === 'grassland'
+    ? ' — WARNING: grassland conversion is SOIL-dominated; the biomass term is computed but the dominant soil carbon change is NOT included (pending LUC-2); this estimate is materially incomplete for grassland conversion'
+    : '';
+
+  return {
+    emissions: emissions_tCO2,
+    dataQuality: 'secondary',
+    gas: 'CO2',
+    factor,
+    category: 'land_use_change', // NOT land_management — this books in the LUC category
+    hectares: area_ha,
+    carbonStock: { biomass: emissions_tCO2, soil: null }, // soil pending LUC-2
+    basis: `IPCC 2006 GL Vol4 Tier-1 land-converted-to-cropland biomass (Eq 2.16; B_after=0, conversion-year instantaneous; CF 0.5 per Table 5.8; ΔC_G Table 5.9); SCREENING ESTIMATE, biomass pool only, excludes soil organic carbon change${soilFlag}`,
   };
 }

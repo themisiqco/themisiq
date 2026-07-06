@@ -54,6 +54,11 @@ export interface EmissionEstimate {
   breakdown?: { direct?: number; volatilisation: number; leaching: number };
   // Crop-residue N2O surfaces the derived residue-N (kg N) so the Eq.11.6/11.7 step is auditable.
   fCrKgN?: number;
+  // Carbon-stock-change estimators (LUC) report a distinct category, land occupation, and a
+  // biomass/soil split (soil null until the soil pool is built).
+  category?: LandCategory;
+  hectares?: number;
+  carbonStock?: { biomass: number; soil: number | null };
 }
 
 // The whole land-sector inventory — three categories always distinct.

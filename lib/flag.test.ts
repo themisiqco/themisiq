@@ -4,7 +4,7 @@
 // separately and removals are NEVER netted into gross emissions.
 import { describe, it, expect } from 'vitest';
 import { computeFlag } from './flag/engine';
-import { estimateEnteric, estimateManureCH4, estimateManureN2O, estimateManureN2OIndirect, estimateSyntheticFertiliserN2O, estimateAppliedManureN2O, estimateGrazingDepositionN2O, estimateCropResidueN2O } from './flag/estimate';
+import { estimateEnteric, estimateManureCH4, estimateManureN2O, estimateManureN2OIndirect, estimateSyntheticFertiliserN2O, estimateAppliedManureN2O, estimateGrazingDepositionN2O, estimateCropResidueN2O, estimateLUCtoCropland, forestBiomassCarbon } from './flag/estimate';
 import type { FlagActivity } from './flag/types';
 
 const line = (over: Partial<FlagActivity>): FlagActivity => ({
@@ -942,5 +942,60 @@ describe('estimateCropResidueN2O — managed soils, crop-residue N (Eq.11.6/11.7
     expect(() => estimateCropResidueN2O({ crop: 'maize', yieldFresh: -1, area: 100, climate: 'wet' })).toThrow();
     // @ts-expect-error climate required
     expect(() => estimateCropResidueN2O({ crop: 'maize', yieldFresh: 8000, area: 100 })).toThrow();
+  });
+});
+
+describe('estimateLUCtoCropland & forestBiomassCarbon — LUC biomass carbon stock change', () => {
+  it('1. forestBiomassCarbon tropical_rainforest/americas → 300 × 1.37 × 0.5 = 205.5', () => {
+    expect(forestBiomassCarbon('tropical_rainforest', 'americas')).toBeCloseTo(205.5, 4);
+  });
+
+  it('2. LUC bBefore 205.5, 100 ha, annual → (205.5−5.0) × 100 × 44/12 = 73516.67 tCO2', () => {
+    const e = estimateLUCtoCropland({ bBefore_tCha: 205.5, area_ha: 100, cropType: 'annual' });
+    expect(e.emissions).toBeCloseTo(73516.67, 0);
+    expect(e.gas).toBe('CO2');
+    expect(e.category).toBe('land_use_change'); // NOT land_management
+    expect(e.hectares).toBe(100);
+    expect(e.carbonStock!.soil).toBeNull();
+    expect(e.dataQuality).toBe('secondary');
+    expect(e.basis).toContain('SCREENING ESTIMATE');
+  });
+
+  it('3. forestBiomassCarbon temperate_oceanic/north_america → 405.9; convert 40 ha → 58798.67', () => {
+    expect(forestBiomassCarbon('temperate_oceanic', 'north_america')).toBeCloseTo(405.9, 4);
+    const e = estimateLUCtoCropland({ bBefore_tCha: 405.9, area_ha: 40, cropType: 'annual' });
+    expect(e.emissions).toBeCloseTo(58798.67, 0);
+  });
+
+  it('4. perennial_tropical_wet ΔC_G 10.0: bBefore 205.5, 100 ha → 71683.33', () => {
+    const e = estimateLUCtoCropland({ bBefore_tCha: 205.5, area_ha: 100, cropType: 'perennial_tropical_wet' });
+    expect(e.emissions).toBeCloseTo(71683.33, 0);
+  });
+
+  it('5. grassland origin → biomass term computed (1100) BUT soil-dominated incompleteness flag present', () => {
+    const e = estimateLUCtoCropland({ bBefore_tCha: 8, area_ha: 100, cropType: 'annual', originLandType: 'grassland' });
+    expect(e.emissions).toBeCloseTo(1100, 4); // netLoss 3.0 × 100 × 44/12
+    expect(e.basis).toMatch(/SOIL-dominated/);
+    expect(e.basis).toMatch(/materially incomplete/);
+  });
+
+  it('6. forestBiomassCarbon omitted range zone (tropical_mountain) → throws "supply bBefore directly"', () => {
+    expect(() => forestBiomassCarbon('tropical_mountain', 'africa')).toThrow(/supply bBefore directly/);
+  });
+
+  it('7. forestBiomassCarbon tropical_rainforest/europe → throws (no europe value for that zone)', () => {
+    expect(() => forestBiomassCarbon('tropical_rainforest', 'europe')).toThrow();
+  });
+
+  it('8. area 0 → 0; negative bBefore/area → throws', () => {
+    expect(estimateLUCtoCropland({ bBefore_tCha: 205.5, area_ha: 0, cropType: 'annual' }).emissions).toBe(0);
+    expect(() => estimateLUCtoCropland({ bBefore_tCha: -1, area_ha: 100, cropType: 'annual' })).toThrow();
+    expect(() => estimateLUCtoCropland({ bBefore_tCha: 205.5, area_ha: -1, cropType: 'annual' })).toThrow();
+  });
+
+  it('9. CF is 0.5 not 0.47 (locks Table 5.8): rainforest/americas = 205.5, NOT 193.17', () => {
+    const v = forestBiomassCarbon('tropical_rainforest', 'americas');
+    expect(v).toBeCloseTo(205.5, 4);
+    expect(v).not.toBeCloseTo(193.17, 2); // 300 × 1.37 × 0.47 regression
   });
 });

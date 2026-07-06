@@ -24,7 +24,8 @@ export interface EmissionFactor {
       | 'kg'                  // live weight
       | 'gCH4/kgVS'           // manure CH4 factor (Table 10.14)
       | 'kgN/1000kg/day'      // manure N excretion rate (Table 10.19)
-      | 'kgN2O-N/kgN';        // direct N2O EF3 (Table 10.21)
+      | 'kgN2O-N/kgN'         // direct N2O EF3 (Table 10.21)
+      | 'tC/t-dm';           // carbon fraction of dry matter (LUC, Table 5.8)
   source: string;             // exact table citation
   tier: 1 | 2;
   region?: string;
@@ -778,5 +779,59 @@ export const CROP_RESIDUE_PARAMS: Record<CropType, CropResidueParams> = {
   grass_clover:         { nAg: 0.025, nBg: 0.016, rAg: 0.3,  rs: 0.80, dry: 0.90 },
 };
 
-// (Fertiliser and LUC factor sets — enteric's/manure's siblings — are SEPARATE later
-//  tasks, each with its own cited provenance. Intentionally absent for now.)
+// ── Land Use Change → Cropland: biomass carbon stock change (Ch.5 §5.3.1) ────────
+// Tier-1 instantaneous: (B_before − ΔC_G) × area × 44/12, booked in the conversion year.
+export const LUC_CARBON_FRACTION = 0.5; // Table 5.8 SPECIFIES 0.5 for land-conversion biomass (NOT Table 4.3's 0.47)
+export const LUC_CARBON_FRACTION_SRC = 'IPCC 2006 GL Vol4 Table 5.8 (CF 0.5 for land-conversion biomass)';
+export const C_TO_CO2 = 44 / 12;
+
+// ΔC_G — Table 5.9, carbon regrown after 1 yr cropland (t C/ha).
+export const DELTA_CG = {
+  annual: 5.0,
+  perennial_temperate: 2.1,
+  perennial_tropical_dry: 1.8,
+  perennial_tropical_moist: 2.6,
+  perennial_tropical_wet: 10.0,
+};
+export const DELTA_CG_SRC = 'IPCC 2006 GL Vol4 Table 5.9';
+export type CropConversionType = keyof typeof DELTA_CG;
+
+export type ForestZone =
+  // present in FOREST_AGB (point defaults)
+  | 'tropical_rainforest' | 'tropical_moist_deciduous' | 'tropical_dry' | 'tropical_shrubland'
+  | 'subtropical_humid' | 'subtropical_dry' | 'subtropical_steppe' | 'temperate_oceanic' | 'boreal_coniferous'
+  // OMITTED (range / age-split cells) — accepted as input but throw "supply bBefore directly"
+  | 'tropical_mountain' | 'subtropical_mountain' | 'temperate_continental' | 'temperate_mountain'
+  | 'boreal_tundra' | 'boreal_mountain';
+export type ForestContinent =
+  | 'africa' | 'americas' | 'asia_continental' | 'asia_insular' | 'europe'
+  | 'north_america' | 'new_zealand' | 'south_america' | 'asia_europe_na';
+
+// Above-ground biomass — Table 4.7 (t d.m./ha), point-value cells only. Range/age-split zones OMITTED.
+export const FOREST_AGB_SRC = 'IPCC 2006 GL Vol4 Ch4 Table 4.7 (above-ground biomass, natural forests)';
+export const FOREST_AGB: Partial<Record<ForestZone, Partial<Record<ForestContinent, number>>>> = {
+  tropical_rainforest:      { africa: 310, americas: 300, asia_continental: 280, asia_insular: 350 },
+  tropical_moist_deciduous: { africa: 260, americas: 220, asia_continental: 180, asia_insular: 290 },
+  tropical_dry:             { africa: 120, americas: 210, asia_continental: 130, asia_insular: 160 },
+  tropical_shrubland:       { africa: 70,  americas: 80,  asia_continental: 60,  asia_insular: 70 },
+  subtropical_humid:        { americas: 220, asia_continental: 180, asia_insular: 290 },
+  subtropical_dry:          { africa: 140, americas: 210, asia_continental: 130, asia_insular: 160 },
+  subtropical_steppe:       { africa: 70,  americas: 80,  asia_continental: 60,  asia_insular: 70 },
+  temperate_oceanic:        { europe: 120, north_america: 660, new_zealand: 360, south_america: 180 },
+  boreal_coniferous:        { asia_europe_na: 50 }, // Table 4.7 range 10–90 → conservative midpoint 50 (range-derived)
+};
+
+// Root:shoot ratio R — Table 4.4. Flat, or biomass-tiered (agb < threshold → below, else above).
+export type RootShootSpec = number | { threshold: number; below: number; above: number };
+export const ROOT_SHOOT_SRC = 'IPCC 2006 GL Vol4 Ch4 Table 4.4 (root:shoot ratio R)';
+export const ROOT_SHOOT: Partial<Record<ForestZone, RootShootSpec>> = {
+  tropical_rainforest:      0.37,
+  tropical_moist_deciduous: { threshold: 125, below: 0.20, above: 0.24 },
+  tropical_dry:             { threshold: 20,  below: 0.56, above: 0.28 },
+  tropical_shrubland:       0.40,
+  subtropical_humid:        { threshold: 125, below: 0.20, above: 0.24 },
+  subtropical_dry:          { threshold: 20,  below: 0.56, above: 0.28 },
+  subtropical_steppe:       0.32,
+  temperate_oceanic:        0.23, // temperate other-broadleaf 75–150 tier (documented default)
+  boreal_coniferous:        { threshold: 75, below: 0.39, above: 0.24 },
+};
