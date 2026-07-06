@@ -707,6 +707,7 @@ export function estimateLUCtoCropland(input: {
     hectares: area_ha,
     carbonStock: { biomass: emissions_tCO2, soil: null }, // soil pending LUC-2
     basis: `IPCC 2006 GL Vol4 Tier-1 land-converted-to-cropland biomass (Eq 2.16; B_after=0, conversion-year instantaneous; CF 0.5 per Table 5.8; ΔC_G Table 5.9); SCREENING ESTIMATE, biomass pool only, excludes soil organic carbon change${soilFlag}`,
+    flags: ['screening_estimate', 'biomass_only_excludes_soil', ...(originLandType === 'grassland' ? ['grassland_soil_incomplete'] : [])],
   };
 }
 
@@ -771,5 +772,6 @@ export function estimateLUCtoCroplandSoil(input: {
     hectares: area_ha,
     carbonStock: { biomass: null, soil: emissions_tCO2 }, // pairs with LUC-1 biomass; this is the soil pool
     basis: `IPCC 2006 GL Tier-1 land-converted-to-cropland SOC (Ch2 Table 2.3 SOC_ref × Ch5 Table 5.5 F_LU/F_MG/F_I, 20-yr amortised); SCREENING ESTIMATE${flag}`,
+    flags: ['screening_estimate', ...(managementApplied ? [] : ['soc_management_not_applied'])],
   };
 }

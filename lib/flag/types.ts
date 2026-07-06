@@ -59,6 +59,10 @@ export interface EmissionEstimate {
   category?: LandCategory;
   hectares?: number;
   carbonStock?: { biomass: number | null; soil: number | null };
+  // Structured screening/incompleteness markers (surfaced at inventory level by
+  // assembleFlagInventory). E.g. 'screening_estimate', 'biomass_only_excludes_soil',
+  // 'grassland_soil_incomplete', 'soc_management_not_applied'.
+  flags?: string[];
 }
 
 // The whole land-sector inventory — three categories always distinct.
@@ -68,5 +72,26 @@ export interface FlagResult {
   removals: CategoryResult;          // reported SEPARATELY — never subtracted from emissions
   grossEmissions: number;            // LUC + landManagement ONLY (removals excluded)
   totalHectares: number;
+  gwpBasis: GwpVersion;
+}
+
+// ── Reporting surface (assembleFlagInventory) — signed roll-up over EmissionEstimate[] ──
+export interface FlagCategorySummary {
+  category: LandCategory;
+  emissions: number;              // SIGNED tCO2e (may be negative if sequestration > emission within category)
+  byGas: { CH4: number; N2O: number; CO2: number };
+  hectares: number;               // summed land occupation (partial — only lines carrying hectares)
+  lineCount: number;
+  weightedDataQuality: number;    // |emissions|-weighted DQ (1=primary, 2=secondary)
+}
+export interface FlagInventory {
+  landManagement: FlagCategorySummary;
+  landUseChange: FlagCategorySummary;
+  removals: FlagCategorySummary;        // present-but-empty until a removals estimator exists; POSITIVE magnitude
+  grossEmissions: number;               // landManagement + landUseChange (SIGNED; removals EXCLUDED)
+  totalHectares: number;
+  overallWeightedDataQuality: number;   // |emissions|-weighted across all emission lines (removals excluded)
+  screeningFlags: string[];             // de-duped union of all lines' flags
+  lineCount: number;
   gwpBasis: GwpVersion;
 }

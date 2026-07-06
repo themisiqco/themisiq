@@ -3,9 +3,9 @@
 // Exact-number assertions; core invariant: the three categories are reported
 // separately and removals are NEVER netted into gross emissions.
 import { describe, it, expect } from 'vitest';
-import { computeFlag } from './flag/engine';
+import { computeFlag, assembleFlagInventory } from './flag/engine';
 import { estimateEnteric, estimateManureCH4, estimateManureN2O, estimateManureN2OIndirect, estimateSyntheticFertiliserN2O, estimateAppliedManureN2O, estimateGrazingDepositionN2O, estimateCropResidueN2O, estimateLUCtoCropland, forestBiomassCarbon, estimateLUCtoCroplandSoil } from './flag/estimate';
-import type { FlagActivity } from './flag/types';
+import type { FlagActivity, EmissionEstimate } from './flag/types';
 
 const line = (over: Partial<FlagActivity>): FlagActivity => ({
   id: 'x',
@@ -1045,5 +1045,102 @@ describe('estimateLUCtoCroplandSoil — SOC change on conversion to cropland (20
     const e = estimateLUCtoCroplandSoil({ climate: 'warm_temperate_moist', soil: 'hac', area_ha: 100, originLandType: 'grassland', tillage: 'full', carbonInput: 'medium' });
     expect(e.emissions).toBeCloseTo(500.13, 1);
     expect(e.emissions).not.toBeCloseTo(10002.67, 0); // the un-amortised value
+  });
+});
+
+describe('assembleFlagInventory — reporting surface (signed roll-up over EmissionEstimate[])', () => {
+  const F = { value: 1, unit: 'kgN2O-N/kgN' as const, source: 'test', tier: 1 as const };
+  const est = (o: Partial<EmissionEstimate>): EmissionEstimate =>
+    ({ emissions: 0, dataQuality: 'secondary', gas: 'CO2', factor: F, basis: 'test', ...o });
+
+  it('1. mixed inventory: land_management (CH4 100 + N2O 50) + LUC biomass (CO2 500)', () => {
+    const inv = assembleFlagInventory([
+      est({ gas: 'CH4', emissions: 100 }),                               // enteric → land_management (undefined default)
+      est({ gas: 'N2O', emissions: 50 }),                               // synth-fert → land_management
+      est({ gas: 'CO2', emissions: 500, category: 'land_use_change', hectares: 100, flags: ['screening_estimate', 'biomass_only_excludes_soil'] }),
+    ]);
+    expect(inv.landManagement.emissions).toBe(150);
+    expect(inv.landManagement.byGas).toEqual({ CH4: 100, N2O: 50, CO2: 0 });
+    expect(inv.landUseChange.emissions).toBe(500);
+    expect(inv.landUseChange.byGas).toEqual({ CH4: 0, N2O: 0, CO2: 500 });
+    expect(inv.grossEmissions).toBe(650);
+    expect(inv.removals).toMatchObject({ emissions: 0, lineCount: 0 });
+    expect(inv.totalHectares).toBe(100); // only the LUC line carries hectares
+    expect(inv.screeningFlags).toContain('screening_estimate');
+    expect(inv.screeningFlags).toContain('biomass_only_excludes_soil');
+    expect(inv.overallWeightedDataQuality).toBe(2); // all secondary
+    expect(inv.lineCount).toBe(3);
+  });
+
+  it('2. negative SOC line allowed (signed): LUC biomass +500 and SOC −230 → LUC 270, no throw', () => {
+    const inv = assembleFlagInventory([
+      est({ gas: 'CO2', emissions: 500, category: 'land_use_change', hectares: 100 }),
+      est({ gas: 'CO2', emissions: -230, category: 'land_use_change', hectares: 100 }),
+    ]);
+    expect(inv.landUseChange.emissions).toBe(270);
+    expect(inv.grossEmissions).toBe(270);
+  });
+
+  it('3. removals never netted: gross excludes a +300 removals line', () => {
+    const inv = assembleFlagInventory([
+      est({ gas: 'CH4', emissions: 100 }),                              // land_management
+      est({ gas: 'CO2', emissions: 300, category: 'removals' }),        // removals (positive magnitude)
+    ]);
+    expect(inv.removals.emissions).toBe(300);
+    expect(inv.grossEmissions).toBe(100); // NOT 100 − 300; removals excluded entirely
+  });
+
+  it('4. weighted DQ: primary(1) + secondary(2) at equal magnitude → 1.5; negatives weight by magnitude', () => {
+    const inv = assembleFlagInventory([
+      est({ emissions: 100, dataQuality: 'primary' }),
+      est({ emissions: 100, dataQuality: 'secondary' }),
+    ]);
+    expect(inv.overallWeightedDataQuality).toBe(1.5);
+    // magnitude weighting: a negative line still contributes |emissions|
+    const inv2 = assembleFlagInventory([
+      est({ emissions: 100, dataQuality: 'primary' }),
+      est({ emissions: -100, dataQuality: 'secondary' }),
+    ]);
+    expect(inv2.overallWeightedDataQuality).toBe(1.5);
+  });
+
+  it('5. real LUC estimators propagate flags: grassland_soil_incomplete + soc_management_not_applied', () => {
+    const biomass = estimateLUCtoCropland({ bBefore_tCha: 205.5, area_ha: 100, cropType: 'annual', originLandType: 'grassland' });
+    const soc = estimateLUCtoCroplandSoil({ climate: 'warm_temperate_moist', soil: 'hac', area_ha: 100, originLandType: 'grassland' });
+    const inv = assembleFlagInventory([biomass, soc]);
+    expect(inv.screeningFlags).toContain('grassland_soil_incomplete');
+    expect(inv.screeningFlags).toContain('soc_management_not_applied');
+    expect(inv.screeningFlags).toContain('screening_estimate'); // de-duped union (both lines carry it once)
+  });
+
+  it('6. hectares optional: livestock-only inventory (no hectares) assembles, totalHectares 0, no throw', () => {
+    const inv = assembleFlagInventory([
+      est({ gas: 'CH4', emissions: 100 }),
+      est({ gas: 'N2O', emissions: 50 }),
+    ]);
+    expect(inv.totalHectares).toBe(0);
+    expect(inv.landManagement.emissions).toBe(150);
+  });
+
+  it('7. empty estimates[] → zeroed inventory, no throw', () => {
+    const inv = assembleFlagInventory([]);
+    expect(inv.landManagement).toMatchObject({ emissions: 0, lineCount: 0, weightedDataQuality: 0 });
+    expect(inv.landUseChange).toMatchObject({ emissions: 0, lineCount: 0 });
+    expect(inv.removals).toMatchObject({ emissions: 0, lineCount: 0 });
+    expect(inv.grossEmissions).toBe(0);
+    expect(inv.totalHectares).toBe(0);
+    expect(inv.overallWeightedDataQuality).toBe(0);
+    expect(inv.screeningFlags).toEqual([]);
+    expect(inv.gwpBasis).toBe('AR6');
+  });
+
+  it('8. computeFlag UNCHANGED: original FlagActivity partition still works', () => {
+    const r = computeFlag([
+      { id: 'a', category: 'land_use_change', emissions: 1000, hectares: 50 },
+      { id: 'b', category: 'land_management', emissions: 400, hectares: 200 },
+      { id: 'c', category: 'removals', emissions: 300 },
+    ]);
+    expect(r.grossEmissions).toBe(1400);       // removals excluded, unchanged behavior
+    expect(r.removals.emissions).toBe(300);
   });
 });
