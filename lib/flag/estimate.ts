@@ -9,8 +9,8 @@
 // Manure, fertiliser, and LUC estimators are SEPARATE later tasks.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { ENTERIC_CATTLE, ENTERIC_OTHER, FLAG_GWP_AR6, MANURE_VS, MANURE_WEIGHT, MANURE_FACTOR, SYSTEM_VALIDITY, MANURE_LIQUID_FACTOR, LIQUID_SYSTEM_VALIDITY, MANURE_BIOGAS_FACTOR, MANURE_N_RATE, MANURE_N2O_EF3, N2O_EF4, N2O_EF5, FRACGAS_MS, FRACLEACH_MS, N2O_EF1_SYNTH, FRACGASF, FRACLEACH_H, N2O_EF1_OTHER, FRACGASM, N2O_EF3PRP } from './params';
-import type { EmissionFactor, ManureSpecies, ManureSubcategory, ManureSystem, ManureClimate, ManureClimateZone, ManureLiquidSystem, DigesterQuality, ManureN2OSystem, ManureN2OIndirectSystem, ManureSpeciesGroup, IndirectClimate, FertiliserType, ManureActivityTable } from './params';
+import { ENTERIC_CATTLE, ENTERIC_OTHER, FLAG_GWP_AR6, MANURE_VS, MANURE_WEIGHT, MANURE_FACTOR, SYSTEM_VALIDITY, MANURE_LIQUID_FACTOR, LIQUID_SYSTEM_VALIDITY, MANURE_BIOGAS_FACTOR, MANURE_N_RATE, MANURE_N2O_EF3, N2O_EF4, N2O_EF5, FRACGAS_MS, FRACLEACH_MS, N2O_EF1_SYNTH, FRACGASF, FRACLEACH_H, N2O_EF1_OTHER, FRACGASM, N2O_EF3PRP, CROP_RESIDUE_PARAMS } from './params';
+import type { EmissionFactor, ManureSpecies, ManureSubcategory, ManureSystem, ManureClimate, ManureClimateZone, ManureLiquidSystem, DigesterQuality, ManureN2OSystem, ManureN2OIndirectSystem, ManureSpeciesGroup, IndirectClimate, FertiliserType, CropType, CropResidueParams, ManureActivityTable } from './params';
 import type { EmissionEstimate } from './types';
 
 // Cattle & buffalo are region-keyed (Table 10.11); everything else is global (Table 10.10).
@@ -589,5 +589,66 @@ export function estimateGrazingDepositionN2O(input: {
     factor: ef3, // EF3PRP (group/climate-selected); indirect fracs cited in the basis
     basis: 'IPCC 2019 Tier 1 grazing deposition (PRP) N2O (Ch.11; EF3PRP + FracGASM×EF4 + FracLEACH×EF5), screening-grade',
     breakdown: { direct, volatilisation, leaching },
+  };
+}
+
+// ── Crop-residue N2O (managed soils) — residue-N derivation then the Ch.11 tail ─────
+// FIRST pathway with an activity-data derivation step (Eq.11.6/11.7) before the emission chain.
+export function estimateCropResidueN2O(input: {
+  crop: CropType | string;      // unknown → 'generic' fallback (IPCC-provided)
+  yieldFresh: number;           // kg fresh/ha
+  area: number;                 // ha
+  climate: IndirectClimate;     // REQUIRED
+  fracRemove?: number;          // default 0 (Eq.11.6: assume no removal if unavailable)
+  fracBurnt?: number;           // default 0
+  fracRenew?: number;           // default 1 (annual; perennial = 1/X)
+  cf?: number;                  // combustion factor (Ch.2 Table 2.6); only used if fracBurnt > 0
+}): EmissionEstimate {
+  const { crop, yieldFresh, area, climate } = input;
+
+  if (yieldFresh < 0 || area < 0) {
+    throw new Error(`crop residue N2O: yieldFresh and area must be >= 0 (got ${yieldFresh}, ${area})`);
+  }
+  if (climate !== 'wet' && climate !== 'dry') {
+    throw new Error('crop residue N2O: climate (wet|dry) is required — it selects EF1/EF4 and gates leaching');
+  }
+
+  const fr = input.fracRemove ?? 0;
+  const fb = input.fracBurnt ?? 0;
+  const frenew = input.fracRenew ?? 1;
+  const cf = input.cf ?? 0;
+  const inRange = (x: number) => x >= 0 && x <= 1;
+  if (![fr, fb, frenew, cf].every(inRange)) {
+    throw new Error('crop residue N2O: fractions (fracRemove/fracBurnt/fracRenew/cf) must be within [0,1]');
+  }
+  if (fr + fb * cf > 1) {
+    throw new Error('crop residue N2O: residue removed+burnt fraction exceeds 1 (AG residue-N would go negative)');
+  }
+
+  const isKnown = Object.prototype.hasOwnProperty.call(CROP_RESIDUE_PARAMS, crop);
+  const p: CropResidueParams = (CROP_RESIDUE_PARAMS as Record<string, CropResidueParams>)[crop] ?? CROP_RESIDUE_PARAMS.generic;
+
+  // Residue-N derivation (Eq.11.7 dry-matter, Eq.11.6 residue-N). Null coefficients drop their term.
+  const cropDm = yieldFresh * p.dry;                                  // kg d.m./ha
+  const agDm = p.rAg != null ? cropDm * p.rAg : 0;                    // rAg null → AG residue 0
+  const agr = agDm * area;                                           // total above-ground residue d.m.
+  const bgr = p.rs != null ? (cropDm + agDm) * p.rs * area * frenew : 0; // rs null → BGR 0
+  const agN = agr * p.nAg * (1 - fr - fb * cf);
+  const bgN = p.nBg != null ? bgr * p.nBg : 0;                        // nBg null → BGR-N 0
+  const fCr = agN + bgN;                                              // kg residue N
+
+  const ef1 = N2O_EF1_OTHER[climate];
+  const direct = fCr * ef1.value * CONV_N2O;
+  const volatilisation = fCr * FRACGASM * N2O_EF4[climate].value * CONV_N2O;
+  const leaching = climate === 'wet' ? fCr * FRACLEACH_H * N2O_EF5.value * CONV_N2O : 0;
+
+  return {
+    emissions: direct + volatilisation + leaching,
+    dataQuality: 'secondary',
+    gas: 'N2O',
+    factor: ef1,
+    basis: `IPCC 2019 Tier 1 crop-residue N2O (Eq.11.6/11.7 residue-N derivation + EF1-other + FracGASM×EF4 + FracLEACH×EF5; Frac_Remove/Burnt exclude residue counted under manure/biomass-burning to avoid double-counting)${isKnown ? '' : ' [generic crop default]'}, screening-grade`,
+    breakdown: { direct, volatilisation, leaching },
+    fCrKgN: fCr,
   };
 }

@@ -4,7 +4,7 @@
 // separately and removals are NEVER netted into gross emissions.
 import { describe, it, expect } from 'vitest';
 import { computeFlag } from './flag/engine';
-import { estimateEnteric, estimateManureCH4, estimateManureN2O, estimateManureN2OIndirect, estimateSyntheticFertiliserN2O, estimateAppliedManureN2O, estimateGrazingDepositionN2O } from './flag/estimate';
+import { estimateEnteric, estimateManureCH4, estimateManureN2O, estimateManureN2OIndirect, estimateSyntheticFertiliserN2O, estimateAppliedManureN2O, estimateGrazingDepositionN2O, estimateCropResidueN2O } from './flag/estimate';
 import type { FlagActivity } from './flag/types';
 
 const line = (over: Partial<FlagActivity>): FlagActivity => ({
@@ -887,5 +887,60 @@ describe('estimateAppliedManureN2O & estimateGrazingDepositionN2O — managed so
   it('(9) direct-manure pasture redirect now names estimateGrazingDepositionN2O', () => {
     expect(() => estimateManureN2O({ animal: 'dairy_cattle', region: 'north_america', headcount: 1, system: 'pasture_range_paddock' }))
       .toThrow(/estimateGrazingDepositionN2O/);
+  });
+});
+
+describe('estimateCropResidueN2O — managed soils, crop-residue N (Eq.11.6/11.7)', () => {
+  // CONV = 0.429
+  it('1. maize WET, yield 8000, area 100, defaults → F_CR 6319.68, total 31.395', () => {
+    // Crop_dm 6960 ; AG_DM 6960 ; AGR 696000 ; agN 4176 ; BGR 306240 ; bgN 2143.68 ; F_CR 6319.68
+    const e = estimateCropResidueN2O({ crop: 'maize', yieldFresh: 8000, area: 100, climate: 'wet' });
+    expect(e.fCrKgN!).toBeCloseTo(6319.68, 2);
+    expect(e.breakdown!.direct!).toBeCloseTo(16.26686, 3);
+    expect(e.breakdown!.volatilisation).toBeCloseTo(7.97076, 3);
+    expect(e.breakdown!.leaching).toBeCloseTo(7.15742, 3);
+    expect(e.emissions).toBeCloseTo(31.39503, 3);
+    expect(e.gas).toBe('N2O');
+    expect(e.factor.value).toBe(0.006); // EF1-other wet
+  });
+
+  it('2. maize DRY → EF1 0.005, EF4 dry, leaching EXACTLY 0, total 16.40241', () => {
+    const e = estimateCropResidueN2O({ crop: 'maize', yieldFresh: 8000, area: 100, climate: 'dry' });
+    expect(e.breakdown!.leaching).toBe(0);
+    expect(e.emissions).toBeCloseTo(16.40241, 3);
+    expect(e.factor.value).toBe(0.005);
+  });
+
+  it('3. rice (nBg null) → BGR-N term 0; F_CR = agN only (2616.6)', () => {
+    const e = estimateCropResidueN2O({ crop: 'rice', yieldFresh: 6000, area: 50, climate: 'wet' });
+    expect(e.fCrKgN!).toBeCloseTo(2616.6, 1);
+  });
+
+  it("4. unknown crop 'quinoa' → generic params (F_CR 8132.8); basis notes generic default", () => {
+    const e = estimateCropResidueN2O({ crop: 'quinoa', yieldFresh: 8000, area: 100, climate: 'wet' });
+    expect(e.fCrKgN!).toBeCloseTo(8132.8, 1);
+    expect(e.basis).toContain('generic crop default');
+  });
+
+  it('5. fracRemove 0.5, maize wet → agN halved (2088); F_CR 4231.68', () => {
+    const e = estimateCropResidueN2O({ crop: 'maize', yieldFresh: 8000, area: 100, climate: 'wet', fracRemove: 0.5 });
+    expect(e.fCrKgN!).toBeCloseTo(4231.68, 2); // agN 2088 + bgN 2143.68
+  });
+
+  it('6. fracRemove 0.7 + fracBurnt 0.5 + cf 0.8 → (1−0.7−0.4) < 0 → throws', () => {
+    expect(() => estimateCropResidueN2O({ crop: 'maize', yieldFresh: 8000, area: 100, climate: 'wet', fracRemove: 0.7, fracBurnt: 0.5, cf: 0.8 })).toThrow(/exceeds 1/);
+  });
+
+  it('7. alfalfa (rAg null) → AG residue 0, agN 0; F_CR = bgN only (5472)', () => {
+    const e = estimateCropResidueN2O({ crop: 'alfalfa', yieldFresh: 8000, area: 100, climate: 'wet' });
+    expect(e.fCrKgN!).toBeCloseTo(5472, 1); // bgN only
+  });
+
+  it('8. yield 0 → 0; area 0 → 0; negative → throws; climate omitted → throws', () => {
+    expect(estimateCropResidueN2O({ crop: 'maize', yieldFresh: 0, area: 100, climate: 'wet' }).emissions).toBe(0);
+    expect(estimateCropResidueN2O({ crop: 'maize', yieldFresh: 8000, area: 0, climate: 'wet' }).emissions).toBe(0);
+    expect(() => estimateCropResidueN2O({ crop: 'maize', yieldFresh: -1, area: 100, climate: 'wet' })).toThrow();
+    // @ts-expect-error climate required
+    expect(() => estimateCropResidueN2O({ crop: 'maize', yieldFresh: 8000, area: 100 })).toThrow();
   });
 });

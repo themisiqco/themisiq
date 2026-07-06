@@ -737,5 +737,46 @@ export const N2O_EF3PRP: { cpp: Record<IndirectClimate, EmissionFactor>; so: Emi
   so: { value: 0.003, unit: 'kgN2O-N/kgN', source: EF3PRP_SRC, tier: 1 }, // flat, no climate split
 };
 
+// ── Crop-residue N2O (managed soils) — residue-N derivation (Eq.11.6/11.7) ───────
+// Per-crop coefficients, Table 11.1a. nBg/rAg/rs may be '−' in the source → stored as null
+// (that residue term drops to 0). 'generic' is the IPCC fallback for crops not listed.
+export interface CropResidueParams {
+  nAg: number;          // N content of above-ground residue (kg N/kg d.m.)
+  nBg: number | null;   // N content of below-ground residue (null → BGR-N term 0)
+  rAg: number | null;   // above-ground residue : crop product ratio (null → AG residue 0)
+  rs: number | null;    // below-ground : above-ground ratio (null → BGR term 0)
+  dry: number;          // dry-matter fraction of fresh yield
+}
+export type CropType =
+  | 'generic' | 'generic_grains' | 'winter_wheat' | 'spring_wheat' | 'barley' | 'oats' | 'maize'
+  | 'rye' | 'rice' | 'millet' | 'sorghum' | 'beans_pulses' | 'soybeans' | 'potatoes_tubers'
+  | 'peanuts' | 'alfalfa' | 'non_legume_hay' | 'n_fixing_forages' | 'non_n_fixing_forages'
+  | 'perennial_grasses' | 'grass_clover';
+export const CROP_RESIDUE_SRC = 'IPCC 2019 Refinement Vol.4 Ch.11 Table 11.1a';
+export const CROP_RESIDUE_PARAMS: Record<CropType, CropResidueParams> = {
+  // { nAg, nBg, rAg, rs, dry }
+  generic:              { nAg: 0.008, nBg: 0.009, rAg: 1.0,  rs: 0.22, dry: 0.85 }, // fallback for crops not indicated
+  generic_grains:       { nAg: 0.006, nBg: 0.009, rAg: 1.3,  rs: 0.22, dry: 0.88 },
+  winter_wheat:         { nAg: 0.006, nBg: 0.009, rAg: 1.3,  rs: 0.23, dry: 0.89 },
+  spring_wheat:         { nAg: 0.006, nBg: 0.009, rAg: 1.3,  rs: 0.28, dry: 0.89 },
+  barley:               { nAg: 0.007, nBg: 0.014, rAg: 1.2,  rs: 0.22, dry: 0.89 },
+  oats:                 { nAg: 0.007, nBg: 0.008, rAg: 1.3,  rs: 0.25, dry: 0.89 },
+  maize:                { nAg: 0.006, nBg: 0.007, rAg: 1.0,  rs: 0.22, dry: 0.87 },
+  rye:                  { nAg: 0.005, nBg: 0.011, rAg: 1.6,  rs: null, dry: 0.88 }, // RS '−' → BGR 0
+  rice:                 { nAg: 0.007, nBg: null,  rAg: 1.4,  rs: 0.16, dry: 0.89 }, // nBg '−' → BGR-N 0
+  millet:               { nAg: 0.007, nBg: null,  rAg: 1.4,  rs: null, dry: 0.90 },
+  sorghum:              { nAg: 0.007, nBg: 0.006, rAg: 1.4,  rs: null, dry: 0.89 },
+  beans_pulses:         { nAg: 0.008, nBg: 0.008, rAg: 2.1,  rs: 0.19, dry: 0.91 },
+  soybeans:             { nAg: 0.008, nBg: 0.008, rAg: 2.1,  rs: 0.19, dry: 0.91 },
+  potatoes_tubers:      { nAg: 0.019, nBg: 0.014, rAg: 0.4,  rs: 0.20, dry: 0.22 },
+  peanuts:              { nAg: 0.016, nBg: null,  rAg: 1.0,  rs: null, dry: 0.94 },
+  alfalfa:              { nAg: 0.027, nBg: 0.019, rAg: null, rs: 0.40, dry: 0.90 }, // rAg '−' → AG residue 0 (forages harvest ~all AG)
+  non_legume_hay:       { nAg: 0.015, nBg: 0.012, rAg: null, rs: 0.54, dry: 0.90 },
+  n_fixing_forages:     { nAg: 0.027, nBg: 0.022, rAg: 0.3,  rs: 0.40, dry: 0.90 },
+  non_n_fixing_forages: { nAg: 0.015, nBg: 0.012, rAg: 0.3,  rs: 0.54, dry: 0.90 },
+  perennial_grasses:    { nAg: 0.015, nBg: 0.012, rAg: 0.3,  rs: 0.80, dry: 0.90 },
+  grass_clover:         { nAg: 0.025, nBg: 0.016, rAg: 0.3,  rs: 0.80, dry: 0.90 },
+};
+
 // (Fertiliser and LUC factor sets — enteric's/manure's siblings — are SEPARATE later
 //  tasks, each with its own cited provenance. Intentionally absent for now.)

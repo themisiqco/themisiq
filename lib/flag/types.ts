@@ -52,6 +52,8 @@ export interface EmissionEstimate {
   // Optional sub-amounts. Indirect manure N2O splits into volatilisation + leaching;
   // synthetic fertiliser N2O adds a `direct` component.
   breakdown?: { direct?: number; volatilisation: number; leaching: number };
+  // Crop-residue N2O surfaces the derived residue-N (kg N) so the Eq.11.6/11.7 step is auditable.
+  fCrKgN?: number;
 }
 
 // The whole land-sector inventory — three categories always distinct.
