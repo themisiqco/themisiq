@@ -713,5 +713,29 @@ export const SYNTH_FERT_SOURCES = {
   fracLeachH: 'IPCC 2019 Table 11.3 (FracLEACH-(H))',
 };
 
+// ── Managed-soils N2O from APPLIED MANURE (spread on soil) & GRAZING DEPOSITION (PRP) ──
+// Both reuse EF4/EF5/FracLEACH_H; direct term differs (EF1-other for applied, EF3PRP for grazing).
+// EF1 "other N inputs" — Table 11.1, organic/manure/residue direct (distinct from synthetic EF1).
+const EF1_OTHER_SRC = 'IPCC 2019 Table 11.1 (EF1, other N inputs, wet/dry)';
+export const N2O_EF1_OTHER: Record<IndirectClimate, EmissionFactor> = {
+  wet: { value: 0.006, unit: 'kgN2O-N/kgN', source: EF1_OTHER_SRC, tier: 1 },
+  dry: { value: 0.005, unit: 'kgN2O-N/kgN', source: EF1_OTHER_SRC, tier: 1 },
+};
+
+// FracGASM — Table 11.3, volatilisation fraction from applied organic N AND grazing deposition.
+export const FRACGASM = 0.21;
+export const FRACGASM_SRC = 'IPCC 2019 Table 11.3 (FracGASM)';
+
+// EF3PRP — Table 11.1, direct N2O from pasture/range/paddock deposition. CPP (cattle/poultry/pigs)
+// is wet/dry; SO (sheep + other animals) is a single value (footnote 10, no climate split).
+const EF3PRP_SRC = 'IPCC 2019 Table 11.1 (EF3PRP,CPP and EF3PRP,SO; footnote 10)';
+export const N2O_EF3PRP: { cpp: Record<IndirectClimate, EmissionFactor>; so: EmissionFactor } = {
+  cpp: {
+    wet: { value: 0.006, unit: 'kgN2O-N/kgN', source: EF3PRP_SRC, tier: 1 },
+    dry: { value: 0.002, unit: 'kgN2O-N/kgN', source: EF3PRP_SRC, tier: 1 },
+  },
+  so: { value: 0.003, unit: 'kgN2O-N/kgN', source: EF3PRP_SRC, tier: 1 }, // flat, no climate split
+};
+
 // (Fertiliser and LUC factor sets — enteric's/manure's siblings — are SEPARATE later
 //  tasks, each with its own cited provenance. Intentionally absent for now.)

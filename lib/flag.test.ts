@@ -4,7 +4,7 @@
 // separately and removals are NEVER netted into gross emissions.
 import { describe, it, expect } from 'vitest';
 import { computeFlag } from './flag/engine';
-import { estimateEnteric, estimateManureCH4, estimateManureN2O, estimateManureN2OIndirect, estimateSyntheticFertiliserN2O } from './flag/estimate';
+import { estimateEnteric, estimateManureCH4, estimateManureN2O, estimateManureN2OIndirect, estimateSyntheticFertiliserN2O, estimateAppliedManureN2O, estimateGrazingDepositionN2O } from './flag/estimate';
 import type { FlagActivity } from './flag/types';
 
 const line = (over: Partial<FlagActivity>): FlagActivity => ({
@@ -814,5 +814,78 @@ describe('estimateSyntheticFertiliserN2O — managed soils, synthetic fertiliser
     const e = estimateSyntheticFertiliserN2O({ nApplied: 1000, climate: 'wet', fertiliserType: 'urea' });
     expect(e.breakdown!.direct!).toBeCloseTo(6.864, 3);   // 0.016 path
     expect(e.breakdown!.direct!).not.toBeCloseTo(6.006, 3); // would be the 0.014 (EF4) regression
+  });
+});
+
+describe('estimateAppliedManureN2O & estimateGrazingDepositionN2O — managed soils', () => {
+  // CONV = 44/28 × 273 / 1000 = 0.429
+  it('(a1) applied manure WET, 1000 kg N → direct 2.574 + vol 1.26126 + leach 1.13256 = 4.96782', () => {
+    const e = estimateAppliedManureN2O({ nApplied: 1000, climate: 'wet' });
+    expect(e.breakdown!.direct!).toBeCloseTo(2.574, 3);
+    expect(e.breakdown!.volatilisation).toBeCloseTo(1.26126, 4);
+    expect(e.breakdown!.leaching).toBeCloseTo(1.13256, 4);
+    expect(e.emissions).toBeCloseTo(4.96782, 4);
+    expect(e.gas).toBe('N2O');
+    expect(e.factor.value).toBe(0.006);       // EF1-other wet
+    expect(e.factor.source).toContain('Table 11.1');
+  });
+
+  it('(a2) applied manure DRY, 1000 kg N → EF1 0.005, leaching EXACTLY 0, total 2.59545', () => {
+    const e = estimateAppliedManureN2O({ nApplied: 1000, climate: 'dry' });
+    expect(e.breakdown!.leaching).toBe(0);
+    expect(e.emissions).toBeCloseTo(2.59545, 4);
+    expect(e.factor.value).toBe(0.005);
+  });
+
+  it('(3) grazing dairy NA WET, 100 head → cpp EF3PRP 0.006 → total 69.5383', () => {
+    // N_ex 139.9775 ; N_dep 13997.75 ; direct 36.03021 + vol 17.65480 + leach 15.85329
+    const e = estimateGrazingDepositionN2O({ animal: 'dairy_cattle', region: 'north_america', headcount: 100, climate: 'wet' });
+    expect(e.emissions).toBeCloseTo(69.5383, 2);
+    expect(e.factor.value).toBe(0.006);       // EF3PRP cpp wet
+    expect(e.breakdown!.direct!).toBeCloseTo(36.0302, 2);
+  });
+
+  it('(4) grazing sheep developed WET, 1000 head → SO EF3PRP flat 0.003 → total 18.80899', () => {
+    // N_ex 5.11 ; N_dep 5110 ; direct = 5110 × 0.003 × 0.429 = 6.57657
+    const e = estimateGrazingDepositionN2O({ animal: 'sheep', region: 'developed', headcount: 1000, climate: 'wet' });
+    expect(e.breakdown!.direct!).toBeCloseTo(6.57657, 4); // SO flat 0.003
+    expect(e.emissions).toBeCloseTo(18.80899, 3);
+  });
+
+  it('(5) grazing sheep DRY → SO EF3PRP still 0.003 (no dry variant); leaching 0; vol uses EF4 dry', () => {
+    const e = estimateGrazingDepositionN2O({ animal: 'sheep', region: 'developed', headcount: 1000, climate: 'dry' });
+    expect(e.factor.value).toBe(0.003);       // flat, NOT a dry-specific value
+    expect(e.breakdown!.direct!).toBeCloseTo(6.57657, 4);
+    expect(e.breakdown!.leaching).toBe(0);
+    expect(e.breakdown!.volatilisation).toBeCloseTo(2.3017995, 5); // 5110 × 0.21 × 0.005 × 0.429
+  });
+
+  it('(6) grazing group mapping: camels → SO 0.003; buffalo → CPP 0.006 wet / 0.002 dry', () => {
+    const camel = estimateGrazingDepositionN2O({ animal: 'camels', region: 'north_america', headcount: 1, climate: 'wet' });
+    expect(camel.factor.value).toBe(0.003);
+    const buffWet = estimateGrazingDepositionN2O({ animal: 'buffalo', region: 'western_europe', headcount: 1, climate: 'wet' });
+    expect(buffWet.factor.value).toBe(0.006);
+    const buffDry = estimateGrazingDepositionN2O({ animal: 'buffalo', region: 'western_europe', headcount: 1, climate: 'dry' });
+    expect(buffDry.factor.value).toBe(0.002);
+  });
+
+  it('(7) grazing buffalo north_america → THROWS (NA region, reuses manure N-rate NA handling)', () => {
+    expect(() => estimateGrazingDepositionN2O({ animal: 'buffalo', region: 'north_america', headcount: 1, climate: 'wet' })).toThrow();
+  });
+
+  it('(8) zero → 0; negative → throws; climate omitted → throws (both estimators)', () => {
+    expect(estimateAppliedManureN2O({ nApplied: 0, climate: 'wet' }).emissions).toBe(0);
+    expect(estimateGrazingDepositionN2O({ animal: 'dairy_cattle', region: 'north_america', headcount: 0, climate: 'wet' }).emissions).toBe(0);
+    expect(() => estimateAppliedManureN2O({ nApplied: -1, climate: 'wet' })).toThrow();
+    expect(() => estimateGrazingDepositionN2O({ animal: 'dairy_cattle', region: 'north_america', headcount: -1, climate: 'wet' })).toThrow();
+    // @ts-expect-error climate required
+    expect(() => estimateAppliedManureN2O({ nApplied: 1000 })).toThrow();
+    // @ts-expect-error climate required
+    expect(() => estimateGrazingDepositionN2O({ animal: 'dairy_cattle', region: 'north_america', headcount: 1 })).toThrow();
+  });
+
+  it('(9) direct-manure pasture redirect now names estimateGrazingDepositionN2O', () => {
+    expect(() => estimateManureN2O({ animal: 'dairy_cattle', region: 'north_america', headcount: 1, system: 'pasture_range_paddock' }))
+      .toThrow(/estimateGrazingDepositionN2O/);
   });
 });

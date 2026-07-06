@@ -9,7 +9,7 @@
 // Manure, fertiliser, and LUC estimators are SEPARATE later tasks.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { ENTERIC_CATTLE, ENTERIC_OTHER, FLAG_GWP_AR6, MANURE_VS, MANURE_WEIGHT, MANURE_FACTOR, SYSTEM_VALIDITY, MANURE_LIQUID_FACTOR, LIQUID_SYSTEM_VALIDITY, MANURE_BIOGAS_FACTOR, MANURE_N_RATE, MANURE_N2O_EF3, N2O_EF4, N2O_EF5, FRACGAS_MS, FRACLEACH_MS, N2O_EF1_SYNTH, FRACGASF, FRACLEACH_H } from './params';
+import { ENTERIC_CATTLE, ENTERIC_OTHER, FLAG_GWP_AR6, MANURE_VS, MANURE_WEIGHT, MANURE_FACTOR, SYSTEM_VALIDITY, MANURE_LIQUID_FACTOR, LIQUID_SYSTEM_VALIDITY, MANURE_BIOGAS_FACTOR, MANURE_N_RATE, MANURE_N2O_EF3, N2O_EF4, N2O_EF5, FRACGAS_MS, FRACLEACH_MS, N2O_EF1_SYNTH, FRACGASF, FRACLEACH_H, N2O_EF1_OTHER, FRACGASM, N2O_EF3PRP } from './params';
 import type { EmissionFactor, ManureSpecies, ManureSubcategory, ManureSystem, ManureClimate, ManureClimateZone, ManureLiquidSystem, DigesterQuality, ManureN2OSystem, ManureN2OIndirectSystem, ManureSpeciesGroup, IndirectClimate, FertiliserType, ManureActivityTable } from './params';
 import type { EmissionEstimate } from './types';
 
@@ -359,7 +359,7 @@ export function estimateManureN2O(input: {
 
   // Three-way system handling.
   if (system === 'pasture_range_paddock') {
-    throw new Error('manure N2O: direct manure N2O for pasture/range/paddock is assessed under managed soils (IPCC Chapter 11), not here');
+    throw new Error('manure N2O: direct manure N2O for pasture/range/paddock is assessed under managed soils (IPCC Chapter 11) — use estimateGrazingDepositionN2O');
   }
   if (system === 'burned_for_fuel') {
     throw new Error('manure N2O: burned-for-fuel N2O is reported under Fuel Combustion, not manure management');
@@ -509,6 +509,85 @@ export function estimateSyntheticFertiliserN2O(input: {
     gas: 'N2O',
     factor: ef1, // primary factor (EF1 direct, climate-selected); FracGASF/EF4/EF5 in the basis
     basis: 'IPCC 2019 Tier 1 synthetic fertiliser N2O (Ch.11 Eq.11.1 direct EF1 + Eq.11.9/11.10 indirect FracGASF×EF4 + FracLEACH×EF5; leaching wet-only), screening-grade',
+    breakdown: { direct, volatilisation, leaching },
+  };
+}
+
+// ── Managed-soils: applied manure to soil (kg N) & grazing deposition/PRP (headcount) ───
+// Both reuse the indirect machinery (FracGASM×EF4 volatilisation, FracLEACH×EF5 leaching, wet-only).
+const CONV_N2O = (44 / 28) * FLAG_GWP_AR6.N2O / 1000; // N→N2O × GWP / 1000 → tCO2e per kg N-source
+
+// (a) Managed manure spread on soil. Direct via EF1 "other N inputs".
+export function estimateAppliedManureN2O(input: {
+  nApplied: number;             // kg N applied
+  climate: IndirectClimate;     // REQUIRED
+}): EmissionEstimate {
+  const { nApplied, climate } = input;
+  if (nApplied < 0) throw new Error(`applied manure N2O: nApplied must be >= 0 (got ${nApplied})`);
+  if (climate !== 'wet' && climate !== 'dry') {
+    throw new Error('applied manure N2O: climate (wet|dry) is required — it selects EF1/EF4 and gates leaching');
+  }
+
+  const ef1 = N2O_EF1_OTHER[climate];
+  const direct = nApplied * ef1.value * CONV_N2O;
+  const volatilisation = nApplied * FRACGASM * N2O_EF4[climate].value * CONV_N2O;
+  const leaching = climate === 'wet' ? nApplied * FRACLEACH_H * N2O_EF5.value * CONV_N2O : 0;
+
+  return {
+    emissions: direct + volatilisation + leaching,
+    dataQuality: 'secondary',
+    gas: 'N2O',
+    factor: ef1,
+    basis: 'IPCC 2019 Tier 1 applied manure to soil N2O (Ch.11; EF1-other + FracGASM×EF4 + FracLEACH×EF5), screening-grade',
+    breakdown: { direct, volatilisation, leaching },
+  };
+}
+
+// PRP direct-EF grouping: cattle/buffalo/swine/poultry → 'cpp' (wet/dry); small ruminants &
+// equids → 'so' (flat 0.003, no climate split for the DIRECT term).
+function prpGroup(species: ManureSpecies): 'cpp' | 'so' {
+  if (species === 'sheep' || species === 'goats' || species === 'horses' || species === 'mules_asses' || species === 'camels') return 'so';
+  return 'cpp'; // dairy_cattle/other_cattle/buffalo/swine/poultry
+}
+
+// (b) Grazing deposition (PRP). Destination for the direct-manure pasture redirect. Deposited N
+// is the full excreted N (reuse the direct-manure N-rate + weight lookup).
+export function estimateGrazingDepositionN2O(input: {
+  animal: ManureSpecies;
+  region: string;
+  headcount: number;
+  climate: IndirectClimate;     // REQUIRED
+  subcategory?: ManureSubcategory;
+}): EmissionEstimate {
+  const { animal, region, headcount, climate, subcategory } = input;
+  if (headcount < 0) throw new Error(`grazing deposition N2O: headcount must be >= 0 (animal ${animal}, got ${headcount})`);
+  if (climate !== 'wet' && climate !== 'dry') {
+    throw new Error('grazing deposition N2O: climate (wet|dry) is required — it selects EF4 and gates leaching');
+  }
+  if ((animal === 'swine' || animal === 'poultry') && !subcategory) {
+    throw new Error(`grazing deposition N2O: subcategory required for ${animal}; refusing to estimate`);
+  }
+
+  const nRate = resolveNRate(animal, subcategory, region);
+  const wt = lookupActivity(MANURE_WEIGHT, animal, subcategory, region);
+  if (!nRate || !wt) {
+    throw new Error(`grazing deposition N2O: no verified IPCC N-rate/weight for ${animal}${subcategory ? '/' + subcategory : ''} in region ${region}; refusing to estimate`);
+  }
+  const nExAnnual = ((nRate.value * wt.value) / 1000) * 365;
+  const nDeposited = headcount * nExAnnual; // all excreted N deposited on pasture
+
+  const group = prpGroup(animal);
+  const ef3 = group === 'so' ? N2O_EF3PRP.so : N2O_EF3PRP.cpp[climate]; // 'so' is climate-flat
+  const direct = nDeposited * ef3.value * CONV_N2O;
+  const volatilisation = nDeposited * FRACGASM * N2O_EF4[climate].value * CONV_N2O;
+  const leaching = climate === 'wet' ? nDeposited * FRACLEACH_H * N2O_EF5.value * CONV_N2O : 0;
+
+  return {
+    emissions: direct + volatilisation + leaching,
+    dataQuality: 'secondary',
+    gas: 'N2O',
+    factor: ef3, // EF3PRP (group/climate-selected); indirect fracs cited in the basis
+    basis: 'IPCC 2019 Tier 1 grazing deposition (PRP) N2O (Ch.11; EF3PRP + FracGASM×EF4 + FracLEACH×EF5), screening-grade',
     breakdown: { direct, volatilisation, leaching },
   };
 }
