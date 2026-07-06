@@ -9,8 +9,8 @@
 // Manure, fertiliser, and LUC estimators are SEPARATE later tasks.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { ENTERIC_CATTLE, ENTERIC_OTHER, FLAG_GWP_AR6, MANURE_VS, MANURE_WEIGHT, MANURE_FACTOR, SYSTEM_VALIDITY, MANURE_LIQUID_FACTOR, LIQUID_SYSTEM_VALIDITY, MANURE_BIOGAS_FACTOR, MANURE_N_RATE, MANURE_N2O_EF3, N2O_EF4, N2O_EF5, FRACGAS_MS, FRACLEACH_MS, N2O_EF1_SYNTH, FRACGASF, FRACLEACH_H, N2O_EF1_OTHER, FRACGASM, N2O_EF3PRP, CROP_RESIDUE_PARAMS, LUC_CARBON_FRACTION, LUC_CARBON_FRACTION_SRC, C_TO_CO2, DELTA_CG, FOREST_AGB, ROOT_SHOOT } from './params';
-import type { EmissionFactor, ManureSpecies, ManureSubcategory, ManureSystem, ManureClimate, ManureClimateZone, ManureLiquidSystem, DigesterQuality, ManureN2OSystem, ManureN2OIndirectSystem, ManureSpeciesGroup, IndirectClimate, FertiliserType, CropType, CropResidueParams, CropConversionType, ForestZone, ForestContinent, ManureActivityTable } from './params';
+import { ENTERIC_CATTLE, ENTERIC_OTHER, FLAG_GWP_AR6, MANURE_VS, MANURE_WEIGHT, MANURE_FACTOR, SYSTEM_VALIDITY, MANURE_LIQUID_FACTOR, LIQUID_SYSTEM_VALIDITY, MANURE_BIOGAS_FACTOR, MANURE_N_RATE, MANURE_N2O_EF3, N2O_EF4, N2O_EF5, FRACGAS_MS, FRACLEACH_MS, N2O_EF1_SYNTH, FRACGASF, FRACLEACH_H, N2O_EF1_OTHER, FRACGASM, N2O_EF3PRP, CROP_RESIDUE_PARAMS, LUC_CARBON_FRACTION, LUC_CARBON_FRACTION_SRC, C_TO_CO2, DELTA_CG, FOREST_AGB, ROOT_SHOOT, LUC_SOC_AMORT_YEARS, SOC_REF, CLIMATE_MAP, F_LU, F_MG, F_I, F_LU_MG_I_SRC } from './params';
+import type { EmissionFactor, ManureSpecies, ManureSubcategory, ManureSystem, ManureClimate, ManureClimateZone, ManureLiquidSystem, DigesterQuality, ManureN2OSystem, ManureN2OIndirectSystem, ManureSpeciesGroup, IndirectClimate, FertiliserType, CropType, CropResidueParams, CropConversionType, ForestZone, ForestContinent, SoilClimate, SoilType, Tillage, CarbonInput, SoilCoarseRegime, ManureActivityTable } from './params';
 import type { EmissionEstimate } from './types';
 
 // Cattle & buffalo are region-keyed (Table 10.11); everything else is global (Table 10.10).
@@ -707,5 +707,69 @@ export function estimateLUCtoCropland(input: {
     hectares: area_ha,
     carbonStock: { biomass: emissions_tCO2, soil: null }, // soil pending LUC-2
     basis: `IPCC 2006 GL Vol4 Tier-1 land-converted-to-cropland biomass (Eq 2.16; B_after=0, conversion-year instantaneous; CF 0.5 per Table 5.8; ΔC_G Table 5.9); SCREENING ESTIMATE, biomass pool only, excludes soil organic carbon change${soilFlag}`,
+  };
+}
+
+// ── LUC → Cropland: SOIL organic carbon change (Ch2 §2.3.3 + Ch5 §5.3.3, Tier 1, 20-yr amortised) ──
+// Pairs with LUC-1 biomass and CLOSES the grassland soil-incompleteness flag. Option-3 management:
+// F_MG/F_I are applied only when BOTH tillage + carbonInput are supplied; otherwise F_LU-only + a loud flag.
+function fMgAfter(tillage: Tillage, coarse: SoilCoarseRegime): number {
+  if (tillage === 'full') return F_MG.full;
+  return (tillage === 'reduced' ? F_MG.reduced : F_MG.no_till)[coarse];
+}
+function fIAfter(input: CarbonInput, coarse: SoilCoarseRegime): number {
+  if (input === 'medium') return F_I.medium;
+  if (input === 'low') return F_I.low[coarse];
+  // high_no_manure / high_with_manure collapse to dry | moistwet (+ tropical_montane).
+  const k: 'dry' | 'moistwet' | 'tropical_montane' =
+    coarse === 'tropical_montane' ? 'tropical_montane'
+    : coarse === 'temperate_dry' || coarse === 'tropical_dry' ? 'dry'
+    : 'moistwet';
+  return (input === 'high_no_manure' ? F_I.high_no_manure : F_I.high_with_manure)[k];
+}
+
+export function estimateLUCtoCroplandSoil(input: {
+  climate: SoilClimate;
+  soil: SoilType;
+  area_ha: number;
+  originLandType: 'forest' | 'grassland' | 'native'; // Tier-1: origin assumed native/stable → SOC_before = SOC_ref
+  tillage?: Tillage;
+  carbonInput?: CarbonInput;
+}): EmissionEstimate {
+  const { climate, soil, area_ha, tillage, carbonInput } = input;
+  if (area_ha < 0) throw new Error(`LUC SOC: area_ha must be >= 0 (got ${area_ha})`);
+
+  const socRef = SOC_REF[climate][soil];
+  if (socRef == null) {
+    throw new Error(`LUC SOC: soil ${soil} does not occur in ${climate} (Table 2.3: NA)`);
+  }
+  const coarse = CLIMATE_MAP[climate];
+  const fLu = F_LU.long_term_cultivated[coarse];
+
+  // Option-3: apply management/input factors only when BOTH are supplied; else F_LU-only fallback.
+  let fMg = 1, fI = 1, managementApplied = false;
+  if (tillage && carbonInput) {
+    fMg = fMgAfter(tillage, coarse);
+    fI = fIAfter(carbonInput, coarse);
+    managementApplied = true;
+  }
+
+  const socAfter = socRef * fLu * fMg * fI;
+  const deltaAnnual = (socRef - socAfter) / LUC_SOC_AMORT_YEARS; // SOC_before = SOC_ref (native origin)
+  const emissions_tCO2 = deltaAnnual * area_ha * C_TO_CO2;       // positive = loss; negative = SOC gain
+
+  const factor: EmissionFactor = { value: fLu, unit: 'ratio', source: F_LU_MG_I_SRC, tier: 1 }; // dominant F_LU factor
+  const flag = managementApplied ? ''
+    : ' — SOC management/input factors NOT applied (tillage/carbonInput regime not supplied); this is the land-use-conversion soil loss ONLY and LIKELY UNDER-ESTIMATES a tilled cropland; supply tillage + carbonInput for the complete figure';
+
+  return {
+    emissions: emissions_tCO2,
+    dataQuality: 'secondary',
+    gas: 'CO2',
+    factor,
+    category: 'land_use_change',
+    hectares: area_ha,
+    carbonStock: { biomass: null, soil: emissions_tCO2 }, // pairs with LUC-1 biomass; this is the soil pool
+    basis: `IPCC 2006 GL Tier-1 land-converted-to-cropland SOC (Ch2 Table 2.3 SOC_ref × Ch5 Table 5.5 F_LU/F_MG/F_I, 20-yr amortised); SCREENING ESTIMATE${flag}`,
   };
 }

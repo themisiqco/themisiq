@@ -25,7 +25,8 @@ export interface EmissionFactor {
       | 'gCH4/kgVS'           // manure CH4 factor (Table 10.14)
       | 'kgN/1000kg/day'      // manure N excretion rate (Table 10.19)
       | 'kgN2O-N/kgN'         // direct N2O EF3 (Table 10.21)
-      | 'tC/t-dm';           // carbon fraction of dry matter (LUC, Table 5.8)
+      | 'tC/t-dm'            // carbon fraction of dry matter (LUC, Table 5.8)
+      | 'ratio';             // dimensionless stock-change factor (SOC, Table 5.5)
   source: string;             // exact table citation
   tier: 1 | 2;
   region?: string;
@@ -834,4 +835,71 @@ export const ROOT_SHOOT: Partial<Record<ForestZone, RootShootSpec>> = {
   subtropical_steppe:       0.32,
   temperate_oceanic:        0.23, // temperate other-broadleaf 75–150 tier (documented default)
   boreal_coniferous:        { threshold: 75, below: 0.39, above: 0.24 },
+};
+
+// ── LUC → Cropland: SOIL organic carbon change (Ch2 §2.3.3 + Ch5 §5.3.3, Tier 1) ──
+// AMORTISED over D=20 yr (Table 5.5 factors are "over 20 years"), unlike LUC-1 biomass (instantaneous).
+export const LUC_SOC_AMORT_YEARS = 20;
+export const LUC_SOC_AMORT_SRC = 'IPCC 2006 GL Vol4 Ch5 Table 5.5 (stock-change factors defined over 20 years)';
+
+export type SoilClimate =
+  | 'boreal' | 'cold_temperate_dry' | 'cold_temperate_moist' | 'warm_temperate_dry'
+  | 'warm_temperate_moist' | 'tropical_dry' | 'tropical_moist' | 'tropical_wet' | 'tropical_montane';
+export type SoilType = 'hac' | 'lac' | 'sandy' | 'spodic' | 'volcanic' | 'wetland';
+export type Tillage = 'full' | 'reduced' | 'no_till';
+export type CarbonInput = 'low' | 'medium' | 'high_no_manure' | 'high_with_manure';
+export type SoilCoarseRegime = 'temperate_dry' | 'temperate_moist' | 'tropical_dry' | 'tropical_moistwet' | 'tropical_montane';
+
+// SOC_REF — Table 2.3 (t C/ha, 0–30 cm), [climate][soil]. Absent soil key = does not occur (throw).
+export const SOC_REF_SRC = 'IPCC 2006 GL Vol4 Ch2 Table 2.3 (SOC_REF, 0-30cm)';
+export const SOC_REF: Record<SoilClimate, Partial<Record<SoilType, number>>> = {
+  boreal:               { hac: 68, sandy: 10, spodic: 117, volcanic: 20, wetland: 146 },        // no lac
+  cold_temperate_dry:   { hac: 50, lac: 33, sandy: 34, volcanic: 20, wetland: 87 },             // no spodic
+  cold_temperate_moist: { hac: 95, lac: 85, sandy: 71, spodic: 115, volcanic: 130, wetland: 87 },
+  warm_temperate_dry:   { hac: 38, lac: 24, sandy: 19, volcanic: 70, wetland: 88 },             // no spodic
+  warm_temperate_moist: { hac: 88, lac: 63, sandy: 34, volcanic: 80, wetland: 88 },             // no spodic
+  tropical_dry:         { hac: 38, lac: 35, sandy: 31, volcanic: 50, wetland: 86 },             // no spodic
+  tropical_moist:       { hac: 65, lac: 47, sandy: 39, volcanic: 70, wetland: 86 },             // no spodic
+  tropical_wet:         { hac: 44, lac: 60, sandy: 66, volcanic: 130, wetland: 86 },            // no spodic
+  tropical_montane:     { hac: 88, lac: 63, sandy: 34, volcanic: 80, wetland: 86 },             // no spodic
+};
+
+// 9-zone climate → Table-5.5 coarse regime (deterministic, Table 5.5 fn1).
+export const CLIMATE_MAP: Record<SoilClimate, SoilCoarseRegime> = {
+  boreal: 'temperate_dry', cold_temperate_dry: 'temperate_dry', warm_temperate_dry: 'temperate_dry',
+  cold_temperate_moist: 'temperate_moist', warm_temperate_moist: 'temperate_moist',
+  tropical_dry: 'tropical_dry',
+  tropical_moist: 'tropical_moistwet', tropical_wet: 'tropical_moistwet',
+  tropical_montane: 'tropical_montane',
+};
+
+// Stock-change factors — Table 5.5 (defined over 20 yr).
+export const F_LU_MG_I_SRC = 'IPCC 2006 GL Vol4 Ch5 Table 5.5 (F_LU/F_MG/F_I, over 20yr)';
+export const F_LU: {
+  long_term_cultivated: Record<SoilCoarseRegime, number>;
+  paddy_rice: number;
+  perennial_tree: number;
+  set_aside: Partial<Record<SoilCoarseRegime, number>>;
+} = {
+  long_term_cultivated: { temperate_dry: 0.80, temperate_moist: 0.69, tropical_dry: 0.58, tropical_moistwet: 0.48, tropical_montane: 0.64 },
+  paddy_rice: 1.10,      // all regimes
+  perennial_tree: 1.00,  // all regimes
+  set_aside: { temperate_dry: 0.93, temperate_moist: 0.82, tropical_montane: 0.88 }, // included for completeness; estimator uses long_term_cultivated
+};
+export const F_MG: { full: number; reduced: Record<SoilCoarseRegime, number>; no_till: Record<SoilCoarseRegime, number> } = {
+  full: 1.00,
+  reduced: { temperate_dry: 1.02, temperate_moist: 1.08, tropical_dry: 1.09, tropical_moistwet: 1.15, tropical_montane: 1.09 },
+  no_till: { temperate_dry: 1.10, temperate_moist: 1.15, tropical_dry: 1.17, tropical_moistwet: 1.22, tropical_montane: 1.16 },
+};
+// F_I high_* collapse temperate/tropical into dry|moistwet (+ tropical_montane) per Table 5.5.
+export const F_I: {
+  low: Record<SoilCoarseRegime, number>;
+  medium: number;
+  high_no_manure: Record<'dry' | 'moistwet' | 'tropical_montane', number>;
+  high_with_manure: Record<'dry' | 'moistwet' | 'tropical_montane', number>;
+} = {
+  low: { temperate_dry: 0.95, temperate_moist: 0.92, tropical_dry: 0.95, tropical_moistwet: 0.92, tropical_montane: 0.94 },
+  medium: 1.00,
+  high_no_manure:   { dry: 1.04, moistwet: 1.11, tropical_montane: 1.08 },
+  high_with_manure: { dry: 1.37, moistwet: 1.44, tropical_montane: 1.41 },
 };

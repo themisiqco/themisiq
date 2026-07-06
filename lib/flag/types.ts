@@ -58,7 +58,7 @@ export interface EmissionEstimate {
   // biomass/soil split (soil null until the soil pool is built).
   category?: LandCategory;
   hectares?: number;
-  carbonStock?: { biomass: number; soil: number | null };
+  carbonStock?: { biomass: number | null; soil: number | null };
 }
 
 // The whole land-sector inventory — three categories always distinct.

@@ -4,7 +4,7 @@
 // separately and removals are NEVER netted into gross emissions.
 import { describe, it, expect } from 'vitest';
 import { computeFlag } from './flag/engine';
-import { estimateEnteric, estimateManureCH4, estimateManureN2O, estimateManureN2OIndirect, estimateSyntheticFertiliserN2O, estimateAppliedManureN2O, estimateGrazingDepositionN2O, estimateCropResidueN2O, estimateLUCtoCropland, forestBiomassCarbon } from './flag/estimate';
+import { estimateEnteric, estimateManureCH4, estimateManureN2O, estimateManureN2OIndirect, estimateSyntheticFertiliserN2O, estimateAppliedManureN2O, estimateGrazingDepositionN2O, estimateCropResidueN2O, estimateLUCtoCropland, forestBiomassCarbon, estimateLUCtoCroplandSoil } from './flag/estimate';
 import type { FlagActivity } from './flag/types';
 
 const line = (over: Partial<FlagActivity>): FlagActivity => ({
@@ -997,5 +997,53 @@ describe('estimateLUCtoCropland & forestBiomassCarbon — LUC biomass carbon sto
     const v = forestBiomassCarbon('tropical_rainforest', 'americas');
     expect(v).toBeCloseTo(205.5, 4);
     expect(v).not.toBeCloseTo(193.17, 2); // 300 × 1.37 × 0.47 regression
+  });
+});
+
+describe('estimateLUCtoCroplandSoil — SOC change on conversion to cropland (20-yr amortised)', () => {
+  it('1. grassland→cropland warm_temperate_moist/hac, 100 ha, full/medium → 500.13', () => {
+    // SOC_ref 88 ; F_LU 0.69, F_MG 1.0, F_I 1.0 → SOC_after 60.72 ; (88−60.72)/20 = 1.364 ; ×100×44/12
+    const e = estimateLUCtoCroplandSoil({ climate: 'warm_temperate_moist', soil: 'hac', area_ha: 100, originLandType: 'grassland', tillage: 'full', carbonInput: 'medium' });
+    expect(e.emissions).toBeCloseTo(500.13, 1);
+    expect(e.gas).toBe('CO2');
+    expect(e.category).toBe('land_use_change');
+    expect(e.carbonStock!.biomass).toBeNull();
+    expect(e.hectares).toBe(100);
+  });
+
+  it('2. no_till + high_with_manure → SOC GAIN (negative): F_MG 1.15 × F_I 1.44 → ≈ −230.13', () => {
+    // SOC_after 88×0.69×1.15×1.44 = 100.55232 ; (88−100.55232)/20 = −0.627616 ; ×100×44/12 = −230.126
+    const e = estimateLUCtoCroplandSoil({ climate: 'warm_temperate_moist', soil: 'hac', area_ha: 100, originLandType: 'grassland', tillage: 'no_till', carbonInput: 'high_with_manure' });
+    expect(e.emissions).toBeCloseTo(-230.13, 1);
+    expect(e.emissions).toBeLessThan(0); // no-till + manure can sequester
+  });
+
+  it('3. management NOT supplied → F_LU-only (500.13) + loud under-estimate flag', () => {
+    const e = estimateLUCtoCroplandSoil({ climate: 'warm_temperate_moist', soil: 'hac', area_ha: 100, originLandType: 'grassland' });
+    expect(e.emissions).toBeCloseTo(500.13, 1); // same value as full/medium (both factors = 1)
+    expect(e.basis).toMatch(/NOT applied/);
+    expect(e.basis).toMatch(/UNDER-ESTIMATES/);
+  });
+
+  it('4. climate map: tropical_wet → tropical_moistwet → F_LU 0.48; hac(44), 50 ha, full/medium → 209.73', () => {
+    // SOC_after 44×0.48 = 21.12 ; (44−21.12)/20 = 1.144 ; ×50×44/12 = 209.733
+    const e = estimateLUCtoCroplandSoil({ climate: 'tropical_wet', soil: 'hac', area_ha: 50, originLandType: 'forest', tillage: 'full', carbonInput: 'medium' });
+    expect(e.emissions).toBeCloseTo(209.73, 1);
+  });
+
+  it('5. NA soil combos throw: boreal+lac, warm_temperate_dry+spodic', () => {
+    expect(() => estimateLUCtoCroplandSoil({ climate: 'boreal', soil: 'lac', area_ha: 100, originLandType: 'forest' })).toThrow(/Table 2.3: NA/);
+    expect(() => estimateLUCtoCroplandSoil({ climate: 'warm_temperate_dry', soil: 'spodic', area_ha: 100, originLandType: 'forest' })).toThrow(/Table 2.3: NA/);
+  });
+
+  it('6. area 0 → 0; negative → throws', () => {
+    expect(estimateLUCtoCroplandSoil({ climate: 'warm_temperate_moist', soil: 'hac', area_ha: 0, originLandType: 'forest' }).emissions).toBe(0);
+    expect(() => estimateLUCtoCroplandSoil({ climate: 'warm_temperate_moist', soil: 'hac', area_ha: -1, originLandType: 'forest' })).toThrow();
+  });
+
+  it('7. amortisation /20 is applied — test-1 without /20 would be 10002.67, with /20 is 500.13', () => {
+    const e = estimateLUCtoCroplandSoil({ climate: 'warm_temperate_moist', soil: 'hac', area_ha: 100, originLandType: 'grassland', tillage: 'full', carbonInput: 'medium' });
+    expect(e.emissions).toBeCloseTo(500.13, 1);
+    expect(e.emissions).not.toBeCloseTo(10002.67, 0); // the un-amortised value
   });
 });
