@@ -689,5 +689,29 @@ const FRACGAS_SRC = 'IPCC 2019 Refinement Vol.4 Ch.10 Table 10.22 (FracGas_MS)';
 const FRACLEACH_SRC = 'IPCC 2019 Refinement Vol.4 Ch.10 Table 10.22 (FracLeach_MS)';
 export const INDIRECT_FRAC_SOURCES = { fracGas: FRACGAS_SRC, fracLeach: FRACLEACH_SRC };
 
+// ── Managed-soils N2O from SYNTHETIC FERTILISER (Ch.11) ──────────────────────────
+// Input model differs: caller supplies kg N APPLIED (not headcount). EF1 direct (Table 11.1) +
+// indirect via FracGASF×EF4 (volatilisation) and FracLEACH-(H)×EF5 (leaching, wet only).
+export type FertiliserType = 'urea' | 'ammonium' | 'nitrate' | 'ammonium_nitrate' | 'unspecified';
+
+// EF1 direct — Table 11.1, synthetic fertiliser inputs, disaggregated by wet/dry climate.
+// NOTE wet = 0.016 is the SYNTHETIC-SPECIFIC value, DISTINCT from indirect EF4 wet (0.014).
+const EF1_SYNTH_SRC = 'IPCC 2019 Table 11.1 (EF1, synthetic fertiliser inputs, wet/dry)';
+export const N2O_EF1_SYNTH: Record<IndirectClimate, EmissionFactor> = {
+  wet: { value: 0.016, unit: 'kgN2O-N/kgN', source: EF1_SYNTH_SRC, tier: 1 },
+  dry: { value: 0.005, unit: 'kgN2O-N/kgN', source: EF1_SYNTH_SRC, tier: 1 },
+};
+
+// FracGASF — Table 11.3, volatilisation fraction from synthetic fertiliser, by type.
+// 'unspecified' uses the `default` blended value. (EF4 & EF5 are reused from the manure build.)
+export const FRACGASF: Record<'default' | 'urea' | 'ammonium' | 'nitrate' | 'ammonium_nitrate', number> = {
+  default: 0.11, urea: 0.15, ammonium: 0.08, nitrate: 0.01, ammonium_nitrate: 0.05,
+};
+export const FRACLEACH_H = 0.24; // Table 11.3 FracLEACH-(H); wet climate only, dry → 0.
+export const SYNTH_FERT_SOURCES = {
+  fracGasF: 'IPCC 2019 Table 11.3 (FracGASF, by fertiliser type)',
+  fracLeachH: 'IPCC 2019 Table 11.3 (FracLEACH-(H))',
+};
+
 // (Fertiliser and LUC factor sets — enteric's/manure's siblings — are SEPARATE later
 //  tasks, each with its own cited provenance. Intentionally absent for now.)

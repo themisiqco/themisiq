@@ -4,7 +4,7 @@
 // separately and removals are NEVER netted into gross emissions.
 import { describe, it, expect } from 'vitest';
 import { computeFlag } from './flag/engine';
-import { estimateEnteric, estimateManureCH4, estimateManureN2O, estimateManureN2OIndirect } from './flag/estimate';
+import { estimateEnteric, estimateManureCH4, estimateManureN2O, estimateManureN2OIndirect, estimateSyntheticFertiliserN2O } from './flag/estimate';
 import type { FlagActivity } from './flag/types';
 
 const line = (over: Partial<FlagActivity>): FlagActivity => ({
@@ -765,5 +765,54 @@ describe('estimateManureN2OIndirect — volatilisation (Eq.10.26) + leaching (Eq
     const e0 = estimateManureN2OIndirect({ animal: 'dairy_cattle', region: 'north_america', headcount: 0, system: 'solid_storage', climate: 'wet' });
     expect(e0.emissions).toBe(0);
     expect(() => estimateManureN2OIndirect({ animal: 'dairy_cattle', region: 'north_america', headcount: -1, system: 'solid_storage', climate: 'wet' })).toThrow();
+  });
+});
+
+describe('estimateSyntheticFertiliserN2O — managed soils, synthetic fertiliser (Ch.11)', () => {
+  it('1. urea WET, 1000 kg N → direct 6.864 + vol 0.9009 + leach 1.13256 = 8.89746', () => {
+    // CONV = 44/28 × 273 / 1000 ; EF1(wet)=0.016, FracGASF(urea)=0.15, EF4(wet)=0.014, FracLEACH=0.24, EF5=0.011
+    const e = estimateSyntheticFertiliserN2O({ nApplied: 1000, climate: 'wet', fertiliserType: 'urea' });
+    expect(e.breakdown!.direct!).toBeCloseTo(6.864, 3);
+    expect(e.breakdown!.volatilisation).toBeCloseTo(0.9009, 4);
+    expect(e.breakdown!.leaching).toBeCloseTo(1.13256, 4);
+    expect(e.emissions).toBeCloseTo(8.89746, 4);
+    expect(e.gas).toBe('N2O');
+    expect(e.dataQuality).toBe('secondary');
+    expect(e.factor.value).toBe(0.016); // EF1 wet (synthetic-specific)
+    expect(e.factor.source).toContain('Table 11.1');
+  });
+
+  it('2. urea DRY, 1000 kg N → EF1 0.005, leaching EXACTLY 0', () => {
+    const e = estimateSyntheticFertiliserN2O({ nApplied: 1000, climate: 'dry', fertiliserType: 'urea' });
+    expect(e.breakdown!.leaching).toBe(0);       // dry-climate gate
+    expect(e.breakdown!.direct!).toBeCloseTo(2.145, 3);        // 1000 × 0.005 × CONV
+    expect(e.breakdown!.volatilisation).toBeCloseTo(0.32175, 4); // 1000 × 0.15 × 0.005 × CONV
+    expect(e.emissions).toBeCloseTo(2.46675, 4);
+    expect(e.factor.value).toBe(0.005);
+  });
+
+  it('3. nitrate-based WET, 500 kg N → FracGASF(nitrate) 0.01 (low) → total 4.02831', () => {
+    const e = estimateSyntheticFertiliserN2O({ nApplied: 500, climate: 'wet', fertiliserType: 'nitrate' });
+    expect(e.emissions).toBeCloseTo(4.02831, 4);
+  });
+
+  it('4. unspecified type WET, 1000 kg N → FracGASF default 0.11 → total 8.65722', () => {
+    const e = estimateSyntheticFertiliserN2O({ nApplied: 1000, climate: 'wet' });
+    expect(e.emissions).toBeCloseTo(8.65722, 4);
+  });
+
+  it('5. nApplied 0 → 0 (all components 0), no throw; negative → throws; climate omitted → throws', () => {
+    const e0 = estimateSyntheticFertiliserN2O({ nApplied: 0, climate: 'wet', fertiliserType: 'urea' });
+    expect(e0.emissions).toBe(0);
+    expect(e0.breakdown).toEqual({ direct: 0, volatilisation: 0, leaching: 0 });
+    expect(() => estimateSyntheticFertiliserN2O({ nApplied: -1, climate: 'wet' })).toThrow();
+    // @ts-expect-error climate is required
+    expect(() => estimateSyntheticFertiliserN2O({ nApplied: 1000, fertiliserType: 'urea' })).toThrow();
+  });
+
+  it('6. EF1 wet is 0.016 (synthetic-specific), NOT EF4 0.014 — direct = 1000×0.016×CONV = 6.864', () => {
+    const e = estimateSyntheticFertiliserN2O({ nApplied: 1000, climate: 'wet', fertiliserType: 'urea' });
+    expect(e.breakdown!.direct!).toBeCloseTo(6.864, 3);   // 0.016 path
+    expect(e.breakdown!.direct!).not.toBeCloseTo(6.006, 3); // would be the 0.014 (EF4) regression
   });
 });

@@ -9,8 +9,8 @@
 // Manure, fertiliser, and LUC estimators are SEPARATE later tasks.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { ENTERIC_CATTLE, ENTERIC_OTHER, FLAG_GWP_AR6, MANURE_VS, MANURE_WEIGHT, MANURE_FACTOR, SYSTEM_VALIDITY, MANURE_LIQUID_FACTOR, LIQUID_SYSTEM_VALIDITY, MANURE_BIOGAS_FACTOR, MANURE_N_RATE, MANURE_N2O_EF3, N2O_EF4, N2O_EF5, FRACGAS_MS, FRACLEACH_MS } from './params';
-import type { EmissionFactor, ManureSpecies, ManureSubcategory, ManureSystem, ManureClimate, ManureClimateZone, ManureLiquidSystem, DigesterQuality, ManureN2OSystem, ManureN2OIndirectSystem, ManureSpeciesGroup, IndirectClimate, ManureActivityTable } from './params';
+import { ENTERIC_CATTLE, ENTERIC_OTHER, FLAG_GWP_AR6, MANURE_VS, MANURE_WEIGHT, MANURE_FACTOR, SYSTEM_VALIDITY, MANURE_LIQUID_FACTOR, LIQUID_SYSTEM_VALIDITY, MANURE_BIOGAS_FACTOR, MANURE_N_RATE, MANURE_N2O_EF3, N2O_EF4, N2O_EF5, FRACGAS_MS, FRACLEACH_MS, N2O_EF1_SYNTH, FRACGASF, FRACLEACH_H } from './params';
+import type { EmissionFactor, ManureSpecies, ManureSubcategory, ManureSystem, ManureClimate, ManureClimateZone, ManureLiquidSystem, DigesterQuality, ManureN2OSystem, ManureN2OIndirectSystem, ManureSpeciesGroup, IndirectClimate, FertiliserType, ManureActivityTable } from './params';
 import type { EmissionEstimate } from './types';
 
 // Cattle & buffalo are region-keyed (Table 10.11); everything else is global (Table 10.10).
@@ -471,5 +471,44 @@ export function estimateManureN2OIndirect(input: {
     factor: ef4, // primary indirect factor (EF4, climate-selected); FracGas/FracLeach in the basis
     basis: 'IPCC 2019 Tier 1 indirect manure N2O (volatilisation Eq.10.26 + leaching Eq.10.27; FracGas/FracLeach Table 10.22; EF4/EF5 Table 11.3; leaching wet-climate only), screening-grade',
     breakdown: { volatilisation, leaching },
+  };
+}
+
+// ── Managed-soils N2O from synthetic fertiliser (IPCC Ch.11) ─────────────────────
+// Input model DIFFERS: the caller supplies kg N APPLIED (not headcount). Self-contained —
+// NOT routed through the manure species/system machinery. Direct (Eq.11.1, EF1) + indirect
+// volatilisation (Eq.11.9, FracGASF×EF4) + leaching (Eq.11.10, FracLEACH×EF5, wet only).
+export function estimateSyntheticFertiliserN2O(input: {
+  nApplied: number;             // kg N applied
+  climate: IndirectClimate;     // REQUIRED — selects EF1/EF4 AND gates leaching
+  fertiliserType?: FertiliserType;
+}): EmissionEstimate {
+  const { nApplied, climate, fertiliserType } = input;
+
+  if (nApplied < 0) {
+    throw new Error(`synthetic fertiliser N2O: nApplied must be >= 0 (got ${nApplied})`);
+  }
+  if (climate !== 'wet' && climate !== 'dry') {
+    throw new Error('synthetic fertiliser N2O: climate (wet|dry) is required — it selects EF1/EF4 and gates leaching');
+  }
+
+  const ef1 = N2O_EF1_SYNTH[climate];
+  const ef4 = N2O_EF4[climate];
+  const type = fertiliserType ?? 'unspecified';
+  const fracGasF = type === 'unspecified' ? FRACGASF.default : FRACGASF[type];
+
+  const CONV = (44 / 28) * FLAG_GWP_AR6.N2O / 1000; // N→N2O × GWP / 1000 → tCO2e per kg N-source
+  const direct = nApplied * ef1.value * CONV;
+  const volatilisation = nApplied * fracGasF * ef4.value * CONV;
+  // Leaching applies ONLY in wet climates (Table 11.3 note); dry → 0.
+  const leaching = climate === 'wet' ? nApplied * FRACLEACH_H * N2O_EF5.value * CONV : 0;
+
+  return {
+    emissions: direct + volatilisation + leaching,
+    dataQuality: 'secondary',
+    gas: 'N2O',
+    factor: ef1, // primary factor (EF1 direct, climate-selected); FracGASF/EF4/EF5 in the basis
+    basis: 'IPCC 2019 Tier 1 synthetic fertiliser N2O (Ch.11 Eq.11.1 direct EF1 + Eq.11.9/11.10 indirect FracGASF×EF4 + FracLEACH×EF5; leaching wet-only), screening-grade',
+    breakdown: { direct, volatilisation, leaching },
   };
 }
