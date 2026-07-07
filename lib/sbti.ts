@@ -7,7 +7,7 @@
 // Engine build is incremental. THIS step ships categorize() + validateTargetConfig()
 // + acaSuggestedReductionPct() + computeTrajectory() + progressStatus()
 // + requiredScope3Categories() + cycleState() — the final engine function.
-import { CATEGORY_A_THRESHOLDS, NET_ZERO, ELEC_GROWTH_ABSOLUTE_THRESHOLD_PCT, ACA, SCOPE3_SIGNIFICANCE_PCT } from './sbti/params';
+import { CATEGORY_A_THRESHOLDS, NET_ZERO, ELEC_GROWTH_ABSOLUTE_THRESHOLD_PCT, ACA, SCOPE3_SIGNIFICANCE_PCT, FLAG_MATERIALITY_PCT, FLAG_EXEMPTION_PCT, FLAG_SECTOR_S1_COVERAGE_PCT, FLAG_SECTOR_S3_COVERAGE_PCT, FLAG_NODEFOR_MAX_DATE, FLAG_NODEFOR_MAX_YEARS_AFTER_SUBMISSION } from './sbti/params';
 
 // ── Company categorization (CNZS V2.0, Table 1) ────────────────────────
 export interface CategorizeInput {
@@ -505,4 +505,147 @@ export function cycleState(input: {
       : null;
 
   return { phase, renewalDue: cycle.renewalDue, transitionPlanDue };
+}
+
+// ── SBTi FLAG target-setting (FLAG-1: applicability + config validation) ────────
+// SBTi FLAG Guidance v1.2 (Mar 2026). Consumes caller-supplied FLAG emission PRIMITIVES
+// (not FlagInventory — the engine stays inventory-agnostic, matching baseEmissions/actual).
+// Mirrors requiredScope3Categories: loud guards, %-of-total, params thresholds, graded result.
+export type FlagTargetStatus = 'required_sector' | 'required_material' | 'recommended' | 'exempt_below_floor';
+export interface FlagApplicabilityResult {
+  status: FlagTargetStatus;
+  flagPct: number;    // flagGrossEmissions / totalS123 × 100
+  required: boolean;  // true for the two 'required_*' statuses
+  reason: string;     // human-readable, cites the rule
+}
+
+/**
+ * Determine whether a company must set a separate SBTi FLAG target (SBTi FLAG v1.2).
+ *   - FLAG-designated sector member: required unless FLAG < 5% of footprint (exempt).
+ *   - Non-sector: required if FLAG ≥ 20% of footprint; recommended (voluntary) 5–20%; exempt < 5%.
+ * flagGrossEmissions is GROSS-of-removals. A net-sequestering inventory (gross < 0) has no positive
+ * FLAG emissions to trigger materiality → exempt, but flagged honestly (removals-target rules may apply).
+ */
+export function flagTargetApplicability(input: {
+  flagGrossEmissions: number;      // tCO2e, gross (removals excluded) — FlagInventory.grossEmissions, caller-supplied
+  totalS123Emissions: number;      // tCO2e, total Scope 1+2+3 (the SBTi denominator)
+  isFlagDesignatedSector: boolean;
+}): FlagApplicabilityResult {
+  const { flagGrossEmissions, totalS123Emissions, isFlagDesignatedSector } = input;
+
+  if (!Number.isFinite(flagGrossEmissions)) {
+    throw new Error('flagTargetApplicability: flagGrossEmissions must be a finite number.');
+  }
+  if (!Number.isFinite(totalS123Emissions) || totalS123Emissions <= 0) {
+    throw new Error('flagTargetApplicability: totalS123Emissions must be a finite number > 0 (cannot compute a percentage of zero total).');
+  }
+  if (flagGrossEmissions > totalS123Emissions) {
+    throw new Error(`flagTargetApplicability: flagGrossEmissions (${flagGrossEmissions}) cannot exceed totalS123Emissions (${totalS123Emissions}) — input error.`);
+  }
+
+  // Net-sequestering FLAG inventory: no positive gross emissions to weigh — honest exempt, not a silent 0.
+  if (flagGrossEmissions < 0) {
+    return {
+      status: 'exempt_below_floor',
+      flagPct: 0,
+      required: false,
+      reason: 'net-sequestering FLAG inventory (gross < 0); no positive FLAG emissions to trigger materiality — FLAG removals-target rules may still apply (SBTi FLAG v1.2).',
+    };
+  }
+
+  const flagPct = (flagGrossEmissions / totalS123Emissions) * 100;
+  const pctStr = flagPct.toFixed(1);
+
+  if (isFlagDesignatedSector) {
+    if (flagPct >= FLAG_EXEMPTION_PCT) {
+      return { status: 'required_sector', flagPct, required: true,
+        reason: `FLAG-designated sector with FLAG emissions ${pctStr}% ≥${FLAG_EXEMPTION_PCT}% → separate FLAG target required (SBTi FLAG v1.2).` };
+    }
+    return { status: 'exempt_below_floor', flagPct, required: false,
+      reason: `FLAG-designated sector but FLAG emissions ${pctStr}% <${FLAG_EXEMPTION_PCT}% → below the exemption floor, no separate FLAG target required (SBTi FLAG v1.2).` };
+  }
+
+  if (flagPct >= FLAG_MATERIALITY_PCT) {
+    return { status: 'required_material', flagPct, required: true,
+      reason: `FLAG emissions ${pctStr}% ≥${FLAG_MATERIALITY_PCT}% of total footprint → material, separate FLAG target required (SBTi FLAG v1.2).` };
+  }
+  if (flagPct >= FLAG_EXEMPTION_PCT) {
+    return { status: 'recommended', flagPct, required: false,
+      reason: `FLAG emissions ${pctStr}% between ${FLAG_EXEMPTION_PCT}% and ${FLAG_MATERIALITY_PCT}% → FLAG target recommended (voluntary), not required (SBTi FLAG v1.2).` };
+  }
+  return { status: 'exempt_below_floor', flagPct, required: false,
+    reason: `FLAG emissions ${pctStr}% <${FLAG_EXEMPTION_PCT}% of total footprint → exempt from a separate FLAG target (SBTi FLAG v1.2).` };
+}
+
+// ── FLAG target config + validation (FLAG-1) ────────────────────────────────────
+export interface NoDeforestationCommitment {
+  committed: boolean;
+  targetDate: string;              // ISO 'YYYY-MM-DD'
+  submissionDate?: string;         // FLAG target submission date, for the +2yr check
+}
+export interface FlagTargetConfig {
+  baseYear: number;
+  targetYear: number;
+  pathway: 'sector' | 'commodity' | 'combination';   // trajectory itself is FLAG-2
+  reductionPct?: number;           // deferred to FLAG-2
+  noDeforestation: NoDeforestationCommitment;
+  scope1CoveragePct?: number;      // validated against 95% if supplied
+  scope3CoveragePct?: number;      // validated against 67% if supplied
+}
+
+/**
+ * Validate a near-term FLAG target config (SBTi FLAG v1.2). Accumulates ALL failing reasons
+ * (no short-circuit); ok === reasons.length === 0. Pure; dates compared as YYYY-MM-DD strings
+ * (lexicographic == calendar for that format; zero timezone surface — matches cycleState).
+ */
+export function validateFlagTargetConfig(cfg: FlagTargetConfig): ValidationResult {
+  const reasons: string[] = [];
+
+  // F1 — target after base year.
+  if (!(cfg.targetYear > cfg.baseYear)) {
+    reasons.push('FLAG target year must be after the base year.');
+  }
+  // F2 — near-term FLAG horizon 5–10 years.
+  const horizon = cfg.targetYear - cfg.baseYear;
+  if (horizon < 5 || horizon > 10) {
+    reasons.push(`Near-term FLAG target horizon must be 5–10 years (targetYear − baseYear); got ${horizon}.`);
+  }
+  // F3 — no-deforestation commitment is MANDATORY.
+  if (cfg.noDeforestation.committed !== true) {
+    reasons.push('A no-deforestation commitment is mandatory for any FLAG target (SBTi FLAG v1.2, FLAG-C4).');
+  }
+
+  const td = cfg.noDeforestation.targetDate;
+  if (!ISO_DATE.test(td)) {
+    reasons.push(`No-deforestation targetDate must be an ISO YYYY-MM-DD date; got '${td}'.`);
+  } else {
+    // F4 — targetDate ≤ 2030-12-31 hard ceiling.
+    if (td > FLAG_NODEFOR_MAX_DATE) {
+      reasons.push(`No-deforestation target date ${td} exceeds the ${FLAG_NODEFOR_MAX_DATE} ceiling (SBTi FLAG v1.2).`);
+    }
+    // F5 — targetDate ≤ submissionDate + 2 years (only if submissionDate supplied and valid).
+    const sd = cfg.noDeforestation.submissionDate;
+    if (sd != null) {
+      if (!ISO_DATE.test(sd)) {
+        reasons.push(`No-deforestation submissionDate must be an ISO YYYY-MM-DD date; got '${sd}'.`);
+      } else {
+        const [y, m, d] = sd.split('-');
+        const ceiling = `${Number(y) + FLAG_NODEFOR_MAX_YEARS_AFTER_SUBMISSION}-${m}-${d}`;
+        if (td > ceiling) {
+          reasons.push(`No-deforestation target date ${td} is more than ${FLAG_NODEFOR_MAX_YEARS_AFTER_SUBMISSION} years after the submission date ${sd} (must be ≤ ${ceiling}).`);
+        }
+      }
+    }
+  }
+
+  // F6 — Scope-1 coverage ≥95% if supplied.
+  if (cfg.scope1CoveragePct != null && cfg.scope1CoveragePct < FLAG_SECTOR_S1_COVERAGE_PCT) {
+    reasons.push(`FLAG Scope-1 coverage ${cfg.scope1CoveragePct}% is below the required ${FLAG_SECTOR_S1_COVERAGE_PCT}%.`);
+  }
+  // F7 — Scope-3 coverage ≥67% if supplied.
+  if (cfg.scope3CoveragePct != null && cfg.scope3CoveragePct < FLAG_SECTOR_S3_COVERAGE_PCT) {
+    reasons.push(`FLAG Scope-3 coverage ${cfg.scope3CoveragePct}% is below the required ${FLAG_SECTOR_S3_COVERAGE_PCT}%.`);
+  }
+
+  return { ok: reasons.length === 0, reasons };
 }

@@ -2,7 +2,7 @@
 // Engine tests — step 1: categorize() only. Assertions read thresholds from params
 // (not hardcoded), so a §12 criteria change to params re-points them automatically.
 import { describe, it, expect } from 'vitest';
-import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, progressStatus, progressForTarget, scopeActualField, trajectoryPointForYear, requiredScope3Categories, cycleState, type TargetConfig, type SbtiProfile } from './sbti';
+import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, progressStatus, progressForTarget, scopeActualField, trajectoryPointForYear, requiredScope3Categories, cycleState, flagTargetApplicability, validateFlagTargetConfig, type TargetConfig, type SbtiProfile, type FlagTargetConfig } from './sbti';
 import { CATEGORY_A_THRESHOLDS as T, NET_ZERO, ELEC_GROWTH_ABSOLUTE_THRESHOLD_PCT, ACA, SCOPE3_SIGNIFICANCE_PCT } from './sbti/params';
 
 describe('categorize — Route 1 (any country)', () => {
@@ -561,5 +561,92 @@ describe('cycleState', () => {
     expect(() => at('2027-2-1')).toThrow();                                                                   // malformed today
     expect(() => cycleState({ cycle: { ...baseCycle, cycleEnd: undefined as unknown as string }, category: 'A', today: '2029-06-01' })).toThrow(); // missing cycleEnd
     expect(() => cycleState({ cycle: { ...baseCycle, cycleStart: '2027-02-01', cycleEnd: '2026-01-01' }, category: 'A', today: '2029-06-01' })).toThrow(); // cycleEnd before cycleStart
+  });
+});
+
+describe('flagTargetApplicability — SBTi FLAG v1.2 (FLAG-1)', () => {
+  it('1. food producer (sector), 1000/4000 = 25% → required_sector, required', () => {
+    const r = flagTargetApplicability({ flagGrossEmissions: 1000, totalS123Emissions: 4000, isFlagDesignatedSector: true });
+    expect(r.status).toBe('required_sector');
+    expect(r.required).toBe(true);
+    expect(r.flagPct).toBe(25);
+  });
+  it('2. sector but 100/4000 = 2.5% (<5%) → exempt_below_floor, not required', () => {
+    const r = flagTargetApplicability({ flagGrossEmissions: 100, totalS123Emissions: 4000, isFlagDesignatedSector: true });
+    expect(r.status).toBe('exempt_below_floor');
+    expect(r.required).toBe(false);
+  });
+  it('3. non-sector, 1000/4000 = 25% (≥20%) → required_material, required', () => {
+    const r = flagTargetApplicability({ flagGrossEmissions: 1000, totalS123Emissions: 4000, isFlagDesignatedSector: false });
+    expect(r.status).toBe('required_material');
+    expect(r.required).toBe(true);
+  });
+  it('4. non-sector, 400/4000 = 10% → recommended, not required', () => {
+    const r = flagTargetApplicability({ flagGrossEmissions: 400, totalS123Emissions: 4000, isFlagDesignatedSector: false });
+    expect(r.status).toBe('recommended');
+    expect(r.required).toBe(false);
+  });
+  it('5. non-sector, 100/4000 = 2.5% → exempt_below_floor', () => {
+    const r = flagTargetApplicability({ flagGrossEmissions: 100, totalS123Emissions: 4000, isFlagDesignatedSector: false });
+    expect(r.status).toBe('exempt_below_floor');
+    expect(r.required).toBe(false);
+  });
+  it('6. boundary non-sector exactly 20% (800/4000) → required_material (≥ inclusive)', () => {
+    const r = flagTargetApplicability({ flagGrossEmissions: 800, totalS123Emissions: 4000, isFlagDesignatedSector: false });
+    expect(r.status).toBe('required_material');
+    expect(r.flagPct).toBe(20);
+  });
+  it('7. boundary non-sector exactly 5% (200/4000) → recommended (≥5, <20)', () => {
+    const r = flagTargetApplicability({ flagGrossEmissions: 200, totalS123Emissions: 4000, isFlagDesignatedSector: false });
+    expect(r.status).toBe('recommended');
+    expect(r.flagPct).toBe(5);
+  });
+  it('8. negative flagGross (net-sequestering, −50) → exempt_below_floor, flagPct 0, reason notes it', () => {
+    const r = flagTargetApplicability({ flagGrossEmissions: -50, totalS123Emissions: 4000, isFlagDesignatedSector: false });
+    expect(r.status).toBe('exempt_below_floor');
+    expect(r.flagPct).toBe(0);
+    expect(r.required).toBe(false);
+    expect(r.reason).toMatch(/net-sequestering/);
+  });
+  it('9. total 0 throws; flagGross > total throws', () => {
+    expect(() => flagTargetApplicability({ flagGrossEmissions: 100, totalS123Emissions: 0, isFlagDesignatedSector: false })).toThrow();
+    expect(() => flagTargetApplicability({ flagGrossEmissions: 5000, totalS123Emissions: 4000, isFlagDesignatedSector: false })).toThrow();
+  });
+});
+
+describe('validateFlagTargetConfig — SBTi FLAG v1.2 (FLAG-1)', () => {
+  const base: FlagTargetConfig = {
+    baseYear: 2022, targetYear: 2030, pathway: 'sector',
+    noDeforestation: { committed: true, targetDate: '2030-12-31' },
+  };
+  it('10. valid config → ok true', () => {
+    const r = validateFlagTargetConfig(base);
+    expect(r.ok).toBe(true);
+    expect(r.reasons).toEqual([]);
+  });
+  it('11. no commitment → ok false, reason names the mandatory rule', () => {
+    const r = validateFlagTargetConfig({ ...base, noDeforestation: { committed: false, targetDate: '2030-12-31' } });
+    expect(r.ok).toBe(false);
+    expect(r.reasons.some(x => /no-deforestation commitment is mandatory/i.test(x))).toBe(true);
+  });
+  it('12. targetDate 2031-06-01 → ok false (exceeds 2030 ceiling)', () => {
+    const r = validateFlagTargetConfig({ ...base, noDeforestation: { committed: true, targetDate: '2031-06-01' } });
+    expect(r.ok).toBe(false);
+    expect(r.reasons.some(x => /2030-12-31 ceiling/.test(x))).toBe(true);
+  });
+  it('13. submissionDate 2027-01-01 + targetDate 2030-01-01 (>2yr) → ok false (F5)', () => {
+    const r = validateFlagTargetConfig({ ...base, noDeforestation: { committed: true, targetDate: '2030-01-01', submissionDate: '2027-01-01' } });
+    expect(r.ok).toBe(false);
+    expect(r.reasons.some(x => /more than 2 years after the submission date/.test(x))).toBe(true);
+  });
+  it('14. horizon 3 (too short) and 12 (too long) → ok false', () => {
+    expect(validateFlagTargetConfig({ ...base, baseYear: 2027, targetYear: 2030 }).ok).toBe(false); // 3
+    expect(validateFlagTargetConfig({ ...base, baseYear: 2018, targetYear: 2030 }).ok).toBe(false); // 12
+  });
+  it('15. scope1 90% (below 95) and scope3 60% (below 67) → ok false', () => {
+    const r = validateFlagTargetConfig({ ...base, scope1CoveragePct: 90, scope3CoveragePct: 60 });
+    expect(r.ok).toBe(false);
+    expect(r.reasons.some(x => /Scope-1 coverage 90% is below the required 95%/.test(x))).toBe(true);
+    expect(r.reasons.some(x => /Scope-3 coverage 60% is below the required 67%/.test(x))).toBe(true);
   });
 });

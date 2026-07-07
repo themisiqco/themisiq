@@ -78,6 +78,22 @@ export const NET_ZERO = {
 // Any S3 category ≥5% of total Scope 3 must carry a target (replaces V1's 67%-coverage rule).
 export const SCOPE3_SIGNIFICANCE_PCT = 5;
 
+// ── FLAG (Forest, Land & Agriculture) target thresholds ────────────────
+// SBTi FLAG Guidance v1.2 (Mar 2026). A separate FLAG target is required when FLAG gross
+// emissions are material to the company footprint (or the company is in a FLAG-designated
+// sector); a no-deforestation commitment is mandatory alongside any FLAG target.
+export const FLAG_MATERIALITY_PCT = 20;   // FLAG gross ≥20% of total S1+2+3 → FLAG target REQUIRED (SBTi FLAG v1.2)
+export const FLAG_EXEMPTION_PCT = 5;      // <5% of total footprint → exempt from a separate FLAG target (SBTi FLAG v1.2)
+export const FLAG_SECTOR_S1_COVERAGE_PCT = 95;  // near-term FLAG Scope-1 coverage threshold (SBTi FLAG v1.2)
+export const FLAG_SECTOR_S3_COVERAGE_PCT = 67;  // near-term FLAG Scope-3 coverage threshold (SBTi FLAG v1.2)
+export const FLAG_SECTOR_MIN_REDUCTION_RATE_PCT = 3.03; // sector-pathway min annual reduction (FLAG-2 trajectory; unused in FLAG-1)
+export const FLAG_NODEFOR_MAX_DATE = '2030-12-31';       // no-deforestation target-date hard ceiling (SBTi FLAG v1.2)
+export const FLAG_NODEFOR_MAX_YEARS_AFTER_SUBMISSION = 2; // and ≤ 2 yrs after FLAG target submission
+export const FLAG_NODEFOR_WORDING =
+  '[Company X] commits to no-deforestation across its primary deforestation-linked commodities, ' +
+  'with a target date of [no later than 2 years after FLAG target submission date, and no later than 31 December 2030].';
+  // Required public commitment wording (SBTi FLAG v1.2, FLAG-C4).
+
 // ── Version transition dates (SBTi's own dates — wizard copy must use these) ──
 export const VERSION_DATES = {
   v2_0EffectiveDate: '2027-02-01',     // effective 1 Feb 2027
