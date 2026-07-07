@@ -97,13 +97,13 @@ export default function DealAssessmentPage() {
   const risks: SectorRisk[] = (data.sector && SECTOR_RISKS[data.sector]) || []
   const obligations = getObligations(data.location_count ?? 0, frameworks, data.sector ?? undefined)
 
-  const fmt = (n: number) => `$${n.toLocaleString()}`
+  const fmt = (n: number) => `USD ${n.toLocaleString()}`
   const themisIqFigure = obligations.locationUnset
     ? 'Custom quote'
     : obligations.themisIqHasCustom
       ? (obligations.themisIqTotal != null ? `~${fmt(obligations.themisIqTotal)} + custom` : 'Custom quote')
       : `~${fmt(obligations.themisIqTotal ?? 0)}`
-  const consultantRange = `$${Math.round(obligations.consultantLow / 1000)}k–$${Math.round(obligations.consultantHigh / 1000)}k`
+  const consultantRange = `USD ${Math.round(obligations.consultantLow / 1000)}k–${Math.round(obligations.consultantHigh / 1000)}k`
   const includedModulesLabel = obligations.included.map(o => o.short).join(' + ') + ' modules'
 
   // CTA → the pre-configured /order screen. modules = pricing-page ids (/order converts them);
@@ -189,6 +189,7 @@ export default function DealAssessmentPage() {
             Priced like sustainability software, scoped like a consultant&rsquo;s engagement. The difference is automation, not depth: traditional fees are dominated by manual data-collection and review hours — the platform handles those directly, without cutting the deliverable.
           </div>
         </div>
+        <div style={{ fontSize: 11, color: '#888784', marginTop: 8, marginBottom: 16 }}>Benchmark figures shown in USD.</div>
 
         {/* Included for this deal */}
         <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.25)', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: 16 }}>
@@ -215,7 +216,7 @@ export default function DealAssessmentPage() {
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 600 }}>{o.themisIqPrice != null ? `+ ${fmt(o.themisIqPrice)}` : '+ Custom'}</div>
-              <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>consultant ${Math.round(o.consultantLow / 1000)}k–${Math.round(o.consultantHigh / 1000)}k</div>
+              <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>consultant USD {Math.round(o.consultantLow / 1000)}k–{Math.round(o.consultantHigh / 1000)}k</div>
             </div>
           </div>
         ))}
@@ -223,7 +224,7 @@ export default function DealAssessmentPage() {
         {/* Flagged — honest caveat, summed into NEITHER figure */}
         {obligations.flagged.map((o, i) => (
           <div key={i} style={{ background: '#FBF3E2', border: '0.5px solid rgba(146,102,10,0.25)', borderRadius: 10, padding: '0.85rem 1.25rem', marginBottom: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: '#92660A', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Not included — separate specialist</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#92660A', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Covered via SBTi target-setting</div>
             <div style={{ fontSize: 13, color: '#555553' }}>{o.label}</div>
             {o.scopeNote && <div style={{ fontSize: 11, color: '#888784', marginTop: 3, lineHeight: 1.5 }}>{o.scopeNote}</div>}
           </div>

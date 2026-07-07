@@ -114,7 +114,7 @@ export const getComplianceCost = (dealValue: number, sector: string, frameworks:
 // conservative; refresh periodically. Highs tightened so the platform reads as a
 // credible alternative, not a basement bargain.
 export const CONSULTANT_RANGES = {
-  ghg:              { low: 15000, high: 30000 }, // GHG inventory & Scope 3 assessment
+  ghg:              { low: 18000, high: 30000 }, // GHG inventory & Scope 3 assessment
   supplyChain:      { low: 10000, high: 20000 }, // Supply-chain / Scope 3 value-chain
   climateRisk:      { low: 12000, high: 24000 }, // Climate risk — physical & transition
   financedEmissions:{ low: 12000, high: 20000 }, // Financed emissions (PCAF Cat.15) — FS only
@@ -199,8 +199,8 @@ export function getObligations(locationCount: number, frameworks: string[], sect
   // Flagged (NOT summed into either figure) — honest caveats for scopes needing a separate specialist.
   const flagged: ObligationTier[] = []
   if (sector === 'Agriculture & Food') {
-    flagged.push({ label: 'Land-sector (FLAG) emissions', short: 'FLAG', themisIqPrice: null, consultantLow: 0, consultantHigh: 0,
-      scopeNote: 'Requires separate specialist land-sector (FLAG) assessment — not included in either figure.' })
+    flagged.push({ label: 'Forest, Land & Agriculture (FLAG)', short: 'FLAG', themisIqPrice: null, consultantLow: 0, consultantHigh: 0,
+      scopeNote: 'Covered via SBTi science-based target-setting where applicable. Land-sector inventory assessed separately.' })
   }
 
   // themisIqPrice 0 is a REAL (free/bundled) price — kept by the != null filter, adds nothing to the
