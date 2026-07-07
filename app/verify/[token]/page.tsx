@@ -27,6 +27,7 @@ interface VerifierPayload {
   audit?: AuditEntry[]
   verifier?: { name: string | null; email: string | null }
   expires_at?: string
+  accepted_at?: string | null
   error?: string
 }
 
@@ -35,6 +36,10 @@ const FRAMEWORK_NAMES: Record<string, string> = {
 }
 const boundaryLabel = (b: string) =>
   ({ operational_control: 'Operational Control', financial_control: 'Financial Control', equity_share: 'Equity Share' } as Record<string, string>)[b] || b
+
+// Consent wording version stamped onto the verifier's ToS/Privacy acceptance.
+// Bump this whenever the Terms or Privacy Policy are materially revised.
+const CONSENT_VERSION = '2026-07-v1'
 
 const AUDIT_FIELDS: Record<string, string> = {
   company_name: 'Company name', reporting_year: 'Reporting year',
@@ -65,6 +70,13 @@ export default function VerifierPage() {
   const [loading, setLoading] = useState(true)
   const [docs, setDocs] = useState<VerifierDoc[]>([])
   const [docsLoading, setDocsLoading] = useState(false)
+  // Consent gate: local state for the accept flow (only meaningful before acceptance).
+  const [accepted, setAccepted] = useState(false)
+  const [email, setEmail] = useState('')
+  const [tosChecked, setTosChecked] = useState(false)
+  const [privacyChecked, setPrivacyChecked] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [gateError, setGateError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!token) return
@@ -74,14 +86,24 @@ export default function VerifierPage() {
     })
   }, [token])
 
+  // Seed the consent-gate email from the grant's stored verifier email, once,
+  // without clobbering anything the verifier has typed. (Does not touch the load effect.)
+  useEffect(() => {
+    if (data?.verifier?.email) setEmail(prev => prev || data.verifier!.email!)
+  }, [data])
+
+  // Documents fetch — gated on verifier access. Only fires once the token is
+  // already accepted (accepted_at set on load) or has just been accepted in-session.
   useEffect(() => {
     if (!token) return
+    const hasAccess = !!data?.accepted_at || accepted
+    if (!hasAccess) return
     setDocsLoading(true)
     fetch('/api/verifier-documents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) })
       .then(r => r.ok ? r.json() : { documents: [] })
       .then((d: { documents?: VerifierDoc[] }) => { setDocs(d.documents || []); setDocsLoading(false) })
       .catch(() => setDocsLoading(false))
-  }, [token])
+  }, [token, data?.accepted_at, accepted])
 
   if (loading) return <Shell><div style={{ padding: '4rem', textAlign: 'center', color: '#888784' }}>Loading verification review…</div></Shell>
 
@@ -91,6 +113,82 @@ export default function VerifierPage() {
         <div style={{ maxWidth: 540, margin: '4rem auto', textAlign: 'center', padding: '0 1.5rem' }}>
           <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>Link invalid or expired</h1>
           <p style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, fontWeight: 300 }}>This verification link is no longer valid. It may have expired or been revoked. Please contact the company that shared it with you to request a new link.</p>
+        </div>
+      </Shell>
+    )
+  }
+
+  // ── Consent gate ──────────────────────────────────────────────────────────
+  // Already-accepted tokens self-dismiss: fall straight through to the review.
+  const alreadyAccepted = !!data.accepted_at
+
+  const handleAccept = async () => {
+    setSubmitting(true)
+    setGateError(null)
+    const { data: res, error } = await supabase.rpc('verifier_accept_invite', {
+      p_token: token, p_email: email.trim(), p_consent_version: CONSENT_VERSION,
+    })
+    if (error || !res) {
+      setGateError('Something went wrong, please try again.')
+      setSubmitting(false)
+      return
+    }
+    if (res.status === 'accepted' || res.status === 'already_accepted') {
+      setAccepted(true)
+      return
+    }
+    // 'invalid' (or anything unexpected): leave the gate up.
+    setGateError('This invite is no longer valid. Please contact the company that sent it.')
+    setSubmitting(false)
+  }
+
+  if (!alreadyAccepted && !accepted) {
+    const gateCompany = data.inventory?.company_name
+    return (
+      <Shell>
+        <div style={{ maxWidth: 540, margin: '3.5rem auto', padding: '0 1.5rem' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Independent Verification Review</div>
+          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.6rem,3vw,2rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>Confirm your details to continue</h1>
+          <p style={{ fontSize: 14, color: '#555553', fontWeight: 300, lineHeight: 1.7, marginBottom: '1.75rem' }}>
+            You&rsquo;ve been invited to review {gateCompany ? <>the GHG inventory for <strong style={{ fontWeight: 500, color: '#0d0d0d' }}>{gateCompany}</strong></> : 'a GHG inventory'} for independent assurance. Please confirm your email and agree to the Terms and Privacy Policy to proceed.
+          </p>
+
+          <div style={{ marginBottom: '1.25rem' }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#888784', marginBottom: 6 }}>Your email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="you@firm.com"
+              style={{ width: '100%', boxSizing: 'border-box', fontSize: 14, padding: '10px 12px', borderRadius: 8, border: '0.5px solid #e8e7e4', color: '#0d0d0d', background: '#fff' }}
+            />
+          </div>
+
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: '#555553', lineHeight: 1.6, marginBottom: 12, cursor: 'pointer' }}>
+            <input type="checkbox" checked={tosChecked} onChange={e => setTosChecked(e.target.checked)} style={{ marginTop: 3, flexShrink: 0 }} />
+            <span>I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: '#7425e3', textDecoration: 'underline' }}>Terms of Service</a></span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: '#555553', lineHeight: 1.6, marginBottom: '1.5rem', cursor: 'pointer' }}>
+            <input type="checkbox" checked={privacyChecked} onChange={e => setPrivacyChecked(e.target.checked)} style={{ marginTop: 3, flexShrink: 0 }} />
+            <span>I agree to the <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#7425e3', textDecoration: 'underline' }}>Privacy Policy</a></span>
+          </label>
+
+          <button
+            onClick={handleAccept}
+            disabled={submitting || !tosChecked || !privacyChecked || !email.trim()}
+            style={{
+              width: '100%', fontSize: 14, fontWeight: 500, padding: '12px 20px', borderRadius: 8, border: 'none',
+              background: '#0d0d0d', color: '#fff',
+              cursor: (submitting || !tosChecked || !privacyChecked || !email.trim()) ? 'not-allowed' : 'pointer',
+              opacity: (submitting || !tosChecked || !privacyChecked || !email.trim()) ? 0.45 : 1,
+            }}
+          >
+            {submitting ? 'Confirming…' : 'Accept & view inventory'}
+          </button>
+
+          {gateError && (
+            <div style={{ marginTop: 12, fontSize: 13, color: '#B91C1C', lineHeight: 1.6 }}>{gateError}</div>
+          )}
         </div>
       </Shell>
     )

@@ -21,10 +21,10 @@ export async function POST(req: NextRequest) {
 
   const admin = createServerClient()
 
-  // 1. Validate token: active + not expired
+  // 1. Validate token: active + not expired + not revoked
   const { data: access, error: accessErr } = await admin
     .from('verifier_access')
-    .select('inventory_id, status, expires_at')
+    .select('inventory_id, status, expires_at, revoked_at, accepted_at')
     .eq('token', token)
     .eq('status', 'active')
     .single()
@@ -32,8 +32,15 @@ export async function POST(req: NextRequest) {
   if (accessErr || !access) {
     return NextResponse.json({ error: 'invalid_or_expired' }, { status: 403 })
   }
-  if (new Date(access.expires_at) < new Date()) {
+  if (new Date(access.expires_at) < new Date() || access.revoked_at != null) {
     return NextResponse.json({ error: 'invalid_or_expired' }, { status: 403 })
+  }
+
+  // 1b. Consent hard-gate — authoritative, server-side, token-only. No signed URLs
+  // are issued until this verifier has accepted (ToS/Privacy). The gate depends
+  // solely on the stored accepted_at, never on anything the client sends.
+  if (access.accepted_at == null) {
+    return NextResponse.json({ error: 'consent_required' }, { status: 403 })
   }
 
   // 2. Load ONLY this inventory's locations_data (paths derived here, never from user input)
