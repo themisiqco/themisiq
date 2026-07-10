@@ -794,6 +794,19 @@ function calcInventory(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
   }, { s1_total: 0, s2_location: 0, s2_market: 0, co2: 0, ch4: 0, n2o: 0, biogenic: 0 })
 }
 
+// Map a concierge (docType, fuelType) pair to its inventory field(s). Module-scoped so both the
+// confirm path (updateProposal / addCoverageResolution) and buildWorkings share one join key.
+function fieldFor(docType: string, fuelType: string): { amount: keyof Location; unit?: keyof Location } | null {
+  if (docType === 'utility_electricity' && fuelType === 'electricity') return { amount: 'electricity_kwh' }
+  if (docType === 'renewable_cert' && fuelType === 'electricity') return { amount: 'renewable_electricity_kwh' }
+  if (docType === 'utility_bill_gas' && fuelType === 'natural_gas') return { amount: 'natural_gas_amount', unit: 'natural_gas_unit' }
+  if (docType === 'fuel_propane' && fuelType === 'propane') return { amount: 'propane_amount', unit: 'propane_unit' }
+  if (docType === 'fuel_diesel' && fuelType === 'diesel') return { amount: 'diesel_stationary_amount', unit: 'diesel_stationary_unit' }
+  if (docType === 'fleet_fuel' && fuelType === 'diesel') return { amount: 'diesel_mobile_amount', unit: 'diesel_mobile_unit' }
+  if (docType === 'fleet_fuel' && fuelType === 'gasoline') return { amount: 'gasoline_amount', unit: 'gasoline_unit' }
+  return null
+}
+
 function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024, resolutions: CoverageResolution[] = []) {
   const rows: any[] = []
   const pushFuel = (loc: Location, source: string, scope: number, activity: number, unit: string, ef: { co2: number; ch4: number; n2o: number }) => {
@@ -1296,18 +1309,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         return { ...d, extracted: d.extracted.map((p, i) => i === propIdx ? { ...p, ...patch } : p) }
       })
 
-      // 2. Map a (docType, fuelType) pair to its inventory field(s).
-      const fieldFor = (docType: string, fuelType: string): { amount: keyof Location; unit?: keyof Location } | null => {
-        if (docType === 'utility_electricity' && fuelType === 'electricity') return { amount: 'electricity_kwh' }
-        if (docType === 'renewable_cert' && fuelType === 'electricity') return { amount: 'renewable_electricity_kwh' }
-        if (docType === 'utility_bill_gas' && fuelType === 'natural_gas') return { amount: 'natural_gas_amount', unit: 'natural_gas_unit' }
-        if (docType === 'fuel_propane' && fuelType === 'propane') return { amount: 'propane_amount', unit: 'propane_unit' }
-        if (docType === 'fuel_diesel' && fuelType === 'diesel') return { amount: 'diesel_stationary_amount', unit: 'diesel_stationary_unit' }
-        if (docType === 'fleet_fuel' && fuelType === 'diesel') return { amount: 'diesel_mobile_amount', unit: 'diesel_mobile_unit' }
-        if (docType === 'fleet_fuel' && fuelType === 'gasoline') return { amount: 'gasoline_amount', unit: 'gasoline_unit' }
-        return null
-      }
-
+      // 2. (fieldFor is now module-scoped — shared with buildWorkings.)
       // 3. Gather confirmed proposals per target field.
 const byField: Record<string, { sum: number; units: Set<string>; unitField?: keyof Location; refs: { docId: string; pi: number }[]; fuelType: string }> = {}
       docs.forEach(d => {
@@ -1372,16 +1374,7 @@ if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.uni
       const locs = inv.locations.map(loc => {
         if (loc.id !== res.locId) return loc
         const next: any = { ...loc }
-        const fieldFor = (docType: string, fuelType: string): { amount: keyof Location; unit?: keyof Location } | null => {
-          if (docType === 'utility_electricity' && fuelType === 'electricity') return { amount: 'electricity_kwh' }
-          if (docType === 'renewable_cert' && fuelType === 'electricity') return { amount: 'renewable_electricity_kwh' }
-          if (docType === 'utility_bill_gas' && fuelType === 'natural_gas') return { amount: 'natural_gas_amount', unit: 'natural_gas_unit' }
-          if (docType === 'fuel_propane' && fuelType === 'propane') return { amount: 'propane_amount', unit: 'propane_unit' }
-          if (docType === 'fuel_diesel' && fuelType === 'diesel') return { amount: 'diesel_stationary_amount', unit: 'diesel_stationary_unit' }
-          if (docType === 'fleet_fuel' && fuelType === 'diesel') return { amount: 'diesel_mobile_amount', unit: 'diesel_mobile_unit' }
-          if (docType === 'fleet_fuel' && fuelType === 'gasoline') return { amount: 'gasoline_amount', unit: 'gasoline_unit' }
-          return null
-        }
+        // fieldFor is module-scoped — shared with updateProposal and buildWorkings.
         const sums: Record<string, { sum: number; fuelType: string }> = {}
         loc.source_docs.forEach(d => d.extracted?.forEach(p => {
           if (p.status !== 'confirmed' || p.value == null) return
