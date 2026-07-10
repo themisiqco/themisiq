@@ -13,6 +13,12 @@ interface WorkingRow {
   activity_data: number; activity_unit: string
   emission_factor: string; ef_source: string; gwp_basis: string
   result_tco2e: number
+  // Concierge provenance (present only for bill-sourced rows). Lets a verifier trace a figure
+  // back to the quote read off the bill; 'concierge-extrapolated' rows are grossed-up estimates.
+  source_quotes?: string[]
+  source_doc_ids?: string[]
+  entry_method?: 'manual' | 'concierge' | 'concierge-extrapolated'
+  extrapolation_note?: string
 }
 interface InventoryData {
   company_name: string; reporting_year: number; revenue_millions: number
@@ -242,7 +248,21 @@ export default function VerifierPage() {
                 {inv.workings.map((w, i) => (
                   <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#f8f7f5', borderBottom: '0.5px solid #e8e7e4' }}>
                     <td style={{ padding: '8px 10px', color: '#555553' }}>{w.location}</td>
-                    <td style={{ padding: '8px 10px', color: '#0d0d0d', fontWeight: 500 }}>{w.source}</td>
+                    <td style={{ padding: '8px 10px', color: '#0d0d0d', fontWeight: 500 }}>
+                      <span>{w.source}</span>
+                      {w.entry_method === 'concierge' && (
+                        <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: '#7425e3', background: 'rgba(116,37,227,0.08)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Bill-sourced</span>
+                      )}
+                      {w.entry_method === 'concierge-extrapolated' && (
+                        <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: '#888784', background: '#efeeec', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Estimated</span>
+                      )}
+                      {w.source_quotes && w.source_quotes.length > 0 && (
+                        <div style={{ marginTop: 4, fontSize: 11, fontStyle: 'italic', fontWeight: 400, color: '#888784' }}>From source: {w.source_quotes.map(q => `"${q}"`).join('; ')}</div>
+                      )}
+                      {w.extrapolation_note && (
+                        <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: '#888784' }}>Estimated — {w.extrapolation_note}</div>
+                      )}
+                    </td>
                     <td style={{ padding: '8px 10px', color: '#555553' }}>{w.scope}</td>
                     <td style={{ padding: '8px 10px', color: '#555553', whiteSpace: 'nowrap' }}>{w.activity_data.toLocaleString()} {w.activity_unit}</td>
                     <td style={{ padding: '8px 10px', color: '#888784', fontSize: 11 }}>{w.emission_factor}</td>
