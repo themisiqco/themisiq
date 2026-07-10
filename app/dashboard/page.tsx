@@ -4,8 +4,21 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
 import { supabase } from '../../lib/supabase'
+import { FLAT_MODULE_PRICES } from '../../lib/pricing'
 
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+
+// Locked-card price lookup: dashboard module id → FLAT_MODULE_PRICES key.
+// Only the six flat-priced modules appear here; ghg/scope3/sbti/portal have no
+// flat price (GHG is tier-banded) and intentionally render "Preview free" only.
+const ID_TO_PRICE_KEY: Record<string, keyof typeof FLAT_MODULE_PRICES> = {
+  climate_risk: 'climate-risk',
+  supply_chain: 'supply-chain',
+  ai: 'ai-governance',
+  cyber: 'cyber',
+  deals: 'deals',
+  people: 'people',
+}
 
 // Auto-expiring "New" badge on the SBTi card — no DB / per-user state, just a date compare.
 const SBTI_NEW_UNTIL = new Date('2026-08-01')
@@ -348,7 +361,13 @@ export default function Dashboard() {
                           )}
                         </>
                       ) : (
-                        <span style={{ fontSize: 11, color: '#888784' }}>Preview free · <span style={{ color: '#7425e3', fontWeight: 500 }}>unlock for $999</span></span>
+                        (() => {
+                          const priceKey = ID_TO_PRICE_KEY[mod.id]
+                          const price = priceKey ? FLAT_MODULE_PRICES[priceKey] : null
+                          return (
+                            <span style={{ fontSize: 11, color: '#888784' }}>Preview free{price !== null && <> · <span style={{ color: '#7425e3', fontWeight: 500 }}>unlock for ${price.toLocaleString('en-US')}/yr</span></>}</span>
+                          )
+                        })()
                       )}
                     </div>
                   </a>
