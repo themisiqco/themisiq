@@ -807,36 +807,88 @@ function fieldFor(docType: string, fuelType: string): { amount: keyof Location; 
   return null
 }
 
+// Provenance stamp attached to a workings row so the verifier can trace a figure back to its bills.
+// concierge = read verbatim off confirmed bills; concierge-extrapolated = grossed up for a coverage
+// gap (number is estimated, quotes are the underlying bills); manual = not concierge-read.
+interface Provenance {
+  source_quotes?: string[]
+  source_doc_ids?: string[]
+  entry_method: 'manual' | 'concierge' | 'concierge-extrapolated'
+  extrapolation_note?: string
+}
+
 function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024, resolutions: CoverageResolution[] = []) {
   const rows: any[] = []
-  const pushFuel = (loc: Location, source: string, scope: number, activity: number, unit: string, ef: { co2: number; ch4: number; n2o: number }) => {
+  const pushFuel = (loc: Location, source: string, scope: number, activity: number, unit: string, ef: { co2: number; ch4: number; n2o: number }, prov?: Provenance) => {
     const g = calcGas(ef, activity, gwpVersion)
     rows.push({ location: loc.name || 'Location', source, scope, activity_data: activity, activity_unit: unit,
-      emission_factor: `CO2 ${ef.co2}, CH4 ${ef.ch4}, N2O ${ef.n2o} kg/${unit}`, ef_source: combustionSource(loc), gwp_basis: gwpVersion, result_tco2e: g.total })
+      emission_factor: `CO2 ${ef.co2}, CH4 ${ef.ch4}, N2O ${ef.n2o} kg/${unit}`, ef_source: combustionSource(loc), gwp_basis: gwpVersion, result_tco2e: g.total, ...(prov ?? {}) })
+  }
+  // Read-only per-location provenance gather: mirror updateProposal's byField collection, but keep
+  // only what a verifier needs — the confirmed proposals' sourceQuotes and their parent doc ids,
+  // keyed by the inventory amount field they feed (via the shared module-scoped fieldFor).
+  const gatherProvenance = (loc: Location): Record<string, { quotes: string[]; docIds: string[]; fuelTypes: Set<string> }> => {
+    const map: Record<string, { quotes: string[]; docIds: string[]; fuelTypes: Set<string> }> = {}
+    loc.source_docs.forEach(d => {
+      d.extracted?.forEach(p => {
+        if (p.status !== 'confirmed' || p.value == null) return
+        const m = fieldFor(d.document_type, p.fuelType)
+        if (!m) return
+        const key = String(m.amount)
+        if (!map[key]) map[key] = { quotes: [], docIds: [], fuelTypes: new Set() }
+        if (p.sourceQuote) map[key].quotes.push(p.sourceQuote)
+        if (!map[key].docIds.includes(d.id)) map[key].docIds.push(d.id)
+        map[key].fuelTypes.add(p.fuelType)
+      })
+    })
+    return map
+  }
+  // Turn a gathered field entry into the workings provenance stamp. No proposals → honest 'manual'.
+  // A matching acknowledged coverage gap → 'concierge-extrapolated' with the gross-up basis noted;
+  // the quotes stay (they're the real bills behind the pre-gross sum), but the number is estimated.
+  const provFor = (loc: Location, prov: ReturnType<typeof gatherProvenance>, field: keyof Location): Provenance => {
+    const entry = prov[String(field)]
+    const quotes = entry?.quotes ?? []
+    if (!quotes.length) return { entry_method: 'manual' }
+    const extr = resolutions.find(r =>
+      r.kind === 'extrapolate' && r.locId === loc.id && entry!.fuelTypes.has(r.fuelType) && !!r.monthsCovered && r.monthsCovered > 0)
+    if (extr && extr.monthsCovered) {
+      const mult = 12 / extr.monthsCovered
+      const multStr = Number.isInteger(mult) ? String(mult) : mult.toFixed(2)
+      return {
+        source_quotes: quotes,
+        source_doc_ids: entry!.docIds,
+        entry_method: 'concierge-extrapolated',
+        extrapolation_note: `${extr.monthsCovered} of 12 months from bills; grossed ×${multStr} for acknowledged coverage gap`,
+      }
+    }
+    return { source_quotes: quotes, source_doc_ids: entry!.docIds, entry_method: 'concierge' }
   }
   for (const loc of locations) {
-    if (loc.has_natural_gas && loc.natural_gas_amount > 0) pushFuel(loc, 'Natural gas', 1, loc.natural_gas_amount, loc.natural_gas_unit, pickEF(loc, `natural_gas_${loc.natural_gas_unit}` as keyof typeof EF))
-    if (loc.has_propane && loc.propane_amount > 0) pushFuel(loc, 'Propane', 1, loc.propane_amount, loc.propane_unit, pickEF(loc, `propane_${loc.propane_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF))
-    if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0) pushFuel(loc, 'Diesel (stationary)', 1, loc.diesel_stationary_amount, loc.diesel_stationary_unit, pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF))
-    if (loc.has_fuel_oil && loc.fuel_oil_gallons > 0) pushFuel(loc, 'Fuel oil', 1, loc.fuel_oil_gallons, 'gallons', pickEF(loc, 'fuel_oil_gallon'))
-    if (loc.has_mobile && loc.gasoline_amount > 0) pushFuel(loc, 'Gasoline (mobile)', 1, loc.gasoline_amount, loc.gasoline_unit, pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF))
-    if (loc.has_mobile && loc.diesel_mobile_amount > 0) pushFuel(loc, 'Diesel (mobile)', 1, loc.diesel_mobile_amount, loc.diesel_mobile_unit, pickEF(loc, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF))
+    const prov = gatherProvenance(loc)
+    if (loc.has_natural_gas && loc.natural_gas_amount > 0) pushFuel(loc, 'Natural gas', 1, loc.natural_gas_amount, loc.natural_gas_unit, pickEF(loc, `natural_gas_${loc.natural_gas_unit}` as keyof typeof EF), provFor(loc, prov, 'natural_gas_amount'))
+    if (loc.has_propane && loc.propane_amount > 0) pushFuel(loc, 'Propane', 1, loc.propane_amount, loc.propane_unit, pickEF(loc, `propane_${loc.propane_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provFor(loc, prov, 'propane_amount'))
+    if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0) pushFuel(loc, 'Diesel (stationary)', 1, loc.diesel_stationary_amount, loc.diesel_stationary_unit, pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provFor(loc, prov, 'diesel_stationary_amount'))
+    if (loc.has_fuel_oil && loc.fuel_oil_gallons > 0) pushFuel(loc, 'Fuel oil', 1, loc.fuel_oil_gallons, 'gallons', pickEF(loc, 'fuel_oil_gallon'), provFor(loc, prov, 'fuel_oil_gallons'))
+    if (loc.has_mobile && loc.gasoline_amount > 0) pushFuel(loc, 'Gasoline (mobile)', 1, loc.gasoline_amount, loc.gasoline_unit, pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provFor(loc, prov, 'gasoline_amount'))
+    if (loc.has_mobile && loc.diesel_mobile_amount > 0) pushFuel(loc, 'Diesel (mobile)', 1, loc.diesel_mobile_amount, loc.diesel_mobile_unit, pickEF(loc, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provFor(loc, prov, 'diesel_mobile_amount'))
     if (!loc.uses_ammonia && loc.has_hfc_refrigerants && loc.refrigerant_purchased_kg > 0) {
       const ref_gwp = REFRIGERANT_GWP[loc.refrigerant_type]?.[gwpVersion] ?? 0
-      rows.push({ location: loc.name || 'Location', source: `Refrigerant (${loc.refrigerant_type})`, scope: 1, activity_data: loc.refrigerant_purchased_kg, activity_unit: 'kg', emission_factor: `GWP ${ref_gwp}`, ef_source: 'IPCC GWP', gwp_basis: gwpVersion, result_tco2e: loc.refrigerant_purchased_kg * ref_gwp / 1000 })
+      rows.push({ location: loc.name || 'Location', source: `Refrigerant (${loc.refrigerant_type})`, scope: 1, activity_data: loc.refrigerant_purchased_kg, activity_unit: 'kg', emission_factor: `GWP ${ref_gwp}`, ef_source: 'IPCC GWP', gwp_basis: gwpVersion, result_tco2e: loc.refrigerant_purchased_kg * ref_gwp / 1000, entry_method: 'manual' })
     }
     if (loc.electricity_kwh > 0) {
       const gf = getGridFactor(loc.grid_region, year)
-      rows.push({ location: loc.name || 'Location', source: `Electricity (${gf.usedRegion}, ${gf.usedYear})`, scope: 2, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${gf.ef} kg/kWh`, ef_source: EF_SOURCES.electricity, gwp_basis: 'location-based', result_tco2e: loc.electricity_kwh * gf.ef / 1000 })
+      rows.push({ location: loc.name || 'Location', source: `Electricity (${gf.usedRegion}, ${gf.usedYear})`, scope: 2, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${gf.ef} kg/kWh`, ef_source: EF_SOURCES.electricity, gwp_basis: 'location-based', result_tco2e: loc.electricity_kwh * gf.ef / 1000, ...provFor(loc, prov, 'electricity_kwh') })
       // Market-based Scope 2: residual-mix factor on uncovered load, with provenance stamped for the verifier.
       const resRegion = loc.residual_region || (loc.grid_region.startsWith('EU_') ? loc.grid_region : '')
       const res = getResidualFactor(resRegion, year, gwpVersion)
       const uncovered = Math.max(0, loc.electricity_kwh - loc.renewable_electricity_kwh)
       const mktEf = res.applicable ? res.ef : gf.ef
-      rows.push({ location: loc.name || 'Location', source: `Electricity (S2 market-based${res.applicable ? `, residual mix ${res.usedRegion}` : ', location-factor fallback'})`, scope: 2, activity_data: uncovered, activity_unit: 'kWh uncovered', emission_factor: `${mktEf.toFixed(4)} kg/kWh`, ef_source: `${res.source}${res.vintage && res.vintage !== 'n/a' ? ` · vintage: ${res.vintage}` : ''}${res.note ? ` · ${res.note}` : ''}`, gwp_basis: res.applicable ? gwpVersion : 'location-based', result_tco2e: uncovered * mktEf / 1000 })
+      // Market-based row is a derived (uncovered = grid − renewable) figure, not a verbatim bill read → manual.
+      rows.push({ location: loc.name || 'Location', source: `Electricity (S2 market-based${res.applicable ? `, residual mix ${res.usedRegion}` : ', location-factor fallback'})`, scope: 2, activity_data: uncovered, activity_unit: 'kWh uncovered', emission_factor: `${mktEf.toFixed(4)} kg/kWh`, ef_source: `${res.source}${res.vintage && res.vintage !== 'n/a' ? ` · vintage: ${res.vintage}` : ''}${res.note ? ` · ${res.note}` : ''}`, gwp_basis: res.applicable ? gwpVersion : 'location-based', result_tco2e: uncovered * mktEf / 1000, entry_method: 'manual' })
     }
     if (loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0) {
-      rows.push({ location: loc.name || 'Location', source: 'Purchased steam', scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: 'mmbtu', emission_factor: `${EF.steam_mmbtu} kg/mmbtu`, ef_source: EF_SOURCES.combustion, gwp_basis: 'location-based', result_tco2e: loc.purchased_steam_mmbtu * EF.steam_mmbtu / 1000 })
+      rows.push({ location: loc.name || 'Location', source: 'Purchased steam', scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: 'mmbtu', emission_factor: `${EF.steam_mmbtu} kg/mmbtu`, ef_source: EF_SOURCES.combustion, gwp_basis: 'location-based', result_tco2e: loc.purchased_steam_mmbtu * EF.steam_mmbtu / 1000, entry_method: 'manual' })
     }
   }
   // ── Coverage-resolution audit trail ──────────────────────────────────────
