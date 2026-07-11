@@ -1327,7 +1327,10 @@ const searchParams = useSearchParams()
   useEffect(() => { loadCompanies() }, [])
 
   const startNewInventory = () => {
-    router.replace('/dashboard/ghg') // clear any stale ?id= so the load-by-id effect can't re-apply it
+    // Do NOT navigate here. router.replace('/dashboard/ghg') would strip ?view=list, re-firing the
+    // [searchParams] mode effect, which redirects existing-inventory users to /trends and clobbers the
+    // setMode('wizard') below (the "button does nothing" bug). This button only renders in list mode,
+    // where no ?id is present, so there's no stale ?id to clear — switching mode in state is enough.
     setInventoryId(null)
     setSaved(false)
     setDirty(false) // fresh inventory is pristine until the user types
