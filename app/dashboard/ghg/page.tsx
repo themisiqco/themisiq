@@ -378,6 +378,9 @@ const US_SUBREGIONS: Array<[string, string]> = [
   ['SRVC', 'SRVC — SERC Virginia/Carolina'],
 ]
 const US_STATES = ['AK','AL','AR','AZ','CA','CO','CT','DC','DE','FL','GA','HI','IA','ID','IL','IN','KS','KY','LA','MA','MD','ME','MI','MN','MO','MS','MT','NC','ND','NE','NH','NJ','NM','NV','NY','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VA','VT','WA','WI','WV','WY']
+// Australian states/territories offered for grid selection. ACT shares the NSW grid factor, and
+// WA/NT auto-map to their main interconnected grids (SWIS/DKIS) — both handled in detectGridRegion.
+const AU_STATES = ['NSW','ACT','VIC','QLD','SA','WA','TAS','NT']
 // EU-27 ISO codes (EL = Greece per EEA/EU convention). Maps country -> EU_XX grid key.
 const EU_COUNTRIES = ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','EL','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE']
 // EU-27 dropdown options: [ISO, label with flag], alphabetical by country name.
@@ -393,6 +396,13 @@ const EU_COUNTRY_OPTIONS: Array<[string, string]> = [
 function detectGridRegion(code: string, country?: string): string {
   const c = (code || '').toUpperCase().trim()
   const ctry = (country || '').toUpperCase().trim()
+  // Australia first — its NT/WA codes collide with a CA province / US state, so gate on country.
+  // ACT shares the NSW grid; WA→AU_WA (SWIS main); NT→AU_NT (DKIS main); else AU_<state>.
+  if (ctry === 'AU' || ctry === 'AUSTRALIA') {
+    if (c === 'ACT' || c === 'NSW') return 'AU_NSW'
+    if (AU_STATES.includes(c)) return 'AU_' + c
+    return 'AU_AVG'
+  }
   if ((ctry === 'CA' || ctry === 'CANADA') && CA_PROVINCES.includes(c)) return c
   if (CA_PROVINCES.includes(c) && !US_STATES.includes(c)) return c
   if (US_STATES.includes(c)) return 'US_' + c
@@ -403,6 +413,7 @@ function detectGridRegion(code: string, country?: string): string {
 function gridRegionForCountry(country: string): string {
   const ctry = (country || '').toUpperCase().trim()
   if (ctry === 'GB' || ctry === 'UK') return 'UK'
+  if (ctry === 'NZ' || ctry === 'NEW ZEALAND') return 'NZ'
   if (EU_COUNTRIES.includes(ctry)) return 'EU_' + ctry
   return ''
 }
@@ -484,7 +495,7 @@ interface SourceDoc {
 interface Location {
  id: string; name: string; country: string; state?: string; province?: string; region?: string
   has_natural_gas: boolean; natural_gas_amount: number; natural_gas_unit: 'mcf' | 'therms' | 'mmbtu' | 'm3' | 'kwh'
-  has_propane: boolean; propane_amount: number; propane_unit: 'gallons' | 'litres'
+  has_propane: boolean; propane_amount: number; propane_unit: 'gallons' | 'litres' | 'kg'
   has_diesel_stationary: boolean; diesel_stationary_amount: number; diesel_stationary_unit: 'gallons' | 'litres'
   has_fuel_oil: boolean; fuel_oil_gallons: number
   has_mobile: boolean; gasoline_amount: number; gasoline_unit: 'gallons' | 'litres'; diesel_mobile_amount: number; diesel_mobile_unit: 'gallons' | 'litres'
@@ -709,6 +720,8 @@ function ngUnitOptions(country: string): Array<[string, string]> {
   const ctry = (country || '').toUpperCase().trim()
   if (ctry === 'CA') return [['m3', 'm³'], ['mcf', 'Mcf']]
   if (ctry === 'GB' || ctry === 'UK') return [['kwh', 'kWh']]
+  if (ctry === 'NZ') return [['kwh', 'kWh']]
+  if (ctry === 'AU') return [['m3', 'm³']]
   if (EU_COUNTRIES.includes(ctry)) return [['m3', 'm³']]
   return [['mcf', 'Mcf'], ['therms', 'Therms'], ['mmbtu', 'MMBtu']]
 }
@@ -721,7 +734,15 @@ function normalizeNgUnit(country: string, unit: string): string {
 // gallons is never offered, so a verifier can't find US units on a metric inventory.
 function liquidUnitOptions(country: string): Array<[string, string]> {
   const ctry = (country || '').toUpperCase().trim()
-  const metric = ctry === 'CA' || ctry === 'GB' || ctry === 'UK' || EU_COUNTRIES.includes(ctry)
+  const metric = ctry === 'CA' || ctry === 'GB' || ctry === 'UK' || ctry === 'AU' || ctry === 'NZ' || EU_COUNTRIES.includes(ctry)
+  return metric ? [['litres', 'Litres']] : [['gallons', 'US gallons'], ['litres', 'Litres']]
+}
+// Propane/LPG units are separate from other liquids: NZ publishes LPG per kg (MfE), so NZ offers kg
+// only; other metric countries (CA/UK/EU/AU) use litres; US/other keep gallons+litres.
+function propaneUnitOptions(country: string): Array<[string, string]> {
+  const ctry = (country || '').toUpperCase().trim()
+  if (ctry === 'NZ') return [['kg', 'kg']]
+  const metric = ctry === 'CA' || ctry === 'GB' || ctry === 'UK' || ctry === 'AU' || EU_COUNTRIES.includes(ctry)
   return metric ? [['litres', 'Litres']] : [['gallons', 'US gallons'], ['litres', 'Litres']]
 }
 
@@ -747,7 +768,12 @@ function validateCompleteness(loc: Location): string[] {
 // US -> EPA EF[key] (unchanged). CA -> ECCC EF_CA[key], with per-province NG CO2 override.
 // GB/UK -> DEFRA EF_UK[key] (national). EU member -> IPCC EF_EU[key] (national Tier-1 defaults).
 // Falls back to EF[key] if a country key is missing, so a location can never silently zero out.
-function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof typeof EF_UK | keyof typeof EF_EU): { co2: number; ch4: number; n2o: number } {
+// Build the propane/LPG EF key from the stored unit. NZ adds a per-kg path (propane_kg); all other
+// jurisdictions use gallon/litre. Kept in one place so calc + workings + review stay in lock-step.
+function propaneEfKey(unit: string): 'propane_gallon' | 'propane_litre' | 'propane_kg' {
+  return unit === 'gallons' ? 'propane_gallon' : unit === 'kg' ? 'propane_kg' : 'propane_litre'
+}
+function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof typeof EF_UK | keyof typeof EF_EU | keyof typeof EF_AU | keyof (typeof EF_NZ)['commercial']): { co2: number; ch4: number; n2o: number } {
   const ctry = (loc.country || '').toUpperCase().trim()
   if (ctry === 'GB' || ctry === 'UK') {
     const ukBase = (EF_UK as any)[key] as { co2: number; ch4: number; n2o: number } | undefined
@@ -756,6 +782,17 @@ function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof
   if (EU_COUNTRIES.includes(ctry)) {
     const euBase = (EF_EU as any)[key] as { co2: number; ch4: number; n2o: number } | undefined
     return euBase ? { ...euBase } : ({ ...((EF as any)[key] as { co2: number; ch4: number; n2o: number }) })
+  }
+  // Australia: EF_AU per-unit table; missing keys (e.g. fuel oil) fall back to US EF (UK/EU parity).
+  if (ctry === 'AU') {
+    const auBase = (EF_AU as any)[key] as { co2: number; ch4: number; n2o: number } | undefined
+    return auBase ? { ...auBase } : ({ ...((EF as any)[key] as { co2: number; ch4: number; n2o: number }) })
+  }
+  // New Zealand: EF_NZ is use-class keyed (commercial default / industrial); missing keys fall back to US EF.
+  if (ctry === 'NZ') {
+    const nzTable = (EF_NZ as any)[loc.nz_use_class ?? 'commercial']
+    const nzBase = nzTable?.[key] as { co2: number; ch4: number; n2o: number } | undefined
+    return nzBase ? { ...nzBase } : ({ ...((EF as any)[key] as { co2: number; ch4: number; n2o: number }) })
   }
   if (ctry !== 'CA') return (EF as any)[key] as { co2: number; ch4: number; n2o: number }
   const caBase = (EF_CA as any)[key] as { co2: number; ch4: number; n2o: number } | undefined
@@ -776,6 +813,8 @@ function combustionSource(loc: Location): string {
   const ctry = (loc.country || '').toUpperCase().trim()
   if (ctry === 'CA') return EF_SOURCES.combustion_ca
   if (ctry === 'GB' || ctry === 'UK') return EF_SOURCES.combustion_uk
+  if (ctry === 'AU') return EF_SOURCES.combustion_au
+  if (ctry === 'NZ') return EF_SOURCES.combustion_nz
   if (EU_COUNTRIES.includes(ctry)) return EF_SOURCES.combustion_eu
   return EF_SOURCES.combustion
 }
@@ -802,7 +841,7 @@ function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: numbe
     s1_stationary += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
   }
   if (loc.has_propane && loc.propane_amount > 0) {
-    const ef = pickEF(loc, `propane_${loc.propane_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF)
+    const ef = pickEF(loc, propaneEfKey(loc.propane_unit) as keyof typeof EF)
     const g = calcGas(ef, loc.propane_amount, gwpVersion)
     s1_stationary += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
   }
@@ -936,7 +975,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
   for (const loc of locations) {
     const prov = gatherProvenance(loc)
     if (loc.has_natural_gas && loc.natural_gas_amount > 0) pushFuel(loc, 'Natural gas', 1, loc.natural_gas_amount, loc.natural_gas_unit, pickEF(loc, `natural_gas_${loc.natural_gas_unit}` as keyof typeof EF), provFor(loc, prov, 'natural_gas_amount'))
-    if (loc.has_propane && loc.propane_amount > 0) pushFuel(loc, 'Propane', 1, loc.propane_amount, loc.propane_unit, pickEF(loc, `propane_${loc.propane_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provFor(loc, prov, 'propane_amount'))
+    if (loc.has_propane && loc.propane_amount > 0) pushFuel(loc, 'Propane', 1, loc.propane_amount, loc.propane_unit, pickEF(loc, propaneEfKey(loc.propane_unit) as keyof typeof EF), provFor(loc, prov, 'propane_amount'))
     if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0) pushFuel(loc, 'Diesel (stationary)', 1, loc.diesel_stationary_amount, loc.diesel_stationary_unit, pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provFor(loc, prov, 'diesel_stationary_amount'))
     if (loc.has_fuel_oil && loc.fuel_oil_gallons > 0) pushFuel(loc, 'Fuel oil', 1, loc.fuel_oil_gallons, 'gallons', pickEF(loc, 'fuel_oil_gallon'), provFor(loc, prov, 'fuel_oil_gallons'))
     if (loc.has_mobile && loc.gasoline_amount > 0) pushFuel(loc, 'Gasoline (mobile)', 1, loc.gasoline_amount, loc.gasoline_unit, pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provFor(loc, prov, 'gasoline_amount'))
@@ -1312,18 +1351,20 @@ const searchParams = useSearchParams()
     setInventory(inv => {
       const locs = [...inv.locations]
       locs[idx] = { ...locs[idx], [field]: value }
-     if (field === 'state') locs[idx].grid_region = detectGridRegion(value, 'US')
+     if (field === 'state') locs[idx].grid_region = detectGridRegion(value, locs[idx].country) // US states → US_<ST>; AU states → AU_<region>
 if (field === 'province') locs[idx].grid_region = value // Canadian provinces map directly
       if (field === 'country') {
         locs[idx].natural_gas_unit = normalizeNgUnit(value, locs[idx].natural_gas_unit) as any
-        // UK and EU grids are national — set grid_region directly from the country.
+        // UK, EU and NZ grids are national — set grid_region directly from the country.
+        // (AU returns '' here and resolves on the state pick; US resolves on the state pick.)
         const gr = gridRegionForCountry(value)
         if (gr) locs[idx].grid_region = gr
-        // Metric countries (CA, UK, EU) default liquid fuels to litres; US/other keep gallons.
+        // Metric countries (CA, UK, EU, AU, NZ) default liquid fuels to litres; US/other keep gallons.
+        // NZ LPG is the exception — MfE publishes it per kg, so propane defaults to kg for NZ.
         const ctryUp = (value || '').toUpperCase().trim()
-        const metric = ctryUp === 'CA' || ctryUp === 'GB' || ctryUp === 'UK' || EU_COUNTRIES.includes(ctryUp)
+        const metric = ctryUp === 'CA' || ctryUp === 'GB' || ctryUp === 'UK' || ctryUp === 'AU' || ctryUp === 'NZ' || EU_COUNTRIES.includes(ctryUp)
         if (metric) {
-          locs[idx].propane_unit = 'litres'
+          locs[idx].propane_unit = ctryUp === 'NZ' ? 'kg' : 'litres'
           locs[idx].diesel_stationary_unit = 'litres'
           locs[idx].gasoline_unit = 'litres'
           locs[idx].diesel_mobile_unit = 'litres'
@@ -2183,11 +2224,11 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                             return <tr><td style={wTd}>Natural gas</td><td style={wTd}>{loc.natural_gas_amount} {loc.natural_gas_unit}</td><td style={wTd}>{efCo2e.toFixed(3)} kg CO₂e/{loc.natural_gas_unit}</td><td style={wTd}>{combustionSource(loc)}</td><td style={wTd}>{wGwp}</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
                           })()}
                           {loc.has_propane && loc.propane_amount > 0 && (() => {
-                            const ef = pickEF(loc, `propane_${loc.propane_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF)
+                            const ef = pickEF(loc, propaneEfKey(loc.propane_unit) as keyof typeof EF)
                             const g = GWP[wGwp]
                             const efCo2e = ef.co2 + ef.ch4 * g.CH4_fossil + ef.n2o * g.N2O
                             const total = efCo2e * loc.propane_amount / 1000
-                            return <tr><td style={wTd}>Propane</td><td style={wTd}>{loc.propane_amount} {loc.propane_unit}</td><td style={wTd}>{efCo2e.toFixed(3)} kg CO₂e/{loc.propane_unit === 'gallons' ? 'gal' : 'L'}</td><td style={wTd}>{combustionSource(loc)}</td><td style={wTd}>{wGwp}</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
+                            return <tr><td style={wTd}>Propane</td><td style={wTd}>{loc.propane_amount} {loc.propane_unit}</td><td style={wTd}>{efCo2e.toFixed(3)} kg CO₂e/{loc.propane_unit === 'gallons' ? 'gal' : loc.propane_unit === 'kg' ? 'kg' : 'L'}</td><td style={wTd}>{combustionSource(loc)}</td><td style={wTd}>{wGwp}</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
                           })()}
                           {loc.has_diesel_stationary && loc.diesel_stationary_amount > 0 && (() => {
                             const ef = pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF)
