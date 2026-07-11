@@ -178,7 +178,7 @@ const EF_SOURCES = {
   combustion_uk: 'UK DEFRA/DESNZ (2025) GHG Conversion Factors for Company Reporting',
   combustion_eu: 'IPCC (2006) Guidelines Vol.2 — Tier 1 default combustion factors',
   combustion_au: 'DCCEEW NGA Factors 2025 (AR5)',
-  combustion_nz: 'NZ MfE Measuring Emissions 2026',
+  combustion_nz: 'NZ MfE Measuring Emissions 2026 v2 (as-published basis — factors stored verbatim, no AR re-basing)',
   electricity: 'US EPA eGRID2023 (US) / ECCC v3.0 (CA) / DEFRA 2025 (UK) / EEA 2023 (EU) / DCCEEW NGA 2025 (AU) / NZ MfE 2026 (NZ)',
   residual_us: 'Green-e Residual Mix 2025 (2023 data, publ. 2026-01-29, CRS) — residual CO₂; eGRID2023 Rev2 (publ. 2025-06-12) CH₄/N₂O. Green-e factors out Green-e-certified voluntary sales (the only published US residual source per CRS).',
   residual_eu: 'AIB European Residual Mixes 2024 (publ. 2025-05-30, Grexel/AIB; Ecoinvent CO₂ inputs) — combined CO₂e, gCO₂/kWh.',
@@ -253,6 +253,14 @@ function nzTdLoss(year: number): number {
   let ty = years[0]; for (const y of years) { if (y <= year) ty = y }
   return NZ_TD_LOSS[ty]
 }
+// ── DEFERRED: Scope 3 Category 3 (upstream / T&D) ELECTRICITY factors — AU + NZ ──────────────
+// NOT WIRED. The engine has no Scope 3 Category 3 electricity line today; only the NZ T&D losses
+// above (nz_td_losses opt-in) are surfaced. These primary-source values are captured here so they
+// aren't lost — transcribe into a real Cat 3 electricity line in a future step before using them.
+//   Australia — DCCEEW NGA Factors 2025, Scope 3 (kg CO2e/kWh, AR5):
+//     NSW+ACT 0.03, VIC 0.09, QLD 0.09, SA 0.04, WA (SWIS) 0.06, TAS 0.03, NT 0.09, National 0.07
+//   New Zealand — MfE "Measuring Emissions" 2026 Scope 3 electricity table: transcribe the exact
+//     value(s) from the workbook when wiring (deliberately not reproduced here to avoid inventing figures).
 // ── RESIDUAL MIX (market-based Scope 2) ──────────────────────────────────────
 // Market-based Scope 2 applies a RESIDUAL-MIX factor to UNCOVERED load (electricity
 // not backed by a contractual instrument) — NOT the location-based grid average.
