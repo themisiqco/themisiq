@@ -246,6 +246,13 @@ const GRID_EF: Record<string, Record<number, number>> = {
 // This is a Scope 3 Category 3 factor, NOT Scope 2; year-keyed for nearest-year lookup like GRID_EF.
 // Added as an optional, separately-labelled line only when a NZ location opts in (nz_td_losses).
 const NZ_TD_LOSS: Record<number, number> = { 2025: 0.00596 }
+// Nearest-year (≤ requested, else earliest) NZ T&D loss factor, kg CO2e/kWh. Scope 3 Cat 3.
+// Shared by calcLocation and buildWorkings so the calc term and the workings row never diverge.
+function nzTdLoss(year: number): number {
+  const years = Object.keys(NZ_TD_LOSS).map(Number).sort((a, b) => a - b)
+  let ty = years[0]; for (const y of years) { if (y <= year) ty = y }
+  return NZ_TD_LOSS[ty]
+}
 // ── RESIDUAL MIX (market-based Scope 2) ──────────────────────────────────────
 // Market-based Scope 2 applies a RESIDUAL-MIX factor to UNCOVERED load (electricity
 // not backed by a contractual instrument) — NOT the location-based grid average.
@@ -880,7 +887,12 @@ function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: numbe
   const res = getResidualFactor(resRegion, year, gwpVersion)
   const market_elec_ef = res.applicable ? res.ef : grid_ef
   const s2_market = (uncovered_kwh * market_elec_ef + steam_kg) / 1000
-  return { s1_stationary, s1_mobile, s1_fugitive, s1_total, s2_location, s2_market, gases, biogenic: loc.biogenic_co2_mt }
+  // NZ transmission & distribution losses — Scope 3 Category 3, NOT Scope 2. Kept as a DISTINCT
+  // term (s3_td) and deliberately never added into s2_location/s2_market. Opt-in per NZ location.
+  const s3_td = (loc.country === 'NZ' && loc.nz_td_losses && loc.electricity_kwh > 0)
+    ? loc.electricity_kwh * nzTdLoss(year) / 1000
+    : 0
+  return { s1_stationary, s1_mobile, s1_fugitive, s1_total, s2_location, s2_market, s3_td, gases, biogenic: loc.biogenic_co2_mt }
 }
 
 function calcInventory(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024) {
@@ -994,6 +1006,12 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       const mktEf = res.applicable ? res.ef : gf.ef
       // Market-based row is a derived (uncovered = grid − renewable) figure, not a verbatim bill read → manual.
       rows.push({ location: loc.name || 'Location', source: `Electricity (S2 market-based${res.applicable ? `, residual mix ${res.usedRegion}` : ', location-factor fallback'})`, scope: 2, activity_data: uncovered, activity_unit: 'kWh uncovered', emission_factor: `${mktEf.toFixed(4)} kg/kWh`, ef_source: `${res.source}${res.vintage && res.vintage !== 'n/a' ? ` · vintage: ${res.vintage}` : ''}${res.note ? ` · ${res.note}` : ''}`, gwp_basis: res.applicable ? gwpVersion : 'location-based', result_tco2e: uncovered * mktEf / 1000, entry_method: 'manual' })
+      // NZ T&D losses — Scope 3 Category 3, NOT Scope 2. Distinct row (scope 3) so it never reads as
+      // part of the S2 figure; opt-in per NZ location. Kept in lock-step with calcLocation via nzTdLoss.
+      if (loc.country === 'NZ' && loc.nz_td_losses) {
+        const td = nzTdLoss(year)
+        rows.push({ location: loc.name || 'Location', source: 'Electricity T&D losses (NZ) — Scope 3 Cat 3', scope: 3, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${td} kg/kWh`, ef_source: `${EF_SOURCES.electricity} · T&D losses (Scope 3 Cat 3)`, gwp_basis: 'scope3-cat3', result_tco2e: loc.electricity_kwh * td / 1000, entry_method: 'manual' })
+      }
     }
     if (loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0) {
       rows.push({ location: loc.name || 'Location', source: 'Purchased steam', scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: 'mmbtu', emission_factor: `${EF.steam_mmbtu} kg/mmbtu`, ef_source: EF_SOURCES.combustion, gwp_basis: 'location-based', result_tco2e: loc.purchased_steam_mmbtu * EF.steam_mmbtu / 1000, entry_method: 'manual' })
