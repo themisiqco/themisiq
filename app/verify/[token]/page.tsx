@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 
@@ -78,6 +78,10 @@ export default function VerifierPage() {
   const [loading, setLoading] = useState(true)
   const [docs, setDocs] = useState<VerifierDoc[]>([])
   const [docsLoading, setDocsLoading] = useState(false)
+  // Workings table is min-width:720 inside an overflow-x:auto wrapper; show a scroll hint
+  // only when it actually overflows (narrow screens), never when the whole table fits.
+  const workingsScrollRef = useRef<HTMLDivElement | null>(null)
+  const [isScrollable, setIsScrollable] = useState(false)
   // Consent gate: local state for the accept flow (only meaningful before acceptance).
   const [accepted, setAccepted] = useState(false)
   const [email, setEmail] = useState('')
@@ -112,6 +116,17 @@ export default function VerifierPage() {
       .then((d: { documents?: VerifierDoc[] }) => { setDocs(d.documents || []); setDocsLoading(false) })
       .catch(() => setDocsLoading(false))
   }, [token, data?.accepted_at, accepted])
+
+  // Measure whether the workings table overflows its wrapper; re-measure on resize.
+  useEffect(() => {
+    const measure = () => {
+      const el = workingsScrollRef.current
+      setIsScrollable(!!el && el.scrollWidth > el.clientWidth)
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [data, accepted, docs])
 
   if (loading) return <Shell><div style={{ padding: '4rem', textAlign: 'center', color: '#888784' }}>Loading verification review…</div></Shell>
 
@@ -212,7 +227,7 @@ export default function VerifierPage() {
 
   return (
     <Shell>
-      <div style={{ maxWidth: 920, margin: '0 auto', padding: '2.5rem 1.5rem 4rem' }}>
+      <div style={{ maxWidth: 920, minWidth: 0, margin: '0 auto', padding: '2.5rem 1.5rem 4rem' }}>
         <div style={{ background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.25)', borderRadius: 10, padding: '10px 16px', marginBottom: '1.5rem', fontSize: 12, color: '#7425e3', fontWeight: 500 }}>
           Read-only verifier view · You are reviewing a GHG inventory shared for independent assurance{data.expires_at ? ` · Access expires ${new Date(data.expires_at).toLocaleDateString()}` : ''}
         </div>
@@ -241,7 +256,12 @@ export default function VerifierPage() {
           Per-source breakdown as calculated at save time. Each line shows the activity data, emission factor, and GWP basis used — enabling independent recalculation under ISO 14064-3.
         </p>
         {(inv.workings && inv.workings.length > 0) ? (
-          <div style={{ overflowX: 'auto', marginBottom: '2rem' }}>
+          <>
+          {isScrollable && (
+            <div style={{ fontSize: 11, color: '#7425e3', fontWeight: 500, marginBottom: 6 }}>Scroll horizontally to see all columns →</div>
+          )}
+          <div ref={workingsScrollRef} style={{ overflowX: 'auto', marginBottom: '2rem' }}>
+            <div style={{ minWidth: 720 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr style={{ background: '#0d0d0d' }}>
@@ -289,8 +309,10 @@ export default function VerifierPage() {
                 ))}
               </tbody>
             </table>
+            </div>
             <div style={{ fontSize: 11, color: '#888784', marginTop: 8 }}>Emission factor sources: US EPA (combustion), US EPA eGRID (electricity), IPCC (GWP). Verifier should confirm each sampled line independently.</div>
           </div>
+          </>
         ) : (
           <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.5rem', textAlign: 'center', fontSize: 13, color: '#888784', marginBottom: '2rem' }}>No calculation workings recorded for this inventory yet.</div>
         )}
@@ -365,7 +387,7 @@ export default function VerifierPage() {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ background: '#fff', minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+    <div style={{ background: '#fff', minHeight: '100vh', minWidth: 0, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
       <div style={{ borderBottom: '0.5px solid #e8e7e4', padding: '1rem 1.5rem' }}>
         <span style={{ fontWeight: 700, fontSize: 18, color: '#0d0d0d' }}>Themis<span style={{ color: '#7425e3' }}>IQ</span></span>
       </div>
