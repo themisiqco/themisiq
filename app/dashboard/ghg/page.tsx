@@ -896,9 +896,13 @@ function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: numbe
   const ref_gwp = REFRIGERANT_GWP[loc.refrigerant_type]?.[gwpVersion] ?? 0
   const s1_fugitive = (!loc.uses_ammonia && loc.has_hfc_refrigerants) ? loc.refrigerant_purchased_kg * ref_gwp / 1000 : 0
   const s1_total = s1_stationary + s1_mobile + s1_fugitive
-  const grid_ef = getGridFactor(loc.grid_region, year).ef
+  // Grid-region gate: when the location's grid_region isn't a real GRID_EF key (us_average default,
+  // '', unmapped country), OMIT the electricity Scope 2 entirely — no getGridFactor call, no electricity
+  // contribution — exactly like an absent Scope 1 fuel. Steam (grid-independent) is unaffected.
+  const gridResolved = isResolvedGridRegion(loc.grid_region)
+  const grid_ef = gridResolved ? getGridFactor(loc.grid_region, year).ef : 0
   const steam_kg = loc.has_purchased_steam ? loc.purchased_steam_mmbtu * EF.steam_mmbtu : 0
-  const s2_location = (loc.electricity_kwh * grid_ef + steam_kg) / 1000
+  const s2_location = ((gridResolved ? loc.electricity_kwh * grid_ef : 0) + steam_kg) / 1000
   // Market-based: covered (contractual) kWh @ 0 (RECs/PPAs/green tariffs assumed zero-emission — documented);
   // uncovered kWh @ residual-mix factor. If no residual mix applies (full-disclosure region, or US subregion
   // not yet selected), fall back to the location grid factor for uncovered load and flag it.
@@ -906,7 +910,7 @@ function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: numbe
   const resRegion = loc.residual_region || (loc.grid_region.startsWith('EU_') ? loc.grid_region : '')
   const res = getResidualFactor(resRegion, year, gwpVersion)
   const market_elec_ef = res.applicable ? res.ef : grid_ef
-  const s2_market = (uncovered_kwh * market_elec_ef + steam_kg) / 1000
+  const s2_market = ((gridResolved ? uncovered_kwh * market_elec_ef : 0) + steam_kg) / 1000
   // NZ transmission & distribution losses — Scope 3 Category 3, NOT Scope 2. Kept as a DISTINCT
   // term (s3_td) and deliberately never added into s2_location/s2_market. Opt-in per NZ location.
   const s3_td = (loc.country === 'NZ' && loc.nz_td_losses && loc.electricity_kwh > 0)
@@ -1016,7 +1020,9 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       const ref_gwp = REFRIGERANT_GWP[loc.refrigerant_type]?.[gwpVersion] ?? 0
       rows.push({ location: loc.name || 'Location', source: `Refrigerant (${loc.refrigerant_type})`, scope: 1, activity_data: loc.refrigerant_purchased_kg, activity_unit: 'kg', emission_factor: `GWP ${ref_gwp}`, ef_source: 'IPCC GWP', gwp_basis: gwpVersion, result_tco2e: loc.refrigerant_purchased_kg * ref_gwp / 1000, entry_method: 'manual' })
     }
-    if (loc.electricity_kwh > 0) {
+    // Grid-region gate: unresolved grid_region → OMIT the electricity Scope 2 rows entirely (no
+    // getGridFactor call, no US_AVG row). NZ (T&D row below) is always resolved, so no real T&D is lost.
+    if (loc.electricity_kwh > 0 && isResolvedGridRegion(loc.grid_region)) {
       const gf = getGridFactor(loc.grid_region, year)
       rows.push({ location: loc.name || 'Location', source: `Electricity (${gf.usedRegion}, ${gf.usedYear})`, scope: 2, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${gf.ef} kg/kWh`, ef_source: EF_SOURCES.electricity, gwp_basis: 'location-based', result_tco2e: loc.electricity_kwh * gf.ef / 1000, ...provFor(loc, prov, 'electricity_kwh') })
       // Market-based Scope 2: residual-mix factor on uncovered load, with provenance stamped for the verifier.
@@ -1726,7 +1732,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
         const { slices } = buildMonthlyEmissions(
           inventory.locations as any,   // source_docs[].extracted[] live on these
           inventory.reporting_year,
-          { calcGas, pickEF, getGridFactor },
+          { calcGas, pickEF, getGridFactor, isResolvedGridRegion },
           'AR6'
         )
         // idempotent: replace this inventory's monthly rows
@@ -2355,11 +2361,11 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                             const total = loc.refrigerant_purchased_kg * ref_gwp / 1000
                             return <tr><td style={wTd}>Refrigerant ({loc.refrigerant_type})</td><td style={wTd}>{loc.refrigerant_purchased_kg} kg</td><td style={wTd}>GWP {ref_gwp}</td><td style={wTd}>IPCC {wGwp} / GHG Protocol</td><td style={wTd}>{wGwp}</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
                           })()}
-                          {loc.electricity_kwh > 0 && (() => {
+                          {loc.electricity_kwh > 0 && isResolvedGridRegion(loc.grid_region) && (() => {
                             const ef = getGridFactor(loc.grid_region, inventory.reporting_year).ef
                             return <tr style={{ background: '#f8f7f5' }}><td style={wTd}>Electricity (S2 location)</td><td style={wTd}>{loc.electricity_kwh.toLocaleString()} kWh</td><td style={wTd}>{ef.toFixed(4)} kg CO₂e/kWh</td><td style={wTd}>{EF_SOURCES.electricity} — {loc.grid_region}</td><td style={wTd}>N/A</td><td style={{ ...wTd, fontWeight: 600, color: '#0F6E56' }}>{(loc.electricity_kwh * ef / 1000).toFixed(4)}</td></tr>
                           })()}
-                          {loc.electricity_kwh > 0 && needsMarketBased && (() => {
+                          {loc.electricity_kwh > 0 && needsMarketBased && isResolvedGridRegion(loc.grid_region) && (() => {
                             const mGwp: GwpVersion = (FRAMEWORKS.find(f => (f.id === 'esrs' || f.id === 'gri') && inventory.selected_frameworks.includes(f.id))?.gwp as GwpVersion) || 'AR6'
                             const resRegion = loc.residual_region || (loc.grid_region.startsWith('EU_') ? loc.grid_region : '')
                             const res = getResidualFactor(resRegion, inventory.reporting_year, mGwp)

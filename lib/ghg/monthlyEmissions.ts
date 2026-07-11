@@ -30,6 +30,9 @@ export interface MonthlyDeps {
   calcGas: (ef: EFFactor, amount: number, gwp: GwpVersion, biogenic?: boolean) => { total: number };
   pickEF: (loc: any, key: any) => EFFactor;        // accept caller's Location + literal-union key
   getGridFactor: (region: string, year: number) => { ef: number; usedRegion: string; usedYear: number };
+  // True iff region is a real GRID_EF key. Unresolved grid regions OMIT electricity monthly rows
+  // (no getGridFactor call, no US_AVG fallback), mirroring the annual calc/workings guard.
+  isResolvedGridRegion: (region: string) => boolean;
 }
 
 /** Minimal location shape the factor fns need (country/region for EF lookup). */
@@ -179,6 +182,11 @@ export function buildMonthlyEmissions(
         let billTotal: number;
         let efSource: string | null;
         if (resolved.kind === "electricity") {
+          // Unresolved grid region → OMIT this electricity bill (no getGridFactor call, no US_AVG).
+          if (!deps.isResolvedGridRegion(loc.grid_region ?? "")) {
+            skipped.push({ fuelType: p.fuelType, document_type: doc.document_type, reason: `unresolved grid region (${loc.grid_region ?? ""})` });
+            continue;
+          }
           const gf = deps.getGridFactor(loc.grid_region ?? "", reportingYear);
           billTotal = (p.value * gf.ef) / 1000;
           efSource = `grid:${gf.usedRegion}:${gf.usedYear}`;
