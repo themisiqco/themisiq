@@ -71,13 +71,14 @@ export async function POST(req: NextRequest) {
   }
 
   // 4. Short-lived signed URLs for each
-  const results: { file_name: string; document_type: string; location: string; signed_url: string | null }[] = []
+  const results: { file_name: string; document_type: string; location: string; file_path: string; signed_url: string | null }[] = []
   for (const d of docs) {
     const { data: signed } = await admin.storage.from(BUCKET).createSignedUrl(d.file_path, SIGNED_URL_TTL)
     results.push({
       file_name: d.file_name,
       document_type: d.document_type,
       location: d.location,
+      file_path: d.file_path,
       signed_url: signed?.signedUrl || null,
     })
   }
