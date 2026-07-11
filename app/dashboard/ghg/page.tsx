@@ -813,6 +813,7 @@ function fieldFor(docType: string, fuelType: string): { amount: keyof Location; 
 interface Provenance {
   source_quotes?: string[]
   source_doc_ids?: string[]
+  source_file_paths?: string[]
   entry_method: 'manual' | 'concierge' | 'concierge-extrapolated'
   extrapolation_note?: string
 }
@@ -827,16 +828,18 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
   // Read-only per-location provenance gather: mirror updateProposal's byField collection, but keep
   // only what a verifier needs — the confirmed proposals' sourceQuotes and their parent doc ids,
   // keyed by the inventory amount field they feed (via the shared module-scoped fieldFor).
-  const gatherProvenance = (loc: Location): Record<string, { quotes: string[]; docIds: string[]; fuelTypes: Set<string> }> => {
-    const map: Record<string, { quotes: string[]; docIds: string[]; fuelTypes: Set<string> }> = {}
+  const gatherProvenance = (loc: Location): Record<string, { quotes: string[]; paths: string[]; docIds: string[]; fuelTypes: Set<string> }> => {
+    const map: Record<string, { quotes: string[]; paths: string[]; docIds: string[]; fuelTypes: Set<string> }> = {}
     loc.source_docs.forEach(d => {
       d.extracted?.forEach(p => {
         if (p.status !== 'confirmed' || p.value == null) return
         const m = fieldFor(d.document_type, p.fuelType)
         if (!m) return
         const key = String(m.amount)
-        if (!map[key]) map[key] = { quotes: [], docIds: [], fuelTypes: new Set() }
-        if (p.sourceQuote) map[key].quotes.push(p.sourceQuote)
+        if (!map[key]) map[key] = { quotes: [], paths: [], docIds: [], fuelTypes: new Set() }
+        // paths[] stays index-aligned with quotes[]: push the parent doc's file_path in the same
+        // step as its sourceQuote so quote[i] ↔ source_file_paths[i] on the verifier row.
+        if (p.sourceQuote) { map[key].quotes.push(p.sourceQuote); map[key].paths.push(d.file_path) }
         if (!map[key].docIds.includes(d.id)) map[key].docIds.push(d.id)
         map[key].fuelTypes.add(p.fuelType)
       })
@@ -858,11 +861,12 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       return {
         source_quotes: quotes,
         source_doc_ids: entry!.docIds,
+        source_file_paths: entry!.paths,
         entry_method: 'concierge-extrapolated',
         extrapolation_note: `${extr.monthsCovered} of 12 months from bills; grossed ×${multStr} for acknowledged coverage gap`,
       }
     }
-    return { source_quotes: quotes, source_doc_ids: entry!.docIds, entry_method: 'concierge' }
+    return { source_quotes: quotes, source_doc_ids: entry!.docIds, source_file_paths: entry!.paths, entry_method: 'concierge' }
   }
   for (const loc of locations) {
     const prov = gatherProvenance(loc)
