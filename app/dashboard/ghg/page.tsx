@@ -321,6 +321,12 @@ const RESIDUAL_US: Record<string, Record<number, ResidualGas>> = {
   SRVC: { 2023: { co2: 601.89,  ch4: 0.045, n2o: 0.006 } },
 }
 
+// A grid_region is "resolved" iff it's a real GRID_EF key. 'us_average' (the init default), '' and any
+// unmapped string are UNRESOLVED; the deliberate US_AVG/EU_AVG/AU_AVG fallback keys and every AU_/NZ
+// key ARE keys → resolved. Single source of truth for the grid-region gate (does not read the factor).
+function isResolvedGridRegion(region: string): boolean {
+  return Object.prototype.hasOwnProperty.call(GRID_EF, region)
+}
 function getGridFactor(region: string, year: number): { ef: number; usedRegion: string; usedYear: number } {
   const table = GRID_EF[region]
   if (!table) return { ef: GRID_EF.US_AVG[2023], usedRegion: 'US_AVG', usedYear: 2023 }
