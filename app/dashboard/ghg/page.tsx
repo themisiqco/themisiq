@@ -241,6 +241,11 @@ const GRID_EF: Record<string, Record<number, number>> = {
   // National grid (no sub-national split); year-keyed like the Canadian provinces.
   NZ: { 2023: 0.0766, 2024: 0.0994, 2025: 0.0787 },
 }
+
+// New Zealand electricity transmission & distribution (T&D) losses — MfE 2026 (v2), kg CO2e/kWh.
+// This is a Scope 3 Category 3 factor, NOT Scope 2; year-keyed for nearest-year lookup like GRID_EF.
+// Added as an optional, separately-labelled line only when a NZ location opts in (nz_td_losses).
+const NZ_TD_LOSS: Record<number, number> = { 2025: 0.00596 }
 // ── RESIDUAL MIX (market-based Scope 2) ──────────────────────────────────────
 // Market-based Scope 2 applies a RESIDUAL-MIX factor to UNCOVERED load (electricity
 // not backed by a contractual instrument) — NOT the location-based grid average.
@@ -487,6 +492,10 @@ interface Location {
   electricity_kwh: number; grid_region: string; renewable_electricity_kwh: number; residual_region: string
   has_purchased_steam: boolean; purchased_steam_mmbtu: number
   biogenic_co2_mt: number
+  // New Zealand-only (optional, default-safe): use-class picks the EF_NZ variant (Commercial default /
+  // Industrial — no Residential in MfE data); nz_td_losses toggles the optional Scope 3 Cat 3 T&D line.
+  nz_use_class?: 'commercial' | 'industrial'
+  nz_td_losses?: boolean
   source_docs: SourceDoc[]
 }
 
@@ -689,6 +698,7 @@ const emptyLocation = (id: string, name: string, state = ''): Location => ({
   electricity_kwh: 0, grid_region: 'us_average', renewable_electricity_kwh: 0, residual_region: '',
   has_purchased_steam: false, purchased_steam_mmbtu: 0,
   biogenic_co2_mt: 0,
+  nz_use_class: 'commercial', nz_td_losses: false,
   source_docs: [],
 })
 
