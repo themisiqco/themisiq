@@ -1895,6 +1895,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
     ))}
   </optgroup>
   <option value="AU">🇦🇺 Australia</option>
+  <option value="NZ">🇳🇿 New Zealand</option>
   <option value="OTHER">Other…</option>
 </select>
 {loc.country === 'US' && (
@@ -1913,12 +1914,20 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
     ))}
   </select>
 )}
-{loc.country && loc.country !== 'US' && loc.country !== 'CA' && gridRegionForCountry(loc.country) && (
+{loc.country === 'AU' && (
+  <select value={loc.state || ''} onChange={e => updateLocation(i, 'state', e.target.value)} style={{ ...inputStyle, width: 130 }}>
+    <option value="">State…</option>
+    {AU_STATES.map(s => (
+      <option key={s} value={s}>{s}</option>
+    ))}
+  </select>
+)}
+{loc.country && loc.country !== 'US' && loc.country !== 'CA' && loc.country !== 'AU' && gridRegionForCountry(loc.country) && (
   <span style={{ fontSize: 12, color: '#0F6E56', alignSelf: 'center', whiteSpace: 'nowrap' }}>
     Grid: {gridRegionForCountry(loc.country)} ({getGridFactor(gridRegionForCountry(loc.country), inventory.reporting_year).ef} kg/kWh)
   </span>
 )}
-{loc.country && loc.country !== 'US' && loc.country !== 'CA' && !gridRegionForCountry(loc.country) && (
+{loc.country && loc.country !== 'US' && loc.country !== 'CA' && loc.country !== 'AU' && !gridRegionForCountry(loc.country) && (
   <input value={loc.region || ''} onChange={e => updateLocation(i, 'region', e.target.value)} placeholder="State/Region" style={{ ...inputStyle, width: 120 }} />
 )}
               </div>
@@ -1993,7 +2002,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
               {loc.has_propane && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-                    {liquidUnitOptions(loc.country).map(([val, label]) => (
+                    {propaneUnitOptions(loc.country).map(([val, label]) => (
                       <button key={val} onClick={() => updateLocation(activeLocation, 'propane_unit', val as any)} style={unitBtn(loc.propane_unit === val)}>{label}</button>
                     ))}
                   </div>
@@ -2078,12 +2087,36 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                     {validateElectricity(loc.electricity_kwh)}
                   </div>
                 )}
-                {loc.state
+                {loc.country === 'AU'
+                  ? (loc.grid_region.startsWith('AU_')
+                      ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{loc.grid_region}</strong> — {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh (DCCEEW NGA 2025)</div>
+                      : <div style={{ background: '#FEF3E2', border: '0.5px solid #fde68a', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400e' }}>Select your state above to resolve the grid emission factor.</div>)
+                  : loc.state
                   ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region auto-detected: <strong>{detectedRegion?.label}</strong> — {detectedRegion ? getGridFactor(detectedRegion.value, inventory.reporting_year).ef : "—"} kg CO₂e/kWh (eGRID 2023)</div>
-                  : (loc.grid_region.startsWith('EU_') || loc.grid_region === 'UK')
-                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{loc.grid_region}</strong> — {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh ({loc.grid_region === 'UK' ? 'DEFRA 2025' : 'EEA 2023'})</div>
+                  : (loc.grid_region.startsWith('EU_') || loc.grid_region === 'UK' || loc.grid_region === 'NZ')
+                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{loc.grid_region}</strong> — {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh ({loc.grid_region === 'UK' ? 'DEFRA 2025' : loc.grid_region === 'NZ' ? 'NZ MfE 2026' : 'EEA 2023'})</div>
                   : <Field label="Grid region"><select value={loc.grid_region} onChange={e => updateLocation(activeLocation, 'grid_region', e.target.value)} style={inputStyle}><optgroup label="Canada">{GRID_REGIONS_CA.map(r => <option key={r.value} value={r.value}>{r.label} — {getGridFactor(r.value, inventory.reporting_year).ef} kg CO₂e/kWh</option>)}</optgroup><optgroup label="United States">{GRID_REGIONS_US.map(r => <option key={r.value} value={r.value}>{r.label} — {getGridFactor(r.value, inventory.reporting_year).ef} kg CO₂e/kWh</option>)}</optgroup></select></Field>
                 }
+                {loc.country === 'NZ' && (
+                  <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }}>Combustion use-class</div>
+                      <div style={{ fontSize: 11, color: '#888784', marginBottom: 8 }}>MfE publishes stationary-combustion factors by use-class. Most sites are Commercial (default).</div>
+                      <details>
+                        <summary style={{ cursor: 'pointer', fontSize: 12, color: '#7425e3' }}>{(loc.nz_use_class ?? 'commercial') === 'industrial' ? 'Industrial selected — change use-class' : 'Advanced: change use-class (using Commercial)'}</summary>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                          {(['commercial', 'industrial'] as const).map(uc => (
+                            <button key={uc} onClick={() => updateLocation(activeLocation, 'nz_use_class', uc)} style={unitBtn((loc.nz_use_class ?? 'commercial') === uc)}>{uc === 'commercial' ? 'Commercial' : 'Industrial'}</button>
+                          ))}
+                        </div>
+                      </details>
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#555553', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={!!loc.nz_td_losses} onChange={e => updateLocation(activeLocation, 'nz_td_losses', e.target.checked)} style={{ marginTop: 2, flexShrink: 0 }} />
+                      <span>Include electricity <strong>transmission &amp; distribution (T&amp;D) losses</strong> — reported as a separate <strong>Scope 3 Category 3</strong> line, not added to Scope 2. <span style={{ color: '#888784' }}>Off by default.</span></span>
+                    </label>
+                  </div>
+                )}
                 {loc.country === 'US' && (
                   <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 8, padding: '12px 14px' }}>
                     <Field label="eGRID subregion (for market-based Scope 2)" hint="Required only for ESRS E1 / GRI 305 market-based reporting. Leave blank if not reporting those — market-based will use the grid-average factor as a conservative fallback.">
@@ -2296,6 +2329,13 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                             const factorLabel = res.applicable ? `${mktEf.toFixed(4)} kg CO₂e/kWh (residual mix · ${res.usedRegion})` : `${mktEf.toFixed(4)} kg CO₂e/kWh (location-factor fallback)`
                             const sourceLabel = `${res.source}${res.vintage && res.vintage !== 'n/a' ? ` · vintage: ${res.vintage}` : ''}${res.note ? ` · ${res.note}` : ''}`
                             return <tr style={{ background: '#f8f7f5' }}><td style={wTd}>Electricity (S2 market-based)</td><td style={wTd}>{uncovered.toLocaleString()} kWh uncovered</td><td style={wTd}>{factorLabel}</td><td style={wTd}>{sourceLabel}</td><td style={wTd}>{res.applicable ? mGwp : 'location-based'}</td><td style={{ ...wTd, fontWeight: 600, color: '#0F6E56' }}>{total.toFixed(4)}</td></tr>
+                          })()}
+                          {loc.country === 'NZ' && loc.nz_td_losses && loc.electricity_kwh > 0 && (() => {
+                            // Scope 3 Cat 3 — reuses nzTdLoss() so this row can't diverge from the buildWorkings row.
+                            // Deliberately NOT rolled into the S1+S2 TOTAL below (T&D is Scope 3, its own labelled line).
+                            const td = nzTdLoss(inventory.reporting_year)
+                            const total = loc.electricity_kwh * td / 1000
+                            return <tr style={{ background: '#faf7ff' }}><td style={wTd}>Electricity T&D losses (NZ) — Scope 3 Cat 3</td><td style={wTd}>{loc.electricity_kwh.toLocaleString()} kWh</td><td style={wTd}>{td} kg CO₂e/kWh</td><td style={wTd}>NZ MfE 2026 · T&D (Scope 3 Cat 3)</td><td style={wTd}>Scope 3 Cat 3</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
                           })()}
                           {loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0 && (() => {
                             const total = loc.purchased_steam_mmbtu * EF.steam_mmbtu / 1000
