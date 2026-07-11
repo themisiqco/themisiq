@@ -1626,6 +1626,13 @@ if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.uni
     })
   })
   const conciergeReady = conciergePending.length === 0 && unresolvedCoverage.length === 0
+  // Grid-region gate: locations whose grid_region isn't a real GRID_EF key (us_average default, '',
+  // or an unmapped country) — these silently fall back to US_AVG in getGridFactor. Consumed by the
+  // step-2 advance + export gates and the UI prompt (sub-steps D/E). Pure derivation, no behaviour here.
+  const unresolvedGridLocations = inventory.locations
+    .map((l, i) => ({ i, name: l.name || `Location ${i + 1}`, region: l.grid_region }))
+    .filter(l => !isResolvedGridRegion(l.region))
+  const gridReady = unresolvedGridLocations.length === 0
   const needsPriorYear = inventory.selected_frameworks.includes('cdp')
   const needsEmployees = inventory.selected_frameworks.includes('ecovadis')
   const needsBiogenic = inventory.selected_frameworks.includes('esrs') || inventory.selected_frameworks.includes('gri')
