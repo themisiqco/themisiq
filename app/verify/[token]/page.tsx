@@ -7,7 +7,7 @@ interface AuditEntry {
   id: string; action: string; user_email: string | null; created_at: string
   old_values: Record<string, unknown> | null; new_values: Record<string, unknown> | null
 }
-interface VerifierDoc { file_name: string; document_type: string; location: string; signed_url: string | null }
+interface VerifierDoc { file_name: string; document_type: string; location: string; file_path: string; signed_url: string | null }
 interface WorkingRow {
   location: string; source: string; scope: number
   activity_data: number; activity_unit: string
@@ -17,6 +17,8 @@ interface WorkingRow {
   // back to the quote read off the bill; 'concierge-extrapolated' rows are grossed-up estimates.
   source_quotes?: string[]
   source_doc_ids?: string[]
+  // Index-aligned with source_quotes: the storage path behind quote[i], used to resolve a signed URL.
+  source_file_paths?: string[]
   entry_method?: 'manual' | 'concierge' | 'concierge-extrapolated'
   extrapolation_note?: string
 }
@@ -202,6 +204,10 @@ export default function VerifierPage() {
 
   const inv = data.inventory
   const audit = data.audit || []
+  // Correlate a workings row's source_file_paths[i] to a short-lived signed URL from the docs fetch.
+  // Skip null signed_urls; a missing key just falls back to plain text (never a broken link).
+  const pathToSignedUrl: Record<string, string> = {}
+  for (const d of docs) { if (d.file_path && d.signed_url) pathToSignedUrl[d.file_path] = d.signed_url }
   const frameworks = (inv.selected_frameworks || []).map(f => FRAMEWORK_NAMES[f] || f)
 
   return (
@@ -257,7 +263,18 @@ export default function VerifierPage() {
                         <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: '#888784', background: '#efeeec', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Estimated</span>
                       )}
                       {w.source_quotes && w.source_quotes.length > 0 && (
-                        <div style={{ marginTop: 4, fontSize: 11, fontStyle: 'italic', fontWeight: 400, color: '#888784' }}>From source: {w.source_quotes.map(q => `"${q}"`).join('; ')}</div>
+                        <div style={{ marginTop: 4, fontSize: 11, fontStyle: 'italic', fontWeight: 400, color: '#888784' }}>From source: {w.source_quotes.map((q, qi) => {
+                          const p = w.source_file_paths?.[qi]
+                          const url = p ? pathToSignedUrl[p] : undefined
+                          return (
+                            <span key={qi}>
+                              {qi > 0 && '; '}
+                              {url ? (
+                                <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: '#7425e3', textDecoration: 'underline', textDecorationThickness: '0.5px', textUnderlineOffset: 2 }}>{`"${q}"`}</a>
+                              ) : `"${q}"`}
+                            </span>
+                          )
+                        })}</div>
                       )}
                       {w.extrapolation_note && (
                         <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: '#888784' }}>Estimated — {w.extrapolation_note}</div>
