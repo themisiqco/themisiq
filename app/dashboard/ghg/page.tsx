@@ -1390,7 +1390,10 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         // UK, EU and NZ grids are national — set grid_region directly from the country.
         // (AU returns '' here and resolves on the state pick; US resolves on the state pick.)
         const gr = gridRegionForCountry(value)
+        // UK/EU/NZ resolve immediately; US/CA/AU/OTHER need a state/province pick — CLEAR any prior
+        // region so a country switch can't leave a stale wrong-country factor (e.g. US_CA on an AU loc).
         if (gr) locs[idx].grid_region = gr
+        else locs[idx].grid_region = ''
         // Metric countries (CA, UK, EU, AU, NZ) default liquid fuels to litres; US/other keep gallons.
         // NZ LPG is the exception — MfE publishes it per kg, so propane defaults to kg for NZ.
         const ctryUp = (value || '').toUpperCase().trim()
