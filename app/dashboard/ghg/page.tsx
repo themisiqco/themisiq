@@ -185,6 +185,17 @@ const GRID_EF: Record<string, Record<number, number>> = {
   EU_PL: { 2023: 0.614 }, EU_PT: { 2023: 0.119 }, EU_RO: { 2023: 0.234 }, EU_SK: { 2023: 0.084 },
   EU_SI: { 2023: 0.176 }, EU_ES: { 2023: 0.158 }, EU_SE: { 2023: 0.008 },
   EU_AVG: { 2023: 0.210 },
+  // Australia — DCCEEW National Greenhouse Accounts (NGA) Factors 2025, Table 1 Scope 2
+  // (kg CO2e/kWh, AR5 basis). Single vintage. State grids; two auto-map decisions:
+  //   ACT has no separate grid → shares NSW (mapping done in detectGridRegion).
+  //   WA → SWIS (South West Interconnected System, the main WA grid); NT → DKIS
+  //   (Darwin-Katherine Interconnected System, the main NT grid). Both mapped in detectGridRegion.
+  AU_NSW: { 2025: 0.64 }, AU_VIC: { 2025: 0.78 }, AU_QLD: { 2025: 0.67 },
+  AU_SA: { 2025: 0.22 }, AU_WA: { 2025: 0.50 }, AU_TAS: { 2025: 0.20 }, AU_NT: { 2025: 0.56 },
+  AU_AVG: { 2025: 0.62 },
+  // New Zealand — MfE "Measuring Emissions" 2026 (v2), national electricity (kg CO2e/kWh).
+  // National grid (no sub-national split); year-keyed like the Canadian provinces.
+  NZ: { 2023: 0.0766, 2024: 0.0994, 2025: 0.0787 },
 }
 // ── RESIDUAL MIX (market-based Scope 2) ──────────────────────────────────────
 // Market-based Scope 2 applies a RESIDUAL-MIX factor to UNCOVERED load (electricity
