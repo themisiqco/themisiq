@@ -422,12 +422,18 @@ function detectGridRegion(code: string, country?: string): string {
   if (ctry === 'AU' || ctry === 'AUSTRALIA') {
     if (c === 'ACT' || c === 'NSW') return 'AU_NSW'
     if (AU_STATES.includes(c)) return 'AU_' + c
-    return 'AU_AVG'
+    // Blank / unknown AU state → UNRESOLVED (''), NOT 'AU_AVG' — same rationale as the US fallback
+    // below: a real AU_AVG key would read as resolved and slip past the gate. AU_AVG stays a
+    // deliberate/calc-only key, never a silent blank-state result.
+    return ''
   }
   if ((ctry === 'CA' || ctry === 'CANADA') && CA_PROVINCES.includes(c)) return c
   if (CA_PROVINCES.includes(c) && !US_STATES.includes(c)) return c
   if (US_STATES.includes(c)) return 'US_' + c
-  return 'US_AVG'
+  // Blank / unknown state → UNRESOLVED ('' ), NOT 'US_AVG'. A real US_AVG key would read as resolved
+  // and slip past the gate; '' lets the gate catch a US location with no state (like CA-no-province).
+  // US_AVG remains a deliberate calc-time fallback inside getGridFactor; no UI offers it as a choice.
+  return ''
 }
 // Country-level grid region for countries whose grid factor is national (UK, EU members).
 // Returns the GRID_EF key, or '' if the country isn't one we map at country level.
@@ -2119,7 +2125,16 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region auto-detected: <strong>{detectedRegion?.label}</strong> — {detectedRegion ? getGridFactor(detectedRegion.value, inventory.reporting_year).ef : "—"} kg CO₂e/kWh (eGRID 2023)</div>
                   : (loc.grid_region.startsWith('EU_') || loc.grid_region === 'UK' || loc.grid_region === 'NZ')
                   ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{loc.grid_region}</strong> — {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh ({loc.grid_region === 'UK' ? 'DEFRA 2025' : loc.grid_region === 'NZ' ? 'NZ MfE 2026' : 'EEA 2023'})</div>
-                  : <Field label="Grid region"><select value={loc.grid_region} onChange={e => updateLocation(activeLocation, 'grid_region', e.target.value)} style={inputStyle}><optgroup label="Canada">{GRID_REGIONS_CA.map(r => <option key={r.value} value={r.value}>{r.label} — {getGridFactor(r.value, inventory.reporting_year).ef} kg CO₂e/kWh</option>)}</optgroup><optgroup label="United States">{GRID_REGIONS_US.map(r => <option key={r.value} value={r.value}>{r.label} — {getGridFactor(r.value, inventory.reporting_year).ef} kg CO₂e/kWh</option>)}</optgroup></select></Field>
+                  : isResolvedGridRegion(loc.grid_region)
+                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{loc.grid_region}</strong> — {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh ({loc.country === 'CA' ? 'ECCC v3.0' : loc.country === 'US' ? 'US EPA eGRID2023' : loc.country === 'AU' ? 'DCCEEW NGA 2025' : 'grid factor'})</div>
+                  : (loc.country === 'CA' || loc.country === 'US')
+                  ? <div style={{ background: '#FEF3E2', border: '0.5px solid #fde68a', borderRadius: 8, padding: '10px 14px', display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
+                      <div style={{ fontSize: 12, color: '#92400e' }}>Select your {loc.country === 'CA' ? 'province' : 'state'}/region to resolve the grid emission factor.</div>
+                      {loc.country === 'CA'
+                        ? <select value="" onChange={e => updateLocation(activeLocation, 'province', e.target.value)} style={inputStyle}><option value="" disabled>Select province…</option>{GRID_REGIONS_CA.map(r => <option key={r.value} value={r.value}>{r.label} — {r.ef} kg CO₂e/kWh</option>)}</select>
+                        : <select value="" onChange={e => updateLocation(activeLocation, 'state', e.target.value)} style={inputStyle}><option value="" disabled>Select state…</option>{US_STATES.map(s => <option key={s} value={s}>{s} — {getGridFactor('US_' + s, inventory.reporting_year).ef} kg CO₂e/kWh</option>)}</select>}
+                    </div>
+                  : <div style={{ background: '#FEF3E2', border: '0.5px solid #fde68a', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400e' }}>Grid factor not available for this jurisdiction — <a href="mailto:hello@themisiq.co" style={{ color: '#7425e3', textDecoration: 'underline' }}>contact us</a>.</div>
                 }
                 {loc.country === 'NZ' && (
                   <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
@@ -2179,7 +2194,9 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem' }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>All locations</div>
               <div style={{ fontSize: 14, fontWeight: 600, color: '#7425e3' }}>{totals_ar6.s1_total.toFixed(2)} mt Scope 1</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#0F6E56', marginTop: 4 }}>{totals_ar6.s2_location.toFixed(2)} mt Scope 2</div>
+              {gridReady
+                ? <div style={{ fontSize: 14, fontWeight: 600, color: '#0F6E56', marginTop: 4 }}>{totals_ar6.s2_location.toFixed(2)} mt Scope 2</div>
+                : <div style={{ marginTop: 4 }}><div style={{ fontSize: 14, fontWeight: 600, color: '#888784' }}>— mt Scope 2</div><div style={{ fontSize: 10, color: '#888784', marginTop: 1 }}>Resolve grid regions to preview Scope 2</div></div>}
             </div>
           </div>
         </div>
