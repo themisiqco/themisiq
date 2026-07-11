@@ -130,12 +130,56 @@ const EF_EU = {
   gasoline_gallon: { co2: 8.657763, ch4: 0.000374756, n2o: 0.000074951 },
 }
 
+// Australia combustion factors — DCCEEW National Greenhouse Accounts (NGA) Factors 2025 (AR5 basis).
+// NGA publishes an energy-content factor (GJ/unit) and a combined Scope 1 EF per GJ; effective per-unit
+// values are PRE-COMPUTED here (energy_content × combined-EF/GJ) and stored AS-IS in `co2` with ch4:0,
+// n2o:0 — so calcGas reproduces the NGA-derived figure exactly and AU intentionally does NOT respond to
+// the AR4/AR5/AR6 toggle (AR5 is already baked into the published combined EF). Metric units (m³, litres).
+const EF_AU = {
+  // Natural gas (NGA Table 4, ex-Table 39 energy content): 0.0393 GJ/m³ × 51.53 kgCO2e/GJ = 2.0251 → 2.025 kg/m³.
+  natural_gas_m3: { co2: 2.025, ch4: 0, n2o: 0 },
+  // Diesel oil (NGA Table 4/Table 1): 38.6 GJ/kL × 70.2 kgCO2e/GJ ÷ 1000 = 2.70972 → 2.710 kg/L.
+  diesel_litre: { co2: 2.710, ch4: 0, n2o: 0 },
+  diesel_mobile_litre: { co2: 2.710, ch4: 0, n2o: 0 },
+  // Petrol / gasoline (NGA Table 4): 34.2 GJ/kL × 67.8 kgCO2e/GJ ÷ 1000 = 2.31876 → 2.319 kg/L.
+  gasoline_litre: { co2: 2.319, ch4: 0, n2o: 0 },
+  // LPG (NGA Table 4): 25.7 GJ/kL × 60.6 kgCO2e/GJ ÷ 1000 = 1.55742 → 1.557 kg/L (per-litre, matches engine input).
+  propane_litre: { co2: 1.557, ch4: 0, n2o: 0 },
+}
+
+// New Zealand combustion factors — MfE "Measuring Emissions" 2026 (v2). Published per-unit directly, so
+// stored AS-IS in `co2` with ch4:0, n2o:0 (like EF_UK/EF_AU) — reproduces the MfE figure exactly and does
+// NOT respond to the AR toggle. Use-class selectable: Commercial (default) / Industrial only — the MfE
+// stationary-combustion workbook has NO Residential row for these fuels (only coal), so Residential is
+// intentionally absent (we do not invent factors). NG is per kWh; LPG is per kg (MfE publishes kg, engine
+// gains a kg input path); liquids per litre. Petrol has NO stationary factor in MfE — it exists only as a
+// Transport fuel, so gasoline_litre maps to Transport Regular Petrol (2.36143); Industrial has no petrol
+// row and falls back to that same Regular transport value.
+const EF_NZ = {
+  commercial: {
+    natural_gas_kwh: { co2: 0.19543, ch4: 0, n2o: 0 },   // MfE Stationary Combustion, Commercial
+    diesel_litre: { co2: 2.6759, ch4: 0, n2o: 0 },
+    diesel_mobile_litre: { co2: 2.6759, ch4: 0, n2o: 0 }, // stationary value reused for mobile (deliberate, for consistency)
+    propane_kg: { co2: 2.97164, ch4: 0, n2o: 0 },        // LPG per kg (MfE)
+    gasoline_litre: { co2: 2.36143, ch4: 0, n2o: 0 },    // Transport Regular Petrol (no stationary petrol row)
+  },
+  industrial: {
+    natural_gas_kwh: { co2: 0.195067, ch4: 0, n2o: 0 },  // MfE Stationary Combustion, Industrial
+    diesel_litre: { co2: 2.66873, ch4: 0, n2o: 0 },
+    diesel_mobile_litre: { co2: 2.66873, ch4: 0, n2o: 0 },
+    propane_kg: { co2: 2.96632, ch4: 0, n2o: 0 },
+    gasoline_litre: { co2: 2.36143, ch4: 0, n2o: 0 },    // no Industrial petrol → Regular transport fallback
+  },
+}
+
 const EF_SOURCES = {
   combustion: 'US EPA (2024) Emission Factors for Greenhouse Gas Inventories',
   combustion_ca: 'ECCC (2025) Emission factors and reference values v3.0',
   combustion_uk: 'UK DEFRA/DESNZ (2025) GHG Conversion Factors for Company Reporting',
   combustion_eu: 'IPCC (2006) Guidelines Vol.2 — Tier 1 default combustion factors',
-  electricity: 'US EPA eGRID2023 (US) / ECCC v3.0 (CA) / DEFRA 2025 (UK) / EEA 2023 (EU)',
+  combustion_au: 'DCCEEW NGA Factors 2025 (AR5)',
+  combustion_nz: 'NZ MfE Measuring Emissions 2026',
+  electricity: 'US EPA eGRID2023 (US) / ECCC v3.0 (CA) / DEFRA 2025 (UK) / EEA 2023 (EU) / DCCEEW NGA 2025 (AU) / NZ MfE 2026 (NZ)',
   residual_us: 'Green-e Residual Mix 2025 (2023 data, publ. 2026-01-29, CRS) — residual CO₂; eGRID2023 Rev2 (publ. 2025-06-12) CH₄/N₂O. Green-e factors out Green-e-certified voluntary sales (the only published US residual source per CRS).',
   residual_eu: 'AIB European Residual Mixes 2024 (publ. 2025-05-30, Grexel/AIB; Ecoinvent CO₂ inputs) — combined CO₂e, gCO₂/kWh.',
   gwp_ar4: 'IPCC AR4 (2007) — selectable alternate; aligns with CARB AB 32 / Mandatory Reporting Regulation, but not the default for any current framework',
