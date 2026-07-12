@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Nav from '../../components/Nav'
 import { useEntitlement } from '../../../lib/useEntitlement'
 import { supabase } from '../../../lib/supabase'
-import { getObligations, getApplicableFrameworks, getComplianceCost, SECTOR_RISKS } from '../../../lib/deals/assessment'
+import { getObligations, getApplicableFrameworks, getComplianceCost, SECTOR_RISKS, DEFAULT_PIPELINE_TARGETS } from '../../../lib/deals/assessment'
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -459,6 +459,23 @@ export default function DealsDashboard() {
             </div>
           </div>
           <div style={{ fontSize: 11, color: '#888784', marginTop: -8, marginBottom: 16 }}>Benchmark figures shown in USD.</div>
+
+          {/* Pipeline-ROI scenario — DASHBOARD ONLY (not shared into the public /deals/[token] page:
+              wrong audience). Reuses the already-computed consultant range × DEFAULT_PIPELINE_TARGETS
+              and the annual themisIqFigure — no new numbers. */}
+          <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#7425e3', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Across your pipeline</div>
+            {obligations.locationUnset ? (
+              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6 }}>Enter a location count to see your annual ThemisIQ price — one subscription covers your whole screening pipeline, not one deal.</div>
+            ) : (
+              <>
+                <div style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.6 }}>
+                  Screen ~{DEFAULT_PIPELINE_TARGETS} targets/year. Traditional ESG due diligence: <strong>~USD {Math.round(obligations.consultantLow * DEFAULT_PIPELINE_TARGETS / 1000)}k–{Math.round(obligations.consultantHigh * DEFAULT_PIPELINE_TARGETS / 1000)}k</strong> in per-engagement fees. ThemisIQ: <strong style={{ color: '#0F6E56' }}>{themisIqFigure}</strong> per year, unlimited targets.
+                </div>
+                <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.6, marginTop: 6 }}>One subscription covers your whole screening pipeline, not one deal.</div>
+              </>
+            )}
+          </div>
 
           {/* Included for this deal */}
           <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.25)', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: 16 }}>

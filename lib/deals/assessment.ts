@@ -120,6 +120,11 @@ export const CONSULTANT_RANGES = {
   financedEmissions:{ low: 12000, high: 20000 }, // Financed emissions (PCAF Cat.15) — FS only
 }
 
+// Default pipeline size for the DASHBOARD-ONLY "across your pipeline" ROI scenario (screen N targets
+// per year on one annual subscription). Display-only — never enters any per-deal figure. Change here
+// to re-scale the pipeline argument. Not used on the public /deals/[token] page (wrong audience).
+export const DEFAULT_PIPELINE_TARGETS = 10
+
 // Detected frameworks whose presence implies a value-chain / Scope 3 supply-chain obligation.
 // VERIFIED strings only (getApplicableFrameworks emits these) — no phantoms.
 // PCAF is NOT here: financed emissions (Cat.15) is its own obligation, not supply chain.
