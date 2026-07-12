@@ -458,7 +458,7 @@ export default function DealsDashboard() {
               Priced like sustainability software, scoped like a consultant&rsquo;s engagement. The difference is automation, not depth: traditional fees are dominated by manual data-collection and review hours — the platform handles those directly, without cutting the deliverable.
             </div>
           </div>
-          <div style={{ fontSize: 11, color: '#888784', marginTop: -8, marginBottom: 16 }}>Benchmark figures shown in USD.</div>
+          <div style={{ fontSize: 11, color: '#888784', marginTop: -8, marginBottom: 16, lineHeight: 1.6 }}>Benchmark figures shown in USD. <strong style={{ fontWeight: 600 }}>How we benchmark:</strong> per-obligation market ranges for standalone ESG due-diligence workstreams, scaled by number of locations and sector intensity — indicative, not a quote.</div>
 
           {/* Pipeline-ROI scenario — DASHBOARD ONLY (not shared into the public /deals/[token] page:
               wrong audience). Reuses the already-computed consultant range × DEFAULT_PIPELINE_TARGETS

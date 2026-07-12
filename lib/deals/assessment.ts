@@ -110,9 +110,13 @@ export const getComplianceCost = (dealValue: number, sector: string, frameworks:
 }
 
 // ─── Module-aware obligation engine ─────────────────────────────────────────────
-// Consultant first-year cost ranges (USD) — 2026 cited market ranges, anchored
-// conservative; refresh periodically. Highs tightened so the platform reads as a
-// credible alternative, not a basement bargain.
+// Consultant first-year cost ranges (USD), per obligation. SOURCE BASIS: these align with 2026 M&A
+// due-diligence market analyses — standalone ESG / specialist DD workstreams typically run in the tens
+// of thousands per engagement; total transaction due diligence commonly runs ~0.2%–4% of deal value
+// (the percentage falls as deal size rises); GHG inventory is typically the single largest ESG
+// workstream, so it anchors the highest range. Anchored conservative, highs tightened so the platform
+// reads as a credible alternative (not a basement bargain). Indicative benchmarks, not quotes — refresh
+// periodically. The per-obligation figures below are unchanged; only the sourcing note was added.
 export const CONSULTANT_RANGES = {
   ghg:              { low: 18000, high: 30000 }, // GHG inventory & Scope 3 assessment
   supplyChain:      { low: 10000, high: 20000 }, // Supply-chain / Scope 3 value-chain
