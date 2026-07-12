@@ -142,7 +142,16 @@ export const SUPPLY_CHAIN_TRIGGERS = ['CS3D', 'CSRD', 'SFDR']
 // scales (GHG_TIERS), so the GAP narrows at high facility counts — intentional.
 const CONSULTANT_LOCATION_FACTOR = (locationCount: number): number =>
   locationCount <= 3 ? 1.0 : locationCount <= 15 ? 1.5 : 2.0   // reuse GHG_TIERS thresholds
+// Scope 1-intensive sectors — material process / extraction / combustion emissions, so their GHG
+// INVENTORY is more work to build (more sources, more sites). This list tracks GHG-inventory BUILD
+// EFFORT, NOT overall ESG risk. It is a deliberately COARSE, directional signal (heavy vs not).
+// ⚠️ DO NOT derive this — or the multiplier below — from SECTOR_RISKS severity. That is a SEPARATE
+// axis (risk materiality/urgency for the deal memo), and it decouples from inventory effort: e.g.
+// Financial Services carries critical risk (financed emissions) but a light own-ops GHG inventory
+// (its heavy work is the separately-priced PCAF line). Coupling cost to severity would misprice those
+// sectors and invent per-sector precision we can't cite. Keep this coarse and effort-based.
 const HEAVY_SECTORS = ['Energy & Utilities', 'Industrials & Manufacturing', 'Mining & Metals', 'Transport & Logistics', 'Agriculture & Food']
+// One modest, defensible bump for Scope 1-intensive sectors' GHG line only (see included[] above).
 const CONSULTANT_SECTOR_FACTOR = (sector?: string): number =>
   sector && HEAVY_SECTORS.includes(sector) ? 1.25 : 1.0
 // Round a scaled consultant figure to the nearest 1000 so the "k" display stays clean.
