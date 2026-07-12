@@ -92,8 +92,12 @@ export const getComplianceCost = (dealValue: number, sector: string, frameworks:
   // High-emissions / financial sectors and more applicable frameworks push toward the upper end.
   const pctLow = isHighEmissions ? 0.0020 : isFinancial ? 0.0015 : 0.0010
   const pctHigh = (isHighEmissions ? 0.0040 : isFinancial ? 0.0035 : 0.0025) + (fwCount > 2 ? 0.0010 : 0)
-  const low = Math.max(7500, dealValue * pctLow)
-  const high = Math.max(25000, dealValue * pctHigh)
+  // TRUE percentage of deal value — no floors. This is a RISK-EXPOSURE figure (the dashboard
+  // "ESG value-at-risk exposure" block), not a minimum engagement fee, so the $ always agrees with the
+  // % and a small deal correctly shows proportionally small exposure. (The old Math.max(7500/25000)
+  // floors were a cost-framing artifact; low/high are consumed only by that exposure display + its export row.)
+  const low = dealValue * pctLow
+  const high = dealValue * pctHigh
 
   const items = [
     { item: 'GHG inventory & Scope 3 assessment', cost: isHighEmissions ? '$40,000–80,000' : '$15,000–35,000' },

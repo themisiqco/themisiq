@@ -245,7 +245,7 @@ export default function DealsDashboard() {
       [],
       ['Flagged — separate specialist (in neither total)', 'ThemisIQ', 'Consultant (reference)'],
       ...obligations.flagged.map(o => [o.scopeNote ? `${o.label} — ${o.scopeNote}` : o.label, 'Not included', 'Not included']),
-      ...(complianceCost ? [[`Indicative ESG-DD range: ~${(complianceCost.pctLow * 100).toFixed(2)}%–${(complianceCost.pctHigh * 100).toFixed(2)}% of deal value; requires specialist confirmation`]] : []),
+      ...(complianceCost ? [[`ESG value-at-risk exposure: ~${(complianceCost.pctLow * 100).toFixed(2)}%–${(complianceCost.pctHigh * 100).toFixed(2)}% of deal value (~USD ${Math.round(complianceCost.low).toLocaleString()}–${Math.round(complianceCost.high).toLocaleString()}) carries ESG-related risk to assess; indicative exposure, not a cost — requires specialist confirmation`]] : []),
       [],
       ['DATA ROOM GAPS'],
       ['Item', 'Status'],
@@ -521,9 +521,17 @@ export default function DealsDashboard() {
             </div>
           ))}
 
-          {/* % context line — from getComplianceCost */}
-          <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.6, marginBottom: 16 }}>
-            ~{(complianceCost.pctLow * 100).toFixed(2)}%–{(complianceCost.pctHigh * 100).toFixed(2)}% of deal value, typical ESG-DD range · {deal.sector || '—'}, {deal.jurisdiction}, {frameworks.length} applicable frameworks · indicative, scope-matched to the obligations detected for this deal · requires specialist confirmation
+          {/* ESG value-at-risk EXPOSURE — from getComplianceCost. A RISK metric the analyst diligences
+              AGAINST, not a cost and NOT compared to the ThemisIQ price. Kept visually + semantically
+              separate from the consultant-vs-ThemisIQ cost hero above (different concept). */}
+          <div style={{ background: '#FCEBEB', border: '0.5px solid rgba(185,28,28,0.2)', borderRadius: 10, padding: '0.85rem 1.25rem', marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#B91C1C', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>ESG value-at-risk exposure</div>
+            <div style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.6 }}>
+              ~{(complianceCost.pctLow * 100).toFixed(2)}%–{(complianceCost.pctHigh * 100).toFixed(2)}% of deal value (~USD {Math.round(complianceCost.low).toLocaleString()}–{Math.round(complianceCost.high).toLocaleString()}) carries ESG-related risk to assess.
+            </div>
+            <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.6, marginTop: 4 }}>
+              {deal.sector || '—'}, {deal.jurisdiction}, {frameworks.length} applicable frameworks · indicative exposure, not a cost · requires specialist confirmation.
+            </div>
           </div>
 
           <div style={{ background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.2)', borderRadius: 10, padding: '1rem' }}>
