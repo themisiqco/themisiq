@@ -21,6 +21,8 @@
  * flag, never compute with a guessed factor).
  */
 
+import { parseLocalDate, exclusiveEnd } from "./engine";
+
 export type GwpVersion = "AR4" | "AR5" | "AR6";
 
 export interface EFFactor { co2: number; ch4: number; n2o: number }
@@ -89,15 +91,16 @@ export interface MonthlyResult {
 }
 
 // ---- date helpers (day-level, mirrors the coverage engine's approach) --------
-
-function parseLocalDate(s: string): Date | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
-  if (!m) return null;
-  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-}
+// parseLocalDate + exclusiveEnd are imported from lib/ghg/engine (single source of
+// truth). The engine's exclusiveEnd canonicalizes BOTH bill-end conventions; this
+// module's old blind +1-day copy DISAGREED with it — a live bug — so importing the
+// engine's version is the fix.
+// daysBetween stays LOCAL and half-open on purpose: the engine's daysBetween is
+// inclusive (+1 day) for coverage's inclusive ranges. This module prorates over the
+// half-open span [start, exclusiveEnd), so it needs the exclusive day count; using
+// the engine's inclusive version would inflate every bill's totalDays and break the
+// monthly↔annual reconciliation.
 const DAY = 86400000;
-/** inclusive end -> exclusive end (+1 day), matching the billing-cycle convention */
-function exclusiveEnd(d: Date): Date { return new Date(d.getTime() + DAY); }
 function daysBetween(a: Date, b: Date): number { return Math.round((b.getTime() - a.getTime()) / DAY); }
 function monthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
