@@ -480,7 +480,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       // 2. applyResolutions is the ONE implementation of what each field's figure is (shared with
       //    buildWorkings). It gathers confirmed proposals, sums, and applies any coverage resolution.
       const loc: any = { ...locs[locIdx], source_docs: docs }
-      const applied = applyResolutions(loc, inv.coverage_resolutions ?? [])
+      const win = periodFromYearAndEnd(inv.reporting_year, inv.fiscal_year_end_month)
+      const applied = applyResolutions(loc, inv.coverage_resolutions ?? [], win.start, win.end)
 
       // 3. Write each field. Mixed units -> don't write; flag those proposals for review.
       const flagged: { docId: string; pi: number }[] = []
@@ -514,11 +515,12 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       // Re-derive affected fields so an extrapolation applies right away. We recompute the
       // same byField sum used in updateProposal, now that the resolution is present.
       const resolutions = [...existing, res]
+      const win = periodFromYearAndEnd(inv.reporting_year, inv.fiscal_year_end_month)
       const locs = inv.locations.map(loc => {
         if (loc.id !== res.locId) return loc
         const next: any = { ...loc }
         // Same single implementation as updateProposal — no copy-pasted gross-up logic.
-        Object.values(applyResolutions(loc, resolutions)).forEach(a => {
+        Object.values(applyResolutions(loc, resolutions, win.start, win.end)).forEach(a => {
           if (a.mixedUnits) return
           next[a.field] = a.value
           if (a.unitField && a.unit != null) next[a.unitField] = a.unit
@@ -608,7 +610,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       scope2_intensity: inventory.revenue_millions > 0 ? totals_ar6.s2_location / inventory.revenue_millions : 0,
       gwp_version: 'AR6',
       status: 'draft',
-workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, coverageResolutions),
+workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, coverageResolutions, inventory.fiscal_year_end_month),
       updated_at: new Date().toISOString(),
     }
     let savedId: string | null = inventoryId

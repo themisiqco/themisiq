@@ -86,6 +86,75 @@ describe('GROUP A — straddle', () => {
   });
 });
 
+// ── STEP 1 (Phase 3a) — straddle detection uses the canonical half-open interval ──
+describe('straddle detection (canonical, day-map-consistent)', () => {
+  const win = { s: new Date(2024, 0, 1), e: new Date(2024, 11, 31) };
+
+  it("2024-12-01 → 2025-01-01 (first-of-next-month) is NOT a straddle — it covers December only; full year → 'full'", () => {
+    const periods: CoveragePeriod[] = [
+      { docId: 'a', pi: 0, start: new Date(2024, 0, 1), end: new Date(2024, 11, 1) },  // Jan 1 → Dec 1 (Jan–Nov)
+      { docId: 'b', pi: 0, start: new Date(2024, 11, 1), end: new Date(2025, 0, 1) },   // Dec 1 → Jan 1 (December)
+    ];
+    const r = analyzeCoverage(periods, win.s, win.e);
+    expect(r.straddles.length).toBe(0);   // the bill that fooled us in June: no phantom straddle
+    expect(r.status).toBe('full');
+  });
+
+  it("2024-12-20 → 2025-01-19 IS a straddle; daysInYear 12, totalDays 31 (Jan 19 is the last covered day)", () => {
+    const periods: CoveragePeriod[] = [{ docId: 's', pi: 0, start: new Date(2024, 11, 20), end: new Date(2025, 0, 19) }];
+    const r = analyzeCoverage(periods, win.s, win.e);
+    expect(r.straddles.length).toBe(1);
+    expect(r.straddles[0].daysInYear).toBe(12);
+    // With exclusiveEnd fixed (mid-month = inclusive), Jan 19 is covered → canonical span is 31 days,
+    // 12 of them in FY2024. 12/31 = the correct proration, matching A1.
+    expect(r.straddles[0].totalDays).toBe(31);
+  });
+});
+
+// ── exclusiveEnd: mid-month bill ends are INCLUSIVE (H1/H2/H3) [SEV 1] ─────────
+// A meter-read cycle "Dec 20 – Jan 19" means Jan 19 IS covered (inclusive). Only the
+// 1st of a month reads as exclusive (first-of-next-month convention). The old heuristic
+// treated every non-last-day-of-month date as exclusive → dropped a day at every mid-
+// month boundary → a phantom gap in every month of a fully-billed year.
+describe('exclusiveEnd — mid-month ends are inclusive', () => {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  it('H1 conventions: last-day inclusive, first-of-month exclusive, mid-month inclusive', () => {
+    expect(iso(exclusiveEnd(new Date(2024, 4, 31)))).toBe('2024-06-01'); // last day of month → inclusive
+    expect(iso(exclusiveEnd(new Date(2024, 5, 1)))).toBe('2024-06-01');  // first of month → exclusive (unchanged)
+    expect(iso(exclusiveEnd(new Date(2025, 0, 19)))).toBe('2025-01-20'); // mid-month → inclusive (was WRONG: gave 01-19)
+  });
+
+  it('H2 consecutive mid-month meter cycles: NO gap at the boundary — 2025-01-19 must be covered', () => {
+    const periods: CoveragePeriod[] = [
+      { docId: '1', pi: 0, start: new Date(2024, 11, 20), end: new Date(2025, 0, 19) },
+      { docId: '2', pi: 0, start: new Date(2025, 0, 20), end: new Date(2025, 1, 19) },
+    ];
+    const r = analyzeCoverage(periods, new Date(2025, 0, 1), new Date(2025, 11, 31));
+    expect(r.gaps.some(g => g.label.startsWith('Jan'))).toBe(false); // January fully covered — no dropped boundary day
+    expect(r.overlaps.length).toBe(0);                                // and no double-count at the seam
+  });
+
+  it('H3 a full year of consecutive mid-month bills has NO phantom gaps — all twelve months covered', () => {
+    // 13 mid-month cycles (Dec 20 2024 → Jan 19 2026) span calendar FY2025. Mid-month cycles are offset
+    // from the calendar, so 13 are needed to cover all twelve months (the task said "twelve"; see report).
+    const periods: CoveragePeriod[] = [];
+    for (let i = 0; i < 13; i++) {
+      const start = new Date(2024, 11, 20); start.setMonth(start.getMonth() + i);
+      const end = new Date(2025, 0, 19); end.setMonth(end.getMonth() + i);
+      periods.push({ docId: String(i), pi: 0, start, end });
+    }
+    const r = analyzeCoverage(periods, new Date(2025, 0, 1), new Date(2025, 11, 31));
+    expect(r.gaps.length).toBe(0);          // THE FIX: zero phantom gaps at any interior boundary
+    expect(r.monthsCovered).toBe(12);       // every month fully covered
+    expect(r.status).not.toBe('gap');       // the phantom-gap bug is gone
+    // status is 'straddle' (not 'full'): the two FY-edge cycles legitimately cross Jan 1 and need a
+    // proration choice. That is correct — mid-month cycles can't align to a calendar year. See report.
+    expect(r.status).toBe('straddle');
+  });
+});
+
 // ── GROUP B — Absence indistinguishable from attested zero [SEV 1] ────────────
 describe('GROUP B — silent absence', () => {
   it("B1 buildWorkings emits SOME natural-gas trace row even when has_natural_gas is false (absence must be recorded, not silent)", () => {

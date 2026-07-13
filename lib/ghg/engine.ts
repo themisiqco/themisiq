@@ -590,17 +590,18 @@ function daysBetween(a: Date, b: Date): number {
   return Math.round((b.getTime() - a.getTime()) / 86400000) + 1 // inclusive
 }
 
-// Two extraction conventions appear for a bill's end date: last-day-of-month
-// ("05-01 → 05-31") and first-of-next-month ("05-01 → 06-01"). Canonicalize BOTH
-// to a half-open exclusive boundary (the first uncovered day) so coverage — and
-// monthly attribution — is convention-independent. Shared by analyzeCoverage and
-// lib/ghg/monthlyEmissions (which previously re-declared a diverged +1-day copy).
+// Canonicalize a bill's printed end date to a half-open exclusive boundary (the first
+// UNCOVERED day). Bills print their end one of two ways:
+//   "Dec 20 – Jan 19"  → Jan 19 is the last COVERED day (inclusive; the common meter-read cycle)
+//   "Dec 01 – Jan 01"  → Jan 01 is the first UNCOVERED day (exclusive; first-of-next-month)
+// The 1st of a month is the ONLY date that reads as exclusive; every other end date is the
+// last covered day and must be pushed +1 to get the exclusive boundary. (The old heuristic
+// keyed on "last day of month", which silently dropped a day at every mid-month boundary.)
+// Shared by analyzeCoverage AND lib/ghg/monthlyEmissions — one definition, no diverged copy.
 function exclusiveEnd(end: Date): Date {
-  const DAY = 86400000
-  const isLastDayOfMonth = new Date(end.getTime() + DAY).getMonth() !== end.getMonth()
-  return isLastDayOfMonth
-    ? new Date(end.getFullYear(), end.getMonth() + 1, 1)
-    : new Date(end.getFullYear(), end.getMonth(), end.getDate())
+  return end.getDate() === 1
+    ? new Date(end.getFullYear(), end.getMonth(), 1)
+    : new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1)
 }
 
 function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date): CoverageResult {
@@ -619,25 +620,37 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
     while (d <= last) { reqMonths.push(monthKey(d)); d.setMonth(d.getMonth() + 1) }
   }
 
-  // Straddles: bills crossing the reporting-year boundary (disclosure %, raw ends).
-  // Out-of-window: bills entirely outside the reporting year (no in-window days) — not counted.
+  // Canonical half-open reporting window: winEnd is inclusive, so the exclusive boundary is winEnd + 1
+  // day. This is the SAME boundary the day-map below uses — straddle detection and coverage can never
+  // disagree (that disagreement, via the raw-end test, was the phantom-straddle bug).
+  const winS = new Date(winStart.getFullYear(), winStart.getMonth(), winStart.getDate())
+  const winEexcl = new Date(winEnd.getFullYear(), winEnd.getMonth(), winEnd.getDate() + 1)
+  const dayCount = (a: Date, b: Date): number => Math.round((b.getTime() - a.getTime()) / DAY) // half-open, NOT the inclusive daysBetween
+
+  // Straddles: a bill whose CANONICAL [start, exclusiveEnd(end)) interval has days BOTH inside and
+  // outside the window. Out-of-window: no in-window days. Using exclusiveEnd (which handles both
+  // bill-end conventions) means a first-of-next-month end like 2024-12-01→2025-01-01 is seen as
+  // covering December ONLY — no phantom straddle. daysInYear/totalDays are half-open, consistent
+  // with the day-map. No materiality threshold: once the convention is right, every straddle is real.
   const straddles: CoverageResult['straddles'] = []
   const outOfWindow: CoverageResult['outOfWindow'] = []
   const fmtPeriod = (p: CoveragePeriod) =>
     `${p.start.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`
   periods.forEach(p => {
-    if (p.start < winStart || p.end > winEnd) {
-      const overlapStart = p.start < winStart ? winStart : p.start
-      const overlapEnd = p.end > winEnd ? winEnd : p.end
-      if (overlapEnd >= overlapStart) {
-        const daysInYear = daysBetween(overlapStart, overlapEnd)
-        const totalDays = daysBetween(p.start, p.end)
-        straddles.push({ p, daysInYear, totalDays, pctInYear: Math.round((daysInYear / totalDays) * 1000) / 10 })
-      } else {
-        // No overlap with the window at all → fully outside the reporting year.
-        outOfWindow.push({ label: fmtPeriod(p) })
-      }
+    const pStart = new Date(p.start.getFullYear(), p.start.getMonth(), p.start.getDate())
+    const pEndExcl = exclusiveEnd(p.end)
+    const totalDays = dayCount(pStart, pEndExcl)
+    const ovStart = pStart > winS ? pStart : winS
+    const ovEndExcl = pEndExcl < winEexcl ? pEndExcl : winEexcl
+    const daysInYear = Math.max(0, dayCount(ovStart, ovEndExcl))
+    if (daysInYear <= 0) {
+      // No in-window days → fully outside the reporting year.
+      outOfWindow.push({ label: fmtPeriod(p) })
+    } else if (daysInYear < totalDays) {
+      // Part in, part out → a real straddle.
+      straddles.push({ p, daysInYear, totalDays, pctInYear: Math.round((daysInYear / totalDays) * 1000) / 10 })
     }
+    // daysInYear === totalDays → fully in-window → neither straddle nor out-of-window.
   })
 
   // ── DAY-LEVEL CONTINUITY (verifier-defensible primitive) ──
@@ -645,8 +658,7 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
   // canonical [start, exclusiveEnd) spans it. Gaps = uncovered days; overlaps = days
   // covered by ≥2 bills. Month-level results below are derived from this day map, so
   // the calendar-vs-billing-cycle artifact never produces false gaps or false overlaps.
-  const winS = new Date(winStart.getFullYear(), winStart.getMonth(), winStart.getDate())
-  const winEexcl = new Date(winEnd.getFullYear(), winEnd.getMonth(), winEnd.getDate() + 1)
+  // (winS / winEexcl are defined above, shared with straddle detection.)
   const totalDaysInWin = Math.round((winEexcl.getTime() - winS.getTime()) / DAY)
   const idxOf = (d: Date): number =>
     Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - winS.getTime()) / DAY)
@@ -1008,9 +1020,25 @@ export interface AppliedField {
   refs: { docId: string; pi: number }[]   // (docId, proposal index) feeding this field — for the write path's mixed-unit flip
 }
 
-export function applyResolutions(loc: Location, resolutions: CoverageResolution[]): Record<string, AppliedField> {
+export function applyResolutions(loc: Location, resolutions: CoverageResolution[], winStart: Date, winEnd: Date): Record<string, AppliedField> {
+  const DAY = 86400000
+  const winEexcl = new Date(winEnd.getFullYear(), winEnd.getMonth(), winEnd.getDate() + 1)
+  const year = winEnd.getFullYear()
+  // Does THIS proposal's canonical [start, exclusiveEnd(end)) interval straddle the window? Same
+  // convention as analyzeCoverage's detector, so the strip, the figure and the audit trail agree.
+  const proposalStraddles = (periodStart: string | null, periodEnd: string | null): boolean => {
+    if (!periodStart || !periodEnd) return false
+    const s = parseLocalDate(periodStart)
+    const e = exclusiveEnd(parseLocalDate(periodEnd))
+    const total = Math.round((e.getTime() - s.getTime()) / DAY)
+    const ovS = s > winStart ? s : winStart
+    const ovE = e < winEexcl ? e : winEexcl
+    const inWin = Math.max(0, Math.round((ovE.getTime() - ovS.getTime()) / DAY))
+    return inWin > 0 && inWin < total
+  }
+
   // 1. Gather confirmed proposals per target field (via the shared fieldFor join key).
-  type Acc = { field: keyof Location; unitField?: keyof Location; rawSum: number; units: Set<string>; fuelType: string; fuelTypes: Set<string>; quotes: string[]; docIds: string[]; filePaths: string[]; refs: { docId: string; pi: number }[] }
+  type Acc = { field: keyof Location; unitField?: keyof Location; rawSum: number; units: Set<string>; fuelType: string; fuelTypes: Set<string>; quotes: string[]; docIds: string[]; filePaths: string[]; refs: { docId: string; pi: number }[]; props: { value: number; periodStart: string | null; periodEnd: string | null }[] }
   const acc: Record<string, Acc> = {}
   loc.source_docs.forEach(d => {
     d.extracted?.forEach((p, pi) => {
@@ -1018,8 +1046,9 @@ export function applyResolutions(loc: Location, resolutions: CoverageResolution[
       const map = fieldFor(d.document_type, p.fuelType)
       if (!map) return
       const key = String(map.amount)
-      if (!acc[key]) acc[key] = { field: map.amount, unitField: map.unit, rawSum: 0, units: new Set(), fuelType: p.fuelType, fuelTypes: new Set(), quotes: [], docIds: [], filePaths: [], refs: [] }
+      if (!acc[key]) acc[key] = { field: map.amount, unitField: map.unit, rawSum: 0, units: new Set(), fuelType: p.fuelType, fuelTypes: new Set(), quotes: [], docIds: [], filePaths: [], refs: [], props: [] }
       acc[key].rawSum += p.value
+      acc[key].props.push({ value: p.value, periodStart: p.periodStart, periodEnd: p.periodEnd })
       if (p.unit) acc[key].units.add(p.unit)
       acc[key].fuelTypes.add(p.fuelType)
       acc[key].refs.push({ docId: d.id, pi })
@@ -1033,17 +1062,44 @@ export function applyResolutions(loc: Location, resolutions: CoverageResolution[
   for (const [key, a] of Object.entries(acc)) {
     const mixedUnits = a.units.size > 1
     const unit = a.units.size === 1 ? [...a.units][0] : undefined
-    // Extrapolate is the ONLY resolution that changes the figure today (×12/monthsCovered); it takes
-    // precedence for the factor, exactly as the old write path did. straddle/duplicate are RECORDED
-    // with factor 1 — today's (deliberately-preserved, wrong) behaviour. Phase 3 changes the factor.
     const extr = resolutions.find(r => r.kind === 'extrapolate' && r.locId === loc.id && r.fuelType === a.fuelType && !!r.monthsCovered && r.monthsCovered > 0)
-    const other = resolutions.find(r => (r.kind === 'straddle' || r.kind === 'duplicate') && r.locId === loc.id && r.fuelType === a.fuelType)
-    const match = extr ?? other
-    const factor = (extr && extr.monthsCovered) ? 12 / extr.monthsCovered : 1
-    const adjustment = match
-      ? { kind: match.kind, method: resolutionMethod(match), basis: resolutionBasis(match), factor }
-      : null
-    out[key] = { field: a.field, unitField: a.unitField, rawSum: a.rawSum, value: a.rawSum * factor, unit, adjustment, mixedUnits, fuelTypes: [...a.fuelTypes], quotes: a.quotes, docIds: a.docIds, filePaths: a.filePaths, refs: a.refs }
+    const strad = resolutions.find(r => r.kind === 'straddle' && r.locId === loc.id && r.fuelType === a.fuelType)
+    const dup = resolutions.find(r => r.kind === 'duplicate' && r.locId === loc.id && r.fuelType === a.fuelType)
+
+    // STRADDLE scaling is PER-PROPOSAL — only the straddling bill(s) are scaled; the other bills for
+    // this field are left untouched (scaling the whole sum would corrupt eleven correct bills).
+    const straddleFactor =
+      strad?.straddleChoice === 'next_year' ? 0
+      : strad?.straddleChoice === 'this_year' ? 1
+      : strad?.straddleChoice === 'prorate' ? (strad.totalDays ? (strad.daysInYear ?? 0) / strad.totalDays : 1)
+      : 1
+    const straddledSum = strad
+      ? a.props.reduce((s, pr) => s + pr.value * (proposalStraddles(pr.periodStart, pr.periodEnd) ? straddleFactor : 1), 0)
+      : a.rawSum
+    // EXTRAPOLATION gross-up applies AFTER the per-proposal straddle scaling. ORDER MATTERS.
+    const extrFactor = (extr && extr.monthsCovered) ? 12 / extr.monthsCovered : 1
+    const value = mixedUnits ? a.rawSum : straddledSum * extrFactor
+
+    let adjustment: AppliedField['adjustment'] = null
+    if (extr || strad || dup) {
+      // basis states the REAL arithmetic, in application order (straddle per-proposal, THEN extrapolate).
+      const parts: string[] = []
+      if (strad) {
+        const tot = strad.totalDays ?? 0, din = strad.daysInYear ?? 0
+        parts.push(
+          strad.straddleChoice === 'next_year' ? `next_year: straddling bill excluded (0 of ${tot} days counted)`
+          : strad.straddleChoice === 'this_year' ? `this_year: straddling bill counted in full (${tot} of ${tot} days)`
+          : `prorate: ${din} of ${tot} days in FY${year}; straddling bill scaled ×${(tot ? din / tot : 1).toFixed(3)}`
+        )
+      }
+      if (extr) parts.push(resolutionBasis(extr))
+      if (dup && !strad && !extr) parts.push(resolutionBasis(dup))
+      // primary drives kind + method: extrapolate (the gross-up) if present, else the straddle/duplicate.
+      const primary = extr ?? strad ?? dup!
+      adjustment = { kind: primary.kind, method: resolutionMethod(primary), basis: parts.join('; then '), factor: a.rawSum > 0 ? value / a.rawSum : 1 }
+    }
+
+    out[key] = { field: a.field, unitField: a.unitField, rawSum: a.rawSum, value, unit, adjustment, mixedUnits, fuelTypes: [...a.fuelTypes], quotes: a.quotes, docIds: a.docIds, filePaths: a.filePaths, refs: a.refs }
   }
   return out
 }
@@ -1059,8 +1115,9 @@ interface Provenance {
   extrapolation_note?: string
 }
 
-function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024, resolutions: CoverageResolution[] = []) {
+function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024, resolutions: CoverageResolution[] = [], fiscalYearEndMonth: number = 12) {
   const rows: any[] = []
+  const win = periodFromYearAndEnd(year, fiscalYearEndMonth)
   const pushFuel = (loc: Location, source: string, scope: number, activity: number, unit: string, ef: { co2: number; ch4: number; n2o: number }, prov?: Provenance) => {
     const g = calcGas(ef, activity, gwpVersion)
     rows.push({ location: loc.name || 'Location', source, scope, activity_data: activity, activity_unit: unit,
@@ -1069,7 +1126,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
   for (const loc of locations) {
     // applyResolutions is the single source of the figure AND its provenance/method, so the number
     // in the row and the claim in the audit trail cannot diverge (that divergence was the SEV 0 bug).
-    const applied = applyResolutions(loc, resolutions)
+    const applied = applyResolutions(loc, resolutions, win.start, win.end)
     // Figure for a field: the resolution-applied value when the field is concierge-derived; otherwise
     // the location's own value (manual entry, or a mixed-unit field the write path deliberately skipped).
     const figure = (field: keyof Location): number => {
