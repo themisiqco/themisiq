@@ -956,6 +956,98 @@ function fieldFor(docType: string, fuelType: string): { amount: keyof Location; 
   return null
 }
 
+// ── Resolution application — single source of truth for what a figure IS ──────
+// The human-readable method/basis strings are composed HERE, once. Both the per-field
+// adjustment (applyResolutions) and the coverage-resolution audit rows in buildWorkings
+// read from these, so the claim on the figure and the claim in the audit trail cannot
+// drift apart — the divergence they used to have IS the SEV 0 bug.
+function resolutionMethod(r: CoverageResolution): string {
+  return r.kind === 'extrapolate' ? `Extrapolation (×12/${r.monthsCovered}, ${r.pctEstimated}% estimated)`
+    : r.kind === 'duplicate' ? 'Overlap confirmed (no double-count adjustment)'
+    : r.kind === 'straddle' ? `Straddle — ${r.straddleChoice}${r.daysInYear != null && r.totalDays != null ? ` (${r.daysInYear}/${r.totalDays} days in year)` : ''}`
+    : r.kind
+}
+function resolutionBasis(r: CoverageResolution): string {
+  if (r.kind === 'extrapolate' && r.monthsCovered) {
+    const mult = 12 / r.monthsCovered
+    const multStr = Number.isInteger(mult) ? String(mult) : mult.toFixed(2)
+    return `${r.monthsCovered} of 12 months from bills; grossed ×${multStr} for acknowledged coverage gap`
+  }
+  if (r.kind === 'straddle') {
+    return r.daysInYear != null && r.totalDays != null
+      ? `${r.daysInYear} of ${r.totalDays} days fall in the reporting year`
+      : `boundary-straddling bill resolved by ${r.straddleChoice}`
+  }
+  if (r.kind === 'duplicate') return 'overlapping bills accepted as-is; no double-count adjustment applied'
+  return r.note
+}
+
+/**
+ * Single source of truth for what a location's activity figures ARE, given its
+ * confirmed proposals and any coverage resolutions on file.
+ * Pure. Called by the component's write path AND by buildWorkings — so the
+ * figure in the total and the figure in the audit trail cannot diverge.
+ */
+export interface AppliedField {
+  field: keyof Location
+  unitField?: keyof Location
+  rawSum: number          // sum of confirmed proposals, before any adjustment
+  value: number           // the figure actually used
+  unit?: string
+  adjustment: null | {
+    kind: 'extrapolate' | 'straddle' | 'duplicate'
+    method: string        // human-readable, flows verbatim into workings
+    basis: string         // e.g. "9 of 12 months; ×12/9" | "12 of 31 days in FY"
+    factor: number        // multiplier applied to rawSum (1 = unchanged)
+  }
+  mixedUnits: boolean     // true → do not write; caller flags for manual review
+  fuelTypes: string[]
+  quotes: string[]
+  docIds: string[]
+  filePaths: string[]
+  refs: { docId: string; pi: number }[]   // (docId, proposal index) feeding this field — for the write path's mixed-unit flip
+}
+
+export function applyResolutions(loc: Location, resolutions: CoverageResolution[]): Record<string, AppliedField> {
+  // 1. Gather confirmed proposals per target field (via the shared fieldFor join key).
+  type Acc = { field: keyof Location; unitField?: keyof Location; rawSum: number; units: Set<string>; fuelType: string; fuelTypes: Set<string>; quotes: string[]; docIds: string[]; filePaths: string[]; refs: { docId: string; pi: number }[] }
+  const acc: Record<string, Acc> = {}
+  loc.source_docs.forEach(d => {
+    d.extracted?.forEach((p, pi) => {
+      if (p.status !== 'confirmed' || p.value == null) return
+      const map = fieldFor(d.document_type, p.fuelType)
+      if (!map) return
+      const key = String(map.amount)
+      if (!acc[key]) acc[key] = { field: map.amount, unitField: map.unit, rawSum: 0, units: new Set(), fuelType: p.fuelType, fuelTypes: new Set(), quotes: [], docIds: [], filePaths: [], refs: [] }
+      acc[key].rawSum += p.value
+      if (p.unit) acc[key].units.add(p.unit)
+      acc[key].fuelTypes.add(p.fuelType)
+      acc[key].refs.push({ docId: d.id, pi })
+      // paths[] index-aligned with quotes[] (quote[i] ↔ source_file_paths[i] on the verifier row).
+      if (p.sourceQuote) { acc[key].quotes.push(p.sourceQuote); acc[key].filePaths.push(d.file_path) }
+      if (!acc[key].docIds.includes(d.id)) acc[key].docIds.push(d.id)
+    })
+  })
+  // 2. Compute each field's figure + adjustment.
+  const out: Record<string, AppliedField> = {}
+  for (const [key, a] of Object.entries(acc)) {
+    const mixedUnits = a.units.size > 1
+    const unit = a.units.size === 1 ? [...a.units][0] : undefined
+    // Extrapolate is the ONLY resolution that changes the figure today (×12/monthsCovered); it takes
+    // precedence for the factor, exactly as the old write path did. straddle/duplicate are RECORDED
+    // with factor 1 — today's (deliberately-preserved, wrong) behaviour. Phase 3 changes the factor.
+    const extr = resolutions.find(r => r.kind === 'extrapolate' && r.locId === loc.id && r.fuelType === a.fuelType && !!r.monthsCovered && r.monthsCovered > 0)
+    const other = resolutions.find(r => (r.kind === 'straddle' || r.kind === 'duplicate') && r.locId === loc.id && r.fuelType === a.fuelType)
+    const match = extr ?? other
+    const factor = (extr && extr.monthsCovered) ? 12 / extr.monthsCovered : 1
+    const adjustment = match
+      ? { kind: match.kind, method: resolutionMethod(match), basis: resolutionBasis(match), factor }
+      : null
+    out[key] = { field: a.field, unitField: a.unitField, rawSum: a.rawSum, value: a.rawSum * factor, unit, adjustment, mixedUnits, fuelTypes: [...a.fuelTypes], quotes: a.quotes, docIds: a.docIds, filePaths: a.filePaths, refs: a.refs }
+  }
+  return out
+}
+
 // Provenance stamp attached to a workings row so the verifier can trace a figure back to its bills.
 // concierge = read verbatim off confirmed bills; concierge-extrapolated = grossed up for a coverage
 // gap (number is estimated, quotes are the underlying bills); manual = not concierge-read.
@@ -974,57 +1066,34 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     rows.push({ location: loc.name || 'Location', source, scope, activity_data: activity, activity_unit: unit,
       emission_factor: `CO2 ${ef.co2}, CH4 ${ef.ch4}, N2O ${ef.n2o} kg/${unit}`, ef_source: combustionSource(loc), gwp_basis: gwpVersion, result_tco2e: g.total, ...(prov ?? {}) })
   }
-  // Read-only per-location provenance gather: mirror updateProposal's byField collection, but keep
-  // only what a verifier needs — the confirmed proposals' sourceQuotes and their parent doc ids,
-  // keyed by the inventory amount field they feed (via the shared module-scoped fieldFor).
-  const gatherProvenance = (loc: Location): Record<string, { quotes: string[]; paths: string[]; docIds: string[]; fuelTypes: Set<string> }> => {
-    const map: Record<string, { quotes: string[]; paths: string[]; docIds: string[]; fuelTypes: Set<string> }> = {}
-    loc.source_docs.forEach(d => {
-      d.extracted?.forEach(p => {
-        if (p.status !== 'confirmed' || p.value == null) return
-        const m = fieldFor(d.document_type, p.fuelType)
-        if (!m) return
-        const key = String(m.amount)
-        if (!map[key]) map[key] = { quotes: [], paths: [], docIds: [], fuelTypes: new Set() }
-        // paths[] stays index-aligned with quotes[]: push the parent doc's file_path in the same
-        // step as its sourceQuote so quote[i] ↔ source_file_paths[i] on the verifier row.
-        if (p.sourceQuote) { map[key].quotes.push(p.sourceQuote); map[key].paths.push(d.file_path) }
-        if (!map[key].docIds.includes(d.id)) map[key].docIds.push(d.id)
-        map[key].fuelTypes.add(p.fuelType)
-      })
-    })
-    return map
-  }
-  // Turn a gathered field entry into the workings provenance stamp. No proposals → honest 'manual'.
-  // A matching acknowledged coverage gap → 'concierge-extrapolated' with the gross-up basis noted;
-  // the quotes stay (they're the real bills behind the pre-gross sum), but the number is estimated.
-  const provFor = (loc: Location, prov: ReturnType<typeof gatherProvenance>, field: keyof Location): Provenance => {
-    const entry = prov[String(field)]
-    const quotes = entry?.quotes ?? []
-    if (!quotes.length) return { entry_method: 'manual' }
-    const extr = resolutions.find(r =>
-      r.kind === 'extrapolate' && r.locId === loc.id && entry!.fuelTypes.has(r.fuelType) && !!r.monthsCovered && r.monthsCovered > 0)
-    if (extr && extr.monthsCovered) {
-      const mult = 12 / extr.monthsCovered
-      const multStr = Number.isInteger(mult) ? String(mult) : mult.toFixed(2)
-      return {
-        source_quotes: quotes,
-        source_doc_ids: entry!.docIds,
-        source_file_paths: entry!.paths,
-        entry_method: 'concierge-extrapolated',
-        extrapolation_note: `${extr.monthsCovered} of 12 months from bills; grossed ×${multStr} for acknowledged coverage gap`,
-      }
-    }
-    return { source_quotes: quotes, source_doc_ids: entry!.docIds, source_file_paths: entry!.paths, entry_method: 'concierge' }
-  }
   for (const loc of locations) {
-    const prov = gatherProvenance(loc)
-    if (loc.has_natural_gas && loc.natural_gas_amount > 0) pushFuel(loc, 'Natural gas', 1, loc.natural_gas_amount, loc.natural_gas_unit, pickEF(loc, `natural_gas_${loc.natural_gas_unit}` as keyof typeof EF), provFor(loc, prov, 'natural_gas_amount'))
-    if (loc.has_propane && loc.propane_amount > 0) pushFuel(loc, 'Propane', 1, loc.propane_amount, loc.propane_unit, pickEF(loc, propaneEfKey(loc.propane_unit) as keyof typeof EF), provFor(loc, prov, 'propane_amount'))
-    if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0) pushFuel(loc, 'Diesel (stationary)', 1, loc.diesel_stationary_amount, loc.diesel_stationary_unit, pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provFor(loc, prov, 'diesel_stationary_amount'))
-    if (loc.has_fuel_oil && loc.fuel_oil_gallons > 0) pushFuel(loc, 'Fuel oil', 1, loc.fuel_oil_gallons, 'gallons', pickEF(loc, 'fuel_oil_gallon'), provFor(loc, prov, 'fuel_oil_gallons'))
-    if (loc.has_mobile && loc.gasoline_amount > 0) pushFuel(loc, 'Gasoline (mobile)', 1, loc.gasoline_amount, loc.gasoline_unit, pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provFor(loc, prov, 'gasoline_amount'))
-    if (loc.has_mobile && loc.diesel_mobile_amount > 0) pushFuel(loc, 'Diesel (mobile)', 1, loc.diesel_mobile_amount, loc.diesel_mobile_unit, pickEF(loc, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provFor(loc, prov, 'diesel_mobile_amount'))
+    // applyResolutions is the single source of the figure AND its provenance/method, so the number
+    // in the row and the claim in the audit trail cannot diverge (that divergence was the SEV 0 bug).
+    const applied = applyResolutions(loc, resolutions)
+    // Figure for a field: the resolution-applied value when the field is concierge-derived; otherwise
+    // the location's own value (manual entry, or a mixed-unit field the write path deliberately skipped).
+    const figure = (field: keyof Location): number => {
+      const a = applied[String(field)]
+      return a && !a.mixedUnits ? a.value : (loc as any)[field] as number
+    }
+    // Provenance stamp from the applied field. No quotes → honest 'manual'. An adjustment on file
+    // (extrapolate/straddle/duplicate) with quotes → 'concierge-extrapolated' + the method/basis note.
+    const provOf = (field: keyof Location): Provenance => {
+      const a = applied[String(field)]
+      const quotes = a?.quotes ?? []
+      if (!quotes.length) return { entry_method: 'manual' }
+      if (a && a.adjustment) {
+        return { source_quotes: quotes, source_doc_ids: a.docIds, source_file_paths: a.filePaths,
+          entry_method: 'concierge-extrapolated', extrapolation_note: `${a.adjustment.method} — ${a.adjustment.basis}` }
+      }
+      return { source_quotes: quotes, source_doc_ids: a!.docIds, source_file_paths: a!.filePaths, entry_method: 'concierge' }
+    }
+    if (loc.has_natural_gas && loc.natural_gas_amount > 0) pushFuel(loc, 'Natural gas', 1, figure('natural_gas_amount'), loc.natural_gas_unit, pickEF(loc, `natural_gas_${loc.natural_gas_unit}` as keyof typeof EF), provOf('natural_gas_amount'))
+    if (loc.has_propane && loc.propane_amount > 0) pushFuel(loc, 'Propane', 1, figure('propane_amount'), loc.propane_unit, pickEF(loc, propaneEfKey(loc.propane_unit) as keyof typeof EF), provOf('propane_amount'))
+    if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0) pushFuel(loc, 'Diesel (stationary)', 1, figure('diesel_stationary_amount'), loc.diesel_stationary_unit, pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provOf('diesel_stationary_amount'))
+    if (loc.has_fuel_oil && loc.fuel_oil_gallons > 0) pushFuel(loc, 'Fuel oil', 1, figure('fuel_oil_gallons'), 'gallons', pickEF(loc, 'fuel_oil_gallon'), provOf('fuel_oil_gallons'))
+    if (loc.has_mobile && loc.gasoline_amount > 0) pushFuel(loc, 'Gasoline (mobile)', 1, figure('gasoline_amount'), loc.gasoline_unit, pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provOf('gasoline_amount'))
+    if (loc.has_mobile && loc.diesel_mobile_amount > 0) pushFuel(loc, 'Diesel (mobile)', 1, figure('diesel_mobile_amount'), loc.diesel_mobile_unit, pickEF(loc, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provOf('diesel_mobile_amount'))
     if (!loc.uses_ammonia && loc.has_hfc_refrigerants && loc.refrigerant_purchased_kg > 0) {
       const ref_gwp = REFRIGERANT_GWP[loc.refrigerant_type]?.[gwpVersion] ?? 0
       rows.push({ location: loc.name || 'Location', source: `Refrigerant (${loc.refrigerant_type})`, scope: 1, activity_data: loc.refrigerant_purchased_kg, activity_unit: 'kg', emission_factor: `GWP ${ref_gwp}`, ef_source: 'IPCC GWP', gwp_basis: gwpVersion, result_tco2e: loc.refrigerant_purchased_kg * ref_gwp / 1000, entry_method: 'manual' })
@@ -1033,7 +1102,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     // getGridFactor call, no US_AVG row). NZ (T&D row below) is always resolved, so no real T&D is lost.
     if (loc.electricity_kwh > 0 && isResolvedGridRegion(loc.grid_region)) {
       const gf = getGridFactor(loc.grid_region, year)
-      rows.push({ location: loc.name || 'Location', source: `Electricity (${gf.usedRegion}, ${gf.usedYear})`, scope: 2, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${gf.ef} kg/kWh`, ef_source: EF_SOURCES.electricity, gwp_basis: 'location-based', result_tco2e: loc.electricity_kwh * gf.ef / 1000, ...provFor(loc, prov, 'electricity_kwh') })
+      rows.push({ location: loc.name || 'Location', source: `Electricity (${gf.usedRegion}, ${gf.usedYear})`, scope: 2, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${gf.ef} kg/kWh`, ef_source: EF_SOURCES.electricity, gwp_basis: 'location-based', result_tco2e: loc.electricity_kwh * gf.ef / 1000, ...provOf('electricity_kwh') })
       // Market-based Scope 2: residual-mix factor on uncovered load, with provenance stamped for the verifier.
       const resRegion = loc.residual_region || (loc.grid_region.startsWith('EU_') ? loc.grid_region : '')
       const res = getResidualFactor(resRegion, year, gwpVersion)
@@ -1056,18 +1125,15 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
   // Every gap/overlap/straddle the user resolved is recorded here so a verifier
   // sees the method and basis behind any estimated or adjusted figure. Spec: line 462.
   for (const r of resolutions) {
-    const method =
-      r.kind === 'extrapolate' ? `Extrapolation (×12/${r.monthsCovered}, ${r.pctEstimated}% estimated)`
-      : r.kind === 'duplicate' ? 'Overlap confirmed (no double-count adjustment)'
-      : r.kind === 'straddle' ? `Straddle — ${r.straddleChoice}${r.daysInYear != null && r.totalDays != null ? ` (${r.daysInYear}/${r.totalDays} days in year)` : ''}`
-      : r.kind
+    // Method string comes from the SAME resolutionMethod() that fills AppliedField.adjustment.method,
+    // so the audit row and the figure's provenance stamp can never claim different things.
     rows.push({
       location: '—',
       source: `Coverage resolution: ${r.fuelType || 'fuel'}`,
       scope: 0,
       activity_data: null,
       activity_unit: r.kind,
-      emission_factor: method,
+      emission_factor: resolutionMethod(r),
       ef_source: r.note,
       gwp_basis: 'coverage_resolution',
       result_tco2e: null,
@@ -1075,6 +1141,44 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     })
   }
   return rows
+}
+
+// Coverage gate (step 9b), lifted verbatim from page.tsx. Per location × document_type, run
+// analyzeCoverage and flag any gap/overlap/straddle lacking a matching resolution. Pure.
+// NOTE (Phase 2b): the periods.length===0 early-return is PRESERVED — a strip with no dated bills
+// surfaces nothing (analyzeCoverage's 'none' is discarded). Phase 3b removes it; until then B3b stays red.
+export function findUnresolvedCoverage(
+  locations: Location[],
+  reportingYear: number,
+  fiscalYearEndMonth: number,
+  resolutions: CoverageResolution[]
+): { locId: string; fuelType: string; status: string }[] {
+  const coverageWin = periodFromYearAndEnd(reportingYear, fiscalYearEndMonth)
+  return locations.flatMap(loc => {
+    const byType = new Map<string, SourceDoc[]>()
+    loc.source_docs.forEach(d => {
+      const arr = byType.get(d.document_type) ?? []
+      arr.push(d)
+      byType.set(d.document_type, arr)
+    })
+    return [...byType.values()].flatMap(docs => {
+      const periods: CoveragePeriod[] = docs.flatMap(d =>
+        (d.extracted ?? [])
+          .filter(p => p.status === 'confirmed' && p.periodStart && p.periodEnd)
+          .map(p => ({ docId: d.id, pi: 0, start: parseLocalDate(p.periodStart as string), end: parseLocalDate(p.periodEnd as string) }))
+      )
+      if (periods.length === 0) return []
+      const cov = analyzeCoverage(periods, coverageWin.start, coverageWin.end)
+      const fuelOfStrip = docs.flatMap(d => d.extracted ?? []).find(p => p.status === 'confirmed' && p.periodStart)?.fuelType ?? ''
+      const hasRes = (kind: CoverageResolution['kind']) =>
+        resolutions.some(r => r.kind === kind && r.locId === loc.id && r.fuelType === fuelOfStrip)
+      const unresolved =
+        (cov.status === 'gap' && !hasRes('extrapolate')) ||
+        (cov.status === 'overlap' && !hasRes('duplicate')) ||
+        (cov.status === 'straddle' && !hasRes('straddle'))
+      return unresolved ? [{ locId: loc.id, fuelType: fuelOfStrip, status: cov.status }] : []
+    })
+  })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

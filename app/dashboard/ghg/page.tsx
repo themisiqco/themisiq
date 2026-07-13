@@ -13,7 +13,8 @@ import {
   GRID_REGIONS_CA, GRID_REGIONS_US, FRAMEWORKS,
   nzTdLoss, isResolvedGridRegion, getGridFactor, getResidualFactor,
   detectGridRegion, gridRegionForCountry, propaneEfKey, pickEF, combustionSource,
-  calcGas, calcLocation, calcInventory, fieldFor, buildWorkings, emptyLocation,
+  calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation,
+  applyResolutions, findUnresolvedCoverage,
   ngUnitOptions, normalizeNgUnit, liquidUnitOptions, propaneUnitOptions,
   validateElectricity, validateNaturalGas, validateCompleteness,
   parseLocalDate, periodFromYearAndEnd, analyzeCoverage,
@@ -476,45 +477,20 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         return { ...d, extracted: d.extracted.map((p, i) => i === propIdx ? { ...p, ...patch } : p) }
       })
 
-      // 2. (fieldFor is now module-scoped — shared with buildWorkings.)
-      // 3. Gather confirmed proposals per target field.
-const byField: Record<string, { sum: number; units: Set<string>; unitField?: keyof Location; refs: { docId: string; pi: number }[]; fuelType: string }> = {}
-      docs.forEach(d => {
-        d.extracted?.forEach((p, pi) => {
-          if (p.status !== 'confirmed' || p.value == null) return
-          const map = fieldFor(d.document_type, p.fuelType)
-          if (!map) return
-          const key = String(map.amount)
-if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.unit, refs: [], fuelType: p.fuelType }
-          byField[key].sum += p.value
-          if (p.unit) byField[key].units.add(p.unit)
-          byField[key].refs.push({ docId: d.id, pi })
-        })
-      })
+      // 2. applyResolutions is the ONE implementation of what each field's figure is (shared with
+      //    buildWorkings). It gathers confirmed proposals, sums, and applies any coverage resolution.
+      const loc: any = { ...locs[locIdx], source_docs: docs }
+      const applied = applyResolutions(loc, inv.coverage_resolutions ?? [])
 
-      // 4. Write each field. Mixed units -> don't write; flag those proposals for review.
-      const loc: any = { ...locs[locIdx] }
+      // 3. Write each field. Mixed units -> don't write; flag those proposals for review.
       const flagged: { docId: string; pi: number }[] = []
-  Object.entries(byField).forEach(([amountField, info]) => {
-        if (info.units.size > 1) {
-          flagged.push(...info.refs)
-          return
-        }
-        // Coverage extrapolation: if the customer acknowledged a gap for this fuel+location,
-        // gross up the raw sum by the coverage ratio (×12/monthsCovered). Raw proposals are
-        // never modified — this transparent layer is applied only at field-write time, and the
-        // method is recorded in coverage_resolutions → workings for the verifier.
-        const extr = (inv.coverage_resolutions ?? []).find(r =>
-          r.kind === 'extrapolate' && r.locId === loc.id && r.fuelType === info.fuelType)
-        if (extr && extr.monthsCovered && extr.monthsCovered > 0) {
-          loc[amountField] = info.sum * (12 / extr.monthsCovered)
-        } else {
-          loc[amountField] = info.sum
-        }
-        if (info.unitField && info.units.size === 1) loc[info.unitField] = [...info.units][0]
+      Object.values(applied).forEach(a => {
+        if (a.mixedUnits) { flagged.push(...a.refs); return }
+        loc[a.field] = a.value
+        if (a.unitField && a.unit != null) loc[a.unitField] = a.unit
       })
 
-      // 5. If any field had mixed units, flip those proposals to needs_manual_review.
+      // 4. If any field had mixed units, flip those proposals to needs_manual_review.
       if (flagged.length) {
         docs = docs.map(d => {
           if (!d.extracted) return d
@@ -541,21 +517,11 @@ if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.uni
       const locs = inv.locations.map(loc => {
         if (loc.id !== res.locId) return loc
         const next: any = { ...loc }
-        // fieldFor is module-scoped — shared with updateProposal and buildWorkings.
-        const sums: Record<string, { sum: number; fuelType: string }> = {}
-        loc.source_docs.forEach(d => d.extracted?.forEach(p => {
-          if (p.status !== 'confirmed' || p.value == null) return
-          const map = fieldFor(d.document_type, p.fuelType)
-          if (!map) return
-          const key = String(map.amount)
-          if (!sums[key]) sums[key] = { sum: 0, fuelType: p.fuelType }
-          sums[key].sum += p.value
-        }))
-        Object.entries(sums).forEach(([amountField, info]) => {
-          const extr = resolutions.find(r => r.kind === 'extrapolate' && r.locId === loc.id && r.fuelType === info.fuelType)
-          next[amountField] = (extr && extr.monthsCovered && extr.monthsCovered > 0)
-            ? info.sum * (12 / extr.monthsCovered)
-            : info.sum
+        // Same single implementation as updateProposal — no copy-pasted gross-up logic.
+        Object.values(applyResolutions(loc, resolutions)).forEach(a => {
+          if (a.mixedUnits) return
+          next[a.field] = a.value
+          if (a.unitField && a.unit != null) next[a.unitField] = a.unit
         })
         return next
       })
@@ -566,35 +532,10 @@ if (!byField[key]) byField[key] = { sum: 0, units: new Set(), unitField: map.uni
   // Concierge export gate: block export while any proposal is unconfirmed ('extracted') or flagged ('needs_manual_review').
   // No proposals (manual-entry users) -> trivially ready. Coverage-completeness is a separate check (step 9b).
   const conciergePending = inventory.locations.flatMap(l => l.source_docs).flatMap(d => d.extracted ?? []).filter(p => p.status === 'extracted' || p.status === 'needs_manual_review')
-  // Coverage gate (step 9b): mirror each DocUpload strip — per location × document_type,
-  // run analyzeCoverage and flag any gap/overlap/straddle lacking a matching resolution.
-  const coverageWin = periodFromYearAndEnd(inventory.reporting_year, inventory.fiscal_year_end_month)
+  // Coverage gate (step 9b) — pure engine function. Per location × document_type, run analyzeCoverage
+  // and flag any gap/overlap/straddle lacking a matching resolution. conciergeReady composes over it.
   const coverageResolutions = inventory.coverage_resolutions ?? []
-  const unresolvedCoverage = inventory.locations.flatMap(loc => {
-    const byType = new Map<string, SourceDoc[]>()
-    loc.source_docs.forEach(d => {
-      const arr = byType.get(d.document_type) ?? []
-      arr.push(d)
-      byType.set(d.document_type, arr)
-    })
-    return [...byType.values()].flatMap(docs => {
-      const periods: CoveragePeriod[] = docs.flatMap(d =>
-        (d.extracted ?? [])
-          .filter(p => p.status === 'confirmed' && p.periodStart && p.periodEnd)
-          .map(p => ({ docId: d.id, pi: 0, start: parseLocalDate(p.periodStart as string), end: parseLocalDate(p.periodEnd as string) }))
-      )
-      if (periods.length === 0) return []
-      const cov = analyzeCoverage(periods, coverageWin.start, coverageWin.end)
-      const fuelOfStrip = docs.flatMap(d => d.extracted ?? []).find(p => p.status === 'confirmed' && p.periodStart)?.fuelType ?? ''
-      const hasRes = (kind: CoverageResolution['kind']) =>
-        coverageResolutions.some(r => r.kind === kind && r.locId === loc.id && r.fuelType === fuelOfStrip)
-      const unresolved =
-        (cov.status === 'gap' && !hasRes('extrapolate')) ||
-        (cov.status === 'overlap' && !hasRes('duplicate')) ||
-        (cov.status === 'straddle' && !hasRes('straddle'))
-      return unresolved ? [{ locId: loc.id, fuelType: fuelOfStrip, status: cov.status }] : []
-    })
-  })
+  const unresolvedCoverage = findUnresolvedCoverage(inventory.locations, inventory.reporting_year, inventory.fiscal_year_end_month, coverageResolutions)
   const conciergeReady = conciergePending.length === 0 && unresolvedCoverage.length === 0
   // Grid-region gate: locations whose grid_region isn't a real GRID_EF key (us_average default, '',
   // or an unmapped country) — these silently fall back to US_AVG in getGridFactor. Consumed by the

@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildWorkings, calcLocation, calcInventory, analyzeCoverage, exclusiveEnd,
   isResolvedGridRegion, detectGridRegion, getResidualFactor, getGridFactor,
-  pickEF, calcGas, emptyLocation,
+  pickEF, calcGas, emptyLocation, findUnresolvedCoverage,
   type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal,
 } from './engine';
 import { buildMonthlyEmissions, reconcileByScope } from './monthlyEmissions';
@@ -94,14 +94,28 @@ describe('GROUP B — silent absence', () => {
     expect(rows.some(r => /gas/i.test(String(r.source)))).toBe(true);
   });
 
-  it.todo("B2 export-completeness gate must BLOCK a location with no gas doc and has_natural_gas=false — conciergeReady is a page.tsx React closure, not engine-testable (Phase 3: extract the gate)");
+  it("B2 the coverage gate must flag a location that has electricity but no gas doc and has_natural_gas=false (absence must not export clean)", () => {
+    const l = loc({ id: 'B2', electricity_kwh: 10000, grid_region: 'US_CA', has_natural_gas: false });
+    // Phase 2b: gate is now the pure findUnresolvedCoverage. It only inspects docs that exist, so an
+    // absent fuel produces nothing → the location exports clean. That silent pass is the SEV 1 bug.
+    const unresolved = findUnresolvedCoverage([l], 2024, 12, []);
+    expect(unresolved.length).toBeGreaterThan(0); // ← currently 0: absence is indistinguishable from attested zero
+  });
 
   it("B3a analyzeCoverage returns status 'none' for zero periods (regression guard — this already holds)", () => {
     const r = analyzeCoverage([], new Date(2024, 0, 1), new Date(2024, 11, 31));
     expect(r.status).toBe('none');
   });
 
-  it.todo("B3b the caller must SURFACE status 'none' — unresolvedCoverage early-returns on periods.length===0 in page.tsx (component closure, not engine-testable)");
+  it("B3b the gate must SURFACE 'none' for a doc whose confirmed proposals carry no dates (currently the periods.length===0 early-return discards it)", () => {
+    const l = loc({
+      id: 'B3', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'mcf',
+      // confirmed gas proposal but NO period dates → periods is empty → early-return swallows 'none'.
+      source_docs: [doc('utility_bill_gas', [prop({ periodStart: null, periodEnd: null })])],
+    });
+    const unresolved = findUnresolvedCoverage([l], 2024, 12, []);
+    expect(unresolved.some(u => u.status === 'none')).toBe(true); // ← currently false: 'none' never surfaces
+  });
 });
 
 // ── GROUP C — Coverage keyed on docType, not (docType, fuelType) [SEV 2] ──────
