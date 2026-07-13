@@ -775,19 +775,18 @@ function propaneUnitOptions(country: string): Array<[string, string]> {
 
 
 function validateElectricity(kwh: number): string | null {
-  if (kwh > 0 && kwh < 1000) return "u26a0 This seems low for a commercial location u2014 please confirm this is the annual total, not a single month."
-  if (kwh > 50000000) return "u26a0 This is unusually high u2014 please confirm the unit is kWh, not MWh."
+  if (kwh > 0 && kwh < 1000) return "⚠ This seems low for a commercial location — please confirm this is the annual total, not a single month."
+  if (kwh > 50000000) return "⚠ This is unusually high — please confirm the unit is kWh, not MWh."
   return null
 }
 function validateNaturalGas(amount: number, unit: string): string | null {
-  if (amount > 0 && unit === "mcf" && amount < 10) return "u26a0 This seems low u2014 please confirm this is the annual total."
-  if (unit === "mcf" && amount > 500000) return "u26a0 This seems high u2014 please double-check your bills."
+  if (amount > 0 && unit === "mcf" && amount < 10) return "⚠ This seems low — please confirm this is the annual total."
+  if (unit === "mcf" && amount > 500000) return "⚠ This seems high — please double-check your bills."
   return null
 }
 function validateCompleteness(loc: Location): string[] {
   const warnings: string[] = []
-  if (loc.electricity_kwh === 0) warnings.push("No electricity entered u2014 most commercial locations use grid electricity.")
-  if (!loc.has_natural_gas && !loc.has_propane && !loc.has_diesel_stationary && !loc.has_mobile) warnings.push("No Scope 1 sources selected u2014 if this location has no on-site fuel use, that is fine.")
+  if (loc.electricity_kwh === 0) warnings.push("No electricity entered — most commercial locations use grid electricity.")
   return warnings
 }
 
@@ -2067,6 +2066,16 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 </div>
               )}
             </QuestionCard>
+            <QuestionCard question="Does this location use fuel oil?" hint="Heating oil for boilers or furnaces — check delivery records" checked={loc.has_fuel_oil} onToggle={v => updateLocation(activeLocation, 'has_fuel_oil', v)}>
+              {loc.has_fuel_oil && (
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
+                  <Field label={`Total fuel oil purchased — ${inventory.reporting_year} (gallons)`}>
+                    <input type="number" value={loc.fuel_oil_gallons || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_gallons', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                  </Field>
+                  {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
+                </div>
+              )}
+            </QuestionCard>
             <QuestionCard question="Does this location have company-owned vehicles or mobile equipment?" hint="Delivery trucks, forklifts, company cars — check fleet fuel cards" checked={loc.has_mobile} onToggle={v => updateLocation(activeLocation, 'has_mobile', v)}>
               {loc.has_mobile && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 14 }}>
@@ -2179,6 +2188,16 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 {isPaid ? <DocUpload label="Upload electricity bills" locIdx={activeLocation} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} /> : <LockedDocUpload label="Upload electricity bills" />}
               </div>
             </div>
+            <QuestionCard question="Does this location purchase steam or district heating?" hint="Purchased steam or hot water from a district energy system — Scope 2" checked={loc.has_purchased_steam} onToggle={v => updateLocation(activeLocation, 'has_purchased_steam', v)}>
+              {loc.has_purchased_steam && (
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
+                  <Field label={`Total purchased steam — ${inventory.reporting_year} (mmbtu)`}>
+                    <input type="number" value={loc.purchased_steam_mmbtu || ''} onChange={e => updateLocation(activeLocation, 'purchased_steam_mmbtu', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                  </Field>
+                  {isPaid ? <DocUpload label="Upload steam / district heating bills" locIdx={activeLocation} docType="purchased_steam" docs={loc.source_docs.filter(d => d.document_type === 'purchased_steam')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} /> : <LockedDocUpload label="Upload steam / district heating bills" />}
+                </div>
+              )}
+            </QuestionCard>
           </div>
           <div style={{ position: 'sticky', top: 80 }}>
             <div style={{ background: '#111827', borderRadius: 12, padding: '1.5rem', marginBottom: 12 }}>
@@ -2238,9 +2257,9 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   <Field label={`${loc.name} — Renewable electricity (kWh)`} hint="Enter kWh covered by PPAs, RECs, or green tariffs. Leave 0 if none.">
                     <input type="number" value={loc.renewable_electricity_kwh || ''} onChange={e => updateLocation(i, 'renewable_electricity_kwh', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
+                  {isPaid ? <DocUpload label={`Upload RECs / PPAs — ${loc.name}`} locIdx={i} docType="renewable_cert" docs={loc.source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} /> : <LockedDocUpload label={`Upload RECs / PPAs — ${loc.name}`} />}
                 </div>
               ))}
-              {isPaid ? <DocUpload label="Upload renewable energy certificates or PPA contracts" locIdx={0} docType="renewable_cert" docs={inventory.locations[0].source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={inventory.locations[0].id} coverageResolutions={inventory.coverage_resolutions ?? []} /> : <LockedDocUpload label="Upload renewable energy certificates or PPA contracts" />}
             </div>
           )}
           {needsBiogenic && (
@@ -2291,6 +2310,24 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                         <div style={{ fontSize: 11, color: '#888784' }}>Scope 2 (market)</div>
                         <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: fw.color }}>{totals.s2_market.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
                       </div>
+                    )}
+                    {(fw.id === 'esrs' || fw.id === 'gri') && (
+                      <div style={{ marginBottom: 6 }}>
+                        <div style={{ fontSize: 11, color: '#888784' }}>Biogenic CO₂ (reported separately)</div>
+                        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: fw.color }}>{totals.biogenic.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                      </div>
+                    )}
+                    {fw.id === 'cdp' && (
+                      <>
+                        <div style={{ marginBottom: 6 }}>
+                          <div style={{ fontSize: 11, color: '#888784' }}>Prior year Scope 1 ({inventory.reporting_year - 1})</div>
+                          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: fw.color }}>{inventory.prior_year_s1.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                        </div>
+                        <div style={{ marginBottom: 6 }}>
+                          <div style={{ fontSize: 11, color: '#888784' }}>Prior year Scope 2 ({inventory.reporting_year - 1})</div>
+                          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: fw.color }}>{inventory.prior_year_s2.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                        </div>
+                      </>
                     )}
                     {rev > 0 && <div style={{ fontSize: 11, color: '#888784', marginTop: 4 }}>Intensity: {(totals.s1_total / rev).toFixed(4)} mt/$M</div>}
                     {emp > 0 && fw.id === 'ecovadis' && <div style={{ fontSize: 11, color: '#888784' }}>Per employee: {(totals.s1_total / emp * 1000).toFixed(2)} kgCO₂e</div>}
@@ -2526,13 +2563,13 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                         <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>Export is locked until every figure read from your bills is confirmed and every coverage gap, overlap, or boundary-straddle is resolved. Check the Energy &amp; fuel data step.</div>
                       </div>
                     )}
-                    <button onClick={() => dataConfirmed && conciergeReady && gridReady && generateExport(fw.id)} style={{ fontSize: 14, fontWeight: 500, opacity: (dataConfirmed && conciergeReady && gridReady) ? 1 : 0.4, cursor: (dataConfirmed && conciergeReady && gridReady) ? "pointer" : "not-allowed", padding: '12px 28px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', border: 'none', }}>
                     <div style={{ background: "#fff", border: "1px solid #e8e7e4", borderRadius: 8, padding: "14px 16px", marginTop: 16, marginBottom: 16 }}>
                       <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
                         <input type="checkbox" checked={dataConfirmed} onChange={e => setDataConfirmed(e.target.checked)} style={{ marginTop: 2, flexShrink: 0 }} />
                         <span style={{ fontSize: 12, color: "#555553", lineHeight: 1.6 }}>I confirm that the data entered is accurate to the best of my knowledge and has been sourced from actual utility bills and operational records. I understand that ThemisIQ applies the correct methodology to the data I provide, and that accuracy of the underlying data is my responsibility.</span>
                       </label>
                     </div>
+                    <button onClick={() => dataConfirmed && conciergeReady && gridReady && generateExport(fw.id)} style={{ fontSize: 14, fontWeight: 500, opacity: (dataConfirmed && conciergeReady && gridReady) ? 1 : 0.4, cursor: (dataConfirmed && conciergeReady && gridReady) ? "pointer" : "not-allowed", padding: '12px 28px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', border: 'none', }}>
                       ⬇ Download {fw.name} Report (CSV)
                     </button>
                     <button onClick={() => dataConfirmed && conciergeReady && gridReady && generateAssurance()} style={{ fontSize: 14, fontWeight: 500, opacity: (dataConfirmed && conciergeReady && gridReady) ? 1 : 0.4, cursor: (dataConfirmed && conciergeReady && gridReady) ? 'pointer' : 'not-allowed', padding: '12px 28px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', marginLeft: 10 }}>Download Full Assurance Package (PDF)</button>
@@ -2608,10 +2645,15 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
       ['Scope 1 total (mtCO₂e)', totals.s1_total.toFixed(4)],
       ['Scope 2 location-based (mtCO₂e)', totals.s2_location.toFixed(4)],
       ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Scope 2 market-based (mtCO₂e)', totals.s2_market.toFixed(4)]] : []),
+      ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Biogenic CO₂ (mtCO₂) — reported separately', totals.biogenic.toFixed(4)]] : []),
+      ...(fw.id === 'cdp' ? [
+        [`Prior year Scope 1 (${inventory.reporting_year - 1}) mtCO₂e`, inventory.prior_year_s1],
+        [`Prior year Scope 2 (${inventory.reporting_year - 1}) mtCO₂e`, inventory.prior_year_s2],
+      ] : []),
       ...(rev > 0 ? [['S1 intensity (mtCO₂e/$M revenue)', (totals.s1_total / rev).toFixed(6)]] : []),
       [''],
       ['METHODS'],
-      ['Combustion factors', EF_SOURCES.combustion],
+      ...[...new Set(inventory.locations.map(l => combustionSource(l)))].map(src => ['Combustion factors', src]),
       ['Electricity factors', EF_SOURCES.electricity],
       ['GWP values', fw.gwp === 'AR4' ? EF_SOURCES.gwp_ar4 : fw.gwp === 'AR5' ? EF_SOURCES.gwp_ar5 : EF_SOURCES.gwp_ar6],
       ...((fw.id === 'esrs' || fw.id === 'gri')
