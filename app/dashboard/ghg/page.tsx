@@ -14,14 +14,14 @@ import {
   nzTdLoss, isResolvedGridRegion, getGridFactor, getResidualFactor,
   detectGridRegion, gridRegionForCountry, propaneEfKey, pickEF, combustionSource,
   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation,
-  applyResolutions, findUnresolvedCoverage,
+  applyResolutions, findUnresolvedCoverage, findUndeclaredStreams, STREAM_META,
   ngUnitOptions, normalizeNgUnit, liquidUnitOptions, propaneUnitOptions,
   validateElectricity, validateNaturalGas, validateCompleteness,
   parseLocalDate, periodFromYearAndEnd, analyzeCoverage,
 } from '../../../lib/ghg/engine'
 import type {
   GwpVersion, Location, Inventory, SourceDoc, ExtractedProposal,
-  ConciergeStatus, CoveragePeriod, CoverageResolution,
+  ConciergeStatus, CoveragePeriod, CoverageResolution, DeclarableStream,
 } from '../../../lib/ghg/engine'
 
 
@@ -546,6 +546,12 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     .map((l, i) => ({ i, name: l.name || `Location ${i + 1}`, region: l.grid_region }))
     .filter(l => !isResolvedGridRegion(l.region))
   const gridReady = unresolvedGridLocations.length === 0
+  // Completeness gate (COMPOSED with, never folded into, the coverage gate). A stream with neither data
+  // nor an explicit attestation is UNDECLARED — absence must not export as an attested zero. Remedy is
+  // data or attestation, NOT acknowledgement (unlike a coverage gap). Gated at the same four sites as
+  // gridReady, with its own amber message; deliberately NOT gating the step-2 Continue.
+  const undeclaredStreams = findUndeclaredStreams(inventory.locations)
+  const declarationsReady = undeclaredStreams.length === 0
   const needsPriorYear = inventory.selected_frameworks.includes('cdp')
   const needsEmployees = inventory.selected_frameworks.includes('ecovadis')
   const needsBiogenic = inventory.selected_frameworks.includes('esrs') || inventory.selected_frameworks.includes('gri')
@@ -1097,6 +1103,34 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 </div>
               )}
             </QuestionCard>
+            {(() => {
+              // Completeness attestation — mirror of the grid-region prompt, but for streams the location
+              // has neither entered nor attested. Attesting writes a StreamAttestation (stream + timestamp);
+              // the stream then declares and drops off the list. Does NOT block step-2 Continue — this is
+              // an export-time gate, surfaced here so it can be cleared where the fuel data lives.
+              const activeUndeclared = undeclaredStreams.filter(u => u.locId === loc.id)
+              if (activeUndeclared.length === 0) return null
+              const attest = (streams: DeclarableStream[]) => {
+                const at = new Date().toISOString()
+                const existing = loc.stream_attestations ?? []
+                updateLocation(activeLocation, 'stream_attestations', [...existing, ...streams.map(stream => ({ stream, attested_at: at }))])
+              }
+              return (
+                <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.3)', borderRadius: 12, padding: '1.15rem 1.25rem' }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#ba7517', marginBottom: 4 }}>Confirm what this location does NOT have</div>
+                  <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, marginBottom: 12 }}>An undeclared stream is not the same as zero — completeness can&apos;t be asserted until each is either entered above or attested absent. Required before export.</div>
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
+                    {activeUndeclared.map(u => (
+                      <label key={u.stream} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={false} onChange={() => attest([u.stream])} style={{ marginTop: 2, flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>No {STREAM_META[u.stream].noun} at this location</span>
+                      </label>
+                    ))}
+                  </div>
+                  <button onClick={() => attest(activeUndeclared.map(u => u.stream))} style={{ marginTop: 14, fontSize: 12, fontWeight: 600, padding: '9px 20px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', cursor: 'pointer' }}>Attest all remaining as absent</button>
+                </div>
+              )
+            })()}
           </div>
           <div style={{ position: 'sticky', top: 80 }}>
             <div style={{ background: '#111827', borderRadius: 12, padding: '1.5rem', marginBottom: 12 }}>
@@ -1448,7 +1482,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                         </div>
                       ))}
                     </div>
-                    {(!conciergeReady || !gridReady) && (
+                    {(!conciergeReady || !gridReady || !declarationsReady) && (
                       <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.3)', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
                       {conciergePending.length > 0 && (
                           <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {conciergePending.length} uploaded figure{conciergePending.length > 1 ? 's' : ''} still need{conciergePending.length > 1 ? '' : 's'} your confirmation</div>
@@ -1459,7 +1493,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                         {unresolvedGridLocations.length > 0 && (
                           <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {unresolvedGridLocations.length} location{unresolvedGridLocations.length > 1 ? 's' : ''} need{unresolvedGridLocations.length > 1 ? '' : 's'} a grid region: {unresolvedGridLocations.map(l => l.name).join(', ')}</div>
                         )}
-                        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>Export is locked until every figure read from your bills is confirmed and every coverage gap, overlap, or boundary-straddle is resolved. Check the Energy &amp; fuel data step.</div>
+                        {undeclaredStreams.length > 0 && (
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {undeclaredStreams.length} undeclared stream{undeclaredStreams.length > 1 ? 's' : ''} — enter the data or attest absent on the Energy &amp; fuel step: {undeclaredStreams.map(u => `${u.locName}: ${STREAM_META[u.stream].label}`).join('; ')}</div>
+                        )}
+                        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>Export is locked until every figure read from your bills is confirmed, every coverage gap, overlap, or boundary-straddle is resolved, and every emission stream is either entered or attested absent. Check the Energy &amp; fuel data step.</div>
                       </div>
                     )}
                     <div style={{ background: "#fff", border: "1px solid #e8e7e4", borderRadius: 8, padding: "14px 16px", marginTop: 16, marginBottom: 16 }}>
@@ -1468,10 +1505,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                         <span style={{ fontSize: 12, color: "#555553", lineHeight: 1.6 }}>I confirm that the data entered is accurate to the best of my knowledge and has been sourced from actual utility bills and operational records. I understand that ThemisIQ applies the correct methodology to the data I provide, and that accuracy of the underlying data is my responsibility.</span>
                       </label>
                     </div>
-                    <button onClick={() => dataConfirmed && conciergeReady && gridReady && generateExport(fw.id)} style={{ fontSize: 14, fontWeight: 500, opacity: (dataConfirmed && conciergeReady && gridReady) ? 1 : 0.4, cursor: (dataConfirmed && conciergeReady && gridReady) ? "pointer" : "not-allowed", padding: '12px 28px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', border: 'none', }}>
+                    <button onClick={() => dataConfirmed && conciergeReady && gridReady && declarationsReady && generateExport(fw.id)} style={{ fontSize: 14, fontWeight: 500, opacity: (dataConfirmed && conciergeReady && gridReady && declarationsReady) ? 1 : 0.4, cursor: (dataConfirmed && conciergeReady && gridReady && declarationsReady) ? "pointer" : "not-allowed", padding: '12px 28px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', border: 'none', }}>
                       ⬇ Download {fw.name} Report (CSV)
                     </button>
-                    <button onClick={() => dataConfirmed && conciergeReady && gridReady && generateAssurance()} style={{ fontSize: 14, fontWeight: 500, opacity: (dataConfirmed && conciergeReady && gridReady) ? 1 : 0.4, cursor: (dataConfirmed && conciergeReady && gridReady) ? 'pointer' : 'not-allowed', padding: '12px 28px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', marginLeft: 10 }}>Download Full Assurance Package (PDF)</button>
+                    <button onClick={() => dataConfirmed && conciergeReady && gridReady && declarationsReady && generateAssurance()} style={{ fontSize: 14, fontWeight: 500, opacity: (dataConfirmed && conciergeReady && gridReady && declarationsReady) ? 1 : 0.4, cursor: (dataConfirmed && conciergeReady && gridReady && declarationsReady) ? 'pointer' : 'not-allowed', padding: '12px 28px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', marginLeft: 10 }}>Download Full Assurance Package (PDF)</button>
                   </div>
                   <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem', fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
                     <strong>Disclaimer:</strong>
@@ -1490,7 +1527,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           {/* SBTi nudge — shown once the inventory is saved AND its figures confirmed (a settled
               baseline). Affirmative next-step, not a warning. Always shows when gated (no sbti_targets
               read); copy reads fine whether or not targets already exist. GHG-gated page ⇒ no entitlement check. */}
-          {inventoryId && dataConfirmed && conciergeReady && gridReady && (
+          {inventoryId && dataConfirmed && conciergeReady && gridReady && declarationsReady && (
             <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.25)', borderRadius: 10, padding: '1.25rem', marginTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' as const }}>
               <div style={{ flex: 1, minWidth: 280 }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Your inventory is the baseline for science-based targets.</div>

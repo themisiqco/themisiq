@@ -14,8 +14,8 @@ import { describe, it, expect } from 'vitest';
 import {
   buildWorkings, calcLocation, calcInventory, analyzeCoverage, exclusiveEnd,
   isResolvedGridRegion, detectGridRegion, getResidualFactor, getGridFactor,
-  pickEF, calcGas, emptyLocation, findUnresolvedCoverage,
-  type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal,
+  pickEF, calcGas, emptyLocation, findUnresolvedCoverage, findUndeclaredStreams,
+  type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal, type StreamAttestation,
 } from './engine';
 import { buildMonthlyEmissions, reconcileByScope } from './monthlyEmissions';
 
@@ -163,12 +163,14 @@ describe('GROUP B — silent absence', () => {
     expect(rows.some(r => /gas/i.test(String(r.source)))).toBe(true);
   });
 
-  it("B2 the coverage gate must flag a location that has electricity but no gas doc and has_natural_gas=false (absence must not export clean)", () => {
+  it("B2 the completeness gate must flag a stream with neither data nor attestation — electricity present, no gas doc, has_natural_gas=false, no gas attestation → natural_gas is undeclared", () => {
     const l = loc({ id: 'B2', electricity_kwh: 10000, grid_region: 'US_CA', has_natural_gas: false });
-    // Phase 2b: gate is now the pure findUnresolvedCoverage. It only inspects docs that exist, so an
-    // absent fuel produces nothing → the location exports clean. That silent pass is the SEV 1 bug.
-    const unresolved = findUnresolvedCoverage([l], 2024, 12, []);
-    expect(unresolved.length).toBeGreaterThan(0); // ← currently 0: absence is indistinguishable from attested zero
+    // COMPOSE, not fold: findUnresolvedCoverage only inspects docs that exist, so an absent fuel
+    // produces nothing there — and it SHOULDN'T, because the two are different failures with different
+    // remedies. A coverage gap is acknowledgeable (extrapolate); an undeclared stream is not (only data
+    // or attestation). The absence gate is the SEPARATE findUndeclaredStreams.
+    const undeclared = findUndeclaredStreams([l]);
+    expect(undeclared.some(u => u.stream === 'natural_gas' && u.locId === 'B2')).toBe(true);
   });
 
   it("B3a analyzeCoverage returns status 'none' for zero periods (regression guard — this already holds)", () => {

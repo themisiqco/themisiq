@@ -539,6 +539,9 @@ interface Location {
   nz_use_class?: 'commercial' | 'industrial'
   nz_td_losses?: boolean
   source_docs: SourceDoc[]
+  // Per-stream "this site has no such supply" attestations. Absent (undefined/missing entry) means
+  // NOBODY has answered → the stream is UNDECLARED and blocks export. See findUndeclaredStreams.
+  stream_attestations?: StreamAttestation[]
 }
 
 // Derive the reporting period from a reporting year + fiscal year-end MONTH (1-12).
@@ -968,6 +971,20 @@ function fieldFor(docType: string, fuelType: string): { amount: keyof Location; 
   return null
 }
 
+// Reverse of fieldFor at the docType level: the fuelType a document_type carries, when we cannot read
+// it off a dated proposal (e.g. a 'none'-status strip with no usable dates). fleet_fuel carries TWO
+// fuels → null here (3c gives it proper per-fuel handling); non-concierge docs → null.
+function fuelTypeForDocType(docType: string): string | null {
+  switch (docType) {
+    case 'utility_electricity': return 'electricity'
+    case 'renewable_cert': return 'electricity'
+    case 'utility_bill_gas': return 'natural_gas'
+    case 'fuel_propane': return 'propane'
+    case 'fuel_diesel': return 'diesel'
+    default: return null // fleet_fuel (two fuels — 3c), service_record, fuel_oil, purchased_steam
+  }
+}
+
 // ── Resolution application — single source of truth for what a figure IS ──────
 // The human-readable method/basis strings are composed HERE, once. Both the per-field
 // adjustment (applyResolutions) and the coverage-resolution audit rows in buildWorkings
@@ -1177,6 +1194,18 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     if (loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0) {
       rows.push({ location: loc.name || 'Location', source: 'Purchased steam', scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: 'mmbtu', emission_factor: `${EF.steam_mmbtu} kg/mmbtu`, ef_source: EF_SOURCES.combustion, gwp_basis: 'location-based', result_tco2e: loc.purchased_steam_mmbtu * EF.steam_mmbtu / 1000, entry_method: 'manual' })
     }
+    // ── Declaration rows: a row for EVERY stream that has no data, so absence is never silent ──
+    // Streams WITH data are already emitted above. For the rest: attested_absent (result 0 = a claim of
+    // zero) vs undeclared (result null = an ABSENCE, not a claim — must not look like 0 in a verifier CSV).
+    const attestedAt = new Map((loc.stream_attestations ?? []).map(a => [a.stream, a.attested_at]))
+    for (const s of DECLARABLE_STREAMS) {
+      if (streamHasData(loc, s)) continue
+      const meta = STREAM_META[s]
+      const at = attestedAt.get(s)
+      rows.push(at
+        ? { location: loc.name || 'Location', source: meta.label, scope: meta.scope, activity_data: 0, activity_unit: '—', emission_factor: '—', ef_source: '—', gwp_basis: 'declaration', result_tco2e: 0, declaration: 'attested_absent', entry_method: 'attestation', note: `No ${meta.noun} at this location. Attested ${at}.` }
+        : { location: loc.name || 'Location', source: meta.label, scope: meta.scope, activity_data: 0, activity_unit: '—', emission_factor: '—', ef_source: '—', gwp_basis: 'declaration', result_tco2e: null, declaration: 'undeclared', entry_method: 'undeclared', note: 'NOT DECLARED — completeness cannot be asserted.' })
+    }
   }
   // ── Coverage-resolution audit trail ──────────────────────────────────────
   // Every gap/overlap/straddle the user resolved is recorded here so a verifier
@@ -1200,10 +1229,11 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
   return rows
 }
 
-// Coverage gate (step 9b), lifted verbatim from page.tsx. Per location × document_type, run
-// analyzeCoverage and flag any gap/overlap/straddle lacking a matching resolution. Pure.
-// NOTE (Phase 2b): the periods.length===0 early-return is PRESERVED — a strip with no dated bills
-// surfaces nothing (analyzeCoverage's 'none' is discarded). Phase 3b removes it; until then B3b stays red.
+// Coverage gate (step 9b). Per location × document_type, run analyzeCoverage and flag any
+// gap/overlap/straddle lacking a matching resolution, AND any 'none' (docs uploaded but no dated
+// confirmed bills). Pure. Phase 3b: the periods.length===0 early-return is GONE — 'none' now surfaces
+// (the sixth coverage state was previously thrown away). 'none' has no resolution kind and must not:
+// the fix is to date the bills, not to acknowledge the absence, so it simply blocks.
 export function findUnresolvedCoverage(
   locations: Location[],
   reportingYear: number,
@@ -1218,23 +1248,79 @@ export function findUnresolvedCoverage(
       arr.push(d)
       byType.set(d.document_type, arr)
     })
-    return [...byType.values()].flatMap(docs => {
+    return [...byType.entries()].flatMap(([docType, docs]) => {
       const periods: CoveragePeriod[] = docs.flatMap(d =>
         (d.extracted ?? [])
           .filter(p => p.status === 'confirmed' && p.periodStart && p.periodEnd)
           .map(p => ({ docId: d.id, pi: 0, start: parseLocalDate(p.periodStart as string), end: parseLocalDate(p.periodEnd as string) }))
       )
-      if (periods.length === 0) return []
       const cov = analyzeCoverage(periods, coverageWin.start, coverageWin.end)
-      const fuelOfStrip = docs.flatMap(d => d.extracted ?? []).find(p => p.status === 'confirmed' && p.periodStart)?.fuelType ?? ''
+      // fuelType: read off the first dated confirmed proposal; when none exists (the 'none' case),
+      // fall back to the document_type's canonical fuel so the blocking row is still labelled.
+      const fuelOfStrip = docs.flatMap(d => d.extracted ?? []).find(p => p.status === 'confirmed' && p.periodStart)?.fuelType
+        ?? fuelTypeForDocType(docType) ?? ''
       const hasRes = (kind: CoverageResolution['kind']) =>
         resolutions.some(r => r.kind === kind && r.locId === loc.id && r.fuelType === fuelOfStrip)
       const unresolved =
+        cov.status === 'none' ||                                    // docs uploaded, no dated bills → blocks (no resolution)
         (cov.status === 'gap' && !hasRes('extrapolate')) ||
         (cov.status === 'overlap' && !hasRes('duplicate')) ||
         (cov.status === 'straddle' && !hasRes('straddle'))
       return unresolved ? [{ locId: loc.id, fuelType: fuelOfStrip, status: cov.status }] : []
     })
+  })
+}
+
+// ── Undeclared streams (completeness gate) ────────────────────────────────────
+// Same pattern as the grid-region gate (isResolvedGridRegion / gridReady): a `has_*` flag of false is
+// BOTH the init default AND "no such supply" — one field, two meanings. A stream is DECLARED only when
+// it has data OR carries an explicit attestation; otherwise it is UNDECLARED and blocks export.
+export const DECLARABLE_STREAMS = [
+  'natural_gas', 'propane', 'diesel_stationary', 'fuel_oil',
+  'mobile', 'refrigerants', 'electricity', 'purchased_steam',
+] as const
+export type DeclarableStream = typeof DECLARABLE_STREAMS[number]
+
+export interface StreamAttestation {
+  stream: DeclarableStream
+  attested_at: string      // ISO
+}
+
+// Display metadata for each stream's workings row (label, scope, human noun for the attestation note).
+export const STREAM_META: Record<DeclarableStream, { label: string; scope: number; noun: string }> = {
+  natural_gas:       { label: 'Natural gas',                          scope: 1, noun: 'natural gas supply' },
+  propane:           { label: 'Propane',                              scope: 1, noun: 'propane / LPG supply' },
+  diesel_stationary: { label: 'Diesel (stationary)',                  scope: 1, noun: 'stationary diesel' },
+  fuel_oil:          { label: 'Fuel oil',                             scope: 1, noun: 'fuel oil' },
+  mobile:            { label: 'Company vehicles / mobile equipment',  scope: 1, noun: 'company vehicles or mobile equipment' },
+  refrigerants:      { label: 'Refrigerants',                         scope: 1, noun: 'refrigeration or cooling' },
+  electricity:       { label: 'Electricity',                          scope: 2, noun: 'purchased electricity' },
+  purchased_steam:   { label: 'Purchased steam',                      scope: 2, noun: 'purchased steam / district heating' },
+}
+
+// True iff a location has DATA for a stream (the `has_*` flag or a positive amount). Shared by
+// findUndeclaredStreams and buildWorkings so the gate and the workings agree on what counts as declared.
+function streamHasData(loc: Location, s: DeclarableStream): boolean {
+  switch (s) {
+    case 'natural_gas': return loc.has_natural_gas
+    case 'propane': return loc.has_propane
+    case 'diesel_stationary': return loc.has_diesel_stationary
+    case 'fuel_oil': return loc.has_fuel_oil
+    case 'mobile': return loc.has_mobile
+    case 'refrigerants': return loc.has_hfc_refrigerants || loc.uses_ammonia
+    case 'electricity': return loc.electricity_kwh > 0
+    case 'purchased_steam': return loc.purchased_steam_mmbtu > 0
+  }
+}
+
+export function findUndeclaredStreams(
+  locations: Location[]
+): { locId: string; locName: string; stream: DeclarableStream }[] {
+  return locations.flatMap(loc => {
+    const attested = new Set((loc.stream_attestations ?? []).map(a => a.stream))
+    return DECLARABLE_STREAMS
+      .filter(s => !streamHasData(loc, s) && !attested.has(s))
+      .map(stream => ({ locId: loc.id, locName: loc.name || 'Location', stream }))
   })
 }
 
