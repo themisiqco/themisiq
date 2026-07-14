@@ -59,6 +59,21 @@ Lisa is a non-expert in terminal/git workflows. When a manual step is genuinely 
 
 ---
 
+## GHG engine invariants (`lib/ghg/engine.ts`)
+
+The engine is pure calc (no React/Supabase): all factor tables, coverage analysis, and `buildWorkings` live here. These invariants are load-bearing — don't break them:
+
+- **`app/dashboard/ghg/page.tsx` RENDERS `buildWorkings()` output; never re-derive workings rows in the component.** There is ONE renderer. A second, hand-rolled derivation in `renderStep4` once drifted from the engine and was removed — reintroducing any per-row calc in the component is the regression.
+- **`applyResolutions()` is the single source of truth for what a figure IS.** Both the write path and the audit trail derive from it, so the number and the method claimed for it cannot disagree.
+- **`exclusiveEnd()` — ONE definition.** End date on the 1st = exclusive (first-of-next-month billing); every other end date = inclusive last covered day. `monthlyEmissions.ts` imports it — do not fork it.
+- **`daysBetween` (engine) is INCLUSIVE; `monthlyEmissions.ts` uses a LOCAL half-open count. Two contracts, deliberate — do NOT unify them.** The half-open count is what makes monthly proration reconcile; the inclusive one serves coverage's inclusive ranges.
+- **Monthly = evidenced only. Annual = evidenced + estimated. They are SUPPOSED to diverge on extrapolated inventories.** Never gross up monthly slices — a dated slice must not assert consumption no bill supports. `reconcile()` models the expected gap; a non-zero `unexplained_delta` is a real defect. (`reconcile` is exported + tested but not yet surfaced in the UI — separate design.)
+- **Coverage gate is keyed per `(document_type, fuelType)` and iterates `cov.issues` (all conditions present), not the scalar `status`.** A fleet_fuel doc's gasoline and diesel are separate groups; a gap masked by an overlap must still block.
+- **`s3_td` (NZ electricity T&D, Scope 3 Cat 3) is a DISTINCT total — never folded into S1/S2.** `calcInventory` surfaces it separately.
+- **Run `npx vitest run lib/ghg/engine.test.ts` (27 green) before and after any engine change.** If a previously-green test breaks, stop.
+
+---
+
 ## Methodology integrity rules
 
 - Preserve **verbatim source values** where a verifier may cross-check against the source document (e.g. bill period end dates — do not silently normalize "May 01" to "Apr 30").
