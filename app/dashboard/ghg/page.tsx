@@ -609,6 +609,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       prior_year_s2: inventory.prior_year_s2,
       selected_frameworks: inventory.selected_frameworks,
       locations_data: inventory.locations,
+      coverage_resolutions: coverageResolutions,
       scope1_total: totals_ar6.s1_total,
       scope2_location_total: totals_ar6.s2_location,
       scope2_market_total: totals_ar6.s2_market,

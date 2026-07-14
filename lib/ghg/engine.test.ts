@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildWorkings, calcLocation, calcInventory, analyzeCoverage, exclusiveEnd,
   isResolvedGridRegion, detectGridRegion, getResidualFactor, getGridFactor,
-  pickEF, calcGas, emptyLocation, findUnresolvedCoverage, findUndeclaredStreams,
+  pickEF, calcGas, emptyLocation, findUnresolvedCoverage, findUndeclaredStreams, applyResolutions,
   type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal, type StreamAttestation,
 } from './engine';
 import { buildMonthlyEmissions, reconcile } from './monthlyEmissions';
@@ -388,5 +388,68 @@ describe('GROUP G — regression guards', () => {
     const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     expect(iso(exclusiveEnd(new Date(2024, 4, 31)))).toBe('2024-06-01'); // last-day-of-month → first of next
     expect(iso(exclusiveEnd(new Date(2024, 5, 1)))).toBe('2024-06-01');  // first-of-next-month → unchanged (already exclusive)
+  });
+});
+
+// ── GROUP I — coverage_resolutions MUST persist (the write-only-feature fix) ──
+// ghg_inventories.coverage_resolutions was a write-only feature: the save path
+// never wrote the column, so every reload read []. These tests pin WHY the column
+// must persist — they document the exact figure divergence a lost resolution causes,
+// so nobody strips the persistence later thinking it inert.
+describe('GROUP I — coverage_resolutions persistence contract', () => {
+  const winStart = new Date(2024, 0, 1);
+  const winEnd = new Date(2024, 11, 31); // reporting window for year 2024, FY-end Dec
+  // One confirmed 9-month gas bill (Jan–Sep, 900 mcf). natural_gas_amount is 1200 —
+  // the grossed-up figure applyResolutions wrote into locations_data last session.
+  const nineMonthGasLoc = () => loc({
+    has_natural_gas: true, natural_gas_amount: 1200, natural_gas_unit: 'mcf',
+    source_docs: [doc('utility_bill_gas', [prop({
+      fuelType: 'natural_gas', value: 900, unit: 'mcf', periodStart: '2024-01-01', periodEnd: '2024-09-30',
+    })])],
+  });
+  const extrapolateRes: CoverageResolution = {
+    locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate', monthsCovered: 9, pctEstimated: 25,
+    note: '9 of 12 months; grossed ×12/9', acknowledgedAt: '2024-06-01T00:00:00Z',
+  };
+
+  it('I1 round-trip contract: applyResolutions with a 9/12 extrapolate gives value 1200 from rawSum 900; with [] gives 900 — and the two DIFFER', () => {
+    const withRes = applyResolutions(nineMonthGasLoc(), [extrapolateRes], winStart, winEnd).natural_gas_amount;
+    const without = applyResolutions(nineMonthGasLoc(), [], winStart, winEnd).natural_gas_amount;
+    // Grossed up: 900 × 12/9 = 1200, with an adjustment on the figure.
+    expect(withRes.rawSum).toBe(900);
+    expect(withRes.value).toBeCloseTo(1200, 6);
+    expect(withRes.adjustment?.kind).toBe('extrapolate');
+    // Resolution lost → falls back to the raw source sum, silently, with no adjustment.
+    expect(without.rawSum).toBe(900);
+    expect(without.value).toBe(900);
+    expect(without.adjustment).toBeNull();
+    // THE divergence the missing column caused: same location, same bills, 1200 vs 900,
+    // decided solely by whether the resolution survived the reload. This assertion is the
+    // whole reason coverage_resolutions must persist — do not delete it.
+    expect(withRes.value).not.toBe(without.value);
+    expect(withRes.value - without.value).toBeCloseTo(300, 6);
+  });
+
+  it('I2 buildWorkings with [] emits NO coverage-resolution audit row, and the recomputed gas figure (900) contradicts the persisted grossed-up field (1200) — a DETECTABLE unexplained discrepancy', () => {
+    const l = nineMonthGasLoc(); // locations_data persisted natural_gas_amount = 1200
+    const rows = buildWorkings([l], 'AR6', 2024, [], 12);
+    // No resolution on file → no audit row explaining any gross-up.
+    const auditRow = rows.find(r => r.gwp_basis === 'coverage_resolution');
+    expect(auditRow).toBeUndefined();
+    // With the resolution gone, the workings gas figure silently reverts to the raw 900
+    // (the "silent revert" consequence), while the persisted location field still reads 1200.
+    const gas = ngRow(rows);
+    expect(gas?.activity_data).toBe(900);
+    expect(l.natural_gas_amount).toBe(1200);
+    // Detectability: the recomputed workings figure disagrees with the persisted field AND
+    // there is no coverage-resolution row to explain either number. If this state weren't
+    // detectable we couldn't guard against it. (Sanity: WITH the resolution the two agree
+    // and the audit row is present.)
+    const inconsistentAndUnexplained = gas!.activity_data !== l.natural_gas_amount && !auditRow;
+    expect(inconsistentAndUnexplained).toBe(true);
+
+    const withRes = buildWorkings([l], 'AR6', 2024, [extrapolateRes], 12);
+    expect(ngRow(withRes)?.activity_data).toBe(1200);
+    expect(withRes.find(r => r.gwp_basis === 'coverage_resolution')).toBeDefined();
   });
 });
