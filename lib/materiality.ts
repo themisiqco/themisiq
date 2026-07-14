@@ -18,6 +18,13 @@ export type ModelConfig = {
   phys_high: number; phys_med: number
   topic_high: number; topic_med: number
   horizon_short: number; horizon_medium: number; horizon_long: number
+  // Transition-driver band thresholds. LOAD-BEARING METHODOLOGY under the normalised financial
+  // score (climateFinancial): they set each driver's high/med boundary AND its normalisation
+  // denominator, so they determine the E1 number — not just a display band. They live in
+  // mr_model_config (not a hardcoded const) so model_version covers them. Policy carries an extra
+  // jurisdiction factor (range ~0-26); the other three do not (range ~0-9), hence two scales.
+  trans_policy_high: number; trans_policy_med: number
+  trans_driver_high: number; trans_driver_med: number
 }
 export type Industry = { code: string; label: string; carbon_exposure: number }
 export type RegionHazard = { region_code: string; hazard: string; intensity: number }
@@ -43,6 +50,10 @@ export type ReferenceData = {
   scenarios: Scenario[]
   industryOpportunities: IndustryOpportunity[]
   industryTransitionDrivers: IndustryTransitionDriver[]
+  // Asset-profile hazard modifiers, keyed profile → hazard → multiplier. Optional during the
+  // migration to mr_asset_modifiers: when absent the engine falls back to the ASSET_MOD const
+  // (see note below). Supply from the DB to bring these coefficients under model_version.
+  assetModifiers?: Record<string, Record<string, number>>
 }
 
 // ---------- User input ----------
@@ -59,14 +70,26 @@ export type AssessmentInput = {
 
 // ---------- Output ----------
 export type Band = 'high' | 'med' | 'low'
-export type PhysicalRisk = { hazard: string; band: Band; score: number; drivingRegion: string }
-export type TransitionRisk = { driver: string; band: Band; score: number }
+// A hazard's data state. 'assessed' = a mr_region_hazards row exists (any intensity, incl. 0 — a
+// real finding of no exposure). 'no_reference_data' = NO row for (region, hazard): we never looked,
+// so score is NULL (an absence, NOT 0) and band is 'unknown'. The two MUST render distinctly.
+export type PhysicalRisk = {
+  hazard: string
+  band: Band | 'unknown'
+  score: number | null            // null when unknown — never 0 (0 is a measured claim of no exposure)
+  drivingRegion: string
+  dataStatus: 'assessed' | 'no_reference_data'
+}
+// highThreshold: the driver's 'high' band boundary (from config). Carried so the normalised
+// financial score (score / highThreshold) is auditable and so the two driver scales are explicit.
+export type TransitionRisk = { driver: string; band: Band; score: number; highThreshold: number }
 export type Opportunity = { category: string; label: string; band: Band; relevance: number }
 export type MatrixTopic = {
   code: string; label: string; category: string
-  financial: number; impact: number
-  financialBand: Band; impactBand: Band
-  quadrant: 'both' | 'financial' | 'impact' | 'low'
+  financial: number | null; impact: number | null   // null when no baseline — NOT a default 2
+  financialBand: Band | 'unknown'; impactBand: Band | 'unknown'
+  quadrant: 'both' | 'financial' | 'impact' | 'low' | 'unknown'
+  dataStatus: 'assessed' | 'no_baseline'
 }
 export type AssessmentResult = {
   mode: 's2' | 'csrd'
@@ -76,6 +99,9 @@ export type AssessmentResult = {
   opportunities: Opportunity[]
   matrix: MatrixTopic[]            // empty in s2 mode
   climateFinancialScore: number    // 0..10, the E1 financial number from the engine
+  // The asset-modifier set actually applied (asset_profile → hazard → multiplier), surfaced so a
+  // verifier can reproduce the physical scores from the artefact. See ASSET_MOD note below.
+  assetModifiers: Record<string, number>
   summary: { physicalHigh: number; transitionHigh: number; topicsBothAxes: number; opportunitiesStrong: number }
 }
 
@@ -101,11 +127,24 @@ const OPP_SCENARIO_LINK: Record<string, 'transition' | 'physical' | 'neutral'> =
   resilience: 'physical',
 }
 
+// ⚠️ METHODOLOGY-COVERAGE GAP — these coefficients are OUTSIDE model_version.
+// Every other coefficient (sensitivity, intensity, policy_intensity, carbon_exposure, weight,
+// physical_mult) is a mr_* DB row covered by config.model_version. These asset modifiers are a
+// hardcoded const with no cited source: edit them, redeploy, and every report still stamps the old
+// model_version while its numbers have moved. They MUST move to mr_asset_modifiers (migration
+// 20260714_climate_risk_methodology.sql adds the table + seeds these exact values). Until the API
+// route supplies ref.assetModifiers from that table, this const is the FALLBACK only; the set
+// actually applied is surfaced on AssessmentResult.assetModifiers so the artefact stays reproducible.
 const ASSET_MOD: Record<string, Record<string, number>> = {
   coastal:    { coastal: 1.5, cyclone: 1.3, flood: 1.2 },
   inland:     { heat: 1.2, drought: 1.2, wildfire: 1.2, coastal: 0.3 },
   water:      { water: 1.5, drought: 1.4 },
   distributed:{ coastal: 0.6, flood: 0.8, heat: 0.8, drought: 0.8, water: 0.8, wildfire: 0.8, cyclone: 0.8, cold: 0.8 },
+}
+// Resolve the asset-modifier set for a profile: DB (ref.assetModifiers) when present, else the
+// const fallback. One seam so the migration can flip the source without touching computePhysical.
+function assetModifiersFor(ref: ReferenceData, profile: string): Record<string, number> {
+  return (ref.assetModifiers ?? ASSET_MOD)[profile] ?? {}
 }
 
 function horizonMult(cfg: ModelConfig, h: AssessmentInput['horizon']): number {
@@ -115,25 +154,46 @@ function horizonMult(cfg: ModelConfig, h: AssessmentInput['horizon']): number {
 function computePhysical(input: AssessmentInput, ref: ReferenceData, scenario: Scenario): PhysicalRisk[] {
   const sens = ref.industryHazards.filter(h => h.industry_code === input.industryCode)
   const hzn = horizonMult(ref.config, input.horizon)
-  const assetMod = ASSET_MOD[input.assetProfile] || {}
+  const assetMod = assetModifiersFor(ref, input.assetProfile)
   const out: PhysicalRisk[] = []
   for (const s of sens) {
     if (s.sensitivity <= 0) continue
-    let regionExp = 0, driver = ''
+    // Distinguish "a row exists" (assessed) from "no row at all" (no reference data). A row with
+    // intensity 0 is a REAL finding of no exposure; a missing row is an ABSENCE. They are not equal.
+    let regionExp = 0, driver = '', found = false
     for (const rc of input.regionCodes) {
       const rh = ref.regionHazards.find(r => r.region_code === rc && r.hazard === s.hazard)
-      if (rh && rh.intensity > regionExp) { regionExp = rh.intensity; driver = rc }
+      if (rh) {
+        found = true
+        if (!driver) driver = rc                 // attribute even an all-zero finding to a region
+        if (rh.intensity > regionExp) { regionExp = rh.intensity; driver = rc }
+      }
     }
-    if (regionExp === 0) continue
+    if (!found) {
+      // NEVER omit and NEVER score 0: emit the hazard as unknown so the gap is visible in the report.
+      out.push({
+        hazard: HAZARD_LABELS[s.hazard] ?? s.hazard,
+        band: 'unknown', score: null, drivingRegion: '', dataStatus: 'no_reference_data',
+      })
+      continue
+    }
+    // Assessed (intensity 0 → score 0, band 'low' — a real, disclosed finding of no exposure).
     const score = regionExp * s.sensitivity * (assetMod[s.hazard] ?? 1) * scenario.physical_mult * hzn
     out.push({
       hazard: HAZARD_LABELS[s.hazard] ?? s.hazard,
       band: score >= ref.config.phys_high ? 'high' : score >= ref.config.phys_med ? 'med' : 'low',
       score: Math.round(score * 10) / 10,
       drivingRegion: driver,
+      dataStatus: 'assessed',
     })
   }
-  return out.sort((a, b) => b.score - a.score)
+  // Unknown (data-gap) rows FIRST so they are prominent — they must not sort as low-risk and sink
+  // to the bottom of the list where a reader would miss them; assessed rows follow by score desc.
+  return out.sort((a, b) => {
+    const au = a.dataStatus === 'no_reference_data', bu = b.dataStatus === 'no_reference_data'
+    if (au !== bu) return au ? -1 : 1
+    return (b.score ?? 0) - (a.score ?? 0)
+  })
 }
 
 // New computeTransition — all four drivers real, sector-weighted, scenario-varying.
@@ -163,9 +223,12 @@ function computeTransition(input: AssessmentInput, ref: ReferenceData, scenario:
   }
 
   const round1 = (v: number) => Math.round(v * 10) / 10
-  // Policy is jurisdiction-scaled (larger range); the other three are not.
-  const policyBand = (v: number): Band => v >= 12 ? 'high' : v >= 6 ? 'med' : 'low'
-  const driverBand = (v: number): Band => v >= 4 ? 'high' : v >= 2 ? 'med' : 'low'
+  // Band thresholds now come from config (mr_model_config) — they are load-bearing methodology
+  // under the normalised financial score, so they must be covered by model_version. Policy is
+  // jurisdiction-scaled (larger range); the other three are not.
+  const cfg = ref.config
+  const policyBand = (v: number): Band => v >= cfg.trans_policy_high ? 'high' : v >= cfg.trans_policy_med ? 'med' : 'low'
+  const driverBand = (v: number): Band => v >= cfg.trans_driver_high ? 'high' : v >= cfg.trans_driver_med ? 'med' : 'low'
 
   // Policy / legal: carbon x weight x jurisdiction intensity x scenario x horizon
   const policyScore = carbon * wOf('policy') * jurMax * scenario.transition_mult * hzn
@@ -175,10 +238,10 @@ function computeTransition(input: AssessmentInput, ref: ReferenceData, scenario:
   const repScore    = carbon * wOf('reputation') * scenario.transition_mult * hzn
 
   return [
-    { driver: 'Carbon pricing / policy', band: policyBand(policyScore), score: round1(policyScore) },
-    { driver: 'Market & demand shift',   band: driverBand(marketScore), score: round1(marketScore) },
-    { driver: 'Technology displacement', band: driverBand(techScore),   score: round1(techScore) },
-    { driver: 'Reputation',              band: driverBand(repScore),    score: round1(repScore) },
+    { driver: 'Carbon pricing / policy', band: policyBand(policyScore), score: round1(policyScore), highThreshold: cfg.trans_policy_high },
+    { driver: 'Market & demand shift',   band: driverBand(marketScore), score: round1(marketScore), highThreshold: cfg.trans_driver_high },
+    { driver: 'Technology displacement', band: driverBand(techScore),   score: round1(techScore),   highThreshold: cfg.trans_driver_high },
+    { driver: 'Reputation',              band: driverBand(repScore),    score: round1(repScore),    highThreshold: cfg.trans_driver_high },
   ]
 }
 
@@ -204,10 +267,23 @@ function computeOpportunities(input: AssessmentInput, ref: ReferenceData, scenar
   return out
 }
 
-function climateFinancial(physical: PhysicalRisk[], transition: TransitionRisk[]): number {
-  const physMax = physical.reduce((m, p) => Math.max(m, p.score), 0)
-  const transMax = Math.max(...transition.map(t => t.score), 0)
-  const raw = Math.max(physMax * 1.1, transMax * 0.8)
+// ESRS financial materiality is a THRESHOLD test ("is climate financially material?"), so the
+// operator is a MAX, not a sum: if ANY driver is material, the answer is yes. But the four
+// transition drivers live on incommensurable raw scales (policy carries a jurisdiction factor,
+// range ~0-26; the other three ~0-9), so a raw max was effectively max(policy) — market,
+// technology and reputation could never drive the score. We NORMALISE each driver to its OWN high
+// threshold first (score / highThreshold; 1.0 = at the high-materiality boundary), then take the
+// max across drivers AND physical. Normalised 1.0 maps to the financial high threshold (topic_high).
+// (A weighted SUM would answer a magnitude question ESRS never asks, using weights TCFD declines
+// to prescribe — hence max, and hence NO tuning of the old 1.1/0.8 coefficients.)
+function climateFinancial(physical: PhysicalRisk[], transition: TransitionRisk[], config: ModelConfig): number {
+  // Unknown physical hazards (no reference data → score null) carry no assessed magnitude, so they
+  // do not contribute to the financial number — we cannot claim a materiality we did not assess.
+  const physMax = physical.reduce((m, p) => (p.score != null && p.score > m ? p.score : m), 0)
+  const physNorm = config.phys_high > 0 ? physMax / config.phys_high : 0
+  const transNorm = transition.reduce((m, t) => (t.highThreshold > 0 ? Math.max(m, t.score / t.highThreshold) : m), 0)
+  const combinedNorm = Math.max(physNorm, transNorm)
+  const raw = combinedNorm * config.topic_high
   return Math.max(2, Math.min(10, Math.round(raw * 10) / 10))
 }
 
@@ -215,19 +291,35 @@ function computeMatrix(input: AssessmentInput, ref: ReferenceData, climateFin: n
   const baselines = ref.topicBaselines.filter(b => b.industry_code === input.industryCode)
   const topicBand = (v: number): Band =>
     v >= ref.config.topic_high ? 'high' : v >= ref.config.topic_med ? 'med' : 'low'
+  const round1 = (v: number) => Math.round(v * 10) / 10
   return ref.esrsTopics.slice().sort((a, b) => a.sort_order - b.sort_order).map(topic => {
     const base = baselines.find(b => b.topic_code === topic.code)
-    const financial = topic.code === 'E1' ? climateFin : (base?.financial_base ?? 2)
+    // E1's financial is the engine number (always assessed). Any OTHER topic with no baseline row
+    // for this industry is NOT assessed — it must read 'unknown', NEVER a default 2/'low' that
+    // renders as a positive finding of immateriality on the double-materiality matrix.
+    const isE1 = topic.code === 'E1'
+    const assessed = isE1 || !!base
+    if (!assessed) {
+      return {
+        code: topic.code, label: topic.label, category: topic.category,
+        financial: null, impact: null, financialBand: 'unknown', impactBand: 'unknown',
+        quadrant: 'unknown', dataStatus: 'no_baseline',
+      }
+    }
+    // Reachable only when assessed: E1 (financial = engine number) OR a non-E1 topic WITH a baseline
+    // (so base is non-null here). E1 may still lack a baseline row → its impact falls back to the
+    // neutral default; the ?? 2 therefore only ever applies to E1, never to a data-gap topic (those
+    // returned 'unknown' above).
+    const financial = isE1 ? climateFin : base!.financial_base
     const impact = input.impactOverrides?.[topic.code] ?? base?.impact_base ?? 2
-    const fBand = topicBand(financial)
-    const iBand = topicBand(impact)
     const fMat = financial >= ref.config.topic_med
     const iMat = impact >= ref.config.topic_med
     const quadrant: MatrixTopic['quadrant'] = fMat && iMat ? 'both' : fMat ? 'financial' : iMat ? 'impact' : 'low'
     return {
       code: topic.code, label: topic.label, category: topic.category,
-      financial: Math.round(financial * 10) / 10, impact: Math.round(impact * 10) / 10,
-      financialBand: fBand, impactBand: iBand, quadrant,
+      financial: round1(financial), impact: round1(impact),
+      financialBand: topicBand(financial), impactBand: topicBand(impact), quadrant,
+      dataStatus: 'assessed',
     }
   })
 }
@@ -241,11 +333,14 @@ export function runAssessment(input: AssessmentInput, ref: ReferenceData): Asses
   const physical = computePhysical(input, ref, scenario)
   const transition = computeTransition(input, ref, scenario)
   const opportunities = computeOpportunities(input, ref, scenario)
-  const climateFin = climateFinancial(physical, transition)
+  const climateFin = climateFinancial(physical, transition, ref.config)
   const matrix = input.mode === 'csrd' ? computeMatrix(input, ref, climateFin) : []
   return {
     mode: input.mode, modelVersion: ref.config.model_version,
     physical, transition, opportunities, matrix, climateFinancialScore: climateFin,
+    // Surface the exact asset modifiers applied so the physical scores are reproducible from the
+    // artefact (these coefficients are not yet under model_version — see the ASSET_MOD note).
+    assetModifiers: assetModifiersFor(ref, input.assetProfile),
     summary: {
       physicalHigh: physical.filter(p => p.band === 'high').length,
       transitionHigh: transition.filter(t => t.band === 'high').length,
@@ -317,8 +412,9 @@ export type ResilienceResult = {
   synthesis: ResilienceSynthesis
 }
 
-// Band → ordinal for comparisons.
-function bandRank(b: Band): number { return b === 'high' ? 2 : b === 'med' ? 1 : 0 }
+// Band → ordinal for comparisons. 'unknown' (a data gap, not an assessed low) ranks 0 here; such
+// items are excluded upstream in collectItems, so this only guards the type.
+function bandRank(b: Band | 'unknown'): number { return b === 'high' ? 2 : b === 'med' ? 1 : 0 }
 
 // Collect the per-item cells for a given kind across the three scenario results.
 function collectItems(
@@ -329,7 +425,12 @@ function collectItems(
   for (const ps of perScenario) {
     let rows: { key: string; label: string; driver: string; band: Band; score: number }[] = []
     if (kind === 'physical') {
-      rows = ps.result.physical.map(p => ({ key: p.hazard, label: p.hazard, driver: p.drivingRegion, band: p.band, score: p.score }))
+      // Unknown hazards are a reference-data gap (scenario-independent), not a scenario-contingent
+      // finding — exclude them from the cross-scenario comparison. After this filter every band is
+      // a real Band and every score a number.
+      rows = ps.result.physical
+        .filter(p => p.dataStatus === 'assessed')
+        .map(p => ({ key: p.hazard, label: p.hazard, driver: p.drivingRegion, band: p.band as Band, score: p.score ?? 0 }))
     } else if (kind === 'transition') {
       rows = ps.result.transition.map(t => ({ key: t.driver, label: t.driver, driver: 'policy intensity', band: t.band, score: t.score }))
     } else {
@@ -529,12 +630,16 @@ export function runResilience(input: AssessmentInput, ref: ReferenceData): Resil
     result: runAssessment({ ...input, scenarioCode: t.code }, ref),
   }))
 
-  // Horizon sensitivity: compare the middle scenario at short vs long horizon.
+  // Horizon sensitivity: compare the middle scenario at short vs long horizon. SEVERITY-aware, not
+  // count-based — mirrors profileSwing. A count of material risks is blind to a severity shift: a
+  // profile whose risks worsen (med→high) toward 2050 WITHOUT becoming more numerous would read
+  // 'stable' under a count, dropping the long-horizon worsening sentence from the synthesis. Sum
+  // band ranks (low/med/high = 0/1/2) instead, so a severity rise is seen.
   const midShort = runAssessment({ ...input, scenarioCode: 'ssp245', horizon: 'short' }, ref)
   const midLong  = runAssessment({ ...input, scenarioCode: 'ssp245', horizon: 'long' }, ref)
-  const countMat = (r: AssessmentResult) =>
-    r.physical.filter(p => p.band !== 'low').length + r.transition.filter(t => t.band !== 'low').length
-  const horizonTrend: 'rises' | 'stable' = countMat(midLong) > countMat(midShort) ? 'rises' : 'stable'
+  const severity = (r: AssessmentResult) =>
+    r.physical.reduce((s, p) => s + bandRank(p.band), 0) + r.transition.reduce((s, t) => s + bandRank(t.band), 0)
+  const horizonTrend: 'rises' | 'stable' = severity(midLong) > severity(midShort) ? 'rises' : 'stable'
 
   const { items, synthesis } = computeResilience(perScenario, horizonTrend)
 

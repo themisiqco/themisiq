@@ -11,6 +11,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   runAssessment,
+  runResilience,
   type ReferenceData,
   type AssessmentInput,
   type ModelConfig,
@@ -20,10 +21,12 @@ import {
 // A full, valid reference set + input, with per-test array overrides. config merges
 // deeply (so a test can tweak one threshold); every other field is replaced wholesale.
 const DEFAULT_CONFIG: ModelConfig = {
-  model_version: 'v1.2',
+  model_version: '1.1',
   phys_high: 6, phys_med: 3,
   topic_high: 6, topic_med: 3,
   horizon_short: 0.8, horizon_medium: 1.0, horizon_long: 1.2,
+  trans_policy_high: 12, trans_policy_med: 6,
+  trans_driver_high: 4, trans_driver_med: 2,
 }
 
 function baseRef(over: Partial<ReferenceData> = {}): ReferenceData {
@@ -102,9 +105,11 @@ describe('GROUP A — missing regional hazard data must not vanish', () => {
     )
     const heat = r.physical.find(p => p.hazard === 'Extreme heat')
     const wildfire = r.physical.find(p => p.hazard === 'Wildfire')
-    expect(heat).toBeDefined()             // sanity: a hazard WITH data is present
-    expect(wildfire).toBeDefined()         // RED: silently dropped for want of a region row
-    expect((wildfire as any)?.band).toBe('unknown') // and must be flagged unknown, not scored/omitted
+    expect(heat).toBeDefined()                       // sanity: a hazard WITH data is present
+    expect(wildfire).toBeDefined()                   // was RED: silently dropped for want of a region row
+    expect(wildfire?.band).toBe('unknown')           // flagged unknown, not scored/omitted
+    expect(wildfire?.score).toBeNull()               // null (absence), NOT 0 (a claim)
+    expect(wildfire?.dataStatus).toBe('no_reference_data')
   })
 
   it('A2 region has NO rows at all → every sensitive hazard is unknown, physical.length > 0 (not an empty clean profile)', () => {
@@ -131,8 +136,12 @@ describe('GROUP A — missing regional hazard data must not vanish', () => {
     const wfMissing = missing.physical.find(p => p.hazard === 'Wildfire')
     const wfZero = genuineZero.physical.find(p => p.hazard === 'Wildfire')
     // 0 is a CLAIM (assessed: no exposure); missing is an ABSENCE (never looked). Not the same finding.
-    expect(wfZero).toBeDefined()          // RED: a genuine zero is dropped exactly like missing
-    expect(wfZero).not.toEqual(wfMissing) // RED: both undefined today → indistinguishable
+    expect(wfZero?.dataStatus).toBe('assessed')          // a genuine zero is a real finding...
+    expect(wfZero?.score).toBe(0)                        // ...scored 0, band low
+    expect(wfZero?.band).toBe('low')
+    expect(wfMissing?.dataStatus).toBe('no_reference_data') // ...distinct from an absence
+    expect(wfMissing?.score).toBeNull()
+    expect(wfZero).not.toEqual(wfMissing)                // 0 (a claim) ≠ missing (an absence)
   })
 })
 
@@ -164,8 +173,9 @@ describe('GROUP B — transition drivers are on incommensurable scales', () => {
   })
 
   it('B2 varying ONLY jurMax (1 → 8) must move E1 proportionately, not saturate the clamp', () => {
+    // carbon 2 × weight 1 × jurMax 8 = policy 16 → normalised 16/12 = 1.33 → E1 8.0 (was raw 12.8 → clamp 10).
     const refOver: Partial<ReferenceData> = {
-      industries: [{ code: 'tech-mfg', label: 'Tech mfg', carbon_exposure: 3 }],
+      industries: [{ code: 'tech-mfg', label: 'Tech mfg', carbon_exposure: 2 }],
       industryHazards: [],
       jurisdictions: [
         { code: 'J1', label: 'One', policy_intensity: 1 },
@@ -174,18 +184,18 @@ describe('GROUP B — transition drivers are on incommensurable scales', () => {
     }
     const low = run({ jurisdictionCodes: ['J1'], mode: 's2' }, refOver).climateFinancialScore
     const high = run({ jurisdictionCodes: ['J8'], mode: 's2' }, refOver).climateFinancialScore
-    expect(high).toBeGreaterThan(low)   // sanity: more policy exposure ⇒ more risk
-    expect(high).toBeLessThan(10)       // RED: policy alone saturates the E1 clamp at 10
+    expect(high).toBeGreaterThan(low) // sanity: more policy exposure ⇒ more risk
+    expect(high).toBeLessThan(10)     // was RED: policy alone saturated the E1 clamp at 10
   })
 
-  it('B3 two profiles EACH with one high-band transition driver must score alike (normalised), not diverge by scale', () => {
-    // Company A: policy 'high' (raw 12), everything else zero.
+  it('B3 two profiles EACH with one driver exactly at its high threshold must score alike (normalised), not diverge by scale', () => {
+    // Company A: policy exactly at its high threshold — carbon 4 × weight 1 × jurMax 3 = 12.
     const a = run(
-      { jurisdictionCodes: ['J12'], mode: 's2' },
+      { jurisdictionCodes: ['J3'], mode: 's2' },
       {
-        industries: [{ code: 'tech-mfg', label: 'A', carbon_exposure: 1 }],
+        industries: [{ code: 'tech-mfg', label: 'A', carbon_exposure: 4 }],
         industryHazards: [],
-        jurisdictions: [{ code: 'J12', label: 'Twelve', policy_intensity: 12 }],
+        jurisdictions: [{ code: 'J3', label: 'Three', policy_intensity: 3 }],
         industryTransitionDrivers: [
           { industry_code: 'tech-mfg', transition_driver: 'policy', weight: 2, sort_order: 1 },
           { industry_code: 'tech-mfg', transition_driver: 'technology', weight: 0, sort_order: 2 },
@@ -194,26 +204,26 @@ describe('GROUP B — transition drivers are on incommensurable scales', () => {
         ],
       },
     )
-    // Company B: technology 'high' (raw 4.5), everything else zero.
+    // Company B: technology exactly at its high threshold — carbon 4 × weight 1 = 4.
     const b = run(
       { jurisdictionCodes: [], mode: 's2' },
       {
-        industries: [{ code: 'tech-mfg', label: 'B', carbon_exposure: 3 }],
+        industries: [{ code: 'tech-mfg', label: 'B', carbon_exposure: 4 }],
         industryHazards: [],
         jurisdictions: [],
         industryTransitionDrivers: [
-          { industry_code: 'tech-mfg', transition_driver: 'technology', weight: 3, sort_order: 1 },
+          { industry_code: 'tech-mfg', transition_driver: 'technology', weight: 2, sort_order: 1 },
           { industry_code: 'tech-mfg', transition_driver: 'policy', weight: 0, sort_order: 2 },
           { industry_code: 'tech-mfg', transition_driver: 'market', weight: 0, sort_order: 3 },
           { industry_code: 'tech-mfg', transition_driver: 'reputation', weight: 0, sort_order: 4 },
         ],
       },
     )
-    // Both have exactly one high-band transition driver and three low — same band-profile.
+    // Both have exactly one driver at band 'high' (normalised 1.0) and three low — same finding.
     expect(a.transition.find(t => t.driver === 'Carbon pricing / policy')!.band).toBe('high')
     expect(b.transition.find(t => t.driver === 'Technology displacement')!.band).toBe('high')
-    // Normalised, their E1 scores should match. Raw-max makes A (9.6) ≫ B (3.6).
-    expect(a.climateFinancialScore).toBeCloseTo(b.climateFinancialScore, 0) // RED
+    // Normalised they match (both → topic_high = 6.0). Raw-max made A (9.6) ≫ B (3.2).
+    expect(a.climateFinancialScore).toBeCloseTo(b.climateFinancialScore, 1) // both 6.0
   })
 })
 
@@ -235,7 +245,9 @@ describe('GROUP C — missing topic baseline must not read as immaterial', () =>
   it('C1 a topic with NO baseline row must NOT be silently scored 2/low/NOT-MATERIAL', () => {
     const r = run({ mode: 'csrd' }, refOver)
     const s1 = r.matrix.find(m => m.code === 'S1')!
-    expect(s1.quadrant).not.toBe('low') // RED: a data gap renders as a positive finding of immateriality
+    expect(s1.quadrant).toBe('unknown')       // not 'low' — a data gap is not a finding of immateriality
+    expect(s1.dataStatus).toBe('no_baseline')
+    expect(s1.financial).toBeNull()           // null (absence), NOT a default 2
   })
 
   it('C2 a missing baseline must be DISTINGUISHABLE from a real assessed 2', () => {
@@ -253,9 +265,11 @@ describe('GROUP C — missing topic baseline must not read as immaterial', () =>
 describe('GROUP D — asset modifiers must be captured by the result', () => {
   it('D1 the result must carry the asset-modifier set it used, so a verifier can reproduce the number', () => {
     const r = run({ assetProfile: 'coastal' }, {})
-    // Physical scores are computed WITH the coastal modifiers baked in, but the modifiers
-    // themselves never leave the module — modelVersion (from the DB) cannot capture them.
-    expect((r as any).assetModifiers).toBeDefined() // RED: no such field on AssessmentResult
+    // The applied modifier set now leaves the module on the result, so a verifier can reproduce
+    // the physical scores (coastal → coastal 1.5, cyclone 1.3, flood 1.2).
+    expect(r.assetModifiers).toBeDefined()
+    expect(r.assetModifiers.coastal).toBe(1.5)
+    expect(r.assetModifiers.cyclone).toBe(1.3)
   })
 })
 
@@ -335,5 +349,31 @@ describe('GROUP E — regression guards (should pass)', () => {
   it('E6 s2 mode → empty matrix; csrd mode → populated matrix', () => {
     expect(run({ mode: 's2' }, {}).matrix.length).toBe(0)
     expect(run({ mode: 'csrd' }, {}).matrix.length).toBeGreaterThan(0)
+  })
+})
+
+// ── GROUP F — horizonTrend is count-based, blind to a severity shift [SEV 2] ──
+// runResilience decides horizonTrend by comparing the COUNT of material risks at long vs short
+// horizon. The author already replaced that exact blindness for profileSwing (band-rank severity)
+// but not here. A profile whose risks get MORE SEVERE toward 2050 without getting MORE NUMEROUS
+// is reported 'stable', and the synthesis drops the long-horizon worsening sentence.
+describe('GROUP F — horizon trend must be severity-aware, not count-based', () => {
+  it('F1 risks that rise in BAND SEVERITY (med→high) with the material-risk COUNT unchanged → horizon "worsens"', () => {
+    // One physical hazard: score 4.0 at short horizon (med), 6.0 at long horizon (high) — same
+    // count of non-low risks at both ends, higher severity at the long end. Transition stays low
+    // at both horizons, so nothing changes the COUNT: only the SEVERITY moves.
+    const res = runResilience(
+      baseInput({ industryCode: 'f1', regionCodes: ['reg'], jurisdictionCodes: [], assetProfile: 'inland', mode: 's2' }),
+      baseRef({
+        industries: [{ code: 'f1', label: 'F1', carbon_exposure: 1 }],
+        industryHazards: [{ industry_code: 'f1', hazard: 'flood', sensitivity: 1 }],
+        // inland does not modify flood; ssp245 physical_mult 1.0; horizon short 0.8 / long 1.2.
+        // 5 × 1 × 1 × 1 × 0.8 = 4.0 (med) ; × 1.2 = 6.0 (high).
+        regionHazards: [{ region_code: 'reg', hazard: 'flood', intensity: 5 }],
+        jurisdictions: [],
+        industryTransitionDrivers: [],
+      }),
+    )
+    expect(res.synthesis.horizonNote).toBe('worsens') // RED: count-based trend reads 'stable'
   })
 })

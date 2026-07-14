@@ -17,6 +17,9 @@ const SEV = {
   high: { label: 'HIGH', color: '#B91C1C', bg: '#FCEBEB', border: '#B91C1C' },
   med:  { label: 'MED', color: '#ba7517', bg: '#FEF3E2', border: '#ba7517' },
   low:  { label: 'LOW', color: '#888784', bg: '#f8f7f5', border: '#e8e7e4' },
+  // Data gap (no reference data / no baseline) — amber, distinct from LOW grey. Never reads as an
+  // assessed finding of no exposure/immateriality; scored null, not 0.
+  unknown: { label: 'N/A', color: '#8A5A12', bg: '#FDF6EC', border: '#EAD9BE' },
 }
 
 // opportunity palette — green to read as upside, distinct from the risk reds/ambers
@@ -499,7 +502,7 @@ export default function MaterialityWizard() {
   )
 
   // ─── Results rendering (stage two) ────────────────────────────────────────
-  const pill = (label: string, band: Band, sub?: string) => {
+  const pill = (label: string, band: Band | 'unknown', sub?: string) => {
     const c = SEV[band]
     return (
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: c.bg, color: c.color, fontSize: 12, padding: '4px 10px', borderRadius: 99, margin: '0 6px 6px 0', border: `0.5px solid ${c.border}` }}>
@@ -519,7 +522,10 @@ export default function MaterialityWizard() {
   }
 
   const renderMatrix = () => {
-    const topics: any[] = result?.matrix || []
+    // Exclude unassessed topics (no baseline → financial/impact null) from the scatter: plotting
+    // them at (0,0) would place them in the low/immaterial quadrant — a false finding. They are
+    // surfaced distinctly in the table below (FIX C). Assessed topics only here.
+    const topics: any[] = (result?.matrix || []).filter((t: any) => t.dataStatus !== 'no_baseline')
     const W = 500, H = 360, padL = 48, padR = 16, padT = 16, padB = 40
     const midX = padL + 0.5 * (W - padL - padR)
     const midY = padT + 0.5 * (H - padT - padB)
@@ -577,12 +583,18 @@ export default function MaterialityWizard() {
   }
 
   const renderMatrixTable = () => {
-    const topics: any[] = [...(result?.matrix || [])].sort((a, b) => Math.max(b.financial, b.impact) - Math.max(a.financial, a.impact))
+    // null-safe sort: unassessed topics (financial/impact null) rank last, but render as a distinct
+    // amber "Not assessed" chip — never as an assessed low/immaterial score.
+    const topics: any[] = [...(result?.matrix || [])].sort((a, b) => Math.max(b.financial ?? -1, b.impact ?? -1) - Math.max(a.financial ?? -1, a.impact ?? -1))
     const bandOf = (v: number): Band => v >= 8 ? 'high' : v >= 5 ? 'med' : 'low'
     const mini = (band: Band, val: number) => {
       const c = SEV[band]
       return <span style={{ background: c.bg, color: c.color, fontSize: 12, padding: '3px 9px', borderRadius: 6, border: `0.5px solid ${c.border}` }}>{c.label} · {val.toFixed(1)}</span>
     }
+    // A null value is NO DATA (never 0/low): show it distinctly, not as an assessed band.
+    const cell = (v: number | null) => v == null
+      ? <span style={{ background: SEV.unknown.bg, color: SEV.unknown.color, fontSize: 12, padding: '3px 9px', borderRadius: 6, border: `0.5px solid ${SEV.unknown.border}` }}>Not assessed</span>
+      : mini(bandOf(v), v)
     return (
       <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '1rem 1.25rem', marginBottom: 12, overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -597,8 +609,8 @@ export default function MaterialityWizard() {
             {topics.map((t: any) => (
               <tr key={t.code} style={{ borderTop: '0.5px solid #e8e7e4' }}>
                 <td style={{ padding: '8px 4px', color: '#0d0d0d' }}><span style={{ color: '#aaa', fontSize: 11 }}>{t.code}</span> {t.label}</td>
-                <td style={{ padding: '8px 4px' }}>{mini(bandOf(t.financial), t.financial)}</td>
-                <td style={{ padding: '8px 4px' }}>{mini(bandOf(t.impact), t.impact)}</td>
+                <td style={{ padding: '8px 4px' }}>{cell(t.financial)}</td>
+                <td style={{ padding: '8px 4px' }}>{cell(t.impact)}</td>
               </tr>
             ))}
           </tbody>
@@ -615,7 +627,7 @@ export default function MaterialityWizard() {
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderLeft: '3px solid #ba7517', borderRadius: '0 14px 14px 0', padding: '1rem', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 2 }}>Physical risks <span style={{ fontWeight: 400, color: '#aaa', fontSize: 12 }}>industry × geography × scenario</span></div>
           <p style={{ fontSize: 12, color: '#888784', margin: '0 0 12px' }}>Flagged only where your industry sensitivity meets real regional hazard exposure.</p>
-          <div>{phys.length ? phys.map((p: any, i: number) => <span key={'p'+i}>{pill(p.hazard, p.band, 'in ' + p.drivingRegion)}</span>) : <span style={{ fontSize: 13, color: '#888784' }}>No material physical risks at this intersection.</span>}</div>
+          <div>{phys.length ? phys.map((p: any, i: number) => <span key={'p'+i}>{p.dataStatus === 'no_reference_data' ? pill(p.hazard, 'unknown', 'not assessed — no reference data') : pill(p.hazard, p.band, 'in ' + p.drivingRegion)}</span>) : <span style={{ fontSize: 13, color: '#888784' }}>No material physical risks at this intersection.</span>}</div>
         </div>
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderLeft: '3px solid #534AB7', borderRadius: '0 14px 14px 0', padding: '1rem', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 12 }}>Transition risks <span style={{ fontWeight: 400, color: '#aaa', fontSize: 12 }}>industry carbon × jurisdiction × scenario</span></div>
