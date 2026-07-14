@@ -1,0 +1,2744 @@
+{
+ "exported_at": "2026-07-14T20:42:11.715109+00:00",
+ "_note": "Full export of all mr_* reference tables prior to the provenance rebuild. Source of truth for values; the live DB is NOT backed up (Supabase free tier).",
+ "mr_model_config": [
+  {
+   "id": 1,
+   "model_version": "1.1",
+   "phys_high": 5.5,
+   "phys_med": 3,
+   "topic_high": 8,
+   "topic_med": 5,
+   "horizon_short": 0.85,
+   "horizon_medium": 1,
+   "horizon_long": 1.2,
+   "trans_policy_high": 12,
+   "trans_policy_med": 6,
+   "trans_driver_high": 4,
+   "trans_driver_med": 2,
+   "updated_at": "2026-07-14T18:06:20.529015+00:00"
+  }
+ ],
+ "mr_regions": [
+  {
+   "code": "NWN",
+   "label": "North-Western North America",
+   "continent": "North America",
+   "sort_order": 1,
+   "active": true
+  },
+  {
+   "code": "NEN",
+   "label": "North-Eastern North America",
+   "continent": "North America",
+   "sort_order": 2,
+   "active": true
+  },
+  {
+   "code": "WNA",
+   "label": "Western North America",
+   "continent": "North America",
+   "sort_order": 3,
+   "active": true
+  },
+  {
+   "code": "CNA",
+   "label": "Central North America",
+   "continent": "North America",
+   "sort_order": 4,
+   "active": true
+  },
+  {
+   "code": "ENA",
+   "label": "Eastern North America",
+   "continent": "North America",
+   "sort_order": 5,
+   "active": true
+  },
+  {
+   "code": "CAR",
+   "label": "Caribbean",
+   "continent": "Central America & Caribbean",
+   "sort_order": 6,
+   "active": true
+  },
+  {
+   "code": "NEU",
+   "label": "Northern Europe",
+   "continent": "Europe",
+   "sort_order": 7,
+   "active": true
+  },
+  {
+   "code": "WCE",
+   "label": "Western & Central Europe",
+   "continent": "Europe",
+   "sort_order": 8,
+   "active": true
+  },
+  {
+   "code": "MED",
+   "label": "Mediterranean",
+   "continent": "Europe",
+   "sort_order": 9,
+   "active": true
+  },
+  {
+   "code": "EEU",
+   "label": "Eastern Europe",
+   "continent": "Europe",
+   "sort_order": 10,
+   "active": true
+  },
+  {
+   "code": "SAS",
+   "label": "South Asia",
+   "continent": "Asia & Middle East",
+   "sort_order": 11,
+   "active": true
+  },
+  {
+   "code": "SEA",
+   "label": "South-East Asia",
+   "continent": "Asia & Middle East",
+   "sort_order": 12,
+   "active": true
+  },
+  {
+   "code": "EAS",
+   "label": "East Asia",
+   "continent": "Asia & Middle East",
+   "sort_order": 13,
+   "active": true
+  },
+  {
+   "code": "ARP",
+   "label": "Arabian Peninsula",
+   "continent": "Asia & Middle East",
+   "sort_order": 14,
+   "active": true
+  },
+  {
+   "code": "WCA",
+   "label": "West Central Asia",
+   "continent": "Asia & Middle East",
+   "sort_order": 15,
+   "active": true
+  },
+  {
+   "code": "WAF",
+   "label": "Western Africa",
+   "continent": "Africa",
+   "sort_order": 16,
+   "active": true
+  },
+  {
+   "code": "ESAF",
+   "label": "East Southern Africa",
+   "continent": "Africa",
+   "sort_order": 17,
+   "active": true
+  },
+  {
+   "code": "EAU",
+   "label": "Eastern Australia",
+   "continent": "Australasia & Pacific",
+   "sort_order": 18,
+   "active": true
+  },
+  {
+   "code": "NAU",
+   "label": "Northern Australia",
+   "continent": "Australasia & Pacific",
+   "sort_order": 19,
+   "active": true
+  },
+  {
+   "code": "PAC",
+   "label": "Pacific Small Islands",
+   "continent": "Australasia & Pacific",
+   "sort_order": 20,
+   "active": true
+  }
+ ],
+ "mr_region_aliases": [
+  {
+   "alias_label": "Middle East & North Africa",
+   "region_code": "ARP"
+  },
+  {
+   "alias_label": "North America — Central",
+   "region_code": "CNA"
+  },
+  {
+   "alias_label": "East Asia",
+   "region_code": "EAS"
+  },
+  {
+   "alias_label": "Australia & Pacific",
+   "region_code": "EAU"
+  },
+  {
+   "alias_label": "Eastern Europe",
+   "region_code": "EEU"
+  },
+  {
+   "alias_label": "North America — East Coast",
+   "region_code": "ENA"
+  },
+  {
+   "alias_label": "Southern Europe",
+   "region_code": "MED"
+  },
+  {
+   "alias_label": "Northern Europe",
+   "region_code": "NEU"
+  },
+  {
+   "alias_label": "South Asia",
+   "region_code": "SAS"
+  },
+  {
+   "alias_label": "Southeast Asia",
+   "region_code": "SEA"
+  },
+  {
+   "alias_label": "Sub-Saharan Africa",
+   "region_code": "WAF"
+  },
+  {
+   "alias_label": "North America — West Coast",
+   "region_code": "WNA"
+  }
+ ],
+ "_mr_region_aliases_WARNING": "DORMANT AND WRONG. Nothing in the code fetches this table. Several aliases collapse whole subcontinents onto one AR6 region: 'Sub-Saharan Africa'->WAF (West Africa only), 'Middle East & North Africa'->ARP (Arabian Peninsula only), 'Australia & Pacific'->EAU (Eastern Australia only). If wired, a client in Johannesburg would receive West Africa's hazard profile. DO NOT WIRE. Replace with a country-level mr_countries table.",
+ "mr_industries": [
+  {
+   "code": "agri",
+   "label": "Agriculture & Food",
+   "carbon_exposure": 2,
+   "sort_order": 1,
+   "active": true
+  },
+  {
+   "code": "energy",
+   "label": "Energy & Utilities",
+   "carbon_exposure": 3,
+   "sort_order": 2,
+   "active": true
+  },
+  {
+   "code": "realestate",
+   "label": "Real Estate",
+   "carbon_exposure": 2,
+   "sort_order": 3,
+   "active": true
+  },
+  {
+   "code": "manuf",
+   "label": "Industrials & Manufacturing",
+   "carbon_exposure": 3,
+   "sort_order": 4,
+   "active": true
+  },
+  {
+   "code": "transport",
+   "label": "Transport & Logistics",
+   "carbon_exposure": 3,
+   "sort_order": 5,
+   "active": true
+  },
+  {
+   "code": "finance",
+   "label": "Financial Services",
+   "carbon_exposure": 1,
+   "sort_order": 6,
+   "active": true
+  },
+  {
+   "code": "tech",
+   "label": "Technology",
+   "carbon_exposure": 1,
+   "sort_order": 7,
+   "active": true
+  },
+  {
+   "code": "retail",
+   "label": "Consumer & Retail",
+   "carbon_exposure": 2,
+   "sort_order": 8,
+   "active": true
+  },
+  {
+   "code": "health",
+   "label": "Healthcare & Pharma",
+   "carbon_exposure": 2,
+   "sort_order": 9,
+   "active": true
+  },
+  {
+   "code": "extract",
+   "label": "Mining & Metals",
+   "carbon_exposure": 3,
+   "sort_order": 10,
+   "active": true
+  },
+  {
+   "code": "construction",
+   "label": "Construction & Materials",
+   "carbon_exposure": 3,
+   "sort_order": 11,
+   "active": true
+  },
+  {
+   "code": "profservices",
+   "label": "Professional Services",
+   "carbon_exposure": 1,
+   "sort_order": 12,
+   "active": true
+  },
+  {
+   "code": "other",
+   "label": "Other",
+   "carbon_exposure": 2,
+   "sort_order": 13,
+   "active": true
+  }
+ ],
+ "mr_jurisdictions": [
+  {
+   "code": "eu_ets",
+   "label": "EU (EU ETS)",
+   "policy_intensity": 3,
+   "sort_order": 1,
+   "active": true
+  },
+  {
+   "code": "cbam",
+   "label": "EU CBAM exposure",
+   "policy_intensity": 3,
+   "sort_order": 2,
+   "active": true
+  },
+  {
+   "code": "uk_ets",
+   "label": "UK (UK ETS)",
+   "policy_intensity": 3,
+   "sort_order": 3,
+   "active": true
+  },
+  {
+   "code": "ca",
+   "label": "Canada (federal pricing)",
+   "policy_intensity": 2,
+   "sort_order": 4,
+   "active": true
+  },
+  {
+   "code": "us_fed",
+   "label": "US (federal)",
+   "policy_intensity": 1,
+   "sort_order": 5,
+   "active": true
+  },
+  {
+   "code": "us_ca",
+   "label": "US — California cap-and-trade",
+   "policy_intensity": 2,
+   "sort_order": 6,
+   "active": true
+  },
+  {
+   "code": "cn",
+   "label": "China (national ETS)",
+   "policy_intensity": 2,
+   "sort_order": 7,
+   "active": true
+  },
+  {
+   "code": "kr",
+   "label": "South Korea (K-ETS)",
+   "policy_intensity": 2,
+   "sort_order": 8,
+   "active": true
+  },
+  {
+   "code": "jp",
+   "label": "Japan",
+   "policy_intensity": 1,
+   "sort_order": 9,
+   "active": true
+  },
+  {
+   "code": "au",
+   "label": "Australia (Safeguard)",
+   "policy_intensity": 2,
+   "sort_order": 10,
+   "active": true
+  },
+  {
+   "code": "nz",
+   "label": "New Zealand (NZ ETS)",
+   "policy_intensity": 2,
+   "sort_order": 11,
+   "active": true
+  },
+  {
+   "code": "ch",
+   "label": "Switzerland (CH ETS)",
+   "policy_intensity": 2,
+   "sort_order": 12,
+   "active": true
+  },
+  {
+   "code": "in",
+   "label": "India (CCTS)",
+   "policy_intensity": 1,
+   "sort_order": 21,
+   "active": true
+  },
+  {
+   "code": "id",
+   "label": "Indonesia (ETS)",
+   "policy_intensity": 1,
+   "sort_order": 22,
+   "active": true
+  },
+  {
+   "code": "sg",
+   "label": "Singapore (carbon tax)",
+   "policy_intensity": 2,
+   "sort_order": 23,
+   "active": true
+  },
+  {
+   "code": "za",
+   "label": "South Africa (carbon tax)",
+   "policy_intensity": 1,
+   "sort_order": 24,
+   "active": true
+  },
+  {
+   "code": "mx",
+   "label": "Mexico (carbon tax)",
+   "policy_intensity": 1,
+   "sort_order": 25,
+   "active": true
+  },
+  {
+   "code": "cl",
+   "label": "Chile (carbon tax)",
+   "policy_intensity": 1,
+   "sort_order": 26,
+   "active": true
+  },
+  {
+   "code": "tw",
+   "label": "Taiwan (carbon fee)",
+   "policy_intensity": 1,
+   "sort_order": 27,
+   "active": true
+  },
+  {
+   "code": "kz",
+   "label": "Kazakhstan (ETS)",
+   "policy_intensity": 1,
+   "sort_order": 28,
+   "active": true
+  }
+ ],
+ "mr_esrs_topics": [
+  {
+   "code": "E1",
+   "label": "Climate change",
+   "category": "env",
+   "sort_order": 1
+  },
+  {
+   "code": "E2",
+   "label": "Pollution",
+   "category": "env",
+   "sort_order": 2
+  },
+  {
+   "code": "E3",
+   "label": "Water & marine resources",
+   "category": "env",
+   "sort_order": 3
+  },
+  {
+   "code": "E4",
+   "label": "Biodiversity & ecosystems",
+   "category": "env",
+   "sort_order": 4
+  },
+  {
+   "code": "E5",
+   "label": "Resource use & circular economy",
+   "category": "env",
+   "sort_order": 5
+  },
+  {
+   "code": "S1",
+   "label": "Own workforce",
+   "category": "soc",
+   "sort_order": 6
+  },
+  {
+   "code": "S2",
+   "label": "Workers in the value chain",
+   "category": "soc",
+   "sort_order": 7
+  },
+  {
+   "code": "S3",
+   "label": "Affected communities",
+   "category": "soc",
+   "sort_order": 8
+  },
+  {
+   "code": "S4",
+   "label": "Consumers & end-users",
+   "category": "soc",
+   "sort_order": 9
+  },
+  {
+   "code": "G1",
+   "label": "Business conduct",
+   "category": "gov",
+   "sort_order": 10
+  }
+ ],
+ "mr_scenarios": [
+  {
+   "code": "ssp126",
+   "label": "IPCC SSP1-2.6",
+   "framework": "IPCC",
+   "descriptor": "~1.8°C",
+   "physical_mult": 0.75,
+   "transition_mult": 1.4,
+   "sort_order": 1
+  },
+  {
+   "code": "ssp245",
+   "label": "IPCC SSP2-4.5",
+   "framework": "IPCC",
+   "descriptor": "~2.7°C",
+   "physical_mult": 1,
+   "transition_mult": 1,
+   "sort_order": 2
+  },
+  {
+   "code": "ssp585",
+   "label": "IPCC SSP5-8.5",
+   "framework": "IPCC",
+   "descriptor": "~4.4°C",
+   "physical_mult": 1.4,
+   "transition_mult": 0.6,
+   "sort_order": 3
+  },
+  {
+   "code": "ngfs_orderly",
+   "label": "NGFS Orderly",
+   "framework": "NGFS",
+   "descriptor": "Early policy",
+   "physical_mult": 0.8,
+   "transition_mult": 1.25,
+   "sort_order": 4
+  },
+  {
+   "code": "ngfs_disorderly",
+   "label": "NGFS Disorderly",
+   "framework": "NGFS",
+   "descriptor": "Late, abrupt",
+   "physical_mult": 1,
+   "transition_mult": 1.5,
+   "sort_order": 5
+  },
+  {
+   "code": "ngfs_hothouse",
+   "label": "NGFS Hot House",
+   "framework": "NGFS",
+   "descriptor": "Limited action",
+   "physical_mult": 1.5,
+   "transition_mult": 0.5,
+   "sort_order": 6
+  }
+ ],
+ "mr_asset_modifiers": [
+  {
+   "asset_profile": "coastal",
+   "hazard": "coastal",
+   "modifier": 1.5
+  },
+  {
+   "asset_profile": "coastal",
+   "hazard": "cyclone",
+   "modifier": 1.3
+  },
+  {
+   "asset_profile": "coastal",
+   "hazard": "flood",
+   "modifier": 1.2
+  },
+  {
+   "asset_profile": "inland",
+   "hazard": "heat",
+   "modifier": 1.2
+  },
+  {
+   "asset_profile": "inland",
+   "hazard": "drought",
+   "modifier": 1.2
+  },
+  {
+   "asset_profile": "inland",
+   "hazard": "wildfire",
+   "modifier": 1.2
+  },
+  {
+   "asset_profile": "inland",
+   "hazard": "coastal",
+   "modifier": 0.3
+  },
+  {
+   "asset_profile": "water",
+   "hazard": "water",
+   "modifier": 1.5
+  },
+  {
+   "asset_profile": "water",
+   "hazard": "drought",
+   "modifier": 1.4
+  },
+  {
+   "asset_profile": "distributed",
+   "hazard": "coastal",
+   "modifier": 0.6
+  },
+  {
+   "asset_profile": "distributed",
+   "hazard": "flood",
+   "modifier": 0.8
+  },
+  {
+   "asset_profile": "distributed",
+   "hazard": "heat",
+   "modifier": 0.8
+  },
+  {
+   "asset_profile": "distributed",
+   "hazard": "drought",
+   "modifier": 0.8
+  },
+  {
+   "asset_profile": "distributed",
+   "hazard": "water",
+   "modifier": 0.8
+  },
+  {
+   "asset_profile": "distributed",
+   "hazard": "wildfire",
+   "modifier": 0.8
+  },
+  {
+   "asset_profile": "distributed",
+   "hazard": "cyclone",
+   "modifier": 0.8
+  },
+  {
+   "asset_profile": "distributed",
+   "hazard": "cold",
+   "modifier": 0.8
+  }
+ ],
+ "mr_region_hazards": [
+  {
+   "region_code": "NWN",
+   "hazard": "cold",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "NWN",
+   "hazard": "wildfire",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "NWN",
+   "hazard": "flood",
+   "intensity": 1,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "NEN",
+   "hazard": "cold",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "NEN",
+   "hazard": "flood",
+   "intensity": 1,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "NEN",
+   "hazard": "coastal",
+   "intensity": 1,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "WNA",
+   "hazard": "wildfire",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "WNA",
+   "hazard": "drought",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "WNA",
+   "hazard": "water",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "WNA",
+   "hazard": "heat",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "CNA",
+   "hazard": "heat",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "CNA",
+   "hazard": "flood",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "CNA",
+   "hazard": "drought",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "ENA",
+   "hazard": "cyclone",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "ENA",
+   "hazard": "coastal",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "ENA",
+   "hazard": "heat",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "ENA",
+   "hazard": "flood",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "CAR",
+   "hazard": "cyclone",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "CAR",
+   "hazard": "coastal",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "CAR",
+   "hazard": "heat",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "NEU",
+   "hazard": "flood",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "NEU",
+   "hazard": "coastal",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "NEU",
+   "hazard": "heat",
+   "intensity": 1,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "WCE",
+   "hazard": "heat",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "WCE",
+   "hazard": "flood",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "WCE",
+   "hazard": "drought",
+   "intensity": 1,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "WCE",
+   "hazard": "coastal",
+   "intensity": 1,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "MED",
+   "hazard": "heat",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "MED",
+   "hazard": "drought",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "MED",
+   "hazard": "water",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "MED",
+   "hazard": "wildfire",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "EEU",
+   "hazard": "heat",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "EEU",
+   "hazard": "drought",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "EEU",
+   "hazard": "flood",
+   "intensity": 1,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "SAS",
+   "hazard": "heat",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "SAS",
+   "hazard": "flood",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "SAS",
+   "hazard": "cyclone",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "SAS",
+   "hazard": "water",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "SEA",
+   "hazard": "flood",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "SEA",
+   "hazard": "cyclone",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "SEA",
+   "hazard": "coastal",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "SEA",
+   "hazard": "heat",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "EAS",
+   "hazard": "cyclone",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "EAS",
+   "hazard": "flood",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "EAS",
+   "hazard": "heat",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "EAS",
+   "hazard": "coastal",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "ARP",
+   "hazard": "heat",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "ARP",
+   "hazard": "water",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "ARP",
+   "hazard": "drought",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "WCA",
+   "hazard": "heat",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "WCA",
+   "hazard": "drought",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "WCA",
+   "hazard": "water",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "WAF",
+   "hazard": "heat",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "WAF",
+   "hazard": "drought",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "WAF",
+   "hazard": "flood",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "ESAF",
+   "hazard": "drought",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "ESAF",
+   "hazard": "heat",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "EAU",
+   "hazard": "wildfire",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "EAU",
+   "hazard": "heat",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "EAU",
+   "hazard": "flood",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "NAU",
+   "hazard": "cyclone",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "NAU",
+   "hazard": "heat",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "NAU",
+   "hazard": "flood",
+   "intensity": 2,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "PAC",
+   "hazard": "coastal",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  },
+  {
+   "region_code": "PAC",
+   "hazard": "cyclone",
+   "intensity": 3,
+   "source_note": "AR6 WGI starter"
+  }
+ ],
+ "_mr_region_hazards_NOTE": "65 of a possible 160 cells (20 regions x 8 hazards). ALL rows carry source_note='AR6 WGI starter' - i.e. these are STARTER VALUES, not transcriptions from AR6 WGI Ch12. A MISSING row currently renders as 'not assessed' (post-2026-07-14 fix) - previously it was silently DELETED from the report. Known gaps that do not make sense: ARP has no cyclone row (the Arabian Peninsula does get tropical cyclones - Gonu, Mekunu, Shaheen); ESAF has no flood and no cyclone row (Mozambique; Cyclone Idai).",
+ "mr_industry_hazards": [
+  {
+   "industry_code": "agri",
+   "hazard": "drought",
+   "sensitivity": 3
+  },
+  {
+   "industry_code": "agri",
+   "hazard": "water",
+   "sensitivity": 3
+  },
+  {
+   "industry_code": "agri",
+   "hazard": "heat",
+   "sensitivity": 3
+  },
+  {
+   "industry_code": "agri",
+   "hazard": "flood",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "energy",
+   "hazard": "heat",
+   "sensitivity": 3
+  },
+  {
+   "industry_code": "energy",
+   "hazard": "water",
+   "sensitivity": 3
+  },
+  {
+   "industry_code": "energy",
+   "hazard": "cyclone",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "energy",
+   "hazard": "wildfire",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "realestate",
+   "hazard": "coastal",
+   "sensitivity": 3
+  },
+  {
+   "industry_code": "realestate",
+   "hazard": "flood",
+   "sensitivity": 3
+  },
+  {
+   "industry_code": "realestate",
+   "hazard": "heat",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "realestate",
+   "hazard": "wildfire",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "realestate",
+   "hazard": "cyclone",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "manuf",
+   "hazard": "flood",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "manuf",
+   "hazard": "water",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "manuf",
+   "hazard": "heat",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "transport",
+   "hazard": "flood",
+   "sensitivity": 3
+  },
+  {
+   "industry_code": "transport",
+   "hazard": "cyclone",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "transport",
+   "hazard": "coastal",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "transport",
+   "hazard": "heat",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "finance",
+   "hazard": "flood",
+   "sensitivity": 1
+  },
+  {
+   "industry_code": "finance",
+   "hazard": "coastal",
+   "sensitivity": 1
+  },
+  {
+   "industry_code": "tech",
+   "hazard": "heat",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "tech",
+   "hazard": "water",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "retail",
+   "hazard": "flood",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "retail",
+   "hazard": "drought",
+   "sensitivity": 1
+  },
+  {
+   "industry_code": "health",
+   "hazard": "heat",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "health",
+   "hazard": "flood",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "extract",
+   "hazard": "water",
+   "sensitivity": 3
+  },
+  {
+   "industry_code": "extract",
+   "hazard": "heat",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "extract",
+   "hazard": "flood",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "extract",
+   "hazard": "drought",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "construction",
+   "hazard": "flood",
+   "sensitivity": 3
+  },
+  {
+   "industry_code": "construction",
+   "hazard": "heat",
+   "sensitivity": 3
+  },
+  {
+   "industry_code": "construction",
+   "hazard": "coastal",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "construction",
+   "hazard": "wildfire",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "profservices",
+   "hazard": "flood",
+   "sensitivity": 1
+  },
+  {
+   "industry_code": "profservices",
+   "hazard": "heat",
+   "sensitivity": 1
+  },
+  {
+   "industry_code": "other",
+   "hazard": "flood",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "other",
+   "hazard": "heat",
+   "sensitivity": 2
+  },
+  {
+   "industry_code": "other",
+   "hazard": "drought",
+   "sensitivity": 1
+  }
+ ],
+ "_mr_industry_hazards_NOTE": "41 of a possible 104 cells (13 sectors x 8 hazards). No provenance column. Per the methodology doc s4.4 these are 'starter values'. Per the ECB, assigning sector sensitivity scores by expert judgment IS the prescribed method - no public, non-proprietary sector x hazard matrix exists (everyone who has one sells it). The fix is to DISCLOSE the judgment, not to source it.",
+ "mr_industry_topic_baselines": [
+  {
+   "industry_code": "agri",
+   "topic_code": "E1",
+   "financial_base": 8,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "agri",
+   "topic_code": "E2",
+   "financial_base": 2,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "agri",
+   "topic_code": "E3",
+   "financial_base": 8,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "agri",
+   "topic_code": "E4",
+   "financial_base": 5,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "agri",
+   "topic_code": "E5",
+   "financial_base": 5,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "agri",
+   "topic_code": "S1",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "agri",
+   "topic_code": "S2",
+   "financial_base": 5,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "agri",
+   "topic_code": "S3",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "agri",
+   "topic_code": "S4",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "agri",
+   "topic_code": "G1",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "energy",
+   "topic_code": "E1",
+   "financial_base": 8,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "energy",
+   "topic_code": "E2",
+   "financial_base": 8,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "energy",
+   "topic_code": "E3",
+   "financial_base": 5,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "energy",
+   "topic_code": "E4",
+   "financial_base": 2,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "energy",
+   "topic_code": "E5",
+   "financial_base": 2,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "energy",
+   "topic_code": "S1",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "energy",
+   "topic_code": "S2",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "energy",
+   "topic_code": "S3",
+   "financial_base": 5,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "energy",
+   "topic_code": "S4",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "energy",
+   "topic_code": "G1",
+   "financial_base": 8,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "realestate",
+   "topic_code": "E1",
+   "financial_base": 8,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "realestate",
+   "topic_code": "E2",
+   "financial_base": 2,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "realestate",
+   "topic_code": "E3",
+   "financial_base": 2,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "realestate",
+   "topic_code": "E4",
+   "financial_base": 5,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "realestate",
+   "topic_code": "E5",
+   "financial_base": 8,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "realestate",
+   "topic_code": "S1",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "realestate",
+   "topic_code": "S2",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "realestate",
+   "topic_code": "S3",
+   "financial_base": 2,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "realestate",
+   "topic_code": "S4",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "realestate",
+   "topic_code": "G1",
+   "financial_base": 5,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "manuf",
+   "topic_code": "E1",
+   "financial_base": 8,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "manuf",
+   "topic_code": "E2",
+   "financial_base": 8,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "manuf",
+   "topic_code": "E3",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "manuf",
+   "topic_code": "E4",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "manuf",
+   "topic_code": "E5",
+   "financial_base": 8,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "manuf",
+   "topic_code": "S1",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "manuf",
+   "topic_code": "S2",
+   "financial_base": 5,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "manuf",
+   "topic_code": "S3",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "manuf",
+   "topic_code": "S4",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "manuf",
+   "topic_code": "G1",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "transport",
+   "topic_code": "E1",
+   "financial_base": 8,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "transport",
+   "topic_code": "E2",
+   "financial_base": 5,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "transport",
+   "topic_code": "E3",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "transport",
+   "topic_code": "E4",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "transport",
+   "topic_code": "E5",
+   "financial_base": 2,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "transport",
+   "topic_code": "S1",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "transport",
+   "topic_code": "S2",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "transport",
+   "topic_code": "S3",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "transport",
+   "topic_code": "S4",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "transport",
+   "topic_code": "G1",
+   "financial_base": 8,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "finance",
+   "topic_code": "E1",
+   "financial_base": 8,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "finance",
+   "topic_code": "E2",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "finance",
+   "topic_code": "E3",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "finance",
+   "topic_code": "E4",
+   "financial_base": 2,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "finance",
+   "topic_code": "E5",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "finance",
+   "topic_code": "S1",
+   "financial_base": 5,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "finance",
+   "topic_code": "S2",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "finance",
+   "topic_code": "S3",
+   "financial_base": 2,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "finance",
+   "topic_code": "S4",
+   "financial_base": 8,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "finance",
+   "topic_code": "G1",
+   "financial_base": 8,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "tech",
+   "topic_code": "E1",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "tech",
+   "topic_code": "E2",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "tech",
+   "topic_code": "E3",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "tech",
+   "topic_code": "E4",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "tech",
+   "topic_code": "E5",
+   "financial_base": 5,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "tech",
+   "topic_code": "S1",
+   "financial_base": 8,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "tech",
+   "topic_code": "S2",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "tech",
+   "topic_code": "S3",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "tech",
+   "topic_code": "S4",
+   "financial_base": 8,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "tech",
+   "topic_code": "G1",
+   "financial_base": 8,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "retail",
+   "topic_code": "E1",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "retail",
+   "topic_code": "E2",
+   "financial_base": 2,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "retail",
+   "topic_code": "E3",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "retail",
+   "topic_code": "E4",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "retail",
+   "topic_code": "E5",
+   "financial_base": 5,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "retail",
+   "topic_code": "S1",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "retail",
+   "topic_code": "S2",
+   "financial_base": 8,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "retail",
+   "topic_code": "S3",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "retail",
+   "topic_code": "S4",
+   "financial_base": 8,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "retail",
+   "topic_code": "G1",
+   "financial_base": 8,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "health",
+   "topic_code": "E1",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "health",
+   "topic_code": "E2",
+   "financial_base": 8,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "health",
+   "topic_code": "E3",
+   "financial_base": 5,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "health",
+   "topic_code": "E4",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "health",
+   "topic_code": "E5",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "health",
+   "topic_code": "S1",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "health",
+   "topic_code": "S2",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "health",
+   "topic_code": "S3",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "health",
+   "topic_code": "S4",
+   "financial_base": 8,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "health",
+   "topic_code": "G1",
+   "financial_base": 8,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "extract",
+   "topic_code": "E1",
+   "financial_base": 8,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "extract",
+   "topic_code": "E2",
+   "financial_base": 8,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "extract",
+   "topic_code": "E3",
+   "financial_base": 5,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "extract",
+   "topic_code": "E4",
+   "financial_base": 5,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "extract",
+   "topic_code": "E5",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "extract",
+   "topic_code": "S1",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "extract",
+   "topic_code": "S2",
+   "financial_base": 5,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "extract",
+   "topic_code": "S3",
+   "financial_base": 8,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "extract",
+   "topic_code": "S4",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "extract",
+   "topic_code": "G1",
+   "financial_base": 8,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "construction",
+   "topic_code": "E1",
+   "financial_base": 8,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "construction",
+   "topic_code": "E2",
+   "financial_base": 5,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "construction",
+   "topic_code": "E3",
+   "financial_base": 2,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "construction",
+   "topic_code": "E4",
+   "financial_base": 5,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "construction",
+   "topic_code": "E5",
+   "financial_base": 8,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "construction",
+   "topic_code": "S1",
+   "financial_base": 8,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "construction",
+   "topic_code": "S2",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "construction",
+   "topic_code": "S3",
+   "financial_base": 2,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "construction",
+   "topic_code": "S4",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "construction",
+   "topic_code": "G1",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "profservices",
+   "topic_code": "E1",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "profservices",
+   "topic_code": "E2",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "profservices",
+   "topic_code": "E3",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "profservices",
+   "topic_code": "E4",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "profservices",
+   "topic_code": "E5",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "profservices",
+   "topic_code": "S1",
+   "financial_base": 8,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "profservices",
+   "topic_code": "S2",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "profservices",
+   "topic_code": "S3",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "profservices",
+   "topic_code": "S4",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "profservices",
+   "topic_code": "G1",
+   "financial_base": 8,
+   "impact_base": 8
+  },
+  {
+   "industry_code": "other",
+   "topic_code": "E1",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "other",
+   "topic_code": "E2",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "other",
+   "topic_code": "E3",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "other",
+   "topic_code": "E4",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "other",
+   "topic_code": "E5",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "other",
+   "topic_code": "S1",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "other",
+   "topic_code": "S2",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "other",
+   "topic_code": "S3",
+   "financial_base": 2,
+   "impact_base": 2
+  },
+  {
+   "industry_code": "other",
+   "topic_code": "S4",
+   "financial_base": 5,
+   "impact_base": 5
+  },
+  {
+   "industry_code": "other",
+   "topic_code": "G1",
+   "financial_base": 5,
+   "impact_base": 5
+  }
+ ],
+ "mr_industry_opportunities": [
+  {
+   "industry_code": "manuf",
+   "opportunity_category": "resource_efficiency",
+   "relevance": 3,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "manuf",
+   "opportunity_category": "energy_source",
+   "relevance": 3,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "manuf",
+   "opportunity_category": "products_services",
+   "relevance": 2,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "manuf",
+   "opportunity_category": "markets",
+   "relevance": 2,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "manuf",
+   "opportunity_category": "resilience",
+   "relevance": 2,
+   "sort_order": 5
+  },
+  {
+   "industry_code": "energy",
+   "opportunity_category": "resource_efficiency",
+   "relevance": 2,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "energy",
+   "opportunity_category": "energy_source",
+   "relevance": 3,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "energy",
+   "opportunity_category": "products_services",
+   "relevance": 3,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "energy",
+   "opportunity_category": "markets",
+   "relevance": 3,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "energy",
+   "opportunity_category": "resilience",
+   "relevance": 2,
+   "sort_order": 5
+  },
+  {
+   "industry_code": "extract",
+   "opportunity_category": "resource_efficiency",
+   "relevance": 2,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "extract",
+   "opportunity_category": "energy_source",
+   "relevance": 2,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "extract",
+   "opportunity_category": "products_services",
+   "relevance": 2,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "extract",
+   "opportunity_category": "markets",
+   "relevance": 3,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "extract",
+   "opportunity_category": "resilience",
+   "relevance": 1,
+   "sort_order": 5
+  },
+  {
+   "industry_code": "transport",
+   "opportunity_category": "resource_efficiency",
+   "relevance": 3,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "transport",
+   "opportunity_category": "energy_source",
+   "relevance": 3,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "transport",
+   "opportunity_category": "products_services",
+   "relevance": 2,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "transport",
+   "opportunity_category": "markets",
+   "relevance": 2,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "transport",
+   "opportunity_category": "resilience",
+   "relevance": 1,
+   "sort_order": 5
+  },
+  {
+   "industry_code": "construction",
+   "opportunity_category": "resource_efficiency",
+   "relevance": 2,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "construction",
+   "opportunity_category": "energy_source",
+   "relevance": 2,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "construction",
+   "opportunity_category": "products_services",
+   "relevance": 3,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "construction",
+   "opportunity_category": "markets",
+   "relevance": 3,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "construction",
+   "opportunity_category": "resilience",
+   "relevance": 2,
+   "sort_order": 5
+  },
+  {
+   "industry_code": "agri",
+   "opportunity_category": "resource_efficiency",
+   "relevance": 3,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "agri",
+   "opportunity_category": "energy_source",
+   "relevance": 2,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "agri",
+   "opportunity_category": "products_services",
+   "relevance": 3,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "agri",
+   "opportunity_category": "markets",
+   "relevance": 3,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "agri",
+   "opportunity_category": "resilience",
+   "relevance": 2,
+   "sort_order": 5
+  },
+  {
+   "industry_code": "realestate",
+   "opportunity_category": "resource_efficiency",
+   "relevance": 3,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "realestate",
+   "opportunity_category": "energy_source",
+   "relevance": 2,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "realestate",
+   "opportunity_category": "products_services",
+   "relevance": 2,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "realestate",
+   "opportunity_category": "markets",
+   "relevance": 3,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "realestate",
+   "opportunity_category": "resilience",
+   "relevance": 2,
+   "sort_order": 5
+  },
+  {
+   "industry_code": "retail",
+   "opportunity_category": "resource_efficiency",
+   "relevance": 2,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "retail",
+   "opportunity_category": "energy_source",
+   "relevance": 2,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "retail",
+   "opportunity_category": "products_services",
+   "relevance": 3,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "retail",
+   "opportunity_category": "markets",
+   "relevance": 3,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "retail",
+   "opportunity_category": "resilience",
+   "relevance": 1,
+   "sort_order": 5
+  },
+  {
+   "industry_code": "finance",
+   "opportunity_category": "resource_efficiency",
+   "relevance": 1,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "finance",
+   "opportunity_category": "energy_source",
+   "relevance": 1,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "finance",
+   "opportunity_category": "products_services",
+   "relevance": 3,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "finance",
+   "opportunity_category": "markets",
+   "relevance": 3,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "finance",
+   "opportunity_category": "resilience",
+   "relevance": 2,
+   "sort_order": 5
+  },
+  {
+   "industry_code": "tech",
+   "opportunity_category": "resource_efficiency",
+   "relevance": 2,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "tech",
+   "opportunity_category": "energy_source",
+   "relevance": 2,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "tech",
+   "opportunity_category": "products_services",
+   "relevance": 3,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "tech",
+   "opportunity_category": "markets",
+   "relevance": 3,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "tech",
+   "opportunity_category": "resilience",
+   "relevance": 2,
+   "sort_order": 5
+  },
+  {
+   "industry_code": "health",
+   "opportunity_category": "resource_efficiency",
+   "relevance": 2,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "health",
+   "opportunity_category": "energy_source",
+   "relevance": 1,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "health",
+   "opportunity_category": "products_services",
+   "relevance": 2,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "health",
+   "opportunity_category": "markets",
+   "relevance": 1,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "health",
+   "opportunity_category": "resilience",
+   "relevance": 2,
+   "sort_order": 5
+  },
+  {
+   "industry_code": "profservices",
+   "opportunity_category": "resource_efficiency",
+   "relevance": 1,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "profservices",
+   "opportunity_category": "energy_source",
+   "relevance": 1,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "profservices",
+   "opportunity_category": "products_services",
+   "relevance": 3,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "profservices",
+   "opportunity_category": "markets",
+   "relevance": 3,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "profservices",
+   "opportunity_category": "resilience",
+   "relevance": 1,
+   "sort_order": 5
+  },
+  {
+   "industry_code": "other",
+   "opportunity_category": "resource_efficiency",
+   "relevance": 2,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "other",
+   "opportunity_category": "energy_source",
+   "relevance": 1,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "other",
+   "opportunity_category": "products_services",
+   "relevance": 1,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "other",
+   "opportunity_category": "markets",
+   "relevance": 1,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "other",
+   "opportunity_category": "resilience",
+   "relevance": 1,
+   "sort_order": 5
+  }
+ ],
+ "mr_industry_transition_drivers": [
+  {
+   "industry_code": "energy",
+   "transition_driver": "policy",
+   "weight": 3,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "energy",
+   "transition_driver": "technology",
+   "weight": 3,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "energy",
+   "transition_driver": "market",
+   "weight": 3,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "energy",
+   "transition_driver": "reputation",
+   "weight": 2,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "manuf",
+   "transition_driver": "policy",
+   "weight": 3,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "manuf",
+   "transition_driver": "technology",
+   "weight": 3,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "manuf",
+   "transition_driver": "market",
+   "weight": 2,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "manuf",
+   "transition_driver": "reputation",
+   "weight": 1,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "extract",
+   "transition_driver": "policy",
+   "weight": 3,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "extract",
+   "transition_driver": "technology",
+   "weight": 2,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "extract",
+   "transition_driver": "market",
+   "weight": 3,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "extract",
+   "transition_driver": "reputation",
+   "weight": 2,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "transport",
+   "transition_driver": "policy",
+   "weight": 3,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "transport",
+   "transition_driver": "technology",
+   "weight": 3,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "transport",
+   "transition_driver": "market",
+   "weight": 2,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "transport",
+   "transition_driver": "reputation",
+   "weight": 1,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "construction",
+   "transition_driver": "policy",
+   "weight": 3,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "construction",
+   "transition_driver": "technology",
+   "weight": 2,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "construction",
+   "transition_driver": "market",
+   "weight": 2,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "construction",
+   "transition_driver": "reputation",
+   "weight": 1,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "agri",
+   "transition_driver": "policy",
+   "weight": 2,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "agri",
+   "transition_driver": "technology",
+   "weight": 2,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "agri",
+   "transition_driver": "market",
+   "weight": 3,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "agri",
+   "transition_driver": "reputation",
+   "weight": 2,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "realestate",
+   "transition_driver": "policy",
+   "weight": 3,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "realestate",
+   "transition_driver": "technology",
+   "weight": 2,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "realestate",
+   "transition_driver": "market",
+   "weight": 3,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "realestate",
+   "transition_driver": "reputation",
+   "weight": 1,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "retail",
+   "transition_driver": "policy",
+   "weight": 2,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "retail",
+   "transition_driver": "technology",
+   "weight": 1,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "retail",
+   "transition_driver": "market",
+   "weight": 3,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "retail",
+   "transition_driver": "reputation",
+   "weight": 3,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "finance",
+   "transition_driver": "policy",
+   "weight": 2,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "finance",
+   "transition_driver": "technology",
+   "weight": 1,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "finance",
+   "transition_driver": "market",
+   "weight": 2,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "finance",
+   "transition_driver": "reputation",
+   "weight": 2,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "tech",
+   "transition_driver": "policy",
+   "weight": 1,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "tech",
+   "transition_driver": "technology",
+   "weight": 1,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "tech",
+   "transition_driver": "market",
+   "weight": 2,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "tech",
+   "transition_driver": "reputation",
+   "weight": 2,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "health",
+   "transition_driver": "policy",
+   "weight": 1,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "health",
+   "transition_driver": "technology",
+   "weight": 1,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "health",
+   "transition_driver": "market",
+   "weight": 1,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "health",
+   "transition_driver": "reputation",
+   "weight": 1,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "profservices",
+   "transition_driver": "policy",
+   "weight": 1,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "profservices",
+   "transition_driver": "technology",
+   "weight": 1,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "profservices",
+   "transition_driver": "market",
+   "weight": 2,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "profservices",
+   "transition_driver": "reputation",
+   "weight": 1,
+   "sort_order": 4
+  },
+  {
+   "industry_code": "other",
+   "transition_driver": "policy",
+   "weight": 1,
+   "sort_order": 1
+  },
+  {
+   "industry_code": "other",
+   "transition_driver": "technology",
+   "weight": 1,
+   "sort_order": 2
+  },
+  {
+   "industry_code": "other",
+   "transition_driver": "market",
+   "weight": 1,
+   "sort_order": 3
+  },
+  {
+   "industry_code": "other",
+   "transition_driver": "reputation",
+   "weight": 1,
+   "sort_order": 4
+  }
+ ]
+}
