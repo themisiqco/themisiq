@@ -975,6 +975,78 @@ function calcInventory(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
   }, { s1_total: 0, s2_location: 0, s2_market: 0, s3_td: 0, co2: 0, ch4: 0, n2o: 0, biogenic: 0 })
 }
 
+// tCO2e per fuelType for ONE location, keyed by the same fuelType strings a CoverageResolution
+// carries ('natural_gas' | 'propane' | 'diesel' | 'gasoline' | 'electricity'). This is the per-fuel
+// decomposition calcLocation deliberately lumps together (it sums s1_stationary/s1_mobile); pctEstimated
+// needs the split to weight an extrapolation by the emissions it actually estimated. Same EFs, same
+// grid gate, same GWP as calcLocation — so a fuel's share here reconciles with the inventory total.
+// diesel (stationary AND mobile) both map to 'diesel', matching fieldFor's two diesel docTypes.
+function fuelEmissionsByType(loc: Location, gwpVersion: GwpVersion, year: number): Record<string, number> {
+  const out: Record<string, number> = {}
+  const add = (k: string, v: number) => { out[k] = (out[k] ?? 0) + v }
+  if (loc.has_natural_gas && loc.natural_gas_amount > 0)
+    add('natural_gas', calcGas(pickEF(loc, `natural_gas_${loc.natural_gas_unit}` as keyof typeof EF), loc.natural_gas_amount, gwpVersion).total)
+  if (loc.has_propane && loc.propane_amount > 0)
+    add('propane', calcGas(pickEF(loc, propaneEfKey(loc.propane_unit) as keyof typeof EF), loc.propane_amount, gwpVersion).total)
+  if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0)
+    add('diesel', calcGas(pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), loc.diesel_stationary_amount, gwpVersion).total)
+  if (loc.has_fuel_oil && loc.fuel_oil_gallons > 0)
+    add('fuel_oil', calcGas(pickEF(loc, 'fuel_oil_gallon'), loc.fuel_oil_gallons, gwpVersion).total)
+  if (loc.has_mobile) {
+    if (loc.gasoline_amount > 0)
+      add('gasoline', calcGas(pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), loc.gasoline_amount, gwpVersion).total)
+    if (loc.diesel_mobile_amount > 0)
+      add('diesel', calcGas(pickEF(loc, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), loc.diesel_mobile_amount, gwpVersion).total)
+  }
+  // Electricity = Scope 2 location-based (the series' headline basis). Same grid gate as calcLocation:
+  // an unresolved grid_region contributes 0 there, so it must contribute 0 here too.
+  if (isResolvedGridRegion(loc.grid_region) && loc.electricity_kwh > 0)
+    add('electricity', loc.electricity_kwh * getGridFactor(loc.grid_region, year).ef / 1000)
+  return out
+}
+
+/**
+ * Share of an inventory's Scope 1+2 tCO2e that is ESTIMATED rather than
+ * evidenced, 0-100. Derived from coverage resolutions, weighted by emissions —
+ * NOT by fuel count. A 91.7%-estimated gas figure on a location whose emissions
+ * are 95% electricity is not a 91.7%-estimated inventory.
+ *
+ * Returns null when nothing is estimated AND nothing was concierge-read
+ * (a wholly manual inventory has no evidence basis to measure against —
+ * null is an absence, not zero).
+ */
+export function pctEstimated(
+  locations: Location[],
+  resolutions: CoverageResolution[],
+  gwpVersion: GwpVersion,
+  year: number
+): number | null {
+  // Only 'extrapolate' produces estimated emissions. A straddle 'next_year' EXCLUDES emissions
+  // (not estimation); a straddle 'prorate' is a day-level allocation of REAL metered data (not
+  // estimation); a 'duplicate' resolution drops a double-count (not estimation). None are counted.
+  const extraps = resolutions.filter(r => r.kind === 'extrapolate' && !!r.monthsCovered && r.monthsCovered > 0)
+  let estimated = 0
+  for (const loc of locations) {
+    const byFuel = fuelEmissionsByType(loc, gwpVersion, year)
+    for (const r of extraps) {
+      if (r.locId !== loc.id) continue
+      const m = r.monthsCovered as number
+      const estimatedFraction = Math.max(0, (12 - m) / 12) // e.g. 1/12 evidenced → 11/12 estimated
+      estimated += (byFuel[r.fuelType] ?? 0) * estimatedFraction
+    }
+  }
+  // A wholly manual inventory (no confirmed concierge proposal on any location) has no evidence
+  // basis to measure "estimated share" against — null is an absence, not a 0% claim.
+  const hasConciergeData = locations.some(loc =>
+    (loc.source_docs ?? []).some(d => (d.extracted ?? []).some(p => p.status === 'confirmed' && p.value != null)))
+  if (estimated <= 0 && !hasConciergeData) return null
+
+  const inv = calcInventory(locations, gwpVersion, year)
+  const total = inv.s1_total + inv.s2_location
+  if (total <= 0) return 0 // concierge data present but zero emissions → 0% estimated, not an absence
+  return (estimated / total) * 100
+}
+
 // Map a concierge (docType, fuelType) pair to its inventory field(s). Module-scoped so both the
 // confirm path (updateProposal / addCoverageResolution) and buildWorkings share one join key.
 function fieldFor(docType: string, fuelType: string): { amount: keyof Location; unit?: keyof Location } | null {

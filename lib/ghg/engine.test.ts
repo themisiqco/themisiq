@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildWorkings, calcLocation, calcInventory, analyzeCoverage, exclusiveEnd,
   isResolvedGridRegion, detectGridRegion, getResidualFactor, getGridFactor,
-  pickEF, calcGas, emptyLocation, findUnresolvedCoverage, findUndeclaredStreams, applyResolutions,
+  pickEF, calcGas, emptyLocation, findUnresolvedCoverage, findUndeclaredStreams, applyResolutions, pctEstimated,
   type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal, type StreamAttestation,
 } from './engine';
 import { buildMonthlyEmissions, reconcile } from './monthlyEmissions';
@@ -451,5 +451,71 @@ describe('GROUP I — coverage_resolutions persistence contract', () => {
     const withRes = buildWorkings([l], 'AR6', 2024, [extrapolateRes], 12);
     expect(ngRow(withRes)?.activity_data).toBe(1200);
     expect(withRes.find(r => r.gwp_basis === 'coverage_resolution')).toBeDefined();
+  });
+});
+
+// ── GROUP J — pctEstimated: estimation share weighted by EMISSIONS, not fuel count ──
+// SBTi permits estimation but requires transparency about it. pctEstimated is the
+// transparency figure: the share of Scope 1+2 tCO2e that is estimated (extrapolated
+// from partial bills), weighted by emissions. These pin the weighting and the
+// null-vs-zero contract (a wholly manual inventory has no evidence basis → null).
+describe('GROUP J — pctEstimated', () => {
+  const extrapolate = (fuelType: string, monthsCovered: number): CoverageResolution => ({
+    locId: 'L1', fuelType, kind: 'extrapolate', monthsCovered, pctEstimated: (12 - monthsCovered) / 12 * 100,
+    note: `${monthsCovered} of 12 months`, acknowledgedAt: '2024-06-01T00:00:00Z',
+  });
+  // A confirmed dated bill on the gas field → the location counts as concierge-read.
+  const gasBill = (value: number, periodEnd: string) =>
+    doc('utility_bill_gas', [prop({ fuelType: 'natural_gas', value, unit: 'mcf', periodStart: '2024-01-01', periodEnd })]);
+
+  it('J1 one fuel, 1/12 months extrapolated, sole emission source → ≈91.7% estimated', () => {
+    const l = loc({
+      has_natural_gas: true, natural_gas_amount: 1200, natural_gas_unit: 'mcf',
+      source_docs: [gasBill(100, '2024-01-31')], // 1 month evidenced, grossed ×12 into the 1200 field
+    });
+    // 11/12 of the sole fuel's emissions are estimated → 91.67%.
+    expect(pctEstimated([l], [extrapolate('natural_gas', 1)], 'AR6', 2024)).toBeCloseTo(91.67, 1);
+  });
+
+  it('J2 same 1/12 gas extrapolation, but electricity is 95% of tCO2e → estimation is SMALL (~4.6%), not 91.7% — weighting is by emissions, not fuel count', () => {
+    // Derive electricity_kwh from the engine so electricity is exactly 19× the gas emissions
+    // (gas = 5% of the S1+2 total). No hand-computed EFs → robust to factor-table changes.
+    const gasT = calcLocation(loc({ has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf' }), 'AR6', 2024).s1_total;
+    const gf = getGridFactor('US_AVG', 2024).ef; // resolved grid key (G1)
+    const kwh = (19 * gasT * 1000) / gf; // electricity tCO2e = kwh·gf/1000 = 19·gasT
+    const l = loc({
+      has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf',
+      grid_region: 'US_AVG', electricity_kwh: kwh,
+      source_docs: [gasBill(1000 / 12, '2024-01-31')],
+    });
+    const pct = pctEstimated([l], [extrapolate('natural_gas', 1)], 'AR6', 2024);
+    // (gasT × 11/12) / (20 × gasT) × 100 = (11/12)/20 × 100 ≈ 4.58 — NOT 91.7.
+    expect(pct).toBeCloseTo(4.58, 1);
+    expect(pct).toBeLessThan(10);
+  });
+
+  it('J3 fully evidenced 12/12 (no extrapolation) → 0% estimated', () => {
+    const l = loc({
+      has_natural_gas: true, natural_gas_amount: 1200, natural_gas_unit: 'mcf',
+      source_docs: [gasBill(1200, '2024-12-31')], // full-year bill, no resolution
+    });
+    expect(pctEstimated([l], [], 'AR6', 2024)).toBe(0);
+  });
+
+  it('J4 wholly manual inventory (no proposals, no resolutions) → null (an absence, not zero)', () => {
+    const l = loc({ has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf' }); // source_docs: []
+    expect(pctEstimated([l], [], 'AR6', 2024)).toBeNull();
+  });
+
+  it('J5 straddle "prorate" only, no extrapolate → 0% (proration allocates real metered data; it is not estimation)', () => {
+    const l = loc({
+      has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf',
+      source_docs: [gasBill(1000, '2024-12-31')],
+    });
+    const strad: CoverageResolution = {
+      locId: 'L1', fuelType: 'natural_gas', kind: 'straddle', straddleChoice: 'prorate',
+      daysInYear: 20, totalDays: 31, note: 'prorated', acknowledgedAt: '2024-06-01T00:00:00Z',
+    };
+    expect(pctEstimated([l], [strad], 'AR6', 2024)).toBe(0);
   });
 });

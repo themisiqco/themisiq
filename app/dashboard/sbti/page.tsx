@@ -776,6 +776,21 @@ export default function SbtiDashboard() {
                   One near-term target per selected scope. The reduction % is pre-filled with the SBTi ACA-suggested rate; edit any field and it re-validates live.
                 </p>
 
+                {/* Estimation disclosure — SBTi permits estimation where it is DISCLOSED, so we
+                    surface it (do NOT gate target-setting on it). Same amber treatment gwpConsistent
+                    carries on the trends page. baselinePctEstimated: this baseline's estimated share;
+                    estimationConsistent: whether the years being compared share one evidence basis. */}
+                {series && series.baselinePctEstimated != null && series.baselinePctEstimated > 0 && (
+                  <div style={{ background: '#FDF6EC', border: '0.5px solid #EAD9BE', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 12.5, color: '#8A5A12', lineHeight: 1.6 }}>
+                    Baseline includes <strong>{series.baselinePctEstimated.toFixed(1)}%</strong> estimated data (extrapolated from partial bills). SBTi permits estimation where it is disclosed.
+                  </div>
+                )}
+                {series && !series.estimationConsistent && (
+                  <div style={{ background: '#FDF6EC', border: '0.5px solid #EAD9BE', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 12.5, color: '#8A5A12', lineHeight: 1.6 }}>
+                    <span style={{ fontWeight: 600 }}>Evidence basis varies across years</span> — one or more reporting years include estimated data, so a year-over-year comparison may not be like-for-like.
+                  </div>
+                )}
+
                 {selectedScopes.length === 0 ? (
                   <div style={{ fontSize: 13, color: '#888784', fontWeight: 300 }}>No scopes selected — go back to Step 2 to choose scopes.</div>
                 ) : (

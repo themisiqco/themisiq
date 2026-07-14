@@ -25,6 +25,9 @@
  *     opts.baselineYearByCompanyId when target-setting designates one.
  *   - gwpConsistent flags whether every year shares one GWP basis — a cross-year
  *     comparison across mixed bases (e.g. legacy AR4 + new AR6) is not valid.
+ *   - estimationConsistent flags whether every year is fully evidenced — comparing a
+ *     partly-estimated baseline against a fully-evidenced year is not valid either.
+ *     baselinePctEstimated carries the baseline year's estimated share for disclosure.
  *   - Rows with a null company_id (pre-link / unlinked) are skipped — they can't
  *     be grouped by identity. Surface those separately in the UI if needed.
  */
@@ -41,6 +44,7 @@ export interface InventoryRow {
   revenue_millions?: number | null;
   employee_count?: number | null;
   gwp_version?: string | null;
+  pctEstimated?: number | null;     // share of S1+2 estimated (0-100); null = wholly manual / unknown
 }
 
 export interface SeriesYear {
@@ -60,6 +64,8 @@ export interface SeriesYear {
   vsBaselinePct: number | null;
   yoyPct: number | null;
   gwpVersion: string | null;
+  /** Share of this year's S1+2 tCO2e that is estimated (0-100); null = wholly manual / unknown. */
+  pctEstimated: number | null;
 }
 
 export interface CompanySeries {
@@ -70,6 +76,15 @@ export interface CompanySeries {
   years: SeriesYear[];               // ascending by year
   /** True if every year shares one gwp_version — required for a valid comparison. */
   gwpConsistent: boolean;
+  /** Estimated share (0-100) of the baseline year's S1+2; null = wholly manual / unknown. */
+  baselinePctEstimated: number | null;
+  /**
+   * True iff every year is fully evidenced (pctEstimated null or 0). Any year carrying
+   * estimation → false. Mirrors gwpConsistent in spirit: comparing a partly-estimated year
+   * against a fully-evidenced one is not a valid like-for-like comparison, just as comparing
+   * across mixed GWP bases is not. SBTi permits estimation; it requires it be disclosed.
+   */
+  estimationConsistent: boolean;
 }
 
 const num = (v: number | null | undefined): number | null =>
@@ -115,6 +130,14 @@ export function buildCompanySeries(
     const gwpConsistent =
       new Set(ordered.map((r) => r.gwp_version ?? "unknown")).size <= 1;
 
+    // estimationConsistent mirrors gwpConsistent: true iff every year is fully evidenced
+    // (pctEstimated null or 0). Any estimated year → false. Comparing a 25%-estimated baseline
+    // against a fully-evidenced current year is no more valid than comparing across GWP bases.
+    const estimationConsistent = ordered.every(
+      (r) => r.pctEstimated == null || r.pctEstimated === 0
+    );
+    const baselinePctEstimated = num(baselineRow.pctEstimated);
+
     const years: SeriesYear[] = ordered.map((r, i) => {
       const scope12Total = r.scope1_total + r.scope2_location_total;
       const scope3 = num(r.scope3_total);
@@ -146,6 +169,7 @@ export function buildCompanySeries(
             ? +(((scope12Total - prevTotal) / prevTotal) * 100).toFixed(1)
             : null,
         gwpVersion: r.gwp_version ?? null,
+        pctEstimated: num(r.pctEstimated),
       };
     });
 
@@ -156,6 +180,8 @@ export function buildCompanySeries(
       baselineScope12Total,
       years,
       gwpConsistent,
+      baselinePctEstimated,
+      estimationConsistent,
     });
   }
 

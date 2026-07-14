@@ -23,6 +23,12 @@ export interface LoadSeriesResult {
   series: CompanySeries[];
   /** Inventories dropped because they have no company_id (pre-link/unlinked). */
   skippedUnlinked: number;
+  /**
+   * Inventories dropped because scope1_total OR scope2_location_total is NULL.
+   * A null total is an ABSENCE ("no figure for this scope"), not zero — coercing
+   * it to 0 would let it anchor a trajectory as if a real measurement said zero.
+   */
+  skippedNoTotals: number;
   /** Set when the load failed (auth, embed/FK missing, network). series is []. */
   error: string | null;
 }
@@ -38,6 +44,7 @@ interface RawRow {
   revenue_millions: number | null;
   employee_count: number | null;
   gwp_version: string | null;
+  pct_estimated: number | null;
   // reverse embed: object when to-one detected, array otherwise, null when none
   scope3_inventories:
     | { total_scope3_tco2e: number | null }
@@ -47,13 +54,14 @@ interface RawRow {
 
 const SELECT =
   "company_id, company_name, reporting_year, scope1_total, scope2_location_total, " +
-  "scope2_market_total, revenue_millions, employee_count, gwp_version, " +
+  "scope2_market_total, revenue_millions, employee_count, gwp_version, pct_estimated, " +
   "scope3_inventories(total_scope3_tco2e)";
 
 export async function loadCompanySeries(): Promise<LoadSeriesResult> {
   const empty = (error: string | null): LoadSeriesResult => ({
     series: [],
     skippedUnlinked: 0,
+    skippedNoTotals: 0,
     error,
   });
 
@@ -75,29 +83,39 @@ export async function loadCompanySeries(): Promise<LoadSeriesResult> {
     const rows = (data ?? []) as unknown as RawRow[];
 
     let skippedUnlinked = 0;
-    const mapped: InventoryRow[] = rows.map((r) => {
+    let skippedNoTotals = 0;
+    const mapped: InventoryRow[] = [];
+    for (const r of rows) {
+      // A NULL Scope 1 OR Scope 2 total is an ABSENCE, not zero. Skip the row entirely rather than
+      // coerce ?? 0 — a coerced zero would enter the series as a real figure and anchor a trajectory.
+      if (r.scope1_total == null || r.scope2_location_total == null) {
+        skippedNoTotals++;
+        continue;
+      }
       if (!r.company_id) skippedUnlinked++;
       // unwrap the Scope 3 embed: object OR array OR null
       const s3 = Array.isArray(r.scope3_inventories)
         ? r.scope3_inventories[0]
         : r.scope3_inventories;
-      return {
+      mapped.push({
         company_id: r.company_id,
         company_name: r.company_name ?? "",
         reporting_year: r.reporting_year,
-        scope1_total: r.scope1_total ?? 0,
-        scope2_location_total: r.scope2_location_total ?? 0,
+        scope1_total: r.scope1_total,
+        scope2_location_total: r.scope2_location_total,
         scope2_market_total: r.scope2_market_total,
         scope3_total: s3?.total_scope3_tco2e ?? null,
         revenue_millions: r.revenue_millions,
         employee_count: r.employee_count,
         gwp_version: r.gwp_version,
-      };
-    });
+        pctEstimated: r.pct_estimated, // map straight through; null = wholly manual, NOT 0
+      });
+    }
 
     return {
       series: buildCompanySeries(mapped),
       skippedUnlinked,
+      skippedNoTotals,
       error: null,
     };
   } catch (e) {
