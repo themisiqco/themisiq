@@ -13,8 +13,15 @@
  *
  * Concierge extracts only: electricity, natural_gas, diesel, propane, gasoline.
  * No fuel oil / steam / refrigerant (manual-only) -> those produce no monthly
- * rows. So reconciliation is "monthly sum ~= annual scope total FOR CONCIERGE-
- * COVERED FUELS", never strict equality across all fuels.
+ * rows.
+ *
+ * MONTHLY IS EVIDENCED-ONLY, BY DESIGN. A monthly slice carries a DATE, so it may
+ * only represent consumption a bill actually supports. When an annual figure is
+ * grossed up for a coverage gap (e.g. 9 bills × 12/9), monthly does NOT mirror the
+ * gross-up: distributing an estimated quantity across the uncovered months and
+ * stamping it Oct/Nov/Dec would assert consumption no bill supports — fabrication
+ * with a timestamp. So on a 9/12 inventory monthly sums to 9/12 of annual. That
+ * divergence is CORRECT and is exactly what `reconcile` (below) models and explains.
  *
  * Skips any proposal that is not status==='confirmed', or has value==null, or
  * has null/unparseable dates, or whose unit doesn't map to an EF key (skip +
@@ -22,6 +29,7 @@
  */
 
 import { parseLocalDate, exclusiveEnd } from "./engine";
+import type { CoverageResolution } from "./engine";
 
 export type GwpVersion = "AR4" | "AR5" | "AR6";
 
@@ -227,18 +235,84 @@ export function buildMonthlyEmissions(
   return { slices, skipped };
 }
 
-/**
- * Reconciliation helper (trust feature). Sums monthly tco2e by scope for a given
- * reporting year. Caller compares to the annual scope*_total FOR CONCIERGE-
- * COVERED FUELS — they should match within rounding/straddle tolerance. Bills
- * that straddle into an adjacent year are attributed to the month/year they fall
- * in, so a clean single-year set sums to that year.
- */
-export function reconcileByScope(slices: MonthlySlice[], year: number): { scope1: number; scope2: number } {
+/** Sum evidenced monthly tco2e by scope for a reporting year. Private — the old exported
+ * `reconcileByScope` claimed the sum "should match the annual scope total within tolerance",
+ * which is FALSE whenever an extrapolation is on file (see the module header). `reconcile`
+ * below replaces that false equality with a completeness report that models the divergence. */
+function sumByScope(slices: MonthlySlice[], year: number): { scope1: number; scope2: number } {
   let scope1 = 0, scope2 = 0;
   for (const s of slices) {
     if (s.reporting_year !== year) continue;
     if (s.scope === 1) scope1 += s.tco2e; else scope2 += s.tco2e;
   }
   return { scope1: +scope1.toFixed(4), scope2: +scope2.toFixed(4) };
+}
+
+/**
+ * Completeness report reconciling evidenced monthly slices against the annual engine's figure.
+ * NOT an equality check — monthly is evidenced-only and annual is evidenced + estimated, so on any
+ * extrapolated inventory they legitimately differ. This models that expected divergence and reports
+ * only the REMAINING difference: a non-zero `unexplained_delta` is a genuine defect the trust check
+ * can finally fire on.
+ */
+export interface ReconciliationReport {
+  scope1_evidenced: number;      // Σ monthly slices, scope 1, for `year`
+  scope2_evidenced: number;      // Σ monthly slices, scope 2, for `year`
+  scope1_annual: number;         // annual engine's Scope-1 figure (passed in)
+  scope2_annual: number;         // annual engine's Scope-2 (location) figure (passed in)
+  months_evidenced: number;      // distinct period_month values present in the year's slices
+  months_in_period: number;      // 12, or the fiscal window's month count
+  pct_estimated: number;         // (annual − evidenced) / annual, as a percentage
+  reconciles: boolean;           // TRUE iff the delta is fully explained by extrapolations on file
+  unexplained_delta: number;     // (annual − evidenced) − Σ(expected gross-up). NON-ZERO ⇒ real bug.
+  summary: string;
+}
+
+export function reconcile(
+  slices: MonthlySlice[],
+  year: number,
+  annual: { s1_total: number; s2_location: number },
+  resolutions: CoverageResolution[],
+  monthsInPeriod: number = 12
+): ReconciliationReport {
+  const { scope1: scope1_evidenced, scope2: scope2_evidenced } = sumByScope(slices, year);
+  const yearSlices = slices.filter(s => s.reporting_year === year);
+
+  // Expected gross-up: the estimated (non-evidenced) portion the ANNUAL engine added for each
+  // extrapolate resolution. applyResolutions grosses a fuel ×12/monthsCovered from its evidenced
+  // bills, so annual_fuel = evidenced_fuel × 12/monthsCovered, and the estimated portion is
+  //   annual_fuel × (1 − monthsCovered/12) = evidenced_fuel × (12 − monthsCovered)/monthsCovered.
+  // We derive it from evidenced (the caller passes only aggregate annual, not per-fuel) — identical
+  // by construction to the annual gross-up. A resolution is matched to its slices by fuel_type.
+  let expected1 = 0, expected2 = 0;
+  for (const r of resolutions) {
+    if (r.kind !== "extrapolate" || !r.monthsCovered || r.monthsCovered <= 0 || r.monthsCovered >= 12) continue;
+    const fuelSlices = yearSlices.filter(s => s.fuel_type === r.fuelType);
+    if (fuelSlices.length === 0) continue; // nothing evidenced for this fuel → nothing to gross up
+    const evidencedFuel = fuelSlices.reduce((a, s) => a + s.tco2e, 0);
+    const grossUp = evidencedFuel * (12 - r.monthsCovered) / r.monthsCovered;
+    if (fuelSlices[0].scope === 2) expected2 += grossUp; else expected1 += grossUp;
+  }
+
+  const annualTotal = annual.s1_total + annual.s2_location;
+  const evidencedTotal = scope1_evidenced + scope2_evidenced;
+  const expectedTotal = expected1 + expected2;
+  const unexplained_delta = +((annualTotal - evidencedTotal) - expectedTotal).toFixed(4);
+  const reconciles = Math.abs(unexplained_delta) < 0.01; // rounding tolerance
+
+  const months_evidenced = new Set(yearSlices.map(s => s.period_month)).size;
+  const pct_estimated = annualTotal > 0
+    ? +(((annualTotal - evidencedTotal) / annualTotal) * 100).toFixed(1)
+    : 0;
+
+  const summary = reconciles
+    ? `Monthly evidences ${months_evidenced} of ${monthsInPeriod} months. Annual includes ${monthsInPeriod - months_evidenced} estimated month(s) (${pct_estimated}%).`
+    : `⚠ Unexplained difference of ${unexplained_delta} mtCO₂e between monthly and annual. This is not accounted for by any acknowledged coverage gap.`;
+
+  return {
+    scope1_evidenced, scope2_evidenced,
+    scope1_annual: annual.s1_total, scope2_annual: annual.s2_location,
+    months_evidenced, months_in_period: monthsInPeriod,
+    pct_estimated, reconciles, unexplained_delta, summary,
+  };
 }

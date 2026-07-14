@@ -17,7 +17,7 @@ import {
   pickEF, calcGas, emptyLocation, findUnresolvedCoverage, findUndeclaredStreams,
   type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal, type StreamAttestation,
 } from './engine';
-import { buildMonthlyEmissions, reconcileByScope } from './monthlyEmissions';
+import { buildMonthlyEmissions, reconcile } from './monthlyEmissions';
 
 // ── fixture builders ─────────────────────────────────────────────────────────
 const loc = (o: Partial<Location> = {}): Location => ({ ...emptyLocation('L1', 'Test Site'), ...o });
@@ -279,8 +279,13 @@ describe('GROUP E — NZ T&D losses (Scope 3 Cat 3)', () => {
 });
 
 // ── GROUP F — Monthly vs annual reconciliation [SEV 1] ────────────────────────
-describe('GROUP F — monthly/annual divergence under extrapolation', () => {
-  it("F1 with a 9/12 extrapolation (annual grossed ×12/9, monthly reads raw bills) reconcileByScope must equal the annual Scope-1 total (it does NOT today — pins the divergence)", () => {
+// CONTRACT (Lisa, confirmed): the monthly/annual divergence is CORRECT. Monthly is evidenced-only;
+// annual is evidenced + estimated. `reconcile` must MODEL that divergence and fire only on the
+// UNEXPLAINED remainder — the reconciler finally becomes a trust check that can catch a real defect.
+describe('GROUP F — monthly/annual reconciliation models the (correct) divergence', () => {
+  const deps = { calcGas, pickEF, getGridFactor, isResolvedGridRegion };
+
+  it("F1a a 9/12 extrapolated inventory reconciles: the annual gross-up fully explains the monthly shortfall", () => {
     // Annual field is grossed up to 1200 (= 900 × 12/9); the confirmed bill on file is the raw 900.
     const l = loc({
       has_natural_gas: true, natural_gas_amount: 1200, natural_gas_unit: 'mcf',
@@ -288,12 +293,49 @@ describe('GROUP F — monthly/annual divergence under extrapolation', () => {
         fuelType: 'natural_gas', value: 900, unit: 'mcf', periodStart: '2024-01-01', periodEnd: '2024-09-30',
       })])],
     });
-    const annual = calcInventory([l], 'AR6', 2024).s1_total;
-    const deps = { calcGas, pickEF, getGridFactor, isResolvedGridRegion };
-    const monthly = reconcileByScope(buildMonthlyEmissions([l], 2024, deps, 'AR6').slices, 2024).scope1;
-    // Documented delta: monthly ≈ annual × 9/12 (monthly = evidenced only; annual = evidenced + estimated).
-    // Lisa must choose the contract (a: divergence-is-correct, or b: mirror the gross-up) — this pins today.
-    expect(monthly).toBeCloseTo(annual, 3); // RED: monthly is ~0.75× annual
+    const annual = calcInventory([l], 'AR6', 2024);
+    const res: CoverageResolution = {
+      locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate', monthsCovered: 9, pctEstimated: 25,
+      note: '9 of 12 months; grossed ×12/9', acknowledgedAt: '2024-06-01T00:00:00Z',
+    };
+    const slices = buildMonthlyEmissions([l], 2024, deps, 'AR6').slices;
+    const r = reconcile(slices, 2024, annual, [res]);
+    expect(r.reconciles).toBe(true);
+    expect(r.months_evidenced).toBe(9);
+    expect(r.pct_estimated).toBeCloseTo(25, 1);
+    expect(r.unexplained_delta).toBeCloseTo(0, 2); // ≈ 0; reconciles===true already pins |Δ| < 0.01
+  });
+
+  it("F1b a fully-evidenced 12/12 inventory (no resolutions) reconciles with 0% estimated", () => {
+    const l = loc({
+      has_natural_gas: true, natural_gas_amount: 1200, natural_gas_unit: 'mcf',
+      source_docs: [doc('utility_bill_gas', [prop({
+        fuelType: 'natural_gas', value: 1200, unit: 'mcf', periodStart: '2024-01-01', periodEnd: '2024-12-31',
+      })])],
+    });
+    const annual = calcInventory([l], 'AR6', 2024);
+    const slices = buildMonthlyEmissions([l], 2024, deps, 'AR6').slices;
+    const r = reconcile(slices, 2024, annual, []);
+    expect(r.reconciles).toBe(true);
+    expect(r.pct_estimated).toBeCloseTo(0, 2);
+    expect(r.scope1_evidenced).toBeCloseTo(annual.s1_total, 2); // evidenced ≈ annual (no gross-up)
+    expect(r.months_evidenced).toBe(12);
+  });
+
+  it("F1c a REAL defect — annual figure exceeds the bills with NO resolution to explain it — does NOT reconcile", () => {
+    // natural_gas_amount 2000 but the only bill is 900 (Jan–Sep) and NO extrapolate resolution on file.
+    // The 1100-worth of annual excess is explained by nothing → the reconciler must fire.
+    const l = loc({
+      has_natural_gas: true, natural_gas_amount: 2000, natural_gas_unit: 'mcf',
+      source_docs: [doc('utility_bill_gas', [prop({
+        fuelType: 'natural_gas', value: 900, unit: 'mcf', periodStart: '2024-01-01', periodEnd: '2024-09-30',
+      })])],
+    });
+    const annual = calcInventory([l], 'AR6', 2024);
+    const slices = buildMonthlyEmissions([l], 2024, deps, 'AR6').slices;
+    const r = reconcile(slices, 2024, annual, []); // no resolution — the excess is unexplained
+    expect(r.reconciles).toBe(false);
+    expect(Math.abs(r.unexplained_delta)).toBeGreaterThan(0.01);
   });
 });
 
