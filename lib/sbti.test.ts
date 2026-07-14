@@ -2,7 +2,7 @@
 // Engine tests — step 1: categorize() only. Assertions read thresholds from params
 // (not hardcoded), so a §12 criteria change to params re-points them automatically.
 import { describe, it, expect } from 'vitest';
-import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, progressStatus, progressForTarget, scopeActualField, trajectoryPointForYear, requiredScope3Categories, cycleState, flagTargetApplicability, validateFlagTargetConfig, type TargetConfig, type SbtiProfile, type FlagTargetConfig } from './sbti';
+import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, progressStatus, progressForTarget, scopeActualField, trajectoryPointForYear, requiredScope3Categories, cycleState, flagTargetApplicability, validateFlagTargetConfig, resolveCommittedBaseline, baseYearDrift, baseYearDriftForSeries, type TargetConfig, type SbtiProfile, type FlagTargetConfig } from './sbti';
 import { CATEGORY_A_THRESHOLDS as T, NET_ZERO, ELEC_GROWTH_ABSOLUTE_THRESHOLD_PCT, ACA, SCOPE3_SIGNIFICANCE_PCT } from './sbti/params';
 
 describe('categorize — Route 1 (any country)', () => {
@@ -648,5 +648,105 @@ describe('validateFlagTargetConfig — SBTi FLAG v1.2 (FLAG-1)', () => {
     expect(r.ok).toBe(false);
     expect(r.reasons.some(x => /Scope-1 coverage 90% is below the required 95%/.test(x))).toBe(true);
     expect(r.reasons.some(x => /Scope-3 coverage 60% is below the required 67%/.test(x))).toBe(true);
+  });
+});
+
+// ── GROUP K — base-year frozen at commit; drift surfaced, not absorbed ─────────
+// A committed target's base-year emissions are FROZEN at commit. The live inventory can
+// move afterwards (a corrected bill), but the target must keep grading against its frozen
+// baseline and DISCLOSE the drift — never silently re-anchor. Modelled on the real Acme
+// case: stored 86.4 (Scope 1) vs a live series that has since dropped to 24.1.
+describe('GROUP K — base-year frozen at commit + drift', () => {
+  const STORED = 86.3973962764; // Acme's saved base_year_emissions_tco2e (Scope 1)
+  const LIVE = 24.1;            // what the edited inventory now reports for that base year
+
+  it('K1 a saved target grades against the STORED 86.4, not the live 24.1', () => {
+    // resolveCommittedBaseline picks the frozen value when one is stored.
+    const baseEmissions = resolveCommittedBaseline(STORED, LIVE);
+    expect(baseEmissions).toBe(STORED);
+    // required(2027) with a 2022→2032, 50% path: base × (1 − 50·0.5/100) = base × 0.75.
+    const prog = progressForTarget({
+      baseYear: 2022, baseEmissions: baseEmissions!, targetYear: 2032, reductionPct: 50,
+      method: 'absolute_aca', scope: 's1', assessedYear: 2027, actual: null, effortEvidence: false,
+    });
+    expect(prog.requiredEmissions).toBeCloseTo(STORED * 0.75, 6);   // 64.80 — anchored to 86.4
+    // …and decidedly NOT what a 24.1 baseline would have required (18.08). The two must differ.
+    expect(prog.requiredEmissions).not.toBeCloseTo(LIVE * 0.75, 1); // 18.08
+  });
+
+  it('K2 drift detection: stored 86.4 vs live 24.1 → flagged (|Δ| ≫ 0.5%)', () => {
+    const drift = baseYearDrift(STORED, LIVE);
+    expect(drift).not.toBeNull();
+    expect(drift!.stored).toBe(STORED);
+    expect(drift!.live).toBe(LIVE);
+    expect(Math.abs(drift!.pct)).toBeGreaterThan(0.5);
+    expect(drift!.pct).toBeLessThan(0); // live < stored → negative change
+  });
+
+  it('K3 within tolerance: stored 86.4 vs live 86.42 → NOT flagged (≤ 0.5%)', () => {
+    // (86.42 − 86.4)/86.4 × 100 ≈ 0.023% — a rounding-level change, not a restatement.
+    expect(baseYearDrift(86.4, 86.42)).toBeNull();
+  });
+
+  it('K4 no saved target (nothing stored) → resolveCommittedBaseline falls back to the live series value', () => {
+    expect(resolveCommittedBaseline(null, LIVE)).toBe(LIVE);
+    expect(resolveCommittedBaseline(undefined, LIVE)).toBe(LIVE);
+    // and with nothing stored there is no committed baseline to drift from.
+    expect(baseYearDrift(null, LIVE)).toBeNull();
+  });
+
+  it('K5 a stored 0 baseline is respected (not coerced) and yields no drift %', () => {
+    expect(resolveCommittedBaseline(0, LIVE)).toBe(0);   // ?? keeps 0, never falls through to live
+    expect(baseYearDrift(0, LIVE)).toBeNull();            // no meaningful % change off a zero baseline
+  });
+});
+
+// ── GROUP L — drift compares the target's OWN base year; drifted baseline blocks the grade ──
+describe('GROUP L — drift year-selection + baseline_review', () => {
+  it('L1 compares against the target base-year row, NOT a later year — a decarbonising company is not told its baseline broke', () => {
+    // Target base 2022 (stored 100). Series has 2022 (=100, matches) AND 2024 (=60, 40% lower).
+    // Drift must read the 2022 row → within tolerance → NO drift. The 2024 drop is a real
+    // reduction, not a baseline restatement.
+    const drift = baseYearDriftForSeries(100, 2022, [
+      { year: 2022, emissions: 100 },
+      { year: 2024, emissions: 60 },
+    ]);
+    expect(drift).toBeNull();
+    // Proof it read 2022, not 2024: reading the 2024 figure WOULD have flagged a -40% drift.
+    expect(baseYearDrift(100, 60)).not.toBeNull();
+  });
+
+  it('L2 no row for the target base year → NO comparison, null (never a fabricated one)', () => {
+    // Base 2022, but the series has no 2022 row — only 2024, which would drift if wrongly used.
+    const drift = baseYearDriftForSeries(100, 2022, [{ year: 2024, emissions: 60 }]);
+    expect(drift).toBeNull();
+  });
+
+  it('L2b a matching row with real divergence IS flagged (the Acme case: 86.4 → 21 at the base year)', () => {
+    const drift = baseYearDriftForSeries(86.4, 2025, [{ year: 2025, emissions: 21 }]);
+    expect(drift).not.toBeNull();
+    expect(drift!.stored).toBe(86.4);
+    expect(drift!.live).toBe(21);
+    expect(drift!.pct).toBeLessThan(0);
+  });
+
+  // Shared graded case: 2020→2030, base 1000, 50% → required(2025) = 750. actual 700 is UNDER.
+  const graded = {
+    baseYear: 2020, baseEmissions: 1000, targetYear: 2030, reductionPct: 50,
+    method: 'absolute_aca' as const, scope: 's1' as const, assessedYear: 2025, effortEvidence: false,
+  };
+
+  it("L3 baselineDrifted true → 'baseline_review' even when the actual is comfortably under the line", () => {
+    const r = progressForTarget({ ...graded, actual: 700, baselineDrifted: true });
+    expect(r.status).toBe('baseline_review');       // NOT on_track, though 700 < 750
+    expect(r.requiredEmissions).toBeCloseTo(750);   // trajectory still computed for the chart
+    expect(r.actualEmissions).toBe(700);            // actual still reported, just not graded
+  });
+
+  it('L4 baselineDrifted false/omitted → existing grading unchanged (all statuses reachable)', () => {
+    expect(progressForTarget({ ...graded, actual: 700, baselineDrifted: false }).status).toBe('on_track');
+    expect(progressForTarget({ ...graded, actual: 800 }).status).toBe('off_track'); // omitted → undefined → false
+    expect(progressForTarget({ ...graded, actual: 800, effortEvidence: true }).status).toBe('best_efforts');
+    expect(progressForTarget({ ...graded, actual: null }).status).toBe('no_actual');
   });
 });

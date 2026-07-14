@@ -5,7 +5,7 @@ import Nav from '../../components/Nav'
 import { supabase } from '../../../lib/supabase'
 import { useEntitlement } from '../../../lib/useEntitlement'
 import PaywallCard from '../../components/PaywallCard'
-import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, progressForTarget, scopeActualField, type CategoryResult, type Scope, type TargetConfig, type TargetProgress, type Point } from '../../../lib/sbti'
+import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, progressForTarget, scopeActualField, resolveCommittedBaseline, baseYearDriftForSeries, type CategoryResult, type Scope, type TargetConfig, type TargetProgress, type Point } from '../../../lib/sbti'
 import { loadCompanySeries } from '../../../lib/ghg/loadSeries'
 import type { CompanySeries, SeriesYear } from '../../../lib/ghg/series'
 import { VERSION_DATES, NET_ZERO } from '../../../lib/sbti/params'
@@ -57,7 +57,10 @@ const SCOPE_LABEL: Record<Scope, string> = {
 const SCOPE_ORDER: Scope[] = ['s1', 's2_location', 's3']
 
 // Step 3 (near-term target cards) helpers.
-type Draft = { baseYear: number; targetYear: number; reductionPct: number }
+// storedBaseEmissions: the FROZEN base_year_emissions_tco2e loaded from a committed target.
+// undefined/null for a brand-new (not-yet-saved) draft — such a draft grades against the live
+// series until it is committed. A committed target's baseline never re-anchors to the inventory.
+type Draft = { baseYear: number; targetYear: number; reductionPct: number; storedBaseEmissions?: number | null }
 const round1 = (n: number): number => Math.round(n * 10) / 10
 // ACA rate bucket: S1 and S2 both use 's1s2' (shared RATE only — never merges emissions); S3 uses 's3'.
 const bucketFor = (sc: Scope): 's1s2' | 's3' => (sc === 's3' ? 's3' : 's1s2')
@@ -101,12 +104,15 @@ function latestActualYear(years: SeriesYear[], sc: Scope): number | null {
 }
 
 // Progress / long-term badge palette (matches the existing token set).
-const PILL: Record<'on_track' | 'off_track' | 'best_efforts' | 'no_actual' | 'long_term', { label: string; color: string; bg: string }> = {
-  on_track:     { label: 'On track',         color: '#0F6E56', bg: '#ECFDF5' },
-  off_track:    { label: 'Off track',        color: '#B91C1C', bg: '#FEF2F2' },
-  best_efforts: { label: 'Best efforts',     color: '#92600A', bg: '#FEF3C7' },
-  no_actual:    { label: 'No actuals yet',   color: '#555553', bg: '#f8f7f5' },
-  long_term:    { label: 'Long-term target', color: '#555553', bg: '#f3f0ff' },
+const PILL: Record<'on_track' | 'off_track' | 'best_efforts' | 'no_actual' | 'baseline_review' | 'long_term', { label: string; color: string; bg: string }> = {
+  on_track:        { label: 'On track',         color: '#0F6E56', bg: '#ECFDF5' },
+  off_track:       { label: 'Off track',        color: '#B91C1C', bg: '#FEF2F2' },
+  best_efforts:    { label: 'Best efforts',     color: '#92600A', bg: '#FEF3C7' },
+  no_actual:       { label: 'No actuals yet',   color: '#555553', bg: '#f8f7f5' },
+  // Base year materially changed since commitment — neither pass nor fail; the grade cannot be
+  // computed until the user assesses recalculation. Amber, tied to the drift note beneath it.
+  baseline_review: { label: 'Review baseline',  color: '#8A5A12', bg: '#FDF6EC' },
+  long_term:       { label: 'Long-term target', color: '#555553', bg: '#f3f0ff' },
 }
 const pillStyle = (k: keyof typeof PILL): React.CSSProperties => ({
   fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
@@ -176,7 +182,9 @@ export default function SbtiDashboard() {
       if (cancelled) return
       // NOTE: single-company assumption — pins to the first series. Multi-company accounts
       // need a company picker here (backlogged) before this screen is safe for >1 company.
-      const series = res.series[0] ?? null   // first / most-recent company series
+      // buildCompanySeries sorts by company NAME, so series[0] is the ALPHABETICALLY-FIRST
+      // company (e.g. "Acme…" always wins) — NOT the most recent one the user navigated from.
+      const series = res.series[0] ?? null
       if (!series) { setLoading(false); return } // no inventory → empty state below
 
       setCompanyId(series.companyId)
@@ -208,7 +216,7 @@ export default function SbtiDashboard() {
       // the rendered scopes are the union of (saved rows) ∪ (Step-2 selection).
       const { data: targetRows } = await supabase
         .from('sbti_targets')
-        .select('scope, base_year, target_year, reduction_pct')
+        .select('scope, base_year, target_year, reduction_pct, base_year_emissions_tco2e')
         .eq('company_id', series.companyId)
         .eq('target_type', 'near_term')
       if (cancelled) return
@@ -221,6 +229,7 @@ export default function SbtiDashboard() {
             baseYear: row.base_year ?? (series.baselineYear ?? 2022),
             targetYear: row.target_year ?? 2035,
             reductionPct: row.reduction_pct ?? 0,
+            storedBaseEmissions: row.base_year_emissions_tco2e ?? null, // FROZEN baseline; grading reads this, not the live series
           }
           savedScopes.push(sc)
         }
@@ -233,7 +242,7 @@ export default function SbtiDashboard() {
       // defaults (the net-zero lazy-init effect only fills MISSING drafts, so these survive).
       const { data: nzRows } = await supabase
         .from('sbti_targets')
-        .select('scope, base_year, target_year, reduction_pct')
+        .select('scope, base_year, target_year, reduction_pct, base_year_emissions_tco2e')
         .eq('company_id', series.companyId)
         .eq('target_type', 'net_zero')
       if (cancelled) return
@@ -244,6 +253,7 @@ export default function SbtiDashboard() {
             baseYear: row.base_year ?? (series.baselineYear ?? 2022),
             targetYear: row.target_year ?? NET_ZERO.latestNetZeroYear,
             reductionPct: row.reduction_pct ?? NET_ZERO.minAbsoluteReductionPct,
+            storedBaseEmissions: row.base_year_emissions_tco2e ?? null, // FROZEN baseline (net-zero row's own frozen value)
           }
         }
         setNetZeroDrafts(prev => ({ ...prev, ...seededNz })) // saved values overwrite the 90/2050 default
@@ -319,8 +329,16 @@ export default function SbtiDashboard() {
     })
   }, [selectedScopes, baselineYear])
 
-  // Baseline emissions for a scope (S1/S2 separate; combined = S1+S2 sum for V1.3.1).
-  const baseEmissionsFor = (sc: Scope): number | null => {
+  // Baseline emissions for a scope — TWO sources, deliberately kept apart (S1/S2 separate;
+  // combined = S1+S2 sum for V1.3.1). Collapsing them was the SEV-0 bug: a committed target
+  // silently re-anchored to the live inventory whenever the inventory was edited.
+  //
+  //  - baselineForDrafting: the LIVE GHG series baseline. Correct while the user is CHOOSING a
+  //    baseline for a new target (Step 3 / Step 4 drafting UI).
+  //  - baselineForCommitted: the STORED, frozen base_year_emissions_tco2e of a committed target.
+  //    Correct when GRADING against a commitment (progress view) and when persisting (freeze at
+  //    commit). Falls back to the live baseline ONLY when nothing is stored yet (new draft).
+  const baselineForDrafting = (sc: Scope): number | null => {
     if (!baselineByScope) return null
     switch (sc) {
       case 's1': return baselineByScope.scope1
@@ -328,6 +346,35 @@ export default function SbtiDashboard() {
       case 's3': return baselineByScope.scope3
       case 's1s2_combined': return baselineByScope.scope1 + baselineByScope.scope2Location
     }
+  }
+  const baselineForCommitted = (sc: Scope, draft: Draft | undefined): number | null =>
+    resolveCommittedBaseline(draft?.storedBaseEmissions, baselineForDrafting(sc))
+
+  // Drift is a LIKE-FOR-LIKE comparison: the target's frozen base-year figure vs what the live
+  // inventory NOW reports for THAT SAME base year — never against a different year. Look up the
+  // live row for the target's own baseYear:
+  //   - row found   → compare stored vs that year's figure for this scope (real drift).
+  //   - row MISSING → no inventory exists for the base year → NO comparison is possible → null.
+  // The missing-row branch is load-bearing: absence of a comparison is not evidence of drift. A
+  // decarbonising company (2022 base, 2024 series baseline) must NOT be told its 2022 baseline
+  // "drifted" just because 2024 is lower — that would compare two different years' emissions.
+  const driftFor = (sc: Scope, draft: Draft) => {
+    const liveByYear = (series?.years ?? []).map(y => ({ year: y.year, emissions: y[scopeActualField(sc)] ?? null }))
+    return baseYearDriftForSeries(draft.storedBaseEmissions, draft.baseYear, liveByYear)
+  }
+
+  // FIX 3 — drift disclosure. When the frozen baseline and the live base-year figure diverge
+  // beyond 0.5%, tell the user (SBTi requires base-year recalculation to be assessed and
+  // disclosed) — but DO NOT auto-update the target; the frozen number stays.
+  const driftNote = (sc: Scope, draft: Draft) => {
+    const drift = driftFor(sc, draft)
+    if (!drift) return null
+    const fmt = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 1 })
+    return (
+      <div style={{ background: '#FDF6EC', border: '0.5px solid #EAD9BE', borderRadius: 8, padding: '10px 14px', marginBottom: 10, fontSize: 12.5, color: '#8A5A12', lineHeight: 1.6 }}>
+        Your {draft.baseYear} inventory has changed since this target was set ({fmt(drift.stored)} → {fmt(drift.live)} tCO₂e, a {drift.pct > 0 ? '+' : ''}{drift.pct.toFixed(1)}% change). SBTi requires base-year recalculation to be assessed and disclosed. This target is still anchored to its original baseline.
+      </div>
+    )
   }
   const updateDraft = (sc: Scope, field: keyof Draft, value: number) => {
     setTargetDrafts(prev => {
@@ -348,7 +395,7 @@ export default function SbtiDashboard() {
   // derived REACTIVELY from current state. Reflects in-session Step-3 saves/edits without a reload,
   // and the DB-load path too (the load seeds both selectedScopes and targetDrafts).
   const nearTermTargetScopes = useMemo(
-    () => selectedScopes.filter(sc => targetDrafts[sc] && !(sc === 's3' && baseEmissionsFor(sc) === null)),
+    () => selectedScopes.filter(sc => targetDrafts[sc] && !(sc === 's3' && baselineForCommitted(sc, targetDrafts[sc]) === null)),
     [selectedScopes, targetDrafts, baselineByScope],
   )
 
@@ -406,7 +453,7 @@ export default function SbtiDashboard() {
 
     // Cards to save: selected scopes WITH a draft, excluding the S3 routing card (no base data).
     const cards = selectedScopes
-      .filter(sc => targetDrafts[sc] && !(sc === 's3' && baseEmissionsFor(sc) === null))
+      .filter(sc => targetDrafts[sc] && !(sc === 's3' && baselineForCommitted(sc, targetDrafts[sc]) === null))
       .map(sc => ({ sc, d: targetDrafts[sc]! }))
 
     // Gate: every card must pass validation — name the invalid scope(s) and block.
@@ -437,7 +484,10 @@ export default function SbtiDashboard() {
         s3_category: null, // total-S3 near-term target; no specific category in this step
         method: 'absolute_aca',
         base_year: d.baseYear,
-        base_year_emissions_tco2e: baseEmissionsFor(sc),
+        // Freeze at commit: preserve the stored baseline on re-save; capture the live one only
+        // on first save (storedBaseEmissions still null then → falls back to live). An inventory
+        // edit never restates a committed target here.
+        base_year_emissions_tco2e: baselineForCommitted(sc, d),
         target_year: d.targetYear,
         reduction_pct: d.reductionPct,
         updated_at: now,
@@ -483,7 +533,7 @@ export default function SbtiDashboard() {
         s3_category: null,
         method: 'absolute_aca',
         base_year: d.baseYear,
-        base_year_emissions_tco2e: baseEmissionsFor(sc),
+        base_year_emissions_tco2e: baselineForCommitted(sc, d), // freeze at commit (net-zero row's own frozen value)
         target_year: d.targetYear,
         reduction_pct: d.reductionPct,
         updated_at: now,
@@ -496,7 +546,7 @@ export default function SbtiDashboard() {
   }
 
   // ─── Read-only progress summary (defined here so it closes over series / targetDrafts /
-  // netZeroDrafts / baseEmissionsFor / nearTermTargetScopes — avoids threading ~5 props;
+  // netZeroDrafts / baselineForCommitted / nearTermTargetScopes — avoids threading ~5 props;
   // it is stateless & read-only, so the define-inside render-identity concern is moot).
   // NOT rendered from the top-level return yet — 3d wires the summary-vs-wizard fork. ───
   function SbtiSummary({ onEdit }: { onEdit: () => void }) {
@@ -539,8 +589,8 @@ export default function SbtiDashboard() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: netZero.length > 0 ? 28 : 0 }}>
             {nearTerm.map(sc => {
               const d = targetDrafts[sc]
-              const base = baseEmissionsFor(sc)
               if (!d) return null
+              const base = baselineForCommitted(sc, d) // grade against the FROZEN baseline, not the live inventory
               if (base == null) return mutedCard(sc, 'No baseline emissions for this scope.')
               const traj = computeTrajectory({ baseYear: d.baseYear, baseEmissions: base, targetYear: d.targetYear, reductionPct: d.reductionPct, method: 'absolute_aca' })
               if (traj.length === 0) return mutedCard(sc, 'Trajectory unavailable for this target.')
@@ -548,6 +598,9 @@ export default function SbtiDashboard() {
               // BADGE: grade the latest actual against the required line — but ONLY when that actual year
               // falls within the target's [baseYear, targetYear] span (progressForTarget/trajectoryPointForYear
               // throw for an out-of-range year). Otherwise treat as no_actual — show the path, not a verdict.
+              // A drifted baseline forces 'baseline_review' inside progressForTarget: we must NOT render a
+              // green pass computed on a base year the note beneath this chip has flagged as changed.
+              const drifted = driftFor(sc, d) != null
               const assessedYear = latestActualYear(years, sc)
               let status: TargetProgress['status'] = 'no_actual'
               if (assessedYear != null && assessedYear >= d.baseYear && assessedYear <= d.targetYear) {
@@ -555,7 +608,7 @@ export default function SbtiDashboard() {
                 const actual = yr ? (yr[scopeActualField(sc)] ?? null) : null
                 const prog: TargetProgress = progressForTarget({
                   baseYear: d.baseYear, baseEmissions: base, targetYear: d.targetYear, reductionPct: d.reductionPct,
-                  method: 'absolute_aca', scope: sc, assessedYear, actual, effortEvidence: false,
+                  method: 'absolute_aca', scope: sc, assessedYear, actual, effortEvidence: false, baselineDrifted: drifted,
                 })
                 status = prog.status
               }
@@ -566,6 +619,7 @@ export default function SbtiDashboard() {
                     <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', fontWeight: 400 }}>{scopeLabel(sc)}</div>
                     <span style={pillStyle(status)}>{PILL[status].label}</span>
                   </div>
+                  {driftNote(sc, d)}
                   {chart(buildChartData(traj, years, sc))}
                 </div>
               )
@@ -578,8 +632,8 @@ export default function SbtiDashboard() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {netZero.map(sc => {
               const d = netZeroDrafts[sc]
-              const base = baseEmissionsFor(sc)
               if (!d) return null
+              const base = baselineForCommitted(sc, d) // grade against the FROZEN baseline, not the live inventory
               if (base == null) return mutedCard(sc, 'No baseline emissions for this scope.')
               const traj = computeTrajectory({ baseYear: d.baseYear, baseEmissions: base, targetYear: d.targetYear, reductionPct: d.reductionPct, method: 'absolute_aca' })
               if (traj.length === 0) return mutedCard(sc, 'Trajectory unavailable for this target.')
@@ -589,6 +643,7 @@ export default function SbtiDashboard() {
                     <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', fontWeight: 400 }}>{scopeLabel(sc)}</div>
                     <span style={pillStyle('long_term')}>{PILL.long_term.label}</span>
                   </div>
+                  {driftNote(sc, d)}
                   {chart(buildChartData(traj, years, sc))}
                 </div>
               )
@@ -796,7 +851,7 @@ export default function SbtiDashboard() {
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     {selectedScopes.map(sc => {
-                      const base = baseEmissionsFor(sc)
+                      const base = baselineForDrafting(sc) // Step 3 drafting: the user is choosing a baseline → live series
 
                       // S3 with no Scope 3 inventory → routing empty-state (no editable inputs).
                       if (sc === 's3' && base === null) {
@@ -922,7 +977,7 @@ export default function SbtiDashboard() {
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                       {nearTermTargetScopes.map(sc => {
-                        const base = baseEmissionsFor(sc)
+                        const base = baselineForDrafting(sc) // Step 4 drafting: choosing a net-zero baseline → live series
                         const d = netZeroDrafts[sc]
                         if (!d) return null // seeded by the net-zero lazy-init effect
 

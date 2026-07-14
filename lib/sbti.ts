@@ -293,9 +293,13 @@ export function trajectoryPointForYear(trajectory: Point[], year: number): Point
 // named by scopeActualField). This helper only computes the required path, grades the
 // actual against it, and packages the result for the dashboard.
 
-// Superset of PerformanceStatus adding the "no actual for this scope/year yet" state —
-// distinct from off_track (which means we DO have an actual and it is over the line).
-export type TargetProgressStatus = PerformanceStatus | 'no_actual';
+// Superset of PerformanceStatus adding two "cannot grade" states, both siblings of a graded result:
+//  - 'no_actual'        — no actual emissions for this scope/year yet (nothing to compare).
+//  - 'baseline_review'  — the base-year figure this grade rests on has MATERIALLY changed since
+//    commitment (see baseYearDrift). We cannot answer on-track/off-track until the user assesses
+//    recalculation. NOT off_track ("we know, and you're over the line") and NOT on_track — a grade
+//    computed on a foundation we've flagged as unsound must never render as a pass.
+export type TargetProgressStatus = PerformanceStatus | 'no_actual' | 'baseline_review';
 
 // Pure mapper: target scope → the SeriesYear field the caller reads the actual from.
 // Documents the join WITHOUT importing SeriesYear. s1s2_combined reads the precomputed
@@ -333,6 +337,7 @@ export function progressForTarget(input: {
   assessedYear: number;          // reporting year to grade against
   actual: number | null;         // caller-resolved actual for this scope+year (null if none)
   effortEvidence: boolean;       // pass false for v1
+  baselineDrifted?: boolean;     // true → the frozen base year has materially drifted; do NOT grade
 }): TargetProgress {
   const trajectory = computeTrajectory({
     baseYear: input.baseYear,
@@ -350,6 +355,20 @@ export function progressForTarget(input: {
 
   // Throws if assessedYear is outside base..target — intended (see trajectoryPointForYear).
   const requiredEmissions = trajectoryPointForYear(trajectory, input.assessedYear).emissions;
+
+  // Baseline flagged as drifted → we will NOT compute a grade on a foundation we've flagged.
+  // Takes precedence over the actual-vs-trajectory comparison (a green "on_track" against a
+  // suspect baseline is the exact unearned pass this guards). Still report the actual verbatim.
+  if (input.baselineDrifted) {
+    return {
+      scope: input.scope,
+      assessedYear: input.assessedYear,
+      requiredEmissions,
+      actualEmissions: input.actual,
+      status: 'baseline_review',
+      trajectory,
+    };
+  }
 
   // No actual → report the gap explicitly; never hand null to progressStatus (non-finite throws).
   if (input.actual === null) {
@@ -377,6 +396,73 @@ export function progressForTarget(input: {
     status,
     trajectory,
   };
+}
+
+// ── Base-year integrity (frozen at commit) ─────────────────────────────
+// A committed target's base-year emissions are FROZEN at commit (the stored
+// base_year_emissions_tco2e). The live GHG inventory can move afterwards — a corrected
+// bill, a re-extraction. GHG Protocol and SBTi both define base-year RECALCULATION as a
+// deliberate, disclosed act with a significance threshold; it must NOT happen silently
+// because the underlying inventory changed. These two pure helpers keep the frozen and
+// live baselines distinct and detect when they have drifted apart.
+
+/**
+ * The baseline a target should grade against: the STORED (frozen) value when a target has
+ * been committed, else the live series baseline (a brand-new, not-yet-saved target has
+ * nothing frozen yet). Uses ?? so a stored 0 is respected; never coerces null → 0.
+ */
+export function resolveCommittedBaseline(
+  storedBaseEmissions: number | null | undefined,
+  liveBaseEmissions: number | null,
+): number | null {
+  return storedBaseEmissions ?? liveBaseEmissions;
+}
+
+export interface BaseYearDrift {
+  stored: number;   // frozen base_year_emissions_tco2e
+  live: number;     // what the live inventory now reports for that base year
+  pct: number;      // signed: (live - stored) / stored × 100
+}
+
+/**
+ * Detect drift between a committed target's frozen base-year emissions and what the live
+ * inventory now reports. Returns null when there is nothing to compare (no stored value, no
+ * live value, or a degenerate zero baseline) or when the change is within tolerance (default
+ * 0.5% — rounding). A non-null result is a REAL restatement the user must assess and disclose;
+ * the caller SURFACES it and keeps the frozen number — it never auto-updates the baseline.
+ */
+export function baseYearDrift(
+  storedBaseEmissions: number | null | undefined,
+  liveBaseEmissions: number | null | undefined,
+  tolerancePct = 0.5,
+): BaseYearDrift | null {
+  if (storedBaseEmissions == null || liveBaseEmissions == null) return null;
+  if (storedBaseEmissions === 0) return null; // no meaningful % change off a zero baseline
+  const pct = ((liveBaseEmissions - storedBaseEmissions) / storedBaseEmissions) * 100;
+  if (Math.abs(pct) <= tolerancePct) return null;
+  return { stored: storedBaseEmissions, live: liveBaseEmissions, pct };
+}
+
+/**
+ * Drift for a committed target against the LIVE figure for THE TARGET'S OWN base year — a strict
+ * like-for-like comparison. Selects the live-series row whose year === baseYear:
+ *   - row found  → compare stored vs that year's figure (real drift).
+ *   - row MISSING → no inventory exists for the base year → NO comparison → null.
+ * The missing-year branch is load-bearing: absence of a comparison is NOT evidence of drift. It
+ * must never fall back to a different year — a decarbonising company (2022 base, 2024 series
+ * baseline) would otherwise be told its 2022 baseline "drifted" because 2024 is lower, which
+ * compares two different years' emissions. Caller pre-resolves each year's scope figure into
+ * liveByYear so this stays decoupled from the series row shape.
+ */
+export function baseYearDriftForSeries(
+  storedBaseEmissions: number | null | undefined,
+  baseYear: number,
+  liveByYear: Array<{ year: number; emissions: number | null }>,
+  tolerancePct = 0.5,
+): BaseYearDrift | null {
+  const row = liveByYear.find(y => y.year === baseYear);
+  if (!row) return null; // no inventory for the target's base year → cannot compare
+  return baseYearDrift(storedBaseEmissions, row.emissions, tolerancePct);
 }
 
 // ── Scope 3 significance (≥5% of total S3 → must carry a target) ────────
