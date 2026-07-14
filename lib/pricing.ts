@@ -14,6 +14,10 @@
 // is safe to import anywhere.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Type-only import (erased at runtime — keeps this module free of any server/runtime coupling,
+// safe to import in the browser bundle). Used to type the shared priceLine() helper below.
+import type Stripe from 'stripe'
+
 export const CURRENCY = 'usd'
 
 // ── Canonical module keys ────────────────────────────────────────────────────
@@ -274,7 +278,7 @@ export type AddOnKey = 'verification' | 'concierge-basic' | 'concierge-standard'
 
 export const ADDONS: Record<
   AddOnKey,
-{ key: AddOnKey; label: string; price: number; requires: ModuleKey[]; requiresAddOnAnyOf?: AddOnKey[] }
+{ key: AddOnKey; label: string; price: number; requires: ModuleKey[]; requiresAddOnAnyOf?: AddOnKey[]; isCustomQuote?: boolean }
 > = {
 verification: {
     key: 'verification',
@@ -298,8 +302,12 @@ verification: {
   'concierge-enterprise': {
     key: 'concierge-enterprise',
     label: 'Concierge — Enterprise (16+ locations)',
+    // price 0 is a PLACEHOLDER, not a sellable price. isCustomQuote is the signal — never the 0.
+    // (Inferring "custom quote" from price===0 is the absence-vs-zero confusion: 0 is a claim
+    // (it's free), a flag is the absence of a self-serve price.) Enforced in addOnRequirementsMet.
     price: 0,
     requires: ['ghg'],
+    isCustomQuote: true,
   },
 }
 // Resolve the Concierge tier from a location count. Single source of truth for the
@@ -323,6 +331,13 @@ export function addOnRequirementsMet(
   addOnsOwnedOrInCart: AddOnKey[] = [],
 ): { ok: boolean; reason?: string } {
   const def = ADDONS[addOn]
+  // Quote-only add-ons (e.g. Concierge Enterprise) have NO self-serve price and must never be
+  // purchasable through checkout or invoice — the $0 placeholder is not a price. Reject FIRST,
+  // before prerequisites: owning GHG is not enough. This is the single authority /api/checkout and
+  // /api/admin/create-invoice both defer to, so one guard closes both against a direct-API mint.
+  if (def.isCustomQuote) {
+    return { ok: false, reason: `${def.label} is quote-only and cannot be purchased through checkout. Contact sales.` }
+  }
   const missingModule = def.requires.find((m) => !modulesOwnedOrInCart.includes(m))
   if (missingModule) {
     return {
@@ -347,6 +362,27 @@ export function addOnRequirementsMet(
 // Stripe expects amounts in the smallest currency unit (cents for USD).
 export function toStripeAmount(dollars: number): number {
   return Math.round(dollars * 100)
+}
+
+// Build a one-off, dynamically-priced Stripe line item. Shared by /api/checkout so the fail-loud
+// backstop below lives in one place.
+//
+// A $0 (or negative) line item must THROW, never silently create a free session. The quote-only
+// gate in addOnRequirementsMet is the primary guard; this is belt-and-braces: if any future add-on
+// or pack gets price 0 by accident, it breaks the request path loudly instead of minting a free
+// entitlement. A zero price is not a price.
+export function priceLine(name: string, dollars: number): Stripe.Checkout.SessionCreateParams.LineItem {
+  if (dollars <= 0) {
+    throw new Error(`priceLine: refusing a $0 line item for "${name}" — a zero price is not a price.`)
+  }
+  return {
+    quantity: 1,
+    price_data: {
+      currency: CURRENCY,
+      product_data: { name },
+      unit_amount: toStripeAmount(dollars),
+    },
+  }
 }
 
 // Access term: one-time charge grants one year of access (renewal handled

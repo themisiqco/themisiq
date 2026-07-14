@@ -16,7 +16,6 @@ import type Stripe from 'stripe'
 import { getStripe } from '../../../lib/stripe'
 import { getAuthedClient, bearerFrom, AuthError } from '../../../lib/supabaseAuthed'
 import {
-  CURRENCY,
   ALL_MODULE_KEYS,
   TIER_PRICING,
   locationAllowanceForTier,
@@ -26,7 +25,7 @@ import {
   configuratorPrice,
   cartQuote,
   NEW_PRICING_ACTIVE,
-  toStripeAmount,
+  priceLine,
   type ModuleKey,
   type Tier,
   type GhgTier,
@@ -125,7 +124,8 @@ export async function POST(req: NextRequest) {
       if (moduleKeys.includes('ghg') && tier) ghgAllowance = locationAllowanceForTier(tier) // tier-based ceiling
     }
 
-    // 2c) Add-ons (currently just Verification Readiness)
+    // 2c) Add-ons (Verification Readiness + the Concierge tiers). Each is validated generically
+    // against ADDONS via addOnRequirementsMet, which also rejects quote-only tiers (Enterprise).
     if (body.addOns && body.addOns.length > 0) {
       // What modules does the customer already own? (RLS scopes this to them.)
       const { data: owned } = await supabase
@@ -224,17 +224,5 @@ export async function POST(req: NextRequest) {
     }
     console.error('[checkout] error:', err)
     return NextResponse.json({ error: 'Could not start checkout.' }, { status: 500 })
-  }
-}
-
-// Helper: build a one-off, dynamically-priced Stripe line item.
-function priceLine(name: string, dollars: number): Stripe.Checkout.SessionCreateParams.LineItem {
-  return {
-    quantity: 1,
-    price_data: {
-      currency: CURRENCY,
-      product_data: { name },
-      unit_amount: toStripeAmount(dollars),
-    },
   }
 }

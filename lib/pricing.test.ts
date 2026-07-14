@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cartQuote, ADDONS, type ModuleKey } from './pricing'
+import { cartQuote, ADDONS, addOnRequirementsMet, priceLine, type ModuleKey } from './pricing'
 
 // Regression guard for the new-model cart math (June 2026 rescope). cartQuote is
 // the single source of truth shared by the configurator (display) and the server
@@ -51,5 +51,38 @@ describe('add-on pricing', () => {
   // (it does NOT flow through cartQuote), so this guards what customers actually pay.
   it('Verification Readiness add-on = $1,499', () => {
     expect(ADDONS.verification.price).toBe(1499)
+  })
+})
+
+// ── SECURITY — quote-only add-ons must never be purchasable through checkout ──
+// Concierge Enterprise has price 0 (a custom-quote placeholder). Without a server-side guard,
+// POST /api/checkout { addOns:['concierge-enterprise'] } with GHG owned would mint a real
+// entitlement for free. addOnRequirementsMet (the single authority BOTH routes defer to) and
+// priceLine (fail-loud backstop) close that hole. These pin it shut.
+describe('add-on purchasability — quote-only guard', () => {
+  it('N1 concierge-enterprise is rejected even when GHG is owned (quote-only, not just a prereq gap)', () => {
+    const r = addOnRequirementsMet('concierge-enterprise', ['ghg'])
+    expect(r.ok).toBe(false)
+    expect(r.reason).toMatch(/quote-only/i)
+    // The point: owning GHG is NOT enough — the enterprise tier is unsellable via checkout.
+    expect(ADDONS['concierge-enterprise'].isCustomQuote).toBe(true)
+  })
+
+  it('N2 concierge-basic with GHG owned → ok (the guard must not over-block sellable tiers)', () => {
+    expect(addOnRequirementsMet('concierge-basic', ['ghg']).ok).toBe(true)
+    expect(ADDONS['concierge-basic'].isCustomQuote).toBeUndefined()
+  })
+
+  it('N3 concierge-basic without GHG → rejected (existing ghg→concierge dependency still holds)', () => {
+    const r = addOnRequirementsMet('concierge-basic', [])
+    expect(r.ok).toBe(false)
+    expect(r.reason).toMatch(/ghg/i)
+  })
+
+  it('N4 priceLine refuses a $0 line item (fail-loud backstop; a zero price is not a price)', () => {
+    expect(() => priceLine('Concierge — Enterprise (16+ locations)', 0)).toThrow(/zero price is not a price/i)
+    expect(() => priceLine('anything', -5)).toThrow() // negative also rejected
+    // sanity: a real price builds a normal line item (cents)
+    expect(priceLine('Concierge — Basic', 799).price_data?.unit_amount).toBe(79900)
   })
 })
