@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthedClient, bearerFrom, AuthError } from '../../../../lib/supabaseAuthed'
 import {
-  runResilience, ReferenceData, AssessmentInput,
+  runResilience, regionsWithNoHazardData, ReferenceData, AssessmentInput,
 } from '../../../../lib/materiality'
 
 export async function POST(req: NextRequest) {
@@ -45,12 +45,13 @@ export async function POST(req: NextRequest) {
 
     // ── Fetch reference data (public-readable) ───────────────────────
     const [
-      configRes, industriesRes, regionHazardsRes, industryHazardsRes,
+      configRes, industriesRes, regionsRes, regionHazardsRes, industryHazardsRes,
       jurisdictionsRes, esrsTopicsRes, topicBaselinesRes, scenariosRes,
       opportunitiesRes, transitionDriversRes,
     ] = await Promise.all([
       supabase.from('mr_model_config').select('*').eq('id', 1).single(),
       supabase.from('mr_industries').select('code,label,carbon_exposure'),
+      supabase.from('mr_regions').select('code,label,continent,sort_order').eq('active', true).order('sort_order'),
       supabase.from('mr_region_hazards').select('region_code,hazard,intensity'),
       supabase.from('mr_industry_hazards').select('industry_code,hazard,sensitivity'),
       supabase.from('mr_jurisdictions').select('code,label,policy_intensity'),
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
     ])
 
     const firstErr = [
-      configRes, industriesRes, regionHazardsRes, industryHazardsRes,
+      configRes, industriesRes, regionsRes, regionHazardsRes, industryHazardsRes,
       jurisdictionsRes, esrsTopicsRes, topicBaselinesRes, scenariosRes,
       opportunitiesRes, transitionDriversRes,
     ].find(r => r.error)
@@ -74,6 +75,7 @@ export async function POST(req: NextRequest) {
     const ref: ReferenceData = {
       config: configRes.data!,
       industries: industriesRes.data!,
+      regions: regionsRes.data!,
       regionHazards: regionHazardsRes.data!,
       industryHazards: industryHazardsRes.data!,
       jurisdictions: jurisdictionsRes.data!,
@@ -82,6 +84,13 @@ export async function POST(req: NextRequest) {
       scenarios: scenariosRes.data!,
       industryOpportunities: opportunitiesRes.data!,
       industryTransitionDrivers: transitionDriversRes.data!,
+    }
+
+    // Visibility guard (non-blocking): flag any offered region with zero hazard data, so a report
+    // full of "not assessed" hazards is a known gap rather than a surprise. See regionsWithNoHazardData.
+    const gapRegions = regionsWithNoHazardData(ref)
+    if (gapRegions.length) {
+      console.warn('Resilience: regions offered with NO hazard data (report will read "not assessed"):', gapRegions.join(', '))
     }
 
     // ── Run the resilience analysis ──────────────────────────────────

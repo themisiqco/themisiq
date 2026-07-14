@@ -35,6 +35,9 @@ function baseRef(over: Partial<ReferenceData> = {}): ReferenceData {
     industries: over.industries ?? [
       { code: 'tech-mfg', label: 'Tech manufacturing', carbon_exposure: 3 },
     ],
+    regions: over.regions ?? [
+      { code: 'r', label: 'Test region', continent: 'Test', sort_order: 1 },
+    ],
     regionHazards: over.regionHazards ?? [
       { region_code: 'r', hazard: 'heat', intensity: 3 },
       { region_code: 'r', hazard: 'flood', intensity: 3 },

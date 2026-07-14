@@ -14,6 +14,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { supabase } from '../../../../lib/supabase'
 import { useEntitlement } from '../../../../lib/useEntitlement'
 import PaywallCard from '../../../components/PaywallCard'
+import { REGION_LABEL } from '../../../../lib/climate/regions'
 
 // ─── Lookup helpers (labels we don't store on the assessment row) ─────────────
 
@@ -24,15 +25,8 @@ const SECTOR_LABEL: Record<string, string> = {
   extract: 'Mining & Metals', construction: 'Construction & Materials',
   profservices: 'Professional Services', other: 'Other',
 }
-const REGION_LABEL: Record<string, string> = {
-  NWN: 'North-Western North America', NEN: 'North-Eastern North America',
-  WNA: 'Western North America', CNA: 'Central North America', ENA: 'Eastern North America',
-  CAR: 'Caribbean', NEU: 'Northern Europe', WCE: 'Western & Central Europe',
-  MED: 'Mediterranean', EEU: 'Eastern Europe', SAS: 'South Asia', SEA: 'South-East Asia',
-  EAS: 'East Asia', ARP: 'Arabian Peninsula', WCA: 'West Central Asia',
-  WAF: 'Western Africa', ESAF: 'East Southern Africa', EAU: 'Eastern Australia',
-  NAU: 'Northern Australia', PAC: 'Pacific Small Islands',
-}
+// REGION_LABEL is imported from lib/climate/regions (the ONE shared region-label map). It used to be
+// duplicated inline here; do not re-inline it.
 const JURISDICTION_LABEL: Record<string, string> = {
   eu_ets: 'EU (EU ETS)', cbam: 'EU CBAM exposure', uk_ets: 'UK (UK ETS)',
   ca: 'Canada (federal pricing)', us_fed: 'US (federal)', us_ca: 'US — California cap-and-trade',

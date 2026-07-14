@@ -27,6 +27,9 @@ export type ModelConfig = {
   trans_driver_high: number; trans_driver_med: number
 }
 export type Industry = { code: string; label: string; carbon_exposure: number }
+// The geography of the model — the IPCC AR6 reference regions offered in the UI. Sourced from
+// mr_regions (the single source of truth). `continent` groups the dropdown; `sort_order` orders it.
+export type Region = { code: string; label: string; continent: string; sort_order: number }
 export type RegionHazard = { region_code: string; hazard: string; intensity: number }
 export type IndustryHazard = { industry_code: string; hazard: string; sensitivity: number }
 export type Jurisdiction = { code: string; label: string; policy_intensity: number }
@@ -42,6 +45,9 @@ export type Scenario = {
 export type ReferenceData = {
   config: ModelConfig
   industries: Industry[]
+  // The regions offered in the UI (mr_regions). Load-bearing for the guard below: it is the set the
+  // dropdown can offer, checked against regionHazards so an offered-but-unmodelled region is visible.
+  regions: Region[]
   regionHazards: RegionHazard[]
   industryHazards: IndustryHazard[]
   jurisdictions: Jurisdiction[]
@@ -348,6 +354,20 @@ export function runAssessment(input: AssessmentInput, ref: ReferenceData): Asses
       opportunitiesStrong: opportunities.filter(o => o.band === 'high').length,
     },
   }
+}
+
+/**
+ * Regions offered in the UI that have NO hazard data at all.
+ * A region in the dropdown with zero mr_region_hazards rows will produce a
+ * report where every hazard reads "not assessed" — technically honest, but
+ * useless. This surfaces it so it is a known gap, not a surprise.
+ *
+ * Returns the offending region CODES (in ref.regions order). Empty = every
+ * offered region has at least one hazard row.
+ */
+export function regionsWithNoHazardData(ref: ReferenceData): string[] {
+  const covered = new Set(ref.regionHazards.map(h => h.region_code))
+  return ref.regions.filter(r => !covered.has(r.code)).map(r => r.code)
 }
 
 // ===========================================================================

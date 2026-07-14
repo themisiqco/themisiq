@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useEntitlement } from '../../../lib/useEntitlement'
 import Nav from '../../components/Nav'
@@ -40,29 +40,14 @@ const SECTORS = [
   { code: 'other', label: 'Other' },
 ]
 
-const REGION_GROUPS: { group: string; regions: { code: string; label: string }[] }[] = [
-  { group: 'North America', regions: [
-    { code: 'NWN', label: 'North-Western North America' }, { code: 'NEN', label: 'North-Eastern North America' },
-    { code: 'WNA', label: 'Western North America' }, { code: 'CNA', label: 'Central North America' },
-    { code: 'ENA', label: 'Eastern North America' }, { code: 'CAR', label: 'Caribbean' },
-  ]},
-  { group: 'Europe', regions: [
-    { code: 'NEU', label: 'Northern Europe' }, { code: 'WCE', label: 'Western & Central Europe' },
-    { code: 'MED', label: 'Mediterranean' }, { code: 'EEU', label: 'Eastern Europe' },
-  ]},
-  { group: 'Asia & Middle East', regions: [
-    { code: 'SAS', label: 'South Asia' }, { code: 'SEA', label: 'South-East Asia' },
-    { code: 'EAS', label: 'East Asia' }, { code: 'ARP', label: 'Arabian Peninsula' }, { code: 'WCA', label: 'West Central Asia' },
-  ]},
-  { group: 'Africa', regions: [
-    { code: 'WAF', label: 'Western Africa' }, { code: 'ESAF', label: 'East Southern Africa' },
-  ]},
-  { group: 'Australasia & Pacific', regions: [
-    { code: 'EAU', label: 'Eastern Australia' }, { code: 'NAU', label: 'Northern Australia' }, { code: 'PAC', label: 'Pacific Small Islands' },
-  ]},
-]
+// The region list is NO LONGER hardcoded here. It is fetched from mr_regions via
+// /api/materiality/reference and grouped by `continent` (in sort_order) at runtime — the DB is the
+// single source of truth for the geography of the model. See RegionGroup / the mount effect below.
+type RegionGroup = { group: string; regions: { code: string; label: string }[] }
 
-// AR6 region coverage — "includes, broadly" (AR6 uses polygon boundaries, not country borders)
+// AR6 region coverage — "includes, broadly" (AR6 uses polygon boundaries, not country borders).
+// KEPT hardcoded deliberately: this is UI help text (country hints for the ⓘ tooltip), NOT model
+// data. It gets replaced properly when we build mr_countries; until then it stays here.
 const REGION_COVERAGE: Record<string, string> = {
   NWN: 'Alaska, Yukon, north-western Canada, northern British Columbia',
   NEN: 'Eastern & Arctic Canada, Labrador, Greenland fringe',
@@ -223,6 +208,9 @@ export default function MaterialityWizard() {
   const [legalEntity, setLegalEntity] = useState('')
   const [reportingPeriod, setReportingPeriod] = useState('FY2025')
   const [openCoverage, setOpenCoverage] = useState<string | null>(null)
+  // Region dropdown, sourced from mr_regions (via /api/materiality/reference), grouped by continent
+  // in sort_order. Was a hardcoded const; the DB is now the single source of truth for the geography.
+  const [regionGroups, setRegionGroups] = useState<RegionGroup[]>([])
   const [industryCode, setIndustryCode] = useState('')
   const [regionCodes, setRegionCodes] = useState<string[]>([])
   const [jurisdictionCodes, setJurisdictionCodes] = useState<string[]>([])
@@ -236,6 +224,29 @@ export default function MaterialityWizard() {
   const [savedId, setSavedId] = useState<string | null>(null)
   const [acknowledgedReport, setAcknowledgedReport] = useState(false)
   const [resilienceResult, setResilienceResult] = useState<any>(null)
+
+  // Fetch the region list from the DB once on mount and group it by continent (in sort_order). The
+  // API returns rows already ordered by sort_order, so first-seen continent order = sort_order order.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/materiality/reference')
+        if (!res.ok) return
+        const data = await res.json()
+        const regions: { code: string; label: string; continent: string; sort_order: number }[] = data.regions ?? []
+        const groups: RegionGroup[] = []
+        const byContinent = new Map<string, RegionGroup>()
+        for (const r of regions) {
+          let g = byContinent.get(r.continent)
+          if (!g) { g = { group: r.continent, regions: [] }; byContinent.set(r.continent, g); groups.push(g) }
+          g.regions.push({ code: r.code, label: r.label })
+        }
+        if (!cancelled) setRegionGroups(groups)
+      } catch { /* leave empty; the region step shows a loading hint until data arrives */ }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   const SCENARIO_RATIONALE = "Yes — SSP2-4.5 (~2.7°C) is the most common starting choice and a reasonable middle case, so it's fine to leave it as-is. Change it only if you have a specific reason to test a more optimistic or more severe future. You can always re-run with a different scenario later."
   const HORIZON_RATIONALE = "Medium term (to 2040) is the default lens for a first screening. Companies with long-lived physical assets may prefer the long-term view."
@@ -366,7 +377,10 @@ export default function MaterialityWizard() {
       <h2 style={sectionHead}>Where do you operate?</h2>
       <p style={{ fontSize: 12, color: '#888784', lineHeight: 1.6, marginTop: -4, marginBottom: 12 }}>This step is about <strong style={{ color: '#555553' }}>physical location</strong> — where your assets sit, which drives weather and climate hazards. Whose climate laws apply comes in the next step.</p>
       <p style={sectionSub}><strong style={{ color: '#7425e3', fontWeight: 600 }}>Click the ⓘ on any region to see the countries it covers and confirm your operations fall within it.</strong> These follow the IPCC AR6 climate reference regions — each carries a distinct hazard profile that drives your physical-risk results.</p>
-      {REGION_GROUPS.map(g => (
+      {regionGroups.length === 0 && (
+        <p style={{ fontSize: 12, color: '#888784' }}>Loading regions…</p>
+      )}
+      {regionGroups.map(g => (
         <div key={g.group} style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: '#555553', marginBottom: 8 }}>{g.group}</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
