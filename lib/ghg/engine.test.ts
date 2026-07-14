@@ -191,25 +191,38 @@ describe('GROUP B — silent absence', () => {
 
 // ── GROUP C — Coverage keyed on docType, not (docType, fuelType) [SEV 2] ──────
 describe('GROUP C — one fuel resolves, the other silently does not', () => {
-  it("C1 a fleet_fuel doc with BOTH gasoline and diesel, one acknowledged gap → BOTH workings rows must read 'concierge-extrapolated' (currently only the first-picked fuel does)", () => {
+  it("C1 fleet_fuel carries gasoline AND diesel from the same bills — a gap acknowledged for ONE fuel must NOT clear the gate for the other; acknowledging BOTH grosses both ×12/9", () => {
     const l = loc({
+      id: 'C1',
       has_mobile: true, gasoline_amount: 1200, gasoline_unit: 'gallons',
       diesel_mobile_amount: 1200, diesel_mobile_unit: 'gallons',
       source_docs: [doc('fleet_fuel', [
-        prop({ fuelType: 'gasoline', value: 900, unit: 'gallons', sourceQuote: 'Gasoline 900 gal' }),
-        prop({ fuelType: 'diesel', value: 900, unit: 'gallons', sourceQuote: 'Diesel 900 gal' }),
+        // Both fuels dated Jan–Sep 2024 → 9/12 months covered, an identical gap (Oct–Dec) for EACH.
+        prop({ fuelType: 'gasoline', value: 900, unit: 'gallons', periodStart: '2024-01-01', periodEnd: '2024-09-30', sourceQuote: 'Gasoline 900 gal' }),
+        prop({ fuelType: 'diesel', value: 900, unit: 'gallons', periodStart: '2024-01-01', periodEnd: '2024-09-30', sourceQuote: 'Diesel 900 gal' }),
       ])],
     });
-    // fuelOfStrip picks the FIRST proposal (gasoline); the single extrapolate resolution is keyed to it.
-    const res: CoverageResolution = {
-      locId: 'L1', fuelType: 'gasoline', kind: 'extrapolate', monthsCovered: 9, pctEstimated: 25,
+    const gasRes: CoverageResolution = {
+      locId: 'C1', fuelType: 'gasoline', kind: 'extrapolate', monthsCovered: 9, pctEstimated: 25,
       note: '9 of 12 months; grossed ×12/9', acknowledgedAt: '2024-06-01T00:00:00Z',
     };
-    const rows = buildWorkings([l], 'AR6', 2024, [res]);
+    const dieselRes: CoverageResolution = { ...gasRes, fuelType: 'diesel' };
+
+    // THE FIX (gate keyed per (docType, fuelType)): acknowledging gasoline ONLY leaves diesel's identical
+    // gap unresolved. The old per-docType gate let the gasoline resolution clear the whole strip.
+    const afterGasOnly = findUnresolvedCoverage([l], 2024, 12, [gasRes]);
+    expect(afterGasOnly.some(u => u.fuelType === 'diesel')).toBe(true);
+    expect(afterGasOnly.some(u => u.fuelType === 'gasoline')).toBe(false);
+
+    // THE OUTCOME: acknowledging BOTH clears the gate AND grosses both fields ×12/9.
+    expect(findUnresolvedCoverage([l], 2024, 12, [gasRes, dieselRes]).length).toBe(0);
+    const rows = buildWorkings([l], 'AR6', 2024, [gasRes, dieselRes]);
     const gasoline = rows.find(r => r.source === 'Gasoline (mobile)');
     const diesel = rows.find(r => r.source === 'Diesel (mobile)');
     expect(gasoline?.entry_method).toBe('concierge-extrapolated');
-    expect(diesel?.entry_method).toBe('concierge-extrapolated'); // ← currently 'concierge': the gap silently applies to gasoline only
+    expect(diesel?.entry_method).toBe('concierge-extrapolated');
+    expect(gasoline?.activity_data).toBeCloseTo(900 * 12 / 9, 4); // 1200
+    expect(diesel?.activity_data).toBeCloseTo(900 * 12 / 9, 4);   // 1200
   });
 });
 
@@ -221,13 +234,28 @@ describe('GROUP D — gap + overlap', () => {
   ];
   const winStart = new Date(2024, 0, 1), winEnd = new Date(2024, 11, 31);
 
-  it("D1 both a gap (Jul–Dec) and an overlap (Apr) exist — the scalar status must not collapse to 'overlap' and hide the gap", () => {
+  it("D1 a fuel with BOTH a gap (Jul–Dec) and an overlap (Apr) exposes both in `issues`; acknowledging ONLY the duplicate leaves the gap unresolved and export blocked", () => {
     const r = analyzeCoverage(periods, winStart, winEnd);
     expect(r.gaps.length, 'gaps should be detected').toBeGreaterThan(0);
     expect(r.overlaps.length, 'overlap should be detected').toBeGreaterThan(0);
-    // The gate keys on the scalar `status`. status==='overlap' while gaps exist means the gap
-    // slips past the gate once the duplicate is acknowledged. That masking must not happen.
-    expect(r.status === 'overlap' && r.gaps.length > 0).toBe(false);
+    // `issues` is a SET of EVERY condition present — it does not collapse to the one `status` names.
+    expect(r.issues).toContain('gap');
+    expect(r.issues).toContain('overlap');
+
+    // At the gate: gas bills producing this same gap+overlap. Acknowledging ONLY the duplicate must NOT
+    // clear the gate — the gap still needs its own extrapolate resolution (the D1 masking bug).
+    const l = loc({
+      id: 'D1', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'mcf',
+      source_docs: [doc('utility_bill_gas', [
+        prop({ periodStart: '2024-01-01', periodEnd: '2024-06-30' }), // Jan–Jun
+        prop({ periodStart: '2024-04-01', periodEnd: '2024-04-30' }), // Apr overlap; Jul–Dec gap
+      ])],
+    });
+    const dupOnly: CoverageResolution = {
+      locId: 'D1', fuelType: 'natural_gas', kind: 'duplicate',
+      note: 'overlap accepted', acknowledgedAt: '2024-06-01T00:00:00Z',
+    };
+    expect(findUnresolvedCoverage([l], 2024, 12, [dupOnly]).length).toBeGreaterThan(0);
   });
 });
 

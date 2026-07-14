@@ -573,6 +573,11 @@ function periodFromYearAndEnd(reportingYear: number, fiscalYearEndMonth: number 
 interface CoveragePeriod { docId: string; pi: number; start: Date; end: Date }
 interface CoverageResult {
   status: 'full' | 'gap' | 'overlap' | 'straddle' | 'none'
+  // EVERY condition that holds, not just the one the scalar `status` collapsed to. `status` is a scalar
+  // and the conditions are NOT mutually exclusive — a fuel with BOTH a gap and an overlap used to report
+  // only 'overlap', so acknowledging the duplicate slipped the gap past the gate (the D1 masking bug).
+  // The gate iterates `issues` and requires a resolution for EACH. `status` is kept for display/callsites.
+  issues: Array<'gap' | 'overlap' | 'straddle'>
   monthsCovered: number
   coverageRatio: number               // monthsCovered / 12
   pctEstimated: number                // (12 - monthsCovered)/12, for disclosure
@@ -609,7 +614,7 @@ function exclusiveEnd(end: Date): Date {
 
 function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date): CoverageResult {
   if (periods.length === 0) {
-    return { status: 'none', monthsCovered: 0, coverageRatio: 0, pctEstimated: 0, gaps: [], overlaps: [], straddles: [], outOfWindow: [], summary: 'No dated bills yet.' }
+    return { status: 'none', issues: [], monthsCovered: 0, coverageRatio: 0, pctEstimated: 0, gaps: [], overlaps: [], straddles: [], outOfWindow: [], summary: 'No dated bills yet.' }
   }
   const DAY = 86400000
   // exclusiveEnd (canonicalizes both bill-end conventions to a half-open boundary)
@@ -698,12 +703,24 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
 
   const monthsCovered = covered.length
   const total = reqMonths.length || 12
+  // issues: ALL conditions present (a bill can straddle AND leave a gap AND overlap another). status
+  // is the scalar display value, kept for existing callsites; the gate reads `issues`, not `status`.
+  const issues: CoverageResult['issues'] = []
+  if (gaps.length > 0) issues.push('gap')
+  if (overlapPairs.length > 0) issues.push('overlap')
+  if (straddles.length > 0) issues.push('straddle')
   let status: CoverageResult['status'] = 'full'
   if (gaps.length > 0) status = 'gap'
   if (overlapPairs.length > 0) status = 'overlap'
   if (straddles.length > 0 && gaps.length === 0 && overlapPairs.length === 0) status = 'straddle'
+  // Summary lists EVERY issue present, so the display never advertises just one of several problems.
+  const summaryParts: string[] = []
+  if (issues.includes('gap')) summaryParts.push(`missing ${gaps.map(g => g.label).join(', ')}`)
+  if (issues.includes('overlap')) summaryParts.push(`${overlapPairs.length} month(s) covered by more than one bill`)
+  if (issues.includes('straddle')) summaryParts.push(`${straddles.length} bill(s) cross the reporting-year boundary`)
   return {
     status,
+    issues,
     monthsCovered,
     coverageRatio: monthsCovered / total,
     pctEstimated: Math.round(((total - monthsCovered) / total) * 1000) / 10,
@@ -711,12 +728,9 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
     overlaps: overlapPairs,
     straddles,
     outOfWindow,
-    summary:
-      status === 'full' ? `Full year covered (${monthsCovered}/${total} months).`
-      : status === 'gap' ? `${monthsCovered}/${total} months covered — missing: ${gaps.map(g => g.label).join(', ')}.`
-      : status === 'overlap' ? `Possible duplicate: ${overlapPairs.length} month(s) covered by more than one bill.`
-      : status === 'straddle' ? `${straddles.length} bill(s) cross the reporting-year boundary.`
-      : `${monthsCovered}/${total} months covered.`,
+    summary: status === 'full'
+      ? `Full year covered (${monthsCovered}/${total} months).`
+      : `${monthsCovered}/${total} months covered — ${summaryParts.join('; ')}.`,
   }
 }
 
@@ -950,12 +964,15 @@ function calcInventory(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       s1_total: acc.s1_total + c.s1_total,
       s2_location: acc.s2_location + c.s2_location,
       s2_market: acc.s2_market + c.s2_market,
+      // s3_td is a DISTINCT Scope 3 (Cat 3) total — NZ electricity T&D losses. Accumulated here so the
+      // line that renders in the workings/CSV is totalled SOMEWHERE. NEVER added into s1/s2 (E2 guards).
+      s3_td: acc.s3_td + c.s3_td,
       co2: acc.co2 + c.gases.co2,
       ch4: acc.ch4 + c.gases.ch4,
       n2o: acc.n2o + c.gases.n2o,
       biogenic: acc.biogenic + c.biogenic,
     }
-  }, { s1_total: 0, s2_location: 0, s2_market: 0, co2: 0, ch4: 0, n2o: 0, biogenic: 0 })
+  }, { s1_total: 0, s2_location: 0, s2_market: 0, s3_td: 0, co2: 0, ch4: 0, n2o: 0, biogenic: 0 })
 }
 
 // Map a concierge (docType, fuelType) pair to its inventory field(s). Module-scoped so both the
@@ -1239,11 +1256,14 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
   return rows
 }
 
-// Coverage gate (step 9b). Per location × document_type, run analyzeCoverage and flag any
+// Coverage gate (step 9b). Per location × (document_type, fuelType), run analyzeCoverage and flag any
 // gap/overlap/straddle lacking a matching resolution, AND any 'none' (docs uploaded but no dated
-// confirmed bills). Pure. Phase 3b: the periods.length===0 early-return is GONE — 'none' now surfaces
-// (the sixth coverage state was previously thrown away). 'none' has no resolution kind and must not:
-// the fix is to date the bills, not to acknowledge the absence, so it simply blocks.
+// confirmed bills). Pure.
+// Phase 3c: keyed on (docType, FUELTYPE), not docType. A fleet_fuel doc carries BOTH gasoline and diesel
+// from the SAME bills; the old per-docType grouping picked ONE fuel as the strip and let a resolution on
+// it clear the gate for the other — silent partial extrapolation (the C1 bug). Each fuel is now its own
+// group, requiring its own resolution. And the gate iterates cov.ISSUES (all conditions), not the scalar
+// status, so a gap masked by an overlap can't slip through (the D1 bug).
 export function findUnresolvedCoverage(
   locations: Location[],
   reportingYear: number,
@@ -1251,33 +1271,44 @@ export function findUnresolvedCoverage(
   resolutions: CoverageResolution[]
 ): { locId: string; fuelType: string; status: string }[] {
   const coverageWin = periodFromYearAndEnd(reportingYear, fiscalYearEndMonth)
+  const KIND_FOR: Record<'gap' | 'overlap' | 'straddle', CoverageResolution['kind']> =
+    { gap: 'extrapolate', overlap: 'duplicate', straddle: 'straddle' }
   return locations.flatMap(loc => {
-    const byType = new Map<string, SourceDoc[]>()
+    // Group confirmed DATED proposals by (docType, fuelType). Each group is its own coverage unit.
+    const groups = new Map<string, { fuelType: string; periods: CoveragePeriod[] }>()
+    // A doc whose confirmed proposals carry NO usable dates yields a 'none' (must date the bills — no
+    // resolution can clear it). Label with the doc's known fuel if any, else the docType's canonical fuel;
+    // fleet_fuel (two fuels) can't be labelled from nothing → fuelType '' (one 'none' row per such doc).
+    const noneFuels: string[] = []
     loc.source_docs.forEach(d => {
-      const arr = byType.get(d.document_type) ?? []
-      arr.push(d)
-      byType.set(d.document_type, arr)
+      const confirmed = (d.extracted ?? []).filter(p => p.status === 'confirmed')
+      const dated = confirmed.filter(p => p.periodStart && p.periodEnd)
+      dated.forEach(p => {
+        const key = `${d.document_type}|${p.fuelType}`
+        const g = groups.get(key) ?? { fuelType: p.fuelType, periods: [] }
+        g.periods.push({ docId: d.id, pi: 0, start: parseLocalDate(p.periodStart as string), end: parseLocalDate(p.periodEnd as string) })
+        groups.set(key, g)
+      })
+      if (dated.length === 0 && confirmed.length > 0) {
+        // Confirmed but undated → 'none'. Label from the confirmed proposal's fuel, else the docType's.
+        noneFuels.push(confirmed.find(p => p.fuelType)?.fuelType ?? fuelTypeForDocType(d.document_type) ?? '')
+      } else if ((d.extracted?.length ?? 0) === 0) {
+        // No extracted proposals at all — can't read a fuel. One 'none' row; fleet_fuel → '' (don't invent).
+        noneFuels.push(fuelTypeForDocType(d.document_type) ?? '')
+      }
     })
-    return [...byType.entries()].flatMap(([docType, docs]) => {
-      const periods: CoveragePeriod[] = docs.flatMap(d =>
-        (d.extracted ?? [])
-          .filter(p => p.status === 'confirmed' && p.periodStart && p.periodEnd)
-          .map(p => ({ docId: d.id, pi: 0, start: parseLocalDate(p.periodStart as string), end: parseLocalDate(p.periodEnd as string) }))
-      )
-      const cov = analyzeCoverage(periods, coverageWin.start, coverageWin.end)
-      // fuelType: read off the first dated confirmed proposal; when none exists (the 'none' case),
-      // fall back to the document_type's canonical fuel so the blocking row is still labelled.
-      const fuelOfStrip = docs.flatMap(d => d.extracted ?? []).find(p => p.status === 'confirmed' && p.periodStart)?.fuelType
-        ?? fuelTypeForDocType(docType) ?? ''
+
+    const out: { locId: string; fuelType: string; status: string }[] = []
+    noneFuels.forEach(fuelType => out.push({ locId: loc.id, fuelType, status: 'none' }))
+    for (const [, g] of groups) {
+      const cov = analyzeCoverage(g.periods, coverageWin.start, coverageWin.end)
       const hasRes = (kind: CoverageResolution['kind']) =>
-        resolutions.some(r => r.kind === kind && r.locId === loc.id && r.fuelType === fuelOfStrip)
-      const unresolved =
-        cov.status === 'none' ||                                    // docs uploaded, no dated bills → blocks (no resolution)
-        (cov.status === 'gap' && !hasRes('extrapolate')) ||
-        (cov.status === 'overlap' && !hasRes('duplicate')) ||
-        (cov.status === 'straddle' && !hasRes('straddle'))
-      return unresolved ? [{ locId: loc.id, fuelType: fuelOfStrip, status: cov.status }] : []
-    })
+        resolutions.some(r => r.kind === kind && r.locId === loc.id && r.fuelType === g.fuelType)
+      // Require a resolution for EVERY issue present. Any unresolved issue blocks; report them together.
+      const unresolvedIssues = cov.issues.filter(iss => !hasRes(KIND_FOR[iss]))
+      if (unresolvedIssues.length > 0) out.push({ locId: loc.id, fuelType: g.fuelType, status: unresolvedIssues.join('+') })
+    }
+    return out
   })
 }
 

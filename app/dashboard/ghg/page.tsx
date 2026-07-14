@@ -8,7 +8,7 @@ import { generateAssurancePDF } from '../../../lib/assurancePdf'
 import { useSearchParams, useRouter } from 'next/navigation'
 
 import {
-  GWP, EF_SOURCES, GRID_EF,
+  EF_SOURCES,
   US_STATES, US_SUBREGIONS, AU_STATES, EU_COUNTRIES, EU_COUNTRY_OPTIONS,
   GRID_REGIONS_CA, GRID_REGIONS_US, FRAMEWORKS,
   isResolvedGridRegion, getGridFactor, getResidualFactor,
@@ -1253,6 +1253,13 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                         <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: fw.color }}>{totals.biogenic.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
                       </div>
                     )}
+                    {totals.s3_td > 0 && (
+                      <div style={{ marginBottom: 6 }}>
+                        {/* Distinct Scope 3 (Cat 3) line — NZ electricity T&D losses. Never folded into S1/S2. */}
+                        <div style={{ fontSize: 11, color: '#888784' }}>Scope 3 (Cat 3 — electricity T&amp;D)</div>
+                        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: fw.color }}>{totals.s3_td.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                      </div>
+                    )}
                     {fw.id === 'cdp' && (
                       <>
                         <div style={{ marginBottom: 6 }}>
@@ -1551,6 +1558,8 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
       ['Scope 2 location-based (mtCO₂e)', totals.s2_location.toFixed(4)],
       ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Scope 2 market-based (mtCO₂e)', totals.s2_market.toFixed(4)]] : []),
       ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Biogenic CO₂ (mtCO₂) — reported separately', totals.biogenic.toFixed(4)]] : []),
+      // Distinct Scope 3 (Cat 3) line — NZ electricity T&D losses. Only when present; never in S1/S2.
+      ...(totals.s3_td > 0 ? [['Scope 3 Cat 3 — electricity T&D (mtCO₂e)', totals.s3_td.toFixed(4)]] : []),
       ...(fw.id === 'cdp' ? [
         [`Prior year Scope 1 (${inventory.reporting_year - 1}) mtCO₂e`, inventory.prior_year_s1],
         [`Prior year Scope 2 (${inventory.reporting_year - 1}) mtCO₂e`, inventory.prior_year_s2],
@@ -1731,40 +1740,43 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
       </div>
       <input ref={ref} type="file" multiple accept=".pdf,.xlsx,.csv,.jpg,.png" style={{ display: 'none' }} onChange={e => e.target.files && onUpload(e.target.files, locIdx, docType)} />
       {(() => {
-        // Coverage strip: aggregate this fuel's CONFIRMED proposals at this location, classify completeness.
+        // Coverage strip — ONE per (fuelType) at this location. A fleet_fuel upload carries gasoline AND
+        // diesel from the same bills; each fuel gets its OWN strip, status and resolution (the C1 fix), so a
+        // gap on diesel can't be cleared by acknowledging gasoline. Within a strip, a control is rendered
+        // for EACH unresolved issue in cov.issues — a gap+overlap fuel shows BOTH (the D1 fix).
         const win = periodFromYearAndEnd(reportingYear, fiscalYearEndMonth)
-        const periods: CoveragePeriod[] = docs.flatMap(d =>
-          (d.extracted ?? []).map((p, pi) => ({ p, pi, docId: d.id }))
-            .filter(x => x.p.status === 'confirmed' && x.p.periodStart && x.p.periodEnd)
-            .map(x => ({ docId: x.docId, pi: x.pi, start: parseLocalDate(x.p.periodStart as string), end: parseLocalDate(x.p.periodEnd as string) }))
-        )
-        if (periods.length === 0) return null
-        const cov = analyzeCoverage(periods, win.start, win.end)
- // Is there already an extrapolation resolution for this fuel at this location?
-        const fuelOfStrip = periods.length > 0 ? (docs.flatMap(d => d.extracted ?? []).find(p => p.status === 'confirmed' && p.periodStart)?.fuelType ?? '') : ''
-        // Resolutions on file for this fuel+location, keyed by kind.
-        const resFor = (kind: CoverageResolution['kind']) =>
-          coverageResolutions.find(r => r.kind === kind && r.locId === locId && r.fuelType === fuelOfStrip)
-        const gapRes = resFor('extrapolate')
-        const dupRes = resFor('duplicate')
-        const strdRes = resFor('straddle')
-        // A condition is "resolved" when its matching resolution exists.
-        const resolved =
-          (cov.status === 'gap' && !!gapRes) ||
-          (cov.status === 'overlap' && !!dupRes) ||
-          (cov.status === 'straddle' && !!strdRes)
-        const tone =
-          (cov.status === 'full' || resolved) ? { bg: '#E1F5EE', fg: '#0F6E56', icon: '✓' }
-          : { bg: '#FEF3E2', fg: '#ba7517', icon: '⚠' }
-        return (
-          <div style={{ marginTop: 8, background: tone.bg, borderRadius: 6, padding: '8px 10px', fontSize: 11, color: tone.fg, fontWeight: 600 }}>
-            <div>{tone.icon} {resolved ? `${cov.monthsCovered}/12 months from bills; remaining estimated (${cov.pctEstimated}% estimated).` : cov.summary}</div>
+        const groups = new Map<string, CoveragePeriod[]>()
+        docs.forEach(d => (d.extracted ?? []).forEach((p, pi) => {
+          if (p.status !== 'confirmed' || !p.periodStart || !p.periodEnd) return
+          const arr = groups.get(p.fuelType) ?? []
+          arr.push({ docId: d.id, pi, start: parseLocalDate(p.periodStart as string), end: parseLocalDate(p.periodEnd as string) })
+          groups.set(p.fuelType, arr)
+        }))
+        if (groups.size === 0) return null
+        const KIND_FOR = { gap: 'extrapolate', overlap: 'duplicate', straddle: 'straddle' } as const
+        return [...groups.entries()].map(([fuelOfStrip, periods]) => {
+          const cov = analyzeCoverage(periods, win.start, win.end)
+          const resFor = (kind: CoverageResolution['kind']) =>
+            coverageResolutions.find(r => r.kind === kind && r.locId === locId && r.fuelType === fuelOfStrip)
+          const gapRes = resFor('extrapolate')
+          const dupRes = resFor('duplicate')
+          const strdRes = resFor('straddle')
+          // Resolved only when EVERY issue present has its matching resolution on file.
+          const unresolvedIssues = cov.issues.filter(iss => !resFor(KIND_FOR[iss]))
+          const resolved = unresolvedIssues.length === 0
+          const tone =
+            resolved ? { bg: '#E1F5EE', fg: '#0F6E56', icon: '✓' }
+            : { bg: '#FEF3E2', fg: '#ba7517', icon: '⚠' }
+          const fuelPrefix = groups.size > 1 && fuelOfStrip ? `${fuelOfStrip}: ` : ''
+          return (
+          <div key={fuelOfStrip} style={{ marginTop: 8, background: tone.bg, borderRadius: 6, padding: '8px 10px', fontSize: 11, color: tone.fg, fontWeight: 600 }}>
+            <div>{tone.icon} {fuelPrefix}{resolved && cov.issues.length > 0 ? `${cov.monthsCovered}/12 months from bills; remaining estimated (${cov.pctEstimated}% estimated).` : cov.summary}</div>
             {cov.outOfWindow.length > 0 && (
               <div style={{ marginTop: 4, fontWeight: 400, color: '#555553' }}>
                 ℹ️ {cov.outOfWindow.length} bill{cov.outOfWindow.length > 1 ? 's' : ''} outside reporting year {reportingYear}, not counted: {cov.outOfWindow.map(o => o.label).join(', ')}.
               </div>
             )}
-            {cov.status === 'gap' && !resolved && (
+            {cov.issues.includes('gap') && !gapRes && (
               <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <span style={{ fontWeight: 400, color: '#7c5a16' }}>Upload the missing bill above, or:</span>
                 <button
@@ -1781,7 +1793,7 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
                 >Acknowledge &amp; estimate</button>
               </div>
             )}
-            {cov.status === 'overlap' && !resolved && (
+            {cov.issues.includes('overlap') && !dupRes && (
               <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <span style={{ fontWeight: 400, color: '#7c5a16' }}>Two bills cover the same period — remove the duplicate above, or:</span>
                 <button
@@ -1796,7 +1808,7 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
                 >Confirm not a duplicate</button>
               </div>
             )}
-            {cov.status === 'straddle' && !resolved && (
+            {cov.issues.includes('straddle') && !strdRes && (
               <div style={{ marginTop: 6 }}>
                 <div style={{ fontWeight: 400, color: '#7c5a16', marginBottom: 6 }}>A bill crosses the reporting-year boundary. How should the overlapping portion be counted?</div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -1824,7 +1836,8 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
               </div>
             )}
           </div>
-        )
+          )
+        })
       })()}
       {docs.map(doc => (
         <div key={doc.id} style={{ padding: '3px 0' }}>
