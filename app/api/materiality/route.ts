@@ -104,7 +104,15 @@ export async function POST(req: NextRequest) {
         horizon: input.horizon,
         impact_overrides: input.impactOverrides,
         results: result,
-        workings: { input, modelVersion: result.modelVersion },
+        // disclosure = report-only context (NOT engine inputs). Carried through verbatim so the CSRD
+        // report shows what the user supplied — never a default that looks like an answer.
+        workings: {
+          input, modelVersion: result.modelVersion,
+          disclosure: {
+            reportingPeriod: typeof body.reportingPeriod === 'string' && body.reportingPeriod.trim() ? body.reportingPeriod.trim() : null,
+            legalEntity: typeof body.legalEntity === 'string' && body.legalEntity.trim() ? body.legalEntity.trim() : null,
+          },
+        },
         model_version: result.modelVersion,
         status: 'complete',
       })

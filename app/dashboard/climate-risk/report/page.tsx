@@ -141,7 +141,13 @@ function Row({ k, v }: { k: string; v: string }) {
     </div>
   )
 }
-function Pill({ band }: { band: 'high' | 'med' | 'low' }) {
+function Pill({ band }: { band: 'high' | 'med' | 'low' | 'unknown' }) {
+  // Resilience cells are always assessed (collectItems filters out unknown physical upstream), so
+  // 'unknown' shouldn't reach here — but the band union now includes it, so guard defensively rather
+  // than crash on a future invariant change. Amber "Not assessed", never a silent LOW.
+  if (band === 'unknown') {
+    return <span style={{ background: '#FDF6EC', color: '#8A5A12', border: '0.5px solid #EAD9BE', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99 }}>NOT ASSESSED</span>
+  }
   const c = SEV[band]
   return <span style={{ background: c.bg, color: c.color, border: `0.5px solid ${c.border}`, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99 }}>{band.toUpperCase()}</span>
 }
@@ -164,6 +170,71 @@ function joinList(xs: string[]): string {
   if (xs.length <= 1) return xs[0] ?? ''
   if (xs.length === 2) return `${xs[0]} and ${xs[1]}`
   return `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`
+}
+
+// Scenario-response scatter: each risk positioned by its band under the Paris-aligned (x) vs
+// high-warming (y) future. Ported here so this is the ONE renderer of the resilience artefact
+// (the near-copy in materiality/report was deleted). Self-contained SVG.
+function ResilienceMap({ items }: { items: any[] }) {
+  const risks = (items || []).filter((i: any) => i.kind !== 'opportunity')
+  const W = 620, H = 470, padL = 92, padT = 50, plotW = 340, plotH = 350
+  const px = (f: number) => padL + f * plotW
+  const py = (f: number) => padT + (1 - f) * plotH
+  const frac = (b: string) => b === 'high' ? 0.82 : b === 'med' ? 0.5 : 0.18
+  const bandAt = (it: any, role: string) => it.cells?.find((c: any) => c.role === role)?.band ?? 'low'
+
+  // Group by (paris-band, high-band) cell; stack collisions vertically so labels stay legible.
+  const groups = new Map<string, any[]>()
+  for (const it of risks) {
+    const key = bandAt(it, 'paris') + '|' + bandAt(it, 'high')
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key)!.push(it)
+  }
+  type P = { it: any; cx: number; cy: number; color: string }
+  const placed: P[] = []
+  for (const [key, arr] of groups) {
+    const [xb, yb] = key.split('|')
+    const baseX = px(frac(xb)), baseY = py(frac(yb))
+    const n = arr.length
+    arr.forEach((it: any, i: number) => {
+      placed.push({ it, cx: baseX, cy: baseY + (i - (n - 1) / 2) * 24, color: it.kind === 'physical' ? '#C2410C' : '#7425e3' })
+    })
+  }
+
+  const axis = '#888784', grid = '#e8e7e4', muted = '#555553', ink = '#0d0d0d', hint = '#a8a6a1'
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10 }} role="img" aria-label="Resilience scenario-response map: risks plotted by exposure under a rapid-policy future versus a high-warming future">
+      <line x1={px(0.5)} y1={padT} x2={px(0.5)} y2={padT + plotH} stroke={grid} strokeDasharray="3 4" />
+      <line x1={padL} y1={py(0.5)} x2={padL + plotW} y2={py(0.5)} stroke={grid} strokeDasharray="3 4" />
+      <line x1={padL} y1={padT} x2={padL} y2={padT + plotH} stroke={axis} />
+      <line x1={padL} y1={padT + plotH} x2={padL + plotW} y2={padT + plotH} stroke={axis} />
+      <line x1={px(0.18)} y1={py(0.18)} x2={px(0.82)} y2={py(0.82)} stroke="#b8b6b1" strokeDasharray="2 5" />
+      <text x={px(0.82)} y={padT + 4} textAnchor="middle" fontSize="11" fill={hint}>persistent / robust</text>
+      <text x={px(0.2)} y={padT + 4} textAnchor="middle" fontSize="11" fill={hint}>warming-driven</text>
+      <text x={px(0.82)} y={padT + plotH - 8} textAnchor="middle" fontSize="11" fill={hint}>policy-driven</text>
+      <text x={padL - 10} y={py(0.82) + 4} textAnchor="end" fontSize="11" fill={muted}>High</text>
+      <text x={padL - 10} y={py(0.5) + 4} textAnchor="end" fontSize="11" fill={muted}>Mod</text>
+      <text x={padL - 10} y={py(0.18) + 4} textAnchor="end" fontSize="11" fill={muted}>Low</text>
+      <text x={px(0.18)} y={padT + plotH + 18} textAnchor="middle" fontSize="11" fill={muted}>Low</text>
+      <text x={px(0.5)} y={padT + plotH + 18} textAnchor="middle" fontSize="11" fill={muted}>Mod</text>
+      <text x={px(0.82)} y={padT + plotH + 18} textAnchor="middle" fontSize="11" fill={muted}>High</text>
+      <text x={padL + plotW / 2} y={padT + plotH + 42} textAnchor="middle" fontSize="12" fill={muted}>Exposure under a rapid-policy (Paris-aligned) future →</text>
+      <text x={34} y={padT + plotH / 2} textAnchor="middle" fontSize="12" fill={muted} transform={`rotate(-90 34 ${padT + plotH / 2})`}>Exposure under a high-warming future →</text>
+      {placed.map((d, i) => {
+        const left = d.cx <= px(0.5)
+        return (
+          <g key={i}>
+            <circle cx={d.cx} cy={d.cy} r={7} fill={d.color} opacity={0.9} />
+            <text x={left ? d.cx - 12 : d.cx + 12} y={d.cy + 4} textAnchor={left ? 'end' : 'start'} fontSize="12" fill={ink}>{d.it.label}</text>
+          </g>
+        )
+      })}
+      <circle cx={padL + 8} cy={H - 12} r={6} fill="#C2410C" />
+      <text x={padL + 20} y={H - 8} fontSize="12" fill={muted}>Physical risk</text>
+      <circle cx={padL + 142} cy={H - 12} r={6} fill="#7425e3" />
+      <text x={padL + 154} y={H - 8} fontSize="12" fill={muted}>Transition risk</text>
+    </svg>
+  )
 }
 
 // ─── Resilience report (multi-scenario) ───────────────────────────────────────
@@ -259,8 +330,8 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
             Multi-scenario resilience assessment of climate-related risks and opportunities across a diverse range of climate futures, as required for {isCsrd ? 'CSRD / ESRS E1' : 'IFRS S2'} resilience disclosure.
           </p>
           <div style={{ borderTop: '1px solid #e8e7e4', borderBottom: '1px solid #e8e7e4', padding: '20px 0', marginBottom: 24 }}>
-            <Row k="Legal entity" v={a.workings?.input?.legalEntity || a.company_name || '—'} />
-            <Row k="Reporting period" v={a.workings?.input?.reportingPeriod || 'FY2025'} />
+            <Row k="Legal entity" v={a.workings?.disclosure?.legalEntity || 'Not specified'} />
+            <Row k="Reporting period" v={a.workings?.disclosure?.reportingPeriod || 'Not specified'} />
             <Row k="Primary sector" v={SECTOR_LABEL[a.industry_code] || a.industry_code} />
             <Row k="Operating regions (IPCC AR6)" v={(a.region_codes || []).map((c: string) => `${REGION_LABEL[c] || c} (${c})`).join(', ') || '—'} />
             <Row k="Policy jurisdictions" v={(a.jurisdiction_codes || []).map((c: string) => JURISDICTION_LABEL[c] || c).join(', ') || '—'} />
@@ -283,6 +354,15 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
           </div>
         </section>
 
+        {/* RESILIENCE MAP — scenario-response scatter (ported from the deleted materiality/report copy) */}
+        {(physical.length > 0 || transition.length > 0) && (
+          <section className="page" style={{ marginTop: 48 }}>
+            <H>Resilience map</H>
+            <p style={p}>Each risk is positioned by its exposure under a rapid-policy (Paris-aligned) future and under a high-warming future. Risks toward the top-right are material whichever way the future unfolds; the spread between the physical group (toward the top) and the transition group (toward the right) is the two-channel exposure. Axes use the calibrated bands (Low / Moderate / High), the measure that is comparable across drivers.</p>
+            <ResilienceMap items={items} />
+          </section>
+        )}
+
         {/* SCENARIO SELECTION & RATIONALE — credibility register 1 */}
         <section className="page" style={{ marginTop: 48 }}>
           <H>Scenario selection and rationale</H>
@@ -301,6 +381,7 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
             </tbody>
           </table>
           <p style={p}>This satisfies the explicit requirements of both frameworks: IFRS S2 paragraph 22(b)(i) requires disclosure of whether the scenario analysis used a diverse range of scenarios and one aligned with the latest international agreement on climate change (the Paris-aligned pathway above); CSRD/ESRS E1 requires consideration of at least a high-emissions scenario (the high-warming pathway above). Under both, the choice of scenarios and the rationale for that choice are themselves disclosable; this section documents that judgment.</p>
+          <p style={p}>This screening uses a standard diverse trio spanning the IPCC AR6 range, including a Paris-aligned scenario. It is NOT TAILORED TO YOUR ENTITY. IFRS S2 22(b)(i) requires an entity to explain why its chosen scenarios are relevant to it. A formal assessment should select scenarios that stress the specific hazards and jurisdictions identified in this screening, and state that reasoning. Scenario selection is a matter for management.</p>
         </section>
 
         {/* PER-CHANNEL DETAIL */}
@@ -321,6 +402,9 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
         <section className="page" style={{ marginTop: 48 }}>
           <H>Methodology and basis</H>
           <p style={p}>This resilience analysis runs the underlying climate-risk engine across each scenario in the diverse trio, then derives a resilience conclusion using a transparent, rules-based synthesis. Every classification and statement traces to the underlying scores; no narrative is free-generated.</p>
+          <h3 style={h3}>Timing of the analysis</h3>
+          <p style={p}><strong>Scenario analysis carried out:</strong> {reportDate}.<br /><strong>Reporting period covered:</strong> {a.workings?.disclosure?.reportingPeriod || 'Not specified'}.</p>
+          <p style={p}>IFRS S2 permits climate-related scenario analysis to be refreshed on the entity&rsquo;s strategic planning cycle rather than annually. The resilience conclusion drawn from it must be reassessed and disclosed in every annual reporting period.</p>
           <h3 style={h3}>Frameworks</h3>
           <ul style={ul}>
             <li style={li}><strong>IPCC AR6 WGI reference regions</strong> and <strong>climatic impact-drivers</strong> — the basis for physical-hazard exposure.</li>

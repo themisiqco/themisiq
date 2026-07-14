@@ -102,7 +102,15 @@ export async function POST(req: NextRequest) {
         horizon: input.horizon,
         impact_overrides: input.impactOverrides,
         results: { analysisType: 'resilience', resilience },
-        workings: { input, modelVersion: resilience.modelVersion, analysisType: 'resilience' },
+        // disclosure = report-only context (NOT engine inputs, so deliberately outside AssessmentInput).
+        // Carried through verbatim so the report shows what the user actually supplied — never a default.
+        workings: {
+          input, modelVersion: resilience.modelVersion, analysisType: 'resilience',
+          disclosure: {
+            reportingPeriod: typeof body.reportingPeriod === 'string' && body.reportingPeriod.trim() ? body.reportingPeriod.trim() : null,
+            legalEntity: typeof body.legalEntity === 'string' && body.legalEntity.trim() ? body.legalEntity.trim() : null,
+          },
+        },
         model_version: resilience.modelVersion,
         status: 'complete',
       })
