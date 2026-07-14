@@ -8,11 +8,11 @@ import { generateAssurancePDF } from '../../../lib/assurancePdf'
 import { useSearchParams, useRouter } from 'next/navigation'
 
 import {
-  GWP, REFRIGERANT_GWP, EF, EF_SOURCES, GRID_EF,
+  GWP, EF_SOURCES, GRID_EF,
   US_STATES, US_SUBREGIONS, AU_STATES, EU_COUNTRIES, EU_COUNTRY_OPTIONS,
   GRID_REGIONS_CA, GRID_REGIONS_US, FRAMEWORKS,
-  nzTdLoss, isResolvedGridRegion, getGridFactor, getResidualFactor,
-  detectGridRegion, gridRegionForCountry, propaneEfKey, pickEF, combustionSource,
+  isResolvedGridRegion, getGridFactor, getResidualFactor,
+  detectGridRegion, gridRegionForCountry, pickEF, combustionSource,
   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation,
   applyResolutions, findUnresolvedCoverage, findUndeclaredStreams, STREAM_META,
   ngUnitOptions, normalizeNgUnit, liquidUnitOptions, propaneUnitOptions,
@@ -896,6 +896,9 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
     const loc = inventory.locations[activeLocation]
     const calc = calcLocation(loc, 'AR6', inventory.reporting_year)
     const detectedRegion = [...GRID_REGIONS_CA, ...GRID_REGIONS_US].find(r => r.value === loc.grid_region)
+    // The question a user is asked and the absence they later attest MUST be the same words (STEP 3):
+    // both derive from STREAM_META. See the attestation block below and the workings declaration rows.
+    const streamQuestion = (s: DeclarableStream) => `Does this location ${STREAM_META[s].verb} ${STREAM_META[s].name}?`
     return (
       <div>
         <h2 style={sectionHead}>Energy & fuel data</h2>
@@ -920,7 +923,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '2rem', alignItems: 'start' }}>
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 20 }}>
-            <QuestionCard question="Does this location use natural gas?" hint="For heating, boilers, furnaces — check your gas utility bills" checked={loc.has_natural_gas} onToggle={v => updateLocation(activeLocation, 'has_natural_gas', v)}>
+            <QuestionCard question={streamQuestion('natural_gas')} hint="For heating, boilers, furnaces — check your gas utility bills" checked={loc.has_natural_gas} onToggle={v => updateLocation(activeLocation, 'has_natural_gas', v)}>
               {loc.has_natural_gas && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <p style={qHint}>What unit does your gas supplier show on bills?</p>
@@ -941,7 +944,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 </div>
               )}
             </QuestionCard>
-            <QuestionCard question="Does this location use propane or LPG?" hint="For forklifts and heating — check delivery records" checked={loc.has_propane} onToggle={v => updateLocation(activeLocation, 'has_propane', v)}>
+            <QuestionCard question={streamQuestion('propane')} hint="For forklifts and heating — check delivery records" checked={loc.has_propane} onToggle={v => updateLocation(activeLocation, 'has_propane', v)}>
               {loc.has_propane && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
@@ -956,7 +959,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 </div>
               )}
             </QuestionCard>
-            <QuestionCard question="Does this location use diesel in stationary equipment?" hint="Backup generators, boilers — not vehicles" checked={loc.has_diesel_stationary} onToggle={v => updateLocation(activeLocation, 'has_diesel_stationary', v)}>
+            <QuestionCard question={streamQuestion('diesel_stationary')} hint="Backup generators, boilers — not vehicles" checked={loc.has_diesel_stationary} onToggle={v => updateLocation(activeLocation, 'has_diesel_stationary', v)}>
               {loc.has_diesel_stationary && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
@@ -971,7 +974,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 </div>
               )}
             </QuestionCard>
-            <QuestionCard question="Does this location use fuel oil?" hint="Heating oil for boilers or furnaces — check delivery records" checked={loc.has_fuel_oil} onToggle={v => updateLocation(activeLocation, 'has_fuel_oil', v)}>
+            <QuestionCard question={streamQuestion('fuel_oil')} hint="Heating oil for boilers or furnaces — check delivery records" checked={loc.has_fuel_oil} onToggle={v => updateLocation(activeLocation, 'has_fuel_oil', v)}>
               {loc.has_fuel_oil && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <Field label={`Total fuel oil purchased — ${inventory.reporting_year} (gallons)`}>
@@ -981,7 +984,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 </div>
               )}
             </QuestionCard>
-            <QuestionCard question="Does this location have company-owned vehicles or mobile equipment?" hint="Delivery trucks, forklifts, company cars — check fleet fuel cards" checked={loc.has_mobile} onToggle={v => updateLocation(activeLocation, 'has_mobile', v)}>
+            <QuestionCard question={streamQuestion('mobile')} hint="Delivery trucks, forklifts, company cars — check fleet fuel cards" checked={loc.has_mobile} onToggle={v => updateLocation(activeLocation, 'has_mobile', v)}>
               {loc.has_mobile && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 14 }}>
                   <Field label={`Gasoline for company vehicles — ${inventory.reporting_year}`} hint="Cars, light trucks, vans">
@@ -1009,7 +1012,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
               )}
             </QuestionCard>
             <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.25rem' }}>
-              <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>Does this location have refrigeration or cooling?</div>
+              <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>{streamQuestion('refrigerants')}</div>
               <p style={qHint}>Large commercial refrigeration systems are common emission sources.</p>
               <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
                 <button onClick={() => { updateLocation(activeLocation, 'uses_ammonia', true); updateLocation(activeLocation, 'has_hfc_refrigerants', false) }} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: loc.uses_ammonia ? '#0F6E56' : '#f8f7f5', color: loc.uses_ammonia ? '#fff' : '#555553', border: `0.5px solid ${loc.uses_ammonia ? '#0F6E56' : '#e8e7e4'}`, }}>Ammonia (NH₃)</button>
@@ -1093,7 +1096,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 {isPaid ? <DocUpload label="Upload electricity bills" locIdx={activeLocation} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} /> : <LockedDocUpload label="Upload electricity bills" />}
               </div>
             </div>
-            <QuestionCard question="Does this location purchase steam or district heating?" hint="Purchased steam or hot water from a district energy system — Scope 2" checked={loc.has_purchased_steam} onToggle={v => updateLocation(activeLocation, 'has_purchased_steam', v)}>
+            <QuestionCard question={streamQuestion('purchased_steam')} hint="Purchased steam or hot water from a district energy system — Scope 2" checked={loc.has_purchased_steam} onToggle={v => updateLocation(activeLocation, 'has_purchased_steam', v)}>
               {loc.has_purchased_steam && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <Field label={`Total purchased steam — ${inventory.reporting_year} (mmbtu)`}>
@@ -1123,7 +1126,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                     {activeUndeclared.map(u => (
                       <label key={u.stream} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
                         <input type="checkbox" checked={false} onChange={() => attest([u.stream])} style={{ marginTop: 2, flexShrink: 0 }} />
-                        <span style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>No {STREAM_META[u.stream].noun} at this location</span>
+                        <span style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>This location has no {STREAM_META[u.stream].name}.</span>
                       </label>
                     ))}
                   </div>
@@ -1268,10 +1271,16 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 )
               })}
             </div>
-            {inventory.locations.map((loc, i) => {
-              const wGwp: GwpVersion = (FRAMEWORKS.find(f => f.id === activeExport)?.gwp as GwpVersion) || (activeFrameworks[0]?.gwp as GwpVersion) || 'AR6'
+            {(() => {
+            const wGwp: GwpVersion = (FRAMEWORKS.find(f => f.id === activeExport)?.gwp as GwpVersion) || (activeFrameworks[0]?.gwp as GwpVersion) || 'AR6'
+            // ONE derivation. The tested engine builds every workings row (including Phase-3b declaration
+            // rows and the always-emitted market-based row); the screen just filters by location. The
+            // second, hand-rolled table derivation that used to live here is gone (Phase 4).
+            const allRows = buildWorkings(inventory.locations, wGwp, inventory.reporting_year, coverageResolutions, inventory.fiscal_year_end_month)
+            return inventory.locations.map((loc, i) => {
               const c = calcLocation(loc, wGwp, inventory.reporting_year)
               const key = `loc_${i}`
+              const locRows = allRows.filter(r => r.location === (loc.name || 'Location'))
               return (
                 <div key={loc.id} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, marginBottom: 12, overflow: 'hidden' }}>
                   <div onClick={() => setShowWorkings(w => ({...w, [key]: !w[key]}))} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', }}>
@@ -1287,88 +1296,48 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
                         <thead><tr>{['Source', 'Activity data', 'Emission factor', 'Factor source', 'GWP basis', 'Result (mtCO₂e)'].map(h => <th key={h} style={{ background: '#f8f7f5', padding: '6px 10px', textAlign: 'left', fontSize: 10, fontWeight: 600, color: '#888784', borderBottom: '0.5px solid #e8e7e4' }}>{h}</th>)}</tr></thead>
                         <tbody>
-                          {loc.has_natural_gas && loc.natural_gas_amount > 0 && (() => {
-                            const ef = pickEF(loc, `natural_gas_${loc.natural_gas_unit}` as keyof typeof EF)
-                            const g = GWP[wGwp]
-                            const efCo2e = ef.co2 + ef.ch4 * g.CH4_fossil + ef.n2o * g.N2O
-                            const total = efCo2e * loc.natural_gas_amount / 1000
-                            return <tr><td style={wTd}>Natural gas</td><td style={wTd}>{loc.natural_gas_amount} {loc.natural_gas_unit}</td><td style={wTd}>{efCo2e.toFixed(3)} kg CO₂e/{loc.natural_gas_unit}</td><td style={wTd}>{combustionSource(loc)}</td><td style={wTd}>{wGwp}</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
-                          })()}
-                          {loc.has_propane && loc.propane_amount > 0 && (() => {
-                            const ef = pickEF(loc, propaneEfKey(loc.propane_unit) as keyof typeof EF)
-                            const g = GWP[wGwp]
-                            const efCo2e = ef.co2 + ef.ch4 * g.CH4_fossil + ef.n2o * g.N2O
-                            const total = efCo2e * loc.propane_amount / 1000
-                            return <tr><td style={wTd}>Propane</td><td style={wTd}>{loc.propane_amount} {loc.propane_unit}</td><td style={wTd}>{efCo2e.toFixed(3)} kg CO₂e/{loc.propane_unit === 'gallons' ? 'gal' : loc.propane_unit === 'kg' ? 'kg' : 'L'}</td><td style={wTd}>{combustionSource(loc)}</td><td style={wTd}>{wGwp}</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
-                          })()}
-                          {loc.has_diesel_stationary && loc.diesel_stationary_amount > 0 && (() => {
-                            const ef = pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF)
-                            const g = GWP[wGwp]
-                            const efCo2e = ef.co2 + ef.ch4 * g.CH4_fossil + ef.n2o * g.N2O
-                            const total = efCo2e * loc.diesel_stationary_amount / 1000
-                            return <tr><td style={wTd}>Diesel (stationary)</td><td style={wTd}>{loc.diesel_stationary_amount} {loc.diesel_stationary_unit}</td><td style={wTd}>{efCo2e.toFixed(3)} kg CO₂e/{loc.diesel_stationary_unit === 'gallons' ? 'gal' : 'L'}</td><td style={wTd}>{combustionSource(loc)}</td><td style={wTd}>{wGwp}</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
-                          })()}
-                          {loc.has_fuel_oil && loc.fuel_oil_gallons > 0 && (() => {
-                            const ef = pickEF(loc, 'fuel_oil_gallon')
-                            const g = GWP[wGwp]
-                            const efCo2e = ef.co2 + ef.ch4 * g.CH4_fossil + ef.n2o * g.N2O
-                            const total = efCo2e * loc.fuel_oil_gallons / 1000
-                            return <tr><td style={wTd}>Fuel oil</td><td style={wTd}>{loc.fuel_oil_gallons} gallons</td><td style={wTd}>{efCo2e.toFixed(3)} kg CO₂e/gal</td><td style={wTd}>{combustionSource(loc)}</td><td style={wTd}>{wGwp}</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
-                          })()}
-                          {loc.has_mobile && loc.gasoline_amount > 0 && (() => {
-                            const ef = pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF)
-                            const g = GWP[wGwp]
-                            const efCo2e = ef.co2 + ef.ch4 * g.CH4_fossil + ef.n2o * g.N2O
-                            const total = efCo2e * loc.gasoline_amount / 1000
-                            return <tr><td style={wTd}>Gasoline (mobile)</td><td style={wTd}>{loc.gasoline_amount} {loc.gasoline_unit}</td><td style={wTd}>{efCo2e.toFixed(3)} kg CO₂e/{loc.gasoline_unit === 'gallons' ? 'gal' : 'L'}</td><td style={wTd}>{combustionSource(loc)}</td><td style={wTd}>{wGwp}</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
-                          })()}
-                          {loc.has_mobile && loc.diesel_mobile_amount > 0 && (() => {
-                            const ef = pickEF(loc, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF)
-                            const g = GWP[wGwp]
-                            const efCo2e = ef.co2 + ef.ch4 * g.CH4_fossil + ef.n2o * g.N2O
-                            const total = efCo2e * loc.diesel_mobile_amount / 1000
-                            return <tr><td style={wTd}>Diesel (mobile)</td><td style={wTd}>{loc.diesel_mobile_amount} {loc.diesel_mobile_unit}</td><td style={wTd}>{efCo2e.toFixed(3)} kg CO₂e/{loc.diesel_mobile_unit === 'gallons' ? 'gal' : 'L'}</td><td style={wTd}>{combustionSource(loc)}</td><td style={wTd}>{wGwp}</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
-                          })()}
-                          {!loc.uses_ammonia && loc.has_hfc_refrigerants && loc.refrigerant_purchased_kg > 0 && (() => {
-                            const ref_gwp = REFRIGERANT_GWP[loc.refrigerant_type]?.[wGwp] ?? 0
-                            const total = loc.refrigerant_purchased_kg * ref_gwp / 1000
-                            return <tr><td style={wTd}>Refrigerant ({loc.refrigerant_type})</td><td style={wTd}>{loc.refrigerant_purchased_kg} kg</td><td style={wTd}>GWP {ref_gwp}</td><td style={wTd}>IPCC {wGwp} / GHG Protocol</td><td style={wTd}>{wGwp}</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
-                          })()}
-                          {loc.electricity_kwh > 0 && isResolvedGridRegion(loc.grid_region) && (() => {
-                            const ef = getGridFactor(loc.grid_region, inventory.reporting_year).ef
-                            return <tr style={{ background: '#f8f7f5' }}><td style={wTd}>Electricity (S2 location)</td><td style={wTd}>{loc.electricity_kwh.toLocaleString()} kWh</td><td style={wTd}>{ef.toFixed(4)} kg CO₂e/kWh</td><td style={wTd}>{EF_SOURCES.electricity} — {loc.grid_region}</td><td style={wTd}>N/A</td><td style={{ ...wTd, fontWeight: 600, color: '#0F6E56' }}>{(loc.electricity_kwh * ef / 1000).toFixed(4)}</td></tr>
-                          })()}
-                          {loc.electricity_kwh > 0 && needsMarketBased && isResolvedGridRegion(loc.grid_region) && (() => {
-                            const mGwp: GwpVersion = (FRAMEWORKS.find(f => (f.id === 'esrs' || f.id === 'gri') && inventory.selected_frameworks.includes(f.id))?.gwp as GwpVersion) || 'AR6'
-                            const resRegion = loc.residual_region || (loc.grid_region.startsWith('EU_') ? loc.grid_region : '')
-                            const res = getResidualFactor(resRegion, inventory.reporting_year, mGwp)
-                            const gf = getGridFactor(loc.grid_region, inventory.reporting_year)
-                            const uncovered = Math.max(0, loc.electricity_kwh - loc.renewable_electricity_kwh)
-                            const mktEf = res.applicable ? res.ef : gf.ef
-                            const total = uncovered * mktEf / 1000
-                            const factorLabel = res.applicable ? `${mktEf.toFixed(4)} kg CO₂e/kWh (residual mix · ${res.usedRegion})` : `${mktEf.toFixed(4)} kg CO₂e/kWh (location-factor fallback)`
-                            const sourceLabel = `${res.source}${res.vintage && res.vintage !== 'n/a' ? ` · vintage: ${res.vintage}` : ''}${res.note ? ` · ${res.note}` : ''}`
-                            return <tr style={{ background: '#f8f7f5' }}><td style={wTd}>Electricity (S2 market-based)</td><td style={wTd}>{uncovered.toLocaleString()} kWh uncovered</td><td style={wTd}>{factorLabel}</td><td style={wTd}>{sourceLabel}</td><td style={wTd}>{res.applicable ? mGwp : 'location-based'}</td><td style={{ ...wTd, fontWeight: 600, color: '#0F6E56' }}>{total.toFixed(4)}</td></tr>
-                          })()}
-                          {loc.country === 'NZ' && loc.nz_td_losses && loc.electricity_kwh > 0 && (() => {
-                            // Scope 3 Cat 3 — reuses nzTdLoss() so this row can't diverge from the buildWorkings row.
-                            // Deliberately NOT rolled into the S1+S2 TOTAL below (T&D is Scope 3, its own labelled line).
-                            const td = nzTdLoss(inventory.reporting_year)
-                            const total = loc.electricity_kwh * td / 1000
-                            return <tr style={{ background: '#faf7ff' }}><td style={wTd}>Electricity T&D losses (NZ) — Scope 3 Cat 3</td><td style={wTd}>{loc.electricity_kwh.toLocaleString()} kWh</td><td style={wTd}>{td} kg CO₂e/kWh</td><td style={wTd}>NZ MfE 2026 · T&D (Scope 3 Cat 3)</td><td style={wTd}>Scope 3 Cat 3</td><td style={{ ...wTd, fontWeight: 600, color: '#7425e3' }}>{total.toFixed(4)}</td></tr>
-                          })()}
-                          {loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0 && (() => {
-                            const total = loc.purchased_steam_mmbtu * EF.steam_mmbtu / 1000
-                            return <tr style={{ background: '#f8f7f5' }}><td style={wTd}>Purchased steam (S2 location)</td><td style={wTd}>{loc.purchased_steam_mmbtu} mmbtu</td><td style={wTd}>{EF.steam_mmbtu} kg CO₂e/mmbtu</td><td style={wTd}>{EF_SOURCES.combustion}</td><td style={wTd}>N/A</td><td style={{ ...wTd, fontWeight: 600, color: '#0F6E56' }}>{total.toFixed(4)}</td></tr>
-                          })()}
-                          <tr style={{ background: '#0d0d0d' }}><td colSpan={5} style={{ ...wTd, color: '#fff', fontWeight: 700, background: '#0d0d0d' }}>TOTAL — {loc.name}</td><td style={{ ...wTd, color: '#fff', fontWeight: 700, background: '#0d0d0d' }}>{(c.s1_total + c.s2_location).toFixed(4)}</td></tr>
+                          {locRows.map((r, ri) => {
+                            // Declaration rows (Phase 3b) are now VISIBLE (the point of Phase 4). result_tco2e
+                            // null must never render as 0 — "0" is a claim of zero, "—" is an absence.
+                            if (r.declaration === 'attested_absent') {
+                              return <tr key={ri} style={{ background: '#f4f4f2' }}>
+                                <td style={{ ...wTd, color: '#888784' }}>{r.source}</td>
+                                <td style={{ ...wTd, color: '#888784' }}>—</td>
+                                <td style={{ ...wTd, color: '#888784' }}>—</td>
+                                <td style={{ ...wTd, color: '#888784' }}>{r.note}</td>
+                                <td style={{ ...wTd, color: '#888784' }}>{r.gwp_basis}</td>
+                                <td style={{ ...wTd, color: '#888784', fontWeight: 600 }}>0.0000</td>
+                              </tr>
+                            }
+                            if (r.declaration === 'undeclared') {
+                              return <tr key={ri} style={{ background: '#FEF3E2' }}>
+                                <td style={{ ...wTd, color: '#ba7517', fontWeight: 600 }}>{r.source}</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>{r.note}</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>{r.gwp_basis}</td>
+                                <td style={{ ...wTd, color: '#ba7517', fontWeight: 600 }}>—</td>
+                              </tr>
+                            }
+                            const s2 = r.scope === 2
+                            return <tr key={ri} style={s2 ? { background: '#f8f7f5' } : r.scope === 3 ? { background: '#faf7ff' } : undefined}>
+                              <td style={wTd}>{r.source}</td>
+                              <td style={wTd}>{r.activity_data == null ? '—' : `${r.activity_data} ${r.activity_unit}`}</td>
+                              <td style={wTd}>{r.emission_factor_display}</td>
+                              <td style={wTd}>{r.ef_source}</td>
+                              <td style={wTd}>{r.gwp_basis}</td>
+                              <td style={{ ...wTd, fontWeight: 600, color: s2 ? '#0F6E56' : '#7425e3' }}>{r.result_tco2e == null ? '—' : r.result_tco2e.toFixed(4)}</td>
+                            </tr>
+                          })}
+                          <tr style={{ background: '#0d0d0d' }}><td colSpan={5} style={{ ...wTd, color: '#fff', fontWeight: 700, background: '#0d0d0d' }}>TOTAL — {loc.name} (Scope 1 + Scope 2 location-based)</td><td style={{ ...wTd, color: '#fff', fontWeight: 700, background: '#0d0d0d' }}>{(c.s1_total + c.s2_location).toFixed(4)}</td></tr>
                         </tbody>
                       </table>
                     </div>
                   )}
                 </div>
               )
-            })}
+            })
+            })()}
             <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '1.5rem', marginTop: '1.5rem' }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginBottom: 12 }}>Assurance readiness — ISO 14064-3 / ISAE 3410</div>
               {[
@@ -1494,7 +1463,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                           <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {unresolvedGridLocations.length} location{unresolvedGridLocations.length > 1 ? 's' : ''} need{unresolvedGridLocations.length > 1 ? '' : 's'} a grid region: {unresolvedGridLocations.map(l => l.name).join(', ')}</div>
                         )}
                         {undeclaredStreams.length > 0 && (
-                          <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {undeclaredStreams.length} undeclared stream{undeclaredStreams.length > 1 ? 's' : ''} — enter the data or attest absent on the Energy &amp; fuel step: {undeclaredStreams.map(u => `${u.locName}: ${STREAM_META[u.stream].label}`).join('; ')}</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {undeclaredStreams.length} undeclared stream{undeclaredStreams.length > 1 ? 's' : ''} — enter the data or attest absent on the Energy &amp; fuel step: {undeclaredStreams.map(u => `${u.locName}: ${STREAM_META[u.stream].name}`).join('; ')}</div>
                         )}
                         <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>Export is locked until every figure read from your bills is confirmed, every coverage gap, overlap, or boundary-straddle is resolved, and every emission stream is either entered or attested absent. Check the Energy &amp; fuel data step.</div>
                       </div>
@@ -1604,10 +1573,13 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
         : []),
       [''],
       ['LOCATION BREAKDOWN'],
-      ['Location', 'State', 'S1 Total', 'S2 Location'],
+      // Grid region, not State: loc.state is empty for CA (province), UK, EU, NZ — every non-US location
+      // exported a blank jurisdiction. grid_region (US_PA / ON / NZ) is the key the factor was looked up
+      // under, which is exactly what a verifier needs to reconcile the number.
+      ['Location', 'Grid region', 'S1 Total', 'S2 Location'],
       ...inventory.locations.map(loc => {
         const c = calcLocation(loc, fw.gwp as 'AR4' | 'AR5', inventory.reporting_year)
-        return [loc.name, loc.state, c.s1_total.toFixed(4), c.s2_location.toFixed(4)]
+        return [loc.name, loc.grid_region, c.s1_total.toFixed(4), c.s2_location.toFixed(4)]
       }),
       [''],
       ['DISCLAIMER'],

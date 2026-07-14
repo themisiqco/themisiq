@@ -1135,10 +1135,16 @@ interface Provenance {
 function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024, resolutions: CoverageResolution[] = [], fiscalYearEndMonth: number = 12) {
   const rows: any[] = []
   const win = periodFromYearAndEnd(year, fiscalYearEndMonth)
+  // Screen abbreviations for the combined-factor display, matching what renderStep4 showed (gal / L);
+  // every other unit (mcf, kg, therms, mmbtu…) passes through unchanged. emission_factor (the gas split)
+  // is UNTOUCHED — the CSV / verifier path depends on it. emission_factor_display is display-only.
+  const abbrevUnit = (u: string) => u === 'gallons' ? 'gal' : (u === 'litres' || u === 'liters') ? 'L' : u
   const pushFuel = (loc: Location, source: string, scope: number, activity: number, unit: string, ef: { co2: number; ch4: number; n2o: number }, prov?: Provenance) => {
     const g = calcGas(ef, activity, gwpVersion)
+    const gwp = GWP[gwpVersion]
+    const efCo2e = ef.co2 + ef.ch4 * gwp.CH4_fossil + ef.n2o * gwp.N2O
     rows.push({ location: loc.name || 'Location', source, scope, activity_data: activity, activity_unit: unit,
-      emission_factor: `CO2 ${ef.co2}, CH4 ${ef.ch4}, N2O ${ef.n2o} kg/${unit}`, ef_source: combustionSource(loc), gwp_basis: gwpVersion, result_tco2e: g.total, ...(prov ?? {}) })
+      emission_factor: `CO2 ${ef.co2}, CH4 ${ef.ch4}, N2O ${ef.n2o} kg/${unit}`, emission_factor_display: `${efCo2e.toFixed(3)} kg CO₂e/${abbrevUnit(unit)}`, ef_source: combustionSource(loc), gwp_basis: gwpVersion, result_tco2e: g.total, ...(prov ?? {}) })
   }
   for (const loc of locations) {
     // applyResolutions is the single source of the figure AND its provenance/method, so the number
@@ -1203,8 +1209,8 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       const meta = STREAM_META[s]
       const at = attestedAt.get(s)
       rows.push(at
-        ? { location: loc.name || 'Location', source: meta.label, scope: meta.scope, activity_data: 0, activity_unit: '—', emission_factor: '—', ef_source: '—', gwp_basis: 'declaration', result_tco2e: 0, declaration: 'attested_absent', entry_method: 'attestation', note: `No ${meta.noun} at this location. Attested ${at}.` }
-        : { location: loc.name || 'Location', source: meta.label, scope: meta.scope, activity_data: 0, activity_unit: '—', emission_factor: '—', ef_source: '—', gwp_basis: 'declaration', result_tco2e: null, declaration: 'undeclared', entry_method: 'undeclared', note: 'NOT DECLARED — completeness cannot be asserted.' })
+        ? { location: loc.name || 'Location', source: meta.name, scope: meta.scope, activity_data: 0, activity_unit: '—', emission_factor: '—', emission_factor_display: '—', ef_source: '—', gwp_basis: 'declaration', result_tco2e: 0, declaration: 'attested_absent', entry_method: 'attestation', note: `No ${meta.name} at this location. Attested ${at}.` }
+        : { location: loc.name || 'Location', source: meta.name, scope: meta.scope, activity_data: 0, activity_unit: '—', emission_factor: '—', emission_factor_display: '—', ef_source: '—', gwp_basis: 'declaration', result_tco2e: null, declaration: 'undeclared', entry_method: 'undeclared', note: 'NOT DECLARED — completeness cannot be asserted for this stream.' })
     }
   }
   // ── Coverage-resolution audit trail ──────────────────────────────────────
@@ -1226,6 +1232,10 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       resolved_at: r.acknowledgedAt,
     })
   }
+  // Rows with no gas split (electricity, refrigerant, steam, market-based, T&D, coverage resolutions)
+  // have no combined-factor form — their emission_factor IS already the display string. Declaration
+  // rows set their own '—'. Fill the rest so every row carries a display field for the workings table.
+  for (const r of rows) if (r.emission_factor_display === undefined) r.emission_factor_display = r.emission_factor
   return rows
 }
 
@@ -1286,16 +1296,20 @@ export interface StreamAttestation {
   attested_at: string      // ISO
 }
 
-// Display metadata for each stream's workings row (label, scope, human noun for the attestation note).
-export const STREAM_META: Record<DeclarableStream, { label: string; scope: number; noun: string }> = {
-  natural_gas:       { label: 'Natural gas',                          scope: 1, noun: 'natural gas supply' },
-  propane:           { label: 'Propane',                              scope: 1, noun: 'propane / LPG supply' },
-  diesel_stationary: { label: 'Diesel (stationary)',                  scope: 1, noun: 'stationary diesel' },
-  fuel_oil:          { label: 'Fuel oil',                             scope: 1, noun: 'fuel oil' },
-  mobile:            { label: 'Company vehicles / mobile equipment',  scope: 1, noun: 'company vehicles or mobile equipment' },
-  refrigerants:      { label: 'Refrigerants',                         scope: 1, noun: 'refrigeration or cooling' },
-  electricity:       { label: 'Electricity',                          scope: 2, noun: 'purchased electricity' },
-  purchased_steam:   { label: 'Purchased steam',                      scope: 2, noun: 'purchased steam / district heating' },
+// ONE canonical name per stream — the single source the QuestionCard question, the absence
+// attestation, and the workings declaration row all derive from, so the thing a user is ASKED and the
+// thing they ATTEST (a timestamped legal assertion in the assurance package) are word-for-word the same.
+// `verb` selects "use" vs "have" for the question. Same pattern as applyResolutions: define once,
+// consume in three places, they cannot drift.
+export const STREAM_META: Record<DeclarableStream, { name: string; verb: 'use' | 'have'; scope: number }> = {
+  natural_gas:       { name: 'natural gas',                          verb: 'use',  scope: 1 },
+  propane:           { name: 'propane / LPG',                        verb: 'use',  scope: 1 },
+  diesel_stationary: { name: 'diesel in stationary equipment',       verb: 'use',  scope: 1 },
+  fuel_oil:          { name: 'fuel oil',                             verb: 'use',  scope: 1 },
+  mobile:            { name: 'company vehicles or mobile equipment', verb: 'have', scope: 1 },
+  refrigerants:      { name: 'refrigeration or cooling',             verb: 'have', scope: 1 },
+  electricity:       { name: 'purchased electricity',               verb: 'use',  scope: 2 },
+  purchased_steam:   { name: 'purchased steam or district heating',  verb: 'use',  scope: 2 },
 }
 
 // True iff a location has DATA for a stream (the `has_*` flag or a positive amount). Shared by
