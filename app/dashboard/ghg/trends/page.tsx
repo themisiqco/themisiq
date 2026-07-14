@@ -329,7 +329,9 @@ export default function TrendsPage() {
               <p style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, marginBottom: 16, maxWidth: 620 }}>
                 Set near-term and net-zero targets under the SBTi Corporate Net-Zero Standard V2.0 — your baseline is already here. Your target pathway will appear on this chart.
               </p>
-              <a href="/dashboard/sbti" style={{ display: 'inline-block', fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none' }}>Set science-based targets →</a>
+              {/* Carry the selected company to SBTi (highest-precedence selection) so it binds to
+                  THIS company, not the alphabetical-first. `selected` is guaranteed non-null here. */}
+              <a href={`/dashboard/sbti?companyId=${selected.companyId}`} style={{ display: 'inline-block', fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none' }}>Set science-based targets →</a>
             </div>
           )}
 

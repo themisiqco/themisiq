@@ -1511,7 +1511,9 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Your inventory is the baseline for science-based targets.</div>
                 <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6 }}>Set near-term and net-zero targets under the SBTi Corporate Net-Zero Standard V2.0 — built directly on the figures you just confirmed.</div>
               </div>
-              <a href="/dashboard/sbti" style={{ fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>Set science-based targets →</a>
+              {/* Carry THIS inventory's company so SBTi binds to it directly (highest-precedence
+                  selection), not the alphabetical-first. Falls back to the bare link if unsaved. */}
+              <a href={inventory.company_id ? `/dashboard/sbti?companyId=${inventory.company_id}` : '/dashboard/sbti'} style={{ fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>Set science-based targets →</a>
             </div>
           )}
         </div>

@@ -155,6 +155,8 @@ export default function SbtiDashboard() {
   const [baselineYear, setBaselineYear] = useState<number | null>(null)
   const [baselineByScope, setBaselineByScope] = useState<{ scope1: number; scope2Location: number; scope3: number | null } | null>(null)
   const [series, setSeries] = useState<CompanySeries | null>(null)   // retain full series (per-year actuals) for the progress view
+  const [allSeries, setAllSeries] = useState<CompanySeries[]>([])    // every company; drives the picker (rendered when >1)
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null) // which company this screen is bound to
   const [hasSavedTargets, setHasSavedTargets] = useState(false)      // load-time routing signal (true when saved rows existed)
   const [targetDrafts, setTargetDrafts] = useState<Partial<Record<Scope, Draft>>>({})
 
@@ -168,7 +170,26 @@ export default function SbtiDashboard() {
   const [savingTargets, setSavingTargets] = useState(false)
   const [savedTargets, setSavedTargets] = useState(false)
 
-  // Resolve the active company (via the GHG series) + prefill any existing profile.
+  // Clear ALL per-company state so switching companies never bleeds company A's profile, scopes,
+  // or target drafts into company B. Called at the start of every per-company (re)load.
+  const resetPerCompanyState = () => {
+    setNetTurnover(''); setEmployeeCount(''); setBalanceSheet(''); setTotalEmissions(''); setHighIncome(null)
+    setStandardVersion('v2_0'); setSelectedScopes([])
+    setTargetDrafts({}); setNetZeroDrafts({})
+    setSavedTargets(false); setSavedNetZero(false); setSaved(false); setDirty(false)
+    setHasSavedTargets(false); setGhgScope12(null)
+    setStep(0); setView('wizard')
+  }
+
+  // Switch the active company. Guard unsaved target edits (same intent as the beforeunload guard).
+  const onPickCompany = (cid: string) => {
+    if (cid === selectedCompanyId) return
+    if (dirty && !window.confirm('You have unsaved target edits. Switch company and discard them?')) return
+    setSelectedCompanyId(cid)
+  }
+
+  // Load ALL companies once. The picker (rendered when there is more than one) chooses which one
+  // this screen binds to; the default is the first (buildCompanySeries sorts by company name).
   useEffect(() => {
     if (!isPaid) return
     let cancelled = false
@@ -180,12 +201,31 @@ export default function SbtiDashboard() {
 
       const res = await loadCompanySeries()
       if (cancelled) return
-      // NOTE: single-company assumption — pins to the first series. Multi-company accounts
-      // need a company picker here (backlogged) before this screen is safe for >1 company.
-      // buildCompanySeries sorts by company NAME, so series[0] is the ALPHABETICALLY-FIRST
-      // company (e.g. "Acme…" always wins) — NOT the most recent one the user navigated from.
-      const series = res.series[0] ?? null
-      if (!series) { setLoading(false); return } // no inventory → empty state below
+      setAllSeries(res.series)
+      // Selection precedence: (1) a valid ?companyId= in the URL (the GHG→SBTi bridge — highest),
+      // else (2) auto-select when there is exactly ONE company (no ambiguity), else (3) select
+      // NOTHING. With 2+ companies and no param we must NOT guess — the UI shows a "select a
+      // company" prompt. Auto-picking the alphabetical-first here is the original bug in a dropdown.
+      const fromUrl = new URLSearchParams(window.location.search).get('companyId')
+      const valid = !!fromUrl && res.series.some(s => s.companyId === fromUrl)
+      const initialId = valid ? fromUrl : (res.series.length === 1 ? res.series[0].companyId : null)
+      setSelectedCompanyId(prev => prev ?? initialId)
+      // Nothing selected (0 companies, or 2+ with no param) → no per-company load to wait on, so
+      // stop the spinner now. Effect B owns setLoading(false) when a company IS selected.
+      if (initialId == null) setLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [isPaid])
+
+  // Load the SELECTED company's baseline, profile, and saved targets. Re-runs on every switch;
+  // resets first so nothing from the previously-selected company survives into this one.
+  useEffect(() => {
+    const series = allSeries.find(s => s.companyId === selectedCompanyId)
+    if (!series) return
+    let cancelled = false
+    ;(async () => {
+      setLoading(true)
+      resetPerCompanyState()
 
       setCompanyId(series.companyId)
       setCompanyName(series.company)
@@ -196,7 +236,7 @@ export default function SbtiDashboard() {
       setBaselineYear(series.baselineYear)
       const baseYr = series.years.find(y => y.year === series.baselineYear) ?? latest
       if (baseYr) setBaselineByScope({ scope1: baseYr.scope1, scope2Location: baseYr.scope2Location, scope3: baseYr.scope3 })
-      setSeries(res.series[0] ?? null) // persist the full series alongside the baseline figures
+      setSeries(series) // persist the full series alongside the baseline figures
 
       const { data: profile } = await supabase
         .from('sbti_company_profile')
@@ -212,8 +252,7 @@ export default function SbtiDashboard() {
         setHighIncome(profile.high_income_country ?? null)
       }
 
-      // Load existing NEAR-TERM targets → seed cards. Saved values WIN over ACA defaults;
-      // the rendered scopes are the union of (saved rows) ∪ (Step-2 selection).
+      // Load existing NEAR-TERM targets → seed cards. Reset cleared prior state, so seed = replace.
       const { data: targetRows } = await supabase
         .from('sbti_targets')
         .select('scope, base_year, target_year, reduction_pct, base_year_emissions_tco2e')
@@ -233,7 +272,7 @@ export default function SbtiDashboard() {
           }
           savedScopes.push(sc)
         }
-        setTargetDrafts(prev => ({ ...prev, ...seeded })) // saved values overwrite any ACA default
+        setTargetDrafts(prev => ({ ...prev, ...seeded })) // prev is {} after reset → replace
         setSelectedScopes(prev => Array.from(new Set([...prev, ...savedScopes])))
         // Step 4 reads saved near-term scopes via the nearTermTargetScopes memo (selectedScopes ∩ targetDrafts).
       }
@@ -256,16 +295,16 @@ export default function SbtiDashboard() {
             storedBaseEmissions: row.base_year_emissions_tco2e ?? null, // FROZEN baseline (net-zero row's own frozen value)
           }
         }
-        setNetZeroDrafts(prev => ({ ...prev, ...seededNz })) // saved values overwrite the 90/2050 default
+        setNetZeroDrafts(prev => ({ ...prev, ...seededNz }))
       }
-      setHasSavedTargets((targetRows?.length ?? 0) > 0 || (nzRows?.length ?? 0) > 0)
-      // One-shot initial view: a returning user with saved targets lands on the summary.
-      // Runs once on load (NOT a reactive effect), so a later "Edit targets →" is never overridden.
-      if ((targetRows?.length ?? 0) > 0 || (nzRows?.length ?? 0) > 0) setView('summary')
+      const hasSaved = (targetRows?.length ?? 0) > 0 || (nzRows?.length ?? 0) > 0
+      setHasSavedTargets(hasSaved)
+      // A returning user with saved targets lands on the summary; otherwise the wizard (reset default).
+      setView(hasSaved ? 'summary' : 'wizard')
       setLoading(false)
     })()
     return () => { cancelled = true }
-  }, [isPaid])
+  }, [selectedCompanyId, allSeries])
 
   // Live categorisation — undeclared high-income (null) → false, so Route 2 stays dormant.
   const result = useMemo(() => categorize({
@@ -674,10 +713,35 @@ export default function SbtiDashboard() {
         <h1 style={sectionHead}>SBTi Targets</h1>
         <p style={sectionSub}>Set and monitor your science-based targets under the Corporate Net-Zero Standard V2.0.</p>
 
-        {/* Loading + empty-state live ABOVE the step shell — no steps until a company exists. */}
+        {/* Company picker — shown only when the account has more than one company. Stays mounted
+            during a switch (gated on allSeries, NOT loading) so it doesn't flicker; the content
+            below swaps to "Loading…" while the selected company's targets load. */}
+        {allSeries.length > 1 && (
+          <div style={{ marginBottom: 20, maxWidth: 420 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }}>
+              Company
+            </label>
+            <select
+              value={selectedCompanyId ?? ''}
+              onChange={(e) => onPickCompany(e.target.value)}
+              style={{ width: '100%', fontSize: 13, padding: '9px 12px', border: '0.5px solid #e8e7e4', borderRadius: 8, outline: 'none', boxSizing: 'border-box', background: '#fff' }}
+            >
+              {selectedCompanyId == null && <option value="" disabled>Select a company…</option>}
+              {allSeries.map((s) => (
+                <option key={s.companyId} value={s.companyId}>
+                  {s.company} ({s.years.length} year{s.years.length === 1 ? '' : 's'})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Loading + empty/select states live ABOVE the step shell — no steps until a company is
+            actually chosen. Three distinct states: no companies at all → onboarding; companies
+            exist but none selected (2+ and no ?companyId=) → "select a company"; else summary/wizard. */}
         {loading ? (
           <div style={{ fontSize: 13, color: '#888784', fontWeight: 300 }}>Loading…</div>
-        ) : !companyId ? (
+        ) : allSeries.length === 0 ? (
           <div style={{ background: '#f8f7f5', border: '1px solid #e8e7e4', borderRadius: 14, padding: '2.5rem 2rem', textAlign: 'center' }}>
             <div style={eyebrow}>No inventory yet</div>
             <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, marginBottom: 6 }}>Set up your GHG inventory first</div>
@@ -685,6 +749,10 @@ export default function SbtiDashboard() {
               SBTi categorisation reads from your GHG company. Create a GHG inventory, then come back to set targets.
             </p>
             <a href="/dashboard/ghg" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: '#0d0d0d', color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Go to GHG inventory →</a>
+          </div>
+        ) : !companyId ? (
+          <div style={{ background: '#f8f7f5', border: '1px solid #e8e7e4', borderRadius: 14, padding: '2.5rem 2rem', textAlign: 'center' }}>
+            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', fontWeight: 400, color: '#0d0d0d' }}>Select a company to view or set its science-based targets.</div>
           </div>
         ) : view === 'summary' ? (
           <SbtiSummary onEdit={() => setView('wizard')} />
