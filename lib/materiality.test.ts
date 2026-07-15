@@ -416,4 +416,23 @@ describe('GROUP G — provenance summary counts the reference values THIS result
     // s2 runs no matrix, so the industry topic-baseline rows are not used → fewer counted values.
     expect(s2.nTotal).toBeLessThan(csrd.nTotal)
   })
+
+  it('G4 a resilience analysis counts ALL THREE SSP scenario rows — the mr_scenarios primary_source proof', () => {
+    // The trio runs ssp126/ssp245/ssp585, so all three scenario rows are used. When they are
+    // primary_source (the AR6 attribution), the resilience report must show n_primary_source ≥ 3.
+    const cite = 'IPCC AR6 WGI (2021), SPM, Table SPM.1'
+    const ref = baseRef({
+      scenarios: [
+        { code: 'ssp126', label: 'SSP1-2.6', framework: 'IPCC', descriptor: '~1.8°C', physical_mult: 0.7, transition_mult: 1.3, provenance: 'primary_source', source_ref: cite },
+        { code: 'ssp245', label: 'SSP2-4.5', framework: 'IPCC', descriptor: '~2.7°C', physical_mult: 1.0, transition_mult: 1.0, provenance: 'primary_source', source_ref: cite },
+        { code: 'ssp585', label: 'SSP5-8.5', framework: 'IPCC', descriptor: '~4.4°C', physical_mult: 1.5, transition_mult: 0.8, provenance: 'primary_source', source_ref: cite },
+      ],
+    })
+    const p = runResilience(baseInput({ mode: 'csrd' }), ref).provenance
+    expect(p.nPrimarySource).toBeGreaterThanOrEqual(3)   // all three SSP rows counted, not one
+    expect(p.primarySources).toContain(cite)             // deduped to the single citation
+    // A single (non-resilience) assessment on one SSP counts that scenario just once.
+    const single = runAssessment(baseInput({ mode: 'csrd', scenarioCode: 'ssp245' }), ref).provenance
+    expect(single.nPrimarySource).toBe(1)
+  })
 })

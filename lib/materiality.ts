@@ -709,6 +709,22 @@ function joinList(xs: string[]): string {
   return `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`
 }
 
+// Provenance for a resilience analysis. Unlike a single assessment (one scenario), the trio RUNS ALL
+// THREE SSPs — so all three scenario rows are genuinely used and must be counted. Union the
+// per-scenario used-row sets by object identity: the non-scenario rows are shared references and
+// dedupe to once; the three distinct scenario rows are each counted. Hence an all-SSP-primary_source
+// scenario table yields n_primary_source ≥ 3, not 1.
+export function computeResilienceProvenance(input: AssessmentInput, ref: ReferenceData): ProvenanceSummary {
+  const seen = new Set<ProvenanceFields>()
+  const rows: ProvenanceFields[] = []
+  for (const t of RESILIENCE_TRIO) {
+    for (const r of usedReferenceRows({ ...input, scenarioCode: t.code }, ref)) {
+      if (!seen.has(r)) { seen.add(r); rows.push(r) }
+    }
+  }
+  return summariseProvenance(rows)
+}
+
 // ---------------------------------------------------------------------------
 // runResilience — public entry point. Runs the diverse trio at the chosen
 // horizon, checks horizon sensitivity on the middle scenario, synthesises.
@@ -736,7 +752,7 @@ export function runResilience(input: AssessmentInput, ref: ReferenceData): Resil
 
   return {
     modelVersion: ref.config.model_version,
-    provenance: computeProvenance(input, ref),
+    provenance: computeResilienceProvenance(input, ref),
     trio: RESILIENCE_TRIO.map(t => ({ role: t.role as ResilienceRole, scenarioCode: t.code, label: t.label, warming: t.warming, source: t.source })),
     perScenario,
     items,
