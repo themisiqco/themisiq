@@ -211,6 +211,7 @@ function ReportInner() {
   if (!a) return <Centered>No assessment data.</Centered>
 
   const result = a.results || {}
+  const prov = result.provenance   // provenance roll-up; absent on records saved before provenance shipped
   const physical: any[] = result.physical || []
   const transition: any[] = result.transition || []
   const matrix: any[] = result.matrix || []
@@ -487,6 +488,28 @@ function ReportInner() {
           <H>Data lineage</H>
           <p style={p}>The following inputs were provided by the user for this assessment: primary sector, operating regions, policy jurisdictions, asset profile, time horizon, scenario, and the per-topic impact-materiality self-assessment. All scoring defaults — hazard sensitivities, regional hazard intensities, carbon exposure, jurisdictional policy intensities, transition-driver weights, opportunity relevances, and ESRS topic baselines — are platform reference values, not entity-supplied. The boundary matters for assurance: user inputs scope the assessment; platform defaults and the impact self-assessment must be validated, and informed by stakeholder engagement, before any disclosure.</p>
         </section>
+
+        {/* ── DATA PROVENANCE — how firm the reference values are. Disclosed, never gated. ── */}
+        {prov && prov.nTotal > 0 && (
+          <section className="page" style={{ marginTop: 48 }}>
+            <H>Data provenance</H>
+            <p style={p}>This assessment draws on {prov.nTotal} reference {prov.nTotal === 1 ? 'value' : 'values'}.</p>
+            <ul style={ul}>
+              <li style={li}><strong>{prov.nPrimarySource}</strong> transcribed from named primary sources{prov.nPrimarySource > 0 ? ' (listed below)' : ''}</li>
+              <li style={li}><strong>{prov.nExpertJudgment}</strong> disclosed ThemisIQ expert-judgment determinations</li>
+              <li style={li}><strong>{prov.nStarter}</strong> starter values pending calibration</li>
+            </ul>
+            <p style={p}>Starter values are reasonable sector- and region-level defaults derived from public frameworks (IPCC AR6, TCFD, ESRS, EU Taxonomy). They have not yet been individually validated against a primary source and should be reviewed against entity-specific data before disclosure.</p>
+            {Array.isArray(prov.primarySources) && prov.primarySources.length > 0 && (
+              <>
+                <h3 style={h3}>Primary sources</h3>
+                <ul style={ul}>
+                  {prov.primarySources.map((s: string, i: number) => <li key={'ps' + i} style={li}>{s}</li>)}
+                </ul>
+              </>
+            )}
+          </section>
+        )}
 
         {/* ── LIMITATIONS ────────────────────────────────────────────────── */}
         <section className="page" style={{ marginTop: 48 }}>

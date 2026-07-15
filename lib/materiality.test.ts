@@ -12,6 +12,7 @@ import { describe, it, expect } from 'vitest'
 import {
   runAssessment,
   runResilience,
+  computeProvenance,
   type ReferenceData,
   type AssessmentInput,
   type ModelConfig,
@@ -378,5 +379,41 @@ describe('GROUP F — horizon trend must be severity-aware, not count-based', ()
       }),
     )
     expect(res.synthesis.horizonNote).toBe('worsens') // RED: count-based trend reads 'stable'
+  })
+})
+
+describe('GROUP G — provenance summary counts the reference values THIS result used', () => {
+  it('G1 an assessment built entirely from starter-provenance refs → n_starter = count used, n_primary_source = 0', () => {
+    // baseRef rows carry no provenance tag, so every used value is treated as the least-firm
+    // category ('starter') — the honest current state of the model. The summary must count them
+    // all as starter and claim ZERO primary-source values (never over-stating firmness).
+    const res = runAssessment(baseInput({ mode: 'csrd' }), baseRef())
+    const p = res.provenance
+    expect(p.nTotal).toBeGreaterThan(0)
+    expect(p.nStarter).toBe(p.nTotal)          // every used value is starter
+    expect(p.nPrimarySource).toBe(0)
+    expect(p.nExpertJudgment).toBe(0)
+    expect(p.primarySources).toEqual([])
+    // The three buckets partition the total.
+    expect(p.nStarter + p.nPrimarySource + p.nExpertJudgment).toBe(p.nTotal)
+  })
+
+  it('G2 a used row tagged primary_source is counted and its source_ref is listed', () => {
+    // Tag the industry row (always used) as primary_source with a named citation.
+    const ref = baseRef({
+      industries: [{ code: 'tech-mfg', label: 'Tech manufacturing', carbon_exposure: 3, provenance: 'primary_source', source_ref: 'IPCC AR6 WGI Ch12, Table 12.4' }],
+    })
+    const p = runAssessment(baseInput({ mode: 'csrd' }), ref).provenance
+    expect(p.nPrimarySource).toBe(1)
+    expect(p.primarySources).toEqual(['IPCC AR6 WGI Ch12, Table 12.4'])
+    // It moved OUT of the starter bucket, not added on top.
+    expect(p.nStarter).toBe(p.nTotal - 1)
+  })
+
+  it('G3 counts only rows that fed THIS result — s2 mode excludes the CSRD topic baselines', () => {
+    const csrd = computeProvenance(baseInput({ mode: 'csrd' }), baseRef())
+    const s2 = computeProvenance(baseInput({ mode: 's2' }), baseRef())
+    // s2 runs no matrix, so the industry topic-baseline rows are not used → fewer counted values.
+    expect(s2.nTotal).toBeLessThan(csrd.nTotal)
   })
 })

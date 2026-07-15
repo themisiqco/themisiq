@@ -13,6 +13,15 @@
 // E1 (climate) financial score is overridden by the live physical/transition engine.
 
 // ---------- Reference-data shapes (rows from the mr_* tables) ----------
+// Provenance of a single reference value — mirrors the mr_* CHECK constraint (migration
+// 20260715_mr_provenance_columns). 'starter' = seeded sector/region default pending calibration;
+// 'primary_source' = transcribed from a named source (carried in source_ref); 'expert_judgment' =
+// a disclosed expert-set value. Optional on the row types below: rows loaded from the DB always
+// carry provenance (NOT NULL default 'starter'), but synthetic/legacy rows may omit it — in which
+// case the summary treats them as the LEAST-firm category ('starter'), never over-stating firmness.
+export type Provenance = 'starter' | 'primary_source' | 'expert_judgment'
+type ProvenanceFields = { provenance?: Provenance; source_ref?: string | null }
+
 export type ModelConfig = {
   model_version: string
   phys_high: number; phys_med: number
@@ -25,22 +34,22 @@ export type ModelConfig = {
   // jurisdiction factor (range ~0-26); the other three do not (range ~0-9), hence two scales.
   trans_policy_high: number; trans_policy_med: number
   trans_driver_high: number; trans_driver_med: number
-}
-export type Industry = { code: string; label: string; carbon_exposure: number }
+} & ProvenanceFields
+export type Industry = { code: string; label: string; carbon_exposure: number } & ProvenanceFields
 // The geography of the model — the IPCC AR6 reference regions offered in the UI. Sourced from
 // mr_regions (the single source of truth). `continent` groups the dropdown; `sort_order` orders it.
 export type Region = { code: string; label: string; continent: string; sort_order: number }
-export type RegionHazard = { region_code: string; hazard: string; intensity: number }
-export type IndustryHazard = { industry_code: string; hazard: string; sensitivity: number }
-export type Jurisdiction = { code: string; label: string; policy_intensity: number }
+export type RegionHazard = { region_code: string; hazard: string; intensity: number } & ProvenanceFields
+export type IndustryHazard = { industry_code: string; hazard: string; sensitivity: number } & ProvenanceFields
+export type Jurisdiction = { code: string; label: string; policy_intensity: number } & ProvenanceFields
 export type EsrsTopic = { code: string; label: string; category: string; sort_order: number }
-export type TopicBaseline = { industry_code: string; topic_code: string; financial_base: number; impact_base: number }
-export type IndustryOpportunity = { industry_code: string; opportunity_category: string; relevance: number; sort_order: number }
-export type IndustryTransitionDriver = { industry_code: string; transition_driver: string; weight: number; sort_order: number }
+export type TopicBaseline = { industry_code: string; topic_code: string; financial_base: number; impact_base: number } & ProvenanceFields
+export type IndustryOpportunity = { industry_code: string; opportunity_category: string; relevance: number; sort_order: number } & ProvenanceFields
+export type IndustryTransitionDriver = { industry_code: string; transition_driver: string; weight: number; sort_order: number } & ProvenanceFields
 export type Scenario = {
   code: string; label: string; framework: string; descriptor: string | null
   physical_mult: number; transition_mult: number
-}
+} & ProvenanceFields
 
 export type ReferenceData = {
   config: ModelConfig
@@ -97,9 +106,21 @@ export type MatrixTopic = {
   quadrant: 'both' | 'financial' | 'impact' | 'low' | 'unknown'
   dataStatus: 'assessed' | 'no_baseline'
 }
+// Provenance roll-up over the reference values THIS assessment actually used (the rows that fed the
+// result — not the whole reference tables). Disclosed, never gated (same posture as pct_estimated):
+// it tells a reader how firm the inputs are, it does not block the report.
+export type ProvenanceSummary = {
+  nTotal: number                 // reference values that fed this result
+  nPrimarySource: number         // transcribed from a named primary source
+  nExpertJudgment: number        // disclosed ThemisIQ expert-judgment determinations
+  nStarter: number               // seeded starter defaults pending calibration
+  primarySources: string[]       // distinct source_refs where provenance === 'primary_source'
+}
+
 export type AssessmentResult = {
   mode: 's2' | 'csrd'
   modelVersion: string
+  provenance: ProvenanceSummary
   physical: PhysicalRisk[]
   transition: TransitionRisk[]
   opportunities: Opportunity[]
@@ -330,6 +351,52 @@ function computeMatrix(input: AssessmentInput, ref: ReferenceData, climateFin: n
   })
 }
 
+// Every reference value (row) the assessment actually USED — the rows that fed THIS result, not the
+// whole reference tables. Deliberately mirrors the row selection each compute* does, kept adjacent
+// so the two cannot silently drift. Only the nine provenance-bearing tables are counted; the
+// dimension/label tables (mr_regions, mr_esrs_topics) carry no calibratable value.
+function usedReferenceRows(input: AssessmentInput, ref: ReferenceData): ProvenanceFields[] {
+  const rows: ProvenanceFields[] = []
+  rows.push(ref.config)                                                    // model config — always used (horizon, bands)
+  const industry = ref.industries.find(i => i.code === input.industryCode)
+  if (industry) rows.push(industry)                                        // carbon exposure (transition)
+  const scenario = ref.scenarios.find(s => s.code === input.scenarioCode)
+  if (scenario) rows.push(scenario)                                        // scenario multipliers
+  // industry hazards computePhysical actually iterates (sensitivity > 0)
+  const usedHazards = ref.industryHazards.filter(h => h.industry_code === input.industryCode && h.sensitivity > 0)
+  rows.push(...usedHazards)
+  // region hazards consulted for those hazards across the selected regions
+  const hazardSet = new Set(usedHazards.map(h => h.hazard))
+  rows.push(...ref.regionHazards.filter(r => input.regionCodes.includes(r.region_code) && hazardSet.has(r.hazard)))
+  // selected jurisdictions that exist (computeTransition scans them for the max policy intensity)
+  rows.push(...ref.jurisdictions.filter(j => input.jurisdictionCodes.includes(j.code)))
+  // per-sector transition-driver weights
+  rows.push(...ref.industryTransitionDrivers.filter(d => d.industry_code === input.industryCode))
+  // opportunities scored for this industry (relevance > 0)
+  rows.push(...ref.industryOpportunities.filter(o => o.industry_code === input.industryCode && o.relevance > 0))
+  // topic baselines feed the CSRD matrix only
+  if (input.mode === 'csrd') rows.push(...ref.topicBaselines.filter(b => b.industry_code === input.industryCode))
+  return rows
+}
+
+function summariseProvenance(rows: ProvenanceFields[]): ProvenanceSummary {
+  let nStarter = 0, nPrimarySource = 0, nExpertJudgment = 0
+  const primarySources = new Set<string>()
+  for (const r of rows) {
+    const p = r.provenance ?? 'starter'   // untagged → least-firm category; never over-states firmness
+    if (p === 'primary_source') { nPrimarySource++; if (r.source_ref) primarySources.add(r.source_ref) }
+    else if (p === 'expert_judgment') nExpertJudgment++
+    else nStarter++
+  }
+  return { nTotal: rows.length, nPrimarySource, nExpertJudgment, nStarter, primarySources: [...primarySources] }
+}
+
+// Public: the provenance roll-up for a single assessment. Exported so the resilience path (and tests)
+// can reuse the exact same accounting.
+export function computeProvenance(input: AssessmentInput, ref: ReferenceData): ProvenanceSummary {
+  return summariseProvenance(usedReferenceRows(input, ref))
+}
+
 export function runAssessment(input: AssessmentInput, ref: ReferenceData): AssessmentResult {
   const scenario = ref.scenarios.find(s => s.code === input.scenarioCode)
   if (!scenario) throw new Error(`Unknown scenario: ${input.scenarioCode}`)
@@ -343,6 +410,7 @@ export function runAssessment(input: AssessmentInput, ref: ReferenceData): Asses
   const matrix = input.mode === 'csrd' ? computeMatrix(input, ref, climateFin) : []
   return {
     mode: input.mode, modelVersion: ref.config.model_version,
+    provenance: computeProvenance(input, ref),
     physical, transition, opportunities, matrix, climateFinancialScore: climateFin,
     // Surface the exact asset modifiers applied so the physical scores are reproducible from the
     // artefact (these coefficients are not yet under model_version — see the ASSET_MOD note).
@@ -426,6 +494,9 @@ export type ResilienceSynthesis = {
 
 export type ResilienceResult = {
   modelVersion: string
+  // Provenance roll-up for the analysis. The trio's per-scenario runs use the same reference rows
+  // (each differs only by its one scenario row), so a single representative summary is accurate.
+  provenance: ProvenanceSummary
   trio: { role: ResilienceRole; scenarioCode: string; label: string; warming: string; source: string }[]
   perScenario: { role: ResilienceRole; scenarioCode: string; result: AssessmentResult }[]
   items: ResilienceItem[]
@@ -665,6 +736,7 @@ export function runResilience(input: AssessmentInput, ref: ReferenceData): Resil
 
   return {
     modelVersion: ref.config.model_version,
+    provenance: computeProvenance(input, ref),
     trio: RESILIENCE_TRIO.map(t => ({ role: t.role as ResilienceRole, scenarioCode: t.code, label: t.label, warming: t.warming, source: t.source })),
     perScenario,
     items,

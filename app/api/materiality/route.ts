@@ -51,16 +51,16 @@ export async function POST(req: NextRequest) {
       opportunitiesRes, transitionDriversRes,
     ] = await Promise.all([
       supabase.from('mr_model_config').select('*').eq('id', 1).single(),
-      supabase.from('mr_industries').select('code,label,carbon_exposure'),
+      supabase.from('mr_industries').select('code,label,carbon_exposure,provenance,source_ref'),
       supabase.from('mr_regions').select('code,label,continent,sort_order').eq('active', true).order('sort_order'),
-      supabase.from('mr_region_hazards').select('region_code,hazard,intensity'),
-      supabase.from('mr_industry_hazards').select('industry_code,hazard,sensitivity'),
-      supabase.from('mr_jurisdictions').select('code,label,policy_intensity'),
+      supabase.from('mr_region_hazards').select('region_code,hazard,intensity,provenance,source_ref'),
+      supabase.from('mr_industry_hazards').select('industry_code,hazard,sensitivity,provenance,source_ref'),
+      supabase.from('mr_jurisdictions').select('code,label,policy_intensity,provenance,source_ref'),
       supabase.from('mr_esrs_topics').select('code,label,category,sort_order'),
-      supabase.from('mr_industry_topic_baselines').select('industry_code,topic_code,financial_base,impact_base'),
-      supabase.from('mr_scenarios').select('code,label,framework,descriptor,physical_mult,transition_mult'),
-      supabase.from('mr_industry_opportunities').select('industry_code,opportunity_category,relevance,sort_order'),
-      supabase.from('mr_industry_transition_drivers').select('industry_code,transition_driver,weight,sort_order'),
+      supabase.from('mr_industry_topic_baselines').select('industry_code,topic_code,financial_base,impact_base,provenance,source_ref'),
+      supabase.from('mr_scenarios').select('code,label,framework,descriptor,physical_mult,transition_mult,provenance,source_ref'),
+      supabase.from('mr_industry_opportunities').select('industry_code,opportunity_category,relevance,sort_order,provenance,source_ref'),
+      supabase.from('mr_industry_transition_drivers').select('industry_code,transition_driver,weight,sort_order,provenance,source_ref'),
     ])
 
     const firstErr = [
