@@ -3,7 +3,6 @@
 -- Four world-readable reference tables + steel-tree seed. No RLS (published law, like mr_*).
 -- No `active` column (deliberate — dormant-column trap, cf. mr_jurisdictions).
 -- All CN codes and category assignments transcribed verbatim from IR 2025/2547 Annex I Table 1.
--- Applied to Supabase directly by Lisa; this file is the repo record of that live state.
 
 create table public.cbam_goods_categories (
   code text primary key,
