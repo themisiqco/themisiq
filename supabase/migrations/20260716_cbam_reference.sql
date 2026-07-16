@@ -33,10 +33,24 @@ create table public.cbam_production_routes (
   primary key (category_code, route_code)
 );
 
--- Categories (6) — all steel: CO2-only, Annex II direct-only, functional unit = tonne
+-- Categories (6) — all steel: CO2-only, functional unit = tonne
+-- annex_ii_direct_only = Annex II of Reg (EU) 2023/956 ("only direct emissions are to be taken into
+-- account"). Five of six are in Annex II via its blanket '72 – Iron and steel' heading. sintered_ore is
+-- NOT: 2601 12 00 is an iron ore (ch. 26), listed in Annex I (scope) but absent from Annex II, so BOTH
+-- direct and indirect emissions count for it. IR 2025/2621 Annex I corroborates — sintered ore is the
+-- only one of the six carrying a real indirect value; the rest show N/A.
+--
+-- FERROALLOY CAVEAT: Annex II membership SPLITS WITHIN heading 7202. Only 7202 11 / 7202 19 (FeMn),
+-- 7202 41 / 7202 49 (FeCr) and 7202 60 00 (FeNi) are in-scope direct-only. Ferro-silicon (7202 2),
+-- ferro-silico-manganese, ferro-silico-chromium, ferro-molybdenum, ferro-tungsten, ferro-titanium,
+-- ferro-vanadium, ferro-niobium, ferro-phosphorus, ferro-silico-magnesium and 7204 scrap are excepted
+-- in BOTH Annex I and Annex II — i.e. outside CBAM scope entirely, not merely outside direct-only.
+-- The per-category annex_ii_direct_only = true on ferroalloy is therefore safe ONLY because
+-- cbam_cn_map maps exactly those three prefixes (72021 / 72024 / 72026). Extending that mapping
+-- requires per-CN Annex II treatment IN THE SAME PASS — a category-level boolean cannot express it.
 insert into public.cbam_goods_categories
   (code, label, greenhouse_gases, annex_ii_direct_only, functional_unit, provenance, source_ref) values
-  ('sintered_ore',        'Sintered Ore',           '{CO2}', true, 'tonne', 'primary_source', 'IR 2025/2547 Annex I Table 1'),
+  ('sintered_ore',        'Sintered Ore',           '{CO2}', false, 'tonne', 'primary_source', 'IR 2025/2547 Annex I Table 1'),
   ('pig_iron',            'Pig Iron',               '{CO2}', true, 'tonne', 'primary_source', 'IR 2025/2547 Annex I Table 1'),
   ('dri',                 'DRI',                    '{CO2}', true, 'tonne', 'primary_source', 'IR 2025/2547 Annex I Table 1'),
   ('ferroalloy',          'FeMn/FeCr/FeNi',         '{CO2}', true, 'tonne', 'primary_source', 'IR 2025/2547 Annex I Table 1'),
