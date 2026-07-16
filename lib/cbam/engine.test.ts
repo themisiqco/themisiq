@@ -4,8 +4,16 @@
 // The sign convention is load-bearing: outputs carry ad < 0 so DirEm* nets carbon in − out
 // via a single sum. A test that expects a subtraction here is testing the wrong contract.
 import { describe, it, expect } from 'vitest';
-import { carbonContent, streamEmissions, massBalance } from './engine';
+import { carbonContent, streamEmissions, massBalance, attributeDirect } from './engine';
 import type { SourceStream } from './types';
+
+// Golden fixture A — two input streams netted against one output. DirEm* = 218.008.
+// Shared by the massBalance and attributeDirect suites so the two cannot drift apart.
+const FIXTURE_A: SourceStream[] = [
+  { kind: 'fuel', ccMode: 'direct', ad: 100, cc: 0.5, bf: 0 },
+  { kind: 'fuel', ccMode: 'direct', ad: 10, cc: 1.0, bf: 0 },
+  { kind: 'output', ccMode: 'direct', ad: -50, cc: 0.01, bf: 0 },
+];
 
 describe('carbonContent', () => {
   it('ccMode "direct" returns cc unchanged when bf = 0', () => {
@@ -42,11 +50,19 @@ describe('streamEmissions', () => {
 
 describe('massBalance', () => {
   it('nets outputs against inputs by summing signed stream emissions', () => {
-    const streams: SourceStream[] = [
-      { kind: 'fuel', ccMode: 'direct', ad: 100, cc: 0.5, bf: 0 },
-      { kind: 'fuel', ccMode: 'direct', ad: 10, cc: 1.0, bf: 0 },
-      { kind: 'output', ccMode: 'direct', ad: -50, cc: 0.01, bf: 0 },
-    ];
-    expect(massBalance(streams)).toBeCloseTo(218.008);
+    expect(massBalance(FIXTURE_A)).toBeCloseTo(218.008);
+  });
+});
+
+describe('attributeDirect', () => {
+  it('passes a positive DirEm* through unchanged (Eq 55, EAF single-process)', () => {
+    expect(attributeDirect(FIXTURE_A)).toBeCloseTo(218.008);
+  });
+
+  it('clamps a negative DirEm* to zero — the mandatory zero-floor, never returns negative', () => {
+    // This output stream alone gives massBalance = −183.2.
+    const streams: SourceStream[] = [{ kind: 'output', ccMode: 'direct', ad: -100, cc: 0.5, bf: 0 }];
+    expect(massBalance(streams)).toBeCloseTo(-183.2);
+    expect(attributeDirect(streams)).toBe(0);
   });
 });

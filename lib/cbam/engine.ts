@@ -31,3 +31,12 @@ export function streamEmissions(s: SourceStream): number {
 export function massBalance(streams: SourceStream[]): number {
   return streams.reduce((total, s) => total + streamEmissions(s), 0);
 }
+
+// AttrEm_Dir — attributed direct emissions of a production process. IR 2025/2547 Annex III, Eq 55.
+// EAF single-process MVP: heat import/export, waste-gas corrections, and on-site electricity
+// production are all zero, so Eq 55 collapses to max(0, DirEm*). The zero-floor is mandatory:
+// "Where AttrEm_Dir is calculated to have a negative value, it shall be set to zero."
+// PHASE 2 (integrated plants): AttrEm_Dir = max(0, DirEm* + emHimp − emHexp + wgCorrImp − wgCorrExp − emElProd)
+export function attributeDirect(streams: SourceStream[]): number {
+  return Math.max(0, massBalance(streams));
+}
