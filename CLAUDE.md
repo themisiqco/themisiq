@@ -78,6 +78,7 @@ The engine is pure calc (no React/Supabase): all factor tables, coverage analysi
 
 - Preserve **verbatim source values** where a verifier may cross-check against the source document (e.g. bill period end dates — do not silently normalize "May 01" to "Apr 30").
 - When a value can't be confidently derived, **flag it for manual review** rather than guessing.
+- **`mr_jurisdictions.active` is a DORMANT column — no route reads it.** All three queries (`api/materiality/reference`, `api/materiality`, `api/materiality/resilience`) omit `active` from both the filter and the select, so setting `active = false` is a silent no-op: the row is still fetched and still scored. Retiring a jurisdiction today requires a hard delete, not deactivation. If jurisdictions are ever wired to the DB the way `mr_regions` was, `active` must be added to the filter in all three routes IN THE SAME PASS, or deactivation will keep doing nothing. (Contrast: `mr_regions` DOES filter on `active`.)
 - The six-paragraph legal disclaimer is propagated across all Category-A surfaces (assurance PDF, climate-risk report, materiality report, assessment API, public methodology page, GHG inline report, climate-risk page disclaimers) and the per-module methodology Word docs. Keep these in sync; don't edit one in isolation.
 - Citations/attributions for GWP and emission factors must stay accurate (AR4/AR5/AR6 sourcing in `EF_SOURCES`).
 
