@@ -73,7 +73,6 @@ const REGION_COVERAGE: Record<string, string> = {
 
 const JURISDICTIONS = [
   { code: 'eu_ets', label: 'EU (EU ETS)', desc: 'Operate facilities in, or import energy-intensive goods into, the EU.' },
-  { code: 'cbam', label: 'EU CBAM exposure', desc: 'Sell steel, aluminium, cement, fertiliser, hydrogen, or electricity into the EU.' },
   { code: 'uk_ets', label: 'UK (UK ETS)', desc: 'Operate energy-intensive installations, power, or aviation in the UK.' },
   { code: 'ca', label: 'Canada (federal pricing)', desc: 'Operations in Canadian provinces under the federal carbon-pricing backstop.' },
   { code: 'us_fed', label: 'US (federal)', desc: 'US operations exposed to federal climate rules and SEC climate disclosure.' },
