@@ -1,0 +1,33 @@
+import { CO2_C_RATIO } from './params';
+import type { SourceStream } from './types';
+
+// Carbon content of a source stream. Eq 13 (ef_per_tj), Eq 14 (ef_per_t), Eq 15 (biomass).
+// Fail loud on missing inputs — a missing carbon input must never silently become 0.
+export function carbonContent(s: SourceStream): number {
+  let ccPre: number;
+  switch (s.ccMode) {
+    case 'direct':
+      if (s.cc == null) throw new Error('carbonContent: ccMode "direct" requires cc');
+      ccPre = s.cc;
+      break;
+    case 'ef_per_t':
+      if (s.ef == null) throw new Error('carbonContent: ccMode "ef_per_t" requires ef');
+      ccPre = s.ef / CO2_C_RATIO;                 // Eq 14
+      break;
+    case 'ef_per_tj':
+      if (s.ef == null || s.ncv == null) throw new Error('carbonContent: ccMode "ef_per_tj" requires ef and ncv');
+      ccPre = (s.ef * s.ncv) / CO2_C_RATIO;        // Eq 13
+      break;
+  }
+  return ccPre * (1 - s.bf);                        // Eq 15
+}
+
+// Emissions of one source stream. Eq 12: Em_k = f × AD_k × CC_k. Outputs (ad<0) come out negative.
+export function streamEmissions(s: SourceStream): number {
+  return CO2_C_RATIO * s.ad * carbonContent(s);
+}
+
+// DirEm* — sum over all streams. Single reduce; the sign convention does the netting, never subtract.
+export function massBalance(streams: SourceStream[]): number {
+  return streams.reduce((total, s) => total + streamEmissions(s), 0);
+}
