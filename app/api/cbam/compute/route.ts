@@ -96,8 +96,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to load comparison default' }, { status: 500 });
     }
     const defaultCompared: number | null = def ? Number(def.see_direct) : null;
-    const deltaVsDefault: number | null =
-      defaultCompared == null ? null : result.see - defaultCompared;
+    // Direct-to-direct: cbam_default_values.see_direct is a direct-only default, so compare it
+    // against the direct SEE, not the direct+indirect sum.
+    const deltaDirectVsDefault: number | null =
+      defaultCompared == null ? null : result.direct - defaultCompared;
 
     // ── Build a minimal, verifier-legible workings object ────────────
     // aeG + per-precursor m_i / see_i / provenance. see_i is re-derived via resolveSEE for DISPLAY
@@ -122,11 +124,13 @@ export async function POST(req: NextRequest) {
         process_id: process.id,
         company_id: process.company_id,
         cn_code: process.cn_code,
-        see_total: result.see,
+        see_direct: result.direct,
+        see_indirect: result.indirect,
+        see_total: result.direct + result.indirect,   // derived sum — the one legitimate merge point
         ae_g: result.aeG,
         precursor_contribution: result.precursorContribution,
         default_compared: defaultCompared,
-        delta_vs_default: deltaVsDefault,
+        delta_vs_default: deltaDirectVsDefault,
         workings,
         unresolved: result.unresolved,
       })

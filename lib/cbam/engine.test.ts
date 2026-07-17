@@ -98,7 +98,8 @@ describe('computeSEE', () => {
   it('with no precursors, SEE_g is just ae_g = AttrEm / AL_g (Eq 63)', () => {
     const r = computeSEE(218.008, 100, [], makeCtx());
     expect(r.aeG).toBeCloseTo(2.18008);
-    expect(r.see).toBeCloseTo(2.18008);
+    expect(r.direct).toBeCloseTo(2.18008);
+    expect(r.indirect).toBe(0);
     expect(r.precursorContribution).toBe(0);
     expect(r.unresolved).toEqual([]);
   });
@@ -107,7 +108,8 @@ describe('computeSEE', () => {
     const r = computeSEE(200, 100, [precursor({ massConsumed: 110 })], makeCtx({ defaultLookup: () => 1.4 }));
     expect(r.aeG).toBeCloseTo(2.0);
     expect(r.precursorContribution).toBeCloseTo(1.54); // m_i 1.1 × 1.4
-    expect(r.see).toBeCloseTo(3.54);
+    expect(r.direct).toBeCloseTo(3.54);
+    expect(r.indirect).toBe(0);
     expect(r.unresolved).toEqual([]);
   });
 
@@ -118,7 +120,8 @@ describe('computeSEE', () => {
       makeCtx({ defaultLookup: () => 1.4 }),
     );
     expect(r.precursorContribution).toBe(0);
-    expect(r.see).toBeCloseTo(2.0);
+    expect(r.direct).toBeCloseTo(2.0);
+    expect(r.indirect).toBe(0);
   });
 
   it('zero-rates an EU/exempted-origin precursor without consulting the default', () => {
@@ -132,7 +135,8 @@ describe('computeSEE', () => {
       }),
     );
     expect(r.precursorContribution).toBe(0);
-    expect(r.see).toBeCloseTo(r.aeG);
+    expect(r.direct).toBeCloseTo(r.aeG);
+    expect(r.indirect).toBe(0);
     expect(lookups).toBe(0); // the 99 was never reachable — zero-rating short-circuits first
   });
 
@@ -153,7 +157,8 @@ describe('computeSEE', () => {
       makeCtx({ defaultLookup: () => 99 }),
     );
     expect(r.precursorContribution).toBeCloseTo(1.2);
-    expect(r.see).toBeCloseTo(3.2);
+    expect(r.direct).toBeCloseTo(3.2);
+    expect(r.indirect).toBe(0);
     expect(r.unresolved).toEqual([]);
   });
 

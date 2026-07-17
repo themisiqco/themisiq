@@ -41,9 +41,10 @@ const streams: SourceStream[] = [
 ];
 const AL = 100;
 
-function show(label: string, r: { see: number; aeG: number; precursorContribution: number; unresolved: unknown[] }) {
+function show(label: string, r: { direct: number; indirect: number; aeG: number; precursorContribution: number; unresolved: unknown[] }) {
   console.log(`\n=== ${label} ===`);
-  console.log(`  see                   = ${r.see}`);
+  console.log(`  direct                = ${r.direct}`);
+  console.log(`  indirect              = ${r.indirect}`);
   console.log(`  aeG                   = ${r.aeG}`);
   console.log(`  precursorContribution = ${r.precursorContribution}`);
   console.log(`  unresolved            = ${JSON.stringify(r.unresolved)}`);

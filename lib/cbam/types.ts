@@ -32,7 +32,8 @@ export interface UnresolvedFlag {
 }
 
 export interface SEEResult {
-  see: number;                    // SEE_g
+  direct: number;                 // SEE_g direct (was: see, now split)
+  indirect: number;               // SEE_g indirect — HARDCODED 0 in increment 1 (real calc comes later)
   aeG: number;                    // specific attributed emissions (own process, no precursors)
   precursorContribution: number;  // Σ m_i · SEE_i
   unresolved: UnresolvedFlag[];   // LOUD failures — never silently swallowed

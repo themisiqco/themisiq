@@ -90,5 +90,6 @@ export function computeSEE(
     if (r.unresolved) unresolved.push(r.unresolved);
     precursorContribution += mI * r.value;                  // Eq 62 term
   }
-  return { see: aeG + precursorContribution, aeG, precursorContribution, unresolved };
+  // indirect: 0 — increment 1 is direct-only; real indirect computation is increment 2.
+  return { direct: aeG + precursorContribution, indirect: 0, aeG, precursorContribution, unresolved };
 }
