@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     // ── 2. Load the process (RLS scopes to the owner) ────────────────
     const { data: process, error: procErr } = await supabase
       .from('cbam_production_processes')
-      .select('id, company_id, cn_code, category_code, activity_level, reporting_period')
+      .select('id, company_id, cn_code, category_code, activity_level, reporting_period, installation_id, electricity_consumed')
       .eq('id', processId)
       .single();
 
@@ -54,8 +54,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Process is missing cn_code (the good produced)' }, { status: 400 });
     }
 
-    // ── 3. Load streams + precursors for this process ────────────────
-    const [streamsRes, precursorsRes] = await Promise.all([
+    // ── 3. Load streams + precursors + the two indirect-calc inputs for this process ──
+    //   * installation.country keys the grid factor (the SITE drawing grid power — NOT the
+    //     precursor's origin_country, which is a different concern: zero-rating + precursor defaults).
+    //   * annex_ii_direct_only (per goods category) gates the process's OWN indirect only.
+    const [streamsRes, precursorsRes, installationRes, categoryRes] = await Promise.all([
       supabase
         .from('cbam_source_streams')
         .select('stream_kind, activity_data, cc_mode, carbon_content, emission_factor, ncv, biomass_fraction')
@@ -64,12 +67,31 @@ export async function POST(req: NextRequest) {
         .from('cbam_precursor_inputs')
         .select('precursor_cn_code, precursor_category_code, mass_consumed, boundary, provenance, origin_country, see_value, verifier_report_id, reporting_period')
         .eq('process_id', processId),
+      supabase
+        .from('cbam_installations')
+        .select('country')
+        .eq('id', process.installation_id)
+        .single(),
+      supabase
+        .from('cbam_goods_categories')
+        .select('annex_ii_direct_only')
+        .eq('code', process.category_code)
+        .single(),
     ]);
 
     if (streamsRes.error || precursorsRes.error) {
       console.error('CBAM compute load error:', streamsRes.error || precursorsRes.error);
       return NextResponse.json({ error: 'Failed to load process inputs' }, { status: 500 });
     }
+    if (installationRes.error || !installationRes.data || categoryRes.error || !categoryRes.data) {
+      console.error('CBAM compute indirect-input load error:', installationRes.error || categoryRes.error);
+      return NextResponse.json({ error: 'Failed to load installation/category for indirect calc' }, { status: 500 });
+    }
+
+    const installationCountry: string = installationRes.data.country;
+    const annexIiDirectOnly: boolean = categoryRes.data.annex_ii_direct_only;
+    const electricityConsumed: number | null =
+      process.electricity_consumed == null ? null : Number(process.electricity_consumed);
 
     // ── 4. Adapt DB rows -> engine types (pinned mapping, testable) ──
     const streams = (streamsRes.data ?? []).map(adaptSourceStream);
@@ -82,7 +104,11 @@ export async function POST(req: NextRequest) {
 
     // ── 6. Run the engine (computeSEE is the SINGLE source of truth for the figure) ──
     const attrEm = attributeDirect(streams);
-    const result = computeSEE(attrEm, activityLevel, precursors, ctx);
+    const result = computeSEE(attrEm, activityLevel, precursors, ctx, {
+      annexIiDirectOnly,
+      electricityConsumed,
+      installationCountry,   // grid factor keys off the installation, not any precursor origin
+    });
 
     // ── 7. Compare against the default for the good produced (country 'other', MVP) ──
     const { data: def, error: defErr } = await supabase
@@ -107,14 +133,18 @@ export async function POST(req: NextRequest) {
     const workings = {
       aeG: result.aeG,
       precursorContribution: result.precursorContribution,
-      precursors: precursors.map((p) => ({
-        cnCode: p.cnCode,
-        boundary: p.boundary,
-        provenance: p.provenance,
-        m_i: p.massConsumed / activityLevel,     // Eq 61
-        see_i: resolveSEE(p, ctx).value,          // display value; matches what computeSEE used
-        counted: p.boundary !== 'joint',          // 'joint' is already inside AttrEm — not re-added
-      })),
+      precursors: precursors.map((p) => {
+        const r = resolveSEE(p, ctx);             // display values; match what computeSEE used
+        return {
+          cnCode: p.cnCode,
+          boundary: p.boundary,
+          provenance: p.provenance,
+          m_i: p.massConsumed / activityLevel,    // Eq 61
+          see_i_direct: r.direct,                 // both legs, per the direct/indirect split
+          see_i_indirect: r.indirect,
+          counted: p.boundary !== 'joint',        // 'joint' is already inside AttrEm — not re-added
+        };
+      }),
     };
 
     // ── 8. Persist the see_record (RLS WITH CHECK enforces company ownership) ──

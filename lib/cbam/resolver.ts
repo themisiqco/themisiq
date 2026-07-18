@@ -25,6 +25,9 @@ const FALLBACK_COUNTRY = 'other';
 
 const keyOf = (cnCode: string, country: string) => `${cnCode}|${country}`;
 
+// cbam_grid_factors also seeds an 'other' fallback row (IR 2025/2621 Annex II).
+const GRID_FALLBACK = 'other';
+
 /**
  * Build a ResolveContext backed by cbam_default_values.
  *
@@ -39,12 +42,13 @@ export async function makeResolveContext(
   const cnCodes = [...new Set(precursors.map(p => p.cnCode))];
   const countries = [...new Set([...precursors.map(p => p.originCountry), FALLBACK_COUNTRY])];
 
-  const defaults = new Map<string, number>();
+  // BOTH legs now. see_indirect is null for most rows (Annex II goods) → treat null as 0.
+  const defaults = new Map<string, { direct: number; indirect: number }>();
 
   if (cnCodes.length > 0) {
     const { data, error } = await supabase
       .from('cbam_default_values')
-      .select('cn_code, country, see_direct')
+      .select('cn_code, country, see_direct, see_indirect')
       .in('cn_code', cnCodes)
       .in('country', countries);
 
@@ -55,17 +59,36 @@ export async function makeResolveContext(
     }
 
     for (const row of data ?? []) {
-      defaults.set(keyOf(row.cn_code, row.country), Number(row.see_direct));
+      defaults.set(keyOf(row.cn_code, row.country), {
+        direct: Number(row.see_direct),
+        indirect: row.see_indirect == null ? 0 : Number(row.see_indirect),
+      });
+    }
+  }
+
+  // Grid factors are a small reference table — pre-fetch ALL rows so gridFactor() is a sync Map read,
+  // same pattern as defaults. Keyed by installation country (the site drawing grid power).
+  const gridFactors = new Map<string, number>();
+  {
+    const { data, error } = await supabase
+      .from('cbam_grid_factors')
+      .select('country_code, ef_co2e_mwh');
+    if (error) {
+      throw new Error(`makeResolveContext: cbam_grid_factors fetch failed: ${error.message}`);
+    }
+    for (const row of data ?? []) {
+      gridFactors.set(row.country_code, Number(row.ef_co2e_mwh));
     }
   }
 
   return {
     isEuOrExempted: (country: string) => EU_AND_EXEMPTED.has((country || '').toUpperCase().trim()),
 
-    // SEE_i for the DIRECT chain: returns see_direct, un-marked-up. See the report/README note —
-    // the mark-up columns (markup_2026/2027/2028_plus) apply to see_TOTAL, so no marked-up direct
-    // value exists in this table; applying one is a downstream declaration-layer decision, not this one.
-    defaultLookup: (p: PrecursorInput): number => {
+    // SEE_i for BOTH legs: returns { direct, indirect }, un-marked-up. See the report/README note —
+    // the mark-up columns (markup_2026/2027/2028_plus) apply to see_TOTAL, so no marked-up value
+    // exists in this table; applying one is a downstream declaration-layer decision, not this one.
+    // see_indirect is null for Annex II goods (already zeroed to 0 at pre-fetch) — a legitimate zero.
+    defaultLookup: (p: PrecursorInput): { direct: number; indirect: number } => {
       const specific = defaults.get(keyOf(p.cnCode, p.originCountry));
       if (specific != null) return specific;
 
@@ -81,9 +104,24 @@ export async function makeResolveContext(
       );
     },
 
+    // Grid emission factor for the installation's country (the site drawing grid power), 'other'
+    // fallback. Exact match then fallback, un-normalized — same documented DB-match seam as
+    // defaultLookup (country codes are stored canonical). FAIL LOUD if neither exists.
+    gridFactor: (country: string): number => {
+      const specific = gridFactors.get(country);
+      if (specific != null) return specific;
+
+      const fallback = gridFactors.get(GRID_FALLBACK);
+      if (fallback != null) return fallback;
+
+      throw new Error(
+        `gridFactor: no cbam_grid_factors row for country "${country}", nor fallback "${GRID_FALLBACK}"`,
+      );
+    },
+
     hasValidVerifierReport: (_p: PrecursorInput) => false, // no verifier-report store exists yet (build step 9) — nothing can be verified, so everything falls loudly to default. Correct, not a placeholder.
 
-    computeChildSEE: (p: PrecursorInput): number => {
+    computeChildSEE: (p: PrecursorInput): { direct: number; indirect: number } => {
       throw new Error(`computeChildSEE: computed_here recursion not implemented in MVP (precursor ${p.cnCode}). Scrap-EAF has no in-house CBAM precursors; this is Phase 2 (integrated plants).`);
     },
   };

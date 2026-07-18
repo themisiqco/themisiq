@@ -21,12 +21,17 @@ const FIXTURE_A: SourceStream[] = [
 function makeCtx(over: Partial<ResolveContext> = {}): ResolveContext {
   return {
     isEuOrExempted: () => false,
-    defaultLookup: () => 0,
+    defaultLookup: () => ({ direct: 0, indirect: 0 }),
+    gridFactor: () => 0,
     hasValidVerifierReport: () => true,
-    computeChildSEE: () => 0,
+    computeChildSEE: () => ({ direct: 0, indirect: 0 }),
     ...over,
   };
 }
+
+// Default opts for the pre-existing direct-only cases: Annex II good, no metered electricity.
+// These make ownIndirect 0 so every pre-existing direct value is unaffected.
+const OPTS = { annexIiDirectOnly: true, electricityConsumed: null, installationCountry: 'XX' };
 
 // A precursor with the fields SEE never reads set to inert values; tests override what they test.
 function precursor(over: Partial<PrecursorInput> = {}): PrecursorInput {
@@ -96,7 +101,7 @@ describe('attributeDirect', () => {
 
 describe('computeSEE', () => {
   it('with no precursors, SEE_g is just ae_g = AttrEm / AL_g (Eq 63)', () => {
-    const r = computeSEE(218.008, 100, [], makeCtx());
+    const r = computeSEE(218.008, 100, [], makeCtx(), OPTS);
     expect(r.aeG).toBeCloseTo(2.18008);
     expect(r.direct).toBeCloseTo(2.18008);
     expect(r.indirect).toBe(0);
@@ -105,7 +110,7 @@ describe('computeSEE', () => {
   });
 
   it('adds an external default precursor as m_i × SEE_i (Eq 61/62)', () => {
-    const r = computeSEE(200, 100, [precursor({ massConsumed: 110 })], makeCtx({ defaultLookup: () => 1.4 }));
+    const r = computeSEE(200, 100, [precursor({ massConsumed: 110 })], makeCtx({ defaultLookup: () => ({ direct: 1.4, indirect: 0 }) }), OPTS);
     expect(r.aeG).toBeCloseTo(2.0);
     expect(r.precursorContribution).toBeCloseTo(1.54); // m_i 1.1 × 1.4
     expect(r.direct).toBeCloseTo(3.54);
@@ -117,7 +122,8 @@ describe('computeSEE', () => {
     const r = computeSEE(
       200, 100,
       [precursor({ massConsumed: 110, boundary: 'joint' })],
-      makeCtx({ defaultLookup: () => 1.4 }),
+      makeCtx({ defaultLookup: () => ({ direct: 1.4, indirect: 0 }) }),
+      OPTS,
     );
     expect(r.precursorContribution).toBe(0);
     expect(r.direct).toBeCloseTo(2.0);
@@ -131,8 +137,9 @@ describe('computeSEE', () => {
       [precursor({ massConsumed: 110, originCountry: 'DE' })],
       makeCtx({
         isEuOrExempted: (c) => c === 'DE',
-        defaultLookup: () => { lookups++; return 99; },
+        defaultLookup: () => { lookups++; return { direct: 99, indirect: 99 }; },
       }),
+      OPTS,
     );
     expect(r.precursorContribution).toBe(0);
     expect(r.direct).toBeCloseTo(r.aeG);
@@ -144,7 +151,8 @@ describe('computeSEE', () => {
     const r = computeSEE(
       200, 100,
       [precursor({ massConsumed: 100, provenance: 'actual_verified', seeValue: 5.0 })],
-      makeCtx({ hasValidVerifierReport: () => false, defaultLookup: () => 1.4 }),
+      makeCtx({ hasValidVerifierReport: () => false, defaultLookup: () => ({ direct: 1.4, indirect: 0 }) }),
+      OPTS,
     );
     expect(r.precursorContribution).toBeCloseTo(1.4); // the default, NOT the unbacked seeValue of 5.0
     expect(r.unresolved).toEqual([{ cnCode: '7202', reason: 'missing_or_invalid_verifier_report' }]);
@@ -154,7 +162,8 @@ describe('computeSEE', () => {
     const r = computeSEE(
       200, 100,
       [precursor({ massConsumed: 100, provenance: 'actual_verified', seeValue: 1.2 })],
-      makeCtx({ defaultLookup: () => 99 }),
+      makeCtx({ defaultLookup: () => ({ direct: 99, indirect: 0 }) }),
+      OPTS,
     );
     expect(r.precursorContribution).toBeCloseTo(1.2);
     expect(r.direct).toBeCloseTo(3.2);
@@ -163,6 +172,46 @@ describe('computeSEE', () => {
   });
 
   it('throws when AL_g is not > 0 — ae_g would be a division by zero', () => {
-    expect(() => computeSEE(200, 0, [], makeCtx())).toThrow();
+    expect(() => computeSEE(200, 0, [], makeCtx(), OPTS)).toThrow();
+  });
+
+  // ── increment 2: indirect ────────────────────────────────────────
+  it('Annex II good suppresses its OWN indirect even when electricity is provided', () => {
+    const r = computeSEE(200, 100, [], makeCtx({ gridFactor: () => 0.465 }), {
+      annexIiDirectOnly: true, electricityConsumed: 50, installationCountry: 'TR',
+    });
+    expect(r.indirect).toBe(0);        // own suppressed — the Annex II gate
+    expect(r.direct).toBeCloseTo(2.0); // direct unaffected
+  });
+
+  it('non-Annex-II good prices its own indirect: electricity × gridFactor / AL', () => {
+    const r = computeSEE(200, 100, [], makeCtx({ gridFactor: () => 0.465 }), {
+      annexIiDirectOnly: false, electricityConsumed: 50, installationCountry: 'TR',
+    });
+    expect(r.indirect).toBeCloseTo(0.2325); // 50 × 0.465 / 100
+    expect(r.direct).toBeCloseTo(2.0);
+  });
+
+  it('Annex II good STILL inherits a precursor’s indirect (own suppressed, inherited rolls up)', () => {
+    const r = computeSEE(
+      200, 100,
+      [precursor({ massConsumed: 110 })],
+      makeCtx({ defaultLookup: () => ({ direct: 0, indirect: 0.070 }) }),
+      { annexIiDirectOnly: true, electricityConsumed: 50, installationCountry: 'TR' },
+    );
+    // own indirect suppressed (0), but the precursor's indirect inherits: m_i 1.1 × 0.070 = 0.077.
+    expect(r.indirect).toBeCloseTo(0.077);
+  });
+
+  it('EU-origin precursor zero-rates BOTH legs', () => {
+    const r = computeSEE(
+      200, 100,
+      [precursor({ massConsumed: 110, originCountry: 'DE' })],
+      makeCtx({ isEuOrExempted: (c) => c === 'DE', defaultLookup: () => ({ direct: 99, indirect: 99 }) }),
+      { annexIiDirectOnly: false, electricityConsumed: null, installationCountry: 'TR' },
+    );
+    expect(r.precursorContribution).toBe(0); // direct leg zero-rated
+    expect(r.indirect).toBe(0);              // indirect leg zero-rated too; own indirect null → 0
+    expect(r.direct).toBeCloseTo(2.0);       // just aeG
   });
 });

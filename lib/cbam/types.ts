@@ -32,10 +32,10 @@ export interface UnresolvedFlag {
 }
 
 export interface SEEResult {
-  direct: number;                 // SEE_g direct (was: see, now split)
-  indirect: number;               // SEE_g indirect — HARDCODED 0 in increment 1 (real calc comes later)
+  direct: number;                 // SEE_g direct  = aeG + Σ m_i·SEE_i,direct
+  indirect: number;               // SEE_g indirect = ownIndirect + Σ m_i·SEE_i,indirect
   aeG: number;                    // specific attributed emissions (own process, no precursors)
-  precursorContribution: number;  // Σ m_i · SEE_i
+  precursorContribution: number;  // Σ m_i · SEE_i (direct leg)
   unresolved: UnresolvedFlag[];   // LOUD failures — never silently swallowed
 }
 
@@ -43,7 +43,12 @@ export interface SEEResult {
 // Keeps the engine pure: it decides WHICH value to use; the caller provides HOW to fetch defaults / recurse.
 export interface ResolveContext {
   isEuOrExempted: (country: string) => boolean;
-  defaultLookup: (p: PrecursorInput) => number;      // 2621 default for this precursor
+  // 2621 default for this precursor — BOTH legs. see_indirect is null for most rows → treat as 0
+  // (a legitimate zero for Annex II goods, not missing data).
+  defaultLookup: (p: PrecursorInput) => { direct: number; indirect: number };
+  // tCO2e/MWh from cbam_grid_factors for the given country, 'other' fallback. Throws if neither found.
+  gridFactor: (country: string) => number;
   hasValidVerifierReport: (p: PrecursorInput) => boolean;
-  computeChildSEE: (p: PrecursorInput) => number;    // recurse for computed_here separate processes
+  // recurse for computed_here separate processes — returns both legs (still throws in MVP)
+  computeChildSEE: (p: PrecursorInput) => { direct: number; indirect: number };
 }

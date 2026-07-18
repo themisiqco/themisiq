@@ -56,7 +56,9 @@ async function main() {
 
   // Fixture A — no precursors. Resolver constructs against live anon client but is never queried.
   const ctxA = await makeResolveContext(supabase, []);
-  const rA = computeSEE(attrEm, AL, [], ctxA);
+  // scrap-EAF crude steel is an Annex II good (own indirect suppressed), no metered electricity here.
+  const eafOpts = { annexIiDirectOnly: true, electricityConsumed: null, installationCountry: 'TR' };
+  const rA = computeSEE(attrEm, AL, [], ctxA, eafOpts);
   show('Fixture A (scrap-EAF, no precursors)  expect see/aeG ~2.18008, contrib 0, unresolved []', rA);
 
   // Fixture B — one external DRI default precursor. makeResolveContext pre-fetches 7203 from live.
@@ -70,7 +72,7 @@ async function main() {
     period: 2026,
   };
   const ctxB = await makeResolveContext(supabase, [precursor]);
-  const rB = computeSEE(attrEm, AL, [precursor], ctxB);
+  const rB = computeSEE(attrEm, AL, [precursor], ctxB, eafOpts);
   show('Fixture B (+DRI 7203 external default)  expect m_i 1.1 x 1.325 = 1.4575, see ~3.63758', rB);
 
   console.log('\nDONE.');

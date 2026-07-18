@@ -47,27 +47,29 @@ export function attributeDirect(streams: SourceStream[]): number {
 export function resolveSEE(
   p: PrecursorInput,
   ctx: ResolveContext,
-): { value: number; unresolved?: UnresolvedFlag } {
-  if (ctx.isEuOrExempted(p.originCountry)) return { value: 0 }; // legitimate zero — the ONLY one
+): { direct: number; indirect: number; unresolved?: UnresolvedFlag } {
+  if (ctx.isEuOrExempted(p.originCountry)) return { direct: 0, indirect: 0 }; // zero-rated — both legs
   switch (p.provenance) {
     case 'computed_here':
-      return { value: ctx.computeChildSEE(p) };
+      return ctx.computeChildSEE(p);                         // {direct, indirect}
     case 'actual_verified':
       if (!ctx.hasValidVerifierReport(p)) {
         return {
-          value: ctx.defaultLookup(p),
+          ...ctx.defaultLookup(p),
           unresolved: { cnCode: p.cnCode, reason: 'missing_or_invalid_verifier_report' },
         };
       }
       if (p.seeValue == null) {
         return {
-          value: ctx.defaultLookup(p),
+          ...ctx.defaultLookup(p),
           unresolved: { cnCode: p.cnCode, reason: 'verified_but_no_see_value' },
         };
       }
-      return { value: p.seeValue };
+      // LIMITATION: PrecursorInput.seeValue is a single number, so a verified actual is treated as
+      // direct-only. Carrying a verified precursor's indirect leg needs its own field — don't invent one now.
+      return { direct: p.seeValue, indirect: 0 };
     case 'default':
-      return { value: ctx.defaultLookup(p) };
+      return ctx.defaultLookup(p);                           // {direct, indirect}
   }
 }
 
@@ -78,18 +80,41 @@ export function computeSEE(
   activityLevel: number,
   precursors: PrecursorInput[],
   ctx: ResolveContext,
+  opts: {
+    annexIiDirectOnly: boolean;           // from cbam_goods_categories for THIS process's category
+    electricityConsumed?: number | null;  // MWh; null/undefined → own_indirect 0
+    installationCountry: string;          // keys the grid factor (installation draws the power)
+  },
 ): SEEResult {
   if (activityLevel <= 0) throw new Error('computeSEE: activityLevel (AL_g) must be > 0');
   const aeG = attrEm / activityLevel;                       // Eq 63
-  let precursorContribution = 0;
+
+  // Own indirect (this process's own electricity). Annex II goods suppress their OWN indirect; a
+  // process with no metered electricity has none either. [IR 2025/2547 Eq 35/56/58]
+  const ownIndirect =
+    opts.annexIiDirectOnly || opts.electricityConsumed == null
+      ? 0
+      : (opts.electricityConsumed * ctx.gridFactor(opts.installationCountry)) / activityLevel;
+
+  // Precursor roll-up — TWO parallel sums now (direct and indirect).
+  let precursorContribution = 0;   // direct (unchanged)
+  let precursorIndirect = 0;       // indirect (new)
   const unresolved: UnresolvedFlag[] = [];
   for (const p of precursors) {
     if (p.boundary === 'joint') continue;                   // already in AttrEm — never double-count
     const mI = p.massConsumed / activityLevel;              // Eq 61
     const r = resolveSEE(p, ctx);
     if (r.unresolved) unresolved.push(r.unresolved);
-    precursorContribution += mI * r.value;                  // Eq 62 term
+    precursorContribution += mI * r.direct;                 // Eq 62 term (direct)
+    precursorIndirect     += mI * r.indirect;               // parallel indirect roll-up
   }
-  // indirect: 0 — increment 1 is direct-only; real indirect computation is increment 2.
-  return { direct: aeG + precursorContribution, indirect: 0, aeG, precursorContribution, unresolved };
+
+  // CRITICAL: the Annex II gate applies ONLY to ownIndirect. Precursor indirect rolls up REGARDLESS —
+  // an Annex II good (e.g. crude steel) STILL inherits a non-Annex-II precursor's indirect (e.g.
+  // sintered ore). Assuming the gate suppresses inherited indirect too is a documented industry mistake.
+  return {
+    direct: aeG + precursorContribution,
+    indirect: ownIndirect + precursorIndirect,              // own + inherited
+    aeG, precursorContribution, unresolved,
+  };
 }
