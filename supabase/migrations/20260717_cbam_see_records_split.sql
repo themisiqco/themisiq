@@ -1,6 +1,6 @@
 -- 20260717_cbam_see_records_split.sql
--- Preserve the direct/indirect SEE split into storage. Annex IV reports direct (item 5) and
--- indirect (item 6) as separate assured quantities, so the persisted record carries them separately.
+-- Preserve the direct/indirect SEE split into storage. CBAM requires direct and indirect embedded
+-- emissions to be reported as separate quantities, so the persisted record carries them separately.
 -- see_direct / see_indirect are the source of truth; see_total remains as a derived convenience
 -- (route writes see_total = see_direct + see_indirect). No default on the split columns — the route
 -- must write explicit values (fail-loud: a missing computation cannot hide behind a silent zero).
