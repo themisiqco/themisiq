@@ -4,7 +4,7 @@
 // The sign convention is load-bearing: outputs carry ad < 0 so DirEm* nets carbon in − out
 // via a single sum. A test that expects a subtraction here is testing the wrong contract.
 import { describe, it, expect } from 'vitest';
-import { carbonContent, streamEmissions, massBalance, attributeDirect, computeSEE } from './engine';
+import { carbonContent, streamEmissions, massBalance, attributeDirect, computeSEE, resolveSEE } from './engine';
 import type { SourceStream, PrecursorInput, ResolveContext } from './types';
 
 // Golden fixture A — two input streams netted against one output. DirEm* = 218.008.
@@ -213,5 +213,90 @@ describe('computeSEE', () => {
     expect(r.precursorContribution).toBe(0); // direct leg zero-rated
     expect(r.indirect).toBe(0);              // indirect leg zero-rated too; own indirect null → 0
     expect(r.direct).toBeCloseTo(2.0);       // just aeG
+  });
+});
+
+// ── additive: per-precursor source discriminant (does NOT change any value) ──────────────
+describe('resolveSEE — source discriminant on every branch', () => {
+  it("'eu_zero_rated' for an EU/exempted-origin precursor", () => {
+    const r = resolveSEE(precursor({ originCountry: 'DE' }), makeCtx({ isEuOrExempted: (c) => c === 'DE' }));
+    expect(r.source).toBe('eu_zero_rated');
+    expect(r).toMatchObject({ direct: 0, indirect: 0 }); // value unchanged
+  });
+
+  it("'computed_here' for a recursive child SEE", () => {
+    const r = resolveSEE(
+      precursor({ provenance: 'computed_here' }),
+      makeCtx({ computeChildSEE: () => ({ direct: 3, indirect: 1 }) }),
+    );
+    expect(r.source).toBe('computed_here');
+    expect(r).toMatchObject({ direct: 3, indirect: 1 });
+  });
+
+  it("'verified_actual' for actual_verified with a valid report", () => {
+    const r = resolveSEE(
+      precursor({ provenance: 'actual_verified', seeValue: 1.2 }),
+      makeCtx({ hasValidVerifierReport: () => true }),
+    );
+    expect(r.source).toBe('verified_actual');
+    expect(r).toMatchObject({ direct: 1.2, indirect: 0 });
+    expect(r.unresolved).toBeUndefined();
+  });
+
+  it("'default' for a plain default lookup", () => {
+    const r = resolveSEE(
+      precursor({ provenance: 'default' }),
+      makeCtx({ defaultLookup: () => ({ direct: 1.4, indirect: 0.07 }) }),
+    );
+    expect(r.source).toBe('default');
+    expect(r).toMatchObject({ direct: 1.4, indirect: 0.07 });
+    expect(r.unresolved).toBeUndefined();
+  });
+
+  it("'default_fallback' for actual_verified without a valid verifier report", () => {
+    const r = resolveSEE(
+      precursor({ provenance: 'actual_verified', seeValue: 5.0 }),
+      makeCtx({ hasValidVerifierReport: () => false, defaultLookup: () => ({ direct: 1.4, indirect: 0 }) }),
+    );
+    expect(r.source).toBe('default_fallback');
+    expect(r).toMatchObject({ direct: 1.4, indirect: 0 }); // the default, not the unbacked 5.0
+    expect(r.unresolved).toEqual({ cnCode: '7202', reason: 'missing_or_invalid_verifier_report' });
+  });
+
+  it("'default_fallback' for actual_verified that is verified but has a null seeValue", () => {
+    const r = resolveSEE(
+      precursor({ provenance: 'actual_verified' }), // seeValue undefined
+      makeCtx({ hasValidVerifierReport: () => true, defaultLookup: () => ({ direct: 1.4, indirect: 0 }) }),
+    );
+    expect(r.source).toBe('default_fallback');
+    expect(r.unresolved).toEqual({ cnCode: '7202', reason: 'verified_but_no_see_value' });
+  });
+});
+
+describe('computeSEE — resolutions map and precursorIndirect (additive)', () => {
+  it('resolutions map contains every non-joint precursor keyed by identity, excludes joint ones', () => {
+    const pExt = precursor({ cnCode: 'EXT', massConsumed: 110 });
+    const pJoint = precursor({ cnCode: 'JOINT', massConsumed: 110, boundary: 'joint' });
+    const r = computeSEE(
+      200, 100, [pExt, pJoint],
+      makeCtx({ defaultLookup: () => ({ direct: 1.4, indirect: 0.07 }) }),
+      OPTS,
+    );
+    expect(r.resolutions.has(pExt)).toBe(true);      // non-joint present
+    expect(r.resolutions.has(pJoint)).toBe(false);   // joint legitimately absent
+    expect(r.resolutions.size).toBe(1);
+    expect(r.resolutions.get(pExt)).toMatchObject({ direct: 1.4, indirect: 0.07, source: 'default' });
+  });
+
+  it('precursorIndirect equals the indirect precursor sum Σ m_i·SEE_i,indirect, distinct from indirect', () => {
+    const r = computeSEE(
+      200, 100, [precursor({ massConsumed: 110 })],
+      makeCtx({ defaultLookup: () => ({ direct: 1.4, indirect: 0.070 }), gridFactor: () => 0.465 }),
+      { annexIiDirectOnly: false, electricityConsumed: 50, installationCountry: 'TR' },
+    );
+    // inherited only: m_i 1.1 × 0.070 = 0.077. ownIndirect = 50 × 0.465 / 100 = 0.2325.
+    expect(r.precursorIndirect).toBeCloseTo(0.077);              // inherited part alone
+    expect(r.indirect).toBeCloseTo(0.2325 + 0.077);             // own + inherited — the full leg
+    expect(r.precursorIndirect).not.toBeCloseTo(r.indirect);    // the two are genuinely different
   });
 });

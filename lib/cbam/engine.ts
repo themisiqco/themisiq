@@ -1,5 +1,5 @@
 import { CO2_C_RATIO } from './params';
-import type { SourceStream, PrecursorInput, SEEResult, ResolveContext, UnresolvedFlag } from './types';
+import type { SourceStream, PrecursorInput, SEEResult, ResolveContext, UnresolvedFlag, PrecursorResolution } from './types';
 
 // Carbon content of a source stream. Eq 13 (ef_per_tj), Eq 14 (ef_per_t), Eq 15 (biomass).
 // Fail loud on missing inputs — a missing carbon input must never silently become 0.
@@ -47,29 +47,31 @@ export function attributeDirect(streams: SourceStream[]): number {
 export function resolveSEE(
   p: PrecursorInput,
   ctx: ResolveContext,
-): { direct: number; indirect: number; unresolved?: UnresolvedFlag } {
-  if (ctx.isEuOrExempted(p.originCountry)) return { direct: 0, indirect: 0 }; // zero-rated — both legs
+): PrecursorResolution {
+  if (ctx.isEuOrExempted(p.originCountry)) return { direct: 0, indirect: 0, source: 'eu_zero_rated' }; // zero-rated — both legs
   switch (p.provenance) {
     case 'computed_here':
-      return ctx.computeChildSEE(p);                         // {direct, indirect}
+      return { ...ctx.computeChildSEE(p), source: 'computed_here' };   // {direct, indirect}
     case 'actual_verified':
       if (!ctx.hasValidVerifierReport(p)) {
         return {
           ...ctx.defaultLookup(p),
+          source: 'default_fallback',
           unresolved: { cnCode: p.cnCode, reason: 'missing_or_invalid_verifier_report' },
         };
       }
       if (p.seeValue == null) {
         return {
           ...ctx.defaultLookup(p),
+          source: 'default_fallback',
           unresolved: { cnCode: p.cnCode, reason: 'verified_but_no_see_value' },
         };
       }
       // LIMITATION: PrecursorInput.seeValue is a single number, so a verified actual is treated as
       // direct-only. Carrying a verified precursor's indirect leg needs its own field — don't invent one now.
-      return { direct: p.seeValue, indirect: 0 };
+      return { direct: p.seeValue, indirect: 0, source: 'verified_actual' };
     case 'default':
-      return ctx.defaultLookup(p);                           // {direct, indirect}
+      return { ...ctx.defaultLookup(p), source: 'default' };           // {direct, indirect}
   }
 }
 
@@ -100,10 +102,14 @@ export function computeSEE(
   let precursorContribution = 0;   // direct (unchanged)
   let precursorIndirect = 0;       // indirect (new)
   const unresolved: UnresolvedFlag[] = [];
+  // Per-precursor resolutions, keyed by object identity. Skipped 'joint' precursors are NEVER added —
+  // they're legitimately absent (already inside AttrEm), and a caller relies on that absence.
+  const resolutions = new Map<PrecursorInput, PrecursorResolution>();
   for (const p of precursors) {
     if (p.boundary === 'joint') continue;                   // already in AttrEm — never double-count
     const mI = p.massConsumed / activityLevel;              // Eq 61
     const r = resolveSEE(p, ctx);
+    resolutions.set(p, r);
     if (r.unresolved) unresolved.push(r.unresolved);
     precursorContribution += mI * r.direct;                 // Eq 62 term (direct)
     precursorIndirect     += mI * r.indirect;               // parallel indirect roll-up
@@ -115,6 +121,6 @@ export function computeSEE(
   return {
     direct: aeG + precursorContribution,
     indirect: ownIndirect + precursorIndirect,              // own + inherited
-    aeG, precursorContribution, unresolved,
+    aeG, precursorContribution, precursorIndirect, unresolved, resolutions,
   };
 }

@@ -38,7 +38,7 @@
 // there are no indirect precursor contributions, so the direct share and the total share are the
 // same number and the (4)(b) ambiguity does not bite for crude steel at all. It only matters for
 // goods that carry an indirect leg.
-import type { PrecursorInput } from './types';
+import type { PrecursorInput, PrecursorResolution } from './types';
 
 /**
  * The default-value share, per leg, as a fraction in [0,1] — or null where it is UNDEFINED.
@@ -52,16 +52,14 @@ export interface DefaultShareResult {
   indirect: number | null;
 }
 
-// One precursor's resolution, exactly as computeSEE consumed it. `fromDefault` is the caller's
-// verdict on whether SEE_i came from a default value — it MUST be true not only for a plain
-// provenance='default' precursor but also for the fallback case: an 'actual_verified' precursor that
-// lacked a valid verifier report and fell to defaultLookup() (resolveSEE returns the default value
-// AND an unresolved flag). That precursor is contributing a defaulted number — the operator intended
-// an actual figure but is reporting the default — so it COUNTS toward the default share.
-export interface ResolvedPrecursor {
-  direct: number;
-  indirect: number;
-  fromDefault: boolean;
+// Whether a precursor's SEE_i counts as "a default value was used" (IR 2025/2547 Annex IV §1.2
+// (4)(b) / §1.1 15(d)). Derived from resolveSEE's source discriminant in ONE place so the rule
+// cannot drift. 'default_fallback' counts alongside plain 'default': it is an actual_verified
+// precursor that fell back to the default value (no valid verifier report, or verified-but-null
+// seeValue) — the operator INTENDED an actual figure, but the value being reported IS the default,
+// so it is a defaulted contribution. 'eu_zero_rated', 'computed_here' and 'verified_actual' do not.
+function fromDefault(source: PrecursorResolution['source']): boolean {
+  return source === 'default' || source === 'default_fallback';
 }
 
 // A leg's share: numerator / denominator, but null for any non-positive or non-finite denominator.
@@ -87,7 +85,7 @@ function shareFor(numerator: number, denominator: number): number | null {
  */
 export function computeDefaultShare(
   precursors: PrecursorInput[],
-  resolved: Map<PrecursorInput, ResolvedPrecursor>,
+  resolved: Map<PrecursorInput, PrecursorResolution>,
   activityLevel: number,
   see: { direct: number; indirect: number },
 ): DefaultShareResult {
@@ -109,7 +107,7 @@ export function computeDefaultShare(
       );
     }
 
-    if (!r.fromDefault) continue;                         // actual/computed — not a defaulted figure
+    if (!fromDefault(r.source)) continue;                 // actual/computed — not a defaulted figure
 
     const mI = p.massConsumed / activityLevel;            // m_i = M_i / AL_g, as in computeSEE
     numeratorDirect += mI * r.direct;

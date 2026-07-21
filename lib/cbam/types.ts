@@ -31,12 +31,37 @@ export interface UnresolvedFlag {
   reason: string;
 }
 
+// Which branch of resolveSEE produced a precursor's SEE_i. Additive provenance marker: it records
+// HOW the value was obtained without changing the value. Load-bearing for the default-value share
+// (IR 2025/2547 Annex IV §1.2 (4)(b) / §1.1 15(d)) — 'default' and 'default_fallback' are the two
+// sources that count as "a default value was used".
+export type PrecursorSource =
+  | 'eu_zero_rated'      // EU/exempted origin, zero-rated
+  | 'computed_here'      // recursive child SEE
+  | 'verified_actual'    // actual_verified with a valid verifier report
+  | 'default'            // plain default lookup
+  | 'default_fallback';  // actual_verified that fell back to default (see unresolved for why)
+
+// One precursor's resolved SEE_i plus its source. Mirrors resolveSEE's return so a caller can key a
+// Map<PrecursorInput, PrecursorResolution> by object identity and recover per-precursor provenance.
+export interface PrecursorResolution {
+  direct: number;
+  indirect: number;
+  source: PrecursorSource;
+  unresolved?: UnresolvedFlag;
+}
+
 export interface SEEResult {
   direct: number;                 // SEE_g direct  = aeG + Σ m_i·SEE_i,direct
   indirect: number;               // SEE_g indirect = ownIndirect + Σ m_i·SEE_i,indirect
   aeG: number;                    // specific attributed emissions (own process, no precursors)
   precursorContribution: number;  // Σ m_i · SEE_i (direct leg)
+  precursorIndirect: number;      // Σ m_i · SEE_i (indirect leg) — the inherited part of `indirect`
   unresolved: UnresolvedFlag[];   // LOUD failures — never silently swallowed
+  // Per-precursor resolution keyed by the SAME PrecursorInput object passed in. Skipped 'joint'
+  // precursors are legitimately absent (never resolved). Lets a caller recover per-precursor
+  // {direct, indirect, source} without re-resolving — see lib/cbam/defaultShare.ts.
+  resolutions: Map<PrecursorInput, PrecursorResolution>;
 }
 
 // Injected resolver for a precursor's SEE_i — supplied by the DB/route layer later.
