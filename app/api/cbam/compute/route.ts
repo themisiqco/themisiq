@@ -21,6 +21,7 @@ import { attributeDirect, computeSEE, resolveSEE } from '../../../../lib/cbam/en
 import { makeResolveContext } from '../../../../lib/cbam/resolver';
 import { adaptSourceStream, adaptPrecursor } from '../../../../lib/cbam/adapt';
 import { computeSefaPersist } from '../../../../lib/cbam/sefaCompute';
+import { computeDefaultShare } from '../../../../lib/cbam/defaultShare';
 import type { BenchmarkRow } from '../../../../lib/cbam/benchmarks';
 
 export async function POST(req: NextRequest) {
@@ -111,6 +112,19 @@ export async function POST(req: NextRequest) {
       electricityConsumed,
       installationCountry,   // grid factor keys off the installation, not any precursor origin
     });
+
+    // ── 6b. Default-value share (§1.2 item 4(b) / §1.1 15(d)), per leg ─────────────────────────
+    // Consumes computeSEE's OWN resolutions map — NOT a re-resolution. If the precursor list and
+    // that map ever disagreed, computeDefaultShare's divergence guard would throw; passing the same
+    // `result.resolutions` is precisely what guarantees the share and the SEE cannot diverge.
+    // Either leg is null when its denominator (that leg's embedded emissions) is zero — that null is
+    // "undefined share", not "no defaults used", and MUST be persisted as null, never coerced to 0.
+    const defaultShare = computeDefaultShare(
+      precursors,
+      result.resolutions,
+      activityLevel,
+      { direct: result.direct, indirect: result.indirect },
+    );
 
     // ── 7. Compare against the default for the good produced (country 'other', MVP) ──
     const { data: def, error: defErr } = await supabase
@@ -203,6 +217,8 @@ export async function POST(req: NextRequest) {
         precursor_contribution: result.precursorContribution,
         default_compared: defaultCompared,
         delta_vs_default: deltaDirectVsDefault,
+        default_share_direct: defaultShare.direct,      // null = zero denominator, persisted AS null
+        default_share_indirect: defaultShare.indirect,
         sefa: sefaPersist.sefa,
         sfa_proc: sefaPersist.sfa_proc,
         sefa_precursor_contrib: sefaPersist.sefa_precursor_contrib,
