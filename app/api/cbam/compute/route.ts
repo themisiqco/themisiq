@@ -20,6 +20,8 @@ import { getAuthedClient, bearerFrom, AuthError } from '../../../../lib/supabase
 import { attributeDirect, computeSEE, resolveSEE } from '../../../../lib/cbam/engine';
 import { makeResolveContext } from '../../../../lib/cbam/resolver';
 import { adaptSourceStream, adaptPrecursor } from '../../../../lib/cbam/adapt';
+import { computeSefaPersist } from '../../../../lib/cbam/sefaCompute';
+import type { BenchmarkRow } from '../../../../lib/cbam/benchmarks';
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,7 +39,7 @@ export async function POST(req: NextRequest) {
     // ── 2. Load the process (RLS scopes to the owner) ────────────────
     const { data: process, error: procErr } = await supabase
       .from('cbam_production_processes')
-      .select('id, company_id, cn_code, category_code, activity_level, reporting_period, installation_id, electricity_consumed')
+      .select('id, company_id, cn_code, category_code, activity_level, reporting_period, installation_id, electricity_consumed, steel_grade, route_code')
       .eq('id', processId)
       .single();
 
@@ -127,9 +129,48 @@ export async function POST(req: NextRequest) {
     const deltaDirectVsDefault: number | null =
       defaultCompared == null ? null : result.direct - defaultCompared;
 
+    // ── 7b. SEFA — specific embedded free allocation (§1.2 item 4(e)) ─────────────────────────
+    // Load the year's cbam_sefa_params (CBAM_y, CSCF_y). computeSefaPersist owns the ordering:
+    // a missing row throws (no CBAM factor → not computable), a null CSCF short-circuits to the
+    // pending status WITHOUT fetching benchmarks (the live path for every year), and only a
+    // published CSCF triggers the benchmark lookup + Eq 2/4/6 compute.
+    const { data: sefaParams, error: sefaParamsErr } = await supabase
+      .from('cbam_sefa_params')
+      .select('cbam_factor, cscf, cscf_status')
+      .eq('year', process.reporting_period)
+      .maybeSingle();
+    if (sefaParamsErr) {
+      console.error('CBAM SEFA params load error:', sefaParamsErr);
+      return NextResponse.json({ error: 'Failed to load SEFA parameters' }, { status: 500 });
+    }
+
+    const sefaPersist = await computeSefaPersist({
+      params: sefaParams,   // null when no row for the year → computeSefaPersist throws (genuine error)
+      cnCode: process.cn_code,
+      steelGrade: process.steel_grade,
+      routeCode: process.route_code,
+      reportingPeriod: process.reporting_period,
+      precursors,
+      activityLevel,
+      isEuOrExempted: ctx.isEuOrExempted,
+      // Lazy — only invoked on the computed path. Fetch benchmark rows for the process cn_code AND
+      // every precursor cn_code (Column B lookups need the precursor rows).
+      fetchBenchmarks: async () => {
+        const cnCodes = [...new Set([process.cn_code, ...precursors.map((p) => p.cnCode)])];
+        const { data, error } = await supabase
+          .from('cbam_benchmarks')
+          .select('cn_code, bm_column, route_indicator, period_band, value')
+          .in('cn_code', cnCodes);
+        if (error) throw new Error(`cbam_benchmarks fetch failed: ${error.message}`);
+        return (data ?? []) as BenchmarkRow[];
+      },
+    });
+
     // ── Build a minimal, verifier-legible workings object ────────────
     // aeG + per-precursor m_i / see_i / provenance. see_i is re-derived via resolveSEE for DISPLAY
     // only — the persisted total comes from computeSEE above, never re-summed here.
+    // When SEFA is computed, the benchmark used goes into the same jsonb (§1.2 item 4(f)); when
+    // pending, nothing is recorded — no "would-be" benchmark someone could multiply into a wrong number.
     const workings = {
       aeG: result.aeG,
       precursorContribution: result.precursorContribution,
@@ -145,6 +186,7 @@ export async function POST(req: NextRequest) {
           counted: p.boundary !== 'joint',        // 'joint' is already inside AttrEm — not re-added
         };
       }),
+      ...(sefaPersist.benchmarkWorkings ? { sefaBenchmark: sefaPersist.benchmarkWorkings } : {}),
     };
 
     // ── 8. Persist the see_record (RLS WITH CHECK enforces company ownership) ──
@@ -161,6 +203,10 @@ export async function POST(req: NextRequest) {
         precursor_contribution: result.precursorContribution,
         default_compared: defaultCompared,
         delta_vs_default: deltaDirectVsDefault,
+        sefa: sefaPersist.sefa,
+        sfa_proc: sefaPersist.sfa_proc,
+        sefa_precursor_contrib: sefaPersist.sefa_precursor_contrib,
+        sefa_status: sefaPersist.sefa_status,
         workings,
         unresolved: result.unresolved,
       })
