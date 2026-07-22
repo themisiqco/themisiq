@@ -410,24 +410,57 @@ export function preConsumerScrapShare(chargeMix: ChargeMixRow[]): number | null 
 // ── Part 2 sub-builders — items (4), (5), (6), (12)-(16) ─────────────────────────────────────────
 
 // (4)(c) indirect block. GATED on the good's Annex II status: an Annex II good reports direct
-// emissions only, so all four sub-fields are not_applicable. For a non-Annex-II good the default
-// indirect share comes from the see_record; the ACTUAL indirect share is its arithmetic complement
-// (1 − default share — a real partition of the same total, not a fabricated value); the criteria
-// confirmation has no field yet (marked missing, NOT invented); the specific indirect is see_indirect.
+// emissions only, so all four sub-fields are not_applicable.
+//
+// For a non-Annex-II good, (4)(c)'s actual-vs-default indirect split is determined "in accordance with
+// Article 9", whose actual/default distinction turns on the EMISSION FACTOR, not on metered
+// consumption: the country grid factor (IR 2025/2621 Annex II) is the DEFAULT factor; an ACTUAL factor
+// requires a qualifying PPA or direct technical link with documentary evidence. (4)(c)'s own sub-item —
+// "confirmation that the criteria for the use of actual values … are met" — attaches criteria and
+// evidence to the factor, confirming this reading. This is why the shares are NOT derived from
+// default_share_indirect: that field (serving (4)(b)) measures defaulted PRECURSOR contributions over
+// total indirect, a different quantity — do not reference it here.
+//
+// We implement ONLY the grid-default factor path (the PPA / direct-line actual-factor path is
+// deferred). So every indirect figure the engine can produce is default-factor-derived: own-indirect
+// via gridFactor(), defaulted-precursor indirect via see_indirect, and verified-actual precursors carry
+// no indirect at all (spec §10.6). Therefore, for any non-Annex-II good with NON-ZERO indirect:
+//   • share on ACTUAL values  = 0 — a real computed zero (we know it is zero and why), not missing/N/A;
+//   • share on DEFAULT values = 1 (100%).
+// Where total indirect is zero, there is nothing to apportion → both not_applicable.
+//
+// DOCUMENTED ThemisIQ INTERPRETATION, NOT REGULATORY TEXT: the regulation states neither the
+// denominator nor the arithmetic of this split; the 0/1 result follows from our implementing only the
+// default-factor path. IF THE PPA / DIRECT-LINE PATH IS EVER BUILT, THIS MUST BE REVISITED — the actual
+// share becomes non-zero and the split becomes a real calculation over actual- vs default-factor
+// indirect.
 function buildItem4c(good: GoodComputation, missing: MissingField[]): Item4Indirect {
   if (good.annexIiDirectOnly) {
     const na: ReportField<never> = { status: 'not_applicable', reason: ANNEX_II_REASON };
     return { actualShare: na, defaultShare: na, criteriaConfirmation: na, specificIndirect: na };
   }
   const rec = good.seeRecord;
-  const defaultShare: ReportField<number> = rec ? shareField(rec.default_share_indirect) : { status: 'missing' };
-  let actualShare: ReportField<number>;
-  if (!rec) actualShare = { status: 'missing' };
-  else if (rec.default_share_indirect == null) actualShare = { status: 'not_applicable', reason: ZERO_DENOM_REASON };
-  else actualShare = { status: 'value', value: 1 - rec.default_share_indirect };
 
-  // No field carries the "confirmation that the criteria for the use of actual values are met." Mark
-  // it missing with a hint — never fabricate a confirmation on a verifier-facing report.
+  let actualShare: ReportField<number>;
+  let defaultShare: ReportField<number>;
+  if (!rec) {
+    actualShare = { status: 'missing' };
+    defaultShare = { status: 'missing' };
+  } else if (rec.see_indirect === 0) {
+    // No indirect emissions to apportion — neither share is defined.
+    const na: ReportField<number> = { status: 'not_applicable', reason: 'no indirect emissions to apportion' };
+    actualShare = na;
+    defaultShare = na;
+  } else {
+    // Only the default-factor path exists, so all indirect is default-factor-derived.
+    actualShare = { status: 'value', value: 0 };
+    defaultShare = { status: 'value', value: 1 };
+  }
+
+  // No field carries the "confirmation that the criteria for the use of actual values are met." With
+  // the actual share at 0 there are no actual-value criteria to confirm today, but there is no field
+  // either way and a future PPA / direct-line path WILL need one — so leave it missing with a hint,
+  // never a fabricated confirmation on a verifier-facing report.
   const criteriaConfirmation: ReportField<boolean> = { status: 'missing' };
   missing.push({
     item: '(4)(c)', field: `confirmation the actual-value indirect criteria are met (${good.cnCode ?? good.processId})`,

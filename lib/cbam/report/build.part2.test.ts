@@ -82,17 +82,30 @@ describe('(4)(c) indirect block — Annex II gate', () => {
     expect(missing.filter((m) => m.item === '(4)(c)')).toEqual([]);
   });
 
-  it('non-Annex-II good → indirect shares reported, criteria confirmation missing (not fabricated)', () => {
+  it('non-Annex-II good with non-zero indirect → actual share is a real 0, default share 1 (Article 9 = the factor)', () => {
     const missing: import('./types').MissingField[] = [];
+    // Only the grid-default factor path is implemented, so all indirect is default-factor-derived.
+    // The shares are NOT derived from default_share_indirect (that field serves (4)(b) only).
     const item4 = buildItem4(good({ annexIiDirectOnly: false, seeRecord: seeRecord({ default_share_indirect: 0.3, see_indirect: 0.5 }) }), missing);
     const ind = item4.indirect;
-    expect(ind.defaultShare).toEqual({ status: 'value', value: 0.3 });
-    expect(ind.actualShare.status).toBe('value');
-    if (ind.actualShare.status === 'value') expect(ind.actualShare.value).toBeCloseTo(0.7, 10); // complement
+    // actual share is exactly 0 — asserted as a VALUE, not missing and not N/A.
+    expect(ind.actualShare).toEqual({ status: 'value', value: 0 });
+    expect(ind.defaultShare).toEqual({ status: 'value', value: 1 });
     expect(ind.specificIndirect).toEqual({ status: 'value', value: 0.5 });
     expect(ind.criteriaConfirmation.status).toBe('missing');
     // The unbuilt criteria confirmation IS surfaced as a gap.
     expect(missing.filter((m) => m.item === '(4)(c)')).toHaveLength(1);
+  });
+
+  it('non-Annex-II good with ZERO indirect → both shares not_applicable (nothing to apportion)', () => {
+    const missing: import('./types').MissingField[] = [];
+    const item4 = buildItem4(good({ annexIiDirectOnly: false, seeRecord: seeRecord({ see_indirect: 0 }) }), missing);
+    const ind = item4.indirect;
+    for (const f of [ind.actualShare, ind.defaultShare]) {
+      expect(f.status).toBe('not_applicable');
+      if (f.status === 'not_applicable') expect(f.reason).toBe('no indirect emissions to apportion');
+    }
+    expect(ind.specificIndirect).toEqual({ status: 'value', value: 0 });
   });
 });
 
