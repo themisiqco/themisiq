@@ -16,11 +16,15 @@
 //   • Conditional sub-fields are gated on their parent. When the gate is unanswered we assume NEITHER
 //     branch — the sub-field is 'missing' (undetermined), and no "required" gap is emitted for it,
 //     because we do not yet know whether it is required at all.
-import type { PrecursorInput } from '../types';
+import type { PrecursorInput, PrecursorResolution } from '../types';
+import type { SefaBenchmarkWorkings } from '../sefaCompute';
 import type {
   ReportField, MissingField, Report12,
   Item1Operator, Item2Installation, Coordinates, ProcessSummary,
   Item7Heat, Item8ZeroRatedFuels, Item9WasteGases, Item10Co2Capture, Item11OnsiteElectricity,
+  Item4Good, Item4Indirect, Item5TotalDirect, Item6Indirect,
+  Item12DefaultPrecursor, Item13ActualPrecursor, Item14MultiPeriod, Item15MultiInstallation,
+  Item16PrecursorOrigin,
 } from './types';
 
 // ── DB-row input shapes (this seam, not engine types — mirrors benchmarks.ts's BenchmarkRow) ─────
@@ -78,12 +82,71 @@ export interface ChargeMixRow {
   mass: number;
 }
 
+// ── Part 2 DB-row / computation input shapes ─────────────────────────────────────────────────────
+
+// A persisted cbam_see_records row (the fields the report reads). `workings` is the parsed jsonb; only
+// its sefaBenchmark block is consumed here. see_direct/see_indirect are NOT NULL in the DB.
+export interface SeeRecordRow {
+  see_direct: number;
+  see_indirect: number;
+  default_share_direct: number | null;
+  default_share_indirect: number | null;
+  sefa: number | null;
+  sefa_status: 'computed' | 'not_determinable_cscf_pending' | null;
+  workings: { sefaBenchmark?: SefaBenchmarkWorkings } | null;
+}
+
+// The item-(16) origin-identity columns of a precursor (traceability, NOT origin_country which is a
+// calculation input). reportingPeriod is the PRECURSOR's period (origin_reporting_period), which may
+// differ from the process's — that difference is what (14) turns on.
+export interface PrecursorOriginRow {
+  operatorName: string | null;      // origin_operator_name
+  installationName: string | null;  // origin_installation_name
+  cbamRegistryId: string | null;    // origin_cbam_registry_id ("if applicable")
+  reportingPeriod: number | null;   // origin_reporting_period
+}
+
+// One precursor as the report consumes it: the engine input (which keys the resolutions map) paired
+// with its origin-identity row.
+export interface PrecursorReportInput {
+  precursor: PrecursorInput;
+  origin: PrecursorOriginRow;
+}
+
+// Everything the Part 2 items need about one produced good / process. resolutions is computeSEE's OWN
+// map (keyed by the same PrecursorInput objects) — consuming it, rather than re-resolving, is what
+// keeps the report's source classification identical to the engine's.
+export interface GoodComputation {
+  processId: string;
+  cnCode: string | null;
+  annexIiDirectOnly: boolean;         // gates (4)(c) and (6): true → direct emissions only
+  activityLevel: number;
+  aeG: number | null;                 // specific attributed direct emissions
+  attrEm?: number | null;             // process total direct emissions — PREFERRED over aeG × AL for (5)
+  seeRecord: SeeRecordRow | null;
+  precursors: PrecursorReportInput[];
+  resolutions: Map<PrecursorInput, PrecursorResolution>;
+}
+
 export interface Report12Input {
   operator: OperatorProfileRow | null;
   installation: InstallationRow | null;
   processes: ProcessRow[];
   disclosures: DisclosuresRow | null;
+  // Part 2 — optional. Absent → the Part 2 report items are omitted (a Part-1-only slice), exactly as
+  // before. Present → items (4)-(6) and (12)-(16) are built from these.
+  goods?: GoodComputation[];
+  // The caller's assertion that `goods`/`processes` is the COMPLETE set for this installation and
+  // reporting period. Installation-level totals (5)/(6) are only reported when this is true — we never
+  // pass off a partial sum (e.g. a single process) as the installation's total.
+  installationProcessesComplete?: boolean;
 }
+
+// Fixed reasons, defined once so every surface renders the same wording to a verifier.
+const ANNEX_II_REASON = 'Annex II good — direct emissions only';
+const SEFA_PENDING_REASON = 'not determinable — CSCF not yet published by the Commission';
+const ZERO_DENOM_REASON = 'no embedded emissions to apportion';
+const IMPORTED_ELEC_REASON = 'installation does not import electricity as a CBAM good';
 
 // ── Field helpers ────────────────────────────────────────────────────────────────────────────────
 
@@ -98,6 +161,20 @@ function strField(v: string | null | undefined): ReportField<string> {
 // whole reason the disclosure columns are nullable booleans, not `not null default false`.
 function boolField(v: boolean | null | undefined): ReportField<boolean> {
   if (v == null) return { status: 'missing' };
+  return { status: 'value', value: v };
+}
+
+// A numeric field: null/undefined → missing. 0 is a value (use == null, not falsy).
+function numField(v: number | null | undefined): ReportField<number> {
+  if (v == null) return { status: 'missing' };
+  return { status: 'value', value: v };
+}
+
+// A share (fraction) field read from a persisted see_record. A null share is NOT missing: our
+// defaultShare engine returns null ONLY for a zero denominator (an UNDEFINED share), so a null here
+// is a deliberate not_applicable — 'no embedded emissions to apportion' — never a to-do gap.
+function shareField(v: number | null | undefined): ReportField<number> {
+  if (v == null) return { status: 'not_applicable', reason: ZERO_DENOM_REASON };
   return { status: 'value', value: v };
 }
 
@@ -330,11 +407,264 @@ export function preConsumerScrapShare(chargeMix: ChargeMixRow[]): number | null 
   return pre / denom;
 }
 
+// ── Part 2 sub-builders — items (4), (5), (6), (12)-(16) ─────────────────────────────────────────
+
+// (4)(c) indirect block. GATED on the good's Annex II status: an Annex II good reports direct
+// emissions only, so all four sub-fields are not_applicable. For a non-Annex-II good the default
+// indirect share comes from the see_record; the ACTUAL indirect share is its arithmetic complement
+// (1 − default share — a real partition of the same total, not a fabricated value); the criteria
+// confirmation has no field yet (marked missing, NOT invented); the specific indirect is see_indirect.
+function buildItem4c(good: GoodComputation, missing: MissingField[]): Item4Indirect {
+  if (good.annexIiDirectOnly) {
+    const na: ReportField<never> = { status: 'not_applicable', reason: ANNEX_II_REASON };
+    return { actualShare: na, defaultShare: na, criteriaConfirmation: na, specificIndirect: na };
+  }
+  const rec = good.seeRecord;
+  const defaultShare: ReportField<number> = rec ? shareField(rec.default_share_indirect) : { status: 'missing' };
+  let actualShare: ReportField<number>;
+  if (!rec) actualShare = { status: 'missing' };
+  else if (rec.default_share_indirect == null) actualShare = { status: 'not_applicable', reason: ZERO_DENOM_REASON };
+  else actualShare = { status: 'value', value: 1 - rec.default_share_indirect };
+
+  // No field carries the "confirmation that the criteria for the use of actual values are met." Mark
+  // it missing with a hint — never fabricate a confirmation on a verifier-facing report.
+  const criteriaConfirmation: ReportField<boolean> = { status: 'missing' };
+  missing.push({
+    item: '(4)(c)', field: `confirmation the actual-value indirect criteria are met (${good.cnCode ?? good.processId})`,
+    hint: 'unbuilt input — there is no field yet for the point-6 Annex IV actual-value criteria confirmation',
+  });
+
+  const specificIndirect: ReportField<number> = rec ? { status: 'value', value: rec.see_indirect } : { status: 'missing' };
+  return { actualShare, defaultShare, criteriaConfirmation, specificIndirect };
+}
+
+// (4)(e) SEFA. When the CSCF is unpublished the see_record carries sefa_status
+// 'not_determinable_cscf_pending' with a null sefa — that is not_applicable with a CSCF reason, NEVER
+// a reported 0 (a 0 would fabricate a free-allocation figure).
+function buildItem4e(rec: SeeRecordRow | null): ReportField<number> {
+  if (!rec) return { status: 'missing' };
+  if (rec.sefa_status === 'not_determinable_cscf_pending') return { status: 'not_applicable', reason: SEFA_PENDING_REASON };
+  if (rec.sefa_status === 'computed' && rec.sefa != null) return { status: 'value', value: rec.sefa };
+  return { status: 'missing' };
+}
+
+// (4)(f) benchmark confirmation — the sefaBenchmark block persisted in workings when SEFA was computed;
+// not_applicable with the same CSCF reason when SEFA is pending (no benchmark was applied).
+function buildItem4f(rec: SeeRecordRow | null): ReportField<SefaBenchmarkWorkings> {
+  if (!rec) return { status: 'missing' };
+  if (rec.sefa_status === 'not_determinable_cscf_pending') return { status: 'not_applicable', reason: SEFA_PENDING_REASON };
+  const bm = rec.workings?.sefaBenchmark;
+  if (bm) return { status: 'value', value: bm };
+  return { status: 'missing' };
+}
+
+export function buildItem4(good: GoodComputation, missing: MissingField[]): Item4Good {
+  const rec = good.seeRecord;
+  return {
+    processId: good.processId,
+    cnCode: good.cnCode,
+    specificDirect: rec ? { status: 'value', value: rec.see_direct } : { status: 'missing' },   // (4)(a)
+    defaultShareDirect: rec ? shareField(rec.default_share_direct) : { status: 'missing' },       // (4)(b)
+    indirect: buildItem4c(good, missing),                                                          // (4)(c)
+    importedElectricity: { status: 'not_applicable', reason: IMPORTED_ELEC_REASON },               // (4)(d)
+    sefa: buildItem4e(rec),                                                                        // (4)(e)
+    benchmarkConfirmation: buildItem4f(rec),                                                       // (4)(f)
+  };
+}
+
+// Per-process total DIRECT emissions = attrEm (preferred — the direct value the engine attributed) or
+// aeG × activity level. The installation total sums the processes, but ONLY when the caller asserts the
+// set is complete; otherwise it is missing — a single process's total is not the installation's.
+export function buildItem5(goods: GoodComputation[], complete: boolean, missing: MissingField[]): Item5TotalDirect {
+  const perProcess = goods.map((g) => {
+    const total = g.attrEm != null ? g.attrEm : (g.aeG != null ? g.aeG * g.activityLevel : null);
+    return { processId: g.processId, totalDirect: numField(total) };
+  });
+
+  let installationTotal: ReportField<number>;
+  const allPresent = perProcess.every((p) => p.totalDirect.status === 'value');
+  if (complete && allPresent) {
+    const sum = perProcess.reduce((s, p) => s + (p.totalDirect.status === 'value' ? p.totalDirect.value : 0), 0);
+    installationTotal = { status: 'value', value: sum };
+  } else {
+    installationTotal = { status: 'missing' };
+    missing.push({
+      item: '(5)', field: 'installation-level total direct emissions',
+      hint: 'installation-level aggregation requires every process for the installation and reporting period',
+    });
+  }
+  return { perProcess, installationTotal };
+}
+
+// (6) installation INDIRECT emissions — only where the installation produces goods NOT in Annex II.
+// All-Annex-II → not_applicable. Otherwise the same completeness caveat as (5). Per-process absolute
+// indirect = see_indirect × activity level.
+export function buildItem6(goods: GoodComputation[], complete: boolean, missing: MissingField[]): Item6Indirect {
+  const producesNonAnnexII = goods.some((g) => !g.annexIiDirectOnly);
+  if (!producesNonAnnexII) return { status: 'not_applicable', reason: ANNEX_II_REASON };
+
+  const perProcessIndirect = goods.map((g) => (g.seeRecord ? g.seeRecord.see_indirect * g.activityLevel : null));
+  const allPresent = perProcessIndirect.every((v) => v != null);
+  if (complete && allPresent) {
+    return { status: 'value', value: perProcessIndirect.reduce((s, v) => s + (v as number), 0) };
+  }
+  missing.push({
+    item: '(6)', field: 'installation-level indirect emissions',
+    hint: 'installation-level aggregation requires every process for the installation and reporting period',
+  });
+  return { status: 'missing' };
+}
+
+// A precursor flattened across all goods, carrying the source classification from its own process's
+// resolutions map. 'joint' precursors are excluded upstream (never in the map — produced in the
+// process, Article 4(9)).
+interface FlatPrecursor {
+  cnCode: string;
+  originCountry: string;
+  source: PrecursorResolution['source'];
+  direct: number;                 // resolved SEE_i direct (the default value, or the verified actual)
+  origin: PrecursorOriginRow;
+}
+
+function collectPrecursors(goods: GoodComputation[]): FlatPrecursor[] {
+  const out: FlatPrecursor[] = [];
+  for (const g of goods) {
+    for (const pri of g.precursors) {
+      if (pri.precursor.boundary === 'joint') continue;   // Article 4(9) — produced in the process
+      const res = g.resolutions.get(pri.precursor);
+      if (res == null) {
+        // Same divergence guard as defaultShare: the report must classify precursors off the ENGINE's
+        // own resolutions, not a re-resolution that could disagree.
+        throw new Error(
+          `buildSummaryReport: precursor ${pri.precursor.cnCode} is absent from its process's resolutions map. ` +
+            'Pass the same PrecursorInput objects and resolution results computeSEE consumed.',
+        );
+      }
+      out.push({
+        cnCode: pri.precursor.cnCode, originCountry: pri.precursor.originCountry,
+        source: res.source, direct: res.direct, origin: pri.origin,
+      });
+    }
+  }
+  return out;
+}
+
+// (12)/(13) — partition precursors by the source discriminant. 'computed_here' is EXCLUDED from BOTH
+// lists: that is the REGULATION'S OWN clause — "excluding precursors produced in the production process
+// in accordance with Article 4(9)" — not a choice of ours. An 'eu_zero_rated' precursor fits NEITHER
+// list, and §1.2 does not say where it belongs; we drop it from both AND record the unresolved
+// classification as a gap rather than silently omitting it.
+export function buildItem12and13(
+  flat: FlatPrecursor[], missing: MissingField[],
+): { defaults: Item12DefaultPrecursor[]; actuals: Item13ActualPrecursor[] } {
+  const defaults: Item12DefaultPrecursor[] = [];
+  const actuals: Item13ActualPrecursor[] = [];
+
+  for (const p of flat) {
+    switch (p.source) {
+      case 'default':
+      case 'default_fallback': {
+        missing.push({
+          item: '(12)(b)', field: `name of the good for precursor ${p.cnCode}`,
+          hint: 'unbuilt input — no good-name field; do not substitute the CN code or the 2620 benchmark description',
+        });
+        defaults.push({
+          cnCode: p.cnCode,
+          name: { status: 'missing' },
+          originCountry: strField(p.originCountry),
+          defaultValue: { status: 'value', value: p.direct },
+        });
+        break;
+      }
+      case 'verified_actual': {
+        missing.push({
+          item: '(13)(b)', field: `name of the good for precursor ${p.cnCode}`,
+          hint: 'unbuilt input — no good-name field; do not substitute the CN code or the 2620 benchmark description',
+        });
+        missing.push({
+          item: '(13)(e)', field: `specific indirect embedded emissions for verified precursor ${p.cnCode}`,
+          hint: 'not available — a verified actual precursor has no indirect value (PrecursorInput has no seeValueIndirect; spec §10.6)',
+        });
+        actuals.push({
+          cnCode: p.cnCode,
+          name: { status: 'missing' },
+          originCountry: strField(p.originCountry),
+          reportingPeriod: numField(p.origin.reportingPeriod),
+          specificDirect: { status: 'value', value: p.direct },
+          specificIndirect: { status: 'missing' },
+        });
+        break;
+      }
+      case 'computed_here':
+        // EXCLUDED from both lists — the regulation's Article 4(9) exclusion, not ours.
+        break;
+      case 'eu_zero_rated':
+        missing.push({
+          item: '(12)/(13)', field: `list classification of EU/zero-rated precursor ${p.cnCode}`,
+          hint: 'unresolved — §1.2 does not state whether an EU/zero-rated precursor belongs in the default (12) or actual (13) list; not silently dropped',
+        });
+        break;
+    }
+  }
+  return { defaults, actuals };
+}
+
+// Distinct non-... helper: how many distinct values of `key` appear among a cnCode's precursors.
+function anyCnCodeSpansMultiple(flat: FlatPrecursor[], key: (p: FlatPrecursor) => string): boolean {
+  const byCn = new Map<string, Set<string>>();
+  for (const p of flat) {
+    const set = byCn.get(p.cnCode) ?? new Set<string>();
+    set.add(key(p));
+    byCn.set(p.cnCode, set);
+  }
+  for (const set of byCn.values()) if (set.size >= 2) return true;
+  return false;
+}
+
+// (14) — Article 14(1) multi-PERIOD averaging. Applies only where ≥2 precursors share a CN code but
+// come from different reporting periods. Condition absent → not_applicable. Condition present → missing
+// (the averaging is not implemented — do not silently proceed as if it were).
+export function buildItem14(flat: FlatPrecursor[], missing: MissingField[]): Item14MultiPeriod {
+  const spans = anyCnCodeSpansMultiple(flat, (p) => String(p.origin.reportingPeriod));
+  if (!spans) return { status: 'not_applicable', reason: 'all precursors of each CN code from a single reporting period' };
+  missing.push({ item: '(14)', field: 'multi-period precursor averaging', hint: 'Article 14(1) multi-period averaging not implemented' });
+  return { status: 'missing' };
+}
+
+// (15) — Article 14 multi-INSTALLATION averaging. Applies only where ≥2 precursors share a CN code from
+// different installations. Same treatment as (14).
+export function buildItem15(flat: FlatPrecursor[], missing: MissingField[]): Item15MultiInstallation {
+  const spans = anyCnCodeSpansMultiple(flat, (p) => String(p.origin.installationName));
+  if (!spans) return { status: 'not_applicable', reason: 'all precursors of each CN code from a single installation' };
+  missing.push({ item: '(15)', field: 'multi-installation precursor averaging', hint: 'Article 14 multi-installation averaging not implemented' });
+  return { status: 'missing' };
+}
+
+// (16) — the operator/installation of origin, per precursor. The CBAM Registry ID is "if applicable"
+// in the source, so a null is not treated as a hard gap; operator, installation and period are
+// required traceability and become gaps when absent.
+export function buildItem16(flat: FlatPrecursor[], missing: MissingField[]): Item16PrecursorOrigin[] {
+  return flat.map((p) => {
+    const operatorName = strField(p.origin.operatorName);
+    const installationName = strField(p.origin.installationName);
+    const reportingPeriod = numField(p.origin.reportingPeriod);
+    const hint = 'precursor origin identity (cbam_precursor_inputs origin_* columns)';
+    requireField(operatorName, '(16)', `operator of origin for precursor ${p.cnCode}`, hint, missing);
+    requireField(installationName, '(16)', `installation of origin for precursor ${p.cnCode}`, hint, missing);
+    requireField(reportingPeriod, '(16)', `reporting period of origin for precursor ${p.cnCode}`, hint, missing);
+    const cbamRegistryId: ReportField<string> = p.origin.cbamRegistryId != null && p.origin.cbamRegistryId.trim() !== ''
+      ? { status: 'value', value: p.origin.cbamRegistryId }
+      : { status: 'not_applicable', reason: 'not provided; the CBAM Registry identifier is required only where applicable (§1.2 (16))' };
+    return { cnCode: p.cnCode, operatorName, installationName, cbamRegistryId, reportingPeriod };
+  });
+}
+
 // ── Top-level builder ────────────────────────────────────────────────────────────────────────────
 
 /**
- * Build the §1.2 summary report from fetched rows. Returns the typed Report12 (Part-1 items populated;
- * Part-2 items left unset) alongside a flat list of every gap a submittable report still has.
+ * Build the §1.2 summary report from fetched rows. Returns the typed Report12 alongside a flat list of
+ * every gap a submittable report still has. Part 1 items (identity/processes/disclosures) are always
+ * built; Part 2 items (per-good, precursor lists) are built only when `input.goods` is supplied.
  */
 export function buildSummaryReport(input: Report12Input): { report: Report12; missing: MissingField[] } {
   const missing: MissingField[] = [];
@@ -348,5 +678,22 @@ export function buildSummaryReport(input: Report12Input): { report: Report12; mi
     item10_co2Capture: buildItem10(input.disclosures, missing),
     item11_onsiteElectricity: buildItem11(input.disclosures, missing),
   };
+
+  const goods = input.goods;
+  if (goods && goods.length > 0) {
+    const complete = input.installationProcessesComplete === true;
+    report.item4_perGood = goods.map((g) => buildItem4(g, missing));
+    report.item5_totalDirect = buildItem5(goods, complete, missing);
+    report.item6_indirect = buildItem6(goods, complete, missing);
+
+    const flat = collectPrecursors(goods);
+    const { defaults, actuals } = buildItem12and13(flat, missing);
+    report.item12_defaultPrecursors = defaults;
+    report.item13_actualPrecursors = actuals;
+    report.item14_multiPeriodPrecursor = buildItem14(flat, missing);
+    report.item15_multiInstallationPrecursor = buildItem15(flat, missing);
+    report.item16_precursorOrigin = buildItem16(flat, missing);
+  }
+
   return { report, missing };
 }

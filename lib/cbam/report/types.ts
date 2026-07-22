@@ -7,6 +7,7 @@
 //
 // This file is pure types. The builder (build.ts) and its DB-row inputs live at the seam; nothing
 // here touches Supabase — same split as benchmarks.ts / sefa.ts / defaultShare.ts.
+import type { SefaBenchmarkWorkings } from '../sefaCompute';
 
 // Three-state wrapper for every reportable field. The three states are genuinely distinct on a
 // verifier-facing report and must never collapse into one another:
@@ -99,18 +100,79 @@ export interface Item11OnsiteElectricity {
   exportedFromProcess: ReportField<boolean>; // (11)(d) exported from a production process's system boundaries
 }
 
-// Placeholder for §1.2 items built in Part 2. The property is RESERVED in the report shape now so the
-// contract is stable, but not populated yet — Part 1's builder omits these (they are optional).
-export interface Part2Pending {
-  readonly _part2NotYetBuilt: true;
+// ── §1.2 Part 2 item sub-structures (items (4)-(6), (12)-(16)) ───────────────────────────────────
+
+// (4)(c) — the indirect-emissions block, present only for goods NOT in Annex II. For an Annex II good
+// all four fields are not_applicable ('Annex II good — direct emissions only').
+export interface Item4Indirect {
+  actualShare: ReportField<number>;           // share of indirect emissions determined on ACTUAL values
+  defaultShare: ReportField<number>;          // share of indirect emissions determined on DEFAULT values
+  criteriaConfirmation: ReportField<boolean>; // confirmation the actual-value criteria are met (unbuilt input)
+  specificIndirect: ReportField<number>;      // the specific indirect emissions of the good
 }
 
-// The summary report — one property per §1.2 item. Items (1)-(3) and (7)-(11) are fully typed and
-// built in Part 1; items (4)-(6) and (12)-(16) are declared as optional Part2Pending placeholders,
-// to be typed and built in Part 2. Optionality is what lets the Part-1 builder return a valid Report12
-// without fabricating the items it does not yet compute.
+// (4) — per good. Item (4)(b) maps to the direct default share (see defaultShare.ts). (4)(d) imported
+// electricity is always not_applicable here (this installation does not import electricity as a good).
+export interface Item4Good {
+  processId: string;
+  cnCode: string | null;
+  specificDirect: ReportField<number>;                    // (4)(a) specific direct embedded emissions
+  defaultShareDirect: ReportField<number>;                // (4)(b) share for which default values were used
+  indirect: Item4Indirect;                                // (4)(c)
+  importedElectricity: ReportField<string>;               // (4)(d) — always not_applicable
+  sefa: ReportField<number>;                              // (4)(e) specific embedded free allocation
+  benchmarkConfirmation: ReportField<SefaBenchmarkWorkings>; // (4)(f) benchmark used + method
+}
+
+// (5) — total DIRECT emissions per process, plus the installation-level total (which needs every
+// process for the installation and period; see build.ts for the completeness caveat).
+export interface Item5TotalDirect {
+  perProcess: Array<{ processId: string; totalDirect: ReportField<number> }>;
+  installationTotal: ReportField<number>;
+}
+
+// (6) — installation-level INDIRECT emissions. not_applicable for an all-Annex-II installation.
+export type Item6Indirect = ReportField<number>;
+
+// (12) — a precursor for which DEFAULT values were used.
+export interface Item12DefaultPrecursor {
+  cnCode: string;                     // (12)(a)
+  name: ReportField<string>;          // (12)(b) name of the good — unbuilt input, no field
+  originCountry: ReportField<string>; // (12)(c) country of origin, where known and produced off-site
+  defaultValue: ReportField<number>;  // (12)(d) the applicable default value
+}
+
+// (13) — a precursor for which ACTUAL values were used.
+export interface Item13ActualPrecursor {
+  cnCode: string;                        // (13)(a)
+  name: ReportField<string>;             // (13)(b) name of the good — unbuilt input, no field
+  originCountry: ReportField<string>;    // (13)(c) country of origin, where produced off-site
+  reportingPeriod: ReportField<number>;  // (13)(d) the precursor's reporting period
+  specificDirect: ReportField<number>;   // (13)(e) specific embedded direct emissions
+  specificIndirect: ReportField<number>; // (13)(e) specific embedded indirect — unbuilt (spec §10.6)
+}
+
+// (16) — the operator and installation of ORIGIN of a precursor (traceability, not calculation).
+export interface Item16PrecursorOrigin {
+  cnCode: string;
+  operatorName: ReportField<string>;      // name of the operator of origin
+  installationName: ReportField<string>;  // name of the installation of origin
+  cbamRegistryId: ReportField<string>;    // CBAM Registry ID of origin — "if applicable"
+  reportingPeriod: ReportField<number>;   // applicable reporting period
+}
+
+// (14) and (15) — conditional Article 14 averaging. Never a 'value' in this build: they resolve to
+// not_applicable (the triggering condition does not arise) or missing (it does arise, but Article 14
+// multi-period / multi-installation averaging is not implemented). ReportField<never> encodes that.
+export type Item14MultiPeriod = ReportField<never>;
+export type Item15MultiInstallation = ReportField<never>;
+
+// The summary report — one property per §1.2 item. Items (1)-(3), (7)-(11) are Part 1; (4)-(6) and
+// (12)-(16) are Part 2. The Part 2 properties remain OPTIONAL: buildSummaryReport populates them only
+// when the caller supplies per-good computations, so a Part-1-only slice (no goods) omits them
+// exactly as before rather than fabricating empty per-good items.
 export interface Report12 {
-  // ── Part 1 (implemented) ──
+  // ── Part 1 ──
   item1_operator: Item1Operator;              // (1)
   item2_installation: Item2Installation;      // (2)
   item3_processes: ReportField<ProcessSummary[]>; // (3)
@@ -120,13 +182,13 @@ export interface Report12 {
   item10_co2Capture: Item10Co2Capture;        // (10)
   item11_onsiteElectricity: Item11OnsiteElectricity; // (11)
 
-  // ── Part 2 (declared, not yet built) ──
-  item4_perGood?: Part2Pending;                    // (4) per-good direct emissions / default share / SEFA
-  item5_totalDirect?: Part2Pending;                // (5) total direct emissions of the installation + per process
-  item6_indirect?: Part2Pending;                   // (6) indirect emissions (non-Annex-II goods)
-  item12_defaultPrecursors?: Part2Pending;         // (12) precursors using default values
-  item13_actualPrecursors?: Part2Pending;          // (13) precursors using actual values
-  item14_multiPeriodPrecursor?: Part2Pending;      // (14) precursors from different reporting periods
-  item15_multiInstallationPrecursor?: Part2Pending; // (15) precursor from multiple installations
-  item16_precursorOrigin?: Part2Pending;           // (16) operator/installation of origin of the precursor
+  // ── Part 2 ──
+  item4_perGood?: Item4Good[];                             // (4)
+  item5_totalDirect?: Item5TotalDirect;                    // (5)
+  item6_indirect?: Item6Indirect;                          // (6)
+  item12_defaultPrecursors?: Item12DefaultPrecursor[];     // (12)
+  item13_actualPrecursors?: Item13ActualPrecursor[];       // (13)
+  item14_multiPeriodPrecursor?: Item14MultiPeriod;         // (14)
+  item15_multiInstallationPrecursor?: Item15MultiInstallation; // (15)
+  item16_precursorOrigin?: Item16PrecursorOrigin[];        // (16)
 }
