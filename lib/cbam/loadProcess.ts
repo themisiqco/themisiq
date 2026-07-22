@@ -11,6 +11,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { attributeDirect, computeSEE } from './engine';
 import { makeResolveContext } from './resolver';
 import { adaptSourceStream, adaptPrecursor } from './adapt';
+import type { PrecursorInputRow } from './adapt';
 import type { SourceStream, PrecursorInput, ResolveContext, SEEResult } from './types';
 import type { SteelGrade, RouteCode } from './benchmarks';
 
@@ -43,6 +44,15 @@ export interface ProcessRow {
   route_code: RouteCode | null;
 }
 
+// One cbam_precursor_inputs row as loaded by the select below: the columns adaptPrecursor consumes
+// (PrecursorInputRow) plus the four origin_* provenance columns the report builder pairs positionally.
+export interface PrecursorRow extends PrecursorInputRow {
+  origin_operator_name: string | null;
+  origin_installation_name: string | null;
+  origin_cbam_registry_id: string | null;
+  origin_reporting_period: number | null;
+}
+
 // INVARIANT 10 — result.resolutions is keyed by OBJECT IDENTITY on the PrecursorInput objects in
 // `precursors`. Both are produced by the SAME loadAndComputeProcess call and returned together so
 // callers hold a mutually consistent pair. Never re-adapt (adaptPrecursor) or re-resolve (resolveSEE)
@@ -56,6 +66,12 @@ export interface LoadedProcess {
   electricityConsumed: number | null;
   streams: SourceStream[];
   precursors: PrecursorInput[];
+  // Raw cbam_precursor_inputs rows, POSITIONALLY aligned with `precursors`: `precursors` is a .map()
+  // over this array, so `precursors[i]` is the adapted form of `precursorRows[i]`. PrecursorInput
+  // deliberately carries no row id (it is an engine type, DB-free), so position is the ONLY valid
+  // association. Any caller pairing them must index — never re-sort, never re-fetch — because doing so
+  // would break the object-identity keying of result.resolutions (invariant 10).
+  precursorRows: PrecursorRow[];
   ctx: ResolveContext;
   // Process total direct emissions (pre-division by activity level) — attributeDirect(streams).
   // The report builder prefers this over aeG × AL for §1.2 item 5: it avoids a divide-then-multiply
@@ -99,7 +115,7 @@ export async function loadAndComputeProcess(
       .eq('process_id', processId),
     supabase
       .from('cbam_precursor_inputs')
-      .select('precursor_cn_code, precursor_category_code, mass_consumed, boundary, provenance, origin_country, see_value, verifier_report_id, reporting_period')
+      .select('precursor_cn_code, precursor_category_code, mass_consumed, boundary, provenance, origin_country, see_value, verifier_report_id, reporting_period, origin_operator_name, origin_installation_name, origin_cbam_registry_id, origin_reporting_period')
       .eq('process_id', processId),
     supabase
       .from('cbam_installations')
@@ -129,7 +145,9 @@ export async function loadAndComputeProcess(
 
   // ── 4. Adapt DB rows -> engine types (pinned mapping, testable) ──
   const streams = (streamsRes.data ?? []).map(adaptSourceStream);
-  const precursors = (precursorsRes.data ?? []).map(adaptPrecursor);
+  // Keep the raw rows and .map() over THEM, so precursors[i] is exactly the adapted precursorRows[i].
+  const precursorRows = (precursorsRes.data ?? []) as PrecursorRow[];
+  const precursors = precursorRows.map(adaptPrecursor);
 
   // ── 5. ResolveContext built with the SAME precursor list as computeSEE ──
   // Pre-fetch and compute must see the identical set, or a precursor absent from the pre-fetch
@@ -152,6 +170,7 @@ export async function loadAndComputeProcess(
     electricityConsumed,
     streams,
     precursors,
+    precursorRows,
     ctx,
     attrEm,
     result,
