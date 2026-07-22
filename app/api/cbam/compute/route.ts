@@ -17,9 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthedClient, bearerFrom, AuthError } from '../../../../lib/supabaseAuthed';
-import { attributeDirect, computeSEE } from '../../../../lib/cbam/engine';
-import { makeResolveContext } from '../../../../lib/cbam/resolver';
-import { adaptSourceStream, adaptPrecursor } from '../../../../lib/cbam/adapt';
+import { loadAndComputeProcess, ProcessLoadError } from '../../../../lib/cbam/loadProcess';
 import { computeSefaPersist } from '../../../../lib/cbam/sefaCompute';
 import { computeDefaultShare } from '../../../../lib/cbam/defaultShare';
 import type { BenchmarkRow } from '../../../../lib/cbam/benchmarks';
@@ -37,81 +35,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'process_id is required' }, { status: 400 });
     }
 
-    // ── 2. Load the process (RLS scopes to the owner) ────────────────
-    const { data: process, error: procErr } = await supabase
-      .from('cbam_production_processes')
-      .select('id, company_id, cn_code, category_code, activity_level, reporting_period, installation_id, electricity_consumed, steel_grade, route_code')
-      .eq('id', processId)
-      .single();
-
-    if (procErr || !process) {
-      // Not found OR not owned by this user — RLS makes those indistinguishable, which is correct.
-      return NextResponse.json({ error: 'Process not found' }, { status: 404 });
-    }
-
-    const activityLevel = Number(process.activity_level);
-    if (!(activityLevel > 0)) {
-      return NextResponse.json({ error: 'Process activity_level must be > 0' }, { status: 400 });
-    }
-    if (!process.cn_code) {
-      return NextResponse.json({ error: 'Process is missing cn_code (the good produced)' }, { status: 400 });
-    }
-
-    // ── 3. Load streams + precursors + the two indirect-calc inputs for this process ──
-    //   * installation.country keys the grid factor (the SITE drawing grid power — NOT the
-    //     precursor's origin_country, which is a different concern: zero-rating + precursor defaults).
-    //   * annex_ii_direct_only (per goods category) gates the process's OWN indirect only.
-    const [streamsRes, precursorsRes, installationRes, categoryRes] = await Promise.all([
-      supabase
-        .from('cbam_source_streams')
-        .select('stream_kind, activity_data, cc_mode, carbon_content, emission_factor, ncv, biomass_fraction')
-        .eq('process_id', processId),
-      supabase
-        .from('cbam_precursor_inputs')
-        .select('precursor_cn_code, precursor_category_code, mass_consumed, boundary, provenance, origin_country, see_value, verifier_report_id, reporting_period')
-        .eq('process_id', processId),
-      supabase
-        .from('cbam_installations')
-        .select('country')
-        .eq('id', process.installation_id)
-        .single(),
-      supabase
-        .from('cbam_goods_categories')
-        .select('annex_ii_direct_only')
-        .eq('code', process.category_code)
-        .single(),
-    ]);
-
-    if (streamsRes.error || precursorsRes.error) {
-      console.error('CBAM compute load error:', streamsRes.error || precursorsRes.error);
-      return NextResponse.json({ error: 'Failed to load process inputs' }, { status: 500 });
-    }
-    if (installationRes.error || !installationRes.data || categoryRes.error || !categoryRes.data) {
-      console.error('CBAM compute indirect-input load error:', installationRes.error || categoryRes.error);
-      return NextResponse.json({ error: 'Failed to load installation/category for indirect calc' }, { status: 500 });
-    }
-
-    const installationCountry: string = installationRes.data.country;
-    const annexIiDirectOnly: boolean = categoryRes.data.annex_ii_direct_only;
-    const electricityConsumed: number | null =
-      process.electricity_consumed == null ? null : Number(process.electricity_consumed);
-
-    // ── 4. Adapt DB rows -> engine types (pinned mapping, testable) ──
-    const streams = (streamsRes.data ?? []).map(adaptSourceStream);
-    const precursors = (precursorsRes.data ?? []).map(adaptPrecursor);
-
-    // ── 5. ResolveContext built with the SAME precursor list as computeSEE ──
-    // Pre-fetch and compute must see the identical set, or a precursor absent from the pre-fetch
-    // Map throws on lookup. This is the one invariant the harness proved end-to-end.
-    const ctx = await makeResolveContext(supabase, precursors);
-
-    // ── 6. Run the engine (computeSEE is the SINGLE source of truth for the figure) ──
-    const attrEm = attributeDirect(streams);
-    const result = computeSEE(attrEm, activityLevel, precursors, ctx, {
-      annexIiDirectOnly,
-      electricityConsumed,
-      installationCountry,   // grid factor keys off the installation, not any precursor origin
-    });
+    // ── 2–6. Load, adapt, and compute (the shared spine — see lib/cbam/loadProcess.ts). ──
+    // Steps 2 (load process), 3 (load streams/precursors/installation/category), 4 (adapt),
+    // 5 (ResolveContext on the SAME precursor list), and 6 (computeSEE) live there so the report
+    // route runs the IDENTICAL path. `precursors` and `result.resolutions` come from the one call
+    // and are keyed by object identity — do not re-adapt or re-resolve them downstream (invariant 10).
+    const { process, activityLevel, precursors, ctx, result } =
+      await loadAndComputeProcess(supabase, processId);
 
     // ── 6b. Default-value share (§1.2 item 4(b) / §1.1 15(d)), per leg ─────────────────────────
     // Consumes computeSEE's OWN resolutions map — NOT a re-resolution. If the precursor list and
@@ -254,6 +184,11 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: 401 });
+    }
+    if (error instanceof ProcessLoadError) {
+      // Same status codes and strings the inline load/validate steps used to return directly.
+      const status = error.code === 'not_found' ? 404 : error.code === 'invalid_input' ? 400 : 500;
+      return NextResponse.json({ error: error.message }, { status });
     }
     console.error('CBAM compute route error:', error);
     return NextResponse.json({ error: 'Compute failed' }, { status: 500 });
