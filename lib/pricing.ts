@@ -25,6 +25,7 @@ export const CURRENCY = 'usd'
 // the dashboard folder names under app/dashboard/. This is the canonical list.
 export type ModuleKey =
   | 'ghg'
+  | 'cbam'           // CBAM exporter-side SEE module (standalone, sibling to ghg)
   | 'climate-risk'   // includes the materiality wizard + report
   | 'supply-chain'   // Supplier Portal (data collection)
   | 'people'
@@ -34,6 +35,7 @@ export type ModuleKey =
 
 export const MODULES: { key: ModuleKey; name: string }[] = [
   { key: 'ghg',           name: 'GHG Inventory (Scope 1, 2 & 3)' },
+  { key: 'cbam',          name: 'CBAM (Carbon Border Adjustment Mechanism)' },
   { key: 'climate-risk',  name: 'Climate Risk' },
   { key: 'supply-chain',  name: 'Supply Chain' },
   { key: 'people',        name: 'People & Workforce' },
@@ -130,6 +132,7 @@ export const GHG_TIERS: Record<GhgTier, { priceUSD: number | null; locationAllow
 // Flat single-tier modules (USD / year). Keyed on every non-GHG module so the
 // type fails to compile if a module is ever added without a price.
 export const FLAT_MODULE_PRICES: Record<Exclude<ModuleKey, 'ghg'>, number> = {
+  'cbam':          4900,
   'climate-risk':  4900,
   'deals':         4900,
   'supply-chain':  2900,
@@ -137,10 +140,6 @@ export const FLAT_MODULE_PRICES: Record<Exclude<ModuleKey, 'ghg'>, number> = {
   'ai-governance': 2900,
   'people':        1499,
 }
-
-// All-7 hero bundle (priced at GHG Professional). The all-7 cart will use
-// min(discounted sum, FULL_PLATFORM_PRICE) — wired in the Step 4 checkout cutover.
-export const FULL_PLATFORM_PRICE = 24900
 
 // Self-serve card is disabled ABOVE this; larger orders route to request-an-invoice
 // (admin-invoice draft: card or manual wire — Canadian account has no Stripe ACH).
@@ -176,8 +175,6 @@ export function configuratorPrice(tier: Tier, moduleKeys: ModuleKey[]): number {
 // shown can never differ from the number charged.
 //   - GHG priced by chosen tier (GHG_TIERS); the other six are flat (FLAT_MODULE_PRICES).
 //   - Existing volume discount applies to multi-module carts (2 → −10%, 3+ → −20%).
-//   - All 7 selected → total = min(discounted sum, FULL_PLATFORM_PRICE) so the
-//     Full Platform bundle is always the best all-in price.
 //   - GHG Advisory (priceUSD null) has no self-serve price → requiresQuote=true,
 //     totalUSD=0; the caller routes the whole selection to the contact/quote path
 //     (never sum a null).
@@ -210,8 +207,7 @@ export function cartQuote(sel: CartSelection): CartQuote {
     }
   }
   const discounted = Math.round(sum * (1 - volumeDiscount(modules.length)))
-  const allSeven = ALL_MODULE_KEYS.every((k) => modules.includes(k))
-  const totalUSD = allSeven ? Math.min(discounted, FULL_PLATFORM_PRICE) : discounted
+  const totalUSD = discounted
   return { totalUSD, requiresQuote: false, requiresInvoice: requiresInvoice(totalUSD) }
 }
 

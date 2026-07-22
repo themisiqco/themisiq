@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { tierPrice, tierStrikethrough, volumeDiscount, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, FLAT_MODULE_PRICES, FULL_PLATFORM_PRICE, LEGACY_PRICING_PAGE_ID, type Tier, type GhgTier, type ModuleKey } from '@/lib/pricing'
+import { tierPrice, tierStrikethrough, volumeDiscount, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, FLAT_MODULE_PRICES, LEGACY_PRICING_PAGE_ID, type Tier, type GhgTier, type ModuleKey } from '@/lib/pricing'
 
 type ModuleId = 'ghg' | 'risk' | 'supply' | 'people' | 'deals' | 'ai' | 'cyber'
 
@@ -61,8 +61,6 @@ export default function HomePricing() {
     const key = LEGACY_PRICING_PAGE_ID[id]
     return key === 'ghg' ? GHG_TIERS[tier as GhgTier].priceUSD : FLAT_MODULE_PRICES[key as Exclude<ModuleKey, 'ghg'>]
   }
-  const selectAllSeven = () => { setSelected(new Set<ModuleId>(MODULES.map(m => m.id))); setTier('professional') }
-
   const toggleModule = (id: ModuleId) => {
     setSelected(prev => {
       const next = new Set(prev)
@@ -116,19 +114,17 @@ export default function HomePricing() {
           </div>
         </div>
 
-        {/* Full Platform hero (NEW model) */}
+        {/* Pick-and-pace hero (NEW model) — surfaces the volume discount, not a bundle price */}
         {NEW_PRICING_ACTIVE && (
           <div style={{ background: GRAD, borderRadius: 14, padding: 1, marginBottom: 16 }}>
             <div style={{ background: '#0d0d0d', borderRadius: 13, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#64fe3e', marginBottom: 4 }}>Most popular</div>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, color: '#fff' }}>All 7 modules — Full Platform</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>Every compliance domain. Best all-in price (GHG Professional).</div>
+              <div style={{ flex: 1, minWidth: 260 }}>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, color: '#fff', marginBottom: 6 }}>Pick and pace.</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, maxWidth: 520 }}>Start with the module your next deadline demands. Add others as your obligations grow — each one is a complete, standalone deliverable, not a partial view that only works when you buy the set.</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 10 }}>Two modules −10% · Three or more −20%</div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 30, fontWeight: 700, lineHeight: 1, background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>${FULL_PLATFORM_PRICE.toLocaleString()}</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>/year</div>
-                <button onClick={selectAllSeven} style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', background: GRAD, color: '#0d0d0d' }}>Select all 7 →</button>
+                <button onClick={() => document.getElementById('build-your-stack')?.scrollIntoView({ behavior: 'smooth' })} style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', background: GRAD, color: '#0d0d0d' }}>Build your stack ↓</button>
               </div>
             </div>
           </div>
@@ -226,7 +222,7 @@ export default function HomePricing() {
 
         {/* Module rows (NEW model) — per-module pricing, GHG inline tier picker */}
         {NEW_PRICING_ACTIVE && (
-          <div style={{ border: '1px solid #e8e7e4', borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
+          <div id="build-your-stack" style={{ border: '1px solid #e8e7e4', borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', background: '#f8f7f5', padding: '10px 16px', borderBottom: '1px solid #e8e7e4', alignItems: 'center' }}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784' }}>Select your compliance modules</div>
               <div style={{ fontSize: 10, color: '#888784', fontWeight: 300 }}>Click any row to add or remove</div>

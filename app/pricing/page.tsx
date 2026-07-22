@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { startCheckout } from '../../lib/checkout'
 import ConsentForm, { type ConsentPayload } from '../components/ConsentForm'
-import { LEGACY_PRICING_PAGE_ID, tierPrice, tierStrikethrough, volumeDiscount, ADDONS, conciergeTierForLocations, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, FLAT_MODULE_PRICES, FULL_PLATFORM_PRICE, type Tier, type GhgTier, type ModuleKey, type AddOnKey } from '../../lib/pricing'
+import { LEGACY_PRICING_PAGE_ID, tierPrice, tierStrikethrough, volumeDiscount, ADDONS, conciergeTierForLocations, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, FLAT_MODULE_PRICES, type Tier, type GhgTier, type ModuleKey, type AddOnKey } from '../../lib/pricing'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -210,11 +210,6 @@ function PricingPageInner() {
       ? GHG_TIERS[tier as GhgTier].priceUSD
       : FLAT_MODULE_PRICES[key as Exclude<ModuleKey, 'ghg'>]
   }
-  const selectAllSeven = () => {
-    setSelected(new Set<ModuleId>(MODULES.map((m) => m.id)))
-    setTier('professional') // hero advertises $24,900 = all-7 at GHG Professional
-  }
-
   // Consent modal (new-model self-serve B2B checkout) — gates the Buy-now button.
   const [consentOpen, setConsentOpen] = useState(false)
   // ConsentForm assembles + validates { business, purchaser, consent }; we attach the cart and pay.
@@ -472,19 +467,17 @@ function PricingPageInner() {
           <div style={{ fontSize: 12, color: '#555553', fontWeight: 300 }}>Start with one module. Build your compliance platform as you grow.</div>
         </div>
 
-        {/* Full Platform hero (NEW model) */}
+        {/* Pick-and-pace hero (NEW model) — surfaces the volume discount, not a bundle price */}
         {NEW_PRICING_ACTIVE && (
           <div style={{ background: GRAD, borderRadius: 14, padding: 1, marginBottom: 24 }}>
             <div style={{ background: '#0d0d0d', borderRadius: 13, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#64fe3e', marginBottom: 4 }}>Most popular</div>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, color: '#fff' }}>All 7 modules — Full Platform</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>Every compliance domain. Best all-in price (GHG Professional).</div>
+              <div style={{ flex: 1, minWidth: 260 }}>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, color: '#fff', marginBottom: 6 }}>Pick and pace.</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, maxWidth: 520 }}>Start with the module your next deadline demands. Add others as your obligations grow — each one is a complete, standalone deliverable, not a partial view that only works when you buy the set.</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 10 }}>Two modules −10% · Three or more −20%</div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ ...gradText, fontSize: 30, fontWeight: 700, lineHeight: 1 }}>${FULL_PLATFORM_PRICE.toLocaleString()}</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>/year</div>
-                <button onClick={selectAllSeven} style={{ ...primaryBtn, fontSize: 12 }}>Select all 7 →</button>
+                <button onClick={() => document.getElementById('build-your-stack')?.scrollIntoView({ behavior: 'smooth' })} style={{ ...primaryBtn, fontSize: 12 }}>Build your stack ↓</button>
               </div>
             </div>
           </div>
@@ -601,7 +594,7 @@ function PricingPageInner() {
 
         {/* Module selector (NEW model) — per-module pricing, GHG inline tier picker */}
         {NEW_PRICING_ACTIVE && (
-          <div style={s.moduleWrap}>
+          <div id="build-your-stack" style={s.moduleWrap}>
             <div style={s.moduleHeader}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784' }}>Select your compliance modules</div>
               <div style={{ fontSize: 10, color: '#888784', fontWeight: 300 }}>Click any row to add or remove</div>

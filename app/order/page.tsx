@@ -27,6 +27,7 @@ const GRAD = 'linear-gradient(135deg, #7425e3, #1fb1ff, #64fe3e)'
 
 const MODULE_LABELS: Record<ModuleKey, string> = {
   'ghg': 'GHG Emissions Inventory',
+  'cbam': 'CBAM (Carbon Border Adjustment Mechanism)',
   'climate-risk': 'Climate Risk',
   'supply-chain': 'Supply Chain / Scope 3',
   'deals': 'Deals & Investment',

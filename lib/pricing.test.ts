@@ -1,13 +1,23 @@
 import { describe, it, expect } from 'vitest'
-import { cartQuote, ADDONS, addOnRequirementsMet, priceLine, type ModuleKey } from './pricing'
+import { cartQuote, ADDONS, addOnRequirementsMet, priceLine, FLAT_MODULE_PRICES, GHG_TIERS, volumeDiscount, CARD_THRESHOLD_USD, type ModuleKey, type GhgTier } from './pricing'
 
 // Regression guard for the new-model cart math (June 2026 rescope). cartQuote is
 // the single source of truth shared by the configurator (display) and the server
 // routes (charge), so these assertions protect the actual charged amount once
 // NEW_PRICING_ACTIVE is flipped on.
 const ALL: ModuleKey[] = [
-  'ghg', 'climate-risk', 'supply-chain', 'people', 'deals', 'ai-governance', 'cyber',
+  'ghg', 'cbam', 'climate-risk', 'supply-chain', 'people', 'deals', 'ai-governance', 'cyber',
 ]
+
+// Pre-discount cart total, derived the same way cartQuote() does (GHG by tier,
+// the rest flat). Computed from the source-of-truth tables — never a literal —
+// so adding a module or repricing one keeps these tests honest instead of
+// silently wrong. That drift is exactly what broke the old Full-Platform tests.
+const grossCart = (ghgTier: GhgTier): number =>
+  ALL.reduce(
+    (sum, k) => sum + (k === 'ghg' ? (GHG_TIERS[ghgTier].priceUSD as number) : FLAT_MODULE_PRICES[k as Exclude<ModuleKey, 'ghg'>]),
+    0,
+  )
 
 describe('cartQuote — new pricing model', () => {
   it('single flat module (People) = $1,499, card OK', () => {
@@ -30,12 +40,27 @@ describe('cartQuote — new pricing model', () => {
     expect(q.requiresQuote).toBe(false)
   })
 
-  it('all 7 with GHG Professional = $24,900 (Full Platform cap wins)', () => {
-    expect(cartQuote({ modules: ALL, ghgTier: 'professional' }).totalUSD).toBe(24900)
+  it('a full cart is the discounted sum — no bundle cap', () => {
+    const ghgTier: GhgTier = 'professional'
+    const expected = Math.round(grossCart(ghgTier) * (1 - volumeDiscount(ALL.length)))
+    expect(cartQuote({ modules: ALL, ghgTier }).totalUSD).toBe(expected)
   })
 
-  it('all 7 with GHG Essentials = $19,919 (intended; below Full Platform)', () => {
-    expect(cartQuote({ modules: ALL, ghgTier: 'starter' }).totalUSD).toBe(19919)
+  it('a large cart is discounted at the 3+ volume band (20%), not a literal', () => {
+    const n = ALL.length
+    expect(n).toBeGreaterThanOrEqual(3)
+    // Assert against the 3+ band boundary, so the rate can't be a stale literal.
+    expect(volumeDiscount(n)).toBe(volumeDiscount(3))
+    // …and that same band factor is what cartQuote actually applies.
+    const ghgTier: GhgTier = 'professional'
+    const q = cartQuote({ modules: ALL, ghgTier })
+    expect(q.totalUSD).toBe(Math.round(grossCart(ghgTier) * (1 - volumeDiscount(n))))
+  })
+
+  it('a full cart exceeds the card threshold → requiresInvoice (cap no longer holds it under $10k)', () => {
+    const q = cartQuote({ modules: ALL, ghgTier: 'professional' })
+    expect(q.totalUSD).toBeGreaterThan(CARD_THRESHOLD_USD)
+    expect(q.requiresInvoice).toBe(true)
   })
 
   it('GHG Advisory -> requiresQuote, no self-serve total', () => {
