@@ -482,3 +482,179 @@ Unreachable on the live path while CSCF is unpublished (§11.1), so it bites onl
 **Current documented interpretation:** ThemisIQ implements only the grid-default factor path (PPA/direct-line deferred — decision D2). Every indirect figure the engine can produce is therefore default-factor-derived: own-indirect via `gridFactor()`, defaulted-precursor indirect via `see_indirect`, and verified-actual precursors carry no indirect at all (§10.6). So **actual share = 0** (a real computed zero, not missing — we know it is zero and why) and **default share = 1**, for any non-Annex-II good with non-zero indirect. Zero total indirect → both `not_applicable`.
 
 The regulation states neither the denominator nor the arithmetic, so the 0/1 result is an interpretation following from our implementation scope, not from text. **Revisit if the PPA/direct-line path is ever built** — the actual share becomes non-zero and the split becomes a real calculation. Applies to non-Annex-II goods only, so it does not touch the chapter-72 MVP.
+
+---
+
+## 13. SESSION LOG — 22 Jul 2026
+
+Recorded because several entries below close open items in §10 and add new
+ones. Where this section and an earlier one conflict, this section is later.
+
+### 13.1 What was built
+
+- **`lib/cbam/loadProcess.ts`** — the load→adapt→computeSEE spine, extracted
+  from the compute route so the report route runs the IDENTICAL path.
+  Returns `{ process, activityLevel, installationCountry, annexIiDirectOnly,
+  electricityConsumed, streams, precursors, precursorRows, ctx, attrEm,
+  result }`. Throws `ProcessLoadError` with codes `not_found` /
+  `invalid_input` / `load_failed`; callers map to HTTP. Mirrors the
+  `AuthError` pattern in `lib/supabaseAuthed.ts` (typed error, no embedded
+  status).
+- **`app/api/cbam/report/route.ts`** — GET, keyed on
+  `installation_id` + `reporting_period`, NOT on a see_record id. Serves the
+  §1.2 summary only. Verified live 22 Jul against two fixtures.
+- **`processes_complete` attestation** — column + trigger on
+  `cbam_installation_disclosures`. See 13.4.
+
+### 13.2 §10.4 pin CLOSED
+
+The five per-customer tables missing grants (`cbam_installations`,
+`cbam_production_processes`, `cbam_source_streams`, `cbam_precursor_inputs`,
+`cbam_see_records`) are captured in
+`supabase/migrations/20260722_cbam_customer_grants.sql`. Verified against
+`information_schema.role_table_grants`: the pin's list was exactly right.
+The other four per-customer tables and the three post-17-Jul reference
+tables already carried their grants in their own seed migrations — the
+discipline was working; only the earliest tables predated it.
+
+**Also found (unrelated to CBAM):** `rate_limits` had RLS deliberately
+policy-free but NO grant to `service_role`, so `lib/rateLimit.ts` had been
+failing open silently since 2 Jul. Fixed in
+`20260722_rate_limits_grants.sql`. Generalised rule added to CC memory:
+GRANT and RLS are separate layers, and BYPASSRLS does not bypass GRANT.
+
+### 13.3 §10.5 live-persistence test CLOSED
+
+Done without a UI, using Lisa's real account and a test company. Two
+fixtures seeded and computed through the authenticated route:
+
+| Fixture | Route | see_direct | default | delta | share |
+|---|---|---|---|---|---|
+| A | eaf_scrap, no precursors | 2.1800800000000002 | 3.75 | −1.5699199999999998 | 0 |
+| B | eaf_dri, DRI 7203 external + pig iron 7201 joint | 3.6375800000000003 | 3.75 | −0.11241999999999974 | 0.4006784730507645 |
+
+Fixture B reproduces the §10.3 harness figure (3.63758) through RLS, grants,
+adapters and persistence — previously proven only as owner via a script.
+
+**Proven by this:** the customer grants are sufficient; the RLS policies
+admit the real owner on read AND insert; `adapt.ts` handles live row shapes;
+numerics round-trip as JSON numbers, not strings.
+
+### 13.4 `processes_complete` — operator attestation (NEW)
+
+`buildSummaryReport` gates §1.2 items 5 and 6 (installation-level totals) on
+`installationProcessesComplete`, because a partial sum must never be
+presented as an installation total. Three options were considered:
+
+- (a) hardcode false — honest, ships today, items 5/6 permanently missing
+- (b) infer from row counts — REJECTED. The DB sees only rows that exist; an
+  operator who has not yet entered a process would get a confident
+  "complete" over a partial set. Wrong direction under reasonable assurance.
+- (c) explicit operator attestation — CHOSEN.
+
+Implemented as `processes_complete boolean` +
+`processes_complete_declared_at timestamptz` on
+`cbam_installation_disclosures` (already installation+period keyed).
+Nullable by design: null = not declared, false = declared incomplete,
+true = declared complete.
+
+**Enforced by DB trigger**, not by a route: the table already grants full
+CRUD to `authenticated`, so a route alone is bypassable. The trigger
+(`cbam_stamp_processes_complete`) stamps `declared_at` with server time on
+any change, clears it on retraction to null, and rejects `true` when the
+installation has no processes for that period. That guard rejects only the
+degenerate zero-process case — it does NOT verify completeness. Nothing can;
+the attestation is the operator's assertion.
+
+**Still owed:** a UI surface where the operator can actually make the
+declaration. Until then the flag must never be seeded, including in test.
+
+### 13.5 Stale-record tripwire and the numeric comparison rule
+
+The report route recomputes via the shared spine and compares against the
+stored `cbam_see_records` row before building. Mismatch on either leg throws
+`ReportError('stale_record')` → HTTP 409, carrying record id, process id,
+both stored legs, both recomputed legs, and `computed_at`. It NEVER serves a
+figure that disagrees with the stored record.
+
+**Comparison is strict equality — no tolerance, no rounding.** Established
+empirically 22 Jul: `see_direct::float8 = 3.6375800000000003` is `true`,
+and Postgres prints `3.63758` as the shortest round-tripping form of the
+same IEEE 754 double. Unconstrained `numeric` stores the exact decimal it is
+given; the shared spine guarantees both paths run the same code in the same
+summation order. A tolerance would mask genuine reference-data drift, which
+is the only thing this tripwire exists to catch.
+
+**Consequence for any future refactor:** reordering a `reduce` in the engine
+would change the last bit and fire this tripwire on every report. That is
+the intended behaviour — the fix is to re-run compute, not to add an epsilon.
+
+**Deliberately NOT built:** a workings-diff naming which precursor moved.
+The path is unexercised and would ship untested; both `workings` blobs are
+already persisted, so the diagnosis is recoverable after the fact. Add it
+the first time this fires for real, designed against an actual case.
+
+### 13.6 Workings block defect — FIXED
+
+The compute route's workings block called `resolveSEE` a second time for
+every precursor, including `joint` ones — a re-resolution the same file's
+step-6b comment forbids, and which fabricated a `see_i` for precursors
+`computeSEE` deliberately never resolved. Now reads
+`result.resolutions.get(p)`; joint precursors carry
+`see_i_direct: null`, `see_i_indirect: null`, `source: null`. The
+`PrecursorSource` discriminant was added to the persisted workings.
+
+Verified live on fixture B: DRI (`external`) carries `1.325` / `0` /
+`"default"`; pig iron (`joint`) carries three nulls with `counted: false`.
+The artifact now distinguishes "resolved to zero" from "never resolved".
+
+### 13.7 Positional precursor alignment (NEW CONSTRAINT)
+
+`PrecursorReportInput` pairs a `PrecursorInput` with a
+`PrecursorOriginRow` (the four `origin_*` columns). `PrecursorInput` carries
+no row id — it is an engine type, deliberately DB-free — so there is no key
+to join on. `loadProcess` therefore returns `precursorRows` alongside
+`precursors`, and the two are POSITIONALLY aligned because `precursors` is
+literally `precursorRows.map(adaptPrecursor)` over that same array.
+
+**Any caller pairing them must index, never re-sort or re-fetch.** Doing
+either breaks the object-identity keying of `result.resolutions`
+(invariant 10). Zip in a single pass at the point of construction.
+
+### 13.8 §1.2 item 5 confirmed correct
+
+Item 5 reports `attrEm` (the process's own attributed direct emissions), NOT
+`see_direct`. Both test fixtures report the same 218.008 despite differing
+`see_direct`, because precursors raise SEE without touching `attrEm`.
+Confirmed against `docs/cbam-annex-iv-verbatim.md`: item (5) is *"the total
+direct emissions of the installation during the reporting period and total
+direct emissions per production process."* Precursor emissions are embedded
+in the good and reported via items 4 and 12/13; folding them into item 5
+would double-count.
+
+### 13.9 Country-specific defaults NOT seeded (OPEN)
+
+§0 decided to seed country-specific defaults for 13 exporters. Live,
+`cbam_default_values` holds only `country = 'other'` rows for the crude-steel
+CN codes (`7206 10 00`, `7206 90 00` — both 3.750). The resolver's `'other'`
+fallback handles it correctly, so nothing is wrong — but the accuracy
+argument in §0 (comparing against `'other'` when a country value exists
+overstates the customer's advantage) is currently unrealised. Confirm
+whether the seed was deferred or lost.
+
+### 13.10 Reporting-period seam noted, not yet resolved
+
+`cbam_see_records` has no reporting-period column of its own; the period
+lives on `cbam_production_processes` and the report route joins for it.
+Correct today. Note it if the record ever needs to stand alone.
+
+### 13.11 Test coverage gap
+
+The suite stayed at 500 tests / 15 files across every change today. Nothing
+added covers the route layer: not the tripwire, not the
+`processesWithoutRecord` path, not the 404s, not the workings block. All
+were verified by live runs against production fixtures instead. A
+route-level test stubbing the Supabase client would close this and is the
+cheapest remaining hardening.
+
+---
