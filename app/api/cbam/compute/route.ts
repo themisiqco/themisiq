@@ -17,7 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthedClient, bearerFrom, AuthError } from '../../../../lib/supabaseAuthed';
-import { attributeDirect, computeSEE, resolveSEE } from '../../../../lib/cbam/engine';
+import { attributeDirect, computeSEE } from '../../../../lib/cbam/engine';
 import { makeResolveContext } from '../../../../lib/cbam/resolver';
 import { adaptSourceStream, adaptPrecursor } from '../../../../lib/cbam/adapt';
 import { computeSefaPersist } from '../../../../lib/cbam/sefaCompute';
@@ -181,22 +181,26 @@ export async function POST(req: NextRequest) {
     });
 
     // ── Build a minimal, verifier-legible workings object ────────────
-    // aeG + per-precursor m_i / see_i / provenance. see_i is re-derived via resolveSEE for DISPLAY
-    // only — the persisted total comes from computeSEE above, never re-summed here.
+    // aeG + per-precursor m_i / see_i / provenance. see_i values are READ from computeSEE's own
+    // resolutions map — never re-resolved here, so display cannot drift from the persisted figure.
+    // A precursor with boundary === 'joint' is legitimately absent from that map (it is already
+    // inside AttrEm); it carries null see_i legs — absence of a resolution is not a value, and must
+    // never be coerced to 0 or recomputed.
     // When SEFA is computed, the benchmark used goes into the same jsonb (§1.2 item 4(f)); when
     // pending, nothing is recorded — no "would-be" benchmark someone could multiply into a wrong number.
     const workings = {
       aeG: result.aeG,
       precursorContribution: result.precursorContribution,
       precursors: precursors.map((p) => {
-        const r = resolveSEE(p, ctx);             // display values; match what computeSEE used
+        const r = result.resolutions.get(p);      // computeSEE's own resolution; absent for 'joint'
         return {
           cnCode: p.cnCode,
           boundary: p.boundary,
           provenance: p.provenance,
           m_i: p.massConsumed / activityLevel,    // Eq 61
-          see_i_direct: r.direct,                 // both legs, per the direct/indirect split
-          see_i_indirect: r.indirect,
+          see_i_direct: r?.direct ?? null,        // both legs, per the direct/indirect split; null when 'joint'
+          see_i_indirect: r?.indirect ?? null,
+          source: r?.source ?? null,              // PrecursorSource provenance discriminant; null when 'joint'
           counted: p.boundary !== 'joint',        // 'joint' is already inside AttrEm — not re-added
         };
       }),
