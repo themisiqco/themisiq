@@ -57,6 +57,10 @@ export interface LoadedProcess {
   streams: SourceStream[];
   precursors: PrecursorInput[];
   ctx: ResolveContext;
+  // Process total direct emissions (pre-division by activity level) — attributeDirect(streams).
+  // The report builder prefers this over aeG × AL for §1.2 item 5: it avoids a divide-then-multiply
+  // round trip (aeG is already attrEm / activityLevel), so no rounding is reintroduced.
+  attrEm: number;
   result: SEEResult;        // from computeSEE — carries `resolutions`
 }
 
@@ -149,6 +153,7 @@ export async function loadAndComputeProcess(
     streams,
     precursors,
     ctx,
+    attrEm,
     result,
   };
 }
