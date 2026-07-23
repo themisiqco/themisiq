@@ -418,6 +418,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
               body: JSON.stringify({ filePath: doc.file_path, mediaType: file.type, locationName: inventory.locations[locIdx].name }),
             })
             const json = await res.json()
+            console.log('[concierge RAW]', JSON.stringify(json))
             if (json?.success && Array.isArray(json.fields)) {
               const { convertToCanonical } = await import('../../../lib/unitConversions')
               const knownFuels = ['electricity', 'natural_gas', 'propane', 'diesel', 'gasoline']
