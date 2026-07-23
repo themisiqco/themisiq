@@ -22,6 +22,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../../../lib/supabase'
 import { useEntitlement } from '../../../../lib/useEntitlement'
 import { cbamInputStyle, CbamField } from '../components/DisclosureQuestion'
+import { massBalance } from '../../../../lib/cbam/engine'
+import type { SourceStream } from '../../../../lib/cbam/types'
 
 // ── House style, matching app/dashboard/cbam/page.tsx ──
 const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
@@ -62,6 +64,45 @@ const EMPTY_INSTALLATION: InstallationForm = { id: null, name: '', country: '', 
 // A saved installation row as displayed in the list.
 type InstallationRow = InstallationForm & { id: string }
 
+// ── Step 3 form shapes ──
+type CalcMode = 'actual' | 'default' | 'combined'
+type ProcessForm = {
+  id: string | null
+  installation_id: string
+  cn_code: string
+  category_code: string
+  route_code: string           // '' = null (correct for categories with no routes)
+  activity_level: string
+  reporting_period: string
+  calc_mode: CalcMode
+  steel_grade: string          // '' = null
+  electricity_consumed: string // '' = null
+}
+type ProcessRow = ProcessForm & { id: string }
+const EMPTY_PROCESS = (installationId: string): ProcessForm => ({
+  id: null, installation_id: installationId, cn_code: '', category_code: '', route_code: '',
+  activity_level: '', reporting_period: '2026', calc_mode: 'actual', steel_grade: '', electricity_consumed: '',
+})
+
+type StreamKind = 'fuel' | 'process_material' | 'output'
+type StreamCcMode = 'direct' | 'ef_per_t' | 'ef_per_tj'
+type StreamForm = {
+  id: string | null
+  name: string
+  stream_kind: StreamKind
+  activity_data: string
+  cc_mode: StreamCcMode
+  carbon_content: string
+  emission_factor: string
+  ncv: string
+  biomass_fraction: string
+}
+type StreamRow = StreamForm & { id: string }
+const EMPTY_STREAM: StreamForm = {
+  id: null, name: '', stream_kind: 'fuel', activity_data: '', cc_mode: 'direct',
+  carbon_content: '', emission_factor: '', ncv: '', biomass_fraction: '0',
+}
+
 // '' → null (a blank text box is not a value; store the absence).
 function nullify(s: string): string | null {
   const t = s.trim()
@@ -89,6 +130,25 @@ export default function CbamSetupPage() {
   const [inst2Saving, setInst2Saving] = useState(false)
   const [inst2Saved, setInst2Saved] = useState(false)
   const [inst2Error, setInst2Error] = useState<string | null>(null)
+
+  // ── Step 3 reference data (world-readable) ──
+  const [goodsCategories, setGoodsCategories] = useState<{ code: string; label: string }[]>([])
+  const [routes, setRoutes] = useState<{ category_code: string; route_code: string }[]>([])
+
+  // ── Step 3 processes (scoped to the viewed installation) ──
+  const [procInstallationId, setProcInstallationId] = useState<string | null>(null)
+  const [processes, setProcesses] = useState<ProcessRow[]>([])
+  const [editingProc, setEditingProc] = useState<ProcessForm | null>(null)
+  const [proc3Saving, setProc3Saving] = useState(false)
+  const [proc3Saved, setProc3Saved] = useState(false)
+  const [proc3Error, setProc3Error] = useState<string | null>(null)
+
+  // ── Step 3 source streams (nested under a saved process) ──
+  const [streamsProcId, setStreamsProcId] = useState<string | null>(null)
+  const [streams, setStreams] = useState<StreamRow[]>([])
+  const [editingStream, setEditingStream] = useState<StreamForm | null>(null)
+  const [streamSaving, setStreamSaving] = useState(false)
+  const [streamError, setStreamError] = useState<string | null>(null)
 
   // ── Load the owner's companies (RLS scopes to user_id = auth.uid()) ──
   useEffect(() => {
@@ -298,6 +358,248 @@ export default function CbamSetupPage() {
     loadInstallations(companyId)
   }
 
+  // ── Load reference data (categories + routes; world-readable) ──
+  useEffect(() => {
+    if (!isPaid) return
+    let cancelled = false
+    Promise.all([
+      supabase.from('cbam_goods_categories').select('code, label').order('label'),
+      supabase.from('cbam_production_routes').select('category_code, route_code').order('category_code'),
+    ]).then(([catRes, routeRes]) => {
+      if (cancelled) return
+      if (catRes.error) { setProc3Error(catRes.error.message); return }
+      if (routeRes.error) { setProc3Error(routeRes.error.message); return }
+      setGoodsCategories((catRes.data ?? []) as { code: string; label: string }[])
+      setRoutes((routeRes.data ?? []) as { category_code: string; route_code: string }[])
+    })
+    return () => { cancelled = true }
+  }, [isPaid])
+
+  // Default the viewed installation once installations load.
+  useEffect(() => {
+    setProcInstallationId((prev) => prev ?? installations[0]?.id ?? null)
+  }, [installations])
+
+  // ── Load processes for the viewed installation ──
+  const loadProcesses = (instId: string) => {
+    setProc3Error(null)
+    supabase
+      .from('cbam_production_processes')
+      .select('id, installation_id, cn_code, category_code, route_code, activity_level, reporting_period, calc_mode, steel_grade, electricity_consumed')
+      .eq('installation_id', instId)
+      .order('cn_code')
+      .then(({ data, error }) => {
+        if (error) { setProc3Error(error.message); return }
+        const rows = (data ?? []) as Record<string, unknown>[]
+        setProcesses(rows.map((r) => ({
+          id: r.id as string,
+          installation_id: r.installation_id as string,
+          cn_code: (r.cn_code as string | null) ?? '',
+          category_code: (r.category_code as string | null) ?? '',
+          route_code: (r.route_code as string | null) ?? '',
+          activity_level: r.activity_level == null ? '' : String(r.activity_level),
+          reporting_period: r.reporting_period == null ? '' : String(r.reporting_period),
+          calc_mode: ((r.calc_mode as string | null) ?? 'actual') as CalcMode,
+          steel_grade: (r.steel_grade as string | null) ?? '',
+          electricity_consumed: r.electricity_consumed == null ? '' : String(r.electricity_consumed),
+        })))
+      })
+  }
+  useEffect(() => {
+    if (!procInstallationId) return
+    setEditingProc(null)
+    setProc3Saved(false)
+    setStreamsProcId(null)
+    loadProcesses(procInstallationId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [procInstallationId])
+
+  // ── Load source streams for the expanded process ──
+  const loadStreams = (procId: string) => {
+    setStreamError(null)
+    supabase
+      .from('cbam_source_streams')
+      .select('id, name, stream_kind, activity_data, cc_mode, carbon_content, emission_factor, ncv, biomass_fraction')
+      .eq('process_id', procId)
+      .order('created_at')
+      .then(({ data, error }) => {
+        if (error) { setStreamError(error.message); return }
+        const rows = (data ?? []) as Record<string, unknown>[]
+        setStreams(rows.map((r) => ({
+          id: r.id as string,
+          name: (r.name as string | null) ?? '',
+          stream_kind: r.stream_kind as StreamKind,
+          activity_data: r.activity_data == null ? '' : String(r.activity_data),
+          cc_mode: r.cc_mode as StreamCcMode,
+          carbon_content: r.carbon_content == null ? '' : String(r.carbon_content),
+          emission_factor: r.emission_factor == null ? '' : String(r.emission_factor),
+          ncv: r.ncv == null ? '' : String(r.ncv),
+          biomass_fraction: r.biomass_fraction == null ? '0' : String(r.biomass_fraction),
+        })))
+      })
+  }
+  useEffect(() => {
+    if (!streamsProcId) { setStreams([]); return }
+    setEditingStream(null)
+    loadStreams(streamsProcId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streamsProcId])
+
+  const routesForCategory = (cat: string) => routes.filter((r) => r.category_code === cat)
+
+  function setProc<K extends keyof ProcessForm>(k: K, v: string) {
+    setProc3Saved(false)
+    setEditingProc((p) => (p ? ({ ...p, [k]: v } as ProcessForm) : p))
+  }
+
+  // ── Step 3 save (process) — insert (new) or update (existing) ──
+  async function saveProcess() {
+    if (!companyId || !editingProc) return
+    setProc3Saved(false)
+    setProc3Error(null)
+    const p = editingProc
+    if (!p.installation_id) { setProc3Error('Installation is required (installation_id NOT NULL).'); return }
+    // CN code is the load-bearing field. Enforce the exact 8-digit spaced shape.
+    if (!/^[0-9]{4} [0-9]{2} [0-9]{2}$/.test(p.cn_code.trim())) {
+      setProc3Error(`CN code must be the exact 8-digit spaced code, e.g. '7206 10 00' — "${p.cn_code.trim()}" is not. A 4-digit heading (7206) is an unseeded "see below" row: the default lookup returns nothing and the actual-vs-default comparison is silently lost (spec §10.7). Use the exact code on the customer's customs paperwork; do not shorten or infer it.`)
+      return
+    }
+    if (!p.category_code) { setProc3Error('Category is required (category_code NOT NULL, FK to cbam_goods_categories).'); return }
+    // Route: enforce the composite (category, route) pairing the DB FK enforces.
+    const catRoutes = routesForCategory(p.category_code)
+    if (catRoutes.length === 0) {
+      if (p.route_code !== '') { setProc3Error('This category has no production routes — leave the route unset.'); return }
+    } else if (p.route_code === '' || !catRoutes.some((r) => r.route_code === p.route_code)) {
+      setProc3Error('Choose a production route valid for this category — the (category, route) pair is a composite foreign key and an invalid pair is rejected.')
+      return
+    }
+    const activity = Number(p.activity_level)
+    if (p.activity_level.trim() === '' || Number.isNaN(activity) || activity <= 0) {
+      setProc3Error('Activity level is required and must be greater than 0 (CHECK activity_level > 0).'); return
+    }
+    const period = Number(p.reporting_period)
+    if (!Number.isInteger(period) || period < 2026) {
+      setProc3Error('Reporting period must be an integer ≥ 2026 (CHECK reporting_period >= 2026).'); return
+    }
+    let electricity: number | null = null
+    if (p.electricity_consumed.trim() !== '') {
+      const e = Number(p.electricity_consumed)
+      if (Number.isNaN(e) || e < 0) { setProc3Error('Electricity consumed must be null or ≥ 0 (CHECK).'); return }
+      electricity = e
+    }
+    setProc3Saving(true)
+    const payload = {
+      company_id: companyId,
+      installation_id: p.installation_id,
+      cn_code: p.cn_code.trim(),
+      category_code: p.category_code,
+      route_code: nullify(p.route_code),
+      activity_level: activity,
+      reporting_period: period,
+      calc_mode: p.calc_mode,
+      steel_grade: nullify(p.steel_grade),
+      electricity_consumed: electricity,
+    }
+    const query = p.id
+      ? supabase.from('cbam_production_processes').update(payload).eq('id', p.id)
+      : supabase.from('cbam_production_processes').insert(payload)
+    const { error } = await query
+    if (error) { setProc3Error(error.message); setProc3Saving(false); return }
+    setProc3Saving(false)
+    setProc3Saved(true)
+    setEditingProc(null)
+    loadProcesses(p.installation_id)
+  }
+
+  function setStreamF<K extends keyof StreamForm>(k: K, v: string) {
+    setEditingStream((s) => (s ? ({ ...s, [k]: v } as StreamForm) : s))
+  }
+
+  // ── Step 3 save (source stream). cc_mode drives which inputs are REQUIRED; the
+  // engine fails loud on a missing input (never defaults to zero), so we enforce
+  // the per-mode requirement here before the row can reach the compute route. ──
+  async function saveStream() {
+    if (!companyId || !streamsProcId || !editingStream) return
+    setStreamError(null)
+    const s = editingStream
+    if (s.name.trim() === '') { setStreamError('Stream name is required (NOT NULL).'); return }
+    if (s.activity_data.trim() === '' || Number.isNaN(Number(s.activity_data))) {
+      setStreamError('Activity data is required and must be a number (NOT NULL). Outputs must be NEGATIVE.'); return
+    }
+    const ad = Number(s.activity_data)
+    let carbon: number | null = null
+    let ef: number | null = null
+    let ncv: number | null = null
+    if (s.cc_mode === 'direct') {
+      if (s.carbon_content.trim() === '' || Number.isNaN(Number(s.carbon_content))) {
+        setStreamError("cc_mode 'direct' requires carbon content — the engine throws if it is null."); return
+      }
+      carbon = Number(s.carbon_content)
+    } else if (s.cc_mode === 'ef_per_t') {
+      if (s.emission_factor.trim() === '' || Number.isNaN(Number(s.emission_factor))) {
+        setStreamError("cc_mode 'ef_per_t' requires an emission factor (Eq 14: ef / 3.664)."); return
+      }
+      ef = Number(s.emission_factor)
+    } else {
+      if (s.emission_factor.trim() === '' || Number.isNaN(Number(s.emission_factor)) || s.ncv.trim() === '' || Number.isNaN(Number(s.ncv))) {
+        setStreamError("cc_mode 'ef_per_tj' requires BOTH an emission factor and NCV (Eq 13: (ef × ncv) / 3.664)."); return
+      }
+      ef = Number(s.emission_factor); ncv = Number(s.ncv)
+    }
+    const bf = s.biomass_fraction.trim() === '' ? 0 : Number(s.biomass_fraction)
+    if (Number.isNaN(bf) || bf < 0 || bf > 1) { setStreamError('Biomass fraction must be between 0 and 1 (CHECK).'); return }
+    setStreamSaving(true)
+    const payload = {
+      company_id: companyId,
+      process_id: streamsProcId,
+      name: s.name.trim(),
+      stream_kind: s.stream_kind,
+      activity_data: ad,
+      cc_mode: s.cc_mode,
+      carbon_content: carbon,
+      emission_factor: ef,
+      ncv,
+      biomass_fraction: bf,
+    }
+    const query = s.id
+      ? supabase.from('cbam_source_streams').update(payload).eq('id', s.id)
+      : supabase.from('cbam_source_streams').insert(payload)
+    const { error } = await query
+    if (error) { setStreamError(error.message); setStreamSaving(false); return }
+    setStreamSaving(false)
+    setEditingStream(null)
+    loadStreams(streamsProcId)
+  }
+
+  async function removeStream(id: string) {
+    if (!streamsProcId) return
+    setStreamError(null)
+    const { error } = await supabase.from('cbam_source_streams').delete().eq('id', id)
+    if (error) { setStreamError(error.message); return }
+    loadStreams(streamsProcId)
+  }
+
+  // Running mass balance (DirEm*) over the SAVED streams — the SAME reduce the
+  // compute path uses (imported from the engine, not re-derived). Wrapped: a
+  // saved stream missing a required input for its mode makes carbonContent throw,
+  // so we surface that rather than crash.
+  const massBalanceSum = (): { value: number | null; error: boolean } => {
+    try {
+      const mapped: SourceStream[] = streams.map((s) => ({
+        kind: s.stream_kind,
+        ad: Number(s.activity_data),
+        ccMode: s.cc_mode,
+        cc: s.carbon_content === '' ? undefined : Number(s.carbon_content),
+        ef: s.emission_factor === '' ? undefined : Number(s.emission_factor),
+        ncv: s.ncv === '' ? undefined : Number(s.ncv),
+        bf: s.biomass_fraction === '' ? 0 : Number(s.biomass_fraction),
+      }))
+      return { value: massBalance(mapped), error: false }
+    } catch {
+      return { value: null, error: true }
+    }
+  }
+
   // ── Unpaid → paywall (same treatment as the disclosures page) ──
   if (!isPaid) {
     return (
@@ -362,7 +664,7 @@ export default function CbamSetupPage() {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: '0.5rem' }}>
         <StepTab n={1} label="Operator" sub="who you are" active={step === 1} onClick={() => setStep(1)} />
         <StepTab n={2} label="Installations" sub="where you produce" active={step === 2} onClick={() => setStep(2)} />
-        <StepTab n={3} label="Processes & emissions" sub="coming next" active={step === 3} onClick={() => setStep(3)} muted />
+        <StepTab n={3} label="Processes & emissions" sub="goods & source streams" active={step === 3} onClick={() => setStep(3)} />
         <StepTab n={4} label="Precursors" sub="coming next" active={step === 4} onClick={() => setStep(4)} muted />
       </div>
       {step === 2 && (
@@ -501,12 +803,249 @@ export default function CbamSetupPage() {
         </div>
       )}
 
-      {/* ── STEP 3: PLACEHOLDER — not built this increment ── */}
+      {/* ── STEP 3: PROCESSES + SOURCE STREAMS ── */}
       {step === 3 && (
-        <PlaceholderStep
-          title="(3) Processes and emissions"
-          body="Production processes, their routes and CN codes, source streams and charge mix are the next increment. Each process is created under an installation from Step 2 — that dependency is why this step comes after installations exist."
-        />
+        <div>
+          <div style={itemHead}>(3) Production processes and emissions</div>
+          {installations.length === 0 ? (
+            <div style={{ fontSize: 13, color: '#888784', fontWeight: 300, lineHeight: 1.6 }}>
+              Add an installation in Step 2 first — every process belongs to an installation, so this step depends on it.
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '1.25rem' }}>
+                A process is one produced good at one installation, with the source streams (fuels, materials, outputs) whose carbon nets to its direct emissions. Nothing is computed here — computing is a separate, deliberate action.
+              </div>
+
+              {/* Which installation's processes */}
+              <div style={{ marginBottom: '1.25rem', maxWidth: 420 }}>
+                <CbamField label="Installation">
+                  <select value={procInstallationId ?? ''} onChange={(e) => setProcInstallationId(e.target.value || null)} style={cbamInputStyle}>
+                    {installations.map((i) => <option key={i.id} value={i.id}>{i.name} — {i.country}</option>)}
+                  </select>
+                </CbamField>
+              </div>
+
+              {proc3Error && !editingProc && <ErrorBox prefix="Could not load / save process" message={proc3Error} />}
+
+              {/* Existing processes */}
+              {processes.length === 0 ? (
+                <div style={{ fontSize: 13, color: '#888784', fontWeight: 300, marginBottom: '1rem' }}>No processes yet for this installation.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
+                  {processes.map((proc) => (
+                    <div key={proc.id} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>CN {proc.cn_code} <span style={{ color: '#888784', fontWeight: 300 }}>· {categoryLabel(goodsCategories, proc.category_code)}{proc.route_code ? ` · ${proc.route_code}` : ''}</span></div>
+                          <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>AL {proc.activity_level} · {proc.reporting_period} · {proc.calc_mode}{proc.steel_grade ? ` · ${proc.steel_grade}` : ''}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button type="button" onClick={() => { setEditingProc(proc); setProc3Saved(false); setProc3Error(null) }} style={linkBtn}>Edit</button>
+                          <button type="button" onClick={() => setStreamsProcId(streamsProcId === proc.id ? null : proc.id)} style={linkBtn}>{streamsProcId === proc.id ? 'Hide streams' : 'Manage streams'}</button>
+                        </div>
+                      </div>
+
+                      {/* Nested source streams for this process */}
+                      {streamsProcId === proc.id && (
+                        <div style={{ marginTop: 12, borderTop: '0.5px solid #e8e7e4', paddingTop: 12 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d', marginBottom: 8 }}>Source streams</div>
+
+                          {/* Sign convention — surfaced prominently, it is not intuitive. */}
+                          <div style={{ background: '#FEF3E2', border: '0.5px solid #f5d9ad', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#92400e', lineHeight: 1.5, marginBottom: 10 }}>
+                            Sign convention: direct emissions are a single summed reduce with no subtraction, so an <strong>output</strong> stream must carry <strong>negative</strong> activity data — that is how the balance nets carbon in minus carbon out. A positive output value silently inflates the figure with nothing to catch it.
+                          </div>
+
+                          {streams.length === 0 ? (
+                            <div style={{ fontSize: 12, color: '#888784', marginBottom: 8 }}>No streams yet.</div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+                              {streams.map((st) => (
+                                <div key={st.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: '#f8f7f5', borderRadius: 8, padding: '8px 12px' }}>
+                                  <div style={{ fontSize: 12, color: '#0d0d0d' }}>
+                                    <span style={{ fontWeight: 500 }}>{st.name}</span> <span style={{ color: '#888784' }}>· {st.stream_kind} · AD {st.activity_data} · {st.cc_mode}{Number(st.biomass_fraction) > 0 ? ` · bf ${st.biomass_fraction}` : ''}</span>
+                                  </div>
+                                  <div style={{ display: 'flex', gap: 6 }}>
+                                    <button type="button" onClick={() => { setEditingStream(st); setStreamError(null) }} style={linkBtn}>Edit</button>
+                                    <button type="button" onClick={() => removeStream(st.id)} style={linkBtn}>Remove</button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Running mass balance + zero-floor note. */}
+                          {streams.length > 0 && (() => {
+                            const mb = massBalanceSum()
+                            if (mb.error) {
+                              return <div style={{ fontSize: 12, color: '#92400e', marginBottom: 8 }}>Mass balance not computable — a saved stream is missing a required input for its carbon-content mode.</div>
+                            }
+                            const v = mb.value as number
+                            return (
+                              <div style={{ fontSize: 12, color: v < 0 ? '#92400e' : '#555553', marginBottom: 8, lineHeight: 1.5 }}>
+                                Running mass balance (DirEm*): <strong>{v.toFixed(4)}</strong> t CO₂
+                                {v < 0 && (
+                                  <div style={{ marginTop: 4 }}>
+                                    Negative net — AttrEm_Dir will be floored to zero per Annex III (“Where AttrEm_Dir is calculated to have a negative value, it shall be set to zero”). A negative net usually indicates a data-entry error, e.g. an output entered positive or an input entered negative.
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })()}
+
+                          {!editingStream && (
+                            <button type="button" onClick={() => { setEditingStream(EMPTY_STREAM); setStreamError(null) }} style={linkBtn}>+ Add stream</button>
+                          )}
+
+                          {/* Stream add / edit form — cc_mode drives which fields show. */}
+                          {editingStream && (
+                            <div style={{ marginTop: 10, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                <CbamField label="Stream name — required">
+                                  <input value={editingStream.name} onChange={(e) => setStreamF('name', e.target.value)} style={cbamInputStyle} />
+                                </CbamField>
+                                <CbamField label="Stream kind — required">
+                                  <select value={editingStream.stream_kind} onChange={(e) => setStreamF('stream_kind', e.target.value)} style={cbamInputStyle}>
+                                    <option value="fuel">fuel</option>
+                                    <option value="process_material">process_material</option>
+                                    <option value="output">output</option>
+                                  </select>
+                                </CbamField>
+                                <CbamField label="Activity data — required" hint={editingStream.stream_kind === 'output' ? "OUTPUT stream: enter a NEGATIVE value — outputs net carbon OUT of the balance." : "Tonnes. Fuels and materials are positive."}>
+                                  <input type="number" step="any" value={editingStream.activity_data} onChange={(e) => setStreamF('activity_data', e.target.value)} style={cbamInputStyle} />
+                                  {editingStream.stream_kind === 'output' && editingStream.activity_data.trim() !== '' && Number(editingStream.activity_data) > 0 && (
+                                    <div style={{ marginTop: 4, fontSize: 11, color: '#92400e' }}>This is an output stream but the value is positive — outputs should be negative, a positive value inflates the emissions. (Not blocked, but check this.)</div>
+                                  )}
+                                </CbamField>
+                                <CbamField label="Carbon-content mode — required">
+                                  <select value={editingStream.cc_mode} onChange={(e) => setStreamF('cc_mode', e.target.value)} style={cbamInputStyle}>
+                                    <option value="direct">direct — carbon content</option>
+                                    <option value="ef_per_t">ef_per_t — emission factor per tonne</option>
+                                    <option value="ef_per_tj">ef_per_tj — emission factor per TJ + NCV</option>
+                                  </select>
+                                </CbamField>
+                                {editingStream.cc_mode === 'direct' && (
+                                  <CbamField label="Carbon content — required for this mode" hint="Carbon fraction. The engine throws if this is null in 'direct' mode.">
+                                    <input type="number" step="any" value={editingStream.carbon_content} onChange={(e) => setStreamF('carbon_content', e.target.value)} style={cbamInputStyle} />
+                                  </CbamField>
+                                )}
+                                {editingStream.cc_mode === 'ef_per_t' && (
+                                  <CbamField label="Emission factor — required for this mode" hint="t CO₂ / t. Eq 14: ef / 3.664.">
+                                    <input type="number" step="any" value={editingStream.emission_factor} onChange={(e) => setStreamF('emission_factor', e.target.value)} style={cbamInputStyle} />
+                                  </CbamField>
+                                )}
+                                {editingStream.cc_mode === 'ef_per_tj' && (
+                                  <>
+                                    <CbamField label="Emission factor — required for this mode" hint="t CO₂ / TJ. Eq 13: (ef × ncv) / 3.664.">
+                                      <input type="number" step="any" value={editingStream.emission_factor} onChange={(e) => setStreamF('emission_factor', e.target.value)} style={cbamInputStyle} />
+                                    </CbamField>
+                                    <CbamField label="NCV — required for this mode" hint="Net calorific value (TJ / t).">
+                                      <input type="number" step="any" value={editingStream.ncv} onChange={(e) => setStreamF('ncv', e.target.value)} style={cbamInputStyle} />
+                                    </CbamField>
+                                  </>
+                                )}
+                                <CbamField label="Biomass fraction" hint="0 to 1. Applied as × (1 − biomass_fraction) per Eq 15. Default 0.">
+                                  <input type="number" step="any" value={editingStream.biomass_fraction} onChange={(e) => setStreamF('biomass_fraction', e.target.value)} style={{ ...cbamInputStyle, width: 160 }} />
+                                </CbamField>
+                              </div>
+                              {streamError && <ErrorBox prefix="Could not save stream" message={streamError} />}
+                              <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>
+                                <button type="button" onClick={saveStream} disabled={streamSaving} style={primaryBtn(streamSaving)}>{streamSaving ? 'Saving…' : (editingStream.id ? 'Save stream' : 'Add stream')}</button>
+                                <button type="button" onClick={() => { setEditingStream(null); setStreamError(null) }} style={ghostBtn}>Cancel</button>
+                              </div>
+                            </div>
+                          )}
+                          {streamError && !editingStream && <ErrorBox prefix="Stream error" message={streamError} />}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!editingProc && procInstallationId && (
+                <button type="button" onClick={() => { setEditingProc(EMPTY_PROCESS(procInstallationId)); setProc3Saved(false); setProc3Error(null) }} style={primaryBtn(false)}>
+                  + Add process
+                </button>
+              )}
+
+              {/* Process add / edit form */}
+              {editingProc && (
+                <div style={{ marginTop: '1rem', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.5rem', maxWidth: 640 }}>
+                  <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', color: '#0d0d0d', marginBottom: '1rem' }}>{editingProc.id ? 'Edit process' : 'New process'}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <CbamField label="Installation — required">
+                      <select value={editingProc.installation_id} onChange={(e) => setProc('installation_id', e.target.value)} style={cbamInputStyle}>
+                        {installations.map((i) => <option key={i.id} value={i.id}>{i.name} — {i.country}</option>)}
+                      </select>
+                    </CbamField>
+                    <CbamField label="CN code — required (exact 8-digit spaced)" hint="e.g. '7206 10 00'. Must be the exact 8-digit spaced code — a 4-digit heading (7206) is an unseeded 'see below' row: the default lookup returns nothing and the actual-vs-default comparison is silently lost (spec §10.7). It is on the customer's customs paperwork; do not shorten or infer it.">
+                      <input value={editingProc.cn_code} onChange={(e) => setProc('cn_code', e.target.value)} placeholder="7206 10 00" style={cbamInputStyle} />
+                    </CbamField>
+                    <CbamField label="Category — required">
+                      <select value={editingProc.category_code} onChange={(e) => { setProc('category_code', e.target.value); setProc('route_code', '') }} style={cbamInputStyle}>
+                        <option value="" disabled>Select a category…</option>
+                        {goodsCategories.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
+                      </select>
+                    </CbamField>
+                    {editingProc.category_code && (
+                      routesForCategory(editingProc.category_code).length > 0 ? (
+                        <CbamField label="Production route — required for this category" hint="The (category, route) pair is validated by a composite foreign key — an invalid pair is rejected.">
+                          <select value={editingProc.route_code} onChange={(e) => setProc('route_code', e.target.value)} style={cbamInputStyle}>
+                            <option value="" disabled>Select a route…</option>
+                            {routesForCategory(editingProc.category_code).map((r) => <option key={r.route_code} value={r.route_code}>{r.route_code}</option>)}
+                          </select>
+                        </CbamField>
+                      ) : (
+                        <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.5 }}>This category has no production route — the route is left unset (correct for e.g. iron/steel products and sintered ore).</div>
+                      )
+                    )}
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      <CbamField label="Activity level — required (> 0)">
+                        <input type="number" step="any" value={editingProc.activity_level} onChange={(e) => setProc('activity_level', e.target.value)} placeholder="tonnes" style={{ ...cbamInputStyle, width: 180 }} />
+                      </CbamField>
+                      <CbamField label="Reporting period — required (≥ 2026)">
+                        <input type="number" step={1} min={2026} value={editingProc.reporting_period} onChange={(e) => setProc('reporting_period', e.target.value)} style={{ ...cbamInputStyle, width: 180 }} />
+                      </CbamField>
+                    </div>
+                    <CbamField label="Calculation mode — required">
+                      <select value={editingProc.calc_mode} onChange={(e) => setProc('calc_mode', e.target.value)} style={{ ...cbamInputStyle, width: 220 }}>
+                        <option value="actual">actual</option>
+                        <option value="default">default</option>
+                        <option value="combined">combined</option>
+                      </select>
+                    </CbamField>
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      <CbamField label="Steel grade" hint="Steel goods only; leave unset otherwise.">
+                        <select value={editingProc.steel_grade} onChange={(e) => setProc('steel_grade', e.target.value)} style={{ ...cbamInputStyle, width: 200 }}>
+                          <option value="">(none)</option>
+                          <option value="carbon">carbon</option>
+                          <option value="low_alloy">low_alloy</option>
+                          <option value="high_alloy">high_alloy</option>
+                        </select>
+                      </CbamField>
+                      <CbamField label="Electricity consumed (MWh)" hint="For own-indirect on non-Annex-II goods. Leave blank, or ≥ 0.">
+                        <input type="number" step="any" value={editingProc.electricity_consumed} onChange={(e) => setProc('electricity_consumed', e.target.value)} style={{ ...cbamInputStyle, width: 200 }} />
+                      </CbamField>
+                    </div>
+                  </div>
+                  {proc3Error && <ErrorBox prefix="Could not save process" message={proc3Error} />}
+                  <div style={{ marginTop: '1.25rem', display: 'flex', gap: 10 }}>
+                    <button type="button" onClick={saveProcess} disabled={proc3Saving} style={primaryBtn(proc3Saving)}>{proc3Saving ? 'Saving…' : (editingProc.id ? 'Save changes' : 'Add process')}</button>
+                    <button type="button" onClick={() => { setEditingProc(null); setProc3Error(null) }} style={ghostBtn}>Cancel</button>
+                  </div>
+                </div>
+              )}
+
+              {proc3Saved && !editingProc && (
+                <div style={{ marginTop: '1.25rem', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 13, color: '#0F6E56' }}>✓ Saved</span>
+                  <a href="/dashboard/cbam/report" style={linkAnchor}>Generate report →</a>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       )}
 
       {/* ── STEP 4: PLACEHOLDER — not built this increment ── */}
@@ -551,6 +1090,10 @@ function PlaceholderStep({ title, body }: { title: string; body: string }) {
       <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, fontWeight: 300, maxWidth: 620 }}>{body}</div>
     </div>
   )
+}
+
+function categoryLabel(cats: { code: string; label: string }[], code: string): string {
+  return cats.find((c) => c.code === code)?.label ?? code
 }
 
 function ErrorBox({ prefix, message }: { prefix: string; message: string }) {
