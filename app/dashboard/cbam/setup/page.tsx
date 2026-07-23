@@ -18,7 +18,7 @@
 // DB errors are surfaced VERBATIM — the operator needs to see exactly which
 // CHECK/constraint rejected a save (e.g. the latitude/longitude range checks).
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../../../lib/supabase'
 import { useEntitlement } from '../../../../lib/useEntitlement'
 import { cbamInputStyle, CbamField } from '../components/DisclosureQuestion'
@@ -96,11 +96,32 @@ type StreamForm = {
   emission_factor: string
   ncv: string
   biomass_fraction: string
+  source_doc_id: string        // '' = none (unevidenced); else a cbam_source_documents id
 }
 type StreamRow = StreamForm & { id: string }
 const EMPTY_STREAM: StreamForm = {
   id: null, name: '', stream_kind: 'fuel', activity_data: '', cc_mode: 'direct',
-  carbon_content: '', emission_factor: '', ncv: '', biomass_fraction: '0',
+  carbon_content: '', emission_factor: '', ncv: '', biomass_fraction: '0', source_doc_id: '',
+}
+
+// ── Evidence documents (bucket 'cbam-source-documents') ──
+// Limits mirror the DB bucket: 25 MB cap + MIME allowlist. Legacy .xls is NOT
+// in the allowlist — only .xlsx.
+const CBAM_BUCKET = 'cbam-source-documents'
+const CBAM_MAX_BYTES = 26214400
+const CBAM_MIME_ALLOW = [
+  'application/pdf', 'image/png', 'image/jpeg', 'text/csv',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+]
+const DOC_TYPE_SUGGESTIONS = ['weighbridge ticket', 'fuel delivery note', 'laboratory analysis', 'production log', 'electricity invoice', 'mass balance record']
+type CbamDocument = {
+  id: string
+  file_path: string
+  file_name: string
+  file_size_kb: number | null
+  mime_type: string | null
+  document_type: string | null
+  uploaded_at: string
 }
 
 // '' → null (a blank text box is not a value; store the absence).
@@ -149,6 +170,14 @@ export default function CbamSetupPage() {
   const [editingStream, setEditingStream] = useState<StreamForm | null>(null)
   const [streamSaving, setStreamSaving] = useState(false)
   const [streamError, setStreamError] = useState<string | null>(null)
+
+  // ── Step 3 evidence documents (scoped to the selected company) ──
+  const [documents, setDocuments] = useState<CbamDocument[]>([])
+  const [docType, setDocType] = useState('')
+  const [docNotes, setDocNotes] = useState('')
+  const [docUploading, setDocUploading] = useState(false)
+  const [docError, setDocError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // ── Load the owner's companies (RLS scopes to user_id = auth.uid()) ──
   useEffect(() => {
@@ -419,7 +448,7 @@ export default function CbamSetupPage() {
     setStreamError(null)
     supabase
       .from('cbam_source_streams')
-      .select('id, name, stream_kind, activity_data, cc_mode, carbon_content, emission_factor, ncv, biomass_fraction')
+      .select('id, name, stream_kind, activity_data, cc_mode, carbon_content, emission_factor, ncv, biomass_fraction, source_doc_id')
       .eq('process_id', procId)
       .order('created_at')
       .then(({ data, error }) => {
@@ -435,6 +464,7 @@ export default function CbamSetupPage() {
           emission_factor: r.emission_factor == null ? '' : String(r.emission_factor),
           ncv: r.ncv == null ? '' : String(r.ncv),
           biomass_fraction: r.biomass_fraction == null ? '0' : String(r.biomass_fraction),
+          source_doc_id: (r.source_doc_id as string | null) ?? '',
         })))
       })
   }
@@ -560,6 +590,7 @@ export default function CbamSetupPage() {
       emission_factor: ef,
       ncv,
       biomass_fraction: bf,
+      source_doc_id: nullify(s.source_doc_id),
     }
     const query = s.id
       ? supabase.from('cbam_source_streams').update(payload).eq('id', s.id)
@@ -598,6 +629,111 @@ export default function CbamSetupPage() {
     } catch {
       return { value: null, error: true }
     }
+  }
+
+  // ── EVIDENCE DOCUMENTS ───────────────────────────────────────────────────
+  // CBAM documents are NOT parsed. Unlike GHG utility bills, CBAM evidence
+  // (weighbridge tickets, fuel delivery notes, laboratory analyses, production
+  // logs) has no standardised genre — often company-internal formats, often not
+  // in English. An extracted figure would flow into a financial obligation and
+  // be tested against the operator's own records on a mandatory site visit. The
+  // operator tallies their own records and enters the figure; the document is
+  // the provenance link a verifier follows from that number back to its evidence.
+  const loadDocuments = (cid: string) => {
+    setDocError(null)
+    supabase
+      .from('cbam_source_documents')
+      .select('id, file_path, file_name, file_size_kb, mime_type, document_type, uploaded_at')
+      .eq('company_id', cid)
+      .order('uploaded_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) { setDocError(error.message); return }
+        const rows = (data ?? []) as Record<string, unknown>[]
+        setDocuments(rows.map((r) => ({
+          id: r.id as string,
+          file_path: r.file_path as string,
+          file_name: (r.file_name as string | null) ?? '',
+          file_size_kb: r.file_size_kb == null ? null : Number(r.file_size_kb),
+          mime_type: (r.mime_type as string | null) ?? null,
+          document_type: (r.document_type as string | null) ?? null,
+          uploaded_at: r.uploaded_at as string,
+        })))
+      })
+  }
+  useEffect(() => {
+    if (!companyId) { setDocuments([]); return }
+    loadDocuments(companyId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId])
+
+  const documentName = (id: string): string | null => documents.find((d) => d.id === id)?.file_name ?? null
+
+  // Upload to the bucket, then INSERT the metadata row (REQUIRED). The path MUST
+  // begin with the user's uid — the bucket policy requires
+  // (auth.uid())::text = (storage.foldername(name))[1]. Mirrors the GHG pattern.
+  async function uploadDocument(file: File) {
+    if (!companyId) return
+    setDocError(null)
+    // Validate the DB bucket limits client-side too (the DB is the backstop).
+    if (file.size > CBAM_MAX_BYTES) {
+      setDocError(`"${file.name}" is ${(file.size / 1024 / 1024).toFixed(1)} MB — over the 25 MB limit. Split or compress the file.`)
+      return
+    }
+    if (!CBAM_MIME_ALLOW.includes(file.type)) {
+      setDocError(`"${file.name}" has type "${file.type || 'unknown'}", which is not accepted. Allowed: PDF, PNG, JPEG, CSV, XLSX. Legacy .xls is not accepted — save as .xlsx.`)
+      return
+    }
+    setDocUploading(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { setDocError('Your session has expired. Sign in again to upload.'); setDocUploading(false); return }
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+    const path = `${session.user.id}/cbam/${Date.now()}_${safeName}`
+    const { error: upErr } = await supabase.storage.from(CBAM_BUCKET).upload(path, file, { contentType: file.type })
+    if (upErr) { setDocError(upErr.message); setDocUploading(false); return }
+    // The metadata row is REQUIRED. If it fails, delete the just-uploaded object
+    // so storage and metadata never drift out of sync (no orphan file).
+    const { error: metaErr } = await supabase
+      .from('cbam_source_documents')
+      .insert({
+        company_id: companyId,
+        user_id: session.user.id,
+        file_path: path,
+        file_name: file.name,
+        file_size_kb: Math.round(file.size / 1024),
+        mime_type: file.type,
+        document_type: nullify(docType),
+        notes: nullify(docNotes),
+      })
+      .select('id')
+      .single()
+    if (metaErr) {
+      await supabase.storage.from(CBAM_BUCKET).remove([path])
+      setDocError(`The file uploaded but its metadata row failed to save, so the file was removed to avoid an orphan in storage. Nothing was kept. ${metaErr.message}`)
+      setDocUploading(false)
+      return
+    }
+    setDocType('')
+    setDocNotes('')
+    setDocUploading(false)
+    loadDocuments(companyId)
+  }
+
+  // Delete BOTH the storage object and the metadata row. The FK is
+  // ON DELETE SET NULL, so any stream citing this document keeps its activity
+  // data and only loses source_doc_id — never a silent data deletion. Delete the
+  // row first (which nulls the citing streams), then remove the object.
+  async function deleteDocument(doc: CbamDocument) {
+    const ok = window.confirm(
+      `Delete "${doc.file_name}"?\n\nThis removes both the file and its metadata. Any source stream citing this document will lose its provenance link: the stream is NOT deleted and its activity data stays, but source_doc_id becomes null, so a verifier can no longer trace that figure back to this evidence.`,
+    )
+    if (!ok) return
+    setDocError(null)
+    const { error: metaErr } = await supabase.from('cbam_source_documents').delete().eq('id', doc.id)
+    if (metaErr) { setDocError(metaErr.message); return }
+    const { error: rmErr } = await supabase.storage.from(CBAM_BUCKET).remove([doc.file_path])
+    if (rmErr) { setDocError(`The metadata row was deleted, but removing the file from storage failed: ${rmErr.message}`) }
+    if (companyId) loadDocuments(companyId)
+    if (streamsProcId) loadStreams(streamsProcId)   // refresh linked-document labels
   }
 
   // ── Unpaid → paywall (same treatment as the disclosures page) ──
@@ -817,6 +953,68 @@ export default function CbamSetupPage() {
                 A process is one produced good at one installation, with the source streams (fuels, materials, outputs) whose carbon nets to its direct emissions. Nothing is computed here — computing is a separate, deliberate action.
               </div>
 
+              {/* ── EVIDENCE DOCUMENTS (scoped to the selected company) ──
+                  CBAM documents are NOT parsed. Unlike GHG utility bills, CBAM
+                  evidence (weighbridge tickets, fuel delivery notes, laboratory
+                  analyses, production logs) has no standardised genre — often
+                  company-internal formats, often not in English. An extracted
+                  figure would flow into a financial obligation and be tested
+                  against the operator's own records on a mandatory site visit.
+                  The operator tallies their own records and enters the figure;
+                  the document is the provenance link a verifier follows from
+                  that number back to its evidence. */}
+              <div style={{ marginBottom: '1.5rem', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', color: '#0d0d0d', marginBottom: 4 }}>Evidence documents</div>
+                <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '1rem' }}>
+                  Upload the records behind your figures — weighbridge tickets, fuel delivery notes, laboratory analyses, production logs. These are <strong>not read or parsed</strong>: you tally your own records and enter the figure, and the document is the provenance link a verifier follows back from a number to its evidence. Accepted: PDF, PNG, JPEG, CSV, XLSX (max 25 MB). Legacy .xls is not accepted — save as .xlsx.
+                </div>
+
+                {/* Uploaded documents */}
+                {documents.length === 0 ? (
+                  <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginBottom: '1rem' }}>No documents uploaded yet.</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: '1rem' }}>
+                    {documents.map((doc) => (
+                      <div key={doc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: '#f8f7f5', borderRadius: 8, padding: '8px 12px' }}>
+                        <div style={{ fontSize: 12, color: '#0d0d0d' }}>
+                          <span style={{ fontWeight: 500 }}>{doc.file_name}</span>
+                          <span style={{ color: '#888784' }}> · {doc.document_type ?? 'untyped'} · {formatKb(doc.file_size_kb)} · {new Date(doc.uploaded_at).toLocaleDateString()}</span>
+                        </div>
+                        <button type="button" onClick={() => deleteDocument(doc)} style={linkBtn}>Delete</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Upload */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 520 }}>
+                  <CbamField label="Document type" hint="Free text — CBAM evidence types vary by sector. Pick a suggestion or type your own.">
+                    <input list="cbam-doctype-suggestions" value={docType} onChange={(e) => setDocType(e.target.value)} placeholder="e.g. weighbridge ticket" style={cbamInputStyle} />
+                    <datalist id="cbam-doctype-suggestions">
+                      {DOC_TYPE_SUGGESTIONS.map((s) => <option key={s} value={s} />)}
+                    </datalist>
+                  </CbamField>
+                  <CbamField label="Notes (optional)">
+                    <input value={docNotes} onChange={(e) => setDocNotes(e.target.value)} style={cbamInputStyle} />
+                  </CbamField>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg,.csv,.xlsx,application/pdf,image/png,image/jpeg,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    disabled={docUploading}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0]
+                      if (f) uploadDocument(f)
+                      if (fileInputRef.current) fileInputRef.current.value = ''
+                    }}
+                    style={{ fontSize: 12 }}
+                  />
+                  {docUploading && <div style={{ fontSize: 12, color: '#888784' }}>Uploading…</div>}
+                </div>
+
+                {docError && <ErrorBox prefix="Document error" message={docError} />}
+              </div>
+
               {/* Which installation's processes */}
               <div style={{ marginBottom: '1.25rem', maxWidth: 420 }}>
                 <CbamField label="Installation">
@@ -863,7 +1061,10 @@ export default function CbamSetupPage() {
                               {streams.map((st) => (
                                 <div key={st.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: '#f8f7f5', borderRadius: 8, padding: '8px 12px' }}>
                                   <div style={{ fontSize: 12, color: '#0d0d0d' }}>
-                                    <span style={{ fontWeight: 500 }}>{st.name}</span> <span style={{ color: '#888784' }}>· {st.stream_kind} · AD {st.activity_data} · {st.cc_mode}{Number(st.biomass_fraction) > 0 ? ` · bf ${st.biomass_fraction}` : ''}</span>
+                                    <div><span style={{ fontWeight: 500 }}>{st.name}</span> <span style={{ color: '#888784' }}>· {st.stream_kind} · AD {st.activity_data} · {st.cc_mode}{Number(st.biomass_fraction) > 0 ? ` · bf ${st.biomass_fraction}` : ''}</span></div>
+                                    {st.source_doc_id
+                                      ? <div style={{ fontSize: 11, color: '#0F6E56', marginTop: 2 }}>📎 {documentName(st.source_doc_id) ?? 'linked document'}</div>
+                                      : <div style={{ fontSize: 11, color: '#92400e', marginTop: 2 }}>no source document — a verifier cannot trace this figure</div>}
                                   </div>
                                   <div style={{ display: 'flex', gap: 6 }}>
                                     <button type="button" onClick={() => { setEditingStream(st); setStreamError(null) }} style={linkBtn}>Edit</button>
@@ -946,6 +1147,12 @@ export default function CbamSetupPage() {
                                 )}
                                 <CbamField label="Biomass fraction" hint="0 to 1. Applied as × (1 − biomass_fraction) per Eq 15. Default 0.">
                                   <input type="number" step="any" value={editingStream.biomass_fraction} onChange={(e) => setStreamF('biomass_fraction', e.target.value)} style={{ ...cbamInputStyle, width: 160 }} />
+                                </CbamField>
+                                <CbamField label="Source document" hint="The evidence this activity data came from. Optional — a stream without a document is valid, just unevidenced (a verifier cannot trace it). Upload documents in the Evidence documents panel above.">
+                                  <select value={editingStream.source_doc_id} onChange={(e) => setStreamF('source_doc_id', e.target.value)} style={cbamInputStyle}>
+                                    <option value="">— none (unevidenced) —</option>
+                                    {documents.map((d) => <option key={d.id} value={d.id}>{d.file_name}{d.document_type ? ` (${d.document_type})` : ''}</option>)}
+                                  </select>
                                 </CbamField>
                               </div>
                               {streamError && <ErrorBox prefix="Could not save stream" message={streamError} />}
@@ -1094,6 +1301,12 @@ function PlaceholderStep({ title, body }: { title: string; body: string }) {
 
 function categoryLabel(cats: { code: string; label: string }[], code: string): string {
   return cats.find((c) => c.code === code)?.label ?? code
+}
+
+function formatKb(kb: number | null): string {
+  if (kb == null) return 'size unknown'
+  if (kb >= 1024) return `${(kb / 1024).toFixed(1)} MB`
+  return `${Math.round(kb)} KB`
 }
 
 function ErrorBox({ prefix, message }: { prefix: string; message: string }) {
