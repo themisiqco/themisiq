@@ -29,6 +29,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../../../lib/supabase'
 import { useEntitlement } from '../../../../lib/useEntitlement'
 import { cbamInputStyle, CbamField } from '../components/DisclosureQuestion'
+import { exportReportXlsx } from './exportXlsx'
 import type {
   Report12, ReportField, MissingField, Coordinates, ProcessSummary,
   Item4Good, Item5TotalDirect,
@@ -133,6 +134,9 @@ export default function CbamReportPage() {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<ReportResponse | null>(null)
   const [err, setErr] = useState<ErrState | null>(null)
+  const [exporting, setExporting] = useState(false)
+
+  const selectedInstallation = installations.find((i) => i.id === selectedInstallationId) ?? null
 
   // ── Load the owner's installations (RLS scopes to owner) ──
   useEffect(() => {
@@ -185,6 +189,27 @@ export default function CbamReportPage() {
     } catch (e) {
       setErr({ status: 0, message: e instanceof Error ? e.message : 'Network error' })
       setLoading(false)
+    }
+  }
+
+  // Download the .xlsx from the SAME response object on screen — no refetch, no
+  // second data path. Gated on `data` below, so it can never run (nor render)
+  // while a 409 stale-record panel is showing: the file must never carry a
+  // figure the screen does not. The busy state covers the dynamic xlsx import.
+  async function downloadXlsx() {
+    if (!data || !selectedInstallation) return
+    setExporting(true)
+    try {
+      await exportReportXlsx({
+        report: data.report,
+        missing: data.missing,
+        processesWithoutRecord: data.processesWithoutRecord,
+        processesCompleteDeclaredAt: data.processesCompleteDeclaredAt,
+        installationName: selectedInstallation.name,
+        reportingPeriod,
+      })
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -284,6 +309,19 @@ export default function CbamReportPage() {
           so err and report are mutually exclusive here. */}
       {report && data && (
         <>
+          {/* Download .xlsx — only rendered with a successful report (data is
+              cleared on every fetch, so this is never shown during a 409). */}
+          <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              onClick={downloadXlsx}
+              disabled={exporting}
+              style={{ fontSize: 13, fontWeight: 600, padding: '9px 18px', borderRadius: 8, border: '0.5px solid #7425e3', background: '#fff', color: '#7425e3', cursor: exporting ? 'wait' : 'pointer', opacity: exporting ? 0.6 : 1 }}
+            >
+              {exporting ? 'Preparing .xlsx…' : 'Download .xlsx'}
+            </button>
+          </div>
+
           {/* processesWithoutRecord — the report is not fully backed by computed figures. */}
           {data.processesWithoutRecord.length > 0 && (
             <div style={{ marginTop: '1rem', background: '#FEF3E2', border: '0.5px solid #f5d9ad', borderRadius: 10, padding: '14px 16px' }}>
