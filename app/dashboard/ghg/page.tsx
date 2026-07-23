@@ -402,7 +402,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { setUploading(false); return }
     for (const file of Array.from(files)) {
-      const path = `${session.user.id}/${inventory.reporting_year}/${inventory.locations[locIdx].name.replace(/\s+/g, '_')}/${Date.now()}_${file.name}`
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const path = `${session.user.id}/${inventory.reporting_year}/${inventory.locations[locIdx].name.replace(/\s+/g, '_')}/${Date.now()}_${safeName}`
       const { error } = await supabase.storage.from('source-documents').upload(path, file)
       if (!error) {
         const doc: SourceDoc = { id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, file_name: file.name, document_type: docType, uploaded_at: new Date().toISOString(), file_path: path }
