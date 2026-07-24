@@ -261,7 +261,7 @@ function PricingPageInner() {
     }
     if (count >= 4) return {
       headline: 'Ready to build your compliance platform?',
-      sub: 'One inventory. Multiple frameworks. Specialists who speak your language.',
+      sub: 'One platform, one obligation at a time — powered by expert advisors.',
       buttons: [
         { label: 'Start your free assessment →', href: '/assess', primary: true },
         { label: 'Talk to a specialist', href: '/advisory', primary: false },
