@@ -48,8 +48,12 @@ export const ALL_MODULE_KEYS = MODULES.map((m) => m.key)
 
 // The pricing page currently uses shorthand ids. This maps them to the canonical
 // keys above so we can wire the configurator without rewriting that page yet.
+// NOTE: consumers .filter(Boolean) on lookups here, so an unmapped shorthand
+// id is silently dropped from the cart rather than erroring. Every module
+// that appears on the pricing page MUST have an entry.
 export const LEGACY_PRICING_PAGE_ID: Record<string, ModuleKey> = {
   ghg: 'ghg',
+  cbam: 'cbam',
   risk: 'climate-risk',
   supply: 'supply-chain',
   people: 'people',

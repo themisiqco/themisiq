@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cartQuote, ADDONS, addOnRequirementsMet, priceLine, FLAT_MODULE_PRICES, GHG_TIERS, volumeDiscount, CARD_THRESHOLD_USD, type ModuleKey, type GhgTier } from './pricing'
+import { cartQuote, ADDONS, addOnRequirementsMet, priceLine, FLAT_MODULE_PRICES, GHG_TIERS, volumeDiscount, CARD_THRESHOLD_USD, MODULES, LEGACY_PRICING_PAGE_ID, type ModuleKey, type GhgTier } from './pricing'
 
 // Regression guard for the new-model cart math (June 2026 rescope). cartQuote is
 // the single source of truth shared by the configurator (display) and the server
@@ -67,6 +67,24 @@ describe('cartQuote — new pricing model', () => {
     const q = cartQuote({ modules: ['ghg'], ghgTier: 'advisory' })
     expect(q.requiresQuote).toBe(true)
     expect(q.totalUSD).toBe(0)
+  })
+})
+
+// ── Cart reachability — the silent-drop failure mode ─────────────────────────
+// LEGACY_PRICING_PAGE_ID maps the pricing page's shorthand ids to canonical
+// ModuleKeys, and its consumers .filter(Boolean) the result. An unmapped id is
+// therefore DROPPED from the cart silently — no throw, no log — so a customer
+// could select a module, pay, and never receive it. Both sides are derived from
+// the source-of-truth exports (never a literal list or count) so adding a module
+// fails this test until it is mapped, instead of needing the test edited.
+describe('LEGACY_PRICING_PAGE_ID — cart reachability', () => {
+  it('every module key is reachable through LEGACY_PRICING_PAGE_ID (unmapped ids are silently dropped from the cart)', () => {
+    const mapped = new Set<ModuleKey>(Object.values(LEGACY_PRICING_PAGE_ID))
+    const unmapped = MODULES.map((m) => m.key).filter((k) => !mapped.has(k))
+    expect(
+      unmapped,
+      `module key(s) have no shorthand id in LEGACY_PRICING_PAGE_ID and would be silently dropped from the cart: ${unmapped.join(', ')}`,
+    ).toEqual([])
   })
 })
 
