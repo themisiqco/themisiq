@@ -114,7 +114,7 @@ const FAQ_LD = {
     },
     {
       "@type": "Question",
-      name: "One inventory, every framework - and which scopes each needs",
+      name: "One inventory, multiple frameworks - and which scopes each needs",
       acceptedAnswer: {
         "@type": "Answer",
         text: "From one inventory, ThemisIQ produces reports for SB 253, CDP, ESRS E1 (CSRD), IFRS S2, the GHG Protocol Corporate Standard, EcoVadis, and GRI 305, plus SBTi for inventory and near-term & net-zero target setting. SB 253 and the GHG Protocol Corporate Standard start with Scope 1 and 2; CDP, ESRS E1, IFRS S2, GRI 305, and SBTi involve Scope 3. EcoVadis assesses all three scopes.",
@@ -644,7 +644,7 @@ export default function CalculateEmissionsPage() {
               </details>
 
               <details className="qa">
-                <summary>One inventory, every framework &mdash; and which scopes each needs</summary>
+                <summary>One inventory, multiple frameworks &mdash; and which scopes each needs</summary>
                 <div className="qa-body">
                   Build your inventory once, and ThemisIQ produces the report for whichever framework you&rsquo;re asked for &mdash; with full coverage for SB&nbsp;253, CDP, ESRS&nbsp;E1 (under the EU&rsquo;s CSRD), IFRS&nbsp;S2, the GHG Protocol Corporate Standard, EcoVadis, and GRI&nbsp;305, plus SBTi for inventory and near-term & net-zero target setting. What each one asks for differs:
                   <p className="qa-subhead">Frameworks that start with Scope 1 &amp; 2</p>

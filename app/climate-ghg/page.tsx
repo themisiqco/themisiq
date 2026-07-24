@@ -177,7 +177,7 @@ export default function Page() {
       <section style={{ padding: '0 2.5rem 5rem', maxWidth: 1100, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={eyebrow}>Framework coverage</div>
-          <h2 style={sectionTitle}>One inventory. Every framework.</h2>
+          <h2 style={sectionTitle}>One inventory. Multiple frameworks.</h2>
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
