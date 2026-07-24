@@ -98,7 +98,7 @@ export default function Home() {
       {/* ── PRODUCTS ── */}
       <section style={{ padding: '5rem 2.5rem', maxWidth: 1100, margin: '0 auto' }}>
         <p style={eyebrow}>The ThemisIQ platform</p>
-        <h2 style={sectionTitle}>Seven modules. One source of truth.</h2>
+        <h2 style={sectionTitle}>Purpose-built modules. One source of truth.</h2>
         <p style={sectionSub}>Enter your data once. ThemisIQ maps it across every module and framework automatically.</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden', marginTop: '3rem' }}>
           {modules.filter(m => m.family !== 'Advisory').map((mod, i) => (
