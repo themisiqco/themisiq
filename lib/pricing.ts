@@ -177,7 +177,7 @@ export function configuratorPrice(tier: Tier, moduleKeys: ModuleKey[]): number {
 // The single source of truth for the rescoped model. Both the configurator
 // (price preview) and the server routes (actual charge) call this, so the number
 // shown can never differ from the number charged.
-//   - GHG priced by chosen tier (GHG_TIERS); the other six are flat (FLAT_MODULE_PRICES).
+//   - GHG priced by chosen tier (GHG_TIERS); every other module is flat (FLAT_MODULE_PRICES).
 //   - Existing volume discount applies to multi-module carts (2 → −10%, 3+ → −20%).
 //   - GHG Advisory (priceUSD null) has no self-serve price → requiresQuote=true,
 //     totalUSD=0; the caller routes the whole selection to the contact/quote path

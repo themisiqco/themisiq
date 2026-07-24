@@ -51,7 +51,7 @@ Lisa is a non-expert in terminal/git workflows. When a manual step is genuinely 
 
 ## Architecture notes
 
-- **Seven modules**, positioning "collect once, comply everywhere" across 30+ frameworks: GHG Emissions, Climate Risk, Supply Chain, Deals, AI Governance, People, Cyber.
+- **Modular platform**, positioning "collect once, comply everywhere" across 30+ frameworks: GHG Emissions, CBAM, Climate Risk, Supply Chain, People, Deals, AI Governance, Cyber.
 - **GHG engine** is multi-jurisdiction (US / Canada / UK / EU) with AR4/AR5/AR6 GWP routing, and framework-to-GWP mappings for CDP / ESRS / GRI / IFRS / SB 253. Scope 2 supports residual-mix / market-based calculation; grid-factor display is year-aware (propagates `inventory.reporting_year`).
 - **Concierge is a *mode* of the existing GHG wizard, not a separate system.** It adds bill extraction (Supabase Storage → server-side fetch), a coverage-check system (gap / overlap / straddle resolution), and an export gate.
 - **Export gating** generally follows: `canExport = dataConfirmed && coverage fully resolved && (concierge ⇒ customer_approved)`. Don't loosen a gate without understanding why it exists — they protect verifier-facing correctness.
@@ -84,12 +84,45 @@ The engine is pure calc (no React/Supabase): all factor tables, coverage analysi
 
 ---
 
-## Pricing model (locked — see `docs/pricing-and-concierge-spec-v4.md`)
+## Pricing model — LIVE (NEW_PRICING_ACTIVE = true since the June 2026 rescope)
 
-- All seven modules: uniform **$999 / $2,499 / $4,999** (Starter / Professional / Advisory).
-- **Only GHG scales by location.** GHG location allowances: Starter ≤3, Professional ≤10, Advisory ≤20, 20+ → contact us. Hard enforcement, upgrade wall, no auto-downgrade.
-- **Concierge add-on** (requires GHG) is a *separate* axis priced on actual location count: Basic ≤5 $799, Standard 6–15 $1,499, Enterprise 16+ custom quote.
+- **Source of truth is `lib/pricing.ts`, not this file.** `cartQuote()` is
+  consumed by BOTH the configurator (display) and the checkout/admin-invoice
+  routes (charge), so displayed price == charged price by construction.
+- **GHG is the only tiered module** (`GHG_TIERS`). Every other module is a
+  flat annual price (`FLAT_MODULE_PRICES`): climate-risk $4,900, deals
+  $4,900, cbam $4,900, supply-chain $2,900, cyber $2,900, ai-governance
+  $2,900, people $1,499.
+- **Volume discount** on multi-module carts: 2 modules −10%, 3+ −20%
+  (`volumeDiscount`).
+- **No Full Platform bundle.** `FULL_PLATFORM_PRICE` and the all-modules cap
+  were removed on 23 Jul 2026: the headline figure caused sticker shock and
+  few buyers need every module. The pricing hero now leads with pick-and-pace
+  copy and the volume discount instead.
+- **Never state a module COUNT** in copy or docs. It changes as modules are
+  added and every number goes stale. Say "modules", not "seven modules".
+- **`LEGACY_PRICING_PAGE_ID`** maps the pricing pages' shorthand ids to
+  canonical `ModuleKey`s. Its consumers `.filter(Boolean)`, so an unmapped id
+  is SILENTLY DROPPED from the cart — a customer could select a module, pay,
+  and not receive it. A derived test guards this; adding a module to `MODULES`
+  fails that test until it is mapped.
+- **Only GHG scales by location.** Allowances come from `GHG_TIERS`. Hard
+  enforcement, upgrade wall, no auto-downgrade.
+- **Concierge add-on** (requires GHG) is a separate axis priced on actual
+  location count: Basic ≤5 $799, Standard 6–15 $1,499, Enterprise 16+ custom
+  quote.
+- **`CARD_THRESHOLD_USD` = $10,000.** Above that, self-serve card is off and
+  the order routes to request-an-invoice.
 - `allow_promotion_codes: true` is permanent.
+- **Dead rollback path:** the `!NEW_PRICING_ACTIVE` branches in
+  `app/pricing/page.tsx` and `app/components/HomePricing.tsx` (six guards,
+  plus the else-arm of the ternary at `app/pricing/page.tsx:825`) can no
+  longer render, and the 23 Jul bundle removal only touched the active
+  branches — so reverting the flag would restore a page advertising a bundle
+  `cartQuote` no longer prices. Treat the rollback as gone.
+- **`docs/pricing-and-concierge-spec-v4.md` is HISTORICAL, not current.** It
+  describes the pre-rescope model (uniform $999 / $2,499 / $4,999 tiers).
+  Read it for background only; never price from it.
 
 ---
 
