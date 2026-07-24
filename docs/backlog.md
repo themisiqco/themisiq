@@ -108,3 +108,58 @@ own data; delete deliberately after.
 - **API key rotation** — CC once printed `ANTHROPIC_API_KEY` to terminal
   scrollback. Local only, never committed. Low risk, still worth rotating.
 - **Canonical country list** (`mr_countries`) — app-wide refactor, deferred.
+
+## Verified 23 Jul 2026
+
+### CBAM — precursor form (step 4 of setup wizard)
+Not built. Must NOT offer `computed_here` (computeChildSEE throws — Phase 2).
+Must warn on `actual_verified` that it currently resolves to the default with
+an unresolved flag until a verifier-report record exists. See spec §14.8.
+
+### CBAM — verifier portal
+The real remaining gap. Without it the customer's own actuals are unusable
+and the SEE advantage evaporates. Separate invite and portal view from GHG
+(decided 23 Jul). Verifier needs: all output calculations including
+methodology, and all source documents via signed URLs. Mostly a port of the
+GHG verifier machinery — verifier_access, invite-consent gate, signed
+document delivery. See spec §14.8.
+
+### CBAM — charge mix form and process parameters
+`cbam_charge_mix` and `cbam_process_parameters` have no UI. Note
+`cbam_charge_mix.source_doc_id` still has NO FK — the same fix applied to
+`cbam_source_streams` on 23 Jul should be applied when that form is built.
+
+### CBAM — aluminium categories
+`cbam_goods_categories` is steel-only (six categories). Canadian aluminium is
+the largest North American CBAM flow into the EU (~US$1.65bn 2025) and Quebec
+hydro-powered smelters are the ideal CBAM customer — their actuals would
+crush the default. A Canadian CBAM product cannot currently serve them.
+Commercial decision, not just a backlog line. See spec §14.9.
+
+### CBAM — UI polish
+"+ Add process" opens the form; "Add process" inside it saves. Rename the
+second to "Save process". Same pattern likely on the other add/edit forms
+(installations, source streams, evidence documents).
+
+### Grid factors — only 13 countries seeded
+`cbam_grid_factors` holds 13 countries plus `other` (0.465). An installation
+outside those falls to `other` legitimately, but neither the report nor the
+xlsx distinguishes a country-specific factor from the fallback. Worth
+surfacing so a verifier knows which was used.
+
+### npm advisories (pre-existing, not from CBAM work)
+`npm audit --production` reports next (9 advisories, high), postcss, sharp,
+dompurify. All predate this work. Fixing next requires moving outside the
+stated dependency range, so it is a deliberate decision rather than a routine
+update. Note: xlsx was resolved on 23 Jul by vendoring SheetJS 0.20.3 from
+cdn.sheetjs.com (the npm registry copy is frozen at 0.18.5 with unfixable
+advisories); the tarball is committed at vendor/xlsx-0.20.3.tgz and
+package.json points at it via file:, so Vercel builds do not depend on the
+CDN.
+
+### Supabase Free -> Pro is now a hard prerequisite
+CBAM evidence upload is live. Free gives ~1GB total storage; a single large
+customer exceeds that in year one. Storage cost itself is negligible (a
+100k t/yr mill generates roughly 0.3-1.4 GB/yr of evidence; Pro includes
+100GB and overage is ~$0.021/GB/month), but the plan limit is binding. This
+now blocks shipping the feature, not just prudence about backups.

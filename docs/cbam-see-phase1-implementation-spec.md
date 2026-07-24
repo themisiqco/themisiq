@@ -658,3 +658,216 @@ route-level test stubbing the Supabase client would close this and is the
 cheapest remaining hardening.
 
 ---
+
+## 14. SESSION LOG — 23 Jul 2026
+
+Second working session. Where this conflicts with §13 or earlier, this is
+later.
+
+### 14.1 What shipped
+
+- **Disclosures form** (`app/dashboard/cbam/page.tsx`) — §1.2 items 7-11 plus
+  the attestation. Three-state control, elec-gate clearing, composite-PK
+  upsert. Verified live.
+- **Report view** (`app/dashboard/cbam/report/page.tsx`) — three visually
+  distinct field statuses, `missing` checklist near the top, 409 stale-record
+  panel. Verified live including a deliberately tampered record.
+- **xlsx export** (`app/dashboard/cbam/report/exportXlsx.ts`) — six sheets in
+  Annex IV order, numbers as numeric cells, absence never rendered as blank
+  or zero.
+- **Setup wizard** (`app/dashboard/cbam/setup/page.tsx`) — steps 1-3
+  (operator, installations, processes + source streams + evidence documents).
+  Step 4 (precursors) still a placeholder.
+- **Evidence document storage** — `cbam-source-documents` bucket,
+  `cbam_source_documents` table, composite FK from `cbam_source_streams`.
+
+### 14.2 Three-state disclosure control — the load-bearing UI decision
+
+The GHG module's `QuestionCard` is a two-state checkbox. Mirroring it would
+have written `false` for every untouched question — eleven fabricated
+declarations on a verifier-facing artifact, undoing exactly what invariant 8
+and the nullable columns exist to prevent.
+
+`DisclosureQuestion` is three-state: unanswered / yes / no, with unanswered
+visually distinct from a declared negative, and clicking a selected option
+retracting to null. Verified live: nine untouched questions saved as null.
+
+**DB constraint `cbam_disclosures_elec_gate`** (`electricity_produced_onsite
+IS NOT FALSE OR all five sub-flags IS NULL`) means setting the gate to No
+while sub-flags are populated is REJECTED. The form clears them in the same
+state update and says so in an amber note. Silent clearing would be its own
+fabrication in reverse.
+
+### 14.3 The Commission's communication template is a transitional artifact
+
+Checked the Commission's legislation-and-guidance page 23 Jul 2026. The only
+communication template published is dated 18 Dec 2024 (filename
+`..._20241213.xlsx`), built against IR 2023/1773 Annex IV — the TRANSITIONAL
+act. Every definitive-period regulation postdates it (2025/2546, 2025/2547,
+2025/2620, 2025/2621).
+
+The page IS actively maintained: definitive-period default values and
+benchmarks were published there in Excel on 13 Feb 2026. So the template's
+absence is not neglect.
+
+**Conclusion:** the §1.2 report this module produces IS the definitive-period
+successor to that template's content. The xlsx export therefore carries
+current Annex IV §1.2 content in Annex IV item order and deliberately does
+NOT mimic the superseded template. The Cover sheet says so, so anyone asking
+"why doesn't this match the template I know" has the answer in the file.
+
+### 14.4 Intake write path — direct DML, and a CN format CHECK
+
+The write-path decision deferred in `20260722_cbam_customer_grants.sql` is
+settled: direct DML, not RPC. Every validity rule on those tables is already
+a CHECK or FK, so it is enforced on every write path; an RPC layer would add
+indirection without adding enforcement.
+
+Added `cbam_pp_cn_code_8digit_spaced`: `cn_code ~ '^[0-9]{4} [0-9]{2}
+[0-9]{2}$'`. §10.7 required the exact 8-digit code but nothing enforced it.
+Verified 23 Jul: all 119 eight-digit codes in `cbam_default_values` match;
+the 4- and 6-digit codes deliberately do not. Precursor CN codes are NOT
+constrained this way — they legitimately use narrower seeded codes.
+
+### 14.5 Evidence documents — deliberately NOT parsed
+
+CBAM source documents (weighbridge tickets, fuel delivery notes, laboratory
+analyses, production logs) have no standardised genre, unlike GHG utility
+bills. Often company-internal formats, often not in English, often
+aggregated.
+
+**No extraction.** The operator tallies their own records and enters the
+figure; the document is the provenance link a verifier follows. An extracted
+figure would flow into a financial obligation and be tested against the
+operator's own records on a mandatory site visit — inserting a third artifact
+nobody asked for.
+
+Separate bucket and separate metadata table from GHG, by decision: a CBAM
+verifier and a GHG verifier are different accredited people, and a signed URL
+issued to one must never resolve to the other's evidence. Unlike the GHG
+bucket, this one carries a 25 MB cap and a MIME allowlist.
+
+`ON DELETE SET NULL` on the stream FK: deleting evidence must never silently
+delete the activity data that cited it.
+
+### 14.6 Fixtures rescaled — the old ones were not survivable
+
+The original fixtures were arithmetically convenient and physically
+impossible: 100 t of natural gas to make 100 t of steel (~100x real
+consumption), and a gas carbon content of 0.500 t C/t (methane is 75% carbon
+by mass; real pipeline gas is ~0.734). Two carbon-bearing streams were
+missing entirely.
+
+Rescaled to a 100,000 t/yr scrap-EAF specialty mill, calendar-year period:
+
+| Stream | Mass | kg/t | CC |
+|---|---|---|---|
+| Natural gas | 1 500 t | 15.0 | 0.7340 |
+| Graphite electrodes | 220 t | 2.2 | 0.9990 |
+| Injected anthracite | 2 000 t | 20.0 | 0.8500 |
+| Limestone flux | 3 000 t | 30.0 | 0.1200 |
+| Crude steel out | -100 000 t | — | 0.0018 |
+
+DirEm* = 11 727.658 t CO2 ; **ae_g = 0.1172766 t CO2/t**
+
+| Fixture | see_direct | vs 3.75 default |
+|---|---|---|
+| A scrap-EAF | 0.1172765792 | −96.9 % |
+| B DRI-EAF | 1.5747765792 | −58.0 %; default_share_direct 0.9255 |
+
+The 96.9% advantage is real and explicable: crude steel is an Annex II good,
+so own indirect is suppressed and the mill's 46 500 MWh grid draw does not
+enter the figure. Scrap feedstock plus suppressed indirect, measured against
+a default calibrated for blast-furnace routes.
+
+Fixture B's `default_share_direct` of 0.9255 is the more useful demo number:
+92.6% of embedded emissions come from a defaulted precursor, which is the
+argument for getting upstream suppliers verified.
+
+### 14.7 Article 9 carbon price — deliberately NOT built
+
+Ontario's Emissions Performance Standards is output-based: free allocation
+against a production benchmark, payment only above it. Under the Article 9
+rules, free allocation received under a foreign ETS reduces the qualifying
+amount — only emissions actually priced count.
+
+A low-carbon Ontario EAF therefore has almost no Article 9 claim *because*
+it is low-carbon: far below benchmark, paying nothing, possibly earning
+credits.
+
+Scale, at 100 000 t/yr, 2026 CBAM factor 2.5%, ~EUR 75 certificates:
+
+| | per t | per year |
+|---|---|---|
+| Actuals (0.1173) | EUR 0.22 | EUR 22 100 |
+| Default (3.75) | EUR 7.06 | EUR 705 800 |
+| **Saving from actuals** | EUR 6.84 | **EUR 683 700** |
+
+Article 9 would apply to the EUR 22 100 and yield near zero of it. Not worth
+building. Also: the implementing act was published 13 May 2026 for
+consultation to 10 June and adoption is unconfirmed, and from 2027 the
+Commission will publish default carbon prices in the CBAM Registry, so
+installation-level evidence becomes largely unnecessary.
+
+**Worth doing eventually:** a disclosure field stating whether a carbon price
+was paid, so an importer is not left guessing. A disclosure, not a
+calculation.
+
+### 14.8 Verifier report — the model, corrected
+
+Initial design work drifted toward ThemisIQ holding and validating verifier
+reports. That is wrong. Per IR 2025/2546 the verification report is prepared
+by the verifier on a Commission electronic template, via the CBAM Registry.
+ThemisIQ neither creates it nor sits in its path.
+
+The correct chain: the customer builds the inventory in ThemisIQ, the engine
+computes SEE, and that one set of workings feeds TWO independent outputs —
+the verifier portal (where an accredited verifier examines the workings and
+then issues their assurance report independently via the Registry), and the
+§1.2 report plus xlsx that goes to the EU importer. Neither passes through
+the other.
+
+Consequences:
+- `hasValidVerifierReport` is a misleading name. ThemisIQ cannot confirm a
+  verifier is accredited — that is the National Accreditation Body's role
+  under EN ISO/IEC 14065. What it CAN check is whether the operator has
+  ASSERTED a report covering this precursor. Rename accordingly when built.
+- `computed_here` must NOT be offered in the precursor UI: `computeChildSEE`
+  throws unconditionally (Phase 2). A saved row would fail at compute time.
+- `actual_verified` currently ALWAYS falls back to default with an unresolved
+  flag, because `hasValidVerifierReport` returns false unconditionally. The
+  UI must say so, or a customer's paid-for verified value is silently
+  discarded.
+
+### 14.9 Aluminium gap (NEW, commercial)
+
+`cbam_goods_categories` holds six categories, all steel. The largest North
+American CBAM flow into the EU is **Canadian aluminium** (~US$1.65bn in 2025,
+of which unwrought $1.58bn) against ~US$1.1bn of US iron and steel.
+
+Quebec smelters run on hydro and are among the lowest-carbon aluminium
+producers globally — the ideal CBAM customer, because their actuals would
+crush the default. A Canadian CBAM product cannot currently serve them.
+Worth a deliberate decision, not just a backlog line.
+
+### 14.10 §11 additions
+
+- **Definitive-period communication template** — not published as of
+  23 Jul 2026 (latest is 13 Dec 2024, transitional). Watch for reissue; map
+  the xlsx export onto it if it lands.
+- **Accreditation and verification guidance** — the Commission indicated
+  publication in summer 2026. May specify verifier-report metadata.
+- **Article 9 implementing act** — published 13 May 2026 for consultation to
+  10 June; confirm adoption. Commission default carbon prices expected in the
+  Registry from 2027.
+
+### 14.11 Demo document set
+
+Seven watermarked PDFs for a fictional Ontario scrap-EAF mill (Laurentian
+Steel Inc., Welland; installation CA-ON-LSI-01), figures matching the
+rescaled fixture A. Kept outside the repo. Includes an emissions calculation
+worksheet, because a verifier's first request is the operator's own working
+before they test it.
+
+---
+
