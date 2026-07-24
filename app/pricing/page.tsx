@@ -10,7 +10,7 @@ import { LEGACY_PRICING_PAGE_ID, tierPrice, tierStrikethrough, volumeDiscount, A
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ModuleId = 'ghg' | 'risk' | 'supply' | 'people' | 'deals' | 'ai' | 'cyber'
+type ModuleId = 'ghg' | 'cbam' | 'risk' | 'supply' | 'people' | 'deals' | 'ai' | 'cyber'
 
 interface Module {
   id: ModuleId
@@ -39,6 +39,21 @@ const MODULES: Module[] = [
       sub: 'Your SB 253 Scope 1, 2 & 3 inventory can be complete in days — not months.',
       btn: 'See your emissions instantly →',
       href: '/dashboard/ghg',
+    },
+  },
+  {
+    id: 'cbam',
+    name: 'CBAM — Carbon Border Adjustment Mechanism',
+    description: 'Iron & steel (CN 72–73) · Regulation (EU) 2023/956 · specific embedded emissions (SEE) · direct & indirect split · precursor tracing · installation-level actuals · verification-ready summary for your EU importer',
+    tags: [
+      { label: 'Non-EU exporters', color: 'purple' },
+      { label: 'Definitive regime live', color: 'orange' },
+    ],
+    cta: {
+      headline: 'Is your EU customer asking for your actual emissions?',
+      sub: 'Default values assume the worst. Your own figures, computed and verifiable, almost always cost less.',
+      btn: 'Calculate your embedded emissions →',
+      href: '/dashboard/cbam',
     },
   },
   {
@@ -146,7 +161,7 @@ const tag = (label: string, color: string): React.CSSProperties => ({
 
 function PricingPageInner() {
   const searchParams = useSearchParams()
-  const VALID_MODULE_IDS: ModuleId[] = ['ghg', 'risk', 'supply', 'people', 'deals', 'ai', 'cyber']
+  const VALID_MODULE_IDS: ModuleId[] = ['ghg', 'cbam', 'risk', 'supply', 'people', 'deals', 'ai', 'cyber']
   const initialModules = (() => {
     const param = searchParams.get('modules')
     if (!param) return new Set<ModuleId>(['ghg'])
