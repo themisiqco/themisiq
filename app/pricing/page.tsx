@@ -442,7 +442,7 @@ function PricingPageInner() {
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={s.heroLabel}>Your Trusted Climate & Sustainability Compliance Partner</div>
           <div style={s.heroTitle}>
-            One platform. Every compliance obligation you face.<br />
+            One platform. Purpose-built for each obligation.<br />
             <span style={gradText}>Expert-grade, priced for every business.</span>
           </div>
           <p style={s.heroSub}>
