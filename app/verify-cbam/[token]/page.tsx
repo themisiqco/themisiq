@@ -224,6 +224,15 @@ export default function CbamVerifierPage() {
           Specific Embedded Emissions (SEE) summary — IR (EU) 2025/2547 Annex IV §1.2{verifierName ? ` · Prepared for ${verifierName}` : ''}
         </p>
 
+        {/* Signed-URL expiry warning. URLs are pre-baked at page load with a 1-hour
+            TTL (route SIGNED_URL_TTL), so the clock runs from load, not from click.
+            Only shown when at least one document link is actually usable. */}
+        {report.documents.some(d => d.url) && (
+          <div style={{ background: '#fef3c7', border: '0.5px solid #fde68a', borderRadius: 10, padding: '10px 16px', marginBottom: '2rem', fontSize: 13, color: '#92400e', fontWeight: 500 }}>
+            Source document links expire 1 hour after this page loads. If a document link stops working, reload this page to generate fresh links.
+          </div>
+        )}
+
         <ReportBody data={report} />
       </div>
       <Footer />
@@ -485,7 +494,7 @@ function ReportBody({ data }: { data: VerifierReportResponse }) {
       {/* Source documents */}
       <div style={{ marginBottom: '2rem' }}>
         <SectionHead>Source documents</SectionHead>
-        <p style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '1rem' }}>View links expire after 10 minutes.</p>
+        <p style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '1rem' }}>View links expire 1 hour after this page loads. Reload the page to refresh them.</p>
         {documents.length === 0 ? (
           <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.5rem', textAlign: 'center', fontSize: 13, color: '#888784' }}>No source documents attached.</div>
         ) : documents.map((d, i) => (

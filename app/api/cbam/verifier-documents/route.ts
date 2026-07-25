@@ -29,7 +29,7 @@ import type {
 } from '../../../../lib/cbam/report/build';
 
 const BUCKET = 'cbam-source-documents';   // NOT 'source-documents' — that is GHG evidence.
-const SIGNED_URL_TTL = 600;               // 10 minutes, matching the GHG verifier route.
+const SIGNED_URL_TTL = 3600;              // 1 hour (was 600 / 10 min)
 
 // A stale-record conflict: a persisted see_record no longer matches a recomputation. Same shape and
 // meaning as the owner report route's ReportError — the caller maps it to 409.
