@@ -41,7 +41,7 @@ interface AcceptResult {
 interface VerifierReportResponse {
   report: Report12
   missing: MissingField[]
-  documents: { file_name: string; document_type: string; url: string | null }[]
+  documents: { id: string; file_name: string; document_type: string }[]
   coverage: { processes_total: number; processes_without_record: number }
   verifier: { verifier_name: string | null; installation_name: string | null; reporting_period: number }
 }
@@ -224,16 +224,15 @@ export default function CbamVerifierPage() {
           Specific Embedded Emissions (SEE) summary — IR (EU) 2025/2547 Annex IV §1.2{verifierName ? ` · Prepared for ${verifierName}` : ''}
         </p>
 
-        {/* Signed-URL expiry warning. URLs are pre-baked at page load with a 1-hour
-            TTL (route SIGNED_URL_TTL), so the clock runs from load, not from click.
-            Only shown when at least one document link is actually usable. */}
-        {report.documents.some(d => d.url) && (
+        {/* Signed-URL expiry notice. URLs are minted fresh per-document on click (short TTL),
+            not pre-baked — so this warns about the on-click flow, shown whenever documents exist. */}
+        {report.documents.length > 0 && (
           <div style={{ background: '#fef3c7', border: '0.5px solid #fde68a', borderRadius: 10, padding: '10px 16px', marginBottom: '2rem', fontSize: 13, color: '#92400e', fontWeight: 500 }}>
-            Source document links expire 1 hour after this page loads. If a document link stops working, reload this page to generate fresh links.
+            Source document links are generated fresh each time you open one and expire shortly after. If a link stops working, click View again.
           </div>
         )}
 
-        <ReportBody data={report} />
+        <ReportBody data={report} token={token} />
       </div>
       <Footer />
     </Shell>
@@ -339,7 +338,79 @@ function GoodCard({ g }: { g: Item4Good }) {
   )
 }
 
-function ReportBody({ data }: { data: VerifierReportResponse }) {
+// One source-document row. The signed URL is NOT pre-baked — on click it POSTs
+// { token, docId } to /api/cbam/verifier-documents/sign, which re-validates
+// token + consent + scope and mints a fresh short-TTL URL, then opens it in a
+// new tab. Per-row loading/error state lives here so each row is independent.
+function DocRow({ doc, token }: { doc: { id: string; file_name: string; document_type: string }; token: string }) {
+  const [signing, setSigning] = useState(false)
+  const [failed, setFailed] = useState(false)
+  // Set only when the synchronous tab was blocked but signing SUCCEEDED — we surface
+  // the URL as a real anchor the verifier clicks themselves (a fresh user gesture the
+  // blocker won't suppress). A post-await window.open would be eaten by the same blocker.
+  const [manualUrl, setManualUrl] = useState<string | null>(null)
+
+  const openDoc = async () => {
+    // Open the tab SYNCHRONOUSLY inside the click gesture, before any await — a strict
+    // popup blocker (locked-down corporate browsers) suppresses tabs opened after an
+    // async hop. We navigate this blank tab once the signed URL returns.
+    const tab = window.open('', '_blank', 'noopener,noreferrer')
+    setSigning(true)
+    setFailed(false)
+    setManualUrl(null)
+    try {
+      const res = await fetch('/api/cbam/verifier-documents/sign', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, docId: doc.id }),
+      })
+      const body = res.ok ? ((await res.json()) as { url?: string }) : null
+      if (!body?.url) {
+        if (tab) tab.close()
+        setFailed(true)
+        return
+      }
+      if (tab) {
+        tab.location = body.url
+      } else {
+        // Synchronous tab was blocked — surface the link instead of a post-await
+        // window.open the same blocker would also eat.
+        setManualUrl(body.url)
+      }
+    } catch {
+      if (tab) tab.close()
+      setFailed(true)
+    } finally {
+      setSigning(false)
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px', marginBottom: 8, flexWrap: 'wrap' }}>
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{doc.file_name}</div>
+        <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{doc.document_type}</div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        {failed && <span style={{ fontSize: 11, color: '#B91C1C' }}>Unavailable — try again</span>}
+        {manualUrl && (
+          <span style={{ fontSize: 11, color: '#92400e' }}>
+            Your browser blocked the pop-up.{' '}
+            <a href={manualUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#7425e3', textDecoration: 'underline' }}>Open document</a>
+          </span>
+        )}
+        <button
+          onClick={openDoc}
+          disabled={signing}
+          style={{ fontSize: 12, padding: '6px 16px', borderRadius: 6, border: 'none', background: '#0d0d0d', color: '#fff', cursor: signing ? 'wait' : 'pointer', opacity: signing ? 0.6 : 1 }}
+        >
+          {signing ? 'Opening…' : 'View'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function ReportBody({ data, token }: { data: VerifierReportResponse; token: string }) {
   const { report: r, missing, documents, coverage } = data
   return (
     <>
@@ -494,21 +565,11 @@ function ReportBody({ data }: { data: VerifierReportResponse }) {
       {/* Source documents */}
       <div style={{ marginBottom: '2rem' }}>
         <SectionHead>Source documents</SectionHead>
-        <p style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '1rem' }}>View links expire 1 hour after this page loads. Reload the page to refresh them.</p>
+        <p style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '1rem' }}>Each link is generated when you open it and expires shortly after. If a link stops working, click View again.</p>
         {documents.length === 0 ? (
           <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.5rem', textAlign: 'center', fontSize: 13, color: '#888784' }}>No source documents attached.</div>
-        ) : documents.map((d, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px', marginBottom: 8, flexWrap: 'wrap' }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{d.file_name}</div>
-              <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{d.document_type}</div>
-            </div>
-            {d.url ? (
-              <a href={d.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, padding: '6px 16px', borderRadius: 6, background: '#0d0d0d', color: '#fff', textDecoration: 'none' }}>View</a>
-            ) : (
-              <span style={{ fontSize: 11, color: '#888784' }}>Unavailable</span>
-            )}
-          </div>
+        ) : documents.map((d) => (
+          <DocRow key={d.id} doc={d} token={token} />
         ))}
       </div>
 

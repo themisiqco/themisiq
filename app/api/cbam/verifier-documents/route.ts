@@ -28,8 +28,8 @@ import type {
   GoodComputation, SeeRecordRow, OperatorProfileRow, InstallationRow, DisclosuresRow,
 } from '../../../../lib/cbam/report/build';
 
-const BUCKET = 'cbam-source-documents';   // NOT 'source-documents' — that is GHG evidence.
-const SIGNED_URL_TTL = 3600;              // 1 hour (was 600 / 10 min)
+// Signed-URL minting moved OUT of this route: documents are returned as ids only and re-signed
+// one-at-a-time on click by /api/cbam/verifier-documents/sign (which owns the bucket + TTL constants).
 
 // A stale-record conflict: a persisted see_record no longer matches a recomputation. Same shape and
 // meaning as the owner report route's ReportError — the caller maps it to 409.
@@ -277,27 +277,26 @@ export async function POST(req: NextRequest) {
       new Set((streamRows ?? []).map((r) => r.source_doc_id).filter((x): x is string => x != null)),
     );
 
-    let documents: { file_name: string; document_type: string; url: string | null }[] = [];
+    // Documents carry only their id + display fields — NO pre-baked signed URL and NO file_path.
+    // The client re-signs one doc at a time on click via POST /api/cbam/verifier-documents/sign,
+    // which re-validates token + consent + scope and mints a short-TTL URL. file_path never leaves
+    // the server.
+    let documents: { id: string; file_name: string; document_type: string }[] = [];
     if (docIds.length > 0) {
       const { data: docRows, error: docsErr } = await admin
         .from('cbam_source_documents')
-        .select('file_path, file_name, document_type')
+        .select('id, file_path, file_name, document_type')
         .eq('company_id', companyId)
         .in('id', docIds);
       if (docsErr) {
         console.error('CBAM verifier source_documents load error:', docsErr);
         return NextResponse.json({ error: 'documents_load_failed' }, { status: 500 });
       }
-      documents = await Promise.all(
-        (docRows ?? []).map(async (d) => {
-          const { data: signed } = await admin.storage.from(BUCKET).createSignedUrl(d.file_path, SIGNED_URL_TTL);
-          return {
-            file_name: d.file_name ?? 'document',
-            document_type: d.document_type ?? 'document',
-            url: signed?.signedUrl ?? null,
-          };
-        }),
-      );
+      documents = (docRows ?? []).map((d) => ({
+        id: d.id,
+        file_name: d.file_name ?? 'document',
+        document_type: d.document_type ?? 'document',
+      }));
     }
 
     // ── 6. Respond. Report + gaps + signed documents + minimal verifier display context. NO raw
