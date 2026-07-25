@@ -2,16 +2,23 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
+// Types imported (type-only → erased at runtime) so the render can never drift from
+// the builder's contract. Do not re-declare these shapes locally.
+import type {
+  Report12, MissingField, ReportField, Coordinates, ProcessSummary,
+  Item4Good, Item12DefaultPrecursor, Item13ActualPrecursor, Item16PrecursorOrigin,
+} from '../../../lib/cbam/report/types'
+import type { SefaBenchmarkWorkings } from '../../../lib/cbam/sefaCompute'
 
-// CBAM verifier portal — PART 1 of 2: skeleton, state machine, consent gate.
-// The report render layer is Part 2; the 'valid' branch renders a placeholder.
+// CBAM verifier portal — skeleton + state machine + consent gate (Part 1) and the
+// §1.2 report render (Part 2).
 //
 // State is driven entirely by cbam_verifier_validate_token's three-state return
 // (see 20260724_cbam_verifier_validate_rpc.sql): status IS the gate signal —
 // there is no accepted_at field to read here.
 //   • 'invalid'          → invalid/expired screen
 //   • 'consent_required' → consent gate
-//   • 'valid'            → placeholder (Part 2 = report)
+//   • 'valid'            → report (fetched from /api/cbam/verifier-documents)
 // The validate RPC does NOT return expires_at, so the read-only banner omits the
 // "Access expires" clause rather than fabricating a date.
 
@@ -28,6 +35,15 @@ interface ValidateResult {
 // Shape of cbam_verifier_accept_invite's jsonb return.
 interface AcceptResult {
   status: 'accepted' | 'already_accepted' | 'invalid'
+}
+// Success body of POST /api/cbam/verifier-documents (200 only). Non-ok responses
+// are { error: string } with NO report — see the fetch effect.
+interface VerifierReportResponse {
+  report: Report12
+  missing: MissingField[]
+  documents: { file_name: string; document_type: string; url: string | null }[]
+  coverage: { processes_total: number; processes_without_record: number }
+  verifier: { verifier_name: string | null; installation_name: string | null; reporting_period: number }
 }
 
 // Consent wording version stamped onto the verifier's ToS/Privacy acceptance.
@@ -46,6 +62,10 @@ export default function CbamVerifierPage() {
   const [privacyChecked, setPrivacyChecked] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [gateError, setGateError] = useState<string | null>(null)
+  // Report fetch (Part 2). Only fires once access is granted.
+  const [report, setReport] = useState<VerifierReportResponse | null>(null)
+  const [reportLoading, setReportLoading] = useState(false)
+  const [reportError, setReportError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!token) return
@@ -55,21 +75,37 @@ export default function CbamVerifierPage() {
     })
   }, [token])
 
+  // Report fetch — gated on verifier access. Fires when the token is already
+  // 'valid' on load, or has just been accepted in-session. Branches on res.ok
+  // FIRST: a non-ok body is { error } with no report.
+  useEffect(() => {
+    const hasAccess = result?.status === 'valid' || accepted
+    if (!token || !hasAccess) return
+    setReportLoading(true)
+    setReportError(null)
+    fetch('/api/cbam/verifier-documents', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }),
+    })
+      .then(async r => {
+        if (!r.ok) {
+          let code = 'unknown'
+          try { const b = await r.json(); code = (b && b.error) || 'unknown' } catch { /* non-JSON body */ }
+          setReportError(code)
+          setReportLoading(false)
+          return
+        }
+        const body = (await r.json()) as VerifierReportResponse
+        setReport(body)
+        setReportLoading(false)
+      })
+      .catch(() => { setReportError('unknown'); setReportLoading(false) })
+  }, [token, result?.status, accepted])
+
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) return <Shell><div style={{ padding: '4rem', textAlign: 'center', color: '#888784' }}>Loading verification review…</div></Shell>
 
   // ── Invalid / expired ────────────────────────────────────────────────────────
-  if (!result || result.status === 'invalid') {
-    return (
-      <Shell>
-        <div style={{ maxWidth: 540, margin: '4rem auto', textAlign: 'center', padding: '0 1.5rem' }}>
-          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>Link invalid or expired</h1>
-          <p style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, fontWeight: 300 }}>This link is invalid or has expired. It may have been revoked. Please contact the company that shared it with you to request a new link.</p>
-        </div>
-        <Footer />
-      </Shell>
-    )
-  }
+  if (!result || result.status === 'invalid') return <InvalidScreen />
 
   const verifierName = result.verifier_name || null
   const installationName = result.installation_name || null
@@ -154,9 +190,27 @@ export default function CbamVerifierPage() {
     )
   }
 
-  // ── Placeholder (Part-1 stand-in for the report) ─────────────────────────────
-  // Reached when status is 'valid', or consent was just accepted in-session.
-  // Do NOT fetch /api/cbam/verifier-documents here — that wiring is Part 2.
+  // ── Valid / accepted → the real §1.2 report ──────────────────────────────────
+  // Report-fetch error states. consent_required/invalid → the invalid screen;
+  // stale_record → its own message; anything else → generic.
+  if (reportError === 'invalid' || reportError === 'consent_required') return <InvalidScreen />
+  if (reportError === 'stale_record') {
+    return <ErrorScreen title="Report could not be verified" body="This report could not be verified — a stored figure no longer matches recomputation. Contact the company that shared it." />
+  }
+  if (reportError) return <ErrorScreen title="Report unavailable" body="The report could not be loaded." />
+
+  if (reportLoading || !report) {
+    return (
+      <Shell>
+        <div style={{ maxWidth: 920, margin: '0 auto', padding: '2.5rem 1.5rem 4rem' }}>
+          <ReadOnlyBanner />
+          <div style={{ padding: '3rem', textAlign: 'center', color: '#888784' }}>Loading the verification report…</div>
+        </div>
+        <Footer />
+      </Shell>
+    )
+  }
+
   return (
     <Shell>
       <div style={{ maxWidth: 920, minWidth: 0, margin: '0 auto', padding: '2.5rem 1.5rem 4rem' }}>
@@ -166,18 +220,314 @@ export default function CbamVerifierPage() {
         <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem,3vw,2.4rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>
           {installationName || 'CBAM Installation'}{reportingPeriod != null ? ` · ${reportingPeriod}` : ''}
         </h1>
-        <p style={{ fontSize: 14, color: '#555553', fontWeight: 300, marginBottom: '2rem' }}>Specific Embedded Emissions (SEE) summary</p>
+        <p style={{ fontSize: 14, color: '#555553', fontWeight: 300, marginBottom: '2rem' }}>
+          Specific Embedded Emissions (SEE) summary — IR (EU) 2025/2547 Annex IV §1.2{verifierName ? ` · Prepared for ${verifierName}` : ''}
+        </p>
 
-        <SectionHead>Report</SectionHead>
-        <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.5rem', marginBottom: '2rem' }}>
-          <div style={{ fontSize: 14, color: '#0d0d0d', marginBottom: 8 }}>Report view — Part 2.</div>
-          <div style={{ fontSize: 12, color: '#888784' }}>Verifier: {verifierName || '—'}</div>
-        </div>
+        <ReportBody data={report} />
       </div>
       <Footer />
     </Shell>
   )
 }
+
+// ── Report render spine ──────────────────────────────────────────────────────
+
+// Value formatters, keyed by T.
+const fmtNum = (v: number) => v.toLocaleString(undefined, { maximumFractionDigits: 4 })
+const fmtBool = (v: boolean) => (v ? 'Yes' : 'No')
+const fmtCoords = (c: Coordinates) => `${c.latitude}, ${c.longitude}`
+const fmtBenchmark = (b: SefaBenchmarkWorkings): React.ReactNode => (
+  <>
+    {fmtNum(b.value)}{' '}
+    <span style={{ color: '#888784', fontSize: 11 }}>(Column {b.column} · indicator {b.indicator ?? '—'} · CSCF {fmtNum(b.cscf)})</span>
+  </>
+)
+
+const shortId = (id: string) => (id.length > 10 ? id.slice(0, 8) + '…' : id)
+
+const cardStyle: React.CSSProperties = { background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px', marginBottom: 10 }
+
+// The absence-is-not-a-value invariant, made visual: a missing field must never look
+// like a blank or a zero.
+function MissingMarker() {
+  return <span style={{ fontSize: 11, fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 8px', borderRadius: 4 }}>Not provided</span>
+}
+
+// The single ReportField<T> renderer. Narrows on status BEFORE reading value/reason.
+function Field<T>({ f, format }: { f: ReportField<T>; format?: (v: T) => React.ReactNode }) {
+  if (f.status === 'missing') return <MissingMarker />
+  if (f.status === 'not_applicable') return <span style={{ color: '#888784', fontStyle: 'italic' }}>{f.reason}</span>
+  return <span style={{ color: '#0d0d0d' }}>{format ? format(f.value) : String(f.value)}</span>
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '210px 1fr', gap: 12, padding: '7px 0', borderBottom: '0.5px solid #e8e7e4', fontSize: 13, alignItems: 'baseline' }}>
+      <div style={{ color: '#888784' }}>{label}</div>
+      <div>{children}</div>
+    </div>
+  )
+}
+
+function Section({ n, title, children }: { n: string; title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: '2rem' }}>
+      <SectionHead>{n} · {title}</SectionHead>
+      {children}
+    </div>
+  )
+}
+
+const NoneNote = () => <div style={{ fontSize: 13, color: '#888784' }}>None.</div>
+
+// (3) — ReportField<ProcessSummary[]> rendered as a small table on 'value'.
+function ProcessesField({ f }: { f: ReportField<ProcessSummary[]> }) {
+  if (f.status === 'missing') return <MissingMarker />
+  if (f.status === 'not_applicable') return <span style={{ color: '#888784', fontStyle: 'italic' }}>{f.reason}</span>
+  if (f.value.length === 0) return <NoneNote />
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', minWidth: 480, borderCollapse: 'collapse', fontSize: 12 }}>
+        <thead>
+          <tr style={{ background: '#0d0d0d' }}>
+            {['Process', 'Route', 'Goods (CN)'].map(h => (
+              <th key={h} style={{ color: '#fff', textAlign: 'left', padding: '8px 10px', fontWeight: 500, fontSize: 11, whiteSpace: 'nowrap' }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {f.value.map((p, i) => (
+            <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#f8f7f5', borderBottom: '0.5px solid #e8e7e4' }}>
+              <td style={{ padding: '8px 10px', color: '#555553', whiteSpace: 'nowrap' }}>{shortId(p.processId)}</td>
+              <td style={{ padding: '8px 10px', color: '#555553' }}>{p.route ?? <span style={{ color: '#888784' }}>—</span>}</td>
+              <td style={{ padding: '8px 10px', color: '#0d0d0d' }}>{p.goods.length ? p.goods.join(', ') : <span style={{ color: '#888784' }}>—</span>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// (4) — one good. The core numbers block.
+function GoodCard({ g }: { g: Item4Good }) {
+  return (
+    <div style={cardStyle}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', marginBottom: 6 }}>
+        Good {g.cnCode ?? '—'} <span style={{ fontWeight: 400, color: '#888784' }}>· process {shortId(g.processId)}</span>
+      </div>
+      <Row label="Specific direct (4)(a)"><Field f={g.specificDirect} format={fmtNum} /></Row>
+      <Row label="Default share, direct (4)(b)"><Field f={g.defaultShareDirect} format={fmtNum} /></Row>
+      <Row label="Indirect · actual share (4)(c)"><Field f={g.indirect.actualShare} format={fmtNum} /></Row>
+      <Row label="Indirect · default share (4)(c)"><Field f={g.indirect.defaultShare} format={fmtNum} /></Row>
+      <Row label="Indirect · criteria confirmed (4)(c)"><Field f={g.indirect.criteriaConfirmation} format={fmtBool} /></Row>
+      <Row label="Indirect · specific (4)(c)"><Field f={g.indirect.specificIndirect} format={fmtNum} /></Row>
+      <Row label="Imported electricity (4)(d)"><Field f={g.importedElectricity} /></Row>
+      <Row label="SEFA — free allocation (4)(e)"><Field f={g.sefa} format={fmtNum} /></Row>
+      <Row label="Benchmark used (4)(f)"><Field f={g.benchmarkConfirmation} format={fmtBenchmark} /></Row>
+    </div>
+  )
+}
+
+function ReportBody({ data }: { data: VerifierReportResponse }) {
+  const { report: r, missing, documents, coverage } = data
+  return (
+    <>
+      {/* Coverage callout — the "with summary" completeness signal, near the top. */}
+      {coverage.processes_without_record > 0 ? (
+        <div style={{ background: '#fef3c7', border: '0.5px solid #fcd34d', borderRadius: 10, padding: '10px 16px', marginBottom: '2rem', fontSize: 13, color: '#92400e', fontWeight: 500 }}>
+          {coverage.processes_without_record} of {coverage.processes_total} processes are not yet backed by a computed record.
+        </div>
+      ) : (
+        <div style={{ marginBottom: '2rem', fontSize: 12, color: '#888784' }}>
+          All {coverage.processes_total} processes backed by computed records.
+        </div>
+      )}
+
+      {/* (1) Operator */}
+      <Section n="1" title="Operator">
+        <Row label="Name (1)(a)"><Field f={r.item1_operator.name} /></Row>
+        <Row label="Registration no. (1)(b)"><Field f={r.item1_operator.registrationNo} /></Row>
+        <Row label="Address (1)(c)"><Field f={r.item1_operator.address} /></Row>
+      </Section>
+
+      {/* (2) Installation */}
+      <Section n="2" title="Installation">
+        <Row label="Name (2)(a)"><Field f={r.item2_installation.name} /></Row>
+        <Row label="CBAM Registry ID (2)(b)"><Field f={r.item2_installation.cbamRegistryId} /></Row>
+        <Row label="UN/LOCODE (2)(c)"><Field f={r.item2_installation.unLocode} /></Row>
+        <Row label="Address (2)(d)"><Field f={r.item2_installation.address} /></Row>
+        <Row label="Coordinates (2)(e)"><Field f={r.item2_installation.coordinates} format={fmtCoords} /></Row>
+      </Section>
+
+      {/* (3) Processes */}
+      <Section n="3" title="Production processes & routes">
+        <ProcessesField f={r.item3_processes} />
+      </Section>
+
+      {/* (4) Per-good emissions — optional */}
+      {r.item4_perGood !== undefined && (
+        <Section n="4" title="Per-good embedded emissions">
+          {r.item4_perGood.length === 0 ? <NoneNote /> : r.item4_perGood.map((g, i) => <GoodCard key={i} g={g} />)}
+        </Section>
+      )}
+
+      {/* (5) Total direct — optional */}
+      {r.item5_totalDirect !== undefined && (
+        <Section n="5" title="Total direct emissions">
+          {r.item5_totalDirect.perProcess.map((pp, i) => (
+            <Row key={i} label={`Process ${shortId(pp.processId)}`}><Field f={pp.totalDirect} format={fmtNum} /></Row>
+          ))}
+          <Row label="Installation total"><Field f={r.item5_totalDirect.installationTotal} format={fmtNum} /></Row>
+        </Section>
+      )}
+
+      {/* (6) Indirect — optional, bare ReportField<number> */}
+      {r.item6_indirect !== undefined && (
+        <Section n="6" title="Installation indirect emissions">
+          <Row label="Indirect (tCO2e)"><Field f={r.item6_indirect} format={fmtNum} /></Row>
+        </Section>
+      )}
+
+      {/* (7) Heat */}
+      <Section n="7" title="Measurable heat">
+        <Row label="Imported"><Field f={r.item7_heat.imported} format={fmtBool} /></Row>
+        <Row label="Exported"><Field f={r.item7_heat.exported} format={fmtBool} /></Row>
+      </Section>
+
+      {/* (8) Zero-rated fuels */}
+      <Section n="8" title="Zero-rated fuels">
+        <Row label="Used"><Field f={r.item8_zeroRatedFuels.used} format={fmtBool} /></Row>
+        <Row label="Demonstration"><Field f={r.item8_zeroRatedFuels.demonstration} /></Row>
+      </Section>
+
+      {/* (9) Waste gases */}
+      <Section n="9" title="Waste gases">
+        <Row label="Produced & used"><Field f={r.item9_wasteGases.producedUsed} format={fmtBool} /></Row>
+        <Row label="Imported"><Field f={r.item9_wasteGases.imported} format={fmtBool} /></Row>
+        <Row label="Exported"><Field f={r.item9_wasteGases.exported} format={fmtBool} /></Row>
+      </Section>
+
+      {/* (10) CO2 capture */}
+      <Section n="10" title="CO₂ capture">
+        <Row label="Used"><Field f={r.item10_co2Capture.used} format={fmtBool} /></Row>
+        <Row label="Transferred to"><Field f={r.item10_co2Capture.transferredTo} /></Row>
+      </Section>
+
+      {/* (11) On-site electricity */}
+      <Section n="11" title="On-site electricity">
+        <Row label="Produced on-site (gate)"><Field f={r.item11_onsiteElectricity.producedOnsite} format={fmtBool} /></Row>
+        <Row label="Co-generation (11)(a)"><Field f={r.item11_onsiteElectricity.cogeneration} format={fmtBool} /></Row>
+        <Row label="Separate generation (11)(b)"><Field f={r.item11_onsiteElectricity.separateGeneration} format={fmtBool} /></Row>
+        <Row label="Fossil source (11)(c)"><Field f={r.item11_onsiteElectricity.sourceFossil} format={fmtBool} /></Row>
+        <Row label="Renewable source (11)(c)"><Field f={r.item11_onsiteElectricity.sourceRenewable} format={fmtBool} /></Row>
+        <Row label="Exported from process (11)(d)"><Field f={r.item11_onsiteElectricity.exportedFromProcess} format={fmtBool} /></Row>
+      </Section>
+
+      {/* (12) Default-value precursors — optional */}
+      {r.item12_defaultPrecursors !== undefined && (
+        <Section n="12" title="Precursors — default values">
+          {r.item12_defaultPrecursors.length === 0 ? <NoneNote /> : r.item12_defaultPrecursors.map((p: Item12DefaultPrecursor, i) => (
+            <div key={i} style={cardStyle}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', marginBottom: 6 }}>{p.cnCode}</div>
+              <Row label="Name (12)(b)"><Field f={p.name} /></Row>
+              <Row label="Country of origin (12)(c)"><Field f={p.originCountry} /></Row>
+              <Row label="Default value (12)(d)"><Field f={p.defaultValue} format={fmtNum} /></Row>
+            </div>
+          ))}
+        </Section>
+      )}
+
+      {/* (13) Actual-value precursors — optional */}
+      {r.item13_actualPrecursors !== undefined && (
+        <Section n="13" title="Precursors — actual values">
+          {r.item13_actualPrecursors.length === 0 ? <NoneNote /> : r.item13_actualPrecursors.map((p: Item13ActualPrecursor, i) => (
+            <div key={i} style={cardStyle}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', marginBottom: 6 }}>{p.cnCode}</div>
+              <Row label="Name (13)(b)"><Field f={p.name} /></Row>
+              <Row label="Country of origin (13)(c)"><Field f={p.originCountry} /></Row>
+              <Row label="Reporting period (13)(d)"><Field f={p.reportingPeriod} format={fmtNum} /></Row>
+              <Row label="Specific direct (13)(e)"><Field f={p.specificDirect} format={fmtNum} /></Row>
+              <Row label="Specific indirect (13)(e)"><Field f={p.specificIndirect} format={fmtNum} /></Row>
+            </div>
+          ))}
+        </Section>
+      )}
+
+      {/* (14) / (15) — Article 14 averaging. ReportField<never>: status only. Optional. */}
+      {r.item14_multiPeriodPrecursor !== undefined && (
+        <Section n="14" title="Multi-period precursor averaging">
+          <div style={{ fontSize: 13 }}><Field f={r.item14_multiPeriodPrecursor} /></div>
+        </Section>
+      )}
+      {r.item15_multiInstallationPrecursor !== undefined && (
+        <Section n="15" title="Multi-installation precursor averaging">
+          <div style={{ fontSize: 13 }}><Field f={r.item15_multiInstallationPrecursor} /></div>
+        </Section>
+      )}
+
+      {/* (16) Precursor origin — optional */}
+      {r.item16_precursorOrigin !== undefined && (
+        <Section n="16" title="Precursor origin (traceability)">
+          {r.item16_precursorOrigin.length === 0 ? <NoneNote /> : r.item16_precursorOrigin.map((p: Item16PrecursorOrigin, i) => (
+            <div key={i} style={cardStyle}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', marginBottom: 6 }}>{p.cnCode}</div>
+              <Row label="Operator of origin"><Field f={p.operatorName} /></Row>
+              <Row label="Installation of origin"><Field f={p.installationName} /></Row>
+              <Row label="CBAM Registry ID of origin"><Field f={p.cbamRegistryId} /></Row>
+              <Row label="Reporting period"><Field f={p.reportingPeriod} format={fmtNum} /></Row>
+            </div>
+          ))}
+        </Section>
+      )}
+
+      {/* Source documents */}
+      <div style={{ marginBottom: '2rem' }}>
+        <SectionHead>Source documents</SectionHead>
+        <p style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '1rem' }}>View links expire after 10 minutes.</p>
+        {documents.length === 0 ? (
+          <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.5rem', textAlign: 'center', fontSize: 13, color: '#888784' }}>No source documents attached.</div>
+        ) : documents.map((d, i) => (
+          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px', marginBottom: 8, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{d.file_name}</div>
+              <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{d.document_type}</div>
+            </div>
+            {d.url ? (
+              <a href={d.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, padding: '6px 16px', borderRadius: 6, background: '#0d0d0d', color: '#fff', textDecoration: 'none' }}>View</a>
+            ) : (
+              <span style={{ fontSize: 11, color: '#888784' }}>Unavailable</span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Completeness — every missing[] entry. */}
+      <div style={{ marginBottom: '2rem' }}>
+        <SectionHead>Completeness</SectionHead>
+        {missing.length === 0 ? (
+          <div style={{ fontSize: 13, color: '#0F6E56' }}>No gaps — all §1.2 fields provided.</div>
+        ) : (
+          <div>
+            {missing.map((m, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '6px 0', borderBottom: '0.5px solid #e8e7e4', fontSize: 13 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 8px', borderRadius: 4, whiteSpace: 'nowrap' }}>{m.item}</span>
+                <span style={{ color: '#0d0d0d' }}>{m.field}</span>
+                {m.hint ? <span style={{ color: '#888784' }}>— {m.hint}</span> : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Where an audit trail will sit once CBAM audit wiring lands. */}
+      <div style={{ fontSize: 11, color: '#888784', fontStyle: 'italic' }}>Change history will appear here in a later release.</div>
+    </>
+  )
+}
+
+// ── Chrome (unchanged from Part 1) ───────────────────────────────────────────
 
 // Read-only banner — CBAM-scoped. The validate RPC returns no expires_at, so the
 // "Access expires" clause is deliberately omitted (no date fabricated).
@@ -186,6 +536,33 @@ function ReadOnlyBanner() {
     <div style={{ background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.25)', borderRadius: 10, padding: '10px 16px', marginBottom: '1.5rem', fontSize: 12, color: '#7425e3', fontWeight: 500 }}>
       Read-only verifier view · You are reviewing a CBAM Specific Embedded Emissions (SEE) summary shared for independent verification
     </div>
+  )
+}
+
+// The invalid/expired screen — used for a bad token AND for a report fetch that
+// returns invalid / consent_required (access lost between validate and fetch).
+function InvalidScreen() {
+  return (
+    <Shell>
+      <div style={{ maxWidth: 540, margin: '4rem auto', textAlign: 'center', padding: '0 1.5rem' }}>
+        <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>Link invalid or expired</h1>
+        <p style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, fontWeight: 300 }}>This link is invalid or has expired. It may have been revoked. Please contact the company that shared it with you to request a new link.</p>
+      </div>
+      <Footer />
+    </Shell>
+  )
+}
+
+// Generic centred error screen (stale_record, unexpected report failures).
+function ErrorScreen({ title, body }: { title: string; body: string }) {
+  return (
+    <Shell>
+      <div style={{ maxWidth: 540, margin: '4rem auto', textAlign: 'center', padding: '0 1.5rem' }}>
+        <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>{title}</h1>
+        <p style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, fontWeight: 300 }}>{body}</p>
+      </div>
+      <Footer />
+    </Shell>
   )
 }
 
