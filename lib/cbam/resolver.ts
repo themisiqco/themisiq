@@ -89,6 +89,10 @@ export async function makeResolveContext(
     // exists in this table; applying one is a downstream declaration-layer decision, not this one.
     // see_indirect is null for Annex II goods (already zeroed to 0 at pre-fetch) — a legitimate zero.
     defaultLookup: (p: PrecursorInput): { direct: number; indirect: number } => {
+      // Keyed on (cn_code, country) only — NOT route. Correct per IR 2025/2621:
+      //  defaults are per good/country; production route affects the 2620 benchmark
+      //  (cbam_benchmarks), not the default value. See the 'cbam_default_values
+      //  route-independence' design note in the spec. Do not add route here.
       const specific = defaults.get(keyOf(p.cnCode, p.originCountry));
       if (specific != null) return specific;
 

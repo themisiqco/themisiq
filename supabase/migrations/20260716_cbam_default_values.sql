@@ -27,5 +27,6 @@ create table if not exists public.cbam_default_values (
   markup_2028_plus numeric not null,
   cbam_bm_route    text,
   source_ref       text not null,
+  -- Route-INDEPENDENT by design — correct per IR 2025/2621: defaults are per good/country; production route affects the 2620 benchmark (cbam_benchmarks), not the default value. See the 'cbam_default_values route-independence' design note in the spec. Do not add route.
   primary key (cn_code, country)
 );
