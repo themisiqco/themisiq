@@ -127,7 +127,7 @@ export default function CbamReportPage() {
   const isPaid = useEntitlement('cbam')
 
   const [loadingInstallations, setLoadingInstallations] = useState(true)
-  const [installations, setInstallations] = useState<{ id: string; name: string; country: string }[]>([])
+  const [installations, setInstallations] = useState<{ id: string; name: string; country: string; company_id: string }[]>([])
   const [selectedInstallationId, setSelectedInstallationId] = useState<string | null>(null)
   const [reportingPeriod, setReportingPeriod] = useState<number>(2026)
 
@@ -145,7 +145,7 @@ export default function CbamReportPage() {
     setLoadingInstallations(true)
     supabase
       .from('cbam_installations')
-      .select('id, name, country')
+      .select('id, name, country, company_id')
       .order('name')
       .then(({ data, error }) => {
         if (cancelled) return
@@ -154,7 +154,7 @@ export default function CbamReportPage() {
           setLoadingInstallations(false)
           return
         }
-        const rows = (data ?? []) as { id: string; name: string; country: string }[]
+        const rows = (data ?? []) as { id: string; name: string; country: string; company_id: string }[]
         setInstallations(rows)
         setSelectedInstallationId((prev) => prev ?? rows[0]?.id ?? null)
         setLoadingInstallations(false)
@@ -480,6 +480,127 @@ export default function CbamReportPage() {
           </ItemSection>
         </>
       )}
+
+      {/* Invite a verifier — copy-link parity with GHG. Self-guards on
+          installationId, so it appears whenever an installation is selected,
+          independent of whether a report has been generated. */}
+      <CbamVerifierInvite
+        installationId={selectedInstallationId}
+        companyId={selectedInstallation?.company_id ?? null}
+        reportingPeriod={reportingPeriod}
+      />
+    </div>
+  )
+}
+
+// ── Verifier invite — copy-link parity with the GHG VerifierInvite
+// (app/dashboard/ghg/page.tsx). Copy-link only, no email. The grant grain is the
+// TUPLE (installation_id, company_id, reporting_period), not a single id;
+// company_id is read off the SELECTED installation so the composite FK to
+// cbam_installations(id, company_id) holds. The link points at
+// /verify-cbam/{token} — NOT the GHG /verify/{token}. All of id/token/status/
+// expires_at/consent columns are DB-defaulted and never sent.
+interface CbamVerifierGrant {
+  id: string
+  token: string
+  verifier_name: string | null
+  verifier_email: string | null
+  status: string
+  expires_at: string
+  created_at: string
+}
+
+function CbamVerifierInvite({ installationId, companyId, reportingPeriod }: { installationId: string | null; companyId: string | null; reportingPeriod: number }) {
+  const [grants, setGrants] = useState<CbamVerifierGrant[]>([])
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+
+  const load = () => {
+    if (!installationId || !companyId) return
+    supabase
+      .from('cbam_verifier_access')
+      .select('*')
+      .eq('installation_id', installationId)
+      .eq('company_id', companyId)
+      .eq('reporting_period', reportingPeriod)
+      .order('created_at', { ascending: false })
+      .then((res: { data: CbamVerifierGrant[] | null }) => setGrants(res.data || []))
+  }
+
+  useEffect(() => { load() }, [installationId, companyId, reportingPeriod])
+
+  const createInvite = async () => {
+    if (!installationId || !companyId) return
+    setCreating(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { alert('Please sign in to invite a verifier.'); setCreating(false); return }
+    const { error } = await supabase.from('cbam_verifier_access').insert({
+      installation_id: installationId,
+      company_id: companyId,
+      reporting_period: reportingPeriod,
+      customer_user_id: session.user.id,
+      verifier_name: name || null,
+      verifier_email: email || null,
+    })
+    setCreating(false)
+    if (error) { alert('Could not create invitation: ' + error.message); return }
+    setName(''); setEmail(''); load()
+  }
+
+  const revoke = async (id: string) => {
+    const { error } = await supabase.from('cbam_verifier_access')
+      .update({ status: 'revoked', revoked_at: new Date().toISOString() })
+      .eq('id', id)
+    if (error) { alert('Could not revoke: ' + error.message); return }
+    load()
+  }
+
+  const linkFor = (token: string) => `${typeof window !== 'undefined' ? window.location.origin : 'https://www.themisiq.co'}/verify-cbam/${token}`
+
+  const copy = (token: string, id: string) => {
+    navigator.clipboard.writeText(linkFor(token))
+    setCopiedId(id)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  if (!installationId) return null
+
+  const active = grants.filter((g) => g.status === 'active')
+
+  return (
+    <div style={{ marginTop: '2.5rem', borderTop: '0.5px solid #e8e7e4', paddingTop: '2rem' }}>
+      <h3 style={itemHead}>Invite a verifier</h3>
+      <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.7, marginBottom: '1.25rem' }}>
+        Generate a secure, read-only link for your independent verifier. They&apos;ll see this installation&apos;s Annex IV &sect;1.2 summary and source documents for {reportingPeriod} &mdash; with no ability to edit. Links expire in 90 days, and you can revoke access at any time.
+      </p>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <input value={name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} placeholder="Verifier name (optional)" style={{ ...cbamInputStyle, flex: 1, minWidth: 160 }} />
+        <input value={email} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)} placeholder="Verifier email (optional)" style={{ ...cbamInputStyle, flex: 1, minWidth: 160 }} />
+        <button onClick={createInvite} disabled={creating} style={{ fontSize: 13, fontWeight: 500, padding: '10px 20px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', cursor: creating ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>{creating ? 'Generating…' : 'Generate verifier link'}</button>
+      </div>
+
+      {active.length === 0 && (
+        <div style={{ fontSize: 12, color: '#888784', fontStyle: 'italic' }}>No active verifier links yet.</div>
+      )}
+
+      {active.map((g) => (
+        <div key={g.id} style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px', marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{g.verifier_name || 'Verifier'}{g.verifier_email ? ` · ${g.verifier_email}` : ''}</div>
+              <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>Expires {new Date(g.expires_at).toLocaleDateString()}</div>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => copy(g.token, g.id)} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 6, background: '#fff', border: '0.5px solid #e8e7e4', cursor: 'pointer', color: '#555553' }}>{copiedId === g.id ? '✓ Copied' : 'Copy link'}</button>
+              <button onClick={() => revoke(g.id)} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 6, background: 'none', border: '0.5px solid #e8e7e4', cursor: 'pointer', color: '#B91C1C' }}>Revoke</button>
+            </div>
+          </div>
+          <div style={{ marginTop: 8, fontSize: 11, color: '#888784', wordBreak: 'break-all', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 6, padding: '6px 10px' }}>{linkFor(g.token)}</div>
+        </div>
+      ))}
     </div>
   )
 }
