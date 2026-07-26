@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthedClient, bearerFrom, AuthError } from '../../../../lib/supabaseAuthed';
 import { loadAndComputeProcess, ProcessLoadError } from '../../../../lib/cbam/loadProcess';
 import { buildSummaryReport } from '../../../../lib/cbam/report/build';
+import { seeRecordMatches } from '../../../../lib/cbam/seeMatch';
 import type {
   GoodComputation, SeeRecordRow, OperatorProfileRow, InstallationRow, DisclosuresRow,
 } from '../../../../lib/cbam/report/build';
@@ -151,14 +152,16 @@ export async function GET(req: NextRequest) {
         if (!record) {
           processesWithoutRecord.push(p.id);
         } else if (
-          // Step 6 — TRIPWIRE. Strict equality, no tolerance, no rounding: Postgres unconstrained
-          // numeric round-trips to the identical IEEE 754 double, and the stored figure and this
-          // recomputation run the SAME code in the SAME order via loadAndComputeProcess, so equality
-          // holds unless reference data or process inputs genuinely changed since the record was
-          // written. Verified empirically 22 Jul 2026. A figure that disagrees with the stored record
-          // is NEVER returned.
-          record.see_direct !== loaded.result.direct ||
-          record.see_indirect !== loaded.result.indirect
+          // Step 6 — TRIPWIRE. seeRecordMatches compares both legs within a small float64 tolerance
+          // (see lib/cbam/seeMatch.ts): the stored figure and this recomputation run the SAME engine
+          // via loadAndComputeProcess, so they agree to within ~1 ULP of summation-order drift unless
+          // reference data or process inputs genuinely changed since the record was written. Real
+          // divergence is orders of magnitude larger than the tolerance and still throws. A figure
+          // that disagrees with the stored record is NEVER returned.
+          !seeRecordMatches(
+            { direct: record.see_direct, indirect: record.see_indirect },
+            loaded.result,
+          )
         ) {
           throw new ReportError(
             `see_record ${record.id} for process ${p.id} is stale: ` +

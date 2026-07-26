@@ -111,8 +111,14 @@ export async function loadAndComputeProcess(
   const [streamsRes, precursorsRes, installationRes, categoryRes] = await Promise.all([
     supabase
       .from('cbam_source_streams')
+      // ORDER BY id is load-bearing, not cosmetic: massBalance sums stream emissions with a float64
+      // reduce, which is non-associative. An unordered select returns rows in a mutable physical
+      // order (any UPDATE/VACUUM/replica reshuffles it), changing the summation order and shifting
+      // see_direct by ~1 ULP — which the stale-record tripwire (even with tolerance) should never
+      // see spuriously. A stable order makes the recomputation bit-identical across writes.
       .select('stream_kind, activity_data, cc_mode, carbon_content, emission_factor, ncv, biomass_fraction')
-      .eq('process_id', processId),
+      .eq('process_id', processId)
+      .order('id'),
     supabase
       .from('cbam_precursor_inputs')
       .select('precursor_cn_code, precursor_category_code, mass_consumed, boundary, provenance, origin_country, see_value, verifier_report_id, reporting_period, origin_operator_name, origin_installation_name, origin_cbam_registry_id, origin_reporting_period')

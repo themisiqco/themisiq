@@ -24,6 +24,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '../../../../lib/supabase';
 import { loadAndComputeProcess, ProcessLoadError } from '../../../../lib/cbam/loadProcess';
 import { buildSummaryReport } from '../../../../lib/cbam/report/build';
+import { seeRecordMatches } from '../../../../lib/cbam/seeMatch';
 import type {
   GoodComputation, SeeRecordRow, OperatorProfileRow, InstallationRow, DisclosuresRow,
 } from '../../../../lib/cbam/report/build';
@@ -207,11 +208,14 @@ export async function POST(req: NextRequest) {
         if (!record) {
           processesWithoutRecord.push(p.id);
         } else if (
-          // TRIPWIRE — same strict equality the owner report route uses: the stored figure and this
-          // recomputation run the SAME code in the SAME order, so any divergence means reference data
-          // or inputs changed since the record was written. A disagreeing figure is NEVER served.
-          record.see_direct !== loaded.result.direct ||
-          record.see_indirect !== loaded.result.indirect
+          // TRIPWIRE — the stored figure and this recomputation run the SAME engine, so they agree
+          // to within float64 noise unless reference data or inputs genuinely changed. seeRecordMatches
+          // tolerates ~1 ULP of summation-order drift (see lib/cbam/seeMatch.ts) but still fires on any
+          // real divergence, which is orders of magnitude larger. A disagreeing figure is NEVER served.
+          !seeRecordMatches(
+            { direct: record.see_direct, indirect: record.see_indirect },
+            loaded.result,
+          )
         ) {
           throw new ReportError(
             `see_record ${record.id} for process ${p.id} is stale: ` +
