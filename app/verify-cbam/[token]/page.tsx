@@ -45,6 +45,21 @@ interface VerifierReportResponse {
   coverage: { processes_total: number; processes_without_record: number }
   verifier: { verifier_name: string | null; installation_name: string | null; reporting_period: number }
 }
+// One row from cbam_verifier_audit_history — the whole snapshot pair plus who/when.
+// The field-label whitelist (CBAM_AUDIT_FIELD_LABELS) governs what actually renders.
+interface AuditHistoryEntry {
+  table_name: string
+  action: string
+  old_values: Record<string, unknown> | null
+  new_values: Record<string, unknown> | null
+  user_email: string | null
+  created_at: string
+}
+// cbam_verifier_audit_history's jsonb return. Only 'valid' carries history.
+interface AuditHistoryResult {
+  status: 'valid' | 'consent_required' | 'invalid'
+  history?: AuditHistoryEntry[]
+}
 
 // Consent wording version stamped onto the verifier's ToS/Privacy acceptance.
 // Same value as the GHG verifier page. Bump when Terms or Privacy are materially revised.
@@ -66,6 +81,9 @@ export default function CbamVerifierPage() {
   const [report, setReport] = useState<VerifierReportResponse | null>(null)
   const [reportLoading, setReportLoading] = useState(false)
   const [reportError, setReportError] = useState<string | null>(null)
+  // Change history (Part 2) — same access gate as the report.
+  const [history, setHistory] = useState<AuditHistoryEntry[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
 
   useEffect(() => {
     if (!token) return
@@ -99,6 +117,21 @@ export default function CbamVerifierPage() {
         setReportLoading(false)
       })
       .catch(() => { setReportError('unknown'); setReportLoading(false) })
+  }, [token, result?.status, accepted])
+
+  // Change-history fetch — same access gate as the report. Anon-client RPC,
+  // matching validate/accept (NOT routed through the documents API). Only a
+  // 'valid' status carries history; we're already past consent here, so treat
+  // consent_required/invalid/absent as an empty trail rather than an error.
+  useEffect(() => {
+    const hasAccess = result?.status === 'valid' || accepted
+    if (!token || !hasAccess) return
+    setHistoryLoading(true)
+    supabase.rpc('cbam_verifier_audit_history', { p_token: token }).then((res: { data: AuditHistoryResult | null }) => {
+      const d = res.data
+      setHistory(d && d.status === 'valid' ? (d.history ?? []) : [])
+      setHistoryLoading(false)
+    }, () => { setHistory([]); setHistoryLoading(false) })
   }, [token, result?.status, accepted])
 
   // ── Loading ────────────────────────────────────────────────────────────────
@@ -232,7 +265,7 @@ export default function CbamVerifierPage() {
           </div>
         )}
 
-        <ReportBody data={report} token={token} />
+        <ReportBody data={report} token={token} history={history} historyLoading={historyLoading} />
       </div>
       <Footer />
     </Shell>
@@ -410,7 +443,83 @@ function DocRow({ doc, token }: { doc: { id: string; file_name: string; document
   )
 }
 
-function ReportBody({ data, token }: { data: VerifierReportResponse; token: string }) {
+// Field-label WHITELIST for the verifier change history. Only columns present here
+// render — the RPC forwards the full snapshot, so any column NOT listed (company_id,
+// id, installation_id, created_at, updated_at, the attestation timestamp) is
+// structurally unrenderable. Keyed by table_name; the two audited tables share no
+// column names. Verifier-appropriate operator declarations only.
+const CBAM_AUDIT_FIELD_LABELS: Record<string, Record<string, string>> = {
+  cbam_installation_disclosures: {
+    reporting_period: 'Reporting period',
+    heat_imported: 'Heat imported',
+    heat_exported: 'Heat exported',
+    zero_rated_fuels_used: 'Zero-rated fuels used',
+    zero_rated_fuels_demonstration: 'Zero-rated fuels demonstration',
+    waste_gases_produced_used: 'Waste gases produced & used',
+    waste_gases_imported: 'Waste gases imported',
+    waste_gases_exported: 'Waste gases exported',
+    co2_capture_used: 'CO₂ capture used',
+    co2_capture_transferred_to: 'CO₂ capture transferred to',
+    electricity_produced_onsite: 'Electricity produced on-site',
+    elec_cogeneration: 'Electricity — co-generation',
+    elec_separate_generation: 'Electricity — separate generation',
+    elec_source_fossil: 'Electricity — fossil source',
+    elec_source_renewable: 'Electricity — renewable source',
+    elec_exported_from_process: 'Electricity — exported from process',
+    processes_complete: 'Process set declared complete',
+  },
+  cbam_production_processes: {
+    cn_code: 'CN code',
+    category_code: 'Goods category',
+    route_code: 'Production route',
+    steel_grade: 'Steel grade',
+    activity_level: 'Activity level',
+    electricity_consumed: 'Electricity consumed (MWh)',
+    calc_mode: 'Calculation mode',
+  },
+}
+const AUDIT_ACTION_LABEL: Record<string, string> = { INSERT: 'Added', UPDATE: 'Changed', DELETE: 'Removed' }
+const AUDIT_TABLE_TAG: Record<string, string> = {
+  cbam_installation_disclosures: 'Disclosures',
+  cbam_production_processes: 'Process',
+}
+
+// Value formatter for audit diffs: booleans → Yes/No, null/empty → —.
+function fmtAudit(v: unknown): string {
+  if (v === null || v === undefined || v === '') return '—'
+  if (typeof v === 'boolean') return v ? 'Yes' : 'No'
+  if (Array.isArray(v)) return v.join(', ') || '—'
+  return String(v)
+}
+
+// Reduce one audit entry to its renderable, whitelisted field changes.
+// UPDATE → only fields whose value changed (from → to). INSERT → mapped fields set
+// in new_values (to only). DELETE → mapped fields that were set in old_values (from
+// only). Fields absent from the map are never emitted; INSERT/DELETE skip '—' (a
+// null/unset field carries no signal), but a real `false` (→ 'No') is kept.
+function auditChanges(entry: AuditHistoryEntry): { label: string; from: string | null; to: string | null }[] {
+  const labels = CBAM_AUDIT_FIELD_LABELS[entry.table_name]
+  if (!labels) return []
+  const o = entry.old_values || {}
+  const n = entry.new_values || {}
+  const rows: { label: string; from: string | null; to: string | null }[] = []
+  for (const key of Object.keys(labels)) {
+    const label = labels[key]
+    if (entry.action === 'UPDATE') {
+      const from = fmtAudit(o[key]); const to = fmtAudit(n[key])
+      if (from !== to) rows.push({ label, from, to })
+    } else if (entry.action === 'INSERT') {
+      const to = fmtAudit(n[key])
+      if (to !== '—') rows.push({ label, from: null, to })
+    } else if (entry.action === 'DELETE') {
+      const from = fmtAudit(o[key])
+      if (from !== '—') rows.push({ label, from, to: null })
+    }
+  }
+  return rows
+}
+
+function ReportBody({ data, token, history, historyLoading }: { data: VerifierReportResponse; token: string; history: AuditHistoryEntry[]; historyLoading: boolean }) {
   const { report: r, missing, documents, coverage } = data
   return (
     <>
@@ -591,8 +700,49 @@ function ReportBody({ data, token }: { data: VerifierReportResponse; token: stri
         )}
       </div>
 
-      {/* Where an audit trail will sit once CBAM audit wiring lands. */}
-      <div style={{ fontSize: 11, color: '#888784', fontStyle: 'italic' }}>Change history will appear here in a later release.</div>
+      {/* Change history — operator edits to this tuple's disclosures & processes. */}
+      <div style={{ marginTop: '2rem' }}>
+        <SectionHead>Change history</SectionHead>
+        {historyLoading ? (
+          <div style={{ fontSize: 13, color: '#888784' }}>Loading change history…</div>
+        ) : history.length === 0 ? (
+          <div style={{ fontSize: 13, color: '#888784' }}>No changes recorded.</div>
+        ) : (
+          history.map((entry, i) => {
+            const changes = auditChanges(entry)
+            const actionLabel = AUDIT_ACTION_LABEL[entry.action] ?? entry.action
+            const tag = AUDIT_TABLE_TAG[entry.table_name] ?? entry.table_name
+            return (
+              <div key={i} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px', marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap', marginBottom: changes.length ? 8 : 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#555553', background: '#f0efed', padding: '2px 8px', borderRadius: 4 }}>{tag}</span>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{actionLabel}</span>
+                    <span style={{ fontSize: 12, color: '#888784' }}>{entry.user_email || 'System'}</span>
+                  </div>
+                  <span style={{ fontSize: 11, color: '#888784' }}>{new Date(entry.created_at).toLocaleString()}</span>
+                </div>
+                {changes.length > 0 && (
+                  <div style={{ borderTop: '0.5px solid #f0efed', paddingTop: 8 }}>
+                    {changes.map((c, j) => (
+                      <div key={j} style={{ fontSize: 12, color: '#555553', padding: '2px 0' }}>
+                        <span style={{ color: '#888784' }}>{c.label}:</span>{' '}
+                        {c.from != null && c.to != null ? (
+                          <><span style={{ textDecoration: 'line-through', color: '#888784' }}>{c.from}</span> <span style={{ color: '#888784' }}>→</span> <span style={{ color: '#0d0d0d', fontWeight: 500 }}>{c.to}</span></>
+                        ) : c.to != null ? (
+                          <span style={{ color: '#0d0d0d', fontWeight: 500 }}>{c.to}</span>
+                        ) : (
+                          <span style={{ color: '#0d0d0d', fontWeight: 500 }}>{c.from}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })
+        )}
+      </div>
     </>
   )
 }
