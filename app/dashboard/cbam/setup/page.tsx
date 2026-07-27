@@ -426,7 +426,6 @@ export default function CbamSetupPage() {
       if (cancelled) return
       if (error) { console.error('[CN] fetch error', error); setProc3Error(error.message); return }
       const cnCodes = new Set<string>((data ?? []).map((r) => r.cn_code as string))
-      console.log('[CN] loaded', cnCodes.size, 'distinct codes')   // keep this log
       setValidCnCodes(cnCodes)
     })()
     return () => { cancelled = true }
