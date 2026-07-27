@@ -99,7 +99,7 @@ export default function Home() {
       <section style={{ padding: '5rem 2.5rem', maxWidth: 1100, margin: '0 auto' }}>
         <p style={eyebrow}>The ThemisIQ platform</p>
         <h2 style={sectionTitle}>Purpose-built modules. One source of truth.</h2>
-        <p style={sectionSub}>Enter your data once. ThemisIQ maps it across every module and framework automatically.</p>
+        <p style={sectionSub}>Purpose-built for each obligation. Mapped to the frameworks that apply.</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden', marginTop: '3rem' }}>
           {modules.filter(m => m.family !== 'Advisory').map((mod, i) => (
             <a key={i} href={mod.href} style={{ background: '#fff', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textDecoration: 'none', transition: 'background 0.15s', cursor: 'pointer', borderRight: i % 4 < 3 ? '0.5px solid #e8e7e4' : 'none', borderBottom: i < 4 ? '0.5px solid #e8e7e4' : 'none' }}

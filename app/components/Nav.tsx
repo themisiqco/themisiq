@@ -24,6 +24,7 @@ const MODULES_NAV: { href: string; label: string; labelShort: string; sub: strin
   { href: '/ai-governance', label: 'AI Governance', labelShort: 'AI Governance', sub: 'EU AI Act · NIST AI RMF · ISO 42001' },
   { href: '/cyber', label: 'Cyber Governance', labelShort: 'Cyber', sub: 'NIS2 · DORA · SEC cyber · ISO 27001' },
   { href: '/verification-readiness', label: 'GHG Verification', labelShort: 'GHG Verification', sub: 'ISO 14064-3 · ISAE 3410 · verifier-ready package' },
+  { href: '/cbam', label: 'CBAM', labelShort: 'CBAM', sub: 'Regulation (EU) 2023/956 · verifier-ready' },
 ]
 
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
