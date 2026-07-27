@@ -114,6 +114,11 @@ const CBAM_MIME_ALLOW = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ]
 const DOC_TYPE_SUGGESTIONS = ['weighbridge ticket', 'fuel delivery note', 'laboratory analysis', 'production log', 'electricity invoice', 'mass balance record']
+// Categories that carry an alloy-grade dimension (steel_grade drives the §5.3 benchmark
+// indicator). crude_steel and iron_steel_products have grade-bearing benchmark rows
+// (C-J indicators); sintered_ore/pig_iron/dri/ferroalloy and non-steel sectors (aluminium)
+// do not. The Steel-grade field renders ONLY for these. Add future graded sectors here.
+const STEEL_GRADE_CATEGORIES = new Set(['crude_steel', 'iron_steel_products'])
 type CbamDocument = {
   id: string
   file_path: string
@@ -155,6 +160,9 @@ export default function CbamSetupPage() {
   // ── Step 3 reference data (world-readable) ──
   const [goodsCategories, setGoodsCategories] = useState<{ code: string; label: string }[]>([])
   const [routes, setRoutes] = useState<{ category_code: string; route_code: string }[]>([])
+  // Every CN code that HAS a default row — the authoritative accept-set for the CN field
+  // (exactly what the engine resolves against). Populated in the reference-data effect below.
+  const [validCnCodes, setValidCnCodes] = useState<Set<string>>(new Set())
 
   // ── Step 3 processes (scoped to the viewed installation) ──
   const [procInstallationId, setProcInstallationId] = useState<string | null>(null)
@@ -387,20 +395,40 @@ export default function CbamSetupPage() {
     loadInstallations(companyId)
   }
 
-  // ── Load reference data (categories + routes; world-readable) ──
+  // ── Load reference data (categories + routes + valid CN codes; world-readable) ──
   useEffect(() => {
     if (!isPaid) return
     let cancelled = false
-    Promise.all([
-      supabase.from('cbam_goods_categories').select('code, label').order('label'),
-      supabase.from('cbam_production_routes').select('category_code, route_code').order('category_code'),
-    ]).then(([catRes, routeRes]) => {
+    ;(async () => {
+      const [catRes, routeRes] = await Promise.all([
+        supabase.from('cbam_goods_categories').select('code, label').order('label'),
+        supabase.from('cbam_production_routes').select('category_code, route_code').order('category_code'),
+      ])
       if (cancelled) return
       if (catRes.error) { setProc3Error(catRes.error.message); return }
       if (routeRes.error) { setProc3Error(routeRes.error.message); return }
       setGoodsCategories((catRes.data ?? []) as { code: string; label: string }[])
       setRoutes((routeRes.data ?? []) as { category_code: string; route_code: string }[])
-    })
+
+      // The authoritative CN accept-set: every code with a default row in cbam_default_values,
+      // at whatever granularity the annex seeds it (4-digit heading, 6- or 8-digit subheading) —
+      // exactly what the engine resolves against (exact cn_code membership).
+      //
+      // Filter to country='other' so we get ONE row per distinct cn_code. cbam_default_values is
+      // ~1828 rows (per-country duplication) — over PostgREST's hard 1000-row response cap, which
+      // .limit() does NOT override. But every seeded good carries an 'other' fallback row (the
+      // §10.17 seed invariant the engine relies on), so country='other' yields exactly the ~224
+      // distinct codes in a single request, well under the cap. No pagination, no loop.
+      const { data, error } = await supabase
+        .from('cbam_default_values')
+        .select('cn_code')
+        .eq('country', 'other')
+      if (cancelled) return
+      if (error) { console.error('[CN] fetch error', error); setProc3Error(error.message); return }
+      const cnCodes = new Set<string>((data ?? []).map((r) => r.cn_code as string))
+      console.log('[CN] loaded', cnCodes.size, 'distinct codes')   // keep this log
+      setValidCnCodes(cnCodes)
+    })()
     return () => { cancelled = true }
   }, [isPaid])
 
@@ -489,9 +517,17 @@ export default function CbamSetupPage() {
     setProc3Error(null)
     const p = editingProc
     if (!p.installation_id) { setProc3Error('Installation is required (installation_id NOT NULL).'); return }
-    // CN code is the load-bearing field. Enforce the exact 8-digit spaced shape.
-    if (!/^[0-9]{4} [0-9]{2} [0-9]{2}$/.test(p.cn_code.trim())) {
-      setProc3Error(`CN code must be the exact 8-digit spaced code, e.g. '7206 10 00' — "${p.cn_code.trim()}" is not. A 4-digit heading (7206) is an unseeded "see below" row: the default lookup returns nothing and the actual-vs-default comparison is silently lost (spec §10.7). Use the exact code on the customer's customs paperwork; do not shorten or infer it.`)
+    // CN code is the load-bearing field. Validate MEMBERSHIP against the seeded default values —
+    // the exact set the engine resolves against — not a format shape. CBAM goods are seeded at
+    // mixed granularity (4-digit headings, 6- and 8-digit subheadings), so a format rule mispredicts;
+    // a code with no default row would dead-fall to 'other' (spec §10.7, via the correct mechanism).
+    const cn = p.cn_code.trim()
+    if (validCnCodes.size === 0) {
+      setProc3Error('Reference data is still loading — please try again in a moment.')
+      return
+    }
+    if (!validCnCodes.has(cn)) {
+      setProc3Error(`CN code "${cn}" isn't a recognised CBAM good in this system. Enter the exact code as it appears for your product on the customs paperwork — it must match a default value we hold. (Some goods are listed at 4-digit heading level, others at 6- or 8-digit.)`)
       return
     }
     if (!p.category_code) { setProc3Error('Category is required (category_code NOT NULL, FK to cbam_goods_categories).'); return }
@@ -932,6 +968,7 @@ export default function CbamSetupPage() {
           {inst2Saved && !editing && (
             <div style={{ marginTop: '1.25rem', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 13, color: '#0F6E56' }}>✓ Saved</span>
+              <button type="button" onClick={() => setStep(3)} style={linkBtn}>Next: Processes &amp; emissions →</button>
               <a href="/dashboard/cbam" style={linkAnchor}>Record disclosures →</a>
               <a href="/dashboard/cbam/report" style={linkAnchor}>Generate report →</a>
             </div>
@@ -1190,7 +1227,7 @@ export default function CbamSetupPage() {
                       <input value={editingProc.cn_code} onChange={(e) => setProc('cn_code', e.target.value)} placeholder="7206 10 00" style={cbamInputStyle} />
                     </CbamField>
                     <CbamField label="Category — required">
-                      <select value={editingProc.category_code} onChange={(e) => { setProc('category_code', e.target.value); setProc('route_code', '') }} style={cbamInputStyle}>
+                      <select value={editingProc.category_code} onChange={(e) => { const c = e.target.value; setProc('category_code', c); setProc('route_code', ''); if (!STEEL_GRADE_CATEGORIES.has(c)) setProc('steel_grade', '') }} style={cbamInputStyle}>
                         <option value="" disabled>Select a category…</option>
                         {goodsCategories.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
                       </select>
@@ -1223,14 +1260,16 @@ export default function CbamSetupPage() {
                       </select>
                     </CbamField>
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                      <CbamField label="Steel grade" hint="Steel goods only; leave unset otherwise.">
-                        <select value={editingProc.steel_grade} onChange={(e) => setProc('steel_grade', e.target.value)} style={{ ...cbamInputStyle, width: 200 }}>
-                          <option value="">(none)</option>
-                          <option value="carbon">carbon</option>
-                          <option value="low_alloy">low_alloy</option>
-                          <option value="high_alloy">high_alloy</option>
-                        </select>
-                      </CbamField>
+                      {STEEL_GRADE_CATEGORIES.has(editingProc.category_code) && (
+                        <CbamField label="Steel grade" hint="Steel goods only; leave unset otherwise.">
+                          <select value={editingProc.steel_grade} onChange={(e) => setProc('steel_grade', e.target.value)} style={{ ...cbamInputStyle, width: 200 }}>
+                            <option value="">(none)</option>
+                            <option value="carbon">carbon</option>
+                            <option value="low_alloy">low_alloy</option>
+                            <option value="high_alloy">high_alloy</option>
+                          </select>
+                        </CbamField>
+                      )}
                       <CbamField label="Electricity consumed (MWh)" hint="For own-indirect on non-Annex-II goods. Leave blank, or ≥ 0.">
                         <input type="number" step="any" value={editingProc.electricity_consumed} onChange={(e) => setProc('electricity_consumed', e.target.value)} style={{ ...cbamInputStyle, width: 200 }} />
                       </CbamField>
@@ -1247,7 +1286,8 @@ export default function CbamSetupPage() {
               {proc3Saved && !editingProc && (
                 <div style={{ marginTop: '1.25rem', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 13, color: '#0F6E56' }}>✓ Saved</span>
-                  <a href="/dashboard/cbam/report" style={linkAnchor}>Generate report →</a>
+                  <a href="/dashboard/cbam/report" style={linkBtn}>Generate report →</a>
+                  <button type="button" onClick={() => setStep(4)} style={linkAnchor}>Next: Precursors →</button>
                 </div>
               )}
             </>
