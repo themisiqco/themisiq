@@ -112,18 +112,19 @@ export default function Home() {
               </div>
             </a>
           ))}
-          {/* Advisory — 8th cell, column 4 row 2 */}
-          <a href="/advisory" style={{ gridColumn: '4', gridRow: '2', background: '#0d0d0d', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textDecoration: 'none', transition: 'opacity 0.15s' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.9' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 2 }}>Advisory Services</div>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, color: '#fff', lineHeight: 1.2 }}>Available across all modules</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, fontWeight: 300 }}>Expert advisory services — sector-specific guidance, assurance prep, and board-ready narratives from practitioners who speak your language.</div>
-            <div style={{ marginTop: 'auto', paddingTop: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: '#0d0d0d', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', padding: '8px 16px', borderRadius: 8, whiteSpace: 'nowrap' }}>Talk to a specialist →</span>
-            </div>
-          </a>
         </div>
+
+        {/* Advisory — full-width closing band below the 4×2 module grid (moved out of the grid) */}
+        <a href="/advisory" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '2rem', flexWrap: 'wrap', marginTop: '1.25rem', background: '#0d0d0d', borderRadius: 16, padding: '2.5rem', textDecoration: 'none', transition: 'opacity 0.15s' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.9' }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1' }}>
+          <div style={{ maxWidth: 640 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 8 }}>Advisory Services</div>
+            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: 8 }}>Available across all modules</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, fontWeight: 300 }}>Expert advisory services — sector-specific guidance, assurance prep, and board-ready narratives from practitioners who speak your language.</div>
+          </div>
+          <span style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', padding: '12px 24px', borderRadius: 8, whiteSpace: 'nowrap', flexShrink: 0 }}>Talk to a specialist →</span>
+        </a>
       </section>
 
       {/* ── MATERIALITY CAPABILITY STRIP ── */}
@@ -333,6 +334,7 @@ const modules = [
   { family: 'ThemisIQ', name: 'AI Governance', desc: 'AI risk register. Model inventory. Policy management. EU AI Act readiness. Board-level AI oversight documentation.', tags: ['EU AI Act', 'NIST AI RMF', 'ISO 42001', 'Model risk'], href: '/ai-governance', dark: false },
   { family: 'ThemisIQ', name: 'People & Workforce', desc: 'Human capital reporting. DEI metrics. Pay equity and gender pay gap. Health & safety. Training management.', tags: ['ESRS S1', 'GRI 401-410', 'Pay Transparency', 'CA Pay Data'], href: '/people', dark: false },
   { family: 'ThemisIQ', name: 'Cyber Governance', desc: 'Cyber risk registers. Policy management. Vendor cybersecurity reviews. Incident workflows. CISO dashboards.', tags: ['NIS2', 'DORA', 'ISO 27001', 'NIST CSF'], href: '/cyber', dark: false },
+  { family: 'ThemisIQ', name: 'CBAM', desc: 'Carbon Border Adjustment Mechanism. Specific embedded emissions for goods entering the EU — installation-level actuals, direct & indirect, verifier-ready.', tags: ['Non-EU exporters', '(EU) 2023/956', 'Verifier-ready'], href: '/cbam', dark: false },
 ]
 
 // ── STYLES ──────────────────────────────────────────────────────────
