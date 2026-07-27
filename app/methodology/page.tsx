@@ -58,6 +58,38 @@ const METHODOLOGIES = [
     ],
   },
   {
+    module: 'CBAM — Carbon Border Adjustment Mechanism',
+    color: '#0C447C',
+    bg: '#E6F1FB',
+    standard: 'Regulation (EU) 2023/956 · IR (EU) 2025/2547 · 2025/2620 · 2025/2621 · 2025/2546 · DR (EU) 2025/2551 (EN ISO/IEC 14065)',
+    sections: [
+      {
+        title: 'What it computes',
+        content: 'CBAM requires an EU importer to declare the embedded emissions of each imported good, under the CBAM Regulation (Regulation (EU) 2023/956). ThemisIQ produces the Specific Embedded Emissions (SEE) — the emissions intensity per tonne of a CBAM good that the importer carries into their annual CBAM declaration. Following the embedded-emissions methodology of Implementing Regulation (EU) 2025/2547, SEE is the sum of direct and indirect embedded emissions divided by the net production of the good, expressed in tonnes of CO₂e per tonne: SEE = (direct embedded emissions + indirect embedded emissions) / net production.',
+      },
+      {
+        title: 'Direct & indirect emissions',
+        content: 'Direct process emissions are always included. Indirect (electricity) emissions are included only where the regulation requires: for Annex II goods such as iron & steel, indirect emissions are reported but excluded from the CBAM certificate obligation, so the certificate-relevant figure is direct-only. For complex goods, the embedded emissions of precursors carry into the finished good\'s SEE.',
+      },
+      {
+        title: 'Data basis',
+        content: 'SEE is computed from installation-level actual data, with each figure linked to its source evidence. Where verified actual data is absent, the importer falls back to the default values published in Implementing Regulation (EU) 2025/2621, applied with an annual mark-up that rises each year — which is why verified installation-level actuals almost always result in a lower border charge than defaults.',
+      },
+      {
+        title: 'Free allocation & benchmarks',
+        content: 'The free-allocation adjustment applies production-route benchmarks set out in Implementing Regulation (EU) 2025/2620.',
+      },
+      {
+        title: 'Verification',
+        content: 'All declared embedded emissions require independent third-party verification by an accredited verifier under Implementing Regulation (EU) 2025/2546. Verifier accreditation is governed by Delegated Regulation (EU) 2025/2551, to EN ISO/IEC 14065.',
+      },
+      {
+        title: 'Sector coverage',
+        content: 'Available now for iron & steel; further CBAM sectors in active development.',
+      },
+    ],
+  },
+  {
     module: 'Climate Risk',
     color: '#ba7517',
     bg: '#FEF3E2',
@@ -241,7 +273,7 @@ export default function MethodologyPage() {
             Every number ThemisIQ produces is grounded in a recognised international standard or regulatory framework. We don&apos;t invent methodologies — we implement the ones that matter, correctly, and keep them current.
           </p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' as const }}>
-            {['GHG Protocol', 'IPCC AR6', 'TCFD', 'IFRS S2', 'CSRD ESRS', 'EU AI Act', 'NIST CSF 2.0', 'PCAF-aligned', 'CS3D'].map(tag => (
+            {['GHG Protocol', 'IPCC AR6', 'TCFD', 'IFRS S2', 'CSRD ESRS', 'EU AI Act', 'NIST CSF 2.0', 'PCAF-aligned', 'CS3D', 'CBAM'].map(tag => (
               <span key={tag} style={{ fontSize: 12, padding: '5px 14px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#555553' }}>{tag}</span>
             ))}
           </div>
@@ -252,7 +284,7 @@ export default function MethodologyPage() {
       <div style={{ background: '#E1F5EE', borderBottom: '0.5px solid rgba(15,110,86,0.2)', padding: '1rem 2.5rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#0F6E56', flexShrink: 0 }} />
-          <span style={{ fontSize: 13, color: '#0F6E56', fontWeight: 500 }}>Emission factors and regulatory mappings are reviewed and updated annually — or immediately when a material regulatory change occurs. Last reviewed: May 2026.</span>
+          <span style={{ fontSize: 13, color: '#0F6E56', fontWeight: 500 }}>Emission factors and regulatory mappings are reviewed and updated annually — or immediately when a material regulatory change occurs. Last reviewed: July 2026.</span>
         </div>
       </div>
 
