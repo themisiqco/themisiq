@@ -53,7 +53,7 @@ export default function Page() {
               { val: '30 Sep', unit: '2027', label: 'first importer CBAM declaration due', color: '#B91C1C', bg: '#FCEBEB' },
               { val: '2026', unit: 'definitive period', label: 'CBAM definitive regime now live', color: '#7425e3', bg: '#EDE9FE' },
               { val: 'Actuals', unit: 'not defaults', label: 'installation-level, verifier-ready figures', color: '#0F6E56', bg: '#E1F5EE' },
-              { val: 'CN 72–73', unit: 'available now', label: 'iron & steel; more sectors in development', color: '#0C447C', bg: '#E6F1FB' },
+              { val: 'Steel + Al', unit: 'available now', label: 'iron, steel & aluminium live; more sectors coming', color: '#0C447C', bg: '#E6F1FB' },
             ].map(({ val, unit, label, color, bg }) => (
               <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid ${color}22` }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '2.2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
@@ -96,7 +96,7 @@ export default function Page() {
               What computes today.
             </h2>
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
-              Available now: iron and steel (CN codes 72–73). More CBAM sectors — aluminium, cement, fertilisers, and hydrogen — are in active development. We show you what is live so you always know exactly what the module computes.
+              Available now: iron and steel (CN 72–73) and aluminium (CN 76). More CBAM sectors — cement, fertilisers, and hydrogen — are in active development. We show you what is live so you always know exactly what the module computes.
             </p>
           </div>
           <div style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: '2rem' }}>
@@ -105,11 +105,18 @@ export default function Page() {
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#64fe3e', flexShrink: 0, marginTop: 5 }} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 500, color: '#fff', marginBottom: 2 }}>Iron & steel</div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>CN codes 72–73 · computing now</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>CN 72–73 · computing now</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 0', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#64fe3e', flexShrink: 0, marginTop: 5 }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: '#fff', marginBottom: 2 }}>Aluminium</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>CN 76 · computing now</div>
               </div>
             </div>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', margin: '16px 0 4px' }}>In active development</div>
-            {['Aluminium', 'Cement', 'Fertilisers', 'Hydrogen'].map(sector => (
+            {['Cement', 'Fertilisers', 'Hydrogen'].map(sector => (
               <div key={sector} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#888784', flexShrink: 0, marginTop: 5 }} />
                 <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 300 }}>{sector}</div>

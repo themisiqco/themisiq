@@ -69,7 +69,7 @@ const METHODOLOGIES = [
       },
       {
         title: 'Direct & indirect emissions',
-        content: 'Direct process emissions are always included. Indirect (electricity) emissions are included only where the regulation requires: for Annex II goods such as iron & steel, indirect emissions are reported but excluded from the CBAM certificate obligation, so the certificate-relevant figure is direct-only. For complex goods, the embedded emissions of precursors carry into the finished good\'s SEE.',
+        content: 'Direct process emissions are always included. Indirect (electricity) emissions are included only where the regulation requires: for Annex II goods such as iron, steel and aluminium, indirect emissions are reported but excluded from the CBAM certificate obligation, so the certificate-relevant figure is direct-only. For complex goods, the embedded emissions of precursors carry into the finished good\'s SEE.',
       },
       {
         title: 'Data basis',
@@ -85,7 +85,7 @@ const METHODOLOGIES = [
       },
       {
         title: 'Sector coverage',
-        content: 'Available now for iron & steel; further CBAM sectors in active development.',
+        content: 'Available now for iron & steel and aluminium; further CBAM sectors (cement, fertilisers, hydrogen) in active development.',
       },
     ],
   },
