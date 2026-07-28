@@ -12,6 +12,12 @@ would invert sign for some customers (§6, §10).
 actual-vs-default is not the declarant's election. That was the pre-amendment
 Article 7(2). Regulation (EU) 2025/2083 amended it; the choice is now free.
 See §6.
+Amended: 2026-07-28, following a build recon on `lib/cbam/report/build.ts`.
+Seven of the report's thirteen direct gap sites cannot be cleared by any
+customer action — they are ThemisIQ's own unbuilt fields, an unresolved
+regulatory question, and two unimplemented features. The completeness model
+therefore needs a RESPONSIBILITY dimension orthogonal to item state. See §4
+Spine A and §6.
 Scope: CBAM first; framework intended for all modules.
 Includes: precursor intake specification (in scope, not deferred).
 
@@ -94,6 +100,52 @@ consumes. Same input, two projections. **The completeness model must never
 restate what the engine reads.** A second, drifting source of truth is the
 two-parallel-workings-renderers defect class, which previously shipped a false
 methodology claim to live customers.
+
+**No registry — amended 28 Jul 2026.** An earlier draft of this section
+imagined a declared list of required items that an evaluator would walk. That
+would have been a **second copy of the requirement set**, drifting from the
+report builder — precisely what the invariant above forbids.
+
+`lib/cbam/report/build.ts` already declares the requirement set, imperatively:
+every `requireField(...)` call *is* a declaration that this field is required,
+here, under these conditions. The function simply discards that declaration
+unless the field is absent — it records the numerator and throws away the
+denominator.
+
+The correct change is therefore **not to declare requirements anywhere new**,
+but to make the existing declarations legible: accumulate every evaluation with
+its resulting state, and derive `missing` as a filter. The denominator is the
+accumulator's length.
+
+This also dissolves the objection that no total is derivable because the
+requirement set is data-dependent. Item (11)'s sub-flags are only evaluated
+when the gate is open; items (14)/(15) only when the precursor spread condition
+holds; per-row gaps scale with row counts. **The total is correctly conditional
+because it is computed by the same conditional code paths that produce the
+flags.**
+
+### The responsibility dimension
+
+Item STATE describes the data. It does not describe **who can act**, and those
+are orthogonal. *"Outstanding — upload your gas bill"* and *"Outstanding — we
+have not built the field"* are the same state and entirely different facts.
+
+Every accumulated item therefore carries:
+
+`responsibility: 'operator' | 'platform' | 'regulator'`
+
+- **operator** — the customer supplies it. Counts toward the denominator.
+- **platform** — ThemisIQ has not built the input, or the feature is
+  unimplemented. **Excluded from the denominator.**
+- **regulator** — the instrument does not resolve the question. **Excluded.**
+
+**Why this is not cosmetic.** Without it the finish line is unreachable: a
+perfect denominator would read *"23 of 30"* forever with seven items
+permanently stuck, and a diligent customer would conclude they had missed
+something or that the product was broken. Excluding them is not hiding them —
+they render in their own section, which is also the more useful disclosure for
+a verifier, since *"scope limitations of the tool that produced this report"*
+is a different claim from *"what the operator has not supplied."*
 
 This fixes FP-7 without softening anything. Eleven flags read as failure
 because they appear at the end with no denominator. Against a known total they
@@ -629,6 +681,8 @@ silent-error risk and are solved by 2.5 and 3, not by 1 and 2.
 | ~~**Comparison country basis hardcoded**~~ **RESOLVED 28 Jul 2026** — two-step exact-then-`'other'` lookup mirroring `defaultLookup`; resolved country recorded in `workings.defaultComparison.countryUsed` | Closed | — |
 | ~~**Comparison denominator is un-marked-up**~~ **PARTIALLY RESOLVED 28 Jul 2026** — exposure delta now computed against `markup_YYYY` and persisted in `workings.defaultComparison.exposure`, guarded on `see_direct === see_total`. Still not surfaced to any customer UI | Surfacing is the remaining work | Customer-facing headline |
 | **IR 2025/2621 Annex IV not seeded** (§11.16) — unidentified-origin precursors would resolve to Annex I's `'other'` average instead of the highest-intensity Annex IV value the regulation requires. Understates | Seed Annex IV before precursor intake offers any "origin unknown" path | Precursor intake (§7) |
+| **Seven report gap sites cannot be cleared by any customer action** — `build.ts` lines 465 (4)(c) unbuilt criteria-confirmation field; 600 (12)(b) and 613 (13)(b) unbuilt good-name field; 617 (13)(e) §10.6 verified-precursor indirect limitation; 635 (12)/(13) unresolved which list EU/zero-rated precursors belong in; 663 (14) and 672 (15) Article 14 averaging unimplemented. Four are platform gaps, one is regulatory, two are unimplemented features | Tag `responsibility` and exclude from the denominator; render separately | The whole TO SUPPLY reframe — without this the finish line is unreachable |
+| **All seven are dormant today and ARM with precursor intake** — 465 is gated on non-Annex-II (steel and aluminium are both Annex II); the other six require precursors, and intake is unbuilt. **Four fire PER PRECURSOR** | Must be resolved BEFORE precursor intake ships, not after | Layer 3 / §7 precursor intake |
 | ~~**Spec §3 schema sketch is stale**~~ **RESOLVED 28 Jul 2026** — executable DDL struck; migration is the schema | Closed | — |
 | **System boundaries must align with EU ETS** — Reg. (EU) 2025/2083 recital (16) and amended Art. 7(7)(a): certain finishing processes for some steel and aluminium goods are excluded from the boundary. IR 2025/2547 post-dates the amendment so the engine may already be correct, but this is unverified | Verify against `lib/cbam/` boundary logic; §11 watch entry | Correctness of SEE for downstream steel/aluminium goods |
 | **Quarterly holding can rest on last year's surrender** — Art. 22(2)(b): from 2027 the 50 % quarterly holding may be based on the prior year's surrendered certificate count for the same goods and CN code, rather than defaults. Supplying verified actuals therefore reduces the importer's tied-up working capital in every subsequent year | Marketing argument, unused | Retention / renewal case |
