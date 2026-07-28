@@ -3,6 +3,8 @@
 Status: DESIGN (not yet built)
 Date: 2026-07-28
 Amended: 2026-07-28, following the GHG coverage-check validation test (§8).
+Amended: 2026-07-28, following a primary-source pass on default-value
+conservatism and the actual-vs-default election (§6, §11).
 Scope: CBAM first; framework intended for all modules.
 Includes: precursor intake specification (in scope, not deferred).
 
@@ -301,11 +303,51 @@ because both are structural decisions rather than missing data.
 upgrades one line per quarter and the report regenerates with a smaller
 defaulted fraction. No re-doing setup.
 
-**Commercial gradient (TO VERIFY):** if the `'other'` fallback is genuinely
-conservative across both seeds, a defaulted SEE runs higher than an evidenced
-one — meaning the importer buys more certificates. If that holds, the upgrade
-path is money, not a nag, and it is the strongest argument for returning.
-**Verify against the actual seed before this appears in any copy.**
+**Commercial gradient — VERIFIED FROM PRIMARY SOURCE (28 Jul 2026).**
+Conservatism is not an artefact; it is the Commission's stated design.
+
+- **Defaults are deliberately conservative.** IR (EU) 2025/2621 recital (3):
+  CBAM's anti-leakage objective would be undermined if importers could apply
+  defaults lower than actual embedded emissions, so defaults including
+  mark-ups are set on a conservative approach ensuring embedded emissions are
+  not underestimated.
+- **The mark-up assumes you may be a worse-than-average performer.**
+  Recital (4): the mark-up accounts for installations whose emissions exceed
+  their producer country's average. Because installation-specific third-country
+  data is hard to verify, the Commission uses deviations among Union
+  installations relative to the Union average as the proxy. Every operator
+  carries that assumption until they calculate. **This is the marketing
+  message, and it is the regulation's own logic — not our framing of it.**
+- **The gap widens on a published schedule.** Mark-up phases in at 10 % (2026),
+  20 % (2027), 30 % (2028 onwards) for iron and steel, aluminium, cement and
+  hydrogen; fertilisers sit at 1 % flat (recital (5), Annex I headers).
+  **No copy may state a single generic mark-up figure** — it is sector- and
+  year-dependent. The cost of lacking actuals rises annually, by regulation:
+  a renewal argument with a date on it.
+- **Actual-vs-default is not the customer's election.** Regulation (EU)
+  2023/956 Article 7(2): defaults apply where actual emissions cannot be
+  adequately determined. A customer whose actuals come in worse than the
+  default cannot decline to report them. **The tool can therefore report the
+  truth in either direction without ever handing anyone a reason to conceal
+  it** — which is what makes "fail loud, never flatter" safe to ship here.
+- **Early-year default use is anticipated.** Recital (5) reasons that
+  declarants should be able to use defaults in the first years — partly
+  because verifier numbers may only increase after the transitional period —
+  and rely on actual emissions subsequently. This supports the graceful-
+  degradation design rather than undermining it.
+
+**Framing consequence.** The pitch is risk reduction, not savings: *calculate
+your SEE so your EU importer uses your real figure, rather than a default set
+on the assumption you might be worse than your country's average.* This holds
+regardless of which way the delta falls, so it cannot be falsified by a single
+customer whose actuals come in high. A savings framing can be; do not use one.
+
+**Basis consequence (see §10).** Comparing every process against the `'other'`
+row does not merely lose precision — it compares the customer to a global
+fallback rather than to the mark-up-adjusted default their importer will
+actually face for goods of their origin. That is the figure with commercial
+and compliance meaning. The `'other'` basis understates the case in most
+instances and misstates it in all of them.
 
 ### The honest ceiling
 
@@ -463,8 +505,10 @@ silent-error risk and are solved by 2.5 and 3, not by 1 and 2.
 | Item | Nature | Blocks |
 |---|---|---|
 | `audit_log` schema + RLS unswept (DB-only) | Prerequisite (roadmap 23.1) | Layer 2.5 affirmation writes |
-| `'other'` fallback conservatism unverified across both seeds | Verify from seed | Upgrade-path copy |
-| Any regulatory limit on share of submission resting on defaults | Verify from primary source | Whether "generate on defaults" is unbounded |
+| ~~`'other'` fallback conservatism unverified~~ **RESOLVED 28 Jul 2026** — conservatism is the Commission's stated design (IR 2025/2621 recitals 3–4) | Closed | — |
+| ~~Any regulatory limit on share resting on defaults~~ **RESOLVED 28 Jul 2026** — not a percentage cap but a condition: Art. 7(2) makes defaults a fallback where actuals cannot be adequately determined | Closed | — |
+| **Actual-vs-default comparison is currently write-only** — `default_compared` / `delta_vs_default` are written by the compute route and read by nothing; and the query hardcodes `country='other'`, so the per-country seed (6,423 steel + 1,628 aluminium rows) is unreachable on this path | Decision taken 28 Jul: surface in workings/verifier first, customer-facing headline later; fix basis before either | The commercial gradient above |
+| **Mark-up step 10 %→20 % at 2027, →30 % at 2028**; defaults and mark-ups to be revised by Dec 2027 at latest, with the Commission aiming to bring a revision forward into 2026 where possible | §11 watch | Seeded values' shelf life |
 | Corpus review workflow — entries stale as regulation moves | Design | See `docs/regulatory-source-monitoring-design.md` |
 | CSCF unpublished; benchmark bands stop at 2030; stainless indicator gap | §11 watch | Layer 4 refusal list |
 | Supabase CLI not installed | Tooling | Migration replay testing |
