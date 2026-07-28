@@ -409,7 +409,7 @@ Steps 1–6 are the engine and are fully specced here. 7–10 layer UI/collectio
 
 **10.5 Live-persistence test — CLOSED 22 Jul 2026 (see §13.3). The deferral reasoning below is retained for the record; both stated blockers dissolved by using a real account and a test company rather than waiting for the UI.** The engine+resolver+live-default path is proven end-to-end (`scripts/cbam-harness.ts` → 3.63758). What's NOT yet tested against live: the auth-gated INSERT into `cbam_see_records` + RLS admitting the real owner. Both blocked tonight because (a) no test auth user exists, and (b) `companies.user_id` FKs to `auth.users` (can't fabricate). Deliberately deferred — RLS is already proven by the seven production modules using the identical `getAuthedClient` + WITH-CHECK pattern, so this validates persistence plumbing, not novel logic. Do it when building the UI (which brings a real logged-in user naturally). Do NOT add broad `service_role` grants to customer-data tables just to test — larger standing security surface than the test warrants.
 
-**10.7 CN-code resolution: NO automatic heading→child resolution. Require the exact 8-digit code.** (Established 18 Jul 2026 by a full cross-reference of `cbam_cn_map` × 200 defaults × 478 benchmarks.)
+**10.7 CN-code resolution: NO automatic heading→child resolution. Require the exact seeded code, at whatever granularity the seed holds it.** (Established 18 Jul 2026 by a full cross-reference of `cbam_cn_map` × 200 defaults × 478 benchmarks. **Framing amended 28 Jul 2026** — the finding below is unchanged and remains binding; the original heading and rules said "exact 8-digit code", which was a proxy that held for crude steel and is contradicted by §10.8's own distribution table (19 four-digit, 62 six-digit, 119 eight-digit seeded codes). The real invariant is exact match at the seed's own granularity, no inference in either direction.)
 
 *Finding — zero true gaps, but pervasive ambiguity.* All 44 `cn_map` prefixes resolve in both value datasets at *some* granularity; nothing is missing. But only **1 of 44** (`26011200`, sintered ore) resolves exactly in both. Heading→child resolution would be needed for 24 of 44 in defaults (18 of those **ambiguous** — children carry differing values) and 43 of 44 in benchmarks (20 **ambiguous**). The two datasets *disagree* about which headings are safe: `72021`/`72024` are ambiguous in defaults but uniform in benchmarks; `7217`/`7318` are the reverse. **No blanket "pick any child" rule is available in either dataset.**
 
@@ -417,8 +417,8 @@ Steps 1–6 are the engine and are fully specced here. 7–10 layer UI/collectio
 
 *Rule (binding):*
 - **Prefix matching → CATEGORY only.** `cbam_cn_map.cn_prefix` is digits-only, longest-prefix, and exists to resolve a good to its `goods_category`. Category is uniform across a heading's children by construction, so prefix matching is legitimate here.
-- **Exact 8-digit spaced code → VALUE lookups.** `cbam_default_values` and `cbam_benchmarks` are keyed on the specific good. The customer supplies the full 8-digit CN code (it is on their customs paperwork); the app must NOT infer it. A miss fails loud (existing `defaultLookup` behaviour) rather than resolving to a sibling.
-- Consistent with §10.3 (a crude-steel process needs `7206 10 00`, not `7206`). The input layer (UI/Concierge) must therefore capture the 8-digit code, not a heading.
+- **Exact seeded code → VALUE lookups.** `cbam_default_values` and `cbam_benchmarks` are keyed on the specific good, at the granularity the annex publishes: 4-digit heading (`7201`, `7203`), 6-digit (`7202 11`), or 8-digit spaced (`7206 10 00`). The customer supplies the code exactly as it appears on their customs paperwork; the app must NOT infer it, lengthen it, or shorten it. A miss fails loud (existing `defaultLookup` behaviour) rather than resolving to a sibling. Note that `cbam_benchmarks` is always 8-digit while `cbam_default_values` is mixed-width (§10.8) — the two datasets are keyed differently and neither may be normalised toward the other.
+- Consistent with §10.3 (a crude-steel process needs `7206 10 00`, not `7206` — because `7206` is an unseeded "see below" row, not because 8 digits are required in general). The input layer (UI/Concierge) must therefore capture the code at the granularity the seed holds it. **Implemented 27 Jul 2026** as a seed-membership check: the setup form builds an accept-set from `cbam_default_values` filtered to `country='other'` (~224 distinct codes, one row per code, under the PostgREST 1000-row cap) and accepts exact trimmed membership only — no regex, no length rule, no normalisation. The accept-set is the same table and the same exact keying `defaultLookup` resolves against, so a code that passes the form cannot miss at lookup for format reasons.
 
 **10.8 Three incompatible CN key formats — normalise at every cross-dataset boundary.**
 | Dataset | Format | Distribution |
@@ -734,6 +734,18 @@ Added `cbam_pp_cn_code_8digit_spaced`: `cn_code ~ '^[0-9]{4} [0-9]{2}
 Verified 23 Jul: all 119 eight-digit codes in `cbam_default_values` match;
 the 4- and 6-digit codes deliberately do not. Precursor CN codes are NOT
 constrained this way — they legitimately use narrower seeded codes.
+
+> **SUPERSEDED 27 Jul 2026** (migration `20260727_cbam_drop_8digit_cn_check.sql`).
+> This CHECK was dropped. The constraint was wrong in the same way §10.7's
+> framing was wrong: it enforced a width rule the seed does not follow, and it
+> rejected legitimate 4- and 6-digit steel codes (`7201`, `7203`, `7202 11`) —
+> a latent defect that became operative when the aluminium seed landed. The
+> note above already contains the contradiction ("the 4- and 6-digit codes
+> deliberately do not" match), which should have been the tell. Replaced by
+> client-side seed-membership validation (§10.7). **Residual risk: there is
+> currently no server-side CN validation of any kind** — the client check is
+> the sole enforcement point, which deviates from the house pattern
+> (cf. GHG location bands: client wall + Postgres trigger). Open item.
 
 ### 14.5 Evidence documents — deliberately NOT parsed
 
