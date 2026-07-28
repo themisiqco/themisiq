@@ -1222,7 +1222,7 @@ export default function CbamSetupPage() {
                         {installations.map((i) => <option key={i.id} value={i.id}>{i.name} — {i.country}</option>)}
                       </select>
                     </CbamField>
-                    <CbamField label="CN code — required (exact 8-digit spaced)" hint="e.g. '7206 10 00'. Must be the exact 8-digit spaced code — a 4-digit heading (7206) is an unseeded 'see below' row: the default lookup returns nothing and the actual-vs-default comparison is silently lost (spec §10.7). It is on the customer's customs paperwork; do not shorten or infer it.">
+                    <CbamField label="CN code — required (exactly as on your customs paperwork)" hint="e.g. '7206 10 00'. Granularity varies by good: some are listed at 4-digit heading level (7201, 7203), others at 6-digit (7202 11) or 8-digit spaced (7206 10 00). Enter the code exactly as it appears for your product on your customs paperwork — do not shorten, pad, or infer it. If it is rejected, we hold no published default value at that code: go back to the paperwork rather than trying a shorter or longer version, because a code that happens to be recognised but is not yours will produce a plausible and wrong result.">
                       <input value={editingProc.cn_code} onChange={(e) => setProc('cn_code', e.target.value)} placeholder="7206 10 00" style={cbamInputStyle} />
                     </CbamField>
                     <CbamField label="Category — required">
