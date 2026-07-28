@@ -2,6 +2,7 @@
 
 Status: DESIGN (not yet built)
 Date: 2026-07-28
+Amended: 2026-07-28, following the GHG coverage-check validation test (§8).
 Scope: CBAM first; framework intended for all modules.
 Includes: precursor intake specification (in scope, not deferred).
 
@@ -156,15 +157,23 @@ Solves FP-2 and FP-4. Insufficient for FP-0, FP-3, FP-6.
 The silent-error control. Fires at structural commit points, restates the
 user's own configuration in plain language, and requires affirmation.
 
-Commit points: process boundary; shared-utility allocation; own-vs-inherited
-precursor; net-vs-gross production; output-stream sign convention. (These are
-also where a verifier would probe — a useful check on the list.)
+Commit points (all `singleton` scope for CBAM — see below): process boundary;
+shared-utility allocation; own-vs-inherited precursor; net-vs-gross production;
+output-stream sign convention. (These are also where a verifier would probe — a
+useful check on the list.)
 
-Two required properties:
+Three required properties:
 - **Generated from the user's data**, not a static warning — cannot be
   banner-blindnessed.
 - **Names the specific failure mode.** A generic "are you sure?" cannot be
   meaningfully affirmed.
+- **Carries a scope: `singleton` | `per_instance`.** Configuration-level
+  decisions (process boundary, own-vs-inherited precursor) are affirmed once
+  and apply throughout. Instance-level decisions (GHG straddle proration) need
+  one affirmation per occurrence, and a new occurrence requires a new
+  affirmation. Without scope the engine either nags on settled decisions or —
+  the dangerous case — silently reuses a stale affirmation against data it
+  never saw.
 
 Example: *"You've entered purchased hot metal as a precursor, and you've also
 told us this installation produces hot metal. If you're consuming your own
@@ -224,19 +233,51 @@ Hard constraints, not prompt suggestions:
 
 ### Completion is not binary
 
-Every item carries a state:
+Every item carries one of **five** states:
 
 - **Evidenced** — actual data from the customer's records
-- **Default-substituted** — published Commission default used in place of actuals
-- **Outstanding** — required, not supplied, defaultable
-- **Blocked** — required, not supplied, **not** defaultable
+- **Substituted** — stands in for actuals, and **method-bearing**:
+  - `published_default` — a published Commission default value (carries its
+    citation)
+  - `derived_estimate` — computed from the customer's own partial data
+    (carries its basis note, e.g. GHG's `×12/months_covered` extrapolation)
+- **Outstanding** — required, not supplied, substitutable
+- **Blocked** — required, not supplied, **not** substitutable
+- **Conflicted** — supplied, but contradicted by other supplied data
 
-A submission is *generatable* when nothing is Blocked. It is *complete on
-actuals* only when nothing is Default-substituted. Two finish lines, both
-displayed — they mean different things to the user's importer.
+Two notes on why this shape.
 
-FP-7 resolved: *"23 evidenced · 8 on defaults · 3 outstanding · 0 blocked —
-you can generate now; here's what improves it."*
+**Substitution is method-bearing** because a published default and a derived
+estimate are different claims with different provenance, different
+defensibility to a verifier, and different disclosure obligations. The GHG
+engine already enforces exactly this distinction — *monthly = evidenced only,
+annual = evidenced + estimated* is a locked CLAUDE.md invariant. Collapsing
+them would contradict a rule the platform already holds.
+
+**Conflicted is not an absence.** The other four states describe degrees of
+having a thing; Conflicted describes having two things that cannot both be
+true. GHG's overlap detection is this state (two bills, same period,
+duplicate-or-two-meters). CBAM's own-vs-inherited precursor double-count is
+the same state: nothing is missing, something is contradictory.
+
+A submission is *generatable* when nothing is **Blocked and nothing is
+Conflicted**. It is *complete on actuals* only when nothing is Substituted.
+Two finish lines, both displayed — they mean different things to the user's
+importer.
+
+FP-7 resolved: *"23 evidenced · 8 on defaults · 3 outstanding · 0 blocked ·
+0 conflicts — you can generate now; here's what improves it."*
+
+### Observations channel
+
+Not everything worth surfacing is an item. GHG's out-of-window bills are the
+type case: nothing is required, nothing is missing, the customer simply
+supplied something irrelevant — and GHG correctly shows a neutral notice
+rather than swallowing it silently.
+
+The model therefore carries an **observations channel** alongside items:
+non-blocking, non-stateful, never gates anything, never silent. Without it the
+framework would regress a behaviour GHG already ships.
 
 ### Defaults substitute for data, never for decisions
 
@@ -249,8 +290,10 @@ you can generate now; here's what improves it."*
   convention. These are decisions the operator makes about their own
   installation. A default here is a fabrication with a citation stapled to it.
 
-Consequently **every Blocked item is by construction a Layer 2.5 item.** 2.5
-is the mechanism that clears Blocked; Blocked is what makes 2.5 unskippable.
+Consequently **every Blocked and every Conflicted item is by construction a
+Layer 2.5 item.** 2.5 is the mechanism that clears both states; those states
+are what make 2.5 unskippable. Nothing else in the system can resolve them,
+because both are structural decisions rather than missing data.
 
 ### Graceful degradation
 
@@ -346,19 +389,51 @@ start.** Backlog item 20 flags exactly this gap on the sbti tables and
 `ghg_monthly_emissions`. New tables must not inherit a known defect; written
 correctly they become the template for that hardening pass.
 
-### Validation test (do before building)
+### Validation test — RUN 2026-07-28, PASSED WITH AMENDMENTS
 
-**Can this data model express GHG's existing coverage check?** `analyzeCoverage`
-already produces gap / overlap / straddle / out-of-window, writes resolutions to
-the audit trail, and hard-gates export. That is a completeness model with
-structural confirmation, built once without a framework.
+**Question:** can this data model express GHG's existing coverage check?
+`analyzeCoverage` already produces gap / overlap / straddle / out-of-window,
+writes resolutions to the audit trail, and hard-gates export — a completeness
+model with structural confirmation, built once without a framework.
 
-On paper: express gap-with-extrapolation as a transition to
-Default-substituted, straddle-proration as a 2.5 affirmation, and the export
-gate as *no Blocked items*. If all four express cleanly, the abstraction is
-real. If any needs a special case, the model is CBAM-shaped.
+**Result: the abstraction is real and not CBAM-shaped.** Three of the four
+amendments it forced apply to CBAM equally — which is the opposite of the
+feared failure mode. GHG did not need special cases to fit a CBAM model; GHG
+surfaced holes that were already latent in the CBAM design.
 
-One hour of thinking, not a build. Highest-value hour in the plan.
+**Mapped cleanly:**
+
+- Gap → upload missing bill: Outstanding → Evidenced.
+- Straddle → three-way resolution: a Layer 2.5 affirmation, exactly. The user
+  is shown their own data ("17 of 31 days in RY2025"), a named consequence, a
+  choice; the day-split basis writes to workings and the audit trail. 2.5's
+  shape, built a year early for another module.
+- Export gate → *no Blocked items*. Strongest corroboration in the exercise:
+  `gridReady` **is already a Blocked item** in these terms — required, not
+  supplied, deliberately not substitutable, engine skips Scope 2 rather than
+  fabricate. This model would have described that gate correctly without being
+  told it existed.
+- Secondary corroboration: `result_tco2e` null vs 0 (undeclared vs
+  attested-absent) maps onto Outstanding vs Evidenced-with-value-zero. The
+  state machine already agrees with the CLAUDE.md invariant.
+
+**Amendments forced (all now applied above):**
+
+- **A.** "Default-substituted" was too narrow — gap extrapolation is a derived
+  estimate from the customer's own data, not a published default. Substitution
+  is now method-bearing. (§6)
+- **B.** **No state existed for a conflict.** Overlap is not an absence. Added
+  `Conflicted`; the gate is now *no Blocked and no Conflicted*. This was the
+  finding that justified the exercise — CBAM's own precursor double-count
+  control was specified in §7 without the state machine being able to express
+  it. (§6, §7)
+- **C.** Affirmations need cardinality — `singleton` vs `per_instance`.
+  Without it the engine nags on settled decisions, or silently reuses a stale
+  affirmation against data it never saw. (§5, Layer 2.5)
+- **D.** Added the observations channel for non-blocking notices. (§6)
+
+**Standing rule:** re-run this test against the second module before declaring
+the framework stable. GHG remains the natural second implementation.
 
 ### Sequencing the abstraction
 
