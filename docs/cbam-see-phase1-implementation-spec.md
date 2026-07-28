@@ -122,16 +122,18 @@ create table public.cbam_production_routes (
 );
 
 -- 2621 default values — SCHEMA now, DATA pulled by CC (step 2). Lookup, not logic.
-create table public.cbam_default_values (
-  cn_prefix      text not null,
-  country        text not null,                    -- 'other' = the 'Other countries' fallback table
-  route_code     text,                             -- nullable: some benchmarks are route-independent
-  see_direct     numeric not null,                 -- t CO2e / functional unit, INCLUDING mark-up
-  markup_note    text,                             -- e.g. '10% (2026)'
-  source_ref     text not null,                    -- 'IR 2025/2621 Annex …'
-  primary key (cn_prefix, country, route_code)
-);
+-- cbam_default_values — schema deliberately NOT reproduced here (sketch struck 28 Jul 2026).
+--   AUTHORITY: supabase/migrations/20260716_cbam_default_values.sql
+--   Rationale and design lineage in the note immediately below this fence.
 ```
+
+**`cbam_default_values` — why there is no sketch above.** A `create table` sketch sat at that position from the original design until 28 July 2026, when it was struck. It had drifted from the shipped schema on every field, and because it was executable DDL rather than prose, it was one copy-paste away from creating a table that disagreed with the seed.
+
+The consequential divergence: the sketch annotated `see_direct` as *including mark-up*. The built table does not — `see_direct` holds the annex's raw direct-emissions figure, and the three mark-up-inclusive values are separate numeric columns (`markup_2026`, `markup_2027`, `markup_2028_plus`), transcribed rather than derived, applying to **total** not direct. A table built from the sketch would have been misread by the compute route by the full mark-up: 10 % in 2026 rising to 30 % from 2028. Other divergences: `cn_prefix` (shipped as `cn_code`), `route_code` in the key (shipped without), `markup_note text` (shipped as three `numeric` columns), and `description` / `see_indirect` / `see_total` / `cbam_bm_route` all absent.
+
+**Design lineage worth keeping.** The model was originally conceived as prefix-keyed *and* route-keyed — `primary key (cn_prefix, country, route_code)`. Both ideas proved wrong for value lookup, and knowing that is why two later rules exist. Prefix matching survives for **category resolution only** (§10.7, first binding rule); `cbam_cn_map.cn_prefix` is genuinely prefix-keyed and is not affected by this correction. Route was found not to key default values at all (§10.15, route-independence confirmed correct) and survives only as a trailing benchmark attribute. The shipped PK is `(cn_code, country)`.
+
+**Rule going forward: the migration is the schema.** This spec explains *why* the schema looks as it does; it does not restate *what* it is. A second copy of a schema has nothing keeping it honest — no test, no build, no lint — and this one drifted onto the single column that most mattered. Where a reader needs the columns, the migration is one file away and correct by definition.
 
 Reference tables are world-readable (no RLS) — they're published law, like `mr_*`. `active` column deliberately omitted (learned from the `mr_jurisdictions.active` dormant-column trap — don't add a column no query reads).
 
@@ -361,7 +363,7 @@ assert unresolved.length === 1 AND result still computes (default used, flagged)
 ## 8. Build sequence (numbered, one increment, Vercel-green before next)
 
 1. **Reference schema + steel seed.** Create `cbam_goods_categories`, `cbam_cn_map`, `cbam_precursor_edges`, `cbam_production_routes`; seed the six steel categories, CN prefixes, edges, routes from §2. World-readable, no RLS. *(Data is complete — no pull.)*
-2. **`cbam_default_values` schema (empty) + 2621 data-pull.** Create the table; CC pulls IR 2025/2621 default values for iron & steel CN codes into it (parallel data task — lookup, not logic). Include the "Other countries" fallback rows and the mark-up in `see_direct`.
+2. **`cbam_default_values` schema (empty) + 2621 data-pull.** Create the table; CC pulls IR 2025/2621 default values for iron & steel CN codes into it (parallel data task — lookup, not logic). Include the "Other countries" fallback rows. **CORRECTED 28 Jul 2026:** the original instruction here said to include the mark-up in `see_direct`. That is not what shipped, and would be wrong — `see_direct` holds the raw direct-emissions figure; the mark-up-inclusive values are three separate transcribed columns (`markup_2026`/`markup_2027`/`markup_2028_plus`) applying to total, not direct. See the §3 note.
 3. **Per-customer schema + RLS + RPCs.** Five tables from §4, RLS with WITH CHECK, SECURITY DEFINER read RPCs with column whitelists. Verify cross-tenant isolation with a direct-POST curl (the supplier-portal method).
 4. **Engine: mass balance.** `params.ts` + `types.ts` + `carbonContent`/`streamEmissions`/`massBalance`. Unit tests (Eq 12–15). No DB.
 5. **Engine: attribution (EAF).** `attributeDirect` with the zero-floor + Phase-2 hook comment. Tests incl. the contrived-negative floor case.
