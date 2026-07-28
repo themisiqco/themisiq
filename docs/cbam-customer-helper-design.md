@@ -482,6 +482,16 @@ Requirements:
    are the long-lead items.
 4. **Default fallback per precursor line**, marked Default-substituted, never
    silently.
+5. **"Origin cannot be identified" is a distinct state, and it is NOT the
+   `'other'` fallback.** IR 2025/2621 Art. 1(5) routes unidentified-origin
+   precursors to **Annex IV**, whose values sit at the highest-emission-intensity
+   third country — recital (9) says plainly this is to stop operators claiming
+   unknown origin to dodge a high country default. Annex IV is **not seeded**
+   (§11.16). Until it is, intake must require a real ISO alpha-2 country and
+   must NOT offer an "unknown" option, because unknown would fall through to
+   Annex I's `'other'` average and **understate**. This is a Blocked item in
+   §6's terms, not an Outstanding one: it is not substitutable, because the
+   substitute the regulation names does not exist in our data.
 
 ## 8. Reusability architecture
 
@@ -616,7 +626,9 @@ silent-error risk and are solved by 2.5 and 3, not by 1 and 2.
 | ~~Any regulatory limit on share resting on defaults~~ **RESOLVED 28 Jul 2026** — not a percentage cap but a condition: Art. 7(2) makes defaults a fallback where actuals cannot be adequately determined | Closed | — |
 | **Actual-vs-default comparison is write-only** — `default_compared` / `delta_vs_default` written by the compute route, read by nothing (no select list, no type, no render) | Decision 28 Jul: surface as the *reasonableness delta* in workings/verifier first; label un-marked-up and direct-only | Verifier surface |
 | **Comparison denominator is un-marked-up** — reads `see_direct`; `markup_2026`/`markup_2027`/`markup_2028_plus` are read nowhere. A commercial framing on `see_direct` inverts sign for customers sitting between the raw and marked-up default | Build the *exposure delta* as a separate year-keyed quantity; never repurpose `default_compared` | Customer-facing headline; the §6 commercial gradient |
-| **Comparison country basis hardcoded** — `compute/route.ts` filters `country='other'` as a literal, not a fallback, so the per-country seed (6,423 steel + 1,628 aluminium rows) is unreachable on this path for every process | Fix before either delta is surfaced | Both deltas |
+| ~~**Comparison country basis hardcoded**~~ **RESOLVED 28 Jul 2026** — two-step exact-then-`'other'` lookup mirroring `defaultLookup`; resolved country recorded in `workings.defaultComparison.countryUsed` | Closed | — |
+| ~~**Comparison denominator is un-marked-up**~~ **PARTIALLY RESOLVED 28 Jul 2026** — exposure delta now computed against `markup_YYYY` and persisted in `workings.defaultComparison.exposure`, guarded on `see_direct === see_total`. Still not surfaced to any customer UI | Surfacing is the remaining work | Customer-facing headline |
+| **IR 2025/2621 Annex IV not seeded** (§11.16) — unidentified-origin precursors would resolve to Annex I's `'other'` average instead of the highest-intensity Annex IV value the regulation requires. Understates | Seed Annex IV before precursor intake offers any "origin unknown" path | Precursor intake (§7) |
 | ~~**Spec §3 schema sketch is stale**~~ **RESOLVED 28 Jul 2026** — executable DDL struck; migration is the schema | Closed | — |
 | **System boundaries must align with EU ETS** — Reg. (EU) 2025/2083 recital (16) and amended Art. 7(7)(a): certain finishing processes for some steel and aluminium goods are excluded from the boundary. IR 2025/2547 post-dates the amendment so the engine may already be correct, but this is unverified | Verify against `lib/cbam/` boundary logic; §11 watch entry | Correctness of SEE for downstream steel/aluminium goods |
 | **Quarterly holding can rest on last year's surrender** — Art. 22(2)(b): from 2027 the 50 % quarterly holding may be based on the prior year's surrendered certificate count for the same goods and CN code, rather than defaults. Supplying verified actuals therefore reduces the importer's tied-up working capital in every subsequent year | Marketing argument, unused | Retention / renewal case |
