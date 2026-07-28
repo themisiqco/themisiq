@@ -12,7 +12,10 @@
 //   5. Build the ResolveContext with the SAME precursor list handed to computeSEE (pre-fetch and
 //      compute MUST see the same set, or a precursor throws on lookup).
 //   6. attributeDirect -> computeSEE (the SINGLE source of truth for the figure).
-//   7. Compare against the country-agnostic default for the good produced (country 'other', MVP).
+//   7. Resolve the published default for the good produced at the installation's country,
+//      falling back to 'other', and compute TWO distinct deltas: a reasonableness delta
+//      against the un-marked-up direct default, and an exposure delta against the marked-up
+//      default for the reporting year.
 //   8. Persist a cbam_see_records row and return it. Surface `unresolved` loudly.
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -40,7 +43,7 @@ export async function POST(req: NextRequest) {
     // 5 (ResolveContext on the SAME precursor list), and 6 (computeSEE) live there so the report
     // route runs the IDENTICAL path. `precursors` and `result.resolutions` come from the one call
     // and are keyed by object identity — do not re-adapt or re-resolve them downstream (invariant 10).
-    const { process, activityLevel, precursors, ctx, result } =
+    const { process, activityLevel, precursors, ctx, result, installationCountry } =
       await loadAndComputeProcess(supabase, processId);
 
     // ── 6b. Default-value share (§1.2 item 4(b) / §1.1 15(d)), per leg ─────────────────────────
@@ -56,22 +59,89 @@ export async function POST(req: NextRequest) {
       { direct: result.direct, indirect: result.indirect },
     );
 
-    // ── 7. Compare against the default for the good produced (country 'other', MVP) ──
-    const { data: def, error: defErr } = await supabase
+    // ── 7. Compare against the published default for THIS good and THIS country ─────────
+    // Two-step, mirroring lib/cbam/resolver.ts defaultLookup: exact (cn_code, country) then
+    // the 'other' fallback. Do NOT collapse these into one filter — 'other' is a fallback,
+    // not a default basis, and which one resolved is itself a reportable fact.
+    //
+    // COUNTRY IDENTITY, asserted deliberately: IR 2025/2621 Annex I keys defaults on the
+    // good's country of ORIGIN. installationCountry is where the producing installation
+    // sits. For a producing installation these are the same country. That identity is a
+    // deliberate assertion, not an accident of what happened to be in scope — and the
+    // country actually used is recorded in workings so a verifier can see which row the
+    // figure came from rather than having to infer it.
+    const DEFAULT_COMPARE_COLS = 'see_direct, see_total, markup_2026, markup_2027, markup_2028_plus';
+
+    const { data: defCountry, error: defCountryErr } = await supabase
       .from('cbam_default_values')
-      .select('see_direct')
+      .select(DEFAULT_COMPARE_COLS)
       .eq('cn_code', process.cn_code)
-      .eq('country', 'other')
+      .eq('country', installationCountry)
       .maybeSingle();
-    if (defErr) {
-      console.error('CBAM compute default-compare fetch error:', defErr);
+    if (defCountryErr) {
+      console.error('CBAM compute default-compare fetch error (country):', defCountryErr);
       return NextResponse.json({ error: 'Failed to load comparison default' }, { status: 500 });
     }
+
+    let def = defCountry;
+    let defaultBasisCountry: string | null = defCountry ? installationCountry : null;
+
+    if (!def) {
+      const { data: defOther, error: defOtherErr } = await supabase
+        .from('cbam_default_values')
+        .select(DEFAULT_COMPARE_COLS)
+        .eq('cn_code', process.cn_code)
+        .eq('country', 'other')
+        .maybeSingle();
+      if (defOtherErr) {
+        console.error('CBAM compute default-compare fetch error (other):', defOtherErr);
+        return NextResponse.json({ error: 'Failed to load comparison default' }, { status: 500 });
+      }
+      def = defOther;
+      defaultBasisCountry = defOther ? 'other' : null;
+    }
+
+    // REASONABLENESS DELTA — against the UN-MARKED-UP direct default. This is the verifier's
+    // question ("is this figure plausible against the published value?"), NOT the customer's
+    // ("what would my importer face?"). The two have different denominators and can differ in
+    // SIGN. Never relabel this one as a commercial figure.
     const defaultCompared: number | null = def ? Number(def.see_direct) : null;
-    // Direct-to-direct: cbam_default_values.see_direct is a direct-only default, so compare it
-    // against the direct SEE, not the direct+indirect sum.
     const deltaDirectVsDefault: number | null =
       defaultCompared == null ? null : result.direct - defaultCompared;
+
+    // ── 7b. EXPOSURE DELTA — against the MARKED-UP default the importer actually faces ────
+    // Mark-up schedule is per reporting year. reporting_period has a floor CHECK (>= 2026)
+    // and NO ceiling, so the >= 2028 branch must be open-ended — markup_2028_plus carries
+    // the tail by design. Do not write an exhaustive switch.
+    const markupBasisYear: number = process.reporting_period;
+    const markedUpDefault: number | null =
+      def == null
+        ? null
+        : markupBasisYear <= 2026
+          ? Number(def.markup_2026)
+          : markupBasisYear === 2027
+            ? Number(def.markup_2027)
+            : Number(def.markup_2028_plus);
+
+    // DIMENSIONAL GUARD. IR 2025/2621 mark-ups apply to see_TOTAL. For Annex II goods the
+    // seed carries see_direct === see_total (8,250 of 8,251 rows), so the marked-up figure is
+    // comparable to a direct SEE. Where they differ the good has a real indirect leg and the
+    // certificate basis is direct+indirect — comparing a total-based mark-up against a direct
+    // SEE would be dimensionally wrong. Fail loud rather than emit a mixed-basis number.
+    const defaultIsDirectOnly: boolean =
+      def != null && Number(def.see_direct) === Number(def.see_total);
+
+    const exposure =
+      def == null || markedUpDefault == null || Number.isNaN(markedUpDefault)
+        ? { status: 'no_default_for_good' as const }
+        : !defaultIsDirectOnly
+          ? { status: 'not_determinable_mixed_basis' as const, basisYear: markupBasisYear }
+          : {
+              status: 'computed' as const,
+              basisYear: markupBasisYear,
+              markedUpDefault,
+              delta: result.direct - markedUpDefault,
+            };
 
     // ── 7b. SEFA — specific embedded free allocation (§1.2 item 4(e)) ─────────────────────────
     // Load the year's cbam_sefa_params (CBAM_y, CSCF_y). computeSefaPersist owns the ordering:
@@ -135,6 +205,22 @@ export async function POST(req: NextRequest) {
         };
       }),
       ...(sefaPersist.benchmarkWorkings ? { sefaBenchmark: sefaPersist.benchmarkWorkings } : {}),
+      // Conditional, following the sefaBenchmark idiom above: when no default row resolves,
+      // NOTHING is recorded — no partial block anyone could read a number out of.
+      ...(defaultBasisCountry
+        ? {
+            defaultComparison: {
+              source: 'IR 2025/2621 Annex I',
+              methodVersion: 'country-keyed-v2 (2026-07-28)',
+              installationCountry,
+              countryUsed: defaultBasisCountry,
+              countrySpecific: defaultBasisCountry !== 'other',
+              seeDirectDefault: defaultCompared,
+              deltaDirectVsDefault,
+              exposure,
+            },
+          }
+        : {}),
     };
 
     // ── 8. Persist the see_record (RLS WITH CHECK enforces company ownership) ──
