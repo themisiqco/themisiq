@@ -1,17 +1,11 @@
 'use client'
 import Nav from '../components/Nav'
-import { useState, useEffect } from 'react'
+// useState/useEffect no longer needed — countdown removed 28 Jul 2026.
 import Footer from '@/app/components/Footer'
 export default function Page() {
-  // Countdown to the first importer CBAM declaration (30 Sep 2027). Mirrors the
-  // climate-ghg deadline pattern; recomputed on mount so the initial value is just a paint placeholder.
-  const [daysLeft, setDaysLeft] = useState(430)
-  useEffect(() => {
-    const deadline = new Date('2027-09-30')
-    const today = new Date()
-    const diff = Math.ceil((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-    setDaysLeft(Math.max(0, diff))
-  }, [])
+  // Countdown removed 28 Jul 2026. The Sep-2027 date is the IMPORTER's filing deadline,
+  // not the exporter's — counting down to it invited prospects to defer. The banner now
+  // states the standing commercial consequence instead, which does not expire.
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d' }}>
       <Nav />
@@ -19,7 +13,7 @@ export default function Page() {
       {/* URGENCY BANNER */}
       <div style={{ background: '#B91C1C', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, position: 'sticky', top: 64, zIndex: 99 }}>
         <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff', animation: 'pulse 1.5s infinite' }} />
-        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>CBAM definitive regime is live. First importer declaration due 30 September 2027 —  {daysLeft} days away.</span>
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>CBAM is in its definitive regime. No emissions data means a marked-up default on your goods — and revenue lost to suppliers who have it.</span>
         <a href="/pricing?modules=cbam" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>See CBAM pricing →</a>
       </div>
 
@@ -33,12 +27,12 @@ export default function Page() {
               <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Don’t let default values price you out.</span>
             </h1>
             <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 300, marginBottom: '2rem', maxWidth: 480 }}>
-              When you can’t show verified emissions, importers fall back to worst-case default values — a higher border charge that makes your goods less competitive than suppliers who can. ThemisIQ computes installation-level actuals, independently verifiable and ready to share with your EU customers.
+              Your EU customer declares a number for your goods either way. Without yours, they use a published default for your country — carrying a mark-up that prices in the possibility your installation is dirtier than average. They buy the certificates, so that assumption is priced into what you cost them. ThemisIQ computes installation-level actuals, independently verifiable and ready to share with your EU customers.
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
               <a href="/cbam/preview" style={{ ...btnPrimary, textDecoration: 'none' }}>See a sample report →</a>
               <a href="/pricing?modules=cbam" style={{ ...btnSecondary, textDecoration: 'none' }}>See pricing</a>
-              <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to a specialist</a>
+              <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
               {['Non-EU exporters', 'Regulation (EU) 2023/956', 'Verifier-ready'].map(tag => (
@@ -51,7 +45,7 @@ export default function Page() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {[
               { val: '30 Sep', unit: '2027', label: 'first importer CBAM declaration due', color: '#B91C1C', bg: '#FCEBEB' },
-              { val: '2026', unit: 'definitive period', label: 'CBAM definitive regime now live', color: '#7425e3', bg: '#EDE9FE' },
+              { val: '10→20→30%', unit: 'mark-up by 2028', label: 'what the default adds on top of your country figure', color: '#7425e3', bg: '#EDE9FE' },
               { val: 'Actuals', unit: 'not defaults', label: 'installation-level, verifier-ready figures', color: '#0F6E56', bg: '#E1F5EE' },
               { val: 'Steel + Al', unit: 'available now', label: 'iron, steel & aluminium live; more sectors coming', color: '#0C447C', bg: '#E6F1FB' },
             ].map(({ val, unit, label, color, bg }) => (
@@ -74,7 +68,9 @@ export default function Page() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
           {[
-            { title: 'Actuals beat defaults', desc: 'Default values are set to the worst-case country average plus a mark-up that rises every year. Verified, installation-level actual emissions almost always come in lower — and the gap widens annually.' },
+            { title: 'What the default actually is', desc: 'Under IR (EU) 2025/2621 the default is your country\'s published figure plus a mark-up — 10% for 2026, 20% for 2027, 30% from 2028 (1% for fertilisers). The mark-up exists because the Commission cannot verify whether your installation beats your national average, so it prices in the possibility that it does not. To come out ahead on the default, your installation would have to be more than 10% above your country\'s average this year.' },
+            { title: 'The choice only exists if you have the number', desc: 'Since Regulation (EU) 2025/2083, your EU customer may declare on verified actual values or on defaults. Without your figure they have no choice to make — the default is the only route open to them. With it, they can use whichever is lower, and if the default turns out better for you, you will know that too.' },
+            { title: 'It gets cheaper for them every year', desc: 'From 2027 an importer must hold certificates covering 50% of running-year emissions at each quarter end. Article 22(2) of the CBAM Regulation lets them base that on the previous year\'s surrendered figure rather than on defaults. Supply verified actuals once and you reduce the cash they tie up every quarter thereafter.' },
             { title: 'Specific embedded emissions, done properly', desc: 'Direct and indirect emissions split, precursor tracing through the supply chain, installation-level data rather than estimates. Computed under the CBAM implementing regulations, not approximated.' },
             { title: 'Verifier-ready by design', desc: 'Every figure is sourced and traceable, so the accredited verifier reviewing your emissions can follow each number to its evidence — the independent verification the definitive regime requires for actual values.' },
             { title: 'Built for your EU customer’s declaration', desc: 'Output maps to what the importer needs for their annual CBAM declaration (first due 30 September 2027), so your verified actuals flow into their filing instead of a costly default.' },
@@ -165,16 +161,16 @@ export default function Page() {
       {/* CTA */}
       <section style={{ padding: '6rem 2.5rem', textAlign: 'center' }}>
         <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
-          Stop losing margin to default values.<br />
-          <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Compute your actuals.</span>
+          Your EU customer will declare a number for your goods.<br />
+          <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Make it yours.</span>
         </h2>
         <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
-          ThemisIQ produces installation-level, verifier-ready specific embedded emissions your EU customer can carry into their CBAM declaration — instead of the worst-case default.
+          ThemisIQ produces installation-level, verifier-ready specific embedded emissions your EU customer can carry into their CBAM declaration — instead of a default carrying a mark-up set on an assumption about your installation.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
           <a href="/cbam/preview" style={{ ...btnPrimary, textDecoration: 'none' }}>See a sample report →</a>
           <a href="/pricing?modules=cbam" style={{ ...btnSecondary, textDecoration: 'none' }}>See pricing</a>
-          <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to a specialist</a>
+          <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
         </div>
       </section>
 
