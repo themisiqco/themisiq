@@ -112,17 +112,35 @@ describe('a false disclosure boolean is a value, not missing', () => {
   });
 });
 
+// The sub-builders now accumulate EVERY requirement evaluation, not only the absences. These two
+// helpers read that accumulation the two ways the assertions below need: `gapsOf` is the same
+// order-preserving projection buildSummaryReport uses to derive its `missing` array, so an assertion
+// on it is an assertion on what a caller actually receives; `stateFor` reaches the new state channel.
+const gapsOf = (acc: import('./types').CompletenessItem[]) => acc
+  .filter((i) => i.state === 'outstanding')
+  .map(({ item, field, hint }) => ({ item, field, hint }));
+
+const stateFor = (acc: import('./types').CompletenessItem[], item: string) =>
+  acc.find((i) => i.item === item)?.state;
+
 describe('item (11) gate — three states', () => {
   it('gate TRUE → sub-flags are required (a null sub-flag becomes a gap)', () => {
     const d = DISCLOSURES();
     d.electricity_produced_onsite = true;
     d.elec_separate_generation = null; // knock out one required sub-flag
-    const missing: import('./types').MissingField[] = [];
+    const missing: import('./types').CompletenessItem[] = [];
     const item11 = buildItem11(d, missing);
     expect(item11.producedOnsite).toEqual({ status: 'value', value: true });
     expect(item11.cogeneration.status).toBe('value');
     expect(item11.separateGeneration.status).toBe('missing');
-    expect(missing).toEqual([{ item: '(11)(b)', field: expect.any(String), hint: expect.any(String) }]);
+    expect(gapsOf(missing)).toEqual([{ item: '(11)(b)', field: expect.any(String), hint: expect.any(String) }]);
+    // The accumulator carries the satisfied requirements too — that is the denominator.
+    expect(stateFor(missing, '(11)')).toBe('evidenced');
+    expect(stateFor(missing, '(11)(b)')).toBe('outstanding');
+    for (const item of ['(11)(a)', '(11)(c)', '(11)(d)']) {
+      expect(stateFor(missing, item)).toBe('evidenced');
+    }
+    for (const i of missing) expect(i.responsibility).toBe('operator');
   });
 
   it('gate FALSE → every sub-flag is not_applicable with a reason, and no gaps', () => {
@@ -130,27 +148,41 @@ describe('item (11) gate — three states', () => {
     d.electricity_produced_onsite = false;
     d.elec_cogeneration = null; d.elec_separate_generation = null;
     d.elec_source_fossil = null; d.elec_source_renewable = null; d.elec_exported_from_process = null;
-    const missing: import('./types').MissingField[] = [];
+    const missing: import('./types').CompletenessItem[] = [];
     const item11 = buildItem11(d, missing);
     expect(item11.producedOnsite).toEqual({ status: 'value', value: false });
     for (const f of [item11.cogeneration, item11.separateGeneration, item11.sourceFossil, item11.sourceRenewable, item11.exportedFromProcess]) {
       expect(f.status).toBe('not_applicable');
       if (f.status === 'not_applicable') expect(f.reason).toBe('no on-site electricity generation');
     }
-    expect(missing).toEqual([]);
+    expect(gapsOf(missing)).toEqual([]);
+    // A declared FALSE is a satisfied requirement, not an absence — see the boolField
+    // comment in build.ts. The old assertion (an empty array) could not express this:
+    // nothing was recorded at all, so a satisfied gate and an unasked gate looked identical.
+    // The five sub-flags are correctly absent from the accumulator: a closed gate means
+    // they were never required, so they must not enter the denominator.
+    expect(missing).toHaveLength(1);
+    expect(missing[0].item).toBe('(11)');
+    expect(missing[0].state).toBe('evidenced');
   });
 
   it('gate NULL → the gate and all sub-flags are missing (neither branch assumed)', () => {
     const d = DISCLOSURES();
     d.electricity_produced_onsite = null;
-    const missing: import('./types').MissingField[] = [];
+    const missing: import('./types').CompletenessItem[] = [];
     const item11 = buildItem11(d, missing);
     expect(item11.producedOnsite.status).toBe('missing');
     for (const f of [item11.cogeneration, item11.separateGeneration, item11.sourceFossil, item11.sourceRenewable, item11.exportedFromProcess]) {
       expect(f.status).toBe('missing');
     }
     // The one actionable gap is the gate itself — sub-flags are undetermined, not asserted required.
-    expect(missing).toEqual([{ item: '(11)', field: expect.any(String), hint: expect.any(String) }]);
+    expect(gapsOf(missing)).toEqual([{ item: '(11)', field: expect.any(String), hint: expect.any(String) }]);
+    expect(stateFor(missing, '(11)')).toBe('outstanding');
+    // An unanswered gate does not yet REQUIRE the sub-flags, so they never enter the accumulator —
+    // they are neither supplied nor outstanding, and must not move the denominator either way.
+    for (const item of ['(11)(a)', '(11)(b)', '(11)(c)', '(11)(d)']) {
+      expect(stateFor(missing, item)).toBeUndefined();
+    }
   });
 });
 

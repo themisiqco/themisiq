@@ -30,6 +30,34 @@ export interface MissingField {
   hint?: string;   // where the operator supplies it
 }
 
+// ── Completeness accumulation ────────────────────────────────────────────────────────────────────
+// The builder records EVERY requirement evaluation, not only the absences. `missing` is a derived
+// filter over that accumulation, which is what gives the report a denominator: the requirement set is
+// already declared imperatively by the requireField calls, so counting them needs no second registry.
+
+export type ItemState = 'evidenced' | 'outstanding' | 'not_applicable';
+
+// WHO can clear this item. Orthogonal to state: "outstanding — upload your gas bill"
+// and "outstanding — ThemisIQ has not built the field" are the same state and entirely
+// different facts. Only 'operator' items count toward the customer's denominator.
+export type Responsibility = 'operator' | 'platform' | 'regulator';
+
+export interface CompletenessItem {
+  item: string;            // §1.2 reference, e.g. '(2)(c)'
+  field: string;           // human-readable
+  hint?: string;
+  state: ItemState;
+  responsibility: Responsibility;
+}
+
+export interface CompletenessResult {
+  items: CompletenessItem[];      // every evaluation, in accumulation order
+  requiredCount: number;          // operator items that are not not_applicable
+  suppliedCount: number;          // of those, state === 'evidenced'
+  outstandingCount: number;       // of those, state === 'outstanding'
+  limitations: CompletenessItem[];// responsibility !== 'operator' AND state === 'outstanding'
+}
+
 // ── §1.2 item sub-structures (Part 1: items (1)-(3), (7)-(11)) ───────────────────────────────────
 
 // (1) Identification of the operator. All three parts required.

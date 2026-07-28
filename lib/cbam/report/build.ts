@@ -20,6 +20,7 @@ import type { PrecursorInput, PrecursorResolution } from '../types';
 import type { SefaBenchmarkWorkings } from '../sefaCompute';
 import type {
   ReportField, MissingField, Report12,
+  ItemState, Responsibility, CompletenessItem, CompletenessResult,
   Item1Operator, Item2Installation, Coordinates, ProcessSummary,
   Item7Heat, Item8ZeroRatedFuels, Item9WasteGases, Item10Co2Capture, Item11OnsiteElectricity,
   Item4Good, Item4Indirect, Item5TotalDirect, Item6Indirect,
@@ -200,9 +201,25 @@ function addressField(p: {
   return { status: 'value', value };
 }
 
-// Record a required field as a gap when it is missing. 'not_applicable' and 'value' never emit a gap.
-function requireField<T>(f: ReportField<T>, item: string, field: string, hint: string, missing: MissingField[]): void {
-  if (f.status === 'missing') missing.push({ item, field, hint });
+// The three-state field wrapper collapsed to the completeness vocabulary.
+function stateOf<T>(f: ReportField<T>): ItemState {
+  if (f.status === 'value') return 'evidenced';
+  if (f.status === 'not_applicable') return 'not_applicable';
+  return 'outstanding';
+}
+
+// Record a requirement evaluation. Every call records — a satisfied requirement is as much a fact as
+// an absent one, and discarding it is what left the report with a numerator and no denominator. The
+// `missing` array callers still receive is a filter over this accumulation, so behaviour is unchanged.
+function requireField<T>(
+  f: ReportField<T>,
+  item: string,
+  field: string,
+  hint: string,
+  acc: CompletenessItem[],
+  responsibility: Responsibility = 'operator',
+): void {
+  acc.push({ item, field, hint, state: stateOf(f), responsibility });
 }
 
 // A text sub-field gated on a boolean parent (used by (8) demonstration and (10) transferredTo):
@@ -211,19 +228,19 @@ function requireField<T>(f: ReportField<T>, item: string, field: string, hint: s
 //   parent true    → sub required (value, or missing + gap).
 function gatedText(
   parent: ReportField<boolean>, value: string | null,
-  item: string, field: string, naReason: string, hint: string, missing: MissingField[],
+  item: string, field: string, naReason: string, hint: string, acc: CompletenessItem[],
 ): ReportField<string> {
   if (parent.status === 'missing') return { status: 'missing' };
   if (parent.status === 'value' && parent.value === false) return { status: 'not_applicable', reason: naReason };
   const f = strField(value);
-  requireField(f, item, field, hint, missing);
+  requireField(f, item, field, hint, acc);
   return f;
 }
 
 // ── Sub-builders (one per §1.2 item / group — each pushes its own gaps, independently testable) ───
 
 // (1) Identification of the operator. All parts required. A null profile row → all three missing.
-export function buildItem1(operator: OperatorProfileRow | null, missing: MissingField[]): Item1Operator {
+export function buildItem1(operator: OperatorProfileRow | null, acc: CompletenessItem[]): Item1Operator {
   const name = strField(operator?.operator_name);
   const registrationNo = strField(operator?.registration_no);
   const address = addressField({
@@ -231,14 +248,14 @@ export function buildItem1(operator: OperatorProfileRow | null, missing: Missing
     city: operator?.city ?? null, postcode: operator?.postcode ?? null, country: operator?.country ?? null,
   });
   const hint = 'CBAM operator profile';
-  requireField(name, '(1)(a)', 'operator name', hint, missing);
-  requireField(registrationNo, '(1)(b)', 'operator registration number', hint, missing);
-  requireField(address, '(1)(c)', 'operator full address (in English)', hint, missing);
+  requireField(name, '(1)(a)', 'operator name', hint, acc);
+  requireField(registrationNo, '(1)(b)', 'operator registration number', hint, acc);
+  requireField(address, '(1)(c)', 'operator full address (in English)', hint, acc);
   return { name, registrationNo, address };
 }
 
 // (2) The installation under verification. (2)(a) name is the pre-existing cbam_installations.name.
-export function buildItem2(installation: InstallationRow | null, missing: MissingField[]): Item2Installation {
+export function buildItem2(installation: InstallationRow | null, acc: CompletenessItem[]): Item2Installation {
   const name = strField(installation?.name);
   const cbamRegistryId = strField(installation?.cbam_registry_id);
   const unLocode = strField(installation?.un_locode);
@@ -249,75 +266,85 @@ export function buildItem2(installation: InstallationRow | null, missing: Missin
   });
   const coordinates = coordField(installation?.latitude, installation?.longitude);
   const hint = 'CBAM installation record';
-  requireField(name, '(2)(a)', 'installation name', hint, missing);
-  requireField(cbamRegistryId, '(2)(b)', 'CBAM Registry installation ID', hint, missing);
-  requireField(unLocode, '(2)(c)', 'UN/LOCODE', hint, missing);
-  requireField(address, '(2)(d)', 'installation full address (in English)', hint, missing);
-  requireField(coordinates, '(2)(e)', 'main emission source coordinates', hint, missing);
+  requireField(name, '(2)(a)', 'installation name', hint, acc);
+  requireField(cbamRegistryId, '(2)(b)', 'CBAM Registry installation ID', hint, acc);
+  requireField(unLocode, '(2)(c)', 'UN/LOCODE', hint, acc);
+  requireField(address, '(2)(d)', 'installation full address (in English)', hint, acc);
+  requireField(coordinates, '(2)(e)', 'main emission source coordinates', hint, acc);
   return { name, cbamRegistryId, unLocode, address, coordinates };
 }
 
 // (3) All production processes and routes, with goods per process. Zero processes → the item is
 // missing; otherwise each process must carry a route and at least one good, and any incompleteness is
 // recorded per process.
-export function buildItem3(processes: ProcessRow[], missing: MissingField[]): ReportField<ProcessSummary[]> {
+export function buildItem3(processes: ProcessRow[], acc: CompletenessItem[]): ReportField<ProcessSummary[]> {
   const hint = 'CBAM production processes';
+  // Recorded on BOTH paths: "processes exist" is a satisfied requirement, not a non-event.
+  acc.push({
+    item: '(3)', field: 'production processes and routes', hint,
+    state: processes.length === 0 ? 'outstanding' : 'evidenced', responsibility: 'operator',
+  });
   if (processes.length === 0) {
-    missing.push({ item: '(3)', field: 'production processes and routes', hint });
     return { status: 'missing' };
   }
   const summaries: ProcessSummary[] = processes.map((p) => {
     const hasRoute = p.route_code != null && p.route_code.trim() !== '';
     const hasGood = p.cn_code != null && p.cn_code.trim() !== '';
-    if (!hasRoute) missing.push({ item: '(3)', field: `production route for process ${p.process_id}`, hint });
-    if (!hasGood) missing.push({ item: '(3)', field: `goods (CN code) for process ${p.process_id}`, hint });
+    acc.push({
+      item: '(3)', field: `production route for process ${p.process_id}`, hint,
+      state: hasRoute ? 'evidenced' : 'outstanding', responsibility: 'operator',
+    });
+    acc.push({
+      item: '(3)', field: `goods (CN code) for process ${p.process_id}`, hint,
+      state: hasGood ? 'evidenced' : 'outstanding', responsibility: 'operator',
+    });
     return { processId: p.process_id, route: hasRoute ? p.route_code : null, goods: hasGood ? [p.cn_code as string] : [] };
   });
   return { status: 'value', value: summaries };
 }
 
 // (7) Measurable heat imported / exported. Two independent required booleans.
-export function buildItem7(d: DisclosuresRow | null, missing: MissingField[]): Item7Heat {
+export function buildItem7(d: DisclosuresRow | null, acc: CompletenessItem[]): Item7Heat {
   const hint = 'CBAM installation disclosures';
   const imported = boolField(d?.heat_imported);
   const exported = boolField(d?.heat_exported);
-  requireField(imported, '(7)', 'measurable heat imported', hint, missing);
-  requireField(exported, '(7)', 'measurable heat exported', hint, missing);
+  requireField(imported, '(7)', 'measurable heat imported', hint, acc);
+  requireField(exported, '(7)', 'measurable heat exported', hint, acc);
   return { imported, exported };
 }
 
 // (8) Zero-rated fuels used, plus demonstration (gated on `used`).
-export function buildItem8(d: DisclosuresRow | null, missing: MissingField[]): Item8ZeroRatedFuels {
+export function buildItem8(d: DisclosuresRow | null, acc: CompletenessItem[]): Item8ZeroRatedFuels {
   const hint = 'CBAM installation disclosures';
   const used = boolField(d?.zero_rated_fuels_used);
-  requireField(used, '(8)', 'zero-rated fuels used', hint, missing);
+  requireField(used, '(8)', 'zero-rated fuels used', hint, acc);
   const demonstration = gatedText(
     used, d?.zero_rated_fuels_demonstration ?? null,
-    '(8)', 'demonstration of zero-rating applicability', 'no zero-rated fuels used', hint, missing,
+    '(8)', 'demonstration of zero-rating applicability', 'no zero-rated fuels used', hint, acc,
   );
   return { used, demonstration };
 }
 
 // (9) Waste gases: three independent required booleans.
-export function buildItem9(d: DisclosuresRow | null, missing: MissingField[]): Item9WasteGases {
+export function buildItem9(d: DisclosuresRow | null, acc: CompletenessItem[]): Item9WasteGases {
   const hint = 'CBAM installation disclosures';
   const producedUsed = boolField(d?.waste_gases_produced_used);
   const imported = boolField(d?.waste_gases_imported);
   const exported = boolField(d?.waste_gases_exported);
-  requireField(producedUsed, '(9)', 'waste gases produced and used', hint, missing);
-  requireField(imported, '(9)', 'waste gases imported', hint, missing);
-  requireField(exported, '(9)', 'waste gases exported', hint, missing);
+  requireField(producedUsed, '(9)', 'waste gases produced and used', hint, acc);
+  requireField(imported, '(9)', 'waste gases imported', hint, acc);
+  requireField(exported, '(9)', 'waste gases exported', hint, acc);
   return { producedUsed, imported, exported };
 }
 
 // (10) CO2 capture used, plus the transfer destination (gated on `used`).
-export function buildItem10(d: DisclosuresRow | null, missing: MissingField[]): Item10Co2Capture {
+export function buildItem10(d: DisclosuresRow | null, acc: CompletenessItem[]): Item10Co2Capture {
   const hint = 'CBAM installation disclosures';
   const used = boolField(d?.co2_capture_used);
-  requireField(used, '(10)', 'CO2 capture used', hint, missing);
+  requireField(used, '(10)', 'CO2 capture used', hint, acc);
   const transferredTo = gatedText(
     used, d?.co2_capture_transferred_to ?? null,
-    '(10)', 'CO2 capture transfer destination', 'no CO2 capture used', hint, missing,
+    '(10)', 'CO2 capture transfer destination', 'no CO2 capture used', hint, acc,
   );
   return { used, transferredTo };
 }
@@ -329,12 +356,17 @@ export function buildItem10(d: DisclosuresRow | null, missing: MissingField[]): 
 //   gate null  → the gate itself is the one gap; sub-flags are 'missing' (undetermined), and NO
 //                per-sub-flag gap is emitted — we cannot assume they are required without knowing the
 //                gate is true, nor N/A without knowing it is false.
-export function buildItem11(d: DisclosuresRow | null, missing: MissingField[]): Item11OnsiteElectricity {
+export function buildItem11(d: DisclosuresRow | null, acc: CompletenessItem[]): Item11OnsiteElectricity {
   const hint = 'CBAM installation disclosures';
   const producedOnsite = boolField(d?.electricity_produced_onsite);
 
+  // The gate itself is always required, on every branch — recorded once, before the fork.
+  acc.push({
+    item: '(11)', field: 'on-site electricity generation', hint,
+    state: stateOf(producedOnsite), responsibility: 'operator',
+  });
+
   if (producedOnsite.status === 'missing') {
-    missing.push({ item: '(11)', field: 'on-site electricity generation', hint });
     const undetermined: ReportField<boolean> = { status: 'missing' };
     return {
       producedOnsite,
@@ -354,7 +386,7 @@ export function buildItem11(d: DisclosuresRow | null, missing: MissingField[]): 
   // Gate open (true) — the (a)-(d) sub-flags are required.
   const sub = (v: boolean | null | undefined, item: string, field: string): ReportField<boolean> => {
     const f = boolField(v);
-    requireField(f, item, field, hint, missing);
+    requireField(f, item, field, hint, acc);
     return f;
   };
   return {
@@ -434,7 +466,7 @@ export function preConsumerScrapShare(chargeMix: ChargeMixRow[]): number | null 
 // default-factor path. IF THE PPA / DIRECT-LINE PATH IS EVER BUILT, THIS MUST BE REVISITED — the actual
 // share becomes non-zero and the split becomes a real calculation over actual- vs default-factor
 // indirect.
-function buildItem4c(good: GoodComputation, missing: MissingField[]): Item4Indirect {
+function buildItem4c(good: GoodComputation, acc: CompletenessItem[]): Item4Indirect {
   if (good.annexIiDirectOnly) {
     const na: ReportField<never> = { status: 'not_applicable', reason: ANNEX_II_REASON };
     return { actualShare: na, defaultShare: na, criteriaConfirmation: na, specificIndirect: na };
@@ -462,9 +494,13 @@ function buildItem4c(good: GoodComputation, missing: MissingField[]): Item4Indir
   // either way and a future PPA / direct-line path WILL need one — so leave it missing with a hint,
   // never a fabricated confirmation on a verifier-facing report.
   const criteriaConfirmation: ReportField<boolean> = { status: 'missing' };
-  missing.push({
+  // responsibility: 'platform' — no input exists that could satisfy this, so it is
+  // EXCLUDED from the customer's completeness denominator (§4 Spine A). It is still
+  // recorded and still rendered: a scope limitation of the tool, not an operator gap.
+  acc.push({
     item: '(4)(c)', field: `confirmation the actual-value indirect criteria are met (${good.cnCode ?? good.processId})`,
     hint: 'unbuilt input — there is no field yet for the point-6 Annex IV actual-value criteria confirmation',
+    state: 'outstanding', responsibility: 'platform',
   });
 
   const specificIndirect: ReportField<number> = rec ? { status: 'value', value: rec.see_indirect } : { status: 'missing' };
@@ -491,14 +527,14 @@ function buildItem4f(rec: SeeRecordRow | null): ReportField<SefaBenchmarkWorking
   return { status: 'missing' };
 }
 
-export function buildItem4(good: GoodComputation, missing: MissingField[]): Item4Good {
+export function buildItem4(good: GoodComputation, acc: CompletenessItem[]): Item4Good {
   const rec = good.seeRecord;
   return {
     processId: good.processId,
     cnCode: good.cnCode,
     specificDirect: rec ? { status: 'value', value: rec.see_direct } : { status: 'missing' },   // (4)(a)
     defaultShareDirect: rec ? shareField(rec.default_share_direct) : { status: 'missing' },       // (4)(b)
-    indirect: buildItem4c(good, missing),                                                          // (4)(c)
+    indirect: buildItem4c(good, acc),                                                          // (4)(c)
     importedElectricity: { status: 'not_applicable', reason: IMPORTED_ELEC_REASON },               // (4)(d)
     sefa: buildItem4e(rec),                                                                        // (4)(e)
     benchmarkConfirmation: buildItem4f(rec),                                                       // (4)(f)
@@ -508,7 +544,7 @@ export function buildItem4(good: GoodComputation, missing: MissingField[]): Item
 // Per-process total DIRECT emissions = attrEm (preferred — the direct value the engine attributed) or
 // aeG × activity level. The installation total sums the processes, but ONLY when the caller asserts the
 // set is complete; otherwise it is missing — a single process's total is not the installation's.
-export function buildItem5(goods: GoodComputation[], complete: boolean, missing: MissingField[]): Item5TotalDirect {
+export function buildItem5(goods: GoodComputation[], complete: boolean, acc: CompletenessItem[]): Item5TotalDirect {
   const perProcess = goods.map((g) => {
     const total = g.attrEm != null ? g.attrEm : (g.aeG != null ? g.aeG * g.activityLevel : null);
     return { processId: g.processId, totalDirect: numField(total) };
@@ -516,15 +552,16 @@ export function buildItem5(goods: GoodComputation[], complete: boolean, missing:
 
   let installationTotal: ReportField<number>;
   const allPresent = perProcess.every((p) => p.totalDirect.status === 'value');
+  acc.push({
+    item: '(5)', field: 'installation-level total direct emissions',
+    hint: 'installation-level aggregation requires every process for the installation and reporting period',
+    state: complete && allPresent ? 'evidenced' : 'outstanding', responsibility: 'operator',
+  });
   if (complete && allPresent) {
     const sum = perProcess.reduce((s, p) => s + (p.totalDirect.status === 'value' ? p.totalDirect.value : 0), 0);
     installationTotal = { status: 'value', value: sum };
   } else {
     installationTotal = { status: 'missing' };
-    missing.push({
-      item: '(5)', field: 'installation-level total direct emissions',
-      hint: 'installation-level aggregation requires every process for the installation and reporting period',
-    });
   }
   return { perProcess, installationTotal };
 }
@@ -532,19 +569,25 @@ export function buildItem5(goods: GoodComputation[], complete: boolean, missing:
 // (6) installation INDIRECT emissions — only where the installation produces goods NOT in Annex II.
 // All-Annex-II → not_applicable. Otherwise the same completeness caveat as (5). Per-process absolute
 // indirect = see_indirect × activity level.
-export function buildItem6(goods: GoodComputation[], complete: boolean, missing: MissingField[]): Item6Indirect {
+export function buildItem6(goods: GoodComputation[], complete: boolean, acc: CompletenessItem[]): Item6Indirect {
+  const ITEM6 = {
+    item: '(6)', field: 'installation-level indirect emissions',
+    hint: 'installation-level aggregation requires every process for the installation and reporting period',
+    responsibility: 'operator' as const,
+  };
   const producesNonAnnexII = goods.some((g) => !g.annexIiDirectOnly);
-  if (!producesNonAnnexII) return { status: 'not_applicable', reason: ANNEX_II_REASON };
+  if (!producesNonAnnexII) {
+    acc.push({ ...ITEM6, state: 'not_applicable' });
+    return { status: 'not_applicable', reason: ANNEX_II_REASON };
+  }
 
   const perProcessIndirect = goods.map((g) => (g.seeRecord ? g.seeRecord.see_indirect * g.activityLevel : null));
   const allPresent = perProcessIndirect.every((v) => v != null);
   if (complete && allPresent) {
+    acc.push({ ...ITEM6, state: 'evidenced' });
     return { status: 'value', value: perProcessIndirect.reduce((s, v) => s + (v as number), 0) };
   }
-  missing.push({
-    item: '(6)', field: 'installation-level indirect emissions',
-    hint: 'installation-level aggregation requires every process for the installation and reporting period',
-  });
+  acc.push({ ...ITEM6, state: 'outstanding' });
   return { status: 'missing' };
 }
 
@@ -588,7 +631,7 @@ function collectPrecursors(goods: GoodComputation[]): FlatPrecursor[] {
 // list, and §1.2 does not say where it belongs; we drop it from both AND record the unresolved
 // classification as a gap rather than silently omitting it.
 export function buildItem12and13(
-  flat: FlatPrecursor[], missing: MissingField[],
+  flat: FlatPrecursor[], acc: CompletenessItem[],
 ): { defaults: Item12DefaultPrecursor[]; actuals: Item13ActualPrecursor[] } {
   const defaults: Item12DefaultPrecursor[] = [];
   const actuals: Item13ActualPrecursor[] = [];
@@ -597,9 +640,13 @@ export function buildItem12and13(
     switch (p.source) {
       case 'default':
       case 'default_fallback': {
-        missing.push({
+        // responsibility: 'platform' — no input exists that could satisfy this, so it is
+        // EXCLUDED from the customer's completeness denominator (§4 Spine A). It is still
+        // recorded and still rendered: a scope limitation of the tool, not an operator gap.
+        acc.push({
           item: '(12)(b)', field: `name of the good for precursor ${p.cnCode}`,
           hint: 'unbuilt input — no good-name field; do not substitute the CN code or the 2620 benchmark description',
+          state: 'outstanding', responsibility: 'platform',
         });
         defaults.push({
           cnCode: p.cnCode,
@@ -610,13 +657,18 @@ export function buildItem12and13(
         break;
       }
       case 'verified_actual': {
-        missing.push({
+        // responsibility: 'platform' — no input exists that could satisfy either of these, so both are
+        // EXCLUDED from the customer's completeness denominator (§4 Spine A). They are still
+        // recorded and still rendered: scope limitations of the tool, not operator gaps.
+        acc.push({
           item: '(13)(b)', field: `name of the good for precursor ${p.cnCode}`,
           hint: 'unbuilt input — no good-name field; do not substitute the CN code or the 2620 benchmark description',
+          state: 'outstanding', responsibility: 'platform',
         });
-        missing.push({
+        acc.push({
           item: '(13)(e)', field: `specific indirect embedded emissions for verified precursor ${p.cnCode}`,
           hint: 'not available — a verified actual precursor has no indirect value (PrecursorInput has no seeValueIndirect; spec §10.6)',
+          state: 'outstanding', responsibility: 'platform',
         });
         actuals.push({
           cnCode: p.cnCode,
@@ -632,9 +684,13 @@ export function buildItem12and13(
         // EXCLUDED from both lists — the regulation's Article 4(9) exclusion, not ours.
         break;
       case 'eu_zero_rated':
-        missing.push({
+        // responsibility: 'regulator' — the instrument itself does not resolve which list this
+        // belongs in, so no input could satisfy it. EXCLUDED from the customer's completeness
+        // denominator (§4 Spine A), still recorded and still rendered as a scope limitation.
+        acc.push({
           item: '(12)/(13)', field: `list classification of EU/zero-rated precursor ${p.cnCode}`,
           hint: 'unresolved — §1.2 does not state whether an EU/zero-rated precursor belongs in the default (12) or actual (13) list; not silently dropped',
+          state: 'outstanding', responsibility: 'regulator',
         });
         break;
     }
@@ -657,34 +713,47 @@ function anyCnCodeSpansMultiple(flat: FlatPrecursor[], key: (p: FlatPrecursor) =
 // (14) — Article 14(1) multi-PERIOD averaging. Applies only where ≥2 precursors share a CN code but
 // come from different reporting periods. Condition absent → not_applicable. Condition present → missing
 // (the averaging is not implemented — do not silently proceed as if it were).
-export function buildItem14(flat: FlatPrecursor[], missing: MissingField[]): Item14MultiPeriod {
+export function buildItem14(flat: FlatPrecursor[], acc: CompletenessItem[]): Item14MultiPeriod {
   const spans = anyCnCodeSpansMultiple(flat, (p) => String(p.origin.reportingPeriod));
+  // responsibility: 'platform' — the averaging is unimplemented, so no input could satisfy this. It is
+  // EXCLUDED from the customer's completeness denominator (§4 Spine A). It is still recorded and still
+  // rendered: a scope limitation of the tool, not an operator gap.
+  acc.push({
+    item: '(14)', field: 'multi-period precursor averaging',
+    hint: 'Article 14(1) multi-period averaging not implemented',
+    state: spans ? 'outstanding' : 'not_applicable', responsibility: 'platform',
+  });
   if (!spans) return { status: 'not_applicable', reason: 'all precursors of each CN code from a single reporting period' };
-  missing.push({ item: '(14)', field: 'multi-period precursor averaging', hint: 'Article 14(1) multi-period averaging not implemented' });
   return { status: 'missing' };
 }
 
 // (15) — Article 14 multi-INSTALLATION averaging. Applies only where ≥2 precursors share a CN code from
 // different installations. Same treatment as (14).
-export function buildItem15(flat: FlatPrecursor[], missing: MissingField[]): Item15MultiInstallation {
+export function buildItem15(flat: FlatPrecursor[], acc: CompletenessItem[]): Item15MultiInstallation {
   const spans = anyCnCodeSpansMultiple(flat, (p) => String(p.origin.installationName));
+  // responsibility: 'platform' — same as (14): unimplemented, so no input could satisfy it. EXCLUDED
+  // from the customer's completeness denominator (§4 Spine A), still recorded and still rendered.
+  acc.push({
+    item: '(15)', field: 'multi-installation precursor averaging',
+    hint: 'Article 14 multi-installation averaging not implemented',
+    state: spans ? 'outstanding' : 'not_applicable', responsibility: 'platform',
+  });
   if (!spans) return { status: 'not_applicable', reason: 'all precursors of each CN code from a single installation' };
-  missing.push({ item: '(15)', field: 'multi-installation precursor averaging', hint: 'Article 14 multi-installation averaging not implemented' });
   return { status: 'missing' };
 }
 
 // (16) — the operator/installation of origin, per precursor. The CBAM Registry ID is "if applicable"
 // in the source, so a null is not treated as a hard gap; operator, installation and period are
 // required traceability and become gaps when absent.
-export function buildItem16(flat: FlatPrecursor[], missing: MissingField[]): Item16PrecursorOrigin[] {
+export function buildItem16(flat: FlatPrecursor[], acc: CompletenessItem[]): Item16PrecursorOrigin[] {
   return flat.map((p) => {
     const operatorName = strField(p.origin.operatorName);
     const installationName = strField(p.origin.installationName);
     const reportingPeriod = numField(p.origin.reportingPeriod);
     const hint = 'precursor origin identity (cbam_precursor_inputs origin_* columns)';
-    requireField(operatorName, '(16)', `operator of origin for precursor ${p.cnCode}`, hint, missing);
-    requireField(installationName, '(16)', `installation of origin for precursor ${p.cnCode}`, hint, missing);
-    requireField(reportingPeriod, '(16)', `reporting period of origin for precursor ${p.cnCode}`, hint, missing);
+    requireField(operatorName, '(16)', `operator of origin for precursor ${p.cnCode}`, hint, acc);
+    requireField(installationName, '(16)', `installation of origin for precursor ${p.cnCode}`, hint, acc);
+    requireField(reportingPeriod, '(16)', `reporting period of origin for precursor ${p.cnCode}`, hint, acc);
     const cbamRegistryId: ReportField<string> = p.origin.cbamRegistryId != null && p.origin.cbamRegistryId.trim() !== ''
       ? { status: 'value', value: p.origin.cbamRegistryId }
       : { status: 'not_applicable', reason: 'not provided; the CBAM Registry identifier is required only where applicable (§1.2 (16))' };
@@ -698,35 +767,59 @@ export function buildItem16(flat: FlatPrecursor[], missing: MissingField[]): Ite
  * Build the §1.2 summary report from fetched rows. Returns the typed Report12 alongside a flat list of
  * every gap a submittable report still has. Part 1 items (identity/processes/disclosures) are always
  * built; Part 2 items (per-good, precursor lists) are built only when `input.goods` is supplied.
+ *
+ * `missing` is DERIVED from the accumulation — an order-preserving filter on state === 'outstanding',
+ * projected back to the MissingField shape. It contains exactly what it always did, platform and
+ * regulator items included: this seam changes no behaviour. `completeness` is the new channel, and it
+ * is the only place the operator/platform/regulator split is expressed.
  */
-export function buildSummaryReport(input: Report12Input): { report: Report12; missing: MissingField[] } {
-  const missing: MissingField[] = [];
+export function buildSummaryReport(input: Report12Input):
+  { report: Report12; missing: MissingField[]; completeness: CompletenessResult } {
+  const acc: CompletenessItem[] = [];
   const report: Report12 = {
-    item1_operator: buildItem1(input.operator, missing),
-    item2_installation: buildItem2(input.installation, missing),
-    item3_processes: buildItem3(input.processes, missing),
-    item7_heat: buildItem7(input.disclosures, missing),
-    item8_zeroRatedFuels: buildItem8(input.disclosures, missing),
-    item9_wasteGases: buildItem9(input.disclosures, missing),
-    item10_co2Capture: buildItem10(input.disclosures, missing),
-    item11_onsiteElectricity: buildItem11(input.disclosures, missing),
+    item1_operator: buildItem1(input.operator, acc),
+    item2_installation: buildItem2(input.installation, acc),
+    item3_processes: buildItem3(input.processes, acc),
+    item7_heat: buildItem7(input.disclosures, acc),
+    item8_zeroRatedFuels: buildItem8(input.disclosures, acc),
+    item9_wasteGases: buildItem9(input.disclosures, acc),
+    item10_co2Capture: buildItem10(input.disclosures, acc),
+    item11_onsiteElectricity: buildItem11(input.disclosures, acc),
   };
 
   const goods = input.goods;
   if (goods && goods.length > 0) {
     const complete = input.installationProcessesComplete === true;
-    report.item4_perGood = goods.map((g) => buildItem4(g, missing));
-    report.item5_totalDirect = buildItem5(goods, complete, missing);
-    report.item6_indirect = buildItem6(goods, complete, missing);
+    report.item4_perGood = goods.map((g) => buildItem4(g, acc));
+    report.item5_totalDirect = buildItem5(goods, complete, acc);
+    report.item6_indirect = buildItem6(goods, complete, acc);
 
     const flat = collectPrecursors(goods);
-    const { defaults, actuals } = buildItem12and13(flat, missing);
+    const { defaults, actuals } = buildItem12and13(flat, acc);
     report.item12_defaultPrecursors = defaults;
     report.item13_actualPrecursors = actuals;
-    report.item14_multiPeriodPrecursor = buildItem14(flat, missing);
-    report.item15_multiInstallationPrecursor = buildItem15(flat, missing);
-    report.item16_precursorOrigin = buildItem16(flat, missing);
+    report.item14_multiPeriodPrecursor = buildItem14(flat, acc);
+    report.item15_multiInstallationPrecursor = buildItem15(flat, acc);
+    report.item16_precursorOrigin = buildItem16(flat, acc);
   }
 
-  return { report, missing };
+  // Order, shape and content preserved exactly: filter keeps relative order, and the projection drops
+  // the two new keys. A `hint`-less item would yield a two-key object, matching MissingField's optional
+  // hint rather than materialising `hint: undefined`.
+  const missing: MissingField[] = acc
+    .filter((i) => i.state === 'outstanding')
+    .map(({ item, field, hint }) => (hint === undefined ? { item, field } : { item, field, hint }));
+
+  // The denominator counts ONLY what the operator can act on. A platform or regulator item is real and
+  // is still surfaced — via `limitations` — but counting it would put a finish line out of reach.
+  const operatorItems = acc.filter((i) => i.responsibility === 'operator' && i.state !== 'not_applicable');
+  const completeness: CompletenessResult = {
+    items: acc,
+    requiredCount: operatorItems.length,
+    suppliedCount: operatorItems.filter((i) => i.state === 'evidenced').length,
+    outstandingCount: operatorItems.filter((i) => i.state === 'outstanding').length,
+    limitations: acc.filter((i) => i.responsibility !== 'operator' && i.state === 'outstanding'),
+  };
+
+  return { report, missing, completeness };
 }
