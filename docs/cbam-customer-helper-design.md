@@ -357,11 +357,47 @@ Conservatism is not an artefact; it is the Commission's stated design.
   and rely on actual emissions subsequently. This supports the graceful-
   degradation design rather than undermining it.
 
-**Framing consequence.** The pitch is risk reduction, not savings: *calculate
-your SEE so your EU importer uses your real figure, rather than a default set
-on the assumption you might be worse than your country's average.* This holds
-regardless of which way the delta falls, so it cannot be falsified by a single
-customer whose actuals come in high. A savings framing can be; do not use one.
+**Framing consequence — the pitch is optionality.** Rewritten 28 Jul 2026
+after the Article 7(2) correction above, which removed the objection this
+paragraph originally answered.
+
+> **Without your number, your importer has no choice — they use the default.
+> With it, they can use whichever is lower.**
+
+Three properties make this the right framing, and each is a repair of a
+weakness in what it replaces:
+
+- **It cannot be falsified by one customer.** A savings pitch ("your actuals
+  will cost less") breaks the first time an installation comes in above its
+  country's marked-up default. The optionality pitch does not: for that
+  customer the answer is *the default was the better route, and now you know
+  that* — a real outcome, not a consolation. **Never promise a direction.
+  Promise the choice.**
+- **It explains why a high-emitting installation should still buy.** Under the
+  savings framing they are the customer you cannot serve. Under this one they
+  are a customer who needs the number precisely because they cannot otherwise
+  tell which route is cheaper — and who now has a measured baseline to
+  improve against.
+- **It is what the amended regulation actually provides.** Article 7(2) as
+  amended by Reg. (EU) 2025/2083 gives the declarant an either/or. A product
+  that supplies the missing input to a lawful choice is a straightforwardly
+  honest thing to sell.
+
+**The mark-up remains the reason the choice usually goes one way**, and that
+argument is unaffected by the correction: the default carries 10 % (2026),
+20 % (2027), 30 % (2028+) on top of the country figure, so an installation
+must be worse than its national average by more than that margin before the
+default flatters it. State the threshold, not the outcome — *"you would have
+to be more than 10 % above your country's average this year"* is checkable;
+*"you will almost certainly come in lower"* is a promise we cannot keep for
+every customer.
+
+**Copy rules, binding:**
+- Never state or imply that a customer's actuals will be lower. Ban
+  "almost always", "you'll save", "guaranteed to beat".
+- Always state the mark-up as a schedule with years and sectors, never as one
+  generic figure (fertilisers are 1 % flat).
+- Never imply the declarant is obliged to use actuals. They are not.
 
 ### Two numbers, two audiences — do not conflate them
 
