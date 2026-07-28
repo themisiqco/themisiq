@@ -76,7 +76,7 @@ function makeClient(captor: { payload?: Record<string, unknown> }) {
     cbam_precursor_inputs: { data: [PRECURSOR_ROW], error: null },
     cbam_installations: { data: { country: 'TR' }, error: null },
     cbam_goods_categories: { data: { annex_ii_direct_only: true }, error: null }, // no indirect leg
-    cbam_default_values: { data: { see_direct: 1.4 }, error: null },
+    cbam_default_values: { data: { see_direct: 1.4, see_total: 1.4, markup_2026: 1.54, markup_2027: 1.68, markup_2028_plus: 1.82 }, error: null },
     cbam_sefa_params: { data: { cbam_factor: 0.975, cscf: null, cscf_status: 'pending' }, error: null },
     cbam_see_records: { data: null, error: null },
   };
@@ -87,6 +87,7 @@ function makeClient(captor: { payload?: Record<string, unknown> }) {
         select: () => builder,
         eq: () => builder,
         in: () => builder,
+        order: () => builder,
         insert: (payload: Record<string, unknown>) => {
           captor.payload = payload;
           result = { data: { id: 'see-1', ...payload }, error: null };
@@ -138,5 +139,26 @@ describe('CBAM compute route — default-value share persistence', () => {
     // Annex II good: no indirect leg → indirect denominator 0 → share is UNDEFINED, persisted as null.
     expect(payload.default_share_indirect).toBeNull();
     expect(payload.default_share_indirect).not.toBe(0);
+  });
+
+  it('records the default comparison and a computed exposure delta in workings', async () => {
+    const { status, payload } = await runRoute();
+    expect(status).toBe(200);
+    // STUB LIMITATION: the stub returns one fixed result per table and ignores .eq() filters, so the
+    // country-specific query always resolves and countryUsed reflects the fixture's installation
+    // country rather than a real per-country lookup. The block's SHAPE is what this test protects,
+    // not the country resolution.
+    const workings = payload.workings as { defaultComparison?: Record<string, unknown> };
+    const dc = workings.defaultComparison as Record<string, unknown>;
+    expect(dc).toBeDefined();
+    expect(dc.source).toBe('IR 2025/2621 Annex I');
+    expect(typeof dc.countryUsed).toBe('string');
+    expect((dc.countryUsed as string).length).toBeGreaterThan(0);
+    expect(typeof dc.deltaDirectVsDefault).toBe('number');
+    const exposure = dc.exposure as Record<string, unknown>;
+    expect(exposure.status).toBe('computed');
+    // PROCESS_ROW.reporting_period is 2026, so markup_2026 (1.54) is the marked-up basis.
+    expect(exposure.basisYear).toBe(2026);
+    expect(exposure.markedUpDefault).toBe(1.54);
   });
 });
