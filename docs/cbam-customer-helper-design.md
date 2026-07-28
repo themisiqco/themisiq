@@ -8,6 +8,10 @@ conservatism and the actual-vs-default election (§6, §11).
 Amended: 2026-07-28, following a schema recon on what `see_direct` holds —
 the comparison denominator is un-marked-up and a commercial framing on it
 would invert sign for some customers (§6, §10).
+**CORRECTED: 2026-07-28** — an earlier entry in this document stated that
+actual-vs-default is not the declarant's election. That was the pre-amendment
+Article 7(2). Regulation (EU) 2025/2083 amended it; the choice is now free.
+See §6.
 Scope: CBAM first; framework intended for all modules.
 Includes: precursor intake specification (in scope, not deferred).
 
@@ -327,12 +331,26 @@ Conservatism is not an artefact; it is the Commission's stated design.
   **No copy may state a single generic mark-up figure** — it is sector- and
   year-dependent. The cost of lacking actuals rises annually, by regulation:
   a renewal argument with a date on it.
-- **Actual-vs-default is not the customer's election.** Regulation (EU)
-  2023/956 Article 7(2): defaults apply where actual emissions cannot be
-  adequately determined. A customer whose actuals come in worse than the
-  default cannot decline to report them. **The tool can therefore report the
-  truth in either direction without ever handing anyone a reason to conceal
-  it** — which is what makes "fail loud, never flatter" safe to ship here.
+- **Actual-vs-default IS the declarant's election — CORRECTED 28 Jul 2026.**
+  An earlier draft of this section asserted the opposite, citing Article 7(2)
+  of Regulation (EU) 2023/956 as making defaults conditional on actuals being
+  undeterminable. **That was the original 2023 text.** Regulation (EU)
+  2025/2083 (in force 20 Oct 2025) replaced Article 7(2): embedded emissions
+  in goods other than electricity are determined either (a) on actual
+  emissions, **or** (b) by reference to default values. Recital 19 confirms
+  the either/or framing. The conditionality is gone.
+
+  **This strengthens the product rather than weakening it.** If the route is a
+  genuine choice, then knowing your actuals is what *creates* the choice —
+  without them the declarant has no option but the default. The pitch is
+  therefore: *you cannot elect the better route if you do not know your own
+  number.*
+
+  **And the honesty position holds.** Electing defaults where permitted is
+  lawful; ThemisIQ's obligation is to produce a true figure, not to police
+  what a declarant does with it. The tool reports in either direction. What it
+  must never do is imply that a favourable outcome is assured — see the
+  framing rule below.
 - **Early-year default use is anticipated.** Recital (5) reasons that
   declarants should be able to use defaults in the first years — partly
   because verifier numbers may only increase after the transitional period —
@@ -563,7 +581,10 @@ silent-error risk and are solved by 2.5 and 3, not by 1 and 2.
 | **Actual-vs-default comparison is write-only** — `default_compared` / `delta_vs_default` written by the compute route, read by nothing (no select list, no type, no render) | Decision 28 Jul: surface as the *reasonableness delta* in workings/verifier first; label un-marked-up and direct-only | Verifier surface |
 | **Comparison denominator is un-marked-up** — reads `see_direct`; `markup_2026`/`markup_2027`/`markup_2028_plus` are read nowhere. A commercial framing on `see_direct` inverts sign for customers sitting between the raw and marked-up default | Build the *exposure delta* as a separate year-keyed quantity; never repurpose `default_compared` | Customer-facing headline; the §6 commercial gradient |
 | **Comparison country basis hardcoded** — `compute/route.ts` filters `country='other'` as a literal, not a fallback, so the per-country seed (6,423 steel + 1,628 aluminium rows) is unreachable on this path for every process | Fix before either delta is surfaced | Both deltas |
-| **Spec §3 schema sketch is stale and contradicts the built table** — says `see_direct` is "INCLUDING mark-up" and uses `cn_prefix`/`route_code` with a three-part PK, none of which shipped | Correct or strike; it is a schema a developer could build from | Nothing today |
+| ~~**Spec §3 schema sketch is stale**~~ **RESOLVED 28 Jul 2026** — executable DDL struck; migration is the schema | Closed | — |
+| **System boundaries must align with EU ETS** — Reg. (EU) 2025/2083 recital (16) and amended Art. 7(7)(a): certain finishing processes for some steel and aluminium goods are excluded from the boundary. IR 2025/2547 post-dates the amendment so the engine may already be correct, but this is unverified | Verify against `lib/cbam/` boundary logic; §11 watch entry | Correctness of SEE for downstream steel/aluminium goods |
+| **Quarterly holding can rest on last year's surrender** — Art. 22(2)(b): from 2027 the 50 % quarterly holding may be based on the prior year's surrendered certificate count for the same goods and CN code, rather than defaults. Supplying verified actuals therefore reduces the importer's tied-up working capital in every subsequent year | Marketing argument, unused | Retention / renewal case |
+| **Carbon-price deduction is capped on the default route** — Art. 9(4): where emissions rest on default values, the third-country carbon-price deduction may be claimed only by reference to yearly *default* carbon prices. Actuals open the route to the price actually paid | Marketing argument, unused; material for exporters in carbon-priced jurisdictions | Value case, esp. Canada |
 | **Mark-up step 10 %→20 % at 2027, →30 % at 2028**; defaults and mark-ups to be revised by Dec 2027 at latest, with the Commission aiming to bring a revision forward into 2026 where possible | §11 watch | Seeded values' shelf life |
 | Corpus review workflow — entries stale as regulation moves | Design | See `docs/regulatory-source-monitoring-design.md` |
 | CSCF unpublished; benchmark bands stop at 2030; stainless indicator gap | §11 watch | Layer 4 refusal list |
