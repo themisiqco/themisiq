@@ -5,6 +5,9 @@ Date: 2026-07-28
 Amended: 2026-07-28, following the GHG coverage-check validation test (§8).
 Amended: 2026-07-28, following a primary-source pass on default-value
 conservatism and the actual-vs-default election (§6, §11).
+Amended: 2026-07-28, following a schema recon on what `see_direct` holds —
+the comparison denominator is un-marked-up and a commercial framing on it
+would invert sign for some customers (§6, §10).
 Scope: CBAM first; framework intended for all modules.
 Includes: precursor intake specification (in scope, not deferred).
 
@@ -342,12 +345,62 @@ on the assumption you might be worse than your country's average.* This holds
 regardless of which way the delta falls, so it cannot be falsified by a single
 customer whose actuals come in high. A savings framing can be; do not use one.
 
-**Basis consequence (see §10).** Comparing every process against the `'other'`
-row does not merely lose precision — it compares the customer to a global
-fallback rather than to the mark-up-adjusted default their importer will
-actually face for goods of their origin. That is the figure with commercial
-and compliance meaning. The `'other'` basis understates the case in most
-instances and misstates it in all of them.
+### Two numbers, two audiences — do not conflate them
+
+Schema recon (28 Jul 2026) established that the existing comparison uses the
+**un-marked-up** default. `cbam_default_values.see_direct` is the annex's raw
+direct-emissions column; the three mark-up columns (`markup_2026`,
+`markup_2027`, `markup_2028_plus`) hold the mark-up-inclusive values and are
+**read nowhere in the codebase** — seeded across 8,251 rows, never selected.
+
+That distinction is not a matter of precision. It flips the sign.
+
+Worked example, `7206 10 00` / `'other'`: `see_direct` 3.750,
+`markup_2026` 4.125. A customer whose actual SEE is 3.9 —
+
+| Denominator | Delta | Reads as |
+|---|---|---|
+| `see_direct` (3.750) | **+0.15** | "your actuals are worse than the default" |
+| `markup_2026` (4.125) | **−0.225** | "you beat the figure your importer would otherwise face" |
+
+Both are true. They are answers to different questions, and only the second is
+the pitch this section describes. **Had the existing `default_compared` been
+surfaced under a commercial framing, some customers would have been told they
+are worse off for having calculated — when the regulation's own mark-up means
+they are better off.** That is precisely the failure mode §1 exists to prevent,
+and it was one render away.
+
+The resolution is two distinct quantities:
+
+| | Denominator | Audience | Question answered |
+|---|---|---|---|
+| **Reasonableness delta** | `see_direct` (un-marked-up, direct-only) | Verifier, calculation workings | Is this figure plausible against the published default? |
+| **Exposure delta** | `markup_YYYY` for the reporting year | Customer, and their EU buyer | What does calculating actually save the importer? |
+
+Consequences for the build:
+
+- **`default_compared` as it stands is already correct** for the verifier
+  surface. Keep it; label it explicitly as un-marked-up and direct-only.
+  Do not repurpose it.
+- **The exposure delta does not exist yet** and must be **year-keyed** —
+  10 % / 20 % / 30 % by reporting period, selected from the process's own
+  reporting year, never a constant. The widening gap is the renewal argument,
+  and it only works if the year is right.
+- **Never show both without distinct labels.** Two deltas of opposite sign on
+  one screen, unexplained, is worse than showing neither.
+
+**Country-basis defect (separate, still open).** Independently of the mark-up
+question, the comparison query hardcodes `country='other'`, so it compares
+every process to a global fallback rather than to the default for goods of
+their origin. Both defects must be fixed before either delta is surfaced;
+neither fix implies the other.
+
+**Total-vs-direct is moot for now, but not permanently.** For Annex II goods
+`see_indirect` is null on 8,250 of 8,251 rows, so `see_direct == see_total` and
+the two possible mark-up bases coincide. The single discriminating row
+(`2601 12 00`, sintered ore, non-Annex-II) shows them diverging by ~11 %. The
+distinction becomes live the moment a sector with real indirect values —
+cement, fertilisers, hydrogen — enters the table.
 
 ### The honest ceiling
 
@@ -507,7 +560,10 @@ silent-error risk and are solved by 2.5 and 3, not by 1 and 2.
 | `audit_log` schema + RLS unswept (DB-only) | Prerequisite (roadmap 23.1) | Layer 2.5 affirmation writes |
 | ~~`'other'` fallback conservatism unverified~~ **RESOLVED 28 Jul 2026** — conservatism is the Commission's stated design (IR 2025/2621 recitals 3–4) | Closed | — |
 | ~~Any regulatory limit on share resting on defaults~~ **RESOLVED 28 Jul 2026** — not a percentage cap but a condition: Art. 7(2) makes defaults a fallback where actuals cannot be adequately determined | Closed | — |
-| **Actual-vs-default comparison is currently write-only** — `default_compared` / `delta_vs_default` are written by the compute route and read by nothing; and the query hardcodes `country='other'`, so the per-country seed (6,423 steel + 1,628 aluminium rows) is unreachable on this path | Decision taken 28 Jul: surface in workings/verifier first, customer-facing headline later; fix basis before either | The commercial gradient above |
+| **Actual-vs-default comparison is write-only** — `default_compared` / `delta_vs_default` written by the compute route, read by nothing (no select list, no type, no render) | Decision 28 Jul: surface as the *reasonableness delta* in workings/verifier first; label un-marked-up and direct-only | Verifier surface |
+| **Comparison denominator is un-marked-up** — reads `see_direct`; `markup_2026`/`markup_2027`/`markup_2028_plus` are read nowhere. A commercial framing on `see_direct` inverts sign for customers sitting between the raw and marked-up default | Build the *exposure delta* as a separate year-keyed quantity; never repurpose `default_compared` | Customer-facing headline; the §6 commercial gradient |
+| **Comparison country basis hardcoded** — `compute/route.ts` filters `country='other'` as a literal, not a fallback, so the per-country seed (6,423 steel + 1,628 aluminium rows) is unreachable on this path for every process | Fix before either delta is surfaced | Both deltas |
+| **Spec §3 schema sketch is stale and contradicts the built table** — says `see_direct` is "INCLUDING mark-up" and uses `cn_prefix`/`route_code` with a three-part PK, none of which shipped | Correct or strike; it is a schema a developer could build from | Nothing today |
 | **Mark-up step 10 %→20 % at 2027, →30 % at 2028**; defaults and mark-ups to be revised by Dec 2027 at latest, with the Commission aiming to bring a revision forward into 2026 where possible | §11 watch | Seeded values' shelf life |
 | Corpus review workflow — entries stale as regulation moves | Design | See `docs/regulatory-source-monitoring-design.md` |
 | CSCF unpublished; benchmark bands stop at 2030; stainless indicator gap | §11 watch | Layer 4 refusal list |
