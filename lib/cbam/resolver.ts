@@ -100,8 +100,12 @@ export async function makeResolveContext(
       if (fallback != null) return fallback;
 
       // FAIL LOUD — never 0. A missing default is an unpriced precursor, not a free one.
-      // Most likely cause: cn_code is a "see below" heading (7206, 7207, 7211, …) deliberately not
-      // seeded, and must be resolved to its 8-digit child before lookup.
+      // Do NOT resolve a heading to a child code to make this succeed. §10.7 forbids
+      // heading→child inference: children carry differing values (see the 7224 trap), and no
+      // code anywhere performs it. A miss means this cn_code is absent from the seed at the
+      // granularity supplied — which may be a "see below" heading (7206, 7207, 7211, …), an
+      // unseeded sector, or simply a wrong code. The fix is a correct code from the customer's
+      // customs paperwork, never a substituted or inferred one.
       throw new Error(
         `defaultLookup: no cbam_default_values row for cn_code "${p.cnCode}" ` +
         `(country "${p.originCountry}", nor fallback "${FALLBACK_COUNTRY}")`,
