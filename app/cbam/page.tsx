@@ -140,9 +140,10 @@ export default function Page() {
           <tbody>
             {[
               ['CBAM Regulation', 'Regulation (EU) 2023/956', 'The regime itself'],
+              ['CBAM Simplification', 'Regulation (EU) 2025/2083', 'Amends the above — scope, deadlines, boundaries'],
               ['Embedded-emissions calculation', 'IR (EU) 2025/2547', 'How specific embedded emissions are computed'],
               ['Free-allocation adjustment', 'IR (EU) 2025/2620', 'Benchmarks'],
-              ['Default values', 'IR (EU) 2025/2621', 'The fallback verified actuals avoid'],
+              ['Default values', 'IR (EU) 2025/2621', 'The alternative to actuals — carries a mark-up'],
               ['Verification & accreditation', 'IR (EU) 2025/2546 · DR (EU) 2025/2551', 'Verifier accreditation (EN ISO/IEC 14065)'],
             ].map((row, i) => (
               <tr key={i}>

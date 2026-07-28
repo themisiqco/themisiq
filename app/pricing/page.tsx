@@ -51,7 +51,7 @@ const MODULES: Module[] = [
     ],
     cta: {
       headline: 'Is your EU customer asking for your actual emissions?',
-      sub: 'Default values assume the worst. Your own figures, computed and verifiable, almost always cost less.',
+      sub: 'Defaults carry a mark-up on top of the figure published for your country — 10% for 2026, rising to 30% by 2028. Your own verified emissions give your EU customer the choice.',
       btn: 'Calculate your embedded emissions →',
       href: '/dashboard/cbam',
     },
