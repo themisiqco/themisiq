@@ -3,9 +3,12 @@
 //
 // WHY THIS EXISTS. Spec §10.8 records three incompatible CN key formats across the CBAM
 // datasets:
-//   cbam_cn_map.cn_prefix        digits only, no spaces      54× 4-digit, 3× 5-digit, 1× 8-digit
-//   cbam_default_values.cn_code  spaced, mixed width         19× 4-digit, 62× 6-digit, 119× 8-digit
-//   cbam_benchmarks.cn_code      spaced, always 8-digit
+//   cbam_cn_map.cn_prefix        digits only, no spaces   58 rows: 54× 4-digit, 3× 5-digit, 1× 8-digit
+//   cbam_default_values.cn_code  spaced, mixed width      8,052 rows / 224 codes: 27× 4, 63× 6, 134× 8
+//   cbam_benchmarks.cn_code      spaced, always 8-digit   2,389 rows / 536 codes
+// (Counts verified 29 Jul 2026; the default-values line previously carried the steel-only
+// 19/62/119 figures. See spec §10.8 — and §10.9(c): parsing the migrations yields 8,251
+// tuples there, 199 of which are discarded on conflict.)
 // Literal string equality between any two is wrong in the general case: '26011200' never
 // equals '2601 12 00'. The trap is that equality ACCIDENTALLY works on the bare-4-digit
 // subset ('7203' === '7203'), so a naive implementation passes on many steel rows and fails
@@ -85,4 +88,101 @@ export function matchCnPrefix(
     }
   }
   return best;
+}
+
+/**
+ * The result of comparing a user-selected goods category against what the CN map implies.
+ *
+ * THREE STATES, and the third is not a weaker form of the first two. 'no_opinion' means the
+ * map cannot judge — the code is outside CBAM scope, or not yet typed, or the category is not
+ * yet chosen. Collapsing it into 'consistent' would silently bless an unjudged pair;
+ * collapsing it into 'inconsistent' would accuse a user who has done nothing wrong. Same
+ * discipline as ReportField<T>'s value / missing / not_applicable split in report/types.ts.
+ *
+ * FOUR REASONS, and the last one is a different KIND of fact from the other three.
+ * 'no_prefix_match', 'unparseable_cn' and 'no_category_selected' all describe the user's
+ * input — incomplete, out of scope, or not yet typed. 'malformed_reference_row' describes a
+ * defect in OUR seed data: a cbam_cn_map row whose cn_prefix is not digits-only.
+ *
+ * They warrant opposite treatment at the UI surface. A half-typed code deserves SILENCE —
+ * the user is mid-keystroke and has done nothing wrong. Broken reference data deserves
+ * VISIBILITY — nobody is mid-anything, the category hint is silently degraded for every user
+ * hitting that row, and no amount of correct typing will fix it. Merging the two would bury
+ * a system defect inside the most-ignored state in the union.
+ */
+export type CnCategoryAssessment =
+  | { kind: 'consistent'; matched_prefix: string; category_code: string }
+  | { kind: 'inconsistent'; matched_prefix: string; expected_category: string; selected_category: string }
+  | {
+      kind: 'no_opinion';
+      reason: 'no_prefix_match' | 'unparseable_cn' | 'no_category_selected' | 'malformed_reference_row';
+    };
+
+/**
+ * Assess whether a selected goods category agrees with the CN map's opinion of a CN code.
+ *
+ * NEVER THROWS, for any input. This is intended to run at render time on every keystroke, so
+ * a throw would take the form down mid-edit. That is the opposite posture from normalizeCn
+ * and matchCnPrefix, which fail loud by design — the difference is the call site, not the
+ * principle: a save path must refuse bad data, a live hint must not crash while the user is
+ * still typing. An unparseable code is reported as an absence of opinion, never as a pass.
+ *
+ * PRECEDENCE: an unchosen category short-circuits before the code is examined at all. A user
+ * who has typed a CN code but not yet picked a category has made no claim to contradict, and
+ * telling them their unselected category is wrong would be nonsense.
+ *
+ * THE TWO THROW SOURCES ARE SEPARATED STRUCTURALLY, not by inspecting the error. The user's
+ * code is normalised first, in its own try/catch; only if that succeeds is matchCnPrefix
+ * called. So a throw from matchCnPrefix cannot have come from the code — it can only have
+ * come from a row's cn_prefix. Matching on the message text would work today and break the
+ * first time normalizeCn's wording is edited; the ordering cannot rot that way.
+ *
+ * Absorbing a malformed row here is deliberate but is NOT a fix. The loud version lives in
+ * matchCnPrefix, which the save path should call. Do not treat this function as validation
+ * of the seed.
+ */
+export function assessCnCategory(
+  cnCode: string,
+  categoryCode: string,
+  rows: ReadonlyArray<CnMapRow>,
+): CnCategoryAssessment {
+  // `?? ''` rather than trusting the signature: this is called from a form, and an untyped
+  // caller passing null must not be the thing that crashes it.
+  const selected = (categoryCode ?? '').trim();
+  if (selected === '') return { kind: 'no_opinion', reason: 'no_category_selected' };
+
+  const raw = (cnCode ?? '').trim();
+  if (raw === '') return { kind: 'no_opinion', reason: 'unparseable_cn' };
+
+  // Normalise the USER'S code first, alone. This is what makes the two throw sources
+  // distinguishable below: past this point the code is known-good, so nothing downstream can
+  // fail because of it. The user's own error is therefore checked first and wins.
+  let code: string;
+  try {
+    code = normalizeCn(raw);
+  } catch {
+    return { kind: 'no_opinion', reason: 'unparseable_cn' };
+  }
+
+  let match: CnPrefixMatch | null;
+  try {
+    // `code` is already normalised; matchCnPrefix re-normalises it, which is idempotent on
+    // digits. Passing it through keeps prefix matching in one place rather than inlining it.
+    match = matchCnPrefix(code, rows);
+  } catch {
+    // Can only be a row's cn_prefix — see the ordering note in the doc comment.
+    return { kind: 'no_opinion', reason: 'malformed_reference_row' };
+  }
+
+  if (match === null) return { kind: 'no_opinion', reason: 'no_prefix_match' };
+
+  if (match.category_code === selected) {
+    return { kind: 'consistent', matched_prefix: match.matched_prefix, category_code: match.category_code };
+  }
+  return {
+    kind: 'inconsistent',
+    matched_prefix: match.matched_prefix,
+    expected_category: match.category_code,
+    selected_category: selected,
+  };
 }

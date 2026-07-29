@@ -8,7 +8,7 @@
 // seeded spaced form ('7202 11', '7206 10 00', '2601 12 00') so the tests reproduce the
 // actual cross-dataset mismatch §10.8 describes rather than a synthetic one.
 import { describe, it, expect } from 'vitest';
-import { normalizeCn, matchCnPrefix, type CnMapRow } from './cn';
+import { normalizeCn, matchCnPrefix, assessCnCategory, type CnMapRow } from './cn';
 
 // A representative slice of the real seed. Prefixes verbatim; nothing here is invented.
 const SEED: CnMapRow[] = [
@@ -145,5 +145,128 @@ describe('matchCnPrefix — longest-prefix precedence', () => {
     expect(matchCnPrefix('7202 30', OVERLAPPING)).toEqual({
       category_code: 'HEADING_LEVEL', matched_prefix: '7202',
     });
+  });
+});
+
+describe('assessCnCategory — the three states', () => {
+  it('consistent: a products code with iron_steel_products selected', () => {
+    expect(assessCnCategory('7208 10 00', 'iron_steel_products', SEED)).toEqual({
+      kind: 'consistent', matched_prefix: '7208', category_code: 'iron_steel_products',
+    });
+  });
+
+  it('inconsistent: the SAME code with crude_steel selected reports BOTH categories', () => {
+    // Reporting only "wrong" would leave the user to guess what it should be. Both sides are
+    // carried so a caller can say which is which.
+    expect(assessCnCategory('7208 10 00', 'crude_steel', SEED)).toEqual({
+      kind: 'inconsistent',
+      matched_prefix: '7208',
+      expected_category: 'iron_steel_products',
+      selected_category: 'crude_steel',
+    });
+  });
+
+  it('the §3.15.1 fork: 7218 is crude_steel, NOT iron_steel_products', () => {
+    // 7218 sits inside the 7208-7229 span but is deliberately excluded from products — only
+    // primary hot-rolling to 7207/7218/7224 is crude steel. Anyone reading the span as a range
+    // gets this wrong, which is why cbam_cn_map carries an inline comment on the row.
+    expect(assessCnCategory('7218 10 00', 'iron_steel_products', SEED)).toEqual({
+      kind: 'inconsistent',
+      matched_prefix: '7218',
+      expected_category: 'crude_steel',
+      selected_category: 'iron_steel_products',
+    });
+    // …and the correct selection passes.
+    expect(assessCnCategory('7218 10 00', 'crude_steel', SEED)).toEqual({
+      kind: 'consistent', matched_prefix: '7218', category_code: 'crude_steel',
+    });
+  });
+
+  it('aluminium: consistent across the second seed', () => {
+    expect(assessCnCategory('7601', 'primary_aluminium', SEED)).toEqual({
+      kind: 'consistent', matched_prefix: '7601', category_code: 'primary_aluminium',
+    });
+    expect(assessCnCategory('7616 99 90', 'primary_aluminium', SEED)).toEqual({
+      kind: 'inconsistent',
+      matched_prefix: '7616',
+      expected_category: 'aluminium_products',
+      selected_category: 'primary_aluminium',
+    });
+  });
+
+  it('no_opinion / no_prefix_match: the code is outside CBAM scope', () => {
+    // 7204 is scrap — deliberately absent from the map. Not an error, and NOT a pass.
+    expect(assessCnCategory('7204 10 00', 'iron_steel_products', SEED)).toEqual({
+      kind: 'no_opinion', reason: 'no_prefix_match',
+    });
+  });
+
+  it('no_opinion / unparseable_cn: RETURNS rather than throws', () => {
+    // matchCnPrefix throws here by design; the assessor must absorb it. Asserting no throw
+    // explicitly, because a throw at render time takes the whole form down.
+    expect(() => assessCnCategory('72O6 10 00', 'crude_steel', SEED)).not.toThrow();
+    expect(assessCnCategory('72O6 10 00', 'crude_steel', SEED)).toEqual({
+      kind: 'no_opinion', reason: 'unparseable_cn',
+    });
+    expect(assessCnCategory('', 'crude_steel', SEED)).toEqual({
+      kind: 'no_opinion', reason: 'unparseable_cn',
+    });
+    expect(assessCnCategory('   ', 'crude_steel', SEED)).toEqual({
+      kind: 'no_opinion', reason: 'unparseable_cn',
+    });
+  });
+
+  it('no_opinion / no_category_selected takes precedence over an unparseable code', () => {
+    // A user who has not picked a category has made no claim to contradict.
+    expect(assessCnCategory('7208 10 00', '', SEED)).toEqual({
+      kind: 'no_opinion', reason: 'no_category_selected',
+    });
+    expect(assessCnCategory('7208 10 00', '   ', SEED)).toEqual({
+      kind: 'no_opinion', reason: 'no_category_selected',
+    });
+    // Both missing -> the category reason wins, because it is the earlier omission.
+    expect(assessCnCategory('', '', SEED)).toEqual({
+      kind: 'no_opinion', reason: 'no_category_selected',
+    });
+  });
+
+  it('a malformed ROW prefix is absorbed as malformed_reference_row, not thrown', () => {
+    // matchCnPrefix throws on this (a reference-data defect). The save path should see that
+    // throw; a render-time hint must not. It is reported distinctly from a user typo because
+    // it is a system defect: no correct typing will clear it.
+    const BAD: CnMapRow[] = [{ cn_prefix: '72 06x', category_code: 'crude_steel' }];
+    expect(() => assessCnCategory('7206 10 00', 'crude_steel', BAD)).not.toThrow();
+    expect(assessCnCategory('7206 10 00', 'crude_steel', BAD)).toEqual({
+      kind: 'no_opinion', reason: 'malformed_reference_row',
+    });
+  });
+
+  it('a malformed row AND an unparseable code resolve to unparseable_cn — the user is checked first', () => {
+    // Both are broken. The user's own input is validated before the reference data is touched,
+    // so their error is the one reported: it is the one they can act on, and reporting a system
+    // defect to someone who has just mistyped would be noise at exactly the wrong moment.
+    const BAD: CnMapRow[] = [{ cn_prefix: '72 06x', category_code: 'crude_steel' }];
+    expect(assessCnCategory('72O6 10 00', 'crude_steel', BAD)).toEqual({
+      kind: 'no_opinion', reason: 'unparseable_cn',
+    });
+  });
+
+  it('never throws across a spread of valid and malformed inputs', () => {
+    const codes = [
+      '7208 10 00', '7218', '2601 12 00', '7202 11', '7601', '7204 10 00', '9999 99 99',
+      '', '   ', 'ABC', '72O6', '7206-10-00', '..', '-1', '7206\t10\n00', '٧٢٠٦',
+      '0', '00000000000000000000', 'null', 'undefined', '7206 10 00 ',
+    ];
+    const cats = ['crude_steel', 'iron_steel_products', 'primary_aluminium', '', '   ', 'not_a_category'];
+    const rowSets: ReadonlyArray<ReadonlyArray<CnMapRow>> = [
+      SEED, [], [{ cn_prefix: '72 06x', category_code: 'crude_steel' }], [{ cn_prefix: '', category_code: 'x' }],
+    ];
+    let n = 0;
+    for (const c of codes) for (const cat of cats) for (const rows of rowSets) {
+      const r = assessCnCategory(c, cat, rows);   // must not throw
+      expect(['consistent', 'inconsistent', 'no_opinion']).toContain(r.kind);
+      n++;
+    }
+    expect(n).toBe(codes.length * cats.length * rowSets.length);
   });
 });
