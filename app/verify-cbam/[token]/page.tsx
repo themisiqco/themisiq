@@ -5,7 +5,7 @@ import { supabase } from '../../../lib/supabase'
 // Types imported (type-only → erased at runtime) so the render can never drift from
 // the builder's contract. Do not re-declare these shapes locally.
 import type {
-  Report12, MissingField, ReportField, Coordinates, ProcessSummary,
+  Report12, CompletenessResult, CompletenessItem, ReportField, Coordinates, ProcessSummary,
   Item4Good, Item12DefaultPrecursor, Item13ActualPrecursor, Item16PrecursorOrigin,
 } from '../../../lib/cbam/report/types'
 import type { SefaBenchmarkWorkings } from '../../../lib/cbam/sefaCompute'
@@ -40,7 +40,11 @@ interface AcceptResult {
 // are { error: string } with NO report — see the fetch effect.
 interface VerifierReportResponse {
   report: Report12
-  missing: MissingField[]
+  // Replaces the former flat `missing`. completeness.items is a strict superset and
+  // carries WHO can clear each item — the distinction that matters most here: a gap
+  // the operator can close is a finding about the client, while an item ThemisIQ never
+  // produced is a limit on what this evidence can support at all.
+  completeness: CompletenessResult
   documents: { id: string; file_name: string; document_type: string }[]
   coverage: { processes_total: number; processes_without_record: number }
   verifier: { verifier_name: string | null; installation_name: string | null; reporting_period: number }
@@ -520,7 +524,7 @@ function auditChanges(entry: AuditHistoryEntry): { label: string; from: string |
 }
 
 function ReportBody({ data, token, history, historyLoading }: { data: VerifierReportResponse; token: string; history: AuditHistoryEntry[]; historyLoading: boolean }) {
-  const { report: r, missing, documents, coverage } = data
+  const { report: r, completeness, documents, coverage } = data
   return (
     <>
       {/* Coverage callout — the "with summary" completeness signal, near the top. */}
@@ -682,20 +686,42 @@ function ReportBody({ data, token, history, historyLoading }: { data: VerifierRe
         ))}
       </div>
 
-      {/* Completeness — every missing[] entry. */}
+      {/* Completeness — scope limitations first, then operator gaps. */}
       <div style={{ marginBottom: '2rem' }}>
         <SectionHead>Completeness</SectionHead>
-        {missing.length === 0 ? (
-          <div style={{ fontSize: 13, color: '#0F6E56' }}>No gaps — all §1.2 fields provided.</div>
-        ) : (
-          <div>
-            {missing.map((m, i) => (
+
+        {completeness.limitations.length > 0 && (
+          <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: '1.25rem' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#555553', marginBottom: 4 }}>Scope limitations of the producing tool</div>
+            <p style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '0.75rem' }}>These §1.2 items were not produced by ThemisIQ. Each is recorded rather than omitted or estimated. They are not operator gaps — no action by the operator clears them, and they are excluded from the supplied count below.</p>
+            {completeness.limitations.map((m: CompletenessItem, i: number) => (
               <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '6px 0', borderBottom: '0.5px solid #e8e7e4', fontSize: 13 }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 8px', borderRadius: 4, whiteSpace: 'nowrap' }}>{m.item}</span>
-                <span style={{ color: '#0d0d0d' }}>{m.field}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#555553', background: '#e8e7e4', padding: '1px 8px', borderRadius: 4, whiteSpace: 'nowrap' }}>{m.item}</span>
+                <span style={{ color: '#555553' }}>{m.field}</span>
+                <span style={{ color: '#888784', fontStyle: 'italic' }}>— {m.responsibility === 'platform' ? 'input not built' : 'unresolved in the regulation'}</span>
                 {m.hint ? <span style={{ color: '#888784' }}>— {m.hint}</span> : null}
               </div>
             ))}
+          </div>
+        )}
+
+        <div style={{ fontSize: 12, color: '#888784', marginBottom: completeness.outstandingCount > 0 ? '0.75rem' : 0 }}>
+          {completeness.suppliedCount} of {completeness.requiredCount} operator-supplied fields provided.
+        </div>
+
+        {completeness.outstandingCount === 0 ? (
+          <div style={{ fontSize: 13, color: '#0F6E56' }}>No operator gaps — every required field is supplied or accounted for.</div>
+        ) : (
+          <div>
+            {completeness.items
+              .filter((i: CompletenessItem) => i.responsibility === 'operator' && i.state === 'outstanding')
+              .map((m: CompletenessItem, i: number) => (
+                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '6px 0', borderBottom: '0.5px solid #e8e7e4', fontSize: 13 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 8px', borderRadius: 4, whiteSpace: 'nowrap' }}>{m.item}</span>
+                  <span style={{ color: '#0d0d0d' }}>{m.field}</span>
+                  {m.hint ? <span style={{ color: '#888784' }}>— {m.hint}</span> : null}
+                </div>
+              ))}
           </div>
         )}
       </div>
