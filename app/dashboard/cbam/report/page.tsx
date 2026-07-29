@@ -31,7 +31,7 @@ import { useEntitlement } from '../../../../lib/useEntitlement'
 import { cbamInputStyle, CbamField } from '../components/DisclosureQuestion'
 import { exportReportXlsx } from './exportXlsx'
 import type {
-  Report12, ReportField, MissingField, Coordinates, ProcessSummary,
+  Report12, ReportField, MissingField, CompletenessResult, Coordinates, ProcessSummary,
   Item4Good, Item5TotalDirect,
 } from '../../../../lib/cbam/report/types'
 import type { SefaBenchmarkWorkings } from '../../../../lib/cbam/sefaCompute'
@@ -46,6 +46,7 @@ type AnyField = ReportField<unknown>
 interface ReportResponse {
   report: Report12
   missing: MissingField[]
+  completeness: CompletenessResult
   processesWithoutRecord: string[]
   processesCompleteDeclaredAt: string | null
 }
@@ -338,7 +339,7 @@ export default function CbamReportPage() {
           <AttestationBanner declaredAt={data.processesCompleteDeclaredAt} />
 
           {/* THE missing CHECKLIST — a primary feature, near the top, never suppressed. */}
-          <MissingChecklist missing={data.missing} />
+          <MissingChecklist completeness={data.completeness} />
 
           {/* ── All 16 items in Annex IV order ── */}
           <ItemSection n="(1)" title="Identification of the operator">
@@ -637,31 +638,77 @@ function Item5View({ item5 }: { item5: Item5TotalDirect }) {
   )
 }
 
-// ── The missing checklist — a primary feature ──
-function MissingChecklist({ missing }: { missing: MissingField[] }) {
-  if (missing.length === 0) {
-    return (
-      <div style={{ marginTop: '1.5rem', background: '#E1F5EE', border: '0.5px solid #b8e6d5', borderRadius: 12, padding: '1rem 1.25rem' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#0F6E56' }}>✓ Nothing outstanding — every required field is supplied or accounted for.</div>
+// ── The completeness checklist — a primary feature ──
+// Renders THREE things, and the distinction between them is the point:
+//   1. the supplied/required COUNT — the denominator that turns a defect list into progress.
+//      Eleven flags read as failure when they appear with no total; against one they read as
+//      remaining work. Same information, opposite affect, nothing softened.
+//   2. OPERATOR gaps — items the customer clears by supplying data. Amber: action needed.
+//   3. LIMITATIONS — items NO customer action can clear, because ThemisIQ has not built the
+//      input or the regulation does not resolve the question. EXCLUDED from the denominator:
+//      counting them would make the finish line permanently unreachable. Neutral, never amber
+//      — this is a disclosure, not homework.
+function MissingChecklist({ completeness }: { completeness: CompletenessResult }) {
+  const { requiredCount, suppliedCount, outstandingCount, limitations } = completeness
+  const operatorGaps = completeness.items.filter(
+    (i) => i.responsibility === 'operator' && i.state === 'outstanding',
+  )
+  const platformLimits = limitations.filter((i) => i.responsibility === 'platform')
+  const regulatorLimits = limitations.filter((i) => i.responsibility === 'regulator')
+
+  const limitRow = (m: { item: string; field: string; hint?: string }, i: number) => (
+    <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '8px 0', borderBottom: '0.5px solid #e8e7e4' }}>
+      <span style={{ fontSize: 11, fontWeight: 700, color: '#888784', flexShrink: 0, minWidth: 40 }}>{m.item}</span>
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 400, color: '#555553' }}>{m.field}</div>
+        {m.hint && <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.5, marginTop: 2 }}>{m.hint}</div>}
       </div>
-    )
-  }
+    </div>
+  )
+
   return (
-    <div style={{ marginTop: '1.5rem', background: '#fff', border: '1.5px solid #f5d9ad', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#92400e', marginBottom: 4 }}>Before this report is complete</div>
-      <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 4 }}>{missing.length} item{missing.length === 1 ? '' : 's'} still to supply</div>
-      <div style={{ fontSize: 12, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '1rem' }}>Each is a required field with no answer yet. Supply it where the hint points, then regenerate.</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {missing.map((m, i) => (
-          <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', background: '#FEF3E2', border: '0.5px solid #f5d9ad', borderRadius: 8, padding: '10px 12px' }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#92400e', flexShrink: 0, minWidth: 40 }}>{m.item}</span>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{m.field}</div>
-              {m.hint && <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.5, marginTop: 2 }}>{m.hint}</div>}
-            </div>
+    <div style={{ marginTop: '1.5rem' }}>
+      {outstandingCount === 0 ? (
+        <div style={{ background: '#E1F5EE', border: '0.5px solid #b8e6d5', borderRadius: 12, padding: '1rem 1.25rem' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#0F6E56' }}>✓ {suppliedCount} of {requiredCount} supplied — nothing outstanding.</div>
+        </div>
+      ) : (
+        <div style={{ background: '#fff', border: '1.5px solid #f5d9ad', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#92400e', marginBottom: 4 }}>Before this report is complete</div>
+          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 4 }}>{suppliedCount} of {requiredCount} supplied · {outstandingCount} to supply</div>
+          <div style={{ fontSize: 12, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '1rem' }}>Each is a required field with no answer yet. Supply it where the hint points, then regenerate.</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {operatorGaps.map((m, i) => (
+              <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', background: '#FEF3E2', border: '0.5px solid #f5d9ad', borderRadius: 8, padding: '10px 12px' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#92400e', flexShrink: 0, minWidth: 40 }}>{m.item}</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{m.field}</div>
+                  {m.hint && <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.5, marginTop: 2 }}>{m.hint}</div>}
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      )}
+
+      {limitations.length > 0 && (
+        <div style={{ marginTop: '1rem', background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
+          {platformLimits.length > 0 && (
+            <>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#555553', marginBottom: 4 }}>Not captured by this report</div>
+              <div style={{ fontSize: 12, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '0.75rem' }}>These items are part of §1.2 but ThemisIQ cannot currently produce them. They are not gaps in your data, and no action from you will clear them.</div>
+              <div style={{ marginBottom: regulatorLimits.length > 0 ? '1.5rem' : 0 }}>{platformLimits.map(limitRow)}</div>
+            </>
+          )}
+          {regulatorLimits.length > 0 && (
+            <>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#555553', marginBottom: 4 }}>Unresolved in the regulation</div>
+              <div style={{ fontSize: 12, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '0.75rem' }}>The instrument does not settle these. They are recorded rather than assumed — no classification or value has been inferred.</div>
+              <div>{regulatorLimits.map(limitRow)}</div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }

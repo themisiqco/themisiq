@@ -256,7 +256,7 @@ export async function POST(req: NextRequest) {
     // ── 4. Build the §1.2 summary. installationProcessesComplete is the operator's ATTESTATION
     // (DB-trigger enforced), null/false -> false. Same pure builder the owner route uses, unmodified. ──
     const installationProcessesComplete = disclosures?.processes_complete === true;
-    const { report, missing } = buildSummaryReport({
+    const { report, missing, completeness } = buildSummaryReport({
       operator,
       installation,
       processes: processRows.map((p) => ({ process_id: p.id, route_code: p.route_code, cn_code: p.cn_code })),
@@ -309,6 +309,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       report,
       missing,
+      // Counts and the operator/platform/regulator split. Passes this route's
+      // no-internal-ids rule: CompletenessItem carries the same item/field/hint strings
+      // already present in `missing`, plus state and responsibility. No new exposure.
+      completeness,
       documents,
       coverage: {
         processes_total: processRows.length,

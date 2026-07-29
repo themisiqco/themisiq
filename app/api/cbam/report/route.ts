@@ -206,7 +206,7 @@ export async function GET(req: NextRequest) {
     const installationProcessesComplete = disclosures?.processes_complete === true;
 
     // ── 9. Build the §1.2 summary from the fetched rows ──────────────
-    const { report, missing } = buildSummaryReport({
+    const { report, missing, completeness } = buildSummaryReport({
       operator,
       installation,
       processes: processRows.map((p) => ({ process_id: p.id, route_code: p.route_code, cn_code: p.cn_code })),
@@ -220,6 +220,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       report,
       missing,
+      // completeness carries the denominator AND the operator/platform/regulator split.
+      // `missing` remains the flat fail-loud channel and is unchanged — completeness is
+      // strictly additive, so nothing that reads `missing` today is affected.
+      completeness,
       processesWithoutRecord,
       processesCompleteDeclaredAt: disclosures?.processes_complete_declared_at ?? null,
     });
