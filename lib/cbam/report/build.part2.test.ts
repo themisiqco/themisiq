@@ -67,11 +67,20 @@ const inputWith = (goods: GoodComputation[], complete?: boolean): Report12Input 
   goods, installationProcessesComplete: complete,
 });
 
+// Reach the accumulator's two new channels. `missing` is the derived MissingField[] and carries
+// neither, so these read the CompletenessItem accumulation directly — the sub-builder out-parameter
+// where one is passed, or completeness.items where the test goes through buildSummaryReport.
+const itemFor = (acc: import('./types').CompletenessItem[], item: string) =>
+  acc.find((i) => i.item === item);
+
+const respFor = (acc: import('./types').CompletenessItem[], item: string) =>
+  acc.find((i) => i.item === item)?.responsibility;
+
 // ── (4)(c) Annex II gate ─────────────────────────────────────────────────────────────────────────
 
 describe('(4)(c) indirect block — Annex II gate', () => {
   it('Annex II good → all four indirect sub-fields are not_applicable with the Annex II reason', () => {
-    const missing: import('./types').MissingField[] = [];
+    const missing: import('./types').CompletenessItem[] = [];
     const item4 = buildItem4(good({ annexIiDirectOnly: true }), missing);
     const { actualShare, defaultShare, criteriaConfirmation, specificIndirect } = item4.indirect;
     for (const f of [actualShare, defaultShare, criteriaConfirmation, specificIndirect]) {
@@ -83,7 +92,7 @@ describe('(4)(c) indirect block — Annex II gate', () => {
   });
 
   it('non-Annex-II good with non-zero indirect → actual share is a real 0, default share 1 (Article 9 = the factor)', () => {
-    const missing: import('./types').MissingField[] = [];
+    const missing: import('./types').CompletenessItem[] = [];
     // Only the grid-default factor path is implemented, so all indirect is default-factor-derived.
     // The shares are NOT derived from default_share_indirect (that field serves (4)(b) only).
     const item4 = buildItem4(good({ annexIiDirectOnly: false, seeRecord: seeRecord({ default_share_indirect: 0.3, see_indirect: 0.5 }) }), missing);
@@ -95,10 +104,13 @@ describe('(4)(c) indirect block — Annex II gate', () => {
     expect(ind.criteriaConfirmation.status).toBe('missing');
     // The unbuilt criteria confirmation IS surfaced as a gap.
     expect(missing.filter((m) => m.item === '(4)(c)')).toHaveLength(1);
+    // (4)(c) has no input field — no operator action clears it, so it must NOT be tagged
+    // 'operator' or it would enter the denominator and make the total unreachable.
+    expect(respFor(missing, '(4)(c)')).toBe('platform');
   });
 
   it('non-Annex-II good with ZERO indirect → both shares not_applicable (nothing to apportion)', () => {
-    const missing: import('./types').MissingField[] = [];
+    const missing: import('./types').CompletenessItem[] = [];
     const item4 = buildItem4(good({ annexIiDirectOnly: false, seeRecord: seeRecord({ see_indirect: 0 }) }), missing);
     const ind = item4.indirect;
     for (const f of [ind.actualShare, ind.defaultShare]) {
@@ -140,7 +152,7 @@ describe('(12)/(13) precursor partition on the source discriminant', () => {
       { cnCode: 'COMP-01', source: 'computed_here' },
       { cnCode: 'EUZ-01', source: 'eu_zero_rated' },
     ]);
-    const { report, missing } = buildSummaryReport(inputWith([g]));
+    const { report, missing, completeness } = buildSummaryReport(inputWith([g]));
 
     const defaultCns = (report.item12_defaultPrecursors ?? []).map((p) => p.cnCode);
     const actualCns = (report.item13_actualPrecursors ?? []).map((p) => p.cnCode);
@@ -157,15 +169,21 @@ describe('(12)/(13) precursor partition on the source discriminant', () => {
     expect(actualCns).not.toContain('EUZ-01');
     // ...and is NOT silently dropped — it raises a (12)/(13) classification gap.
     expect(missing.filter((m) => m.item === '(12)/(13)' && m.field.includes('EUZ-01'))).toHaveLength(1);
+    // (12)/(13) is REGULATOR, not platform: §1.2 does not state which list an EU/zero-rated
+    // precursor belongs in. Building a field would not resolve it.
+    expect(respFor(completeness.items, '(12)/(13)')).toBe('regulator');
+    expect(respFor(completeness.items, '(12)(b)')).toBe('platform');
   });
 
   it('(12)(d) carries the resolved default value; (13)(e) indirect is missing per §10.6', () => {
     const g = goodWith([{ cnCode: 'DEF-01', source: 'default' }, { cnCode: 'ACT-01', source: 'verified_actual' }]);
-    const { report, missing } = buildSummaryReport(inputWith([g]));
+    const { report, missing, completeness } = buildSummaryReport(inputWith([g]));
     expect(report.item12_defaultPrecursors?.[0].defaultValue).toEqual({ status: 'value', value: 1.4 });
     expect(report.item13_actualPrecursors?.[0].specificDirect).toEqual({ status: 'value', value: 1.4 });
     expect(report.item13_actualPrecursors?.[0].specificIndirect.status).toBe('missing');
     expect(missing.filter((m) => m.item === '(13)(e)')).toHaveLength(1);
+    expect(respFor(completeness.items, '(13)(e)')).toBe('platform');
+    expect(respFor(completeness.items, '(13)(b)')).toBe('platform');
   });
 });
 
@@ -186,9 +204,10 @@ describe('(14) multi-period condition', () => {
       { cnCode: 'X', source: 'default', origin: originRow({ reportingPeriod: 2025 }) },
       { cnCode: 'X', source: 'default', origin: originRow({ reportingPeriod: 2026 }) },
     ]);
-    const { report, missing } = buildSummaryReport(inputWith([g]));
+    const { report, missing, completeness } = buildSummaryReport(inputWith([g]));
     expect(report.item14_multiPeriodPrecursor?.status).toBe('missing');
     expect(missing.filter((m) => m.item === '(14)')).toHaveLength(1);
+    expect(respFor(completeness.items, '(14)')).toBe('platform');
   });
 });
 
@@ -207,9 +226,10 @@ describe('(15) multi-installation condition', () => {
       { cnCode: 'Y', source: 'default', origin: originRow({ installationName: 'Works A' }) },
       { cnCode: 'Y', source: 'default', origin: originRow({ installationName: 'Works B' }) },
     ]);
-    const { report, missing } = buildSummaryReport(inputWith([g]));
+    const { report, missing, completeness } = buildSummaryReport(inputWith([g]));
     expect(report.item15_multiInstallationPrecursor?.status).toBe('missing');
     expect(missing.filter((m) => m.item === '(15)')).toHaveLength(1);
+    expect(respFor(completeness.items, '(15)')).toBe('platform');
   });
 });
 
@@ -234,5 +254,34 @@ describe('(5) total direct emissions', () => {
   it('buildItem5 prefers attrEm but falls back to aeG × activityLevel', () => {
     const item5 = buildItem5([good({ attrEm: null, aeG: 2.0, activityLevel: 100 })], false, []);
     expect(item5.perProcess[0].totalDirect).toEqual({ status: 'value', value: 200 });
+  });
+});
+
+// ── the completeness denominator ─────────────────────────────────────────────────────────────────
+
+describe('completeness — the denominator', () => {
+  // The denominator counts OPERATOR items only. If a platform or regulator item were ever
+  // counted, a diligent customer could supply everything and still never reach the total —
+  // exactly what the responsibility dimension exists to prevent. Before this test existed,
+  // mis-tagging all four platform sites 'operator' left the whole suite green.
+  it('requiredCount excludes platform and regulator items — the finish line must be reachable', () => {
+    // DEF-01 raises a platform gap ((12)(b) good-name); EUZ-01 raises a regulator gap ((12)/(13)
+    // list classification). The null operator/installation/disclosures rows supply the operator items.
+    const g = goodWith([
+      { cnCode: 'DEF-01', source: 'default' },
+      { cnCode: 'EUZ-01', source: 'eu_zero_rated' },
+    ]);
+    const { completeness } = buildSummaryReport(inputWith([g]));
+
+    expect(completeness.limitations.length).toBeGreaterThan(0);
+    for (const i of completeness.limitations) expect(i.responsibility).not.toBe('operator');
+    // Both non-operator responsibilities are represented, so this covers each exclusion path.
+    expect(itemFor(completeness.limitations, '(12)(b)')?.responsibility).toBe('platform');
+    expect(itemFor(completeness.limitations, '(12)/(13)')?.responsibility).toBe('regulator');
+
+    expect(completeness.requiredCount).toBe(
+      completeness.items.filter((i) => i.responsibility === 'operator' && i.state !== 'not_applicable').length,
+    );
+    expect(completeness.suppliedCount + completeness.outstandingCount).toBe(completeness.requiredCount);
   });
 });
