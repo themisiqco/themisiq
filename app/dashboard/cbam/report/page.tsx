@@ -203,7 +203,7 @@ export default function CbamReportPage() {
     try {
       await exportReportXlsx({
         report: data.report,
-        missing: data.missing,
+        completeness: data.completeness,
         processesWithoutRecord: data.processesWithoutRecord,
         processesCompleteDeclaredAt: data.processesCompleteDeclaredAt,
         installationName: selectedInstallation.name,

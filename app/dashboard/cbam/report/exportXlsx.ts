@@ -34,13 +34,17 @@
 // not in the main bundle for users who never export.
 
 import type {
-  Report12, ReportField, MissingField, Coordinates, ProcessSummary,
+  Report12, ReportField, CompletenessResult, CompletenessItem, Coordinates, ProcessSummary,
 } from '../../../../lib/cbam/report/types'
 import type { SefaBenchmarkWorkings } from '../../../../lib/cbam/sefaCompute'
 
 export interface CbamReportExportInput {
   report: Report12
-  missing: MissingField[]
+  // Replaces the former flat `missing: MissingField[]`. completeness.items is a strict
+  // superset — every outstanding item appears in it with state 'outstanding' — plus the
+  // supplied and not-applicable evaluations, plus the operator/platform/regulator split.
+  // Carrying both would be two copies of one fact, drifting the moment either changes.
+  completeness: CompletenessResult
   processesWithoutRecord: string[]
   processesCompleteDeclaredAt: string | null
   installationName: string
@@ -71,7 +75,7 @@ function slugify(s: string): string {
 
 export async function exportReportXlsx(input: CbamReportExportInput): Promise<void> {
   const XLSX = await import('xlsx')
-  const { report, missing, processesWithoutRecord, processesCompleteDeclaredAt, installationName, reportingPeriod } = input
+  const { report, completeness, processesWithoutRecord, processesCompleteDeclaredAt, installationName, reportingPeriod } = input
 
   // ── Sheet 1: Cover ──────────────────────────────────────────────────
   const attestationStatus = processesCompleteDeclaredAt
@@ -92,6 +96,17 @@ export async function exportReportXlsx(input: CbamReportExportInput): Promise<vo
     cover.push([])
     cover.push(['NOT FULLY BACKED BY COMPUTED FIGURES', `${processesWithoutRecord.length} process(es) have no computed see_record`])
     cover.push(['Processes without a record', processesWithoutRecord.join(', ')])
+  }
+
+  // Completeness summary. The denominator counts OPERATOR items only — items ThemisIQ
+  // has not built, and items the regulation does not resolve, cannot be cleared by any
+  // action the operator takes, so counting them would make the total unreachable. They
+  // are not hidden: every one is listed on the Completeness sheet with its reason.
+  cover.push([])
+  cover.push(['Required fields supplied', `${completeness.suppliedCount} of ${completeness.requiredCount}`])
+  cover.push(['Still to supply', completeness.outstandingCount])
+  if (completeness.limitations.length > 0) {
+    cover.push(['Not produced by ThemisIQ', `${completeness.limitations.length} item(s) — see the Completeness sheet; no operator action clears these`])
   }
   cover.push([])
   cover.push(['Note on format', 'This is NOT the Commission\'s transitional-period "CBAM Communication Template for Installations".'])
@@ -240,17 +255,27 @@ export async function exportReportXlsx(input: CbamReportExportInput): Promise<vo
   const ws1216 = XLSX.utils.aoa_to_sheet(s1216)
   ws1216['!cols'] = [{ wch: 10 }, { wch: 20 }, { wch: 34 }, { wch: 26 }, { wch: 28 }, { wch: 20 }, { wch: 20 }]
 
-  // ── Sheet 6: Outstanding (the `missing` array — never filtered/truncated) ──
-  const sMissing: Cell[][] = [['Item', 'Field', 'Where to supply']]
-  if (missing.length === 0) {
-    sMissing.push(['—', 'Nothing outstanding', 'Every required field is supplied or accounted for.'])
+  // ── Sheet 6: Completeness (every evaluation — never filtered/truncated) ──
+  // Formerly the flat `missing` list. Now every requirement the builder evaluated:
+  // supplied, outstanding, and not-applicable alike, each carrying WHO can clear it.
+  // Widened rather than split, deliberately — the screen is the curated view, the file
+  // is the complete record, and a split risks reading as "these were excluded".
+  const statusCell = (s: CompletenessItem['state']): Cell =>
+    s === 'evidenced' ? 'Supplied' : s === 'not_applicable' ? 'Not applicable' : 'OUTSTANDING'
+  const whoCell = (r: CompletenessItem['responsibility']): Cell =>
+    r === 'operator' ? 'Operator' : r === 'platform' ? 'ThemisIQ — input not built' : 'Regulation — unresolved'
+
+  const sCompleteness: Cell[][] = [['Item', 'Field', 'Status', 'Who can clear it', 'Where to supply']]
+  if (completeness.items.length === 0) {
+    sCompleteness.push(['—', 'No requirements evaluated', '—', '—', 'No processes or disclosures present for this installation and period.'])
   } else {
-    missing.forEach((m) => {
-      sMissing.push([m.item, m.field, m.hint ?? ''])
+    completeness.items.forEach((c) => {
+      // Never a blank cell — an em-dash where there is genuinely nothing to point at.
+      sCompleteness.push([c.item, c.field, statusCell(c.state), whoCell(c.responsibility), c.hint ?? '—'])
     })
   }
-  const wsMissing = XLSX.utils.aoa_to_sheet(sMissing)
-  wsMissing['!cols'] = [{ wch: 12 }, { wch: 56 }, { wch: 72 }]
+  const wsCompleteness = XLSX.utils.aoa_to_sheet(sCompleteness)
+  wsCompleteness['!cols'] = [{ wch: 12 }, { wch: 56 }, { wch: 14 }, { wch: 26 }, { wch: 72 }]
 
   // ── Assemble the workbook (sheet order per spec) ────────────────────
   const wb = XLSX.utils.book_new()
@@ -259,7 +284,7 @@ export async function exportReportXlsx(input: CbamReportExportInput): Promise<vo
   XLSX.utils.book_append_sheet(wb, ws46, 'Items 4-6')
   XLSX.utils.book_append_sheet(wb, ws711, 'Items 7-11')
   XLSX.utils.book_append_sheet(wb, ws1216, 'Items 12-16')
-  XLSX.utils.book_append_sheet(wb, wsMissing, 'Outstanding')
+  XLSX.utils.book_append_sheet(wb, wsCompleteness, 'Completeness')
 
   const filename = `cbam-1-2-summary_${slugify(installationName)}_${reportingPeriod}.xlsx`
   XLSX.writeFile(wb, filename)
