@@ -45,6 +45,24 @@ const SEVERITY_CONFIG = {
 
 const STEP_NAMES = ['Deal Setup', 'ESG Screening', 'Risk Findings', 'Cost Estimate', 'Export']
 
+// Regime tokens a risk finding's Framework column may name, in display order, each paired with the
+// framework-list entry that LICENSES it. A token is emitted ONLY when its licensing entry is present
+// in the DETECTED `frameworks` array, so a finding can never name a statute the APPLICABLE
+// FRAMEWORKS section of the same report withheld on a revenue threshold (SB 253 >$1B; SECR >£36M).
+// Jurisdiction is deliberately NOT consulted here — `frameworks` already encodes it, and that is
+// what makes Global resolve correctly (CSRD IS detected for Global, so it must not be erased).
+const REGIME_CANDIDATES: { token: string; licensedBy: string }[] = [
+  { token: 'SB 253',         licensedBy: 'SB 253' },
+  { token: 'CSRD',           licensedBy: 'CSRD' },
+  { token: 'ESRS E1',        licensedBy: 'CSRD' },          // climate standard under CSRD
+  { token: 'UK SRS (S1/S2)', licensedBy: 'UK SRS (S1/S2)' },
+  { token: 'SECR',           licensedBy: 'SECR' },
+]
+// Used when NO candidate is licensed (sub-threshold USA, Canada/Australia/Other, or frameworks not
+// yet computed). Names a methodology and the investor-baseline standard that getApplicableFrameworks
+// emits unconditionally — never a statute.
+const REGIME_FALLBACK = ['GHG Protocol', 'IFRS S2']
+
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -161,20 +179,20 @@ export default function DealsDashboard() {
   }
 
   const risks = SECTOR_RISKS[deal.sector] || []
-  // Rewrite generic disclosure-regime labels (SB 253, bare CSRD) to the jurisdiction's actual regime.
-  // Activity-triggered EU instruments (CBAM, EUDR, AI Act, SFDR, etc.) are left intact — they apply to
-  // UK/non-EU companies through EU-facing activity and have no domestic equivalent.
+  // Rewrite generic disclosure-regime labels (SB 253, bare CSRD) on a static sector risk template to
+  // the regime the DETECTED frameworks actually support. Resolving against `frameworks` rather than
+  // deal.jurisdiction is load-bearing: jurisdiction alone stamped "SB 253" on every USA deal, so a
+  // sub-threshold target was cited against a statute the APPLICABLE FRAMEWORKS section of the same
+  // report correctly omitted. A token here can now only name a regime that section also asserts.
+  // Activity-triggered EU instruments (CBAM, EUDR, AI Act, SFDR, CS3D, ETS) are still left intact —
+  // they apply to UK/non-EU companies through EU-facing activity and have no domestic equivalent.
   const mapFramework = (fw: string): string => {
-    const j = deal.jurisdiction
-    const regime =
-      j === 'UK' ? 'UK SRS S2 / SECR'
-      : j === 'European Union' ? 'CSRD / ESRS E1'
-      : j === 'USA' ? 'SB 253'
-      : 'GHG Protocol / IFRS S2'
+    const licensed = REGIME_CANDIDATES.filter(c => frameworks.includes(c.licensedBy)).map(c => c.token)
+    const regime = licensed.length ? licensed : REGIME_FALLBACK
     return fw
       .split(' / ')
-      .map(tok => (tok === 'SB 253' || tok === 'SB253' || tok === 'CSRD') ? regime : tok)
-      .filter((tok, i, arr) => arr.indexOf(tok) === i)   // dedupe if remap collides
+      .flatMap(tok => (tok === 'SB 253' || tok === 'SB253' || tok === 'CSRD') ? regime : [tok])
+      .filter((tok, i, arr) => arr.indexOf(tok) === i)   // dedupe ATOMIC tokens, post-expansion
       .join(' / ')
   }
   const criticalRisks = risks.filter(r => r.severity === 'critical')
