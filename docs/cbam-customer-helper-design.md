@@ -220,8 +220,31 @@ user's own configuration in plain language, and requires affirmation.
 
 Commit points (all `singleton` scope for CBAM — see below): process boundary;
 shared-utility allocation; own-vs-inherited precursor; net-vs-gross production;
-output-stream sign convention. (These are also where a verifier would probe — a
-useful check on the list.)
+output-stream sign convention; **one-process-per-good (Art 4(6))**. (These are also
+where a verifier would probe — a useful check on the list.)
+
+**The Art 4(6) point is live as of 29 Jul 2026 and is the first real instance of this
+pattern.** The database now rejects a second production process for the same
+(installation, CN code, reporting period) — migration
+`20260729_cbam_art4_6_process_uniqueness.sql`. But the setup form has no client-side
+check, so a user attempting it receives a **raw Postgres unique-violation error**. The
+rejection is correct; the message is not, and "that value is already taken" is precisely
+the wrong explanation — it implies a naming clash rather than a methodological rule.
+
+This is why the layer exists. The right response is not a validation message but a
+playback generated from the user's own configuration:
+
+> *"You already have a process producing 7206 10 00 at this installation for 2026, via
+> the scrap-EAF route. If you also produce it via DRI-EAF, that is not a second process —
+> the regulation requires ONE process covering both routes, with the source streams and
+> production of each combined. Splitting them would report two different emissions
+> intensities for one good, and your EU customer would have no basis to choose between
+> them. Add the DRI-EAF streams and production to the existing process instead."*
+
+Note what the playback must do that an error message cannot: name the **existing** process
+and its route, state the **consequence** of splitting rather than the fact of rejection, and
+give the **corrective action**. The user's next step is to edit a different record than the
+one they are looking at — which no unique-constraint error will ever tell them.
 
 Three required properties:
 - **Generated from the user's data**, not a static warning — cannot be
