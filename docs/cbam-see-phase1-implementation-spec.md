@@ -74,7 +74,7 @@ Six categories, functional unit = tonne, complete primary-source data (no pull).
 | `pig_iron` | Pig Iron | 7201 (+ some 7205) | `blast_furnace`, `smelting_reduction` | `sintered_ore` |
 | `dri` | DRI | 7203 | `direct_reduction` | `sintered_ore` |
 | `ferroalloy` | FeMn/FeCr/FeNi | 7202 1, 7202 4, 7202 6 | `submerged_arc` | `sintered_ore` |
-| `crude_steel` | Crude steel | 7206, 7207, 7218, 7224 | `bof`, `eaf` | `pig_iron` (bof), `dri` (eaf), `ferroalloy` (alloy/stainless) |
+| `crude_steel` | Crude steel | 7206, 7207, 7218, 7224 | `bof`, `eaf_dri`, `eaf_scrap` (corrected 29 Jul 2026 — was `bof`, `eaf`; `'eaf'` was deleted and split in two by `20260718_cbam_route_split_eaf.sql`) | `pig_iron` (bof), `dri` (eaf_dri), `ferroalloy` (alloy/stainless) |
 | `iron_steel_products` | Iron or steel products | 7205, 7208–7229, 7301–7311, 7318, 7326 | (rolling/forging/coating) | `crude_steel` |
 
 **Precursor edges (the tree):**
@@ -116,7 +116,7 @@ create table public.cbam_precursor_edges (
 
 create table public.cbam_production_routes (
   category_code text not null references public.cbam_goods_categories(code),
-  route_code    text not null,                     -- 'eaf', 'bof', 'blast_furnace'…
+  route_code    text not null,                     -- 'eaf_dri', 'eaf_scrap', 'bof', 'blast_furnace'… (corrected 29 Jul 2026 — was 'eaf', retired 18 Jul)
   boundary_note text,
   primary key (category_code, route_code)
 );
