@@ -725,7 +725,7 @@ function AttestationBanner({ declaredAt }: { declaredAt: string | null }) {
   return (
     <div style={{ marginTop: '1rem', fontSize: 12, color: '#555553', background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 8, padding: '10px 14px', lineHeight: 1.6 }}>
       Installation-level totals (items 5 and 6) cannot be reported until you attest that the process set is complete. Make the attestation on the{' '}
-      <a href="/dashboard/cbam" style={{ color: '#7425e3', textDecoration: 'underline' }}>disclosures page</a>, then regenerate this report.
+      <a href="/dashboard/cbam/disclosures" style={{ color: '#7425e3', textDecoration: 'underline' }}>disclosures page</a>, then regenerate this report.
     </div>
   )
 }

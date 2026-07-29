@@ -968,7 +968,7 @@ export default function CbamSetupPage() {
             <div style={{ marginTop: '1.25rem', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 13, color: '#0F6E56' }}>✓ Saved</span>
               <button type="button" onClick={() => setStep(3)} style={linkBtn}>Next: Processes &amp; emissions →</button>
-              <a href="/dashboard/cbam" style={linkAnchor}>Record disclosures →</a>
+              <a href="/dashboard/cbam/disclosures" style={linkAnchor}>Record disclosures →</a>
               <a href="/dashboard/cbam/report" style={linkAnchor}>Generate report →</a>
             </div>
           )}
