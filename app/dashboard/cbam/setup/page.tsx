@@ -24,6 +24,7 @@ import { useEntitlement } from '../../../../lib/useEntitlement'
 import { cbamInputStyle, CbamField } from '../components/DisclosureQuestion'
 import { massBalance } from '../../../../lib/cbam/engine'
 import { assessCnCategory, suggestCategory } from '../../../../lib/cbam/cn'
+import { buildBoundaryGuidanceView } from '../../../../lib/cbam/boundaryGuidanceView'
 import type { SourceStream } from '../../../../lib/cbam/types'
 import type { CnMapRow } from '../../../../lib/cbam/cn'
 
@@ -164,6 +165,10 @@ export default function CbamSetupPage() {
   const [routes, setRoutes] = useState<{ category_code: string; route_code: string }[]>([])
   // CN prefix -> goods category, the §10.7 longest-prefix map. 58 rows.
   const [cnMap, setCnMap] = useState<CnMapRow[]>([])
+  // Collapsed by default, and deliberately NOT reset when the category or route changes: a
+  // reader who opened the rules is comparing them against their selection, and slamming the
+  // panel shut on every change would fight exactly that.
+  const [boundaryOpen, setBoundaryOpen] = useState(false)
   // Every CN code that HAS a default row — the authoritative accept-set for the CN field
   // (exactly what the engine resolves against). Populated in the reference-data effect below.
   const [validCnCodes, setValidCnCodes] = useState<Set<string>>(new Set())
@@ -1353,6 +1358,70 @@ export default function CbamSetupPage() {
                         <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.5 }}>This category has no production route — the route is left unset (correct for e.g. iron/steel products and sintered ore).</div>
                       )
                     )}
+                    {/*
+                      BOUNDARY GUIDANCE — ADVISORY ONLY. Reads nothing, writes nothing, gates
+                      nothing. It is not consulted by saveProcess and holds no form state beyond
+                      whether it is open.
+
+                      Gated on the category being one the page actually LOADED, not on a list
+                      written here. goodsCategories comes from cbam_goods_categories; if the
+                      selected value is not in it, the reference data has not arrived or the
+                      value is one we do not recognise, and quoting regulation text against a
+                      category we cannot name would be worse than showing nothing.
+
+                      Route is passed through when set and narrows the result; a category with
+                      no routes still renders, because the view model treats an entry with no
+                      routes as applying to the whole category.
+
+                      Everything visible below the button comes from the view model — headings,
+                      lead-ins, cites and provision text alike. Do not re-author copy here, and
+                      do not trim, truncate or ellipsise a provision: the whole point of the
+                      panel is that a reader can quote it against the Official Journal.
+                    */}
+                    {editingProc.category_code && goodsCategories.some((c) => c.code === editingProc.category_code) && (() => {
+                      const view = buildBoundaryGuidanceView(editingProc.category_code, editingProc.route_code)
+                      if (!view || view.groups.length === 0) return null
+                      return (
+                        <div>
+                          <button
+                            type="button"
+                            aria-expanded={boundaryOpen}
+                            aria-controls="cbam-boundary-guidance"
+                            onClick={() => setBoundaryOpen((o) => !o)}
+                            style={{
+                              fontSize: 12, fontWeight: 300, lineHeight: 1.5, padding: '2px 10px',
+                              background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4',
+                              borderRadius: 999, cursor: 'pointer',
+                            }}
+                          >
+                            Rules that apply to this good ({view.totalProvisions})
+                          </button>
+                          {boundaryOpen && (
+                            <div id="cbam-boundary-guidance" style={{ marginTop: 10, borderLeft: '0.5px solid #e8e7e4', paddingLeft: 12 }}>
+                              {view.groups.map((g) => (
+                                <div key={g.key} style={{ marginBottom: 16 }}>
+                                  {/* Our framing. Kept visually distinct from the quoted text
+                                      below so a reader can tell which words are whose. */}
+                                  <div style={{ fontSize: 12, fontWeight: 400, lineHeight: 1.5, color: '#555553' }}>{g.heading}</div>
+                                  <div style={{ fontSize: 12, fontWeight: 300, lineHeight: 1.5, color: '#888784' }}>{g.leadIn}</div>
+                                  {g.entries.map((e) => (
+                                    <div key={e.cite} style={{ marginTop: 8 }}>
+                                      <div style={{ fontSize: 12, fontWeight: 300, lineHeight: 1.5, color: '#888784' }}>{e.cite}</div>
+                                      <ul style={{ margin: '2px 0 0', paddingLeft: 16 }}>
+                                        {e.provisions.map((p, i) => (
+                                          // Verbatim. No slice, no ellipsis, no casing change.
+                                          <li key={i} style={{ fontSize: 12, fontWeight: 300, lineHeight: 1.5, color: '#555553' }}>{p}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  ))}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                       <CbamField label="Activity level — required (> 0)">
                         <input type="number" step="any" value={editingProc.activity_level} onChange={(e) => setProc('activity_level', e.target.value)} placeholder="tonnes" style={{ ...cbamInputStyle, width: 180 }} />
