@@ -100,7 +100,19 @@ export interface BoundaryEntry {
   section: string;
   /** Verbatim from the reference file. */
   heading: string;
-  scope: 'cross_sectoral' | 'category';
+  /**
+   * 'special_provisions' holds the .1 subsections of Annex I §3. Those subsections state rules
+   * that determine WHAT FALLS INSIDE a category — thresholds, inclusions, allocations between
+   * categories — rather than describing a boundary, so they are a different kind of entry and
+   * not a boundary with an empty process list.
+   *
+   * Two invariants follow. They always carry `processes: null`: a .1 subsection never
+   * enumerates boundary processes, and null here means the regulation is silent in the same
+   * sense it does everywhere else in this file. And their `categoryCodes` name the categories
+   * THE RULE GOVERNS, which may be more than one — a rule that allocates between categories
+   * touches every category it allocates to, not just the one whose section it is printed under.
+   */
+  scope: 'cross_sectoral' | 'category' | 'special_provisions';
   /** Null ONLY when scope is 'cross_sectoral'. */
   categoryCodes: string[] | null;
   /** Null where the category has no routes. */
@@ -154,6 +166,19 @@ export const BOUNDARIES: BoundaryEntry[] = [
     divergences: [],
   },
   {
+    section: '3.11.1',
+    heading: 'Special provisions',
+    scope: 'special_provisions',
+    categoryCodes: ['sintered_ore'],
+    routeCodes: null,
+    provisions: [
+      'This aggregated goods category includes all kinds of iron ore pellet production (for sale of pellets as well as for direct use in the same installation) and sinter production. To the extent covered by CN code 2601 12 00, also iron ores used as precursors for ferro-chromium (FeCr), ferro-manganese (FeMn) or ferro-nickel (FeNi) may be covered.',
+    ],
+    processes: null,
+    cites: [],
+    divergences: [],
+  },
+  {
     section: '3.11.2',
     heading: 'System boundary',
     scope: 'category',
@@ -170,6 +195,37 @@ export const BOUNDARIES: BoundaryEntry[] = [
     processes: null,
     cites: [],
     divergences: [],
+  },
+  {
+    section: '3.12.1',
+    heading: 'Special provisions',
+    scope: 'special_provisions',
+    // Two categories: the NPI rule allocates between them by nickel content — greater than 10 %
+    // falls here, lower than 10 % falls to pig_iron under §3.13.1.
+    categoryCodes: ['ferroalloy', 'pig_iron'],
+    routeCodes: null,
+    provisions: [
+      'This process covers only the production of the alloys identified under CN codes 7202 1, 7202 4 and 7202 6. Other iron materials with significant alloy content such as spiegeleisen are not covered. NPI (nickel pig iron) is included if the nickel content is greater than 10 %.',
+      'Where waste gases or other flue gases are emitted without abatement, CO contained in the waste gas shall be considered as the molar equivalent of CO2 emissions.',
+    ],
+    processes: null,
+    cites: [],
+    divergences: [
+      {
+        kind: 'category_collapse',
+        ours: ['ferroalloy'],
+        regulation:
+          'this subsection governs FeMn, FeCr and FeNi, which Annex I Table 1 names as three separate aggregated goods categories',
+        basis: 'supabase/migrations/20260716_cbam_reference.sql:43-49',
+        note:
+          'THE COLLAPSE DOES NOT AFFECT COMPUTATION. Benchmarks key on cn_code and default ' +
+          'values on (cn_code, country), so neither ever consults category_code; category_code ' +
+          'enters only annex_ii_direct_only, which reference.sql:43-49 documents as safe for ' +
+          'these three prefixes. IT DOES AFFECT ANNEX IV REPORTING. Annex IV point 2 requires a ' +
+          'different sector-specific parameter per ferroalloy — Mn and carbon, Cr and carbon, ' +
+          'Ni and carbon — and one collapsed category cannot express which of the three applies.',
+      },
+    ],
   },
   {
     section: '3.12.2',
@@ -214,6 +270,21 @@ export const BOUNDARIES: BoundaryEntry[] = [
           'be deferred on the grounds that the numbers come out right.',
       },
     ],
+  },
+  {
+    section: '3.13.1',
+    heading: 'Special provisions',
+    scope: 'special_provisions',
+    // Three categories: the NPI threshold reaches ferroalloy (the other side of §3.12.1's 10 %
+    // split), and the hot-metal rule sets where pig iron ends and crude steel begins.
+    categoryCodes: ['pig_iron', 'ferroalloy', 'crude_steel'],
+    routeCodes: null,
+    provisions: [
+      "This aggregated goods category includes non-alloyed pig iron from blast furnaces as well as alloy-containing pig irons (e.g., spiegeleisen), irrespective of the physical form (e.g. ingots, granules). NPI (nickel pig iron) is included if the nickel content is lower than 10 %. In integrated steel plants, liquid pig iron ('hot metal') directly charged to the oxygen converter is the product which separates the production process for pig iron from the production process of crude steel. Where the installation does not sell or transfer pig iron to other installations, a joint production process including crude steel can be established making subject to the rules of Article 4.",
+    ],
+    processes: null,
+    cites: [],
+    divergences: [],
   },
   {
     section: '3.13.2.1',
@@ -289,6 +360,21 @@ export const BOUNDARIES: BoundaryEntry[] = [
     divergences: [],
   },
   {
+    section: '3.14.1',
+    heading: 'Special provisions',
+    scope: 'special_provisions',
+    // Two categories: the joint-production-process rule reaches crude steel.
+    categoryCodes: ['dri', 'crude_steel'],
+    routeCodes: null,
+    provisions: [
+      'There is only one production route defined, although different technologies may use different qualities of ores, which may require pelletisation or sintering, and different reducing agents (natural gas, diverse fossil fuels or biomass, hydrogen). Therefore, precursors sintered ore or hydrogen may be relevant. As products, iron sponge, hot briquetted iron (HBI) or other forms of direct reduced iron may be relevant, including DRI which is immediately fed to electric arc furnaces or other downstream processes.',
+      'Where the installation does not sell or transfer DRI to other installations, a joint production process including steel can be established making subject to the rules of Article 4.',
+    ],
+    processes: null,
+    cites: [],
+    divergences: [],
+  },
+  {
     section: '3.14.2',
     heading: 'System boundary',
     scope: 'category',
@@ -326,6 +412,25 @@ export const BOUNDARIES: BoundaryEntry[] = [
           'what the OJ says, and a reader following either must be able to arrive.',
       },
     ],
+    divergences: [],
+  },
+  {
+    section: '3.15.1',
+    heading: 'Special provisions',
+    scope: 'special_provisions',
+    // Two categories: the rolling split allocates between them. Primary hot-rolling and rough
+    // forging yielding CN 7207, 7218 or 7224 stay in crude_steel; all other rolling and forging
+    // falls to iron_steel_products.
+    categoryCodes: ['crude_steel', 'iron_steel_products'],
+    routeCodes: null,
+    provisions: [
+      'The system boundary shall cover all necessary activities and units for obtaining crude steel:',
+      '— if the process starts from hot metal (liquid pig iron), the system boundary shall include the basic oxygen converter, vacuum degassing, secondary metallurgy, argon oxygen decarburisation / vacuum oxygen decarburisation, continuous casting or ingot casting, where relevant hot-rolling or forging, and all necessary auxiliary activities such as transfers, re-heating, and flue gas cleaning;',
+      '— if the process uses an electric arc furnace, the system boundary shall include all relevant activities and units such as the electric arc furnace itself, secondary metallurgy, vacuum degassing, argon oxygen decarburisation / vacuum oxygen decarburisation, continuous casting or ingot casting, where relevant hot-rolling or forging, and all necessary auxiliary activities such as transfers, heating of raw materials and equipment, re-heating, and flue gas cleaning;',
+      "— only primary hot-rolling and rough shaping by forging to obtain the semi-finished products under CN codes 7207, 7218 and 7224 are included in this aggregated goods category. All other rolling and forging processes are included in the aggregated goods category 'iron or steel products'.",
+    ],
+    processes: null,
+    cites: [],
     divergences: [],
   },
   {
@@ -405,6 +510,19 @@ export const BOUNDARIES: BoundaryEntry[] = [
     ],
   },
   {
+    section: '3.16.1',
+    heading: 'Special provisions',
+    scope: 'special_provisions',
+    categoryCodes: ['iron_steel_products'],
+    routeCodes: null,
+    // 'None.' is what the regulation prints, and it is a fact — this category has no special
+    // provisions. An empty array would read as untranscribed rather than as transcribed silence.
+    provisions: ['None.'],
+    processes: null,
+    cites: [],
+    divergences: [],
+  },
+  {
     section: '3.16.2',
     heading: 'System boundary',
     scope: 'category',
@@ -437,6 +555,19 @@ export const BOUNDARIES: BoundaryEntry[] = [
       ],
       excluded: ['plating', 'cutting', 'welding', 'finishing'],
     },
+    cites: [],
+    divergences: [],
+  },
+  {
+    section: '3.17.1',
+    heading: 'Special provisions',
+    scope: 'special_provisions',
+    categoryCodes: ['primary_aluminium'],
+    routeCodes: null,
+    provisions: [
+      'This aggregated goods category includes non-alloyed as well as alloyed aluminium, in physical form typical for unwrought metals, such as ingots, slabs, billets or granules. In integrated aluminium plants, liquid aluminium directly charged to the production of aluminium products is included, too.',
+    ],
+    processes: null,
     cites: [],
     divergences: [],
   },
@@ -500,6 +631,17 @@ export const BOUNDARIES: BoundaryEntry[] = [
           'treated like a precursor.',
       },
     ],
+    divergences: [],
+  },
+  {
+    section: '3.18.1',
+    heading: 'Special provisions',
+    scope: 'special_provisions',
+    categoryCodes: ['aluminium_products'],
+    routeCodes: null,
+    provisions: ['None.'],
+    processes: null,
+    cites: [],
     divergences: [],
   },
   {

@@ -193,7 +193,7 @@ describe('BOUNDARIES — cites', () => {
 });
 
 describe('BOUNDARIES — scope and categoryCodes agree', () => {
-  it('cross_sectoral entries have categoryCodes null; category entries have a non-empty array', () => {
+  it('cross_sectoral entries have categoryCodes null; category and special_provisions entries have a non-empty array', () => {
     const failures: string[] = [];
     for (const entry of BOUNDARIES) {
       if (entry.scope === 'cross_sectoral') {
@@ -203,13 +203,29 @@ describe('BOUNDARIES — scope and categoryCodes agree', () => {
           );
         }
       } else {
+        // 'category' and 'special_provisions' alike. A special-provisions rule is scoped to the
+        // categories it governs — possibly several, where it allocates between them — so an
+        // empty or null list means nothing knows what the rule applies to.
         if (entry.categoryCodes === null || entry.categoryCodes.length === 0) {
           failures.push(
-            `§${entry.section}: scope 'category' but categoryCodes is ${JSON.stringify(entry.categoryCodes)} — expected a non-empty array`,
+            `§${entry.section}: scope '${entry.scope}' but categoryCodes is ${JSON.stringify(entry.categoryCodes)} — expected a non-empty array`,
           );
         }
       }
     }
     expect(failures, `scope/categoryCodes disagreements:\n  ${failures.join('\n  ')}`).toEqual([]);
+  });
+
+  // Vacuous until the .1 entries land, and deliberately written ahead of them. A .1 subsection
+  // states what falls inside a category; it never enumerates boundary processes. The moment one
+  // of those entries is added with a populated `processes`, that is the mistake this catches.
+  it('special_provisions entries never enumerate processes', () => {
+    const failures = BOUNDARIES.filter(
+      (e) => e.scope === 'special_provisions' && e.processes !== null,
+    ).map(
+      (e) =>
+        `§${e.section}: scope 'special_provisions' but processes is ${JSON.stringify(e.processes)} — expected null`,
+    );
+    expect(failures, `special_provisions entries enumerating processes:\n  ${failures.join('\n  ')}`).toEqual([]);
   });
 });
