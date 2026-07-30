@@ -462,3 +462,434 @@ category-aware. Verbatim, for the live-sector categories only:
 >    "Ni and carbon". This is where the taxonomy divergence becomes a real
 >    constraint — not in benchmark or default-value lookup, both of which are
 >    CN-keyed.
+
+---
+
+## Annex II and Annex III — outbound points cited by Annex I §3 (verbatim)
+
+Annex I §3 does not stand alone. For the two live sectors its boundary text cites
+four points of Annex II and, by way of an apparent drafting error, one point of
+Annex III. Those points are reproduced here so that every citation carried by a
+boundary rule resolves to primary text held in this repository rather than to a
+paraphrase or to memory.
+
+Scope of this section: 2547 Annex II points B.3.2, B.3.3, B.7 and F; 2547
+Annex III point B. Not included: Annex II points A, C, D, E and G, and Annex III
+points A and C, which are not cited by the live-sector boundary provisions.
+
+**Instrument disambiguation.** Annex I §3 uses the bare phrase "Annex II" for two
+different instruments. Where it says "Annex II to Regulation (EU) 2023/956" it
+means the CBAM Regulation's direct-emissions-only list (the basis of our
+`annex_ii_direct_only` flag). Where it says "Annex II" unqualified — as at
+§3.12.2, §3.13.2, §3.14.2, §3.17.2.1 — it means IR 2025/2547's own Annex II,
+reproduced below. Any citation recorded in code or guidance must name the
+instrument, not just the point.
+
+**Transcription note.** Prose is verbatim. Equations are rendered with `=` where
+the OJ PDF text layer emits `¼`, and with flattened subscripts (`AD_k` for the
+typeset subscript form). Decimal commas are preserved as published. No wording
+has been altered, normalised or repaired.
+
+### Annex II, point B.3.2 — Mass balance method (p. 36)
+
+> B.3.2. Mass balance method
+>
+> The CO2 quantities relevant for each source stream shall be calculated based on
+> the carbon content in each material, without distinguishing fuels and process
+> materials. Carbon leaving the installation in products instead of being emitted
+> is taken into account by output source streams, which have therefore negative
+> activity data.
+>
+> The emissions corresponding to each source stream shall be calculated as
+> follows:
+>
+> Em_k = f × AD_k × CC_k (Equation 12)
+>
+> Where:
+>
+> AD_k is the activity data [t] of material k; for outputs, AD_k is negative;
+>
+> f is the ratio of the molar masses of CO2 and C: f = 3,664 t CO2/t C; and
+>
+> CC_k is the carbon content of material k (dimensionless and positive).
+>
+> If the carbon content of a fuel k is calculated from an emission factor
+> expressed in t CO2/TJ, the following equation shall be used:
+>
+> CC_k = EF_k × NCV_k / f (Equation 13)
+>
+> If the carbon content of a material or fuel k is calculated from an emission
+> factor expressed in t CO2/t, the following equation shall be used:
+>
+> CC_k = EF_k / f (Equation 14)
+>
+> For mixed fuels, the zero-rated biomass fraction may be taken into account,
+> provided that the criteria provided in point B.3.3 are met as follows:
+>
+> CC_k = CC_pre,k × (1 – BF_k) (Equation 15)
+>
+> Where:
+>
+> CC_pre,k is the preliminary carbon content of fuel k (i.e. emission factor
+> assuming the total fuel is fossil) and
+>
+> BF_k is the zero rated biomass fraction of fuel k (dimensionless).
+>
+> For fossil fuels or materials and where the biomass fraction is not known, BF
+> shall be set to the conservative value zero. Where biomass is used as input
+> material or fuel, and output materials contain carbon, the overall mass balance
+> shall treat the biomass fraction conservatively, meaning that the total mass of
+> carbon corresponding to the zero-rated carbon fractions of the carbon contained
+> in all relevant output materials is not lower than the total mass of zero-rated
+> fractions of the carbon contained in input materials and fuels, except if the
+> operator provides evidence of a lower biomass fraction in the output materials
+> by a 'trace the atom' (stoichiometric) method or by carbon-14 analyses.
+
+Cited by §3.12.2 (FeMn/FeCr/FeNi), §3.13.2.1 (blast furnace) and §3.13.2.2
+(smelting reduction), each correctly as "point B.3.2 of Annex II". Cited by
+§3.14.2, §3.15.2.1 and §3.15.2.2 as "point B.3.2 of **Annex III**" — see the
+note under Annex III point B below.
+
+### Annex II, point B.3.3 — Criteria for zero-rating of biomass emissions (pp. 36–37)
+
+> B.3.3. Criteria for zero-rating of biomass emissions
+>
+> 1. Where biomass is used as a fuel for combustion, it shall fulfil the criteria
+> of this point. Where the biomass used for combustion does not comply with these
+> criteria, its carbon content shall be considered as fossil carbon.
+>
+> 2. The biomass shall comply with the sustainability and the greenhouse gas
+> emissions saving criteria laid down in Article 29(2) to (7) and (10) of
+> Directive (EU) 2018/2001.
+>
+> 3. By way of derogation from point 2, biomass contained in or produced from
+> waste and residues, other than agricultural, aquaculture, fisheries and forestry
+> residues shall fulfil only the criteria laid down in Article 29(10) of Directive
+> (EU) 2018/2001. This point shall also apply to waste and residues that are first
+> processed into a product before being further processed into fuels.
+>
+> 4. Electricity, heating and cooling produced from municipal solid waste shall
+> not be subject to the criteria laid down in Article 29(10) of Directive
+> (EU) 2018/2001.
+>
+> 5. The criteria laid down Article 29(2) to (7) and (10) of Directive
+> (EU) 2018/2001 shall apply irrespective of the geographical origin of the
+> biomass.
+>
+> 6. The compliance with the criteria laid down in paragraphs Article 29(2) to (7)
+> and (10) of Directive (EU) 2018/2001 shall be assessed in accordance with
+> Article 30 and Article 31(1) of that Directive. The criteria may be considered
+> complied with if the operator provides evidence of the purchase of a quantity of
+> biofuel, bioliquid or biogas connected to the cancellation of the respective
+> quantity in the Union Database set up pursuant to Article 31a or a proof of
+> sustainability by a recognised voluntary scheme.
+
+Cited by §3.13.2.1, §3.13.2.2 and §3.14.2, each as "point B.3.3 of Annex II".
+The zero-rating is conditional and evidence-bearing: absent the Article 29
+evidence, biomass carbon is fossil carbon. A boundary rule that presents biomass
+as zero-rated without the condition would misstate the regulation.
+
+### Annex II, point B.7 — Requirements for determining perfluorocarbon emissions (pp. 45–48)
+
+> B.7. Requirements for determining perfluorocarbon emissions
+>
+> Monitoring shall cover emissions of perfluorocarbons (PFCs) resulting from anode
+> effects including fugitive emissions of perfluorocarbons. Emissions not related
+> to anode effects shall be determined based on estimation methods in accordance
+> with industry best practice, in particular guidelines provided by the
+> International Aluminium Institute.
+>
+> PFC emissions shall be calculated from the emissions measurable in a duct or
+> stack ('point source emissions') as well as fugitive emissions using the
+> collection efficiency of the duct:
+>
+> PFC emissions (total) = PFC emissions (duct) / collection efficiency (Equation 20)
+>
+> The collection efficiency shall be measured when the installation-specific
+> emission factors are determined.
+>
+> The emissions of CF4 and C2F6 emitted through a duct or stack shall be
+> calculated by using one of the following methods:
+>
+> — method A where the anode effect minutes per cell-day are recorded;
+>
+> — method B where the anode effect overvoltage is recorded.
+
+#### B.7.1 — Calculation Method A, Slope Method
+
+> The following equations for determining PFC emissions shall be used:
+>
+> CF4 emissions [t] = AEM × (SEF_CF4 / 1 000) × PrAl (Equation 21)
+>
+> C2F6 emissions [t] = CF4 emissions × F_C2F6 (Equation 22)
+>
+> Where:
+>
+> AEM is the anode effect minutes/cell-day;
+>
+> SEF_CF4 is the slope emission factor expressed in (kg CF4/t Al produced)/(anode
+> effect minutes/cell-day)]. Where different cell-types are used, different SEF
+> may be applied as appropriate;
+>
+> PrAl is the production of primary aluminium [t] during the reporting period; and
+>
+> F_C2F6 is the weight fraction of C2F6 [t C2F6/t CF4].
+>
+> The anode effect minutes per cell-day expresses the frequency of anode effects
+> (number anode effects/cell-day) multiplied by the average duration of anode
+> effects (anode effect minutes/occurrence):
+>
+> AEM = frequency × average duration (Equation 23)
+>
+> Emission factor: The emission factor for CF4 (slope emission factor, SEF_CF4)
+> expresses the amount [kg] of CF4 emitted per tonne of aluminium produced per
+> anode effect minute per cell-day. The emission factor (weight fraction F_C2F6)
+> of C2F6 expresses the amount [kg] of C2F6 emitted proportionate to the amount
+> [kg] of CF4 emitted.
+>
+> Minimum requirement: Technology-specific emission factors from Table 2 of this
+> point are used.
+>
+> Recommended improvement: Installation-specific emission factors for CF4 and
+> C2F6 are established through continuous or intermittent field measurements. For
+> the determination of those emission factors industry best practice shall be
+> applied, in particular the most recent guidelines provided by the International
+> Aluminium Institute. The emission factor shall also take into account emissions
+> related to non-anode effects. Each emission factor shall be determined with a
+> maximum uncertainty of ± 15 %. The emission factors shall be determined at least
+> every three years or earlier where necessary due to relevant changes at the
+> installation. Relevant changes shall include a change in the distribution of
+> anode effect duration, or a change in the control algorithm affecting the mix of
+> the types of anode effects or the nature of the anode effect termination routine.
+
+Table 2 — Technology-specific emission factors related to activity data for the
+slope method:
+
+| Technology | SEF_CF4 [(kg CF4/t Al)/(AE-Mins/cell-day)] | F_C2F6 [t C2F6/t CF4] |
+|---|---|---|
+| Legacy Point Feed Pre Bake (PFPB L) | 0,122 | 0,097 |
+| Modern Point Feed Pre Bake (PFPB M) | 0,104 | 0,057 |
+| Modern Point-Fed Prebake without fully automated anode effect intervention strategies for PFC emissions (PFPB MW) | — (1) | — (1) |
+| Centre Worked Prebake (CWPB) | 0,143 | 0,121 |
+| Side Worked Prebake (SWPB) | 0,233 | 0,280 |
+| Vertical Stud Søderberg (VSS) | 0,058 | 0,086 |
+| Horizontal Stud Søderberg (HSS) | 0,165 | 0,077 |
+
+> (1) The installation operator has to determine the factor by own measurements.
+> If this is technically not feasible or involves unreasonable costs, the values
+> for CWPB methodology shall be used.
+
+#### B.7.2 — Calculation Method B, Overvoltage Method
+
+> For the overvoltage method, the following equations shall be used:
+>
+> CF4 emissions [t] = OVC × (AEO/CE) × PrAl × 0,001 (Equation 24)
+>
+> C2F6 emissions [t] = CF4 emissions × F_C2F6 (Equation 25)
+>
+> Where:
+>
+> OVC is the overvoltage coefficient ('emission factor') expressed in kg CF4 per
+> tonne of aluminium produced per mV overvoltage;
+>
+> AEO is the anode effect overvoltage per cell [mV] determined as the integral of
+> (time × voltage above the target voltage) divided by the time (duration) of data
+> collection;
+>
+> CE is the average current efficiency of aluminium production [%];
+>
+> PrAl is the annual production of primary aluminium [t]; and
+>
+> F_C2F6 is the weight fraction of C2F6 [t C2F6/t CF4].
+>
+> the term AEO/CE (Anode effect overvoltage / current efficiency) expresses the
+> time-integrated average anode effect overvoltage [mV overvoltage] per average
+> current efficiency [%].
+>
+> Minimum requirement: Technology-specific emission factors from Table 3 of this
+> Annex shall be used.
+>
+> Recommended improvement: Installation-specific emission factors are used for
+> CF4 [(kg CF4/t Al)/(mV)] and C2F6 [t C2F6/t CF4] established through continuous
+> or intermittent field measurements. For the determination of those emission
+> factors industry best practice shall be applied, in particular the most recent
+> guidelines provided by the International Aluminium Institute. The emission
+> factors shall be determined with a maximum uncertainty of ± 15 % each. The
+> emission factors shall be determined at least every three years or earlier where
+> necessary due to relevant changes at the installation. Relevant changes shall
+> include a change in the distribution of anode effect duration, or a change in
+> the control algorithm affecting the mix of the types of anode effects or the
+> nature of the anode effect termination routine
+
+Table 3 — Technology-specific emission factors related to overvoltage activity
+data:
+
+| Technology | EF for CF4 [(kg CF4/t Al)/mV] | EF for C2F6 [t C2F6/t CF4] |
+|---|---|---|
+| Centre Worked Prebake (CWPB) | 1,16 | 0,121 |
+| Side Worked Prebake (SWPB) | 3,65 | 0,252 |
+
+#### B.7.3 — Determination of CO2e emissions
+
+> CO2e emissions shall be calculated from CF4 and C2F6 emissions as follows, using
+> the global warming potentials listed in point G of this Annex.
+>
+> PFC emissions [t CO2e] = CF4 emissions [t] × GWP_CF4 + C2F6 emissions [t] ×
+> GWP_C2F6 (Equation 26)
+
+GWPs from Annex II point G, Table 6: CF4 = 6 630 t CO2e/t CF4;
+C2F6 = 11 100 t CO2e/t C2F6. (N2O = 265 t CO2e/t N2O, not applicable to the live
+sectors.)
+
+Cited by §3.17.2.1 (primary electrolytic smelting) as "point B.7 of Annex II",
+in verbatim body text rather than commentary. Note that Table 3 covers only two
+technologies where Table 2 covers seven, so the choice of method A or B is not
+neutral for a Søderberg installation.
+
+### Annex II, point F — Monitoring of activity levels (pp. 60–61)
+
+> F. MONITORING OF ACTIVITY LEVELS
+>
+> The activity level of a production process shall be calculated as the total mass
+> of the goods leaving the production process during the reporting period measured
+> in functional units and in tonnes of goods. Where production processes are
+> defined such that also the production of precursors is included, double counting
+> shall be avoided by counting only the final products of the production process.
+>
+> Only goods which can be sold or directly used as precursor in another production
+> process shall be taken into account. Off-spec products, by-products, waste, and
+> scrap produced in a production process, irrespective of whether they are
+> returned to production processes, delivered to other installations, or disposed
+> of, shall not be included in the determination of the activity level. They shall
+> therefore be assigned zero embedded emissions when entering another production
+> process.
+>
+> For determining activity levels, the metering requirements laid down in point
+> B.4 apply.
+
+This is the source of scrap zero-rating, and it is not a boundary rule. Zero
+embedded emissions follow *therefore* — as a consequence of scrap being excluded
+from the activity level of the process that produced it, not as a freestanding
+grant. Any guidance stating "scrap is zero-rated" without that mechanism
+overstates its own basis, and would not survive a verifier asking where the rule
+comes from.
+
+Relevant to `secondary_remelt`, whose boundary text at §3.17.2.2 is silent on
+scrap carbon.
+
+### Annex III, point B — Calculation of specific embedded emissions of complex goods (pp. 71–73)
+
+> B. CALCULATION OF SPECIFIC EMBEDDED EMISSIONS OF COMPLEX GOODS
+>
+> In accordance with Annex IV to Regulation (EU) 2023/956, the specific embedded
+> emissions SEE_g of complex goods g shall be calculated as follows:
+>
+> SEE_g = (AttrEm_g + EEInpMat) / AL_g (Equation 59)
+>
+> EEInpMat = Σ(i=1..n) M_i × SEE_i (Equation 60)
+>
+> Where:
+>
+> SEE_g are the specific direct or indirect embedded emissions of (complex) goods
+> g expressed in t CO2e per functional unit;
+>
+> AttrEm_g are the attributed direct or indirect emissions of the production
+> process yielding goods g determined in accordance with point A.3 of this Annex
+> for the reporting period, expressed in t CO2e;
+>
+> AL_g is the activity level of the production process yielding goods g for the
+> reporting period determined in accordance with point F of Annex II, expressed in
+> functional units;
+>
+> EEInpMat are the embedded direct or indirect emissions of all precursors
+> consumed during the reporting period, expressed in t CO2e;
+>
+> M_i is the mass of precursor i used in the production process yielding g during
+> the reporting period, expressed in functional units of precursor i, and
+>
+> SEE_i are the specific direct or indirect embedded emissions of precursor i
+> expressed in t CO2e per functional unit of precursor i.
+>
+> In this calculation, only precursors not covered by the same production process
+> as goods g are taken into account. Where the same precursor is obtained from
+> different production processes, the precursor from each installation shall be
+> treated separately.
+>
+> If a precursor i originates in the Union or in one of the countries or
+> territories exempted pursuant to point 1 of Annex III to Regulation
+> (EU) 2023/956 the specific direct or indirect embedded emissions of that
+> precursor shall be counted as zero.
+>
+> Where a precursor i itself has precursors, those precursors are first taken into
+> account using the same calculation method in order to calculate the embedded
+> emissions of the precursor i before they are used for calculating the embedded
+> emissions of goods g. This method is used recursively to all precursors which
+> are complex goods.
+>
+> The parameter M_i refers to the total mass of precursor required to produce the
+> amount AL_g. It also includes quantities of the precursor which do not end up in
+> the complex goods but may be spilt, cut off, combusted, chemically modified,
+> etc. in the production process and leave the process as by-products, scrap,
+> residues, wastes, or emissions.
+>
+> In order to provide data which can be used independently of activity levels, the
+> specific mass consumption m_i for each precursor i shall be determined and
+> included in the communication pursuant to Annex IV:
+>
+> m_i = M_i / AL_g (Equation 61)
+>
+> Thereby the specific embedded emissions of complex goods g may be expressed as:
+>
+> SEE_g = ae_g + Σ(i=1..n)(m_i × SEE_i) (Equation 62)
+>
+> Where:
+>
+> ae_g are the specific attributed direct or indirect emissions of the production
+> process yielding goods g, expressed in t CO2e per tonne of g, being equivalent
+> to specific embedded emissions without precursors' embedded emissions:
+>
+> ae_g = AttrEm_g / AL_g (Equation 63)
+>
+> m_i is the specific mass consumption of precursor i used in the production
+> process yielding one functional unit of goods g, expressed in functional unit of
+> precursor i per functional unit of goods g (i.e. dimensionless); and
+>
+> SEE_i are the specific direct or indirect embedded emissions of precursor i
+> expressed in t CO2e per functional unit of precursor i.
+
+Equations 64, 65 and 66, covering clinker-content and nitrogen-content
+functional units, are omitted: cement and fertilisers are unbuilt. Retrieve from
+the ELI if those sectors are added.
+
+Two points of contact with our implementation. First, Equation 60 is the SEFA
+recursion — "used recursively to all precursors which are complex goods" is the
+regulation's own statement of the rule our SEFA engine implements. Second, M_i
+explicitly includes precursor mass that never reaches the finished good, which is
+a live risk for any intake UI that asks operators for material *in the product*
+rather than material *consumed by the process*.
+
+#### Note: Annex III has no point B.3.2
+
+Annex III is structured as three points only:
+
+- A — Principles for attributing data to production processes (A.1, A.2 with
+  A.2.1–A.2.3, A.3)
+- B — Calculation of specific embedded emissions of complex goods (no numbered
+  sub-points)
+- C — Harmonised efficiency reference values for separate production of
+  electricity and heat
+
+There is no B.3, and therefore no B.3.2. The mass balance method exists only at
+Annex II point B.3.2, reproduced above.
+
+Three system-boundary provisions nonetheless cite it to Annex III:
+
+- §3.14.2 (DRI)
+- §3.15.2.1 (crude steel — basic oxygen steelmaking)
+- §3.15.2.2 (crude steel — electric arc furnace)
+
+while three parallel provisions cite the same rule correctly to Annex II
+(§3.12.2, §3.13.2.1, §3.13.2.2). Recorded as published. Not repaired, and not
+silently normalised in code: any guidance entry deriving from these three
+sections must reproduce the citation as the OJ prints it and carry a note that
+the operative text is at Annex II point B.3.2.
