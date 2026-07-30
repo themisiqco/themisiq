@@ -23,6 +23,18 @@
 // — and a stray '**' in a quoted provision reads as a transcription error in the one file whose
 // whole claim is that it is not one.
 //
+// A CITE NOTE DESCRIBES THE REGULATION, NEVER OUR IMPLEMENTATION STATE. What a point requires,
+// what it conditions, what it is the source of — all fair. Whether we have built it is not, and
+// neither is "not implemented", "unbuilt", or a pointer to a workplan track.
+//
+// The reason is what can adjudicate the claim. A note about the regulation is settled by the
+// committed extract sitting next to this file: it is checkable today, it stays true, and a
+// reader can verify it without leaving the repo. A note about our implementation state is
+// settled only by the codebase, which moves — and nothing here watches it move. Such a note is
+// wrong the moment the feature lands, wrong silently, and wrong inside a file whose entire
+// claim is that its contents can be trusted verbatim. Implementation state belongs where it is
+// tracked: the spec, or a test that fails when it changes.
+//
 // Blockquote lines in the extract (lines beginning '>') are OUR COMMENTARY, not regulation.
 // They are never transcribed into `provisions`. Where such an annotation matters, it belongs in
 // a `note` on a Cite or in a code comment, where it is visibly ours.
@@ -142,6 +154,137 @@ export const BOUNDARIES: BoundaryEntry[] = [
     divergences: [],
   },
   {
+    section: '3.11.2',
+    heading: 'System boundary',
+    scope: 'category',
+    categoryCodes: ['sintered_ore'],
+    // Null, and not an oversight: sintered_ore genuinely has no rows in cbam_production_routes.
+    // §3.11.2 names no production route either — it gives one boundary for the category as a
+    // whole, unlike §3.13.2 and §3.17.2, which split by route.
+    routeCodes: null,
+    provisions: [
+      'For sintered ore, direct emissions monitoring shall encompass:',
+      '— all processes emitting CO2 from process materials such as limestone and other carbonates or carbonate ores;',
+      '— all processes emitting CO2 from all fuels including coke, waste gases such as coke oven gas, blast furnace gas or converter gas; directly or indirectly linked to the production process, and materials used for flue gas cleaning.',
+    ],
+    processes: null,
+    cites: [],
+    divergences: [],
+  },
+  {
+    section: '3.12.2',
+    heading: 'System boundary',
+    scope: 'category',
+    categoryCodes: ['ferroalloy'],
+    routeCodes: ['submerged_arc'],
+    provisions: [
+      'For FeMn, FeCr and FeNi, direct emissions monitoring shall encompass:',
+      '— all processes directly or indirectly linked to the production processes emitting CO2 emissions caused by fuel inputs, irrespective of whether they are used for energetic or non-energetic use;',
+      '— all processes directly or indirectly linked to the production processes emitting CO2 emissions from process inputs such as limestone and from flue gas cleaning;',
+      '— all processes directly or indirectly linked to the production processes emitting CO2 emissions from the consumption of electrodes or electrode pastes;',
+      '— carbon remaining in the product or in slags or wastes is taken into account by using a mass balance method in accordance with point B.3.2 of Annex II.',
+    ],
+    processes: null,
+    cites: [
+      {
+        instrument: 'ir_2025_2547',
+        annex: 'II',
+        point: 'B.3.2',
+        note:
+          'The fourth bullet does not merely permit a mass balance — it makes B.3.2 the method ' +
+          'by which carbon remaining in the product, slags or wastes is accounted for, so the ' +
+          'boundary is incomplete without it.',
+      },
+    ],
+    divergences: [
+      {
+        kind: 'category_collapse',
+        ours: ['ferroalloy'],
+        regulation:
+          'Annex I Table 1 names FeMn, FeCr and FeNi as three separate aggregated goods categories, which share this single boundary section',
+        basis: 'supabase/migrations/20260716_cbam_reference.sql:43-49',
+        note:
+          'THE COLLAPSE DOES NOT AFFECT COMPUTATION. Benchmarks key on cn_code and default ' +
+          'values on (cn_code, country), so neither ever consults category_code; category_code ' +
+          'enters only annex_ii_direct_only, which reference.sql:43-49 documents as safe for ' +
+          'these three prefixes. IT DOES AFFECT ANNEX IV REPORTING. Annex IV point 2 requires a ' +
+          'different sector-specific parameter per ferroalloy — Mn and carbon, Cr and carbon, ' +
+          'Ni and carbon — and one collapsed category cannot express which of the three applies. ' +
+          'Splitting is therefore a reporting requirement, not a calculation fix, and must not ' +
+          'be deferred on the grounds that the numbers come out right.',
+      },
+    ],
+  },
+  {
+    section: '3.13.2.1',
+    heading: 'Blast furnace route',
+    scope: 'category',
+    categoryCodes: ['pig_iron'],
+    routeCodes: ['blast_furnace'],
+    provisions: [
+      '— all processes directly or indirectly linked to the production processes emitting CO2 from fuels and reducing agents such as coke, coke dust, coal, fuel oils, plastic wastes, natural gas, wood wastes, charcoal, as well as from waste gases such as coke oven gas, blast furnace gas or converter gas;',
+      '— where biomass is used, the provisions of point B.3.3 of Annex II shall be taken into account;',
+      '— all processes directly or indirectly linked to the production processes emitting CO2 from process materials such as limestone, magnesite, and other carbonates, carbonate ores; materials for flue gas cleaning;',
+      '— carbon remaining in the product or in slags or wastes is taken into account by using a mass balance method in accordance with point B.3.2 of Annex II.',
+    ],
+    processes: null,
+    cites: [
+      {
+        instrument: 'ir_2025_2547',
+        annex: 'II',
+        point: 'B.3.3',
+        note:
+          'Reached only where biomass is used. B.3.3 sets the CRITERIA for zero-rating biomass ' +
+          'emissions — it is a conditional gate, not an automatic zero, and a route claiming ' +
+          'biomass without meeting them is claiming a reduction it has not earned.',
+      },
+      {
+        instrument: 'ir_2025_2547',
+        annex: 'II',
+        point: 'B.3.2',
+        note:
+          'Mass balance for carbon remaining in the product, slags or wastes. The same bullet ' +
+          'appears verbatim in §3.13.2.2 — one requirement, two routes.',
+      },
+    ],
+    divergences: [],
+  },
+  {
+    section: '3.13.2.2',
+    heading: 'Smelting reduction',
+    scope: 'category',
+    categoryCodes: ['pig_iron'],
+    routeCodes: ['smelting_reduction'],
+    // Three of these four bullets are word-for-word identical to §3.13.2.1's. Only the first
+    // differs, and only in its waste-gas list: the blast furnace route names 'waste gases such
+    // as coke oven gas, blast furnace gas or converter gas', smelting reduction names 'waste
+    // gases from the process or converter gas'. Do not deduplicate these entries — the routes
+    // are separately named in the source and the one differing bullet is the reason why.
+    provisions: [
+      '— all processes directly or indirectly linked to the production processes emitting CO2 from fuels and reducing agents such as coke, coke dust, coal, fuel oils, plastic wastes, natural gas, wood wastes, charcoal, waste gases from the process or converter gas;',
+      '— where biomass is used, the provisions of point B.3.3 of Annex II shall be taken into account;',
+      '— all processes directly or indirectly linked to the production processes emitting CO2 from process materials such as limestone, magnesite, and other carbonates, carbonate ores; materials for flue gas cleaning;',
+      '— carbon remaining in the product or in slags or wastes is taken into account by using a mass balance method in accordance with point B.3.2 of Annex II.',
+    ],
+    processes: null,
+    cites: [
+      {
+        instrument: 'ir_2025_2547',
+        annex: 'II',
+        point: 'B.3.3',
+        note: 'Reached only where biomass is used. Same conditional gate as §3.13.2.1.',
+      },
+      {
+        instrument: 'ir_2025_2547',
+        annex: 'II',
+        point: 'B.3.2',
+        note:
+          'Mass balance for carbon remaining in the product, slags or wastes.',
+      },
+    ],
+    divergences: [],
+  },
+  {
     section: '3.17.2.1',
     heading: 'Primary (electrolytic) smelting',
     scope: 'category',
@@ -165,7 +308,7 @@ export const BOUNDARIES: BoundaryEntry[] = [
           'The fourth bullet does not merely mention perfluorocarbons — it makes B.7 the ' +
           'monitoring method for them, so the boundary is incomplete without it. B.7 is ' +
           'transcribed in the reference file (Slope Method, Overvoltage Method, and the CO2e ' +
-          'determination). PFC monitoring is not implemented.',
+          'determination).',
       },
     ],
     divergences: [],
@@ -198,8 +341,7 @@ export const BOUNDARIES: BoundaryEntry[] = [
           'Guidance that says "scrap is zero-rated" without naming the mechanism overstates its ' +
           'own basis and will not survive a verifier asking where the rule comes from. Note also ' +
           "the lead paragraph's own rule: unwrought aluminium added from other sources is " +
-          'treated like a precursor, which requires precursor intake — unbuilt (spec §11.15 ' +
-          'track C).',
+          'treated like a precursor.',
       },
     ],
     divergences: [],
