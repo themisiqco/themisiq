@@ -547,6 +547,10 @@ export default function CbamSetupPage() {
       setProc3Error('Reference data is still loading — please try again in a moment.')
       return
     }
+    if (cn === '') {
+      setProc3Error('Enter the CN code for this good, exactly as it appears on your customs paperwork.')
+      return
+    }
     if (!validCnCodes.has(cn)) {
       setProc3Error(`CN code "${cn}" isn't a recognised CBAM good in this system. Enter the exact code as it appears for your product on the customs paperwork — it must match a default value we hold. (Some goods are listed at 4-digit heading level, others at 6- or 8-digit.)`)
       return
@@ -1233,7 +1237,7 @@ export default function CbamSetupPage() {
 
               {!editingProc && procInstallationId && (
                 <button type="button" onClick={() => { setEditingProc(EMPTY_PROCESS(procInstallationId)); setProc3Saved(false); setProc3Error(null) }} style={primaryBtn(false)}>
-                  + Add process
+                  + New process
                 </button>
               )}
 
@@ -1423,7 +1427,12 @@ export default function CbamSetupPage() {
                       )
                     })()}
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                      <CbamField label="Activity level — required (> 0)">
+                      {/* The tonnes unit is HARDCODED, and correct for every sector live today —
+                          iron & steel and aluminium are both measured in tonnes of goods. It would
+                          be wrong for a good measured in anything else (e.g. electricity, in MWh),
+                          so adding such a sector means the unit has to become derived, not just
+                          this label edited. */}
+                      <CbamField label="Activity level (tonnes) — required (> 0)" hint="How much of this good the installation produced during the reporting period.">
                         <input type="number" step="any" value={editingProc.activity_level} onChange={(e) => setProc('activity_level', e.target.value)} placeholder="tonnes" style={{ ...cbamInputStyle, width: 180 }} />
                       </CbamField>
                       <CbamField label="Reporting period — required (≥ 2026)">
@@ -1455,7 +1464,7 @@ export default function CbamSetupPage() {
                   </div>
                   {proc3Error && <ErrorBox prefix="Could not save process" message={proc3Error} />}
                   <div style={{ marginTop: '1.25rem', display: 'flex', gap: 10 }}>
-                    <button type="button" onClick={saveProcess} disabled={proc3Saving} style={primaryBtn(proc3Saving)}>{proc3Saving ? 'Saving…' : (editingProc.id ? 'Save changes' : 'Add process')}</button>
+                    <button type="button" onClick={saveProcess} disabled={proc3Saving} style={primaryBtn(proc3Saving)}>{proc3Saving ? 'Saving…' : (editingProc.id ? 'Save changes' : 'Save process')}</button>
                     <button type="button" onClick={() => { setEditingProc(null); setProc3Error(null) }} style={ghostBtn}>Cancel</button>
                   </div>
                 </div>
