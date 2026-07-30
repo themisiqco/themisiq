@@ -25,6 +25,7 @@ import { cbamInputStyle, CbamField } from '../components/DisclosureQuestion'
 import { massBalance } from '../../../../lib/cbam/engine'
 import { assessCnCategory, suggestCategory } from '../../../../lib/cbam/cn'
 import { buildBoundaryGuidanceView } from '../../../../lib/cbam/boundaryGuidanceView'
+import { routeLabel, calcModeLabel, steelGradeLabel } from '../../../../lib/cbam/labels'
 import type { SourceStream } from '../../../../lib/cbam/types'
 import type { CnMapRow } from '../../../../lib/cbam/cn'
 
@@ -1113,8 +1114,8 @@ export default function CbamSetupPage() {
                     <div key={proc.id} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                         <div>
-                          <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>CN {proc.cn_code} <span style={{ color: '#888784', fontWeight: 300 }}>· {categoryLabel(goodsCategories, proc.category_code)}{proc.route_code ? ` · ${proc.route_code}` : ''}</span></div>
-                          <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>AL {proc.activity_level} · {proc.reporting_period} · {proc.calc_mode}{proc.steel_grade ? ` · ${proc.steel_grade}` : ''}</div>
+                          <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>CN {proc.cn_code} <span style={{ color: '#888784', fontWeight: 300 }}>· {categoryLabel(goodsCategories, proc.category_code)}{proc.route_code ? ` · ${routeLabel(proc.route_code)}` : ''}</span></div>
+                          <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>AL {proc.activity_level} · {proc.reporting_period} · {calcModeLabel(proc.calc_mode)}{proc.steel_grade ? ` · ${steelGradeLabel(proc.steel_grade)}` : ''}</div>
                         </div>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button type="button" onClick={() => { setEditingProc(proc); setProc3Saved(false); setProc3Error(null) }} style={linkBtn}>Edit</button>
@@ -1368,7 +1369,7 @@ export default function CbamSetupPage() {
                         <CbamField label="Production route — required for this category" hint="Only routes that belong to the category you chose are shown here.">
                           <select value={editingProc.route_code} onChange={(e) => setProc('route_code', e.target.value)} style={cbamInputStyle}>
                             <option value="" disabled>Select a route…</option>
-                            {routesForCategory(editingProc.category_code).map((r) => <option key={r.route_code} value={r.route_code}>{r.route_code}</option>)}
+                            {routesForCategory(editingProc.category_code).map((r) => <option key={r.route_code} value={r.route_code}>{routeLabel(r.route_code)}</option>)}
                           </select>
                         </CbamField>
                       ) : (
@@ -1452,11 +1453,11 @@ export default function CbamSetupPage() {
                         <input type="number" step={1} min={2026} value={editingProc.reporting_period} onChange={(e) => setProc('reporting_period', e.target.value)} style={{ ...cbamInputStyle, width: 180 }} />
                       </CbamField>
                     </div>
-                    <CbamField label="Calculation mode — required">
+                    <CbamField label="Calculation method — required">
                       <select value={editingProc.calc_mode} onChange={(e) => setProc('calc_mode', e.target.value)} style={{ ...cbamInputStyle, width: 220 }}>
-                        <option value="actual">actual</option>
-                        <option value="default">default</option>
-                        <option value="combined">combined</option>
+                        <option value="actual">{calcModeLabel('actual')}</option>
+                        <option value="default">{calcModeLabel('default')}</option>
+                        <option value="combined">{calcModeLabel('combined')}</option>
                       </select>
                     </CbamField>
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -1464,9 +1465,9 @@ export default function CbamSetupPage() {
                         <CbamField label="Steel grade" hint="Steel goods only; leave unset otherwise.">
                           <select value={editingProc.steel_grade} onChange={(e) => setProc('steel_grade', e.target.value)} style={{ ...cbamInputStyle, width: 200 }}>
                             <option value="">(none)</option>
-                            <option value="carbon">carbon</option>
-                            <option value="low_alloy">low_alloy</option>
-                            <option value="high_alloy">high_alloy</option>
+                            <option value="carbon">{steelGradeLabel('carbon')}</option>
+                            <option value="low_alloy">{steelGradeLabel('low_alloy')}</option>
+                            <option value="high_alloy">{steelGradeLabel('high_alloy')}</option>
                           </select>
                         </CbamField>
                       )}
