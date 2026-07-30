@@ -23,7 +23,9 @@ import { supabase } from '../../../../lib/supabase'
 import { useEntitlement } from '../../../../lib/useEntitlement'
 import { cbamInputStyle, CbamField } from '../components/DisclosureQuestion'
 import { massBalance } from '../../../../lib/cbam/engine'
+import { assessCnCategory } from '../../../../lib/cbam/cn'
 import type { SourceStream } from '../../../../lib/cbam/types'
+import type { CnMapRow } from '../../../../lib/cbam/cn'
 
 // ── House style, matching app/dashboard/cbam/page.tsx ──
 const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
@@ -160,6 +162,8 @@ export default function CbamSetupPage() {
   // ── Step 3 reference data (world-readable) ──
   const [goodsCategories, setGoodsCategories] = useState<{ code: string; label: string }[]>([])
   const [routes, setRoutes] = useState<{ category_code: string; route_code: string }[]>([])
+  // CN prefix -> goods category, the §10.7 longest-prefix map. 58 rows.
+  const [cnMap, setCnMap] = useState<CnMapRow[]>([])
   // Every CN code that HAS a default row — the authoritative accept-set for the CN field
   // (exactly what the engine resolves against). Populated in the reference-data effect below.
   const [validCnCodes, setValidCnCodes] = useState<Set<string>>(new Set())
@@ -400,15 +404,18 @@ export default function CbamSetupPage() {
     if (!isPaid) return
     let cancelled = false
     ;(async () => {
-      const [catRes, routeRes] = await Promise.all([
+      const [catRes, routeRes, mapRes] = await Promise.all([
         supabase.from('cbam_goods_categories').select('code, label').order('label'),
         supabase.from('cbam_production_routes').select('category_code, route_code').order('category_code'),
+        supabase.from('cbam_cn_map').select('cn_prefix, category_code'),
       ])
       if (cancelled) return
       if (catRes.error) { setProc3Error(catRes.error.message); return }
       if (routeRes.error) { setProc3Error(routeRes.error.message); return }
+      if (mapRes.error) { setProc3Error(mapRes.error.message); return }
       setGoodsCategories((catRes.data ?? []) as { code: string; label: string }[])
       setRoutes((routeRes.data ?? []) as { category_code: string; route_code: string }[])
+      setCnMap((mapRes.data ?? []) as CnMapRow[])
 
       // The authoritative CN accept-set: every code with a default row in cbam_default_values,
       // at whatever granularity the annex seeds it (4-digit heading, 6- or 8-digit subheading) —
@@ -1230,6 +1237,45 @@ export default function CbamSetupPage() {
                         <option value="" disabled>Select a category…</option>
                         {goodsCategories.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
                       </select>
+                      {/*
+                        ADVISORY ONLY. This never blocks a save, never disables a control, and no
+                        validation path consults it — cbam_cn_map is a HINT, NOT AN AUTHORITY.
+
+                        Two known reasons the map can disagree with a correct entry. CN 7205 is
+                        dual-listed and the operator resolves it between two categories; the map
+                        holds one prefix and cannot. And §3.15.1's rolling split — primary
+                        hot-rolling and rough forging yielding CN 7207, 7218 or 7224 stay in crude
+                        steel, all other rolling and forging falls to iron or steel products —
+                        turns on the ACTIVITY, which no CN prefix encodes.
+
+                        So a disagreement means CHECK, not CORRECT. Never phrase it as an error,
+                        and never let it gate the save handler.
+                      */}
+                      {(() => {
+                        const a = assessCnCategory(editingProc.cn_code, editingProc.category_code, cnMap)
+                        // The user has only ever seen labels — the select renders c.label. Falling
+                        // back to the raw code is for a category the map names but goodsCategories
+                        // has not loaded; showing a code beats showing nothing.
+                        const labelFor = (code: string) => goodsCategories.find((c) => c.code === code)?.label ?? code
+                        const line: React.CSSProperties = { marginTop: 4, fontSize: 12, fontWeight: 300, lineHeight: 1.5 }
+                        if (a.kind === 'consistent') {
+                          // Rendered, not silent: a passed check and a check that never ran must
+                          // not look the same.
+                          return <div style={{ ...line, color: '#555553' }}>Customs code and category agree — {a.matched_prefix} is {labelFor(a.category_code)}.</div>
+                        }
+                        if (a.kind === 'inconsistent') {
+                          return <div style={{ ...line, color: '#92400e' }}>Worth checking — customs code {a.matched_prefix} usually means {labelFor(a.expected_category)}, but {labelFor(a.selected_category)} is selected. Nothing is blocked, and this may be right for your good — just confirm before saving.</div>
+                        }
+                        if (a.reason === 'no_prefix_match') {
+                          return <div style={{ ...line, color: '#888784' }}>Not checked — we don&apos;t hold a reference for this customs code, so we can&apos;t say either way. This is not a pass.</div>
+                        }
+                        if (a.reason === 'malformed_reference_row') {
+                          return <div style={{ ...line, color: '#92400e' }}>Not checked — one of our reference records couldn&apos;t be read, so we can&apos;t say either way. This is a problem on our side, not with what you entered.</div>
+                        }
+                        // 'unparseable_cn' and 'no_category_selected': the user is mid-entry and
+                        // has made no claim to contradict. Silence.
+                        return null
+                      })()}
                     </CbamField>
                     {editingProc.category_code && (
                       routesForCategory(editingProc.category_code).length > 0 ? (
