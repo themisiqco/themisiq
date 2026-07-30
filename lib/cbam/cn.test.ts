@@ -8,7 +8,7 @@
 // seeded spaced form ('7202 11', '7206 10 00', '2601 12 00') so the tests reproduce the
 // actual cross-dataset mismatch §10.8 describes rather than a synthetic one.
 import { describe, it, expect } from 'vitest';
-import { normalizeCn, matchCnPrefix, assessCnCategory, type CnMapRow } from './cn';
+import { normalizeCn, matchCnPrefix, assessCnCategory, suggestCategory, type CnMapRow } from './cn';
 
 // A representative slice of the real seed. Prefixes verbatim; nothing here is invented.
 const SEED: CnMapRow[] = [
@@ -22,6 +22,7 @@ const SEED: CnMapRow[] = [
   { cn_prefix: '7207', category_code: 'crude_steel' },
   { cn_prefix: '7218', category_code: 'crude_steel' },
   { cn_prefix: '7224', category_code: 'crude_steel' },
+  { cn_prefix: '7205', category_code: 'iron_steel_products' },   // reference.sql:69, dual-listed
   { cn_prefix: '7208', category_code: 'iron_steel_products' },
   { cn_prefix: '7601', category_code: 'primary_aluminium' },       // aluminium seed
   { cn_prefix: '7616', category_code: 'aluminium_products' },
@@ -268,5 +269,95 @@ describe('assessCnCategory — the three states', () => {
       n++;
     }
     expect(n).toBe(codes.length * cats.length * rowSets.length);
+  });
+});
+
+describe('suggestCategory — the four states', () => {
+  it('offers nothing while there is nothing to go on', () => {
+    // Empty, whitespace-only, and a code the map does not cover. All three are 'none' because
+    // none of them is a defect: the first two mean the user has not typed a code yet, and the
+    // third means the code is outside what the map holds. Nothing to suggest is not an error.
+    expect(suggestCategory('', SEED)).toEqual({ kind: 'none' });
+    expect(suggestCategory('   ', SEED)).toEqual({ kind: 'none' });
+    expect(suggestCategory('9999 99 99', SEED)).toEqual({ kind: 'none' });
+  });
+
+  it('a half-typed or malformed code is none, not a complaint', () => {
+    // normalizeCn rejects these. The user is mid-entry and has made no claim to contradict —
+    // reporting a problem here would fire on the way to a correct code.
+    expect(suggestCategory('72O6', SEED)).toEqual({ kind: 'none' });
+    expect(suggestCategory('7206-10-00', SEED)).toEqual({ kind: 'none' });
+  });
+
+  it("'7208' suggests iron_steel_products, singly", () => {
+    expect(suggestCategory('7208', SEED)).toEqual({
+      kind: 'single', category_code: 'iron_steel_products', matched_prefix: '7208',
+    });
+  });
+
+  it("'7205' is the one dual-listed code — a choice, not a single", () => {
+    // Annex I Table 1 lists 7205 under BOTH pig iron and iron or steel products, asymmetrically:
+    // products carries it 'if not covered under category pig iron', so products is the default
+    // and pig iron the operator-determined exception. primary/alternative encode that ordering
+    // and must not be swapped — see the DUAL_LISTED comment in cn.ts.
+    expect(suggestCategory('7205', SEED)).toEqual({
+      kind: 'choice',
+      primary: 'iron_steel_products',
+      alternative: 'pig_iron',
+      matched_prefix: '7205',
+    });
+  });
+
+  it("'7205 10 00' — a longer, spaced code under the same prefix — is also a choice", () => {
+    // The dual listing is a property of the HEADING, so every subheading beneath it inherits
+    // the ambiguity. Matching on the raw string rather than the normalised matched prefix would
+    // silently miss this and hand the operator a confident wrong answer on the spaced form.
+    expect(suggestCategory('7205 10 00', SEED)).toEqual({
+      kind: 'choice',
+      primary: 'iron_steel_products',
+      alternative: 'pig_iron',
+      matched_prefix: '7205',
+    });
+    expect(suggestCategory('7205 21 00', SEED)).toEqual({
+      kind: 'choice',
+      primary: 'iron_steel_products',
+      alternative: 'pig_iron',
+      matched_prefix: '7205',
+    });
+  });
+
+  it('a malformed ROW prefix gives unavailable, not a throw and not none', () => {
+    // Distinct from 'none' on purpose. 'none' says the map has no opinion; 'unavailable' says
+    // the map could not be read. Collapsing them would hide a broken seed behind an outcome
+    // that looks routine, and no amount of correct typing would ever clear it.
+    const BAD: CnMapRow[] = [{ cn_prefix: '72 06x', category_code: 'crude_steel' }];
+    expect(() => suggestCategory('7208', BAD)).not.toThrow();
+    expect(suggestCategory('7208', BAD)).toEqual({ kind: 'unavailable' });
+  });
+
+  it('a malformed row AND an unparseable code give none — the user is checked first', () => {
+    // Same precedence as assessCnCategory: the user's own input is normalised before the
+    // reference data is touched, so a mid-entry code short-circuits to 'none' and never
+    // surfaces our defect at the moment they are still typing.
+    const BAD: CnMapRow[] = [{ cn_prefix: '72 06x', category_code: 'crude_steel' }];
+    expect(suggestCategory('72O6', BAD)).toEqual({ kind: 'none' });
+  });
+
+  it('never throws across a spread of valid and malformed inputs', () => {
+    const codes = [
+      '7208 10 00', '7205', '7205 10 00', '7218', '2601 12 00', '7202 11', '7601',
+      '7204 10 00', '9999 99 99', '', '   ', 'ABC', '72O6', '7206-10-00', '..', '-1',
+      '7206\t10\n00', '٧٢٠٦', '0', '00000000000000000000', 'null', 'undefined', '7206 10 00 ',
+    ];
+    const rowSets: ReadonlyArray<ReadonlyArray<CnMapRow>> = [
+      SEED, [], [{ cn_prefix: '72 06x', category_code: 'crude_steel' }], [{ cn_prefix: '', category_code: 'x' }],
+    ];
+    let n = 0;
+    for (const c of codes) for (const rows of rowSets) {
+      const r = suggestCategory(c, rows);   // must not throw
+      expect(['none', 'single', 'choice', 'unavailable']).toContain(r.kind);
+      n++;
+    }
+    expect(n).toBe(codes.length * rowSets.length);
   });
 });

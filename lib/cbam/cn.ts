@@ -186,3 +186,117 @@ export function assessCnCategory(
     selected_category: selected,
   };
 }
+
+/**
+ * CN 7205 — THE ONE DUAL-LISTED CODE, and the listing is ASYMMETRIC, not an either/or.
+ *
+ * Annex I Table 1 of IR 2025/2547 lists 7205 under two aggregated goods categories, and the two
+ * entries are not phrased as equals:
+ *   - under Pig Iron: 'Some products under 7205 (Granules and powders, of pig iron,
+ *     spiegeleisen, iron, or steel) may be covered here'
+ *   - under Iron or steel products: '7205 - Granules and powders, of pig iron, spiegeleisen,
+ *     iron or steel (if not covered under category pig iron)'
+ *
+ * The parenthetical 'if not covered under category pig iron' is what makes iron or steel
+ * products the DEFAULT and pig iron the EXCEPTION: the products entry claims the code except
+ * where the pig-iron entry has already taken it, and 'may be covered here' leaves that
+ * determination to the operator, who knows what the granules actually are. So primary is the
+ * fallback the code lands in absent an operator judgement, and alternative is the judgement
+ * they may make. Do not present them as two equal options — that would misstate the Table.
+ *
+ * CITATION CAVEAT. Table 1 is Annex I POINT 2. The committed extract
+ * docs/reference/ir-2025-2547-annex-i-s3-boundaries.md holds Annex I point 3 (system
+ * boundaries) and Annex IV §2 — not point 2. This citation is therefore NOT currently checkable
+ * against a primary source in this repo, unlike everything in boundaries.ts. Transcribe Table 1
+ * into the reference file before treating the quoted phrasings above as verified.
+ *
+ * cbam_cn_map seeds 7205 -> iron_steel_products (20260716_cbam_reference.sql:69, whose own
+ * comment reads '7205 dual-listed; pig-iron-granule exception is operator-resolved'), which is
+ * the same primary/exception shape the Table gives.
+ */
+const DUAL_LISTED = {
+  /** Normalised, and normalised THROUGH normalizeCn so a future edit that adds a space or a
+   *  stray character fails loudly at import rather than silently never matching. */
+  prefix: normalizeCn('7205'),
+  primary: 'iron_steel_products',
+  alternative: 'pig_iron',
+} as const;
+
+/**
+ * What the CN map suggests a code's category is, before the user has chosen one.
+ *
+ * FOUR STATES. 'none' and 'unavailable' are both "no suggestion" but they are not the same
+ * fact: 'none' says the map has nothing to offer for this code (out of scope, or the user is
+ * still typing), 'unavailable' says the map itself could not be read. The first is ordinary,
+ * the second is our defect, and a surface that renders them identically hides a broken seed.
+ * Same split as assessCnCategory's 'no_prefix_match' vs 'malformed_reference_row'.
+ *
+ * 'choice' exists for CN 7205 alone — see DUAL_LISTED. It is NOT a generic "ambiguous" state:
+ * no other seeded prefix maps to two categories, and if one ever does, the Table entry that
+ * makes it so must be read before extending this.
+ */
+export type CnCategorySuggestion =
+  | { kind: 'none' }
+  | { kind: 'single'; category_code: string; matched_prefix: string }
+  | { kind: 'choice'; primary: string; alternative: string; matched_prefix: string }
+  | { kind: 'unavailable' };
+
+/**
+ * Suggest a goods category from a CN code alone.
+ *
+ * NEVER THROWS, for any input — this runs at render time on every keystroke, so a throw would
+ * take the form down mid-edit. Same contract and same reason as assessCnCategory.
+ *
+ * THE TWO THROW SOURCES ARE SEPARATED STRUCTURALLY, not by inspecting the error. The user's
+ * code is normalised first, in its own try/catch; only if that succeeds is matchCnPrefix
+ * called. A throw from matchCnPrefix therefore cannot have come from the code — it can only
+ * have come from a row's cn_prefix, which is why that arm returns 'unavailable' rather than
+ * 'none'. Matching on message text would work today and rot the first time normalizeCn's
+ * wording is edited.
+ *
+ * A half-typed code is 'none', not a complaint: the user has made no claim yet.
+ */
+export function suggestCategory(
+  cnCode: string,
+  rows: ReadonlyArray<CnMapRow>,
+): CnCategorySuggestion {
+  // `?? ''` rather than trusting the signature: called from a form, where an untyped caller
+  // passing null must not be the thing that crashes it.
+  const raw = (cnCode ?? '').trim();
+  if (raw === '') return { kind: 'none' };
+
+  let code: string;
+  try {
+    code = normalizeCn(raw);
+  } catch {
+    return { kind: 'none' };
+  }
+
+  let match: CnPrefixMatch | null;
+  try {
+    match = matchCnPrefix(code, rows);
+  } catch {
+    // Can only be a row's cn_prefix — see the ordering note above.
+    return { kind: 'unavailable' };
+  }
+
+  if (match === null) return { kind: 'none' };
+
+  // Compare against the MATCHED prefix, which matchCnPrefix has already normalised — not
+  // against the user's raw input, which may be spaced ('7205 10 00'), and not against the raw
+  // row string.
+  if (match.matched_prefix === DUAL_LISTED.prefix) {
+    return {
+      kind: 'choice',
+      primary: DUAL_LISTED.primary,
+      alternative: DUAL_LISTED.alternative,
+      matched_prefix: match.matched_prefix,
+    };
+  }
+
+  return {
+    kind: 'single',
+    category_code: match.category_code,
+    matched_prefix: match.matched_prefix,
+  };
+}

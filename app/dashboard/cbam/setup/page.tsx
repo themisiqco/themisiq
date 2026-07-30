@@ -23,7 +23,7 @@ import { supabase } from '../../../../lib/supabase'
 import { useEntitlement } from '../../../../lib/useEntitlement'
 import { cbamInputStyle, CbamField } from '../components/DisclosureQuestion'
 import { massBalance } from '../../../../lib/cbam/engine'
-import { assessCnCategory } from '../../../../lib/cbam/cn'
+import { assessCnCategory, suggestCategory } from '../../../../lib/cbam/cn'
 import type { SourceStream } from '../../../../lib/cbam/types'
 import type { CnMapRow } from '../../../../lib/cbam/cn'
 
@@ -514,6 +514,16 @@ export default function CbamSetupPage() {
   function setProc<K extends keyof ProcessForm>(k: K, v: string) {
     setProc3Saved(false)
     setEditingProc((p) => (p ? ({ ...p, [k]: v } as ProcessForm) : p))
+  }
+
+  // Choosing a category is never just one field: the route is scoped to the category by a
+  // composite FK, and steel grade only exists for two categories. Hoisted out of the select's
+  // onChange so the CN suggestion buttons take the SAME path — a second call site that set
+  // category_code alone would leave a stale route pointing at the old category.
+  function selectCategory(c: string) {
+    setProc('category_code', c)
+    setProc('route_code', '')
+    if (!STEEL_GRADE_CATEGORIES.has(c)) setProc('steel_grade', '')
   }
 
   // ── Step 3 save (process) — insert (new) or update (existing) ──
@@ -1233,7 +1243,7 @@ export default function CbamSetupPage() {
                       <input value={editingProc.cn_code} onChange={(e) => setProc('cn_code', e.target.value)} placeholder="7206 10 00" style={cbamInputStyle} />
                     </CbamField>
                     <CbamField label="Category — required">
-                      <select value={editingProc.category_code} onChange={(e) => { const c = e.target.value; setProc('category_code', c); setProc('route_code', ''); if (!STEEL_GRADE_CATEGORIES.has(c)) setProc('steel_grade', '') }} style={cbamInputStyle}>
+                      <select value={editingProc.category_code} onChange={(e) => selectCategory(e.target.value)} style={cbamInputStyle}>
                         <option value="" disabled>Select a category…</option>
                         {goodsCategories.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
                       </select>
@@ -1272,8 +1282,59 @@ export default function CbamSetupPage() {
                         if (a.reason === 'malformed_reference_row') {
                           return <div style={{ ...line, color: '#92400e' }}>Not checked — one of our reference records couldn&apos;t be read, so we can&apos;t say either way. This is a problem on our side, not with what you entered.</div>
                         }
-                        // 'unparseable_cn' and 'no_category_selected': the user is mid-entry and
-                        // has made no claim to contradict. Silence.
+                        if (a.reason === 'no_category_selected') {
+                          // Nothing has been claimed yet, so there is nothing to check — but there
+                          // may be something to OFFER.
+                          //
+                          // WE SUGGEST, WE DO NOT AUTO-FILL, and that is a methodology choice not a
+                          // UX one. The operator makes the claim. If we pre-selected the category
+                          // from the customs code, the consistency check above would be checking our
+                          // own inference against itself and would agree every time — it would stop
+                          // meaning anything. Worse, a dual-listed code like 7205 would be silently
+                          // resolved on the operator's behalf, turning a judgement only they can
+                          // make into a default they never saw.
+                          const s = suggestCategory(editingProc.cn_code, cnMap)
+                          // Light by design: an offer, not a call to action. The select remains the
+                          // way to choose; these buttons are a shortcut to it, not a replacement.
+                          const chip: React.CSSProperties = {
+                            fontSize: 12, fontWeight: 300, lineHeight: 1.5, padding: '2px 10px',
+                            background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4',
+                            borderRadius: 999, cursor: 'pointer',
+                          }
+                          // Buttons live on their own row beneath the sentence, so two of them wrap
+                          // together as a pair rather than the second one stranding below the text.
+                          // Same container for one button and two, so the two shapes read alike.
+                          const chipRow: React.CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }
+                          if (s.kind === 'single') {
+                            return (
+                              <div style={{ ...line, color: '#888784' }}>
+                                This customs code is usually {labelFor(s.category_code)}.
+                                <div style={chipRow}>
+                                  <button type="button" onClick={() => selectCategory(s.category_code)} style={chip}>Use {labelFor(s.category_code)}</button>
+                                </div>
+                              </div>
+                            )
+                          }
+                          if (s.kind === 'choice') {
+                            return (
+                              <div style={{ ...line, color: '#888784' }}>
+                                This customs code can fall under either category, depending on what
+                                the goods are. It counts as {labelFor(s.primary)} unless they are in
+                                fact {labelFor(s.alternative)} — only you can say which.
+                                <div style={chipRow}>
+                                  <button type="button" onClick={() => selectCategory(s.primary)} style={chip}>Use {labelFor(s.primary)}</button>
+                                  <button type="button" onClick={() => selectCategory(s.alternative)} style={chip}>Use {labelFor(s.alternative)}</button>
+                                </div>
+                              </div>
+                            )
+                          }
+                          // 'none' and 'unavailable' alike: nothing typed, nothing covered, or the
+                          // map could not be read. No suggestion exists to make, and this is not the
+                          // surface on which to report a seed defect to a customer.
+                          return null
+                        }
+                        // 'unparseable_cn': the user is mid-entry and has made no claim to
+                        // contradict. Silence.
                         return null
                       })()}
                     </CbamField>
