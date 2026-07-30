@@ -1,0 +1,228 @@
+// lib/cbam/boundaries.ts
+// IR (EU) 2025/2547 Annex I §3 system boundaries, as pure data. Same shape of module as
+// benchmarks.ts: no React, no Supabase, no I/O, and no imports from anywhere in this repo.
+// Callers render this; nothing here fetches or decides.
+//
+// PROVENANCE — the only rule that matters in this file. Every string in `provisions` and every
+// `heading` is transcribed from docs/reference/ir-2025-2547-annex-i-s3-boundaries.md, which is
+// committed alongside this file and is itself an extract of the authentic OJ PDF (pp. 18–26).
+// Nothing here is written from memory, and nothing is paraphrased. That is spec §11.15's
+// requirement: boundary guidance is transcribed §-by-§ from primary text with the § cited
+// inline, because a verifier will cross-check it against the OJ.
+//
+// STANDING RULE — TRANSCRIBE THE OJ, NOT THE EXTRACT'S RENDERING OF IT. `provisions` and
+// `heading` hold the text as the Official Journal PRINTS it, not as the reference file RENDERS
+// it. That extract is a reading document and carries two things the OJ does not: markdown
+// emphasis (**...**) added by us, and hard line breaks from the extract's wrap width. Strip
+// both. Each provision is a single-line string — no markdown, no internal newlines, single
+// spaces between words. Wording, punctuation, em-dash bullet markers ('— '), decimal commas
+// and spelling stay exactly as printed.
+//
+// The distinction is what makes this file quotable. A verifier holds the OJ, not our extract,
+// so any character we added while making the source readable is a character they will not find
+// — and a stray '**' in a quoted provision reads as a transcription error in the one file whose
+// whole claim is that it is not one.
+//
+// Blockquote lines in the extract (lines beginning '>') are OUR COMMENTARY, not regulation.
+// They are never transcribed into `provisions`. Where such an annotation matters, it belongs in
+// a `note` on a Cite or in a code comment, where it is visibly ours.
+//
+// If text is needed that the reference file does not contain, ADD IT TO THE REFERENCE FILE
+// FIRST, from the OJ. Do not supply it here.
+//
+// SCOPE. Four entries: the cross-sectoral rules and the three aluminium boundaries. The steel
+// boundaries (§3.11–§3.16) are in the reference file and are NOT yet transcribed here.
+//
+// ONE DELIBERATE OMISSION, recorded so it is not mistaken for a transcription error. Each
+// boundary section opens with a stem — 'For that production route, direct emissions monitoring
+// shall take into account:' (§3.17.2.1, §3.17.2.2) and 'For aluminium products, direct
+// emissions monitoring shall take into account:' (§3.18.2). `provisions` holds the bullets and,
+// where §3.17.2.2 has one, the lead paragraph; it does not hold the stem. The bullets are
+// therefore grammatical continuations, not sentences. A render surface that prints them without
+// re-supplying the stem loses 'direct emissions monitoring shall take into account' — which is
+// the verb of the whole section. Supply it.
+
+/** Which instrument a citation points into. */
+export type Instrument = 'ir_2025_2547' | 'reg_2023_956';
+
+export type AnnexId = 'I' | 'II' | 'III' | 'IV' | 'V';
+
+/**
+ * An outbound reference from a boundary section.
+ *
+ * `publishedAs` is present ONLY where the OJ prints a reference that does not resolve.
+ * `annex`/`point` carry the OPERATIVE location — where the text actually is. `publishedAs`
+ * records what is PRINTED. Both are kept because a verifier reading the OJ will look for the
+ * printed reference and a verifier reading the text will look for the operative one, and
+ * silently normalising in either direction leaves one of them unable to follow the trail.
+ */
+export interface Cite {
+  instrument: Instrument;
+  annex: AnnexId;
+  /** Operative point, e.g. 'B.3.2'. Empty where the section cites an Annex as a whole. */
+  point: string;
+  publishedAs?: { annex: AnnexId; point: string };
+  note?: string;
+}
+
+/**
+ * A place where ThemisIQ's own codes do not line up 1:1 with what the regulation names.
+ *
+ * Recorded rather than resolved: the divergence is usually correct (our route split is finer
+ * than the boundary text's), but it must be visible, because a verifier comparing our codes
+ * against the regulation's vocabulary will otherwise read it as an error.
+ */
+export interface Divergence {
+  kind: 'route_split' | 'category_collapse';
+  /** Our codes. */
+  ours: string[];
+  /** What the regulation names. */
+  regulation: string;
+  /** Where our divergence comes from. */
+  basis: string;
+  note: string;
+}
+
+export interface BoundaryEntry {
+  /** Section number as printed, e.g. '3.17.2.2'. */
+  section: string;
+  /** Verbatim from the reference file. */
+  heading: string;
+  scope: 'cross_sectoral' | 'category';
+  /** Null ONLY when scope is 'cross_sectoral'. */
+  categoryCodes: string[] | null;
+  /** Null where the category has no routes. */
+  routeCodes: string[] | null;
+  /** The section's operative text verbatim, one element per printed bullet or paragraph. */
+  provisions: string[];
+  /**
+   * Non-null ONLY where the regulation itself enumerates named processes. Where it does not,
+   * this is null — and null means THE REGULATION IS SILENT, not that we have not filled it in.
+   * Treating silence as an empty include-list would assert a boundary the text does not draw.
+   *
+   * `included: null` inside this object means the regulation names exclusions but no inclusions.
+   */
+  processes: { included: string[] | null; excluded: string[] } | null;
+  cites: Cite[];
+  divergences: Divergence[];
+}
+
+export const BOUNDARIES: BoundaryEntry[] = [
+  {
+    section: '3.1',
+    heading: 'Cross-sectoral rules',
+    scope: 'cross_sectoral',
+    categoryCodes: null,
+    routeCodes: null,
+    provisions: [
+      'Specific embedded emissions shall be calculated as the emissions of the production process and, for complex goods, the embedded emissions of the precursors to produce the functional unit of the good during the reporting period.',
+      'The system boundaries are defined per aggregated goods categories and cover the direct emissions, the indirect emissions from electricity consumption where relevant under Regulation (EU) 2023/956, emitted by all processes directly or indirectly linked to the production processes, and the embedded emissions of precursors, independently of whether these precursors are produced in the installation or acquired from a different installation. In addition to these general rules, the specific details of each aggregated goods category are set out in points 3.2 to 3.19. Any CBAM goods produced by means of a production route not listed in points 3.2 to 3.19 is subject to the cross-sectoral rules described in this point, and to the sector-specific rules if the production route is a combination of the production routes listed in points 3.2 to 3.19.',
+      'The purchase and maintenance of infrastructure and equipment are excluded from the system boundaries.',
+      'When the production process of complex goods listed in Annex II to Regulation (EU) 2023/956 includes one or more precursors not listed in that Annex, the indirect emissions of those precursors will be included in the calculation of the embedded emissions of the complex goods. When the production process of complex goods not listed in that Annex includes one or more precursors listed in that Annex, the indirect emissions of these precursors will not be included in the calculation of the embedded emissions of the complex goods.',
+    ],
+    // §3.1 enumerates no named processes — it states general rules and one blanket exclusion.
+    // The infrastructure/equipment exclusion is carried in `provisions`, not lifted into
+    // `processes`, because it excludes a class of expenditure, not a named process.
+    processes: null,
+    cites: [
+      {
+        instrument: 'reg_2023_956',
+        annex: 'II',
+        point: '',
+        note:
+          "§3.1 turns on Annex II to Regulation (EU) 2023/956 three times in one paragraph — " +
+          "complex goods 'listed in Annex II', precursors 'not listed in that Annex', and the " +
+          'converse. The rule is asymmetric in both directions and it governs INDIRECT emissions ' +
+          'of precursors, not the process boundary itself. The Annex II list decides which arm ' +
+          'applies, and this repo does not hold the text of Regulation (EU) 2023/956 — the ' +
+          'reference file covers IR 2025/2547 only. Retrieve it from the OJ before relying on ' +
+          'membership of that list; do not infer it.',
+      },
+    ],
+    divergences: [],
+  },
+  {
+    section: '3.17.2.1',
+    heading: 'Primary (electrolytic) smelting',
+    scope: 'category',
+    categoryCodes: ['primary_aluminium'],
+    routeCodes: ['primary_electrolysis'],
+    provisions: [
+      '— all processes directly or indirectly linked to the production processes emitting CO2 emissions from the consumption of electrodes or electrode pastes;',
+      '— all processes directly or indirectly linked to the production processes emitting CO2 emissions from any fuels used (e.g. for drying and pre-heating of raw materials, heating of electrolysis cells, heating required for casting);',
+      '— all processes directly or indirectly linked to the production processes emitting CO2 emissions from any flue gas treatment, from soda ash or limestone if relevant;',
+      '— perfluorocarbon emissions caused by anode effects monitored in accordance with point B.7 of Annex II.',
+    ],
+    // The bullets describe emission SOURCES (electrodes, fuels, flue gas treatment, anode
+    // effects), not named processes. §3.17.2.1 enumerates no process list, so this is null.
+    processes: null,
+    cites: [
+      {
+        instrument: 'ir_2025_2547',
+        annex: 'II',
+        point: 'B.7',
+        note:
+          'The fourth bullet does not merely mention perfluorocarbons — it makes B.7 the ' +
+          'monitoring method for them, so the boundary is incomplete without it. B.7 is ' +
+          'transcribed in the reference file (Slope Method, Overvoltage Method, and the CO2e ' +
+          'determination). PFC monitoring is not implemented.',
+      },
+    ],
+    divergences: [],
+  },
+  {
+    section: '3.17.2.2',
+    heading: 'Secondary melting (recycling)',
+    scope: 'category',
+    categoryCodes: ['primary_aluminium'],
+    routeCodes: ['secondary_remelt'],
+    provisions: [
+      'Secondary melting (recycling) of aluminium uses aluminium scrap as main input. However, where unwrought aluminium from other sources is added, it is treated like a precursor.',
+      '— all processes directly or indirectly linked to the production processes emitting CO2 emissions from any fuels used for drying and pre-heating of raw materials, used in melting furnaces, in pre-treatment of scrap such as de-coating and de-oiling, and combustion of the related residues, and fuels required for casting of ingots, billets or slabs;',
+      '— all processes directly or indirectly linked to the production processes emitting CO2 emissions from any fuels used in associated activities such as treatment of skimmings and slag recovery;',
+      '— all processes directly or indirectly linked to the production processes emitting CO2 emissions from any flue gas treatment, from soda ash or limestone if relevant.',
+    ],
+    processes: null,
+    cites: [
+      {
+        instrument: 'ir_2025_2547',
+        annex: 'II',
+        point: 'F',
+        note:
+          'THE SOURCE OF SCRAP ZERO-RATING, AND IT IS NOT A BOUNDARY RULE. §3.17.2.2 is itself ' +
+          'silent on scrap carbon: read alone it neither zero-rates the scrap input nor charges ' +
+          'it. Point F (Monitoring of activity levels) is what does the work, and it does so ' +
+          'indirectly — off-spec products, by-products, waste and scrap are excluded from the ' +
+          'activity level of the process that PRODUCED them, and zero embedded emissions follow ' +
+          "'therefore', as a consequence of that exclusion rather than as a freestanding grant. " +
+          'Guidance that says "scrap is zero-rated" without naming the mechanism overstates its ' +
+          'own basis and will not survive a verifier asking where the rule comes from. Note also ' +
+          "the lead paragraph's own rule: unwrought aluminium added from other sources is " +
+          'treated like a precursor, which requires precursor intake — unbuilt (spec §11.15 ' +
+          'track C).',
+      },
+    ],
+    divergences: [],
+  },
+  {
+    section: '3.18.2',
+    heading: 'System boundary',
+    scope: 'category',
+    categoryCodes: ['aluminium_products'],
+    routeCodes: ['primary_electrolysis', 'secondary_remelt'],
+    provisions: [
+      '— all processes directly or indirectly linked to the production processes emitting CO2 emissions from combustion of fuels and process emissions from flue gas treatment, excluding the following processes: cutting, welding and finishing of aluminium products.',
+    ],
+    // The ONE entry here where the regulation names processes, and it names only exclusions —
+    // hence `included: null`. §3.18.2 carries no include-list at all, where the steel-products
+    // boundary (§3.16.2, not yet transcribed) names eleven processes.
+    //
+    // THREE exclusions, not four. Steel products exclude plating, cutting, welding and
+    // finishing; aluminium products exclude cutting, welding and finishing. PLATING IS EXCLUDED
+    // FOR STEEL AND NOT EXCLUDED FOR ALUMINIUM. Do not add it here by analogy — the asymmetry
+    // is in the source text and is the single fact a user reasoning from steel will get wrong.
+    processes: { included: null, excluded: ['cutting', 'welding', 'finishing'] },
+    cites: [],
+    divergences: [],
+  },
+];
