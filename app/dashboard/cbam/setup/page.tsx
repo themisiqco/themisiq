@@ -334,12 +334,12 @@ export default function CbamSetupPage() {
 
     // Only the two genuine NOT NULL columns are enforced client-side.
     if (editing.name.trim() === '') {
-      setInst2Error('Installation name (2)(a) is required — it is a NOT NULL column.')
+      setInst2Error('Enter a name for this installation.')
       return
     }
     const country = editing.country.trim().toUpperCase()
     if (country === '') {
-      setInst2Error('Country (2)(d) is required — it is a NOT NULL column.')
+      setInst2Error('Choose the country where this installation is located.')
       return
     }
     // Country keys the grid-factor lookup; a code that is not a two-letter ISO
@@ -532,7 +532,7 @@ export default function CbamSetupPage() {
     setProc3Saved(false)
     setProc3Error(null)
     const p = editingProc
-    if (!p.installation_id) { setProc3Error('Installation is required (installation_id NOT NULL).'); return }
+    if (!p.installation_id) { setProc3Error('Choose which installation this process belongs to.'); return }
     // CN code is the load-bearing field. Validate MEMBERSHIP against the seeded default values —
     // the exact set the engine resolves against — not a format shape. CBAM goods are seeded at
     // mixed granularity (4-digit headings, 6- and 8-digit subheadings), so a format rule mispredicts;
@@ -546,27 +546,27 @@ export default function CbamSetupPage() {
       setProc3Error(`CN code "${cn}" isn't a recognised CBAM good in this system. Enter the exact code as it appears for your product on the customs paperwork — it must match a default value we hold. (Some goods are listed at 4-digit heading level, others at 6- or 8-digit.)`)
       return
     }
-    if (!p.category_code) { setProc3Error('Category is required (category_code NOT NULL, FK to cbam_goods_categories).'); return }
+    if (!p.category_code) { setProc3Error('Choose a category for this good.'); return }
     // Route: enforce the composite (category, route) pairing the DB FK enforces.
     const catRoutes = routesForCategory(p.category_code)
     if (catRoutes.length === 0) {
       if (p.route_code !== '') { setProc3Error('This category has no production routes — leave the route unset.'); return }
     } else if (p.route_code === '' || !catRoutes.some((r) => r.route_code === p.route_code)) {
-      setProc3Error('Choose a production route valid for this category — the (category, route) pair is a composite foreign key and an invalid pair is rejected.')
+      setProc3Error('Choose a production route that belongs to this category. The route and the category have to match.')
       return
     }
     const activity = Number(p.activity_level)
     if (p.activity_level.trim() === '' || Number.isNaN(activity) || activity <= 0) {
-      setProc3Error('Activity level is required and must be greater than 0 (CHECK activity_level > 0).'); return
+      setProc3Error('Enter how much of this good was produced. It has to be more than zero.'); return
     }
     const period = Number(p.reporting_period)
     if (!Number.isInteger(period) || period < 2026) {
-      setProc3Error('Reporting period must be an integer ≥ 2026 (CHECK reporting_period >= 2026).'); return
+      setProc3Error('Enter a reporting year of 2026 or later, as a whole number.'); return
     }
     let electricity: number | null = null
     if (p.electricity_consumed.trim() !== '') {
       const e = Number(p.electricity_consumed)
-      if (Number.isNaN(e) || e < 0) { setProc3Error('Electricity consumed must be null or ≥ 0 (CHECK).'); return }
+      if (Number.isNaN(e) || e < 0) { setProc3Error('Electricity consumed can be left blank, or entered as zero or more.'); return }
       electricity = e
     }
     setProc3Saving(true)
@@ -586,7 +586,10 @@ export default function CbamSetupPage() {
       ? supabase.from('cbam_production_processes').update(payload).eq('id', p.id)
       : supabase.from('cbam_production_processes').insert(payload)
     const { error } = await query
-    if (error) { setProc3Error(error.message); setProc3Saving(false); return }
+    // The raw DB message is kept in the console, not shown: a customer cannot act on a
+    // constraint name, and the validation above already reports everything they CAN act on.
+    // Anything reaching here is ours to diagnose, so it must not be swallowed.
+    if (error) { console.error('[cbam] process save failed', error); setProc3Error("We couldn't save this process. Please try again — if it keeps happening, get in touch and we'll look into it."); setProc3Saving(false); return }
     setProc3Saving(false)
     setProc3Saved(true)
     setEditingProc(null)
@@ -604,9 +607,9 @@ export default function CbamSetupPage() {
     if (!companyId || !streamsProcId || !editingStream) return
     setStreamError(null)
     const s = editingStream
-    if (s.name.trim() === '') { setStreamError('Stream name is required (NOT NULL).'); return }
+    if (s.name.trim() === '') { setStreamError('Enter a name for this source stream.'); return }
     if (s.activity_data.trim() === '' || Number.isNaN(Number(s.activity_data))) {
-      setStreamError('Activity data is required and must be a number (NOT NULL). Outputs must be NEGATIVE.'); return
+      setStreamError('Enter the activity data as a number. For an output stream, enter it as a negative figure — carbon leaving in the product counts against the balance.'); return
     }
     const ad = Number(s.activity_data)
     let carbon: number | null = null
@@ -1340,7 +1343,7 @@ export default function CbamSetupPage() {
                     </CbamField>
                     {editingProc.category_code && (
                       routesForCategory(editingProc.category_code).length > 0 ? (
-                        <CbamField label="Production route — required for this category" hint="The (category, route) pair is validated by a composite foreign key — an invalid pair is rejected.">
+                        <CbamField label="Production route — required for this category" hint="Only routes that belong to the category you chose are shown here.">
                           <select value={editingProc.route_code} onChange={(e) => setProc('route_code', e.target.value)} style={cbamInputStyle}>
                             <option value="" disabled>Select a route…</option>
                             {routesForCategory(editingProc.category_code).map((r) => <option key={r.route_code} value={r.route_code}>{r.route_code}</option>)}
