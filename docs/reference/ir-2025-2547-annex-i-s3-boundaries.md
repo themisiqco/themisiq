@@ -395,9 +395,11 @@ if relevant.
 > today — spec §11.15 track C.
 >
 > Note the scrap input itself is NOT zero-rated by §3.17.2.2; the section is
-> silent on scrap carbon. Zero-rating of scrap comes from Annex II point F
-> (off-spec products, by-products, waste and scrap are assigned zero embedded
-> emissions when entering another production process), not from the boundary.
+> silent on scrap carbon. Zero-rating of scrap comes from Annex II point F,
+> reproduced verbatim in the Annex II/III section below, not from the boundary.
+> Point F excludes scrap from the activity level of the process that produced
+> it; zero embedded emissions follow from that exclusion rather than standing
+> as a separate grant.
 > Our `cbam_production_routes.boundary_note` for `secondary_remelt` currently
 > says "scrap zero-rated, re-melt direct energy only" — accurate in effect, but
 > it attributes the zero-rating to the wrong provision.
