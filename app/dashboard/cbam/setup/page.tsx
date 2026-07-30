@@ -598,7 +598,20 @@ export default function CbamSetupPage() {
     // The raw DB message is kept in the console, not shown: a customer cannot act on a
     // constraint name, and the validation above already reports everything they CAN act on.
     // Anything reaching here is ours to diagnose, so it must not be swallowed.
-    if (error) { console.error('[cbam] process save failed', error); setProc3Error("We couldn't save this process. Please try again — if it keeps happening, get in touch and we'll look into it."); setProc3Saving(false); return }
+    if (error) {
+      console.error('[cbam] process save failed', error)
+      // This table also carries a uniqueness rule on (id, company_id), which raises the SAME
+      // error code but cannot realistically collide on this path — id is generated, not chosen.
+      // If that ever changes, this message would have to distinguish the two, because it names
+      // the good and the period and would then be telling the customer the wrong thing.
+      if (error.code === '23505') {
+        setProc3Error('You already have a process for this good and reporting period at this installation. Edit the existing one, or change the CN code or the reporting period.')
+      } else {
+        setProc3Error("We couldn't save this process. Please try again — if it keeps happening, get in touch and we'll look into it.")
+      }
+      setProc3Saving(false)
+      return
+    }
     setProc3Saving(false)
     setProc3Saved(true)
     setEditingProc(null)
