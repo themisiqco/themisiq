@@ -222,6 +222,7 @@ export const BOUNDARIES: BoundaryEntry[] = [
     categoryCodes: ['pig_iron'],
     routeCodes: ['blast_furnace'],
     provisions: [
+      'For that production route, direct emissions monitoring shall encompass:',
       '— all processes directly or indirectly linked to the production processes emitting CO2 from fuels and reducing agents such as coke, coke dust, coal, fuel oils, plastic wastes, natural gas, wood wastes, charcoal, as well as from waste gases such as coke oven gas, blast furnace gas or converter gas;',
       '— where biomass is used, the provisions of point B.3.3 of Annex II shall be taken into account;',
       '— all processes directly or indirectly linked to the production processes emitting CO2 from process materials such as limestone, magnesite, and other carbonates, carbonate ores; materials for flue gas cleaning;',
@@ -261,6 +262,9 @@ export const BOUNDARIES: BoundaryEntry[] = [
     // gases from the process or converter gas'. Do not deduplicate these entries — the routes
     // are separately named in the source and the one differing bullet is the reason why.
     provisions: [
+      // 'For THIS production route', where §3.13.2.1 prints 'For THAT production route'. The
+      // one-word difference is the OJ's, not a typo here.
+      'For this production route, direct emissions monitoring shall encompass:',
       '— all processes directly or indirectly linked to the production processes emitting CO2 from fuels and reducing agents such as coke, coke dust, coal, fuel oils, plastic wastes, natural gas, wood wastes, charcoal, waste gases from the process or converter gas;',
       '— where biomass is used, the provisions of point B.3.3 of Annex II shall be taken into account;',
       '— all processes directly or indirectly linked to the production processes emitting CO2 from process materials such as limestone, magnesite, and other carbonates, carbonate ores; materials for flue gas cleaning;',
@@ -282,6 +286,158 @@ export const BOUNDARIES: BoundaryEntry[] = [
           'Mass balance for carbon remaining in the product, slags or wastes.',
       },
     ],
+    divergences: [],
+  },
+  {
+    section: '3.14.2',
+    heading: 'System boundary',
+    scope: 'category',
+    categoryCodes: ['dri'],
+    routeCodes: ['direct_reduction'],
+    provisions: [
+      'For that production route, direct emissions monitoring shall encompass:',
+      '— all processes directly or indirectly linked to the production processes emitting CO2 from fuels and reducing agents such as coal, natural gas, fuel oils, waste gases from the process or converter gas, etc.;',
+      '— where biogas or other forms of biomass are used, the provisions of point B.3.3 of Annex II shall be taken into account;',
+      '— all processes directly or indirectly linked to the production processes emitting CO2 from process materials such as limestone, magnesite, and other carbonates, carbonate ores, materials for flue gas cleaning;',
+      '— carbon remaining in the product or in slags or wastes is taken into account by using a mass balance method in accordance with point B.3.2 of Annex III.',
+    ],
+    processes: null,
+    cites: [
+      {
+        instrument: 'ir_2025_2547',
+        annex: 'II',
+        point: 'B.3.3',
+        note:
+          'Reached where biogas or other forms of biomass are used — a wider trigger than ' +
+          "§3.13.2's 'where biomass is used'. B.3.3 sets the criteria for zero-rating biomass " +
+          'emissions, not an automatic zero.',
+      },
+      {
+        instrument: 'ir_2025_2547',
+        annex: 'II',
+        point: 'B.3.2',
+        publishedAs: { annex: 'III', point: 'B.3.2' },
+        note:
+          'THE OJ PRINTS ANNEX III AND THE TEXT IS IN ANNEX II. Annex III has no point B.3.2 — ' +
+          'Annex III point B is the calculation of specific embedded emissions of complex goods. ' +
+          'The mass balance method is Annex II point B.3.2, which §3.12.2 and §3.13.2 cite ' +
+          'correctly for the same rule. §3.15.2.1 and §3.15.2.2 carry the same printed ' +
+          'reference. Both locations are kept: annex/point is where the text is, publishedAs is ' +
+          'what the OJ says, and a reader following either must be able to arrive.',
+      },
+    ],
+    divergences: [],
+  },
+  {
+    section: '3.15.2.1',
+    heading: 'Basic oxygen steelmaking',
+    scope: 'category',
+    categoryCodes: ['crude_steel'],
+    routeCodes: ['bof'],
+    provisions: [
+      'For that production route, direct emissions monitoring shall encompass:',
+      '— all processes directly or indirectly linked to the production processes emitting CO2 from fuels such as coal, natural gas, fuel oils, waste gases such as blast furnace gas, coke oven gas or converter gas;',
+      '— all processes directly or indirectly linked to the production processes emitting CO2 from process materials such as limestone, magnesite, and other carbonates, carbonate ores; materials for flue gas cleaning;',
+      '— carbon entering the process in scrap, alloys, graphite etc. and carbon remaining in the product or in slags or wastes is taken into account by using a mass balance method in accordance with point B.3.2 of Annex III.',
+    ],
+    processes: null,
+    cites: [
+      {
+        instrument: 'ir_2025_2547',
+        annex: 'II',
+        point: 'B.3.2',
+        publishedAs: { annex: 'III', point: 'B.3.2' },
+        note:
+          'THE OJ PRINTS ANNEX III AND THE TEXT IS IN ANNEX II. Annex III has no point B.3.2 — ' +
+          'Annex III point B is the calculation of specific embedded emissions of complex goods. ' +
+          'The mass balance method is Annex II point B.3.2, which §3.12.2 and §3.13.2 cite ' +
+          'correctly for the same rule. §3.14.2 and §3.15.2.2 carry the same printed reference. ' +
+          'Both locations are kept: annex/point is where the text is, publishedAs is what the OJ ' +
+          'says, and a reader following either must be able to arrive.',
+      },
+    ],
+    divergences: [],
+  },
+  {
+    section: '3.15.2.2',
+    heading: 'Electric arc furnace',
+    scope: 'category',
+    categoryCodes: ['crude_steel'],
+    routeCodes: ['eaf_dri', 'eaf_scrap'],
+    provisions: [
+      // 'shall take into account', where §3.15.2.1 prints 'shall encompass'. The OJ's own
+      // wording, differing between two adjacent subsections of one section.
+      'For that production route, direct emissions monitoring shall take into account:',
+      '— all processes directly or indirectly linked to the production processes emitting CO2 from fuels such as coal, natural gas, fuel oils, as well as from waste gases such as blast furnace gas, coke oven gas or converter gas;',
+      '— all processes directly or indirectly linked to the production processes emitting CO2 from the consumption of electrodes and electrode pastes;',
+      '— all processes directly or indirectly linked to the production processes emitting CO2 from process materials such as limestone, magnesite, and other carbonates, carbonate ores; materials for flue gas cleaning;',
+      '— carbon entering the process, e.g. in the form of scrap, alloys and graphite, and carbon remaining in the product or in slags or wastes is taken into account by using a mass balance method in accordance with point B.3.2 of Annex III.',
+    ],
+    processes: null,
+    cites: [
+      {
+        instrument: 'ir_2025_2547',
+        annex: 'II',
+        point: 'B.3.2',
+        publishedAs: { annex: 'III', point: 'B.3.2' },
+        note:
+          'THE OJ PRINTS ANNEX III AND THE TEXT IS IN ANNEX II. Annex III has no point B.3.2 — ' +
+          'Annex III point B is the calculation of specific embedded emissions of complex goods. ' +
+          'The mass balance method is Annex II point B.3.2, which §3.12.2 and §3.13.2 cite ' +
+          'correctly for the same rule. §3.14.2 and §3.15.2.1 carry the same printed reference. ' +
+          'Both locations are kept: annex/point is where the text is, publishedAs is what the OJ ' +
+          'says, and a reader following either must be able to arrive.',
+      },
+    ],
+    divergences: [
+      {
+        kind: 'route_split',
+        ours: ['eaf_dri', 'eaf_scrap'],
+        regulation:
+          'Annex I §3.15.2 names two crude steel production routes, basic oxygen steelmaking and electric arc furnace; we hold three',
+        basis: 'supabase/migrations/20260718_cbam_route_split_eaf.sql',
+        note:
+          'The split follows the IR 2025/2620 benchmark distinction between DRI-charged and ' +
+          'scrap-charged EAF, not the boundary text. Both our routes share this single boundary ' +
+          'section unchanged — the same bullets apply to each, and nothing in §3.15.2.2 varies ' +
+          'by charge. The divergence is a benchmark-selection concern, not a boundary one.',
+      },
+    ],
+  },
+  {
+    section: '3.16.2',
+    heading: 'System boundary',
+    scope: 'category',
+    categoryCodes: ['iron_steel_products'],
+    // Null on both counts: iron_steel_products has no rows in cbam_production_routes, and
+    // §3.16 names no route either — one boundary for the category, no route subsections.
+    routeCodes: null,
+    provisions: [
+      'For iron or steel products, direct emissions monitoring shall take into account:',
+      '— all processes directly or indirectly linked to the production processes emitting CO2 emissions from combustion of fuels and process emissions from flue gas treatment, including re-heating, re-melting, casting, hot rolling, cold rolling, forging, annealing, coating, galvanizing, wire drawing, pickling and excluding the following processes: plating, cutting, welding and finishing of iron or steel products.',
+    ],
+    // FOUR exclusions here; §3.18.2 excludes THREE. PLATING IS EXCLUDED FOR IRON AND STEEL
+    // PRODUCTS AND NOT FOR ALUMINIUM PRODUCTS. The include-list is the other asymmetry: eleven
+    // named processes here, none at all in §3.18.2. Both differences are in the source text.
+    // Do NOT normalise the two entries against each other in either direction — not by adding
+    // plating to §3.18.2, and not by dropping it here.
+    processes: {
+      included: [
+        're-heating',
+        're-melting',
+        'casting',
+        'hot rolling',
+        'cold rolling',
+        'forging',
+        'annealing',
+        'coating',
+        'galvanizing',
+        'wire drawing',
+        'pickling',
+      ],
+      excluded: ['plating', 'cutting', 'welding', 'finishing'],
+    },
+    cites: [],
     divergences: [],
   },
   {
@@ -365,6 +521,19 @@ export const BOUNDARIES: BoundaryEntry[] = [
     // is in the source text and is the single fact a user reasoning from steel will get wrong.
     processes: { included: null, excluded: ['cutting', 'welding', 'finishing'] },
     cites: [],
-    divergences: [],
+    divergences: [
+      {
+        kind: 'route_split',
+        ours: ['primary_electrolysis', 'secondary_remelt'],
+        regulation:
+          'Annex I §3.18 names no production route for aluminium products; the section is a single boundary with no route subsections',
+        basis: 'supabase/migrations/20260727_cbam_aluminium_seed.sql:43-47',
+        note:
+          'The routes are inherited from the unwrought aluminium category so a products ' +
+          'declaration can record which upstream route its precursor came from. The boundary ' +
+          'text itself does not vary by route — §3.18.2 is one bullet applying to aluminium ' +
+          'products however the precursor was made.',
+      },
+    ],
   },
 ];
