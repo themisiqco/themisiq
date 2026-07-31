@@ -34,7 +34,7 @@ const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSiz
 const sectionSub: React.CSSProperties = { fontSize: 14, color: '#555553', fontWeight: 300, lineHeight: 1.7, marginBottom: '2rem' }
 const itemHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: '1.15rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 10, marginTop: '2rem' }
 
-type Step = 1 | 2 | 3 | 4
+type Step = 1 | 2 | 3
 type Company = { id: string; name: string }
 
 type OperatorProfile = {
@@ -107,6 +107,49 @@ const EMPTY_STREAM: StreamForm = {
   id: null, name: '', stream_kind: 'fuel', activity_data: '', cc_mode: 'direct',
   carbon_content: '', emission_factor: '', ncv: '', biomass_fraction: '0', source_doc_id: '',
 }
+
+// ── Precursors ──────────────────────────────────────────────────────────────
+type Boundary = 'external' | 'separate_internal' | 'joint'
+type PrecursorForm = {
+  id: string | null
+  cn_code: string
+  category_code: string
+  mass_consumed: string
+  boundary: Boundary
+  origin_country: string
+  reporting_period: string
+  origin_operator_name: string
+  origin_installation_name: string
+  origin_cbam_registry_id: string
+}
+type PrecursorRow = PrecursorForm & { id: string }
+const EMPTY_PRECURSOR = (reportingPeriod: string): PrecursorForm => ({
+  id: null, cn_code: '', category_code: '', mass_consumed: '', boundary: 'external',
+  origin_country: '', reporting_period: reportingPeriod,
+  origin_operator_name: '', origin_installation_name: '', origin_cbam_registry_id: '',
+})
+
+// Plain-language labels for where a precursor came from. The stored value is never shown.
+const BOUNDARY_OPTIONS: { value: Boundary; label: string }[] = [
+  { value: 'external', label: 'Bought from another installation' },
+  { value: 'separate_internal', label: 'Made here, in a separate production process' },
+  { value: 'joint', label: "Made here, inside this process's boundary (joint production)" },
+]
+
+// Reasons a process can consume no CBAM precursors. Values match the CHECK constraint on
+// cbam_production_processes; only the labels are ever rendered.
+const DECLARATION_REASONS: { value: string; label: string }[] = [
+  { value: 'joint_production', label: 'Made as one joint production process' },
+  { value: 'scrap_only_charge', label: 'Charged with scrap only' },
+  { value: 'no_cbam_precursors', label: 'Consumes no CBAM-listed inputs' },
+  { value: 'other', label: 'Something else' },
+]
+const declarationReasonLabel = (v: string | null) =>
+  DECLARATION_REASONS.find((r) => r.value === v)?.label ?? v ?? ''
+
+// Per-process precursor state for the card status line: how many rows, and what the process
+// itself declares. Kept separate from ProcessForm so the process save payload is untouched.
+type PrecursorMeta = { count: number; declaration: string; reason: string | null; note: string | null }
 
 // ── Evidence documents (bucket 'cbam-source-documents') ──
 // Limits mirror the DB bucket: 25 MB cap + MIME allowlist. Legacy .xls is NOT
@@ -214,6 +257,22 @@ export default function CbamSetupPage() {
   const [computeBusyId, setComputeBusyId] = useState<string | null>(null)
   const [computeResult, setComputeResult] = useState<ComputeResponse | null>(null)
   const [computeError, setComputeError] = useState<string | null>(null)
+  // Set when a precursor or declaration change invalidates an open calculation result.
+  const [computeStaleNote, setComputeStaleNote] = useState<string | null>(null)
+
+  // ── Step 3 precursors (nested under a saved process) ──
+  const [precursorProcId, setPrecursorProcId] = useState<string | null>(null)
+  const [precursors, setPrecursors] = useState<PrecursorRow[]>([])
+  const [editingPrecursor, setEditingPrecursor] = useState<PrecursorForm | null>(null)
+  const [precursorSaving, setPrecursorSaving] = useState(false)
+  const [precursorError, setPrecursorError] = useState<string | null>(null)
+  const [precursorNotice, setPrecursorNotice] = useState<string | null>(null)
+  const [precursorMeta, setPrecursorMeta] = useState<Record<string, PrecursorMeta>>({})
+  // Declaration sub-form (only reachable when a process has no precursor rows).
+  const [declReason, setDeclReason] = useState('')
+  const [declNote, setDeclNote] = useState('')
+  // Country codes seeded in the published default values, for the origin-country select.
+  const [originCountries, setOriginCountries] = useState<string[]>([])
   const [streams, setStreams] = useState<StreamRow[]>([])
   const [editingStream, setEditingStream] = useState<StreamForm | null>(null)
   const [streamSaving, setStreamSaving] = useState(false)
@@ -496,6 +555,20 @@ export default function CbamSetupPage() {
         byNormalised.set(key, seeded)
       }
       setValidCnCodes(byNormalised)
+
+      // Countries a precursor can have been produced in. This comes from a view that returns ONE
+      // ROW PER COUNTRY, so PostgREST's 1000-row response cap cannot truncate it. The view owns
+      // both the DISTINCT and the exclusion of 'other' — do not re-add either here.
+      //
+      // Completeness is the point, not tidiness: the default value is looked up by
+      // (cn_code, origin_country), so a country missing from this list would leave an operator
+      // picking the nearest one available and silently resolving a DIFFERENT default.
+      const { data: countryData, error: countryErr } = await supabase
+        .from('cbam_origin_countries')
+        .select('country')
+      if (cancelled) return
+      if (countryErr) { console.error('[CN] country fetch error', countryErr); setProc3Error(countryErr.message); return }
+      setOriginCountries((countryData ?? []).map((r) => r.country as string).sort())
     })()
     return () => { cancelled = true }
   }, [isPaid])
@@ -528,6 +601,7 @@ export default function CbamSetupPage() {
           steel_grade: (r.steel_grade as string | null) ?? '',
           electricity_consumed: r.electricity_consumed == null ? '' : String(r.electricity_consumed),
         })))
+        loadPrecursorMeta(rows.map((r) => r.id as string))
       })
   }
   useEffect(() => {
@@ -550,6 +624,7 @@ export default function CbamSetupPage() {
     setStreamsProcId(null)          // one panel per card
     setComputeResult(null)
     setComputeError(null)
+    setComputeStaleNote(null)
     setComputeBusyId(procId)
 
     const { data: { session } } = await supabase.auth.getSession()
@@ -578,6 +653,253 @@ export default function CbamSetupPage() {
       setComputeError(e instanceof Error ? e.message : 'Network error')
       setComputeBusyId(null)
     }
+  }
+
+  // ── Precursor status for every process in the list ──────────────────────────
+  // TWO SOURCES, because neither alone is the answer. Rows ARE the declaration — entering them
+  // is the act of declaring — while the declaration column carries only the state rows cannot
+  // express: that a process consumes none. Read both, decide in the status line.
+  // A hoisted function declaration, not a const arrow: loadProcesses calls it, and loadProcesses
+  // is defined above it. A const would be in its temporal dead zone at that point.
+  async function loadPrecursorMeta(procIds: string[]) {
+    if (procIds.length === 0) { setPrecursorMeta({}); return }
+    const [rowsRes, procRes] = await Promise.all([
+      supabase.from('cbam_precursor_inputs').select('process_id').in('process_id', procIds),
+      supabase
+        .from('cbam_production_processes')
+        .select('id, precursor_declaration, precursor_declaration_reason, precursor_declaration_note')
+        .in('id', procIds),
+    ])
+    if (rowsRes.error || procRes.error) {
+      setProc3Error((rowsRes.error || procRes.error)!.message)
+      return
+    }
+    const counts: Record<string, number> = {}
+    for (const r of rowsRes.data ?? []) {
+      const pid = r.process_id as string
+      counts[pid] = (counts[pid] ?? 0) + 1
+    }
+    const meta: Record<string, PrecursorMeta> = {}
+    for (const p of procRes.data ?? []) {
+      const pid = p.id as string
+      meta[pid] = {
+        count: counts[pid] ?? 0,
+        declaration: (p.precursor_declaration as string | null) ?? 'unknown',
+        reason: (p.precursor_declaration_reason as string | null) ?? null,
+        note: (p.precursor_declaration_note as string | null) ?? null,
+      }
+    }
+    setPrecursorMeta(meta)
+  }
+
+  // ── Load precursor rows for the expanded process ──
+  const loadPrecursors = (procId: string) => {
+    setPrecursorError(null)
+    supabase
+      .from('cbam_precursor_inputs')
+      .select('id, precursor_cn_code, precursor_category_code, mass_consumed, boundary, origin_country, reporting_period, origin_operator_name, origin_installation_name, origin_cbam_registry_id')
+      .eq('process_id', procId)
+      .order('created_at')
+      .then(({ data, error }) => {
+        if (error) { setPrecursorError(error.message); return }
+        const rows = (data ?? []) as Record<string, unknown>[]
+        setPrecursors(rows.map((r) => ({
+          id: r.id as string,
+          cn_code: (r.precursor_cn_code as string | null) ?? '',
+          category_code: (r.precursor_category_code as string | null) ?? '',
+          mass_consumed: r.mass_consumed == null ? '' : String(r.mass_consumed),
+          boundary: (r.boundary as Boundary | null) ?? 'external',
+          origin_country: (r.origin_country as string | null) ?? '',
+          reporting_period: r.reporting_period == null ? '' : String(r.reporting_period),
+          origin_operator_name: (r.origin_operator_name as string | null) ?? '',
+          origin_installation_name: (r.origin_installation_name as string | null) ?? '',
+          origin_cbam_registry_id: (r.origin_cbam_registry_id as string | null) ?? '',
+        })))
+      })
+  }
+
+  // Any precursor or declaration change invalidates an earlier calculation for that process:
+  // the figure was computed from inputs that have since changed. Clear it rather than leave a
+  // number on screen that no longer describes anything.
+  const invalidateCompute = (procId: string) => {
+    if (computeProcId !== procId) return
+    setComputeResult(null)
+    setComputeError(null)
+    setComputeStaleNote('The precursors for this process have changed, so the earlier figure no longer applies. Calculate again.')
+  }
+
+  function setPrecF<K extends keyof PrecursorForm>(k: K, v: string) {
+    setEditingPrecursor((p) => (p ? ({ ...p, [k]: v } as PrecursorForm) : p))
+  }
+
+  // ── Save one precursor ──
+  // PROVENANCE IS ALWAYS 'default', and there is no picker, because the other two values cannot
+  // currently produce a figure. 'actual_verified' would need a supplier's verification report:
+  // hasValidVerifierReport in lib/cbam/resolver.ts is hardcoded false (no verifier-report store
+  // exists), so every such row would fall back to the default anyway, and resolvePrecursorSefa
+  // throws on it outright. 'computed_here' would need recursive child-SEE: computeChildSEE throws.
+  // Offering either would let an operator record a claim the engine cannot honour.
+  //
+  // see_value and verifier_report_id are deliberately NOT written — both belong to provenance
+  // values that are not offered, and a stored figure with no verification behind it is worse
+  // than no figure.
+  async function savePrecursor() {
+    if (!companyId || !precursorProcId || !editingPrecursor) return
+    setPrecursorError(null)
+    setPrecursorNotice(null)
+    const p = editingPrecursor
+
+    const cn = p.cn_code.trim()
+    if (cn === '') { setPrecursorError('Enter the CN code for this precursor, exactly as it appears on your customs paperwork.'); return }
+    if (validCnCodes.size === 0) { setPrecursorError('Reference data is still loading — please try again in a moment.'); return }
+    let cnKey: string
+    try {
+      cnKey = normalizeCn(cn)
+    } catch {
+      setPrecursorError('A CN code should be digits only — spaces are fine, but letters, dashes and dots are not. Copy it from your customs paperwork exactly as it appears there.')
+      return
+    }
+    // Store the SEEDED form, never the keystrokes — same reason as the process CN code: every
+    // downstream lookup matches by exact string equality.
+    const cnSeeded = validCnCodes.get(cnKey)
+    if (cnSeeded === undefined) {
+      setPrecursorError(`CN code "${cn}" isn't a recognised CBAM good in this system. Enter the exact code as it appears for your product on the customs paperwork — it must match a default value we hold. (Some goods are listed at 4-digit heading level, others at 6- or 8-digit.)`)
+      return
+    }
+    if (!p.category_code) { setPrecursorError('Choose a category for this precursor.'); return }
+    const mass = Number(p.mass_consumed)
+    if (p.mass_consumed.trim() === '' || Number.isNaN(mass) || mass < 0) {
+      setPrecursorError('Enter how much of this precursor was consumed, in tonnes. It cannot be negative.'); return
+    }
+    if (!p.origin_country) { setPrecursorError('Choose the country where this precursor was produced.'); return }
+    const period = Number(p.reporting_period)
+    if (!Number.isInteger(period)) { setPrecursorError('Enter the reporting period as a whole year.'); return }
+
+    setPrecursorSaving(true)
+    const payload = {
+      company_id: companyId,
+      process_id: precursorProcId,
+      precursor_cn_code: cnSeeded,
+      precursor_category_code: p.category_code,
+      mass_consumed: mass,
+      boundary: p.boundary,
+      provenance: 'default',
+      origin_country: p.origin_country,
+      reporting_period: period,
+      origin_operator_name: nullify(p.origin_operator_name.trim()),
+      origin_installation_name: nullify(p.origin_installation_name.trim()),
+      origin_cbam_registry_id: nullify(p.origin_cbam_registry_id.trim()),
+    }
+    const query = p.id
+      ? supabase.from('cbam_precursor_inputs').update(payload).eq('id', p.id)
+      : supabase.from('cbam_precursor_inputs').insert(payload)
+    const { error } = await query
+    if (error) {
+      console.error('[cbam] precursor save failed', error)
+      setPrecursorError("We couldn't save this precursor. Please try again — if it keeps happening, get in touch and we'll look into it.")
+      setPrecursorSaving(false)
+      return
+    }
+
+    // CONTRADICTION GUARD. A process cannot both list precursors and state it consumes none.
+    // Adding a row supersedes the earlier statement, so clear it in the same action and say so —
+    // leaving both would make the record self-contradicting, and silently dropping the statement
+    // would remove something the operator asserted without telling them.
+    const meta = precursorMeta[precursorProcId]
+    if (meta?.declaration === 'none') {
+      const { error: clearErr } = await supabase
+        .from('cbam_production_processes')
+        .update({
+          precursor_declaration: 'unknown',
+          precursor_declaration_reason: null,
+          precursor_declaration_note: null,
+          precursor_declared_at: null,
+        })
+        .eq('id', precursorProcId)
+      if (clearErr) {
+        console.error('[cbam] could not clear superseded declaration', clearErr)
+        setPrecursorError("The precursor was saved, but we couldn't update the earlier statement that this process consumes none. Please get in touch.")
+        setPrecursorSaving(false)
+        return
+      }
+      setPrecursorNotice('You had stated that this process consumes no precursors. That no longer applies now a precursor has been entered, so it has been withdrawn.')
+    }
+
+    setPrecursorSaving(false)
+    setEditingPrecursor(null)
+    invalidateCompute(precursorProcId)
+    loadPrecursors(precursorProcId)
+    loadPrecursorMeta(processes.map((x) => x.id))
+  }
+
+  async function removePrecursor(id: string) {
+    if (!precursorProcId) return
+    setPrecursorError(null)
+    setPrecursorNotice(null)
+    const { error } = await supabase.from('cbam_precursor_inputs').delete().eq('id', id)
+    if (error) {
+      console.error('[cbam] precursor delete failed', error)
+      setPrecursorError("We couldn't remove this precursor. Please try again — if it keeps happening, get in touch.")
+      return
+    }
+    invalidateCompute(precursorProcId)
+    loadPrecursors(precursorProcId)
+    loadPrecursorMeta(processes.map((x) => x.id))
+  }
+
+  // ── Declare that a process consumes no precursors, or withdraw that ──
+  async function saveDeclaration() {
+    if (!precursorProcId) return
+    setPrecursorError(null)
+    setPrecursorNotice(null)
+    if (!declReason) { setPrecursorError('Choose a reason this process consumes no precursors.'); return }
+    if (declReason === 'other' && declNote.trim() === '') {
+      setPrecursorError('Tell us briefly why, so the statement stands on its own.'); return
+    }
+    setPrecursorSaving(true)
+    const { error } = await supabase
+      .from('cbam_production_processes')
+      .update({
+        precursor_declaration: 'none',
+        precursor_declaration_reason: declReason,
+        precursor_declaration_note: nullify(declNote.trim()),
+        precursor_declared_at: new Date().toISOString(),
+      })
+      .eq('id', precursorProcId)
+    setPrecursorSaving(false)
+    if (error) {
+      console.error('[cbam] declaration save failed', error)
+      setPrecursorError("We couldn't record that statement. Please try again — if it keeps happening, get in touch.")
+      return
+    }
+    setDeclReason('')
+    setDeclNote('')
+    invalidateCompute(precursorProcId)
+    loadPrecursorMeta(processes.map((x) => x.id))
+  }
+
+  async function withdrawDeclaration() {
+    if (!precursorProcId) return
+    setPrecursorError(null)
+    setPrecursorNotice(null)
+    setPrecursorSaving(true)
+    const { error } = await supabase
+      .from('cbam_production_processes')
+      .update({
+        precursor_declaration: 'unknown',
+        precursor_declaration_reason: null,
+        precursor_declaration_note: null,
+        precursor_declared_at: null,
+      })
+      .eq('id', precursorProcId)
+    setPrecursorSaving(false)
+    if (error) {
+      console.error('[cbam] declaration withdraw failed', error)
+      setPrecursorError("We couldn't withdraw that statement. Please try again — if it keeps happening, get in touch.")
+      return
+    }
+    invalidateCompute(precursorProcId)
+    loadPrecursorMeta(processes.map((x) => x.id))
   }
 
   // ── Load source streams for the expanded process ──
@@ -989,7 +1311,6 @@ export default function CbamSetupPage() {
         <StepTab n={1} label="Operator" sub="who you are" active={step === 1} onClick={() => setStep(1)} />
         <StepTab n={2} label="Installations" sub="where you produce" active={step === 2} onClick={() => setStep(2)} />
         <StepTab n={3} label="Processes & emissions" sub="goods & source streams" active={step === 3} onClick={() => setStep(3)} />
-        <StepTab n={4} label="Precursors" sub="coming next" active={step === 4} onClick={() => setStep(4)} muted />
       </div>
       {step === 2 && (
         <div style={{ fontSize: 11, color: '#888784', marginBottom: '1rem' }}>Step 1 (Operator) is a prerequisite for a complete report, but you can add installations first.</div>
@@ -1226,24 +1547,200 @@ export default function CbamSetupPage() {
                         <div>
                           <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>CN {proc.cn_code} <span style={{ color: '#888784', fontWeight: 300 }}>· {categoryLabel(goodsCategories, proc.category_code)}{proc.route_code ? ` · ${routeLabel(proc.route_code)}` : ''}</span></div>
                           <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>AL {proc.activity_level} · {proc.reporting_period} · {calcModeLabel(proc.calc_mode)}{proc.steel_grade ? ` · ${steelGradeLabel(proc.steel_grade)}` : ''}</div>
+                          {/* Precursor status. Rows are the evidence of a declaration; the
+                              declaration column only carries the state rows cannot express. */}
+                          {(() => {
+                            const m = precursorMeta[proc.id]
+                            if (m && m.count > 0) {
+                              return <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>Precursors — {m.count} entered</div>
+                            }
+                            if (m && m.declaration === 'none') {
+                              return <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>Precursors — none, {declarationReasonLabel(m.reason).toLowerCase()}</div>
+                            }
+                            return <div style={{ fontSize: 12, color: '#92400e', fontWeight: 300 }}>Precursors — not yet declared</div>
+                          })()}
                         </div>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button type="button" onClick={() => { setEditingProc(proc); setProc3Saved(false); setProc3Error(null) }} style={linkBtn}>Edit</button>
-                          <button type="button" onClick={() => { setStreamsProcId(streamsProcId === proc.id ? null : proc.id); setComputeProcId(null) }} style={linkBtn}>{streamsProcId === proc.id ? 'Hide streams' : 'Manage streams'}</button>
+                          <button type="button" onClick={() => { setStreamsProcId(streamsProcId === proc.id ? null : proc.id); setPrecursorProcId(null); setComputeProcId(null) }} style={linkBtn}>{streamsProcId === proc.id ? 'Hide streams' : 'Streams'}</button>
                           <button
                             type="button"
-                            onClick={() => computeProcId === proc.id ? setComputeProcId(null) : runCompute(proc.id)}
+                            onClick={() => {
+                              const opening = precursorProcId !== proc.id
+                              setPrecursorProcId(opening ? proc.id : null)
+                              setStreamsProcId(null)
+                              setComputeProcId(null)
+                              setEditingPrecursor(null)
+                              setPrecursorError(null)
+                              setPrecursorNotice(null)
+                              setDeclReason('')
+                              setDeclNote('')
+                              if (opening) loadPrecursors(proc.id)
+                            }}
+                            style={linkBtn}
+                          >
+                            {precursorProcId === proc.id ? 'Hide precursors' : 'Precursors'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { if (computeProcId === proc.id) { setComputeProcId(null) } else { setPrecursorProcId(null); runCompute(proc.id) } }}
                             disabled={computeBusyId === proc.id}
                             style={{ ...linkBtn, cursor: computeBusyId === proc.id ? 'wait' : 'pointer', opacity: computeBusyId === proc.id ? 0.6 : 1 }}
                           >
-                            {computeBusyId === proc.id ? 'Calculating…' : computeProcId === proc.id ? 'Hide result' : 'Calculate emissions'}
+                            {computeBusyId === proc.id ? 'Calculating…' : computeProcId === proc.id ? 'Hide result' : 'Calculate'}
                           </button>
                         </div>
                       </div>
 
+                      {/* ── Precursors panel ── */}
+                      {precursorProcId === proc.id && (() => {
+                        const m = precursorMeta[proc.id]
+                        return (
+                          <div style={{ marginTop: 12, borderTop: '0.5px solid #e8e7e4', paddingTop: 12 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d', marginBottom: 8 }}>Precursors</div>
+
+                            {/* What a precursor figure currently rests on. Stated plainly rather
+                                than offered as a choice — see the comment on savePrecursor. */}
+                            <div style={{ fontSize: 12, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: 10 }}>
+                              Precursor figures currently use the published default values. Support for using a supplier&apos;s own verified figure is coming.
+                            </div>
+
+                            {precursorNotice && (
+                              <div style={{ background: '#FEF3E2', border: '0.5px solid #f5d9ad', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#92400e', lineHeight: 1.5, marginBottom: 10 }}>{precursorNotice}</div>
+                            )}
+
+                            {precursors.length === 0 ? (
+                              <div style={{ fontSize: 12, color: '#888784', marginBottom: 8 }}>No precursors entered.</div>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+                                {precursors.map((pr) => (
+                                  <div key={pr.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: '#f8f7f5', borderRadius: 8, padding: '8px 12px' }}>
+                                    <div style={{ fontSize: 12, color: '#0d0d0d' }}>
+                                      <div><span style={{ fontWeight: 500 }}>CN {pr.cn_code}</span> <span style={{ color: '#888784' }}>· {categoryLabel(goodsCategories, pr.category_code)} · {pr.mass_consumed} t · {countryName(pr.origin_country)} · {pr.reporting_period}</span></div>
+                                      <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{BOUNDARY_OPTIONS.find((b) => b.value === pr.boundary)?.label}</div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 6 }}>
+                                      <button type="button" onClick={() => { setEditingPrecursor(pr); setPrecursorError(null); setPrecursorNotice(null) }} style={linkBtn}>Edit</button>
+                                      <button type="button" onClick={() => removePrecursor(pr.id)} style={linkBtn}>Remove</button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {!editingPrecursor && (
+                              <button type="button" onClick={() => { setEditingPrecursor(EMPTY_PRECURSOR(proc.reporting_period)); setPrecursorError(null); setPrecursorNotice(null) }} style={linkBtn}>+ Add precursor</button>
+                            )}
+
+                            {editingPrecursor && (
+                              <div style={{ marginTop: 10, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                  <CbamField label="CN code — required (exactly as on your customs paperwork)">
+                                    <input value={editingPrecursor.cn_code} onChange={(e) => setPrecF('cn_code', e.target.value)} placeholder="7203 00 00" style={cbamInputStyle} />
+                                  </CbamField>
+                                  <CbamField label="Category — required">
+                                    <select value={editingPrecursor.category_code} onChange={(e) => setPrecF('category_code', e.target.value)} style={cbamInputStyle}>
+                                      <option value="" disabled>Select a category…</option>
+                                      {goodsCategories.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
+                                    </select>
+                                  </CbamField>
+                                  <CbamField label="Mass consumed (tonnes) — required">
+                                    <input type="number" step="any" min={0} value={editingPrecursor.mass_consumed} onChange={(e) => setPrecF('mass_consumed', e.target.value)} style={{ ...cbamInputStyle, width: 200 }} />
+                                  </CbamField>
+                                  <CbamField label="Where it came from — required">
+                                    <select value={editingPrecursor.boundary} onChange={(e) => setPrecF('boundary', e.target.value)} style={cbamInputStyle}>
+                                      {BOUNDARY_OPTIONS.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
+                                    </select>
+                                    {editingPrecursor.boundary === 'joint' && (
+                                      // Neutral, not amber: this is how joint production is
+                                      // supposed to work, not a problem to fix.
+                                      <div style={{ marginTop: 4, fontSize: 12, color: '#555553', fontWeight: 300, lineHeight: 1.5 }}>
+                                        The emissions of a precursor made inside this process&apos;s boundary are already counted in this process&apos;s own figure, so entering it here records it without adding it again.
+                                      </div>
+                                    )}
+                                  </CbamField>
+                                  <CbamField label="Country where it was produced — required" hint="Where the precursor was produced, not where it was bought.">
+                                    <select value={editingPrecursor.origin_country} onChange={(e) => setPrecF('origin_country', e.target.value)} style={cbamInputStyle}>
+                                      <option value="" disabled>Select a country…</option>
+                                      {originCountries.map((c) => <option key={c} value={c}>{countryName(c)}</option>)}
+                                    </select>
+                                  </CbamField>
+                                  <CbamField label="Reporting period — required" hint="The period the precursor's emissions figure covers, which may differ from this process's period.">
+                                    <input type="number" step={1} value={editingPrecursor.reporting_period} onChange={(e) => setPrecF('reporting_period', e.target.value)} style={{ ...cbamInputStyle, width: 180 }} />
+                                  </CbamField>
+
+                                  <div style={{ borderTop: '0.5px solid #e8e7e4', paddingTop: 12 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d', marginBottom: 2 }}>Who produced it — all optional</div>
+                                    <div style={{ fontSize: 11, color: '#888784', fontWeight: 300, lineHeight: 1.5, marginBottom: 10 }}>Traceability only. These feed no calculation, and leaving them blank does not affect your figure.</div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                      <CbamField label="Operator name">
+                                        <input value={editingPrecursor.origin_operator_name} onChange={(e) => setPrecF('origin_operator_name', e.target.value)} style={cbamInputStyle} />
+                                      </CbamField>
+                                      <CbamField label="Installation name">
+                                        <input value={editingPrecursor.origin_installation_name} onChange={(e) => setPrecF('origin_installation_name', e.target.value)} style={cbamInputStyle} />
+                                      </CbamField>
+                                      <CbamField label="CBAM Registry ID">
+                                        <input value={editingPrecursor.origin_cbam_registry_id} onChange={(e) => setPrecF('origin_cbam_registry_id', e.target.value)} style={cbamInputStyle} />
+                                      </CbamField>
+                                    </div>
+                                  </div>
+                                </div>
+                                {precursorError && <ErrorBox prefix="Could not save precursor" message={precursorError} />}
+                                <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>
+                                  <button type="button" onClick={savePrecursor} disabled={precursorSaving} style={primaryBtn(precursorSaving)}>{precursorSaving ? 'Saving…' : (editingPrecursor.id ? 'Save precursor' : 'Add precursor')}</button>
+                                  <button type="button" onClick={() => { setEditingPrecursor(null); setPrecursorError(null) }} style={ghostBtn}>Cancel</button>
+                                </div>
+                              </div>
+                            )}
+
+                            {precursorError && !editingPrecursor && <ErrorBox prefix="Could not update precursors" message={precursorError} />}
+
+                            {/* ── Declaration ── */}
+                            <div style={{ marginTop: 14, borderTop: '0.5px solid #e8e7e4', paddingTop: 12 }}>
+                              {precursors.length > 0 ? (
+                                <div style={{ fontSize: 12, color: '#555553', fontWeight: 300, lineHeight: 1.6 }}>
+                                  This process&apos;s precursors are declared by the entries above — nothing further is needed.
+                                </div>
+                              ) : m?.declaration === 'none' ? (
+                                <div>
+                                  <div style={{ fontSize: 12, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: 8 }}>
+                                    You have stated that this process consumes no CBAM precursors — {declarationReasonLabel(m.reason).toLowerCase()}.
+                                    {m.note ? <> Your note: “{m.note}”</> : null}
+                                  </div>
+                                  <button type="button" onClick={withdrawDeclaration} disabled={precursorSaving} style={linkBtn}>Withdraw this statement</button>
+                                </div>
+                              ) : (
+                                <div>
+                                  <div style={{ fontSize: 12, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: 10 }}>
+                                    If this process consumes no CBAM precursors, say so here. A report cannot be generated until every process has either its precursors entered or this statement made.
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 460 }}>
+                                    <CbamField label="Why does this process consume none? — required">
+                                      <select value={declReason} onChange={(e) => setDeclReason(e.target.value)} style={cbamInputStyle}>
+                                        <option value="" disabled>Select a reason…</option>
+                                        {DECLARATION_REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                                      </select>
+                                    </CbamField>
+                                    <CbamField label={declReason === 'other' ? 'Tell us briefly — required' : 'Anything to add? — optional'}>
+                                      <input value={declNote} onChange={(e) => setDeclNote(e.target.value)} style={cbamInputStyle} />
+                                    </CbamField>
+                                  </div>
+                                  <div style={{ marginTop: 12 }}>
+                                    <button type="button" onClick={saveDeclaration} disabled={precursorSaving} style={primaryBtn(precursorSaving)}>{precursorSaving ? 'Saving…' : 'This process consumes no precursors'}</button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })()}
+
                       {/* Compute result / error, expanded in place under this card. */}
-                      {computeProcId === proc.id && (computeResult || computeError) && (
+                      {computeProcId === proc.id && (computeResult || computeError || computeStaleNote) && (
                         <div style={{ marginTop: 12, borderTop: '0.5px solid #e8e7e4', paddingTop: 12 }}>
+                          {computeStaleNote && !computeResult && (
+                            <div style={{ background: '#FEF3E2', border: '0.5px solid #f5d9ad', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#92400e', lineHeight: 1.5 }}>{computeStaleNote}</div>
+                          )}
                           {computeError && <ErrorBox prefix="Could not calculate emissions for this process" message={computeError} />}
                           {computeResult && (
                             <>
@@ -1664,7 +2161,6 @@ export default function CbamSetupPage() {
                 <div style={{ marginTop: '1.25rem', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 13, color: '#0F6E56' }}>✓ Saved</span>
                   <a href="/dashboard/cbam/report" style={linkBtn}>Generate report →</a>
-                  <button type="button" onClick={() => setStep(4)} style={linkAnchor}>Next: Precursors →</button>
                 </div>
               )}
             </>
@@ -1673,12 +2169,6 @@ export default function CbamSetupPage() {
       )}
 
       {/* ── STEP 4: PLACEHOLDER — not built this increment ── */}
-      {step === 4 && (
-        <PlaceholderStep
-          title="(4) Precursors"
-          body="Precursor inputs (goods consumed in a process, with their origin identity and default/actual values) come after processes exist. Building this next."
-        />
-      )}
     </div>
   )
 }
@@ -1706,14 +2196,17 @@ function StepTab({ n, label, sub, active, onClick, muted }: { n: number; label: 
   )
 }
 
-function PlaceholderStep({ title, body }: { title: string; body: string }) {
-  return (
-    <div style={{ marginTop: '1rem', background: '#f8f7f5', border: '0.5px dashed #d8d6d2', borderRadius: 12, padding: '2rem' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784', marginBottom: 6 }}>Coming next</div>
-      <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
-      <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, fontWeight: 300, maxWidth: 620 }}>{body}</div>
-    </div>
-  )
+// ISO alpha-2 -> country name. Falls back to the bare code where the runtime has no name for it
+// — showing the code beats showing nothing, and never a blank option.
+const COUNTRY_NAMES = typeof Intl !== 'undefined' && 'DisplayNames' in Intl
+  ? new Intl.DisplayNames(undefined, { type: 'region' })
+  : null
+function countryName(code: string): string {
+  try {
+    return COUNTRY_NAMES?.of(code) ?? code
+  } catch {
+    return code
+  }
 }
 
 function categoryLabel(cats: { code: string; label: string }[], code: string): string {
