@@ -40,6 +40,7 @@ interface ProcessListRow {
   id: string;
   route_code: string | null;
   cn_code: string | null;
+  precursor_declaration: string;
 }
 
 // cbam_installation_disclosures as loaded here: the §1.2 (7)-(11) disclosure columns (DisclosuresRow)
@@ -95,7 +96,7 @@ export async function GET(req: NextRequest) {
         .maybeSingle(),
       supabase
         .from('cbam_production_processes')
-        .select('id, route_code, cn_code')
+        .select('id, route_code, cn_code, precursor_declaration')
         .eq('installation_id', installationId)
         .eq('reporting_period', reportingPeriod),
     ]);
@@ -117,6 +118,63 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(
         { error: 'No processes found for this installation and reporting period' },
         { status: 404 },
+      );
+    }
+
+    // ── 2b. PRECURSOR DECLARATION GATE ───────────────────────────────
+    // THE TEST IS TWO-PART, and neither half is sufficient alone.
+    //
+    // Rows in cbam_precursor_inputs ARE the evidence that precursors were declared — 'declared'
+    // is deliberately not a stored value, because a stored flag saying so could outlive the rows
+    // it claims (enter three, delete three, flag still reads 'declared'). So the column alone must
+    // never be the test: a process still marked 'unknown' but carrying rows has plainly been
+    // declared, and blocking it would be blocking on a stale flag.
+    //
+    // The column expresses only the state rows CANNOT: 'none' is a positive statement that this
+    // process consumes no CBAM precursors, which no row can represent. So a process is blocked
+    // only where it is at 'unknown' AND has no rows — the one combination in which nobody has
+    // said anything either way.
+    //
+    // This is a statement about DECLARATION, not about emissions. An empty precursor list is a
+    // legitimate answer; what is missing is the answer, not the precursors.
+    const { data: precursorPresenceRows, error: precursorPresenceErr } = await supabase
+      .from('cbam_precursor_inputs')
+      .select('process_id')
+      .in('process_id', processRows.map((p) => p.id));
+
+    if (precursorPresenceErr) {
+      // Same posture as the load failure above: a failed presence check must NEVER be read as
+      // "no rows found", which would block every process on an infrastructure fault.
+      console.error('CBAM report precursor presence load error:', precursorPresenceErr);
+      return NextResponse.json({ error: 'Failed to load report inputs' }, { status: 500 });
+    }
+
+    const processesWithPrecursors = new Set<string>(
+      (precursorPresenceRows ?? []).map((r) => r.process_id as string),
+    );
+    const undeclared = processRows.filter(
+      (p) => p.precursor_declaration === 'unknown' && !processesWithPrecursors.has(p.id),
+    );
+
+    if (undeclared.length > 0) {
+      // Named by CN code — the good, which the operator recognises — never by process id.
+      const codes = undeclared.map((p) => `CN ${p.cn_code ?? '(no code entered)'}`);
+      const subject =
+        codes.length === 1
+          ? `Precursor status has not been declared for ${codes[0]}.`
+          : `Precursor status has not been declared for ${codes.slice(0, -1).join(', ')} and ${codes[codes.length - 1]}.`;
+      return NextResponse.json(
+        {
+          error:
+            `${subject} Every process needs an explicit declaration before a report can be ` +
+            `generated — either enter the precursors it consumes, or state that it consumes none.`,
+          // Discriminator, same 'code' convention as ReportError. This shares status 409 with the
+          // stale-record conflict, and the two need OPPOSITE remedies — re-running compute can
+          // never satisfy this gate. A caller branching on status alone would tell the operator to
+          // do something that cannot work, so the code is what a surface must branch on.
+          code: 'precursor_declaration_required',
+        },
+        { status: 409 },
       );
     }
 

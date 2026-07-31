@@ -54,6 +54,10 @@ interface ReportResponse {
 interface ErrState {
   status: number
   message: string
+  // Discriminator from the response body, where the route sends one. Status alone is not enough:
+  // two different failures share 409 and need opposite remedies, so ErrorPanel branches on this
+  // first. Absent for every response that carries no code.
+  code?: string
 }
 
 // ── Value formatters (only ever called on status 'value') ──
@@ -180,8 +184,14 @@ export default function CbamReportPage() {
       const res = await fetch(url, { headers: { Authorization: `Bearer ${session.access_token}` } })
       const json = await res.json().catch(() => ({} as Record<string, unknown>))
       if (!res.ok) {
-        // 409 clears any report: never show figures alongside a stale-record conflict.
-        setErr({ status: res.status, message: (json as { error?: string }).error ?? `Request failed (${res.status})` })
+        // ANY non-OK response clears the report — `data` is left null and the panel renders alone.
+        // That now covers two distinct 409s, the stale-record conflict and the precursor
+        // declaration gate, and figures must never appear alongside either.
+        setErr({
+          status: res.status,
+          message: (json as { error?: string }).error ?? `Request failed (${res.status})`,
+          code: (json as { code?: string }).code,
+        })
         setLoading(false)
         return
       }
@@ -732,6 +742,19 @@ function AttestationBanner({ declaredAt }: { declaredAt: string | null }) {
 
 // ── Errors, surfaced distinctly by status code ──
 function ErrorPanel({ err }: { err: ErrState }) {
+  // FIRST, before the status check below. This shares status 409 with the stale-record conflict
+  // but is a different kind of thing entirely: nothing is in conflict, nothing was computed
+  // wrongly, and re-running compute would change nothing. It is an unanswered question, so it
+  // reads as one — no "conflict", no status code in the heading, and prose rather than the
+  // diagnostic monospace the stale-record panel uses to show stored-vs-recomputed figures.
+  if (err.code === 'precursor_declaration_required') {
+    return (
+      <div style={{ marginTop: '1.5rem', background: '#FEF3E2', border: '0.5px solid #f5d9ad', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
+        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>One more thing to confirm before the report</div>
+        <div style={{ fontSize: 13, color: '#92400e', lineHeight: 1.7, fontWeight: 300 }}>{err.message}</div>
+      </div>
+    )
+  }
   // 409 stale_record — the important one. Full message verbatim, no report shown.
   if (err.status === 409) {
     return (
