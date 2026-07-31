@@ -23,7 +23,7 @@ import { supabase } from '../../../../lib/supabase'
 import { useEntitlement } from '../../../../lib/useEntitlement'
 import { cbamInputStyle, CbamField } from '../components/DisclosureQuestion'
 import { massBalance } from '../../../../lib/cbam/engine'
-import { assessCnCategory, suggestCategory } from '../../../../lib/cbam/cn'
+import { assessCnCategory, suggestCategory, normalizeCn } from '../../../../lib/cbam/cn'
 import { buildBoundaryGuidanceView } from '../../../../lib/cbam/boundaryGuidanceView'
 import { routeLabel, calcModeLabel, steelGradeLabel } from '../../../../lib/cbam/labels'
 import type { SourceStream } from '../../../../lib/cbam/types'
@@ -172,7 +172,12 @@ export default function CbamSetupPage() {
   const [boundaryOpen, setBoundaryOpen] = useState(false)
   // Every CN code that HAS a default row — the authoritative accept-set for the CN field
   // (exactly what the engine resolves against). Populated in the reference-data effect below.
-  const [validCnCodes, setValidCnCodes] = useState<Set<string>>(new Set())
+  //
+  // A MAP, NOT A SET, and the direction matters: normalised key -> THE SEEDED STRING VERBATIM.
+  // The key exists so a customer typing '72061000' matches a good seeded as '7206 10 00'; the
+  // value exists because the seeded form is what gets stored and what every downstream lookup
+  // compares against by exact string equality. Never store the key.
+  const [validCnCodes, setValidCnCodes] = useState<Map<string, string>>(new Map())
 
   // ── Step 3 processes (scoped to the viewed installation) ──
   const [procInstallationId, setProcInstallationId] = useState<string | null>(null)
@@ -438,8 +443,34 @@ export default function CbamSetupPage() {
         .eq('country', 'other')
       if (cancelled) return
       if (error) { console.error('[CN] fetch error', error); setProc3Error(error.message); return }
-      const cnCodes = new Set<string>((data ?? []).map((r) => r.cn_code as string))
-      setValidCnCodes(cnCodes)
+      // Key on the normalised form so spacing differences between what a customer types and
+      // what the annex seeds cannot cause a false rejection. The VALUE is the seeded string
+      // untouched — that is what gets written and what the compute path matches on.
+      //
+      // A COLLISION CANNOT HAPPEN WITH CURRENT SEED DATA: two distinct seeded codes would have
+      // to differ only in whitespace. If it ever does happen, silently keeping the last one
+      // would drop a real good from the accept-set and reject a customer holding a valid code,
+      // with nothing on screen to explain it. Fail loud instead.
+      const byNormalised = new Map<string, string>()
+      for (const row of data ?? []) {
+        const seeded = row.cn_code as string
+        let key: string
+        try {
+          key = normalizeCn(seeded)
+        } catch (e) {
+          console.error('[CN] seeded code did not parse', { seeded, error: e })
+          setProc3Error('We could not load the reference data for CN codes. Please get in touch so we can look into it.')
+          return
+        }
+        const existing = byNormalised.get(key)
+        if (existing !== undefined && existing !== seeded) {
+          console.error('[CN] two seeded codes collide once whitespace is removed', { key, first: existing, second: seeded })
+          setProc3Error('We could not load the reference data for CN codes. Please get in touch so we can look into it.')
+          return
+        }
+        byNormalised.set(key, seeded)
+      }
+      setValidCnCodes(byNormalised)
     })()
     return () => { cancelled = true }
   }, [isPaid])
@@ -552,7 +583,19 @@ export default function CbamSetupPage() {
       setProc3Error('Enter the CN code for this good, exactly as it appears on your customs paperwork.')
       return
     }
-    if (!validCnCodes.has(cn)) {
+    // Match on the normalised form so '72061000' and '7206 10 00' are the same good, then keep
+    // the SEEDED string. What the customer typed is not what gets stored: every downstream
+    // lookup compares cn_code by exact string equality, so storing their spacing would produce
+    // a row that validates here and finds nothing later.
+    let cnKey: string
+    try {
+      cnKey = normalizeCn(cn)
+    } catch {
+      setProc3Error('A CN code should be digits only — spaces are fine, but letters, dashes and dots are not. Copy it from your customs paperwork exactly as it appears there.')
+      return
+    }
+    const cnSeeded = validCnCodes.get(cnKey)
+    if (cnSeeded === undefined) {
       setProc3Error(`CN code "${cn}" isn't a recognised CBAM good in this system. Enter the exact code as it appears for your product on the customs paperwork — it must match a default value we hold. (Some goods are listed at 4-digit heading level, others at 6- or 8-digit.)`)
       return
     }
@@ -583,7 +626,8 @@ export default function CbamSetupPage() {
     const payload = {
       company_id: companyId,
       installation_id: p.installation_id,
-      cn_code: p.cn_code.trim(),
+      // The SEEDED string, not the keystrokes — see the resolution above.
+      cn_code: cnSeeded,
       category_code: p.category_code,
       route_code: nullify(p.route_code),
       activity_level: activity,
