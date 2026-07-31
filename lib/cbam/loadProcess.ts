@@ -42,6 +42,18 @@ export interface ProcessRow {
   electricity_consumed: number | null;
   steel_grade: SteelGrade | null;
   route_code: RouteCode | null;
+  // Precursor declaration state (20260731_cbam_precursor_declaration.sql). Loaded and carried
+  // through; NOTHING reads them yet. precursor_declaration is NOT NULL with a default, so it is a
+  // plain string; the other three are nullable and are constrained in the DB to be present or
+  // absent together with the declaration value.
+  //
+  // Typed as `string`, not a literal union: the permitted values are a CHECK constraint, and a
+  // union here would be a second, silently-drifting copy of it. Widen only when something
+  // actually branches on the value.
+  precursor_declaration: string;
+  precursor_declaration_reason: string | null;
+  precursor_declaration_note: string | null;
+  precursor_declared_at: string | null;
 }
 
 // One cbam_precursor_inputs row as loaded by the select below: the columns adaptPrecursor consumes
@@ -87,7 +99,7 @@ export async function loadAndComputeProcess(
   // ── 2. Load the process (RLS scopes to the owner) ────────────────
   const { data: process, error: procErr } = await supabase
     .from('cbam_production_processes')
-    .select('id, company_id, cn_code, category_code, activity_level, reporting_period, installation_id, electricity_consumed, steel_grade, route_code')
+    .select('id, company_id, cn_code, category_code, activity_level, reporting_period, installation_id, electricity_consumed, steel_grade, route_code, precursor_declaration, precursor_declaration_reason, precursor_declaration_note, precursor_declared_at')
     .eq('id', processId)
     .single();
 
@@ -122,7 +134,13 @@ export async function loadAndComputeProcess(
     supabase
       .from('cbam_precursor_inputs')
       .select('precursor_cn_code, precursor_category_code, mass_consumed, boundary, provenance, origin_country, see_value, verifier_report_id, reporting_period, origin_operator_name, origin_installation_name, origin_cbam_registry_id, origin_reporting_period')
-      .eq('process_id', processId),
+      .eq('process_id', processId)
+      // Same contract as the source-streams query above: PostgREST does not guarantee row order
+      // without an explicit sort, so an unordered fetch could return the same rows in a different
+      // sequence between a write and a later recomputation. Precursors roll up by summation, but
+      // `precursorRows` is paired POSITIONALLY with `precursors` and floating-point addition is
+      // not associative, so a reordered fetch is a real difference, not a cosmetic one.
+      .order('id'),
     supabase
       .from('cbam_installations')
       .select('country')
