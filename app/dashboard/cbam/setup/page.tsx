@@ -123,6 +123,25 @@ const DOC_TYPE_SUGGESTIONS = ['weighbridge ticket', 'fuel delivery note', 'labor
 // (C-J indicators); sintered_ore/pig_iron/dri/ferroalloy and non-steel sectors (aluminium)
 // do not. The Steel-grade field renders ONLY for these. Add future graded sectors here.
 const STEEL_GRADE_CATEGORIES = new Set(['crude_steel', 'iron_steel_products'])
+
+// What POST /api/cbam/compute returns. Only the fields this page reads are declared — the
+// response also carries the full saved record, which is not rendered here.
+type ComputeResponse = {
+  see_record: { see_direct: number; see_indirect: number; see_total: number }
+  unresolved: { cnCode: string; reason: string }[]
+  hasUnresolved: boolean
+}
+
+// Plain-language renderings of the reasons a precursor fell back to a published default.
+// An UNMAPPED REASON MUST STILL RENDER, verbatim — see the fallback at the call site. Hiding a
+// reason we do not recognise would silently drop the one thing telling the operator why a figure
+// is not fully evidenced, and a new reason string is exactly when that matters most.
+const UNRESOLVED_REASONS: Record<string, string> = {
+  missing_or_invalid_verifier_report:
+    "the supplier's verified report isn't on file, so a published default value was used instead",
+  verified_but_no_see_value:
+    "the supplier's report is on file but carries no emissions figure, so a published default value was used instead",
+}
 type CbamDocument = {
   id: string
   file_path: string
@@ -189,6 +208,12 @@ export default function CbamSetupPage() {
 
   // ── Step 3 source streams (nested under a saved process) ──
   const [streamsProcId, setStreamsProcId] = useState<string | null>(null)
+  // Compute results, expanded in place under one process card at a time — same single-id toggle
+  // as streamsProcId, and mutually exclusive with it so a card never has two panels open.
+  const [computeProcId, setComputeProcId] = useState<string | null>(null)
+  const [computeBusyId, setComputeBusyId] = useState<string | null>(null)
+  const [computeResult, setComputeResult] = useState<ComputeResponse | null>(null)
+  const [computeError, setComputeError] = useState<string | null>(null)
   const [streams, setStreams] = useState<StreamRow[]>([])
   const [editingStream, setEditingStream] = useState<StreamForm | null>(null)
   const [streamSaving, setStreamSaving] = useState(false)
@@ -513,6 +538,47 @@ export default function CbamSetupPage() {
     loadProcesses(procInstallationId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [procInstallationId])
+
+  // ── Calculate emissions for one process ──
+  // COMPUTING WRITES A RECORD. Editing the process afterwards — its activity level, its source
+  // streams, its precursors — leaves that record describing inputs that no longer exist. The
+  // report route recomputes and compares, and REFUSES to serve a report whose stored figure
+  // disagrees with a fresh recomputation, so a stale record surfaces as a conflict there rather
+  // than as a wrong number. Recompute after any edit.
+  async function runCompute(procId: string) {
+    setComputeProcId(procId)
+    setStreamsProcId(null)          // one panel per card
+    setComputeResult(null)
+    setComputeError(null)
+    setComputeBusyId(procId)
+
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      setComputeError('Your session has expired. Please sign in again.')
+      setComputeBusyId(null)
+      return
+    }
+    try {
+      const res = await fetch('/api/cbam/compute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ process_id: procId }),
+      })
+      const json = await res.json().catch(() => ({} as Record<string, unknown>))
+      if (!res.ok) {
+        // Surface the server's own message — it names what actually failed. Never replace it
+        // with a generic string.
+        setComputeError((json as { error?: string }).error ?? `Request failed (${res.status})`)
+        setComputeBusyId(null)
+        return
+      }
+      setComputeResult(json as ComputeResponse)
+      setComputeBusyId(null)
+    } catch (e) {
+      setComputeError(e instanceof Error ? e.message : 'Network error')
+      setComputeBusyId(null)
+    }
+  }
 
   // ── Load source streams for the expanded process ──
   const loadStreams = (procId: string) => {
@@ -1163,9 +1229,58 @@ export default function CbamSetupPage() {
                         </div>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button type="button" onClick={() => { setEditingProc(proc); setProc3Saved(false); setProc3Error(null) }} style={linkBtn}>Edit</button>
-                          <button type="button" onClick={() => setStreamsProcId(streamsProcId === proc.id ? null : proc.id)} style={linkBtn}>{streamsProcId === proc.id ? 'Hide streams' : 'Manage streams'}</button>
+                          <button type="button" onClick={() => { setStreamsProcId(streamsProcId === proc.id ? null : proc.id); setComputeProcId(null) }} style={linkBtn}>{streamsProcId === proc.id ? 'Hide streams' : 'Manage streams'}</button>
+                          <button
+                            type="button"
+                            onClick={() => computeProcId === proc.id ? setComputeProcId(null) : runCompute(proc.id)}
+                            disabled={computeBusyId === proc.id}
+                            style={{ ...linkBtn, cursor: computeBusyId === proc.id ? 'wait' : 'pointer', opacity: computeBusyId === proc.id ? 0.6 : 1 }}
+                          >
+                            {computeBusyId === proc.id ? 'Calculating…' : computeProcId === proc.id ? 'Hide result' : 'Calculate emissions'}
+                          </button>
                         </div>
                       </div>
+
+                      {/* Compute result / error, expanded in place under this card. */}
+                      {computeProcId === proc.id && (computeResult || computeError) && (
+                        <div style={{ marginTop: 12, borderTop: '0.5px solid #e8e7e4', paddingTop: 12 }}>
+                          {computeError && <ErrorBox prefix="Could not calculate emissions for this process" message={computeError} />}
+                          {computeResult && (
+                            <>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d', marginBottom: 8 }}>Specific embedded emissions</div>
+                              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginBottom: 4 }}>
+                                {([
+                                  ['Direct', computeResult.see_record.see_direct],
+                                  ['Indirect', computeResult.see_record.see_indirect],
+                                  ['Total', computeResult.see_record.see_total],
+                                ] as [string, number][]).map(([label, v]) => (
+                                  <div key={label}>
+                                    <div style={{ fontSize: 11, color: '#888784', fontWeight: 300 }}>{label}</div>
+                                    {/* Same formatting the report page uses for these figures
+                                        (fmtNum): locale-grouped, up to 6 decimal places. */}
+                                    <div style={{ fontSize: 14, color: '#0d0d0d', fontWeight: 500 }}>{v.toLocaleString(undefined, { maximumFractionDigits: 6 })}</div>
+                                  </div>
+                                ))}
+                              </div>
+                              {computeResult.hasUnresolved && (
+                                // A WARNING, NOT AN ERROR: the figure is valid and defensible —
+                                // it simply rests on a published default for these precursors
+                                // rather than on a supplier's evidenced value. Amber, never red.
+                                <div style={{ marginTop: 10, background: '#FEF3E2', border: '0.5px solid #f5d9ad', borderRadius: 8, padding: '10px 12px' }}>
+                                  <div style={{ fontSize: 12, color: '#92400e', fontWeight: 600, marginBottom: 4 }}>Some precursors fell back to a published default</div>
+                                  {computeResult.unresolved.map((u, i) => (
+                                    <div key={`${u.cnCode}-${i}`} style={{ fontSize: 12, color: '#92400e', fontWeight: 300, lineHeight: 1.6 }}>
+                                      {/* An UNRECOGNISED reason renders verbatim rather than
+                                          being dropped — see UNRESOLVED_REASONS. */}
+                                      CN {u.cnCode} — {UNRESOLVED_REASONS[u.reason] ?? u.reason}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
 
                       {/* Nested source streams for this process */}
                       {streamsProcId === proc.id && (
