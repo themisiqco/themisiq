@@ -1412,19 +1412,33 @@ export default function CbamSetupPage() {
                               borderRadius: 999, cursor: 'pointer',
                             }}
                           >
+                            {/* aria-hidden: aria-expanded on the button already carries the
+                                state, so a screen reader announcing the glyph too would say it
+                                twice. Purely visual affordance. */}
+                            <span aria-hidden="true" style={{ display: 'inline-block', width: 10, marginRight: 4 }}>{boundaryOpen ? '▾' : '▸'}</span>
                             Rules that apply to this good ({view.totalProvisions})
                           </button>
                           {boundaryOpen && (
                             <div id="cbam-boundary-guidance" style={{ marginTop: 10, borderLeft: '0.5px solid #e8e7e4', paddingLeft: 12 }}>
-                              {view.groups.map((g) => (
-                                <div key={g.key} style={{ marginBottom: 16 }}>
+                              {view.groups.map((g, gi) => (
+                                // Rule between groups, not above the first: a rule at the top
+                                // would read as separating the panel from the button rather than
+                                // one group from the next. Padding above it keeps the rule off
+                                // the heading it introduces.
+                                <div key={g.key} style={gi === 0
+                                  ? { marginBottom: 16 }
+                                  : { marginBottom: 16, borderTop: '1px solid #e8e7e4', paddingTop: 16 }}>
                                   {/* Our framing. Kept visually distinct from the quoted text
                                       below so a reader can tell which words are whose. */}
                                   <div style={{ fontSize: 12, fontWeight: 400, lineHeight: 1.5, color: '#555553' }}>{g.heading}</div>
                                   <div style={{ fontSize: 12, fontWeight: 300, lineHeight: 1.5, color: '#888784' }}>{g.leadIn}</div>
                                   {g.entries.map((e) => (
                                     <div key={e.cite} style={{ marginTop: 8 }}>
-                                      <div style={{ fontSize: 12, fontWeight: 300, lineHeight: 1.5, color: '#888784' }}>{e.cite}</div>
+                                      {/* Darker than the heading and leadIn above it, and matching
+                                          the provisions below it: the cite ATTRIBUTES the
+                                          regulation's text, so it belongs with the quoted words
+                                          rather than with our framing of them. */}
+                                      <div style={{ fontSize: 12, fontWeight: 300, lineHeight: 1.5, color: '#555553' }}>{e.cite}</div>
                                       <ul style={{ margin: '2px 0 0', paddingLeft: 16 }}>
                                         {e.provisions.map((p, i) => (
                                           // Verbatim. No slice, no ellipsis, no casing change.
@@ -1454,7 +1468,10 @@ export default function CbamSetupPage() {
                       </CbamField>
                     </div>
                     <CbamField label="Calculation method — required">
-                      <select value={editingProc.calc_mode} onChange={(e) => setProc('calc_mode', e.target.value)} style={{ ...cbamInputStyle, width: 220 }}>
+                      {/* 360, not 220: the longest option is 'Combination of Actual and Default
+                          Values' at 13px, which clipped. Same width as the steel-grade select
+                          below so the two read as a pair. */}
+                      <select value={editingProc.calc_mode} onChange={(e) => setProc('calc_mode', e.target.value)} style={{ ...cbamInputStyle, width: 360 }}>
                         <option value="actual">{calcModeLabel('actual')}</option>
                         <option value="default">{calcModeLabel('default')}</option>
                         <option value="combined">{calcModeLabel('combined')}</option>
@@ -1463,7 +1480,7 @@ export default function CbamSetupPage() {
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                       {STEEL_GRADE_CATEGORIES.has(editingProc.category_code) && (
                         <CbamField label="Steel grade" hint="Steel goods only; leave unset otherwise.">
-                          <select value={editingProc.steel_grade} onChange={(e) => setProc('steel_grade', e.target.value)} style={{ ...cbamInputStyle, width: 200 }}>
+                          <select value={editingProc.steel_grade} onChange={(e) => setProc('steel_grade', e.target.value)} style={{ ...cbamInputStyle, width: 400 }}>
                             <option value="">(none)</option>
                             <option value="carbon">{steelGradeLabel('carbon')}</option>
                             <option value="low_alloy">{steelGradeLabel('low_alloy')}</option>
