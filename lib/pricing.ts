@@ -136,7 +136,7 @@ export const GHG_TIERS: Record<GhgTier, { priceUSD: number | null; locationAllow
 // Flat single-tier modules (USD / year). Keyed on every non-GHG module so the
 // type fails to compile if a module is ever added without a price.
 export const FLAT_MODULE_PRICES: Record<Exclude<ModuleKey, 'ghg'>, number> = {
-  'cbam':          4900,
+  'cbam':          1499,
   'climate-risk':  4900,
   'deals':         4900,
   'supply-chain':  2900,

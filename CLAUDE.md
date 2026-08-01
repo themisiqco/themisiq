@@ -91,7 +91,7 @@ The engine is pure calc (no React/Supabase): all factor tables, coverage analysi
   routes (charge), so displayed price == charged price by construction.
 - **GHG is the only tiered module** (`GHG_TIERS`). Every other module is a
   flat annual price (`FLAT_MODULE_PRICES`): climate-risk $4,900, deals
-  $4,900, cbam $4,900, supply-chain $2,900, cyber $2,900, ai-governance
+  $4,900, cbam $1,499, supply-chain $2,900, cyber $2,900, ai-governance
   $2,900, people $1,499.
 - **Volume discount** on multi-module carts: 2 modules −10%, 3+ −20%
   (`volumeDiscount`).

@@ -26,6 +26,12 @@ describe('cartQuote — new pricing model', () => {
     })
   })
 
+  it('single flat module (CBAM) = $1,499, card OK', () => {
+    expect(cartQuote({ modules: ['cbam'] })).toEqual({
+      totalUSD: 1499, requiresQuote: false, requiresInvoice: false,
+    })
+  })
+
   it('two flat modules apply the -10% volume discount: (4900 + 1499) * 0.9 = 5759', () => {
     const q = cartQuote({ modules: ['climate-risk', 'people'] })
     expect(q.totalUSD).toBe(5759)
