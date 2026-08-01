@@ -231,7 +231,7 @@ export default function CbamReportPage() {
         <div style={{ position: 'relative', minHeight: 320 }}>
           <div style={{ filter: 'blur(4px)', pointerEvents: 'none', userSelect: 'none' }}>
             <div style={sectionHead}>CBAM §1.2 summary report</div>
-            <div style={sectionSub}>The importer-facing Annex IV §1.2 emissions summary for one installation and reporting period.</div>
+            <div style={sectionSub}>The Annex IV §1.2 emissions summary your customer needs, for one installation and reporting period.</div>
           </div>
           <div style={{ position: 'absolute', inset: 0, zIndex: 10, backdropFilter: 'blur(8px)', background: 'rgba(248,247,245,0.85)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ background: '#fff', borderRadius: 16, padding: '2.5rem', boxShadow: '0 8px 40px rgba(0,0,0,0.12)', border: '0.5px solid #e8e7e4', maxWidth: 480, textAlign: 'center' }}>
@@ -268,7 +268,7 @@ export default function CbamReportPage() {
     <div style={{ maxWidth: 960, margin: '0 auto', padding: '3rem 2rem' }}>
       <div style={sectionHead}>CBAM §1.2 summary report</div>
       <div style={sectionSub}>
-        The importer-facing Annex IV §1.2 emissions summary. Every field is shown in one of three distinct states: a <strong style={{ color: '#0d0d0d' }}>value</strong>, a reasoned <span style={{ color: '#888784' }}>Not applicable</span>, or an outstanding <span style={{ color: '#92400e' }}>To supply</span>. Nothing absent is rendered as a zero or a blank.
+        The Annex IV §1.2 emissions summary your customer needs, for one installation and reporting period. Every figure here is either supplied or explained: a field carries a <strong style={{ color: '#0d0d0d' }}>value</strong>, a <span style={{ color: '#888784' }}>Not applicable</span>{' '}with the reason it doesn&apos;t apply, or a <span style={{ color: '#92400e' }}>To supply</span>{' '}naming what&apos;s outstanding. A gap is always shown as a gap, never as a zero or a blank.
       </div>
 
       {/* ── Installation + reporting-period selectors + on-demand fetch ── */}
@@ -584,7 +584,7 @@ function CbamVerifierInvite({ installationId, companyId, reportingPeriod }: { in
     <div style={{ marginTop: '2.5rem', borderTop: '0.5px solid #e8e7e4', paddingTop: '2rem' }}>
       <h3 style={itemHead}>Invite a verifier</h3>
       <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.7, marginBottom: '1.25rem' }}>
-        Generate a secure, read-only link for your independent verifier. They&apos;ll see this installation&apos;s Annex IV &sect;1.2 summary and source documents for {reportingPeriod} &mdash; with no ability to edit. Links expire in 90 days, and you can revoke access at any time.
+        Generate a secure, read-only link for your independent verifier. They&apos;ll see this installation&apos;s Annex IV &sect;1.2 summary and source documents for {reportingPeriod}, with no ability to edit. Links expire in 90 days, and you can revoke access at any time.
       </p>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', flexWrap: 'wrap' }}>

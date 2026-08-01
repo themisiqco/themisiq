@@ -70,10 +70,10 @@ export default function Page() {
           {[
             { title: 'What the default actually is', desc: 'Under IR (EU) 2025/2621 the default is your country\'s published figure plus a mark-up — 10% for 2026, 20% for 2027, 30% from 2028 (1% for fertilisers). The mark-up exists because the Commission cannot verify whether your installation beats your national average, so it prices in the possibility that it does not. To come out ahead on the default, your installation would have to be more than 10% above your country\'s average this year.' },
             { title: 'The choice only exists if you have the number', desc: 'Since Regulation (EU) 2025/2083, your EU customer may declare on verified actual values or on defaults. Without your figure they have no choice to make — the default is the only route open to them. With it, they can use whichever is lower, and if the default turns out better for you, you will know that too.' },
-            { title: 'It gets cheaper for them every year', desc: 'From 2027 an importer must hold certificates covering 50% of running-year emissions at each quarter end. Article 22(2) of the CBAM Regulation lets them base that on the previous year\'s surrendered figure rather than on defaults. Supply verified actuals once and you reduce the cash they tie up every quarter thereafter.' },
+            { title: 'It gets cheaper for them every year', desc: 'From 2027 your EU customer must hold certificates covering 50% of running-year emissions at each quarter end. Article 22(2) of the CBAM Regulation lets them base that on the previous year\'s surrendered figure rather than on defaults. Supply verified actuals once and you reduce the cash they tie up every quarter thereafter.' },
             { title: 'Specific embedded emissions, done properly', desc: 'Direct and indirect emissions split, precursor tracing through the supply chain, installation-level data rather than estimates. Computed under the CBAM implementing regulations, not approximated.' },
-            { title: 'Verifier-ready by design', desc: 'Every figure is sourced and traceable, so the accredited verifier reviewing your emissions can follow each number to its evidence — the independent verification the definitive regime requires for actual values.' },
-            { title: 'Built for your EU customer’s declaration', desc: 'Output maps to what the importer needs for their annual CBAM declaration (first due 30 September 2027), so your verified actuals flow into their filing instead of a costly default.' },
+            { title: 'Built for the verifier’s review', desc: 'Attach a source document to a figure and the verifier sees that link too. Invite them to a secure read-only view of your summary and its evidence — no ability to edit, and you can revoke access at any time.' },
+            { title: 'Built for your EU customer’s declaration', desc: 'Output maps to what your customer needs for their annual CBAM declaration (first due 30 September 2027), so your verified actuals flow into their filing instead of a costly default.' },
           ].map(({ title, desc }) => (
             <div key={title} style={{ background: '#fff', padding: '2rem' }}>
               <div style={{ fontSize: 16, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
@@ -91,6 +91,9 @@ export default function Page() {
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
               What computes today.
             </h2>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
+              From setup to a verifier&apos;s inbox. Enter your installation and its production processes, record the fuels and materials each process consumes, declare any CBAM precursors that go into your goods, and the module calculates the specific embedded emissions per tonne. It then builds the Annex IV §1.2 emissions summary your customer needs, as a downloadable spreadsheet, and gives you a secure read-only link to send your verifier.
+            </p>
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
               Available now: iron and steel (CN 72–73) and aluminium (CN 76). More CBAM sectors — cement, fertilisers, and hydrogen — are in active development. We show you what is live so you always know exactly what the module computes.
             </p>

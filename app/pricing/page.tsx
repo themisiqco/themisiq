@@ -44,7 +44,7 @@ const MODULES: Module[] = [
   {
     id: 'cbam',
     name: 'CBAM — Carbon Border Adjustment Mechanism',
-    description: 'Regulation (EU) 2023/956 · specific embedded emissions (SEE) · direct & indirect split · precursor tracing · installation-level actuals · verification-ready summary for your EU importer',
+    description: 'Regulation (EU) 2023/956 · specific embedded emissions (SEE) · direct & indirect split · precursor tracing · installation-level actuals · Annex IV §1.2 summary for your EU customer',
     tags: [
       { label: 'Non-EU exporters', color: 'purple' },
       { label: 'Iron & Steel, and Aluminium live', color: 'orange' },

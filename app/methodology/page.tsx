@@ -73,7 +73,7 @@ const METHODOLOGIES = [
       },
       {
         title: 'Data basis',
-        content: 'SEE is computed from installation-level actual data, with each figure linked to its source evidence. Under Article 7(2) of Regulation (EU) 2023/956, as amended by Regulation (EU) 2025/2083, the importer may declare either verified actual values or the default values published in Implementing Regulation (EU) 2025/2621. Defaults carry a mark-up on top of the country figure — 10% for 2026, 20% for 2027 and 30% from 2028 for iron and steel, aluminium, cement and hydrogen; 1% for fertilisers — accounting for installations whose emissions exceed the average for their producer country.',
+        content: 'SEE is computed from installation-level actual data. Where you attach a source document to a figure, that link is carried through to the verifier\'s view. Under Article 7(2) of Regulation (EU) 2023/956, as amended by Regulation (EU) 2025/2083, the importer may declare either verified actual values or the default values published in Implementing Regulation (EU) 2025/2621. Defaults carry a mark-up on top of the country figure — 10% for 2026, 20% for 2027 and 30% from 2028 for iron and steel, aluminium, cement and hydrogen; 1% for fertilisers — accounting for installations whose emissions exceed the average for their producer country.',
       },
       {
         title: 'Free allocation & benchmarks',
