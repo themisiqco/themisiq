@@ -34,6 +34,27 @@ const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSiz
 const sectionSub: React.CSSProperties = { fontSize: 14, color: '#555553', fontWeight: 300, lineHeight: 1.7, marginBottom: '2rem' }
 const itemHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: '1.15rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 10, marginTop: '2rem' }
 
+/**
+ * Bring a just-opened add/edit form into view.
+ *
+ * The process form renders BELOW the entire process list, so with several processes it opens
+ * off-screen: the operator clicks Edit, nothing visibly happens, and the button reads as broken.
+ * The two sub-forms have the same problem inside a long expanded panel.
+ *
+ * KEYED ON WHICH RECORD IS OPEN, never on the form's contents. The key changes when a form opens,
+ * and when the operator clicks Edit on a DIFFERENT record while one is already open — but a
+ * keystroke does not change it, so the page never yanks itself around while someone is typing.
+ * A closed form passes null and scrolls nothing.
+ */
+function useScrollIntoViewOnOpen(key: string | null, ref: React.RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    if (key === null) return
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    // ref is stable; re-running on anything but `key` is exactly what this must not do.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
+}
+
 type Step = 1 | 2 | 3
 type Company = { id: string; name: string }
 
@@ -282,6 +303,17 @@ export default function CbamSetupPage() {
   const [documents, setDocuments] = useState<CbamDocument[]>([])
   const [docType, setDocType] = useState('')
   const [docNotes, setDocNotes] = useState('')
+
+  // ── Scroll a newly-opened form into view ──
+  // The sub-form keys carry their panel's process id as well as the record id: without it,
+  // opening a NEW stream on one process and then a NEW stream on another would produce the same
+  // key twice running and the second one would not scroll.
+  const procFormRef = useRef<HTMLDivElement | null>(null)
+  const streamFormRef = useRef<HTMLDivElement | null>(null)
+  const precursorFormRef = useRef<HTMLDivElement | null>(null)
+  useScrollIntoViewOnOpen(editingProc ? (editingProc.id ?? 'new') : null, procFormRef)
+  useScrollIntoViewOnOpen(editingStream ? `${streamsProcId}:${editingStream.id ?? 'new'}` : null, streamFormRef)
+  useScrollIntoViewOnOpen(editingPrecursor ? `${precursorProcId}:${editingPrecursor.id ?? 'new'}` : null, precursorFormRef)
   const [docUploading, setDocUploading] = useState(false)
   const [docError, setDocError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -1386,7 +1418,7 @@ export default function CbamSetupPage() {
 
           {!editing && (
             <button type="button" onClick={() => { setEditing(EMPTY_INSTALLATION); setInst2Saved(false); setInst2Error(null) }} style={primaryBtn(false)}>
-              + Add installation
+              + New installation
             </button>
           )}
 
@@ -1431,7 +1463,7 @@ export default function CbamSetupPage() {
 
               <div style={{ marginTop: '1.25rem', display: 'flex', gap: 10, alignItems: 'center' }}>
                 <button type="button" onClick={saveInstallation} disabled={inst2Saving} style={primaryBtn(inst2Saving)}>
-                  {inst2Saving ? 'Saving…' : (editing.id ? 'Save changes' : 'Add installation')}
+                  {inst2Saving ? 'Saving…' : (editing.id ? 'Save changes' : 'Save installation')}
                 </button>
                 <button type="button" onClick={() => { setEditing(null); setInst2Error(null) }} style={ghostBtn}>Cancel</button>
               </div>
@@ -1629,11 +1661,11 @@ export default function CbamSetupPage() {
                             )}
 
                             {!editingPrecursor && (
-                              <button type="button" onClick={() => { setEditingPrecursor(EMPTY_PRECURSOR(proc.reporting_period)); setPrecursorError(null); setPrecursorNotice(null) }} style={linkBtn}>+ Add precursor</button>
+                              <button type="button" onClick={() => { setEditingPrecursor(EMPTY_PRECURSOR(proc.reporting_period)); setPrecursorError(null); setPrecursorNotice(null) }} style={linkBtn}>+ New precursor</button>
                             )}
 
                             {editingPrecursor && (
-                              <div style={{ marginTop: 10, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
+                              <div ref={precursorFormRef} style={{ marginTop: 10, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                   <CbamField label="CN code — required (exactly as on your customs paperwork)">
                                     <input value={editingPrecursor.cn_code} onChange={(e) => setPrecF('cn_code', e.target.value)} placeholder="7203 00 00" style={cbamInputStyle} />
@@ -1687,7 +1719,7 @@ export default function CbamSetupPage() {
                                 </div>
                                 {precursorError && <ErrorBox prefix="Could not save precursor" message={precursorError} />}
                                 <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>
-                                  <button type="button" onClick={savePrecursor} disabled={precursorSaving} style={primaryBtn(precursorSaving)}>{precursorSaving ? 'Saving…' : (editingPrecursor.id ? 'Save precursor' : 'Add precursor')}</button>
+                                  <button type="button" onClick={savePrecursor} disabled={precursorSaving} style={primaryBtn(precursorSaving)}>{precursorSaving ? 'Saving…' : (editingPrecursor.id ? 'Save changes' : 'Save precursor')}</button>
                                   <button type="button" onClick={() => { setEditingPrecursor(null); setPrecursorError(null) }} style={ghostBtn}>Cancel</button>
                                 </div>
                               </div>
@@ -1830,12 +1862,12 @@ export default function CbamSetupPage() {
                           })()}
 
                           {!editingStream && (
-                            <button type="button" onClick={() => { setEditingStream(EMPTY_STREAM); setStreamError(null) }} style={linkBtn}>+ Add stream</button>
+                            <button type="button" onClick={() => { setEditingStream(EMPTY_STREAM); setStreamError(null) }} style={linkBtn}>+ New stream</button>
                           )}
 
                           {/* Stream add / edit form — cc_mode drives which fields show. */}
                           {editingStream && (
-                            <div style={{ marginTop: 10, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
+                            <div ref={streamFormRef} style={{ marginTop: 10, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                 <CbamField label="Stream name — required">
                                   <input value={editingStream.name} onChange={(e) => setStreamF('name', e.target.value)} style={cbamInputStyle} />
@@ -1892,7 +1924,7 @@ export default function CbamSetupPage() {
                               </div>
                               {streamError && <ErrorBox prefix="Could not save stream" message={streamError} />}
                               <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>
-                                <button type="button" onClick={saveStream} disabled={streamSaving} style={primaryBtn(streamSaving)}>{streamSaving ? 'Saving…' : (editingStream.id ? 'Save stream' : 'Add stream')}</button>
+                                <button type="button" onClick={saveStream} disabled={streamSaving} style={primaryBtn(streamSaving)}>{streamSaving ? 'Saving…' : (editingStream.id ? 'Save changes' : 'Save stream')}</button>
                                 <button type="button" onClick={() => { setEditingStream(null); setStreamError(null) }} style={ghostBtn}>Cancel</button>
                               </div>
                             </div>
@@ -1913,7 +1945,7 @@ export default function CbamSetupPage() {
 
               {/* Process add / edit form */}
               {editingProc && (
-                <div style={{ marginTop: '1rem', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.5rem', maxWidth: 640 }}>
+                <div ref={procFormRef} style={{ marginTop: '1rem', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.5rem', maxWidth: 640 }}>
                   <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', color: '#0d0d0d', marginBottom: '1rem' }}>{editingProc.id ? 'Edit process' : 'New process'}</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     <CbamField label="Installation — required">
