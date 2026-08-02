@@ -324,10 +324,10 @@ export default function Page() {
       {/* CTA */}
       <section style={{ background: canvas, borderTop: `0.5px solid ${hair}`, padding: '5rem 2.5rem', textAlign: 'center' }}>
         <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2, color: ink }}>
-          Give your EU customers a verified report like this.
+          Give your EU customers the figures they need.
         </h2>
         <p style={{ fontSize: 15, color: muted, maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
-          Installation-level actuals, sourced and verifier-ready — instead of the worst-case default that prices your goods out.
+          Installation-level actuals, with the evidence attached — instead of a published default set conservatively.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
           <a href="/pricing?modules=cbam" style={{ ...btnPrimary, textDecoration: 'none' }}>See CBAM pricing →</a>
@@ -342,5 +342,5 @@ export default function Page() {
   )
 }
 
-const btnPrimary: React.CSSProperties = { fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: '#0d0d0d', color: '#fff', display: 'inline-block' }
-const btnSecondary: React.CSSProperties = { fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', display: 'inline-block' }
+const btnPrimary: React.CSSProperties = { fontSize: 14, fontWeight: 500, padding: '13px 22px', borderRadius: 8, background: '#0d0d0d', color: '#fff', display: 'inline-block' }
+const btnSecondary: React.CSSProperties = { fontSize: 14, fontWeight: 400, padding: '13px 22px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', display: 'inline-block' }

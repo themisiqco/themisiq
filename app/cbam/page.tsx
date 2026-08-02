@@ -2,10 +2,13 @@
 import Nav from '../components/Nav'
 // useState/useEffect no longer needed — countdown removed 28 Jul 2026.
 import Footer from '@/app/components/Footer'
+import { FLAT_MODULE_PRICES } from '../../lib/pricing'
 export default function Page() {
   // Countdown removed 28 Jul 2026. The Sep-2027 date is the IMPORTER's filing deadline,
   // not the exporter's — counting down to it invited prospects to defer. The banner now
   // states the standing commercial consequence instead, which does not expire.
+  // Price from the single source of truth, formatted as app/cbam/readiness/page.tsx does.
+  const cbamPrice = FLAT_MODULE_PRICES.cbam.toLocaleString('en-US')
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d' }}>
       <Nav />
@@ -14,7 +17,7 @@ export default function Page() {
       <div style={{ background: '#B91C1C', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, position: 'sticky', top: 64, zIndex: 99 }}>
         <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff', animation: 'pulse 1.5s infinite' }} />
         <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>CBAM is in its definitive regime. No emissions data means a marked-up default on your goods — and revenue lost to suppliers who have it.</span>
-        <a href="/pricing?modules=cbam" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>See CBAM pricing →</a>
+        <a href="/cbam/readiness" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>See what you&rsquo;ll need →</a>
       </div>
 
       {/* HERO */}
@@ -27,15 +30,16 @@ export default function Page() {
               <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Don’t let default values price you out.</span>
             </h1>
             <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 300, marginBottom: '2rem', maxWidth: 480 }}>
-              Your EU customer declares a number for your goods either way. Without yours, they use a published default for your country — carrying a mark-up that prices in the possibility your installation is dirtier than average. They buy the certificates, so that assumption is priced into what you cost them. ThemisIQ computes installation-level actuals, independently verifiable and ready to share with your EU customers.
+              Your EU customer declares a number for your goods either way. Without yours, they use the published default for your country — set conservatively, and increased by a mark-up of 10% in 2026, rising to 30% by 2028. ThemisIQ computes installation-level actuals under the definitive-period rules, and builds the summary your customer needs.
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
-              <a href="/cbam/preview" style={{ ...btnPrimary, textDecoration: 'none' }}>See a sample report →</a>
-              <a href="/pricing?modules=cbam" style={{ ...btnSecondary, textDecoration: 'none' }}>See pricing</a>
+              <a href="/cbam/readiness" style={{ ...btnPrimary, textDecoration: 'none' }}>What you&rsquo;ll need</a>
+              <a href="/cbam/preview" style={{ ...btnSecondary, textDecoration: 'none' }}>See a sample report</a>
+              <a href="/order?modules=cbam" style={{ ...btnSecondary, textDecoration: 'none' }}>${cbamPrice}/yr</a>
               <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
-              {['Non-EU exporters', 'Regulation (EU) 2023/956', 'Verifier-ready'].map(tag => (
+              {['Non-EU exporters', 'Regulation (EU) 2023/956', 'Annex IV §1.2 summary'].map(tag => (
                 <span key={tag} style={{ fontSize: 11, padding: '4px 12px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#555553' }}>{tag}</span>
               ))}
             </div>
@@ -46,7 +50,7 @@ export default function Page() {
             {[
               { val: '30 Sep', unit: '2027', label: 'first importer CBAM declaration due', color: '#B91C1C', bg: '#FCEBEB' },
               { val: '10→20→30%', unit: 'mark-up by 2028', label: 'what the default adds on top of your country figure', color: '#7425e3', bg: '#EDE9FE' },
-              { val: 'Actuals', unit: 'not defaults', label: 'installation-level, verifier-ready figures', color: '#0F6E56', bg: '#E1F5EE' },
+              { val: 'Actuals', unit: 'not defaults', label: 'installation-level figures, with the evidence attached', color: '#0F6E56', bg: '#E1F5EE' },
               { val: 'Steel + Al', unit: 'available now', label: 'iron, steel & aluminium live; more sectors coming', color: '#0C447C', bg: '#E6F1FB' },
             ].map(({ val, unit, label, color, bg }) => (
               <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid ${color}22` }}>
@@ -169,11 +173,12 @@ export default function Page() {
           <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Make it yours.</span>
         </h2>
         <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
-          ThemisIQ produces installation-level, verifier-ready specific embedded emissions your EU customer can carry into their CBAM declaration — instead of a default carrying a mark-up set on an assumption about your installation.
+          ThemisIQ computes installation-level actuals under the definitive-period rules, and builds the Annex IV §1.2 summary your EU customer carries into their CBAM declaration.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-          <a href="/cbam/preview" style={{ ...btnPrimary, textDecoration: 'none' }}>See a sample report →</a>
-          <a href="/pricing?modules=cbam" style={{ ...btnSecondary, textDecoration: 'none' }}>See pricing</a>
+          <a href="/cbam/readiness" style={{ ...btnPrimary, textDecoration: 'none' }}>What you&rsquo;ll need</a>
+          <a href="/cbam/preview" style={{ ...btnSecondary, textDecoration: 'none' }}>See a sample report</a>
+          <a href="/order?modules=cbam" style={{ ...btnSecondary, textDecoration: 'none' }}>${cbamPrice}/yr</a>
           <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
         </div>
       </section>
@@ -186,8 +191,8 @@ export default function Page() {
   )
 }
 
-const btnPrimary: React.CSSProperties = { fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: '#0d0d0d', color: '#fff', display: 'inline-block' }
-const btnSecondary: React.CSSProperties = { fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', display: 'inline-block' }
+const btnPrimary: React.CSSProperties = { fontSize: 14, fontWeight: 500, padding: '13px 22px', borderRadius: 8, background: '#0d0d0d', color: '#fff', display: 'inline-block' }
+const btnSecondary: React.CSSProperties = { fontSize: 14, fontWeight: 400, padding: '13px 22px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', display: 'inline-block' }
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
 const sectionTitle: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }
 const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, margin: '0 auto', lineHeight: 1.75, fontWeight: 300 }

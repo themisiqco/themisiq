@@ -44,8 +44,8 @@ export const HOLDER_GROUPS: Record<HolderGroup, HolderGroupMeta> = {
   customs:            { order: 2, label: 'Customs documentation',      blurb: 'Your export paperwork, or your customs broker.' },
   plant_operations:   { order: 3, label: 'Plant and production',       blurb: 'Your site or production management — the people who run the process.' },
   finance_procurement:{ order: 4, label: 'Finance and procurement',    blurb: 'Invoices and bills. Usually the fastest route to fuel and electricity quantities.' },
-  suppliers:          { order: 5, label: 'Your suppliers',             blurb: 'Fuel specifications, and later your precursor suppliers. Longest lead time — start here first.' },
-  external_registry:  { order: 6, label: 'External registries',        blurb: 'Identifiers you look up or apply for, rather than ask a colleague for.' },
+  suppliers:          { order: 5, label: 'Supplier information',       blurb: 'Fuel specifications, and later your precursor suppliers. Longest lead time — start here first.' },
+  external_registry:  { order: 6, label: 'Registry identifiers',       blurb: 'Identifiers you look up or apply for, rather than ask a colleague for.' },
 };
 
 export interface ReadinessEntry {
@@ -100,7 +100,7 @@ export const READINESS_ENTRIES: ReadinessEntry[] = [
     whereToFind: 'Issued when a non-EU operator registers an installation in the CBAM Registry, via the Commission portal for third-country operators.',
     goodEnough: 'Registration is voluntary for third-country operators. If you have not registered, leave this blank — never invent an identifier.',
     whyAsked: 'It lets your EU customer link your data to a registered installation.',
-    sourceRef: 'spec §10.16', inferred: false },
+    sourceRef: 'European Commission, CBAM Registry guidance for non-EU installation operators', inferred: false },
 
   { id: 'un_locode', kind: 'derived', item: '(2)(c)', field: 'UN/LOCODE',
     label: 'UN/LOCODE for the installation', holder: 'external_registry',
@@ -164,9 +164,9 @@ export const READINESS_ENTRIES: ReadinessEntry[] = [
     whyAsked: null, sourceRef: null, inferred: true },
 
   { id: 'co2_capture', kind: 'derived', item: '(10)', field: 'CO2 capture used',
-    label: 'CO2 capture used', holder: 'plant_operations',
+    label: 'CO₂ capture used', holder: 'plant_operations',
     whereToFind: 'Process or environmental management.',
-    goodEnough: 'Yes or no. If yes, you will be asked where the captured CO2 is transferred to.',
+    goodEnough: 'Yes or no. If yes, you will be asked where the captured CO₂ is transferred to.',
     whyAsked: null, sourceRef: null, inferred: true },
 
   { id: 'onsite_electricity', kind: 'derived', item: '(11)', field: 'on-site electricity generation',
@@ -187,19 +187,19 @@ export const READINESS_ENTRIES: ReadinessEntry[] = [
     label: 'CN code for each good you produce', holder: 'customs',
     whereToFind: 'Your export documentation, or your customs broker.',
     goodEnough: 'Exactly as it appears on your paperwork. Granularity varies by good — some are listed at four digits, others at six or eight. Do not shorten, pad or infer it.',
-    whyAsked: 'It selects the benchmark and the default value. A wrong-but-recognised code produces a confident wrong answer.',
-    sourceRef: 'spec §10.7', inferred: false },
+    whyAsked: 'It selects the benchmark and the default value. A recognised but incorrect CN code produces a confident, badly wrong answer — we have seen sibling codes differ by a factor of two. Never infer or simplify it.',
+    sourceRef: null, inferred: false },
 
   { id: 'production_output', kind: 'declared', item: null, field: null,
     label: 'How much of each good you produced (the activity level)', holder: 'plant_operations',
     whereToFind: 'Production records for the reporting period.',
-    goodEnough: 'Net tonnes of each CBAM good produced during the period, per CN code. This is the ACTIVITY LEVEL — the denominator of your specific embedded emissions — so it drives the figure directly. Where you produce the same good by more than one route, the regulation requires ONE combined figure covering all routes, not one per route.',
+    goodEnough: 'Net tonnes of each CBAM good produced during the period, per CN code. This is the activity level — the denominator of your specific embedded emissions — so it drives the figure directly. Where you produce the same good by more than one route, the regulation requires one combined figure covering all routes, not one per route.',
     whyAsked: null, sourceRef: 'IR (EU) 2025/2547 Art 1 def (2), Art 4(2), Art 4(6)', inferred: false },
 
   { id: 'fuel_consumption', kind: 'declared', item: null, field: null,
-    label: 'How much of each fuel AND carbon-bearing process material you consumed', holder: 'finance_procurement',
+    label: 'How much of each fuel and carbon-bearing process material you consumed', holder: 'finance_procurement',
     whereToFind: 'Fuel quantities from invoices (finance or procurement) or from meter readings. Process materials — limestone, carbonates, electrodes, alloys, scrap — usually sit in plant or purchasing records rather than on a utility bill, so expect two sources.',
-    goodEnough: 'A quantity per SOURCE STREAM for the reporting period, in tonnes, terajoules, or normal cubic metres for gases. A source stream is any fuel, raw material OR product giving rise to emissions — not only things you burn. For steel: coke, coal, natural gas, fuel oil, AND limestone, magnesite, other carbonates, carbonate ores, electrodes and electrode pastes, scrap, alloys, graphite. For aluminium: electrodes and electrode pastes, soda ash, limestone. Omitting process materials understates direct emissions, sometimes substantially.',
+    goodEnough: 'A quantity per source stream for the reporting period, in tonnes, terajoules, or normal cubic metres for gases. A source stream is any fuel, raw material or product giving rise to emissions — not only things you burn. For steel: coke, coal, natural gas, fuel oil, and limestone, magnesite, other carbonates, carbonate ores, electrodes and electrode pastes, scrap, alloys, graphite. For aluminium: electrodes and electrode pastes, soda ash, limestone. Omitting process materials understates direct emissions, sometimes substantially.',
     whyAsked: 'This is the activity data behind your direct emissions. Without it there is no actual figure and your customer falls back to the default.',
     sourceRef: 'IR (EU) 2025/2547 Art 1 def (8) and (12); Annex I §3.13, §3.15, §3.17', inferred: false },
 
@@ -217,7 +217,7 @@ export const READINESS_ENTRIES: ReadinessEntry[] = [
 
   { id: 'electricity_consumed', kind: 'declared', item: null, field: null,
     label: 'Electricity consumed', holder: 'finance_procurement',
-    whereToFind: 'Utility bills. Sub-meter readings if your plant meters by production line — but these are NOT required.',
+    whereToFind: 'Utility bills. Sub-meter readings if your plant meters by production line — but these are not required.',
     goodEnough: 'MWh for the reporting period. You do not need a per-process split: where an installation draws from several sources the default is the weighted average across the whole installation. Treating one process separately is an upgrade requiring evidence, not a prerequisite.',
     whyAsked: 'It drives indirect emissions. Reported for steel and aluminium, though excluded from the certificate obligation because both are Annex II goods.',
     sourceRef: 'IR (EU) 2025/2547 Art 9', inferred: false },
@@ -229,10 +229,10 @@ export const READINESS_ENTRIES: ReadinessEntry[] = [
     whyAsked: null, sourceRef: null, inferred: false },
 
   { id: 'precursor_verification_reports', kind: 'declared', item: null, field: null,
-    label: 'A VERIFIED emissions report from each precursor supplier', holder: 'suppliers',
+    label: 'A verified emissions report from each precursor supplier', holder: 'suppliers',
     whereToFind: 'Each supplier of a CBAM-listed input you use — pig iron, DRI, crude steel, unwrought aluminium. Ask for their verification report, not for a number in an email.',
-    goodEnough: 'A verification report issued by an ACCREDITED verifier, covering the reporting period in which the precursor was produced. Nothing less is usable: a supplier\'s own unverified figure cannot be used at all, and the published default applies instead. This is the longest-lead item on this list — your supplier may need to engage a verifier before they can answer, so ask first and ask early.',
-    whyAsked: 'Precursor emissions carry into your own figure. Without a verification report the default value applies, and defaults carry a mark-up.',
+    goodEnough: 'A verification report issued by an ACCREDITED verifier, covering the reporting period in which the precursor was produced. An unverified figure from a supplier cannot be used. Where no verified report is available, you may use the published default value for that precursor instead. This is the longest-lead item on this list — your supplier may need to engage a verifier before they can answer, so ask first and ask early.',
+    whyAsked: 'Precursor emissions carry into your own figure. Without a verification report your customer falls back to the published default, which carries a mark-up.',
     sourceRef: 'IR (EU) 2025/2547 Annex II A.1.4-5', inferred: false },
 
   { id: 'evidence_documents', kind: 'declared', item: null, field: null,
