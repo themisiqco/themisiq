@@ -93,6 +93,15 @@ export default function DealAssessmentPage() {
   )
 
   // ── Recompute the assessment from the safe fields via the shared C1 lib (no drift) ──
+  // TODO (PRE-LAUNCH): `frameworks` is read from the STORED jsonb column and is NOT recomputed
+  // here. Deals saved before the per-framework revenue fix stored `[]` whenever revenue was blank
+  // (the old guard withheld the whole list), so an already-shared link will UNDERSTATE both the
+  // obligations and the price shown to the target — an EU/Global deal misses CS3D/CSRD and so
+  // omits the $2,900 supply-chain module. It self-heals the moment the owner reopens and re-saves.
+  // Fix options: (a) recompute the non-revenue frameworks here from jurisdiction + sector, unioned
+  // with the stored revenue-triggered ones (revenue itself is deliberately absent from the RPC, so
+  // SB 253 / SECR can only come from storage); or (b) a one-off backfill. Do NOT ship the public
+  // page to customers before resolving this.
   const frameworks = Array.isArray(data.frameworks) ? data.frameworks : []
   const risks: SectorRisk[] = (data.sector && SECTOR_RISKS[data.sector]) || []
   const obligations = getObligations(data.location_count ?? 0, frameworks, data.sector ?? undefined)

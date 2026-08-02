@@ -15,7 +15,7 @@ export type DealInput = {
   revenue: number
   deal_value: number
   location_count: number
-  currency: string
+  currency: DealCurrency
 }
 
 export type SectorRisk = { risk: string; severity: 'critical' | 'high' | 'medium'; framework: string; detail: string }
@@ -157,17 +157,59 @@ const CONSULTANT_SECTOR_FACTOR = (sector?: string): number =>
 // Round a scaled consultant figure to the nearest 1000 so the "k" display stays clean.
 const roundK = (x: number): number => Math.round(x / 1000) * 1000
 
-export type ObligationTier = { label: string; short: string; themisIqPrice: number | null; consultantLow: number; consultantHigh: number; scopeNote?: string }
+// ─── Obligation pricing ─────────────────────────────────────────────────────────
+// A single `number | null` price overloaded THREE distinct meanings — a real charge, "no
+// self-serve price, quote it", and "free because it is bundled elsewhere" — and 0 was doing
+// duty for the last one. That is the same category error as reading an empty result as a
+// negative finding: included-free is not costs-zero. A bundled scope has NO price to state,
+// so it must not be summable, must not force a quote, and must not render as a currency figure.
+export type ObligationPricing =
+  | { kind: 'priced'; priceUSD: number }   // a real charge — the ONLY kind that sums into a total
+  | { kind: 'bundled' }                    // delivered inside another module; no separate charge
+  | { kind: 'quote' }                      // no self-serve price; forces themisIqHasCustom
+  | { kind: 'excluded' }                   // out of scope for ThemisIQ; in neither total
+
+// Shared rendering so no surface invents its own wording for these states.
+export const obligationPriceLabel = (p: ObligationPricing): string =>
+  p.kind === 'priced' ? `USD ${p.priceUSD.toLocaleString()}`
+  : p.kind === 'bundled' ? 'Included in GHG inventory'
+  : p.kind === 'quote' ? 'Custom quote'
+  : 'Not included'
+
+export type ObligationTier = {
+  label: string
+  short: string
+  pricing: ObligationPricing      // AUTHORITY for what this obligation costs
+  /** @deprecated Derived from `pricing`; retained only so app/deals/[token] compiles unchanged.
+   *  Cannot drift (it is computed, never set). Read `pricing` in new code and delete this once
+   *  the public share page is migrated. bundled/quote/excluded all collapse to null here, which
+   *  is exactly the ambiguity `pricing` exists to remove. */
+  themisIqPrice: number | null
+  consultantLow: number
+  consultantHigh: number
+  scopeNote?: string
+}
 export type Obligations = {
   included: ObligationTier[]      // summed into the headline (both sides)
   recommended: ObligationTier[]   // shown separately, NOT summed
   flagged: ObligationTier[]       // honest caveats — summed into NEITHER figure
-  themisIqTotal: number | null    // sum of non-null included ThemisIQ prices; null when nothing summable
-  themisIqHasCustom: boolean       // an included price is null (Advisory GHG, 16+ locations)
+  themisIqTotal: number | null    // sum of 'priced' included obligations; null when none are priced
+  themisIqHasCustom: boolean      // an included obligation is 'quote' (Advisory GHG, 16+ locations)
   consultantLow: number           // sum of included consultant lows
   consultantHigh: number          // sum of included consultant highs
   locationUnset: boolean          // location_count unset/0 → prompt for the ThemisIQ figure
 }
+
+const priced = (priceUSD: number): ObligationPricing => ({ kind: 'priced', priceUSD })
+const BUNDLED: ObligationPricing = { kind: 'bundled' }
+const QUOTE: ObligationPricing = { kind: 'quote' }
+const EXCLUDED: ObligationPricing = { kind: 'excluded' }
+// A GHG_TIERS price of null means "contact us", not "free".
+const tierPricing = (p: number | null): ObligationPricing => (p == null ? QUOTE : priced(p))
+// Every tier is built through this, so the deprecated field is ALWAYS derived and can never
+// disagree with `pricing`.
+const tier = (t: Omit<ObligationTier, 'themisIqPrice'>): ObligationTier =>
+  ({ ...t, themisIqPrice: t.pricing.kind === 'priced' ? t.pricing.priceUSD : null })
 
 // Pure: deal location count + detected frameworks (+ sector) → scope-matched obligations & prices.
 // ThemisIQ prices come from lib/pricing.ts (single source of truth); consultant = cited ranges.
@@ -179,97 +221,551 @@ export function getObligations(locationCount: number, frameworks: string[], sect
   const sec = CONSULTANT_SECTOR_FACTOR(sector)
 
   // GHG — ALWAYS included. Tier by location count (GHG_TIERS is the authority).
-  const ghgPrice: number | null =
-    locationUnset ? null
-    : locationCount <= (GHG_TIERS.starter.locationAllowance ?? 3)      ? GHG_TIERS.starter.priceUSD
-    : locationCount <= (GHG_TIERS.professional.locationAllowance ?? 15) ? GHG_TIERS.professional.priceUSD
-    : GHG_TIERS.advisory.priceUSD // null → Advisory / custom quote (16+)
+  const ghgPricing: ObligationPricing =
+    locationUnset ? QUOTE
+    : locationCount <= (GHG_TIERS.starter.locationAllowance ?? 3)      ? tierPricing(GHG_TIERS.starter.priceUSD)
+    : locationCount <= (GHG_TIERS.professional.locationAllowance ?? 15) ? tierPricing(GHG_TIERS.professional.priceUSD)
+    : tierPricing(GHG_TIERS.advisory.priceUSD) // null → Advisory / custom quote (16+)
 
   const included: ObligationTier[] = [
     // GHG consultant range scales by location AND sector (a heavy-sector inventory is more work).
-    { label: 'GHG inventory & Scope 3', short: 'GHG', themisIqPrice: ghgPrice,
+    tier({ label: 'GHG inventory & Scope 3', short: 'GHG', pricing: ghgPricing,
       consultantLow: roundK(CONSULTANT_RANGES.ghg.low * loc * sec),
-      consultantHigh: roundK(CONSULTANT_RANGES.ghg.high * loc * sec) },
+      consultantHigh: roundK(CONSULTANT_RANGES.ghg.high * loc * sec) }),
   ]
 
   // Supply chain — included when a genuine value-chain framework is detected (PCAF no longer triggers this).
   // Consultant range scales by location only (value-chain breadth), not sector.
   if (SUPPLY_CHAIN_TRIGGERS.some(f => frameworks.includes(f))) {
-    included.push({ label: 'Supply chain / Scope 3', short: 'supply chain', themisIqPrice: FLAT_MODULE_PRICES['supply-chain'],
+    included.push(tier({ label: 'Supply chain / Scope 3', short: 'supply chain', pricing: priced(FLAT_MODULE_PRICES['supply-chain']),
       consultantLow: roundK(CONSULTANT_RANGES.supplyChain.low * loc),
-      consultantHigh: roundK(CONSULTANT_RANGES.supplyChain.high * loc) })
+      consultantHigh: roundK(CONSULTANT_RANGES.supplyChain.high * loc) }))
   }
 
-  // Financed emissions (PCAF, Scope 3 Cat.15) — Financial Services. Now a REAL included ThemisIQ
-  // scope bundled in the GHG module (price 0), replacing the old mislabelled supply-chain trigger.
+  // Financed emissions (PCAF, Scope 3 Cat.15) — Financial Services. A REAL included ThemisIQ scope,
+  // delivered inside the GHG module, so it is BUNDLED — not priced at zero. It therefore sums into
+  // nothing and never renders as a currency figure. (Pricing it 0 made a quote-tier FS deal read
+  // "~USD 0 + custom" instead of "Custom quote": a free inclusion masquerading as a zero cost.)
   // Portfolio-driven: consultant range scales by NEITHER location nor sector.
   if (frameworks.includes('PCAF')) {
-    included.push({ label: 'Financed emissions (PCAF, Scope 3 Cat.15)', short: 'financed emissions', themisIqPrice: 0,
+    included.push(tier({ label: 'Financed emissions (PCAF, Scope 3 Cat.15)', short: 'financed emissions', pricing: BUNDLED,
       consultantLow: roundK(CONSULTANT_RANGES.financedEmissions.low),
       consultantHigh: roundK(CONSULTANT_RANGES.financedEmissions.high),
-      scopeNote: 'Included in the GHG module (PCAF-aligned engine); consultants bill this separately.' })
+      scopeNote: 'Included in the GHG module (PCAF-aligned engine); consultants bill this separately.' }))
   }
 
   // Recommended (NOT summed) — Climate Risk is always relevant (IFRS S2 / TCFD always emitted).
   // Consultant range scales by location only, not sector.
   const recommended: ObligationTier[] = [
-    { label: 'Climate risk assessment — physical & transition (IFRS S2 / TCFD)', short: 'climate risk', themisIqPrice: FLAT_MODULE_PRICES['climate-risk'],
+    tier({ label: 'Climate risk assessment — physical & transition (IFRS S2 / TCFD)', short: 'climate risk', pricing: priced(FLAT_MODULE_PRICES['climate-risk']),
       consultantLow: roundK(CONSULTANT_RANGES.climateRisk.low * loc),
-      consultantHigh: roundK(CONSULTANT_RANGES.climateRisk.high * loc) },
+      consultantHigh: roundK(CONSULTANT_RANGES.climateRisk.high * loc) }),
   ]
 
   // Flagged (NOT summed into either figure) — honest caveats for scopes needing a separate specialist.
   const flagged: ObligationTier[] = []
   if (sector === 'Agriculture & Food') {
-    flagged.push({ label: 'Forest, Land & Agriculture (FLAG)', short: 'FLAG', themisIqPrice: null, consultantLow: 0, consultantHigh: 0,
-      scopeNote: 'Covered via SBTi science-based target-setting where applicable. Land-sector inventory assessed separately.' })
+    flagged.push(tier({ label: 'Forest, Land & Agriculture (FLAG)', short: 'FLAG', pricing: EXCLUDED, consultantLow: 0, consultantHigh: 0,
+      scopeNote: 'Covered via SBTi science-based target-setting where applicable. Land-sector inventory assessed separately.' }))
   }
 
-  // themisIqPrice 0 is a REAL (free/bundled) price — kept by the != null filter, adds nothing to the
-  // sum, and does NOT set themisIqHasCustom (only null prices do).
-  const nonNull = included.filter(o => o.themisIqPrice != null).map(o => o.themisIqPrice as number)
+  // ONLY 'priced' obligations sum. A bundled scope has no figure to add — summing it as 0 would
+  // assert a zero cost where the truth is "no separate charge". No priced obligation at all → null,
+  // which the surfaces render as "Custom quote" rather than a zero.
+  const pricedTotals = included.filter(o => o.pricing.kind === 'priced').map(o => (o.pricing as { priceUSD: number }).priceUSD)
   return {
     included, recommended, flagged,
-    themisIqTotal: nonNull.length ? nonNull.reduce((a, b) => a + b, 0) : null,
-    themisIqHasCustom: included.some(o => o.themisIqPrice == null),
+    themisIqTotal: pricedTotals.length ? pricedTotals.reduce((a, b) => a + b, 0) : null,
+    themisIqHasCustom: included.some(o => o.pricing.kind === 'quote'),
     consultantLow: included.reduce((a, o) => a + o.consultantLow, 0),
     consultantHigh: included.reduce((a, o) => a + o.consultantHigh, 0),
     locationUnset,
   }
 }
 
-// Framework applicability
-export const getApplicableFrameworks = (jurisdiction: string, revenue: number, sector: string, dealType: string): string[] => {
-  const fw: string[] = []
+// ─── FX for statutory thresholds ────────────────────────────────────────────────
+// Revenue is captured in the DEAL's currency, but every statutory threshold is denominated in
+// the STATUTE's own currency — SB 253 is USD 1bn, SECR is GBP 36m. We convert the REVENUE into
+// the threshold's currency and NEVER convert the threshold: the statutory figure has to stay
+// verbatim so a verifier can cross-check the citation against the legislation itself.
+//
+// Deliberately a STATIC, DATED table — no live API. A rate that moved between two runs would let
+// the same deal silently flip a statutory citation with nothing in the audit trail to explain it.
+// A dated table makes the rate a reviewable input, like an emission factor (cf. EF_SOURCES).
+// Refresh: replace the rates and bump FX_AS_OF in the SAME edit, never separately.
+export type DealCurrency = 'USD' | 'EUR' | 'GBP' | 'CAD' | 'AUD'
 
-  // US — California SB 253 (statutory trigger is >$1B total annual revenue, doing business in CA)
-  if (jurisdiction === 'USA' && revenue > 1000000000) fw.push('SB 253')
+// The currencies the deal form offers. app/dashboard/deals/page.tsx renders its <select> from
+// this list, so the UI and the FX table below cannot drift apart.
+export const DEAL_CURRENCIES: DealCurrency[] = ['USD', 'EUR', 'GBP', 'CAD', 'AUD']
+
+export const FX_AS_OF = '2026-07-01'
+export const FX_SOURCE = 'ECB euro foreign exchange reference rates, 1 July 2026 (14:15 CET daily fixing). https://www.ecb.europa.eu/stats/exchange/eurofxref/shared/pdf/2026/07/20260701.pdf'
+
+// Units of each currency per 1 EUR — the ECB's OWN quotation convention, TRANSCRIBED VERBATIM from
+// the document named in FX_SOURCE. Every number below appears literally in that PDF, so a reviewer
+// confirms this table by comparing digit for digit against the source; nothing has to be re-derived
+// to check it. That is the whole reason the table is EUR-base rather than USD-cross-rated: a stored
+// cross-rate is a computed number with no published figure behind it, and a cross-rate rounded to
+// 2dp cannot be reconciled at all against a source that publishes 4–5 significant figures.
+//
+// WIDTHS ARE NOT NORMALISED. GBP is published to five decimal places and the others to four; they
+// are held exactly as printed. Padding or trimming a digit to make the column tidy would be a
+// silent edit to a transcribed figure.
+//
+// Refresh: re-transcribe from the new day's document and bump FX_AS_OF and the FX_SOURCE URL in
+// the SAME edit as the rates, never separately.
+export const UNITS_PER_EUR: Record<DealCurrency, number> = {
+  EUR: 1,          // the base, by definition — not a published figure
+  USD: 1.1383,
+  GBP: 0.85973,
+  CAD: 1.6191,
+  AUD: 1.6518,
+}
+
+export const isDealCurrency = (c: string): c is DealCurrency => (DEAL_CURRENCIES as string[]).includes(c)
+
+// Convert between two deal currencies through the EUR base. Same currency → identity, so a
+// GBP-denominated threshold tested against GBP revenue has no float round-trip at all.
+// Only ever applied to revenue — never to a threshold.
+export const convertCurrency = (amount: number, from: DealCurrency, to: DealCurrency): number =>
+  from === to ? amount : (amount * UNITS_PER_EUR[to]) / UNITS_PER_EUR[from]
+
+// USD per 1 unit of the listed currency — DERIVED from the EUR base, never stored, so it cannot
+// disagree with the transcribed figures. Retained because the deal report's FX-basis block prints
+// the rate applied (app/dashboard/deals/page.tsx). USD is exactly 1 (x / x), so the anchor cannot
+// drift. Prefer UNITS_PER_EUR in new code — it is the side with a source document behind it.
+export const USD_PER_UNIT: Record<DealCurrency, number> =
+  Object.fromEntries(DEAL_CURRENCIES.map(c => [c, UNITS_PER_EUR.USD / UNITS_PER_EUR[c]])) as Record<DealCurrency, number>
+
+// ─── Multi-limb statutory thresholds ────────────────────────────────────────────
+// Most size tests are N-of-M over turnover, balance-sheet total and headcount — not a single
+// revenue comparison. One mechanism covers every shape: `requires === limbs.length` expresses AND
+// (CSRD, CS3D), `requires < limbs.length` expresses 2-of-3 (SECR, S-211), `requires === 1` with a
+// single limb expresses a plain trigger (SB 253).
+export type SizeMeasure = 'turnover' | 'balance_sheet_total' | 'employees'
+// Headcount carries no currency and never touches FX; money limbs convert the DEAL's figure into
+// the limb's own currency, never the reverse.
+export type LimbUnit = { unit: 'currency'; currency: DealCurrency } | { unit: 'count' }
+export type LimbSource = 'revenue' | 'total_assets' | 'employee_count'
+
+export type ThresholdLimb = {
+  measure: SizeMeasure
+  amount: number                // the figure as it appears in the legislation — never rebased
+  unit: LimbUnit
+  source: LimbSource            // which collected field supplies the value
+  basis: string                 // the MEASURE definition, verbatim from the instrument
+  // false ⇒ `source` is a PROXY for what the instrument actually defines. The instruments do not
+  // agree on what "revenue" means (UK MSA: total turnover incl. subsidiaries; California:
+  // worldwide gross receipts with no COGS deduction; Canada: revenue per consolidated statements;
+  // CSRD: net turnover). We collect ONE figure, so where it stands in for a differently-defined
+  // measure the report must say so rather than imply the statutory definition was applied.
+  exactMeasure: boolean
+  measureNote?: string          // what the instrument defines, when exactMeasure is false
+  // Instruments do NOT agree on the boundary. SB 253 is "in excess of" and the Companies Act
+  // large-company test is "exceeds the medium-sized ceiling" (both strict); S-211 is "at least"
+  // (inclusive). Getting this wrong moves a target across a statutory line, so it is per-limb.
+  comparison: 'gt' | 'gte'
+}
+
+export type ThresholdTest = {
+  framework: string
+  requires: number              // N of M
+  limbs: ThresholdLimb[]
+  lookback: 'most-recent-fy' | 'either-of-two-most-recent-fy'
+  lookbackModelled: boolean     // false ⇒ evaluated on the most recent year only; stated in-report
+  citation: string
+  // TRUE ⇒ constants not yet verified. A pending test is NEVER evaluated and NEVER routed: the
+  // framework keeps its existing jurisdiction-only behaviour. This is the safety net for scaffolded
+  // tests — a 2-of-0 test would otherwise resolve "not-applicable" and silently under-call.
+  pending?: true
+}
+
+export const THRESHOLD_TESTS: Record<string, ThresholdTest> = {
+  'SB 253': {
+    framework: 'SB 253',
+    requires: 1,
+    lookback: 'most-recent-fy', lookbackModelled: true,
+    citation: 'California Health & Safety Code §38532 (SB 253)',
+    limbs: [{
+      measure: 'turnover', amount: 1_000_000_000, unit: { unit: 'currency', currency: 'USD' },
+      source: 'revenue', exactMeasure: false, comparison: 'gt',
+      basis: 'Total annual revenues over USD 1,000,000,000, entity doing business in California.',
+      measureNote: 'California measures worldwide GROSS RECEIPTS with no deduction for cost of goods sold — materially larger than net turnover for a distributor. The figure applied is the deal’s single revenue input, not separately collected on a gross-receipts basis.',
+    }],
+  },
+  'SECR': {
+    framework: 'SECR',
+    requires: 2,
+    lookback: 'most-recent-fy', lookbackModelled: true,
+    citation: 'Companies (Directors’ Report) and LLP (Energy and Carbon Report) Regulations 2018, applying the Companies Act 2006 s.465 "large company" test',
+    limbs: [
+      { measure: 'turnover', amount: 36_000_000, unit: { unit: 'currency', currency: 'GBP' },
+        source: 'revenue', exactMeasure: false, comparison: 'gt',
+        basis: 'Turnover of more than GBP 36,000,000 (Companies Act 2006 s.465 limb 1).',
+        measureNote: 'Companies Act turnover for the company and, where a group, its subsidiaries. The figure applied is the deal’s single revenue input.' },
+      { measure: 'balance_sheet_total', amount: 18_000_000, unit: { unit: 'currency', currency: 'GBP' },
+        source: 'total_assets', exactMeasure: false, comparison: 'gt',
+        basis: 'Balance sheet total of more than GBP 18,000,000 (Companies Act 2006 s.465 limb 2).',
+        measureNote: 'Aggregate of amounts shown as assets in the balance sheet, before deduction of liabilities.' },
+      { measure: 'employees', amount: 250, unit: { unit: 'count' },
+        source: 'employee_count', exactMeasure: false, comparison: 'gt',
+        basis: 'More than 250 employees (Companies Act 2006 s.465 limb 3).',
+        measureNote: 'Average number of employees over the financial year, not headcount at a point in time.' },
+    ],
+  },
+  'Canada S-211': {
+    framework: 'Canada S-211',
+    requires: 2,
+    // See the migration header: the statute measures over EITHER of the two most recent financial
+    // years; two scalar columns hold one. Evaluated on the most recent year only. Failure mode is
+    // UNDER-calling a target that crossed a limb last year and dipped this year; the below-side
+    // near-threshold flag is the mitigation, not a fix.
+    lookback: 'either-of-two-most-recent-fy', lookbackModelled: false,
+    citation: 'Fighting Against Forced Labour and Child Labour in Supply Chains Act (S-211), s.2 "entity"',
+    limbs: [
+      { measure: 'balance_sheet_total', amount: 20_000_000, unit: { unit: 'currency', currency: 'CAD' },
+        source: 'total_assets', exactMeasure: false, comparison: 'gte',
+        basis: 'At least CAD 20,000,000 in assets, in either of the two most recent financial years.',
+        measureNote: 'Assets per consolidated financial statements. LOOKBACK NOT MODELLED — most recent year only.' },
+      { measure: 'turnover', amount: 40_000_000, unit: { unit: 'currency', currency: 'CAD' },
+        source: 'revenue', exactMeasure: false, comparison: 'gte',
+        basis: 'At least CAD 40,000,000 in revenue, in either of the two most recent financial years.',
+        measureNote: 'Revenue per consolidated financial statements. LOOKBACK NOT MODELLED — most recent year only.' },
+      { measure: 'employees', amount: 250, unit: { unit: 'count' },
+        source: 'employee_count', exactMeasure: false, comparison: 'gte',
+        basis: 'At least 250 employees, in either of the two most recent financial years.',
+        measureNote: 'Employees of the entity. LOOKBACK NOT MODELLED — most recent year only.' },
+    ],
+  },
+  // ⚠️ TODO (OMNIBUS) — CSRD and CS3D are employee AND turnover tests (requires === limbs.length).
+  // Constants are NOT written: the post-Omnibus figures are being verified against the amending
+  // directive separately. `pending: true` means these are never evaluated and never routed, so
+  // CSRD/CS3D keep their current jurisdiction-only behaviour and no size test is asserted.
+  // To activate: fill `limbs`, set lookback/lookbackModelled, DELETE `pending`. A test guards that
+  // a pending entry cannot change applicability.
+  'CSRD': {
+    framework: 'CSRD', requires: 2, limbs: [], pending: true,
+    lookback: 'most-recent-fy', lookbackModelled: true,
+    citation: 'Accounting Directive as amended (CSRD) — thresholds pending Omnibus verification',
+  },
+  'CS3D': {
+    framework: 'CS3D', requires: 2, limbs: [], pending: true,
+    lookback: 'most-recent-fy', lookbackModelled: true,
+    citation: 'Directive (EU) 2024/1760 (CS3D) — thresholds pending Omnibus verification',
+  },
+}
+
+// Only tests that are ready to evaluate. Everything else keeps jurisdiction-only behaviour.
+export const isTestActive = (t: ThresholdTest | undefined): t is ThresholdTest =>
+  !!t && !t.pending && t.limbs.length > 0
+
+// Human labels for the fields a limb draws on — a not-assessed outcome must name the field that
+// would resolve it, so a disappearing framework reads as a prompt rather than an absence.
+// MID-SENTENCE register: these read inside "Enter balance-sheet total and headcount to assess SECR."
+// Do not capitalise them; two tests pin that sentence verbatim.
+export const FIELD_LABELS: Record<LimbSource, string> = {
+  revenue: 'target annual revenue',
+  total_assets: 'balance-sheet total',
+  employee_count: 'headcount',
+}
+
+// STANDALONE register: the same fields named as the deal form titles them, for report cells that
+// hold a field NAME rather than a sentence. Separate from FIELD_LABELS because that map is tuned to
+// read mid-sentence and is pinned to exact strings by test.
+// A report an external deal team reads must never print a database identifier: `deals.total_assets`
+// names a column in our schema, which tells the reader nothing they can act on and leaks how the
+// data is stored. Keep these in step with the labels in app/dashboard/deals/page.tsx.
+export const FIELD_FORM_LABELS: Record<LimbSource, string> = {
+  revenue: 'Target annual revenue',
+  total_assets: 'Balance-sheet total',
+  employee_count: 'Employees (headcount)',
+}
+
+// A limb value within ±10% of its OWN figure is marginal — reported rather than given as a clean
+// in/out, because at that distance the answer turns on things this screen cannot settle. That is
+// true of every limb, not only the money ones: turnover and balance-sheet total can move on FX and
+// on which accounting definition of the measure is applied, and headcount — which never touches FX
+// — still moves on whether the instrument means an average over the year or a point-in-time count.
+// Group-vs-entity scoping bites on all three.
+//
+// Marginal is a property of a LIMB. The framework-level near-threshold marker fires only where a
+// marginal limb is DECISIVE for the outcome (see `nearOutcomeFlip`); a marginal limb that cannot
+// change the answer is noise. Boundary is INCLUSIVE (exactly ±10% counts as marginal).
+export const NEAR_THRESHOLD_BAND = 0.10
+export const NEAR_BAND_PCT = `${Math.round(NEAR_THRESHOLD_BAND * 100)}%`
+
+// ─── Undeclared revenue is not zero revenue ──────────────────────────────────────
+// Absence of data is not a value: with no revenue declared we have not EVALUATED the
+// revenue-triggered statutes, which is a different claim from having evaluated them and found
+// they do not apply. Every surface must be able to tell those two apart, so the predicate and
+// the copy live here rather than being re-derived per surface.
+//
+// LIMITATION: the deal form coerces a blank field to 0 (Number('') === 0) and stores it in a
+// NOT NULL-ish numeric column, so a genuinely pre-revenue target cannot today be distinguished
+// from an undeclared one. Both are treated as undeclared — the safer of the two readings, since
+// asserting "revenue = 0" about a target we were never told about is the worse error.
+export const isRevenueDeclared = (revenue: unknown): boolean =>
+  typeof revenue === 'number' && Number.isFinite(revenue) && revenue > 0
+
+// Three states, never two. `assessed-none` is a finding; `not-assessed` is the absence of one.
+export type AssessmentState = 'not-assessed' | 'assessed-none' | 'assessed-findings'
+
+// The revenue guard is PER-FRAMEWORK, not per-section. Only SB 253 and SECR consult revenue; the
+// other thirteen resolve from jurisdiction and sector alone. A report with revenue blank therefore
+// lists everything it CAN determine and names only the triggers it cannot — blanking the whole
+// section was itself a form of "absence rendered as a finding".
+export type DealAssessmentView = {
+  evaluated: boolean          // false when sector/jurisdiction are missing — nothing was run at all
+  notAssessed: string[]       // size-gated frameworks in scope that could not be evaluated
+  fieldsToResolve: LimbSource[]  // the fields that would settle them — a prompt, not an absence
+  frameworks: AssessmentState
+  nearThreshold: AssessmentState
+}
+
+export const assessmentView = (evaluated: boolean, rows: FrameworkApplicability[]): DealAssessmentView => {
+  if (!evaluated) return { evaluated: false, notAssessed: [], fieldsToResolve: [], frameworks: 'not-assessed', nearThreshold: 'not-assessed' }
+  const notAssessed = rows.filter(r => r.status === 'not-assessed').map(r => r.framework)
+  const fieldsToResolve = [...new Set(rows.filter(r => r.status === 'not-assessed').flatMap(r => r.test?.fieldsToResolve ?? []))]
+  const applied = rows.filter(r => r.applies).length
+  const near = rows.filter(r => r.status === 'near-threshold').length
+  return {
+    evaluated: true,
+    notAssessed,
+    fieldsToResolve,
+    // Reports what it could determine. Only fully unassessed when NOTHING resolved and something
+    // was withheld — otherwise the resolved list stands and `notAssessed` carries the caveat.
+    frameworks: applied > 0 ? 'assessed-findings' : notAssessed.length ? 'not-assessed' : 'assessed-none',
+    // Conservative by design: ONE framework whose size test could not be completed blocks any
+    // proximity claim, because a limb that was never evaluated could be the marginal one. Not a
+    // revenue question — a test goes unassessed on ANY undeclared limb (revenue, balance-sheet
+    // total or headcount), or on a deal currency with no published rate.
+    // Where no size-gated framework is in scope at all, nothing was withheld and "none nearby" is a
+    // real, fully-assessed finding. That is EU, Global, Australia and Other today, because CSRD and
+    // CS3D are still pending. Canada is NO LONGER in that set — S-211 is an active 2-of-3 test.
+    nearThreshold: notAssessed.length ? 'not-assessed' : near > 0 ? 'assessed-findings' : 'assessed-none',
+  }
+}
+
+// Shared copy — the CSV and the screen must not drift. Defaults to every framework carrying an
+// ACTIVE size test, derived from THRESHOLD_TESTS at call time, so adding a test cannot leave this
+// stale and a `pending` one is never named. Pass the in-scope subset to name only what actually
+// went unevaluated for this deal. (The `fields` default is still ['revenue'] alone, which
+// under-describes a multi-limb test; every call site in the app passes the resolved list instead.)
+// A size-gated framework that vanishes must read as a PROMPT, not an absence. Every not-assessed
+// note therefore names the specific field(s) that would resolve it.
+export const resolveFieldsPrompt = (fields: LimbSource[], frameworks: string[]): string =>
+  fields.length === 0 ? ''
+  : `Enter ${fields.map(f => FIELD_LABELS[f]).join(' and ')} to assess ${frameworks.join(' and ')}.`
+
+export const notAssessedRevenueNote = (
+  frameworks: string[] = Object.keys(THRESHOLD_TESTS).filter(k => isTestActive(THRESHOLD_TESTS[k])),
+  fields: LimbSource[] = ['revenue'],
+): string =>
+  `NOT ASSESSED — size test incomplete for ${frameworks.join(', ')}. ${resolveFieldsPrompt(fields, frameworks)}`.trim()
+
+// Used where a list DID resolve but a size test was withheld — the caveat must not read as a finding.
+export const partiallyAssessedNote = (frameworks: string[], fields: LimbSource[] = ['revenue']): string => {
+  const one = frameworks.length === 1
+  return `Determined from jurisdiction and sector. NOT ASSESSED: ${frameworks.join(', ')} — the size test could not be completed, so ${one ? 'this trigger was' : 'these triggers were'} not evaluated. This is not a finding that ${one ? 'it does' : 'they do'} not apply. ${resolveFieldsPrompt(fields, frameworks)}`.trim()
+}
+// The near check runs over EVERY limb — turnover, balance-sheet total and headcount — so this must
+// not name revenue. Saying "revenue" describes the old single-limb model and would understate what
+// was checked: a deal whose headcount sits 2% under 250 has a near limb and no near revenue.
+export const nearThresholdNoneNote = (): string =>
+  `None — no limb sits within ${NEAR_BAND_PCT} of its threshold.`
+
+// ─── Limb + outcome evaluation ──────────────────────────────────────────────────
+// The size figures a test draws on. `revenue` keeps the legacy rule (the form coerces blank to 0,
+// so 0 must read as undeclared — documented limitation). The two NEW fields sit in nullable
+// columns, so null means undeclared and 0 is a real declared value: a holding company with 0
+// employees definitively fails the employee limb, which is not the same as not knowing.
+export type DealSize = {
+  revenue: number | null
+  total_assets: number | null
+  employee_count: number | null
+  currency: string
+}
+const declaredLegacy = (v: number | null | undefined): boolean =>
+  typeof v === 'number' && Number.isFinite(v) && v > 0
+const declaredNullable = (v: number | null | undefined): boolean =>
+  typeof v === 'number' && Number.isFinite(v) && v >= 0
+
+export type LimbState = 'met' | 'not-met' | 'not-assessed'
+export type LimbResult = {
+  limb: ThresholdLimb
+  state: LimbState
+  valueApplied: number | null   // expressed in the limb's own unit (converted for money limbs)
+  ratio: number | null          // valueApplied / limb.amount
+  near: boolean
+  side?: 'above' | 'below'
+  fieldToResolve?: LimbSource   // set when not-assessed — the field that would settle it
+  rateUnavailable?: boolean
+}
+
+const evaluateLimb = (limb: ThresholdLimb, size: DealSize): LimbResult => {
+  const raw = limb.source === 'revenue' ? size.revenue
+    : limb.source === 'total_assets' ? size.total_assets
+    : size.employee_count
+  const declared = limb.source === 'revenue' ? declaredLegacy(raw) : declaredNullable(raw)
+  if (!declared) return { limb, state: 'not-assessed', valueApplied: null, ratio: null, near: false, fieldToResolve: limb.source }
+
+  let value = raw as number
+  if (limb.unit.unit === 'currency') {
+    if (!isDealCurrency(size.currency)) {
+      // No dated rate ⇒ the limb cannot be evaluated. Flag rather than guess; treating an unknown
+      // currency as 1:1 USD is the original defect this machinery replaced.
+      return { limb, state: 'not-assessed', valueApplied: null, ratio: null, near: false, fieldToResolve: limb.source, rateUnavailable: true }
+    }
+    value = convertCurrency(value, size.currency, limb.unit.currency)
+  }
+  const ratio = value / limb.amount
+  const near = Math.abs(value - limb.amount) <= limb.amount * NEAR_THRESHOLD_BAND
+  const met = limb.comparison === 'gte' ? value >= limb.amount : value > limb.amount
+  return { limb, state: met ? 'met' : 'not-met', valueApplied: value, ratio, near, side: near ? (met ? 'above' : 'below') : undefined }
+}
+
+export type ThresholdOutcome = {
+  framework: string
+  requires: number
+  limbs: LimbResult[]
+  metCount: number
+  unknownCount: number
+  ceiling: number               // metCount + unknownCount — best case if every unknown limb were met
+  fieldsToResolve: LimbSource[]
+  nearOutcomeFlip: boolean      // a MARGINAL limb is decisive for the outcome
+  flipSide?: 'above' | 'below'
+  lookbackModelled: boolean
+}
+
+// N-of-M with partial evaluation. An undeclared limb does NOT fail the test — it makes the outcome
+// indeterminate only where it could still change the answer:
+//   metCount >= requires   → applies        (already satisfied; no unknown can unsatisfy it)
+//   ceiling  <  requires   → not-applicable (cannot reach N even if every unknown were met)
+//   otherwise              → not-assessed   (genuinely undetermined; name the fields)
+// So a 2-of-3 test with two declared limbs both met APPLIES regardless of the third, and with two
+// declared limbs both unmet is DEFINITIVELY out. Only the ambiguous middle is not-assessed.
+export const evaluateTest = (test: ThresholdTest, size: DealSize): { status: FrameworkStatus; applies: boolean; outcome: ThresholdOutcome } => {
+  const limbs = test.limbs.map(l => evaluateLimb(l, size))
+  const metCount = limbs.filter(l => l.state === 'met').length
+  const unknownCount = limbs.filter(l => l.state === 'not-assessed').length
+  const ceiling = metCount + unknownCount
+
+  const applies = metCount >= test.requires
+  const definitivelyOut = ceiling < test.requires
+  const status: FrameworkStatus = applies ? 'applies' : definitivelyOut ? 'not-applicable' : 'not-assessed'
+
+  // Outcome-flip near-threshold: mark only when a MARGINAL limb is decisive, not whenever any limb
+  // happens to sit near its figure. A near limb that cannot change the answer is noise.
+  const nearAboveMet = limbs.filter(l => l.state === 'met' && l.near).length
+  const nearBelowUnmet = limbs.filter(l => l.state === 'not-met' && l.near).length
+  const flipDown = applies && nearAboveMet > 0 && (metCount - nearAboveMet) < test.requires
+  const flipUp = !applies && nearBelowUnmet > 0 && (metCount + nearBelowUnmet + unknownCount) >= test.requires
+
+  return {
+    status, applies,
+    outcome: {
+      framework: test.framework, requires: test.requires, limbs, metCount, unknownCount, ceiling,
+      fieldsToResolve: [...new Set(limbs.filter(l => l.state === 'not-assessed').map(l => l.fieldToResolve!))],
+      nearOutcomeFlip: flipDown || flipUp,
+      flipSide: flipDown ? 'above' : flipUp ? 'below' : undefined,
+      lookbackModelled: test.lookbackModelled,
+    },
+  }
+}
+
+export type FrameworkStatus = 'applies' | 'near-threshold' | 'not-applicable' | 'not-assessed'
+export type FrameworkApplicability = {
+  framework: string
+  // Authoritative in/out — the ONLY thing getApplicableFrameworks filters on. Near-ness never
+  // changes it: a company 5% OVER a trigger is legally in scope and must stay in scope.
+  applies: boolean
+  status: FrameworkStatus
+  side?: 'above' | 'below'          // set only when status === 'near-threshold'
+  test?: ThresholdOutcome           // per-limb detail behind the decision
+}
+
+const applyTest = (test: ThresholdTest, size: DealSize): FrameworkApplicability => {
+  const { status, applies, outcome } = evaluateTest(test, size)
+  // Near-threshold is a PRESENTATION of a decided outcome, never a replacement for it: the marker
+  // is raised only when a marginal limb is decisive, and `applies` is untouched either way.
+  const near = outcome.nearOutcomeFlip
+  return {
+    framework: test.framework,
+    applies,
+    status: near ? 'near-threshold' : status,
+    ...(near && outcome.flipSide ? { side: outcome.flipSide } : {}),
+    test: outcome,
+  }
+}
+
+// Framework applicability — RICH form. Returns every framework evaluated for this deal, each with
+// its status and (for revenue-triggered ones) the converted figure behind the decision, so a report
+// can show WHY a statute was or wasn't cited. `dealType` is accepted but not read (no framework
+// trigger depends on it today); kept so the signature matches getApplicableFrameworks.
+export const getFrameworkApplicability = (
+  jurisdiction: string, revenue: number, sector: string, dealType: string, currency: string = 'USD',
+  size: { total_assets?: number | null; employee_count?: number | null } = {},
+): FrameworkApplicability[] => {
+  const out: FrameworkApplicability[] = []
+  const dealSize: DealSize = {
+    revenue, currency,
+    total_assets: size.total_assets ?? null,
+    employee_count: size.employee_count ?? null,
+  }
+  // One push for every framework: routed through its size test where one is defined AND ready,
+  // otherwise jurisdiction/sector-only. A `pending` test cannot change behaviour.
+  const plain = (framework: string) => {
+    const t = THRESHOLD_TESTS[framework]
+    out.push(isTestActive(t) ? applyTest(t, dealSize) : { framework, applies: true, status: 'applies' })
+  }
+
+  // US — California SB 253 (statutory trigger is USD 1bn total annual revenue, doing business in CA)
+  if (jurisdiction === 'USA') plain('SB 253')
 
   // EU
-  if (['European Union', 'Global'].includes(jurisdiction)) fw.push('CSRD')
-  if (jurisdiction === 'European Union' && sector === 'Financial Services') fw.push('SFDR')
-  if (['European Union', 'Global'].includes(jurisdiction)) fw.push('EU Taxonomy')
-  if (['European Union', 'Global'].includes(jurisdiction)) fw.push('CS3D')
+  if (['European Union', 'Global'].includes(jurisdiction)) plain('CSRD')
+  if (jurisdiction === 'European Union' && sector === 'Financial Services') plain('SFDR')
+  if (['European Union', 'Global'].includes(jurisdiction)) plain('EU Taxonomy')
+  if (['European Union', 'Global'].includes(jurisdiction)) plain('CS3D')
 
   // UK — distinct regime, NOT CSRD
   if (jurisdiction === 'UK') {
-    if (revenue > 36000000) fw.push('SECR')               // large UK cos: Scope 1+2 mandatory (DEFRA factors)
-    fw.push('UK SRS (S1/S2)')                              // IFRS S1/S2 endorsement — voluntary now, proposed mandatory for listed FY2027+
+    plain('SECR')            // large UK cos: Scope 1+2 mandatory (DEFRA factors). 2-of-3, not turnover-only.
+    plain('UK SRS (S1/S2)')                               // IFRS S1/S2 endorsement — voluntary now, proposed mandatory for listed FY2027+
     if (sector === 'Financial Services') {
-      fw.push('FCA climate disclosure (TCFD)')            // FCA-regulated managers / insurers / pensions
-      fw.push('UK SDR')                                    // sustainability disclosure + investment labels
-      fw.push('Anti-greenwashing rule')                    // applies to all FCA-authorised firms making ESG claims
+      plain('FCA climate disclosure (TCFD)')                // FCA-regulated managers / insurers / pensions
+      plain('UK SDR')                                        // sustainability disclosure + investment labels
+      plain('Anti-greenwashing rule')                        // applies to all FCA-authorised firms making ESG claims
     }
   }
 
+  // Canada — S-211 forced/child labour supply-chain reporting. 2-of-3 size test; NOT a
+  // supply-chain MODULE trigger (it is a reporting obligation, not a value-chain accounting scope),
+  // so it does not enter SUPPLY_CHAIN_TRIGGERS and does not price anything.
+  if (jurisdiction === 'Canada') plain('Canada S-211')
+
   // Investor baseline (expected regardless of jurisdiction)
-  fw.push('IFRS S2')
-  fw.push('TCFD')
-  if (sector === 'Financial Services') fw.push('PCAF')
+  plain('IFRS S2')
+  plain('TCFD')
+  if (sector === 'Financial Services') plain('PCAF')
   if (['Energy & Utilities', 'Industrials & Manufacturing', 'Mining & Metals'].includes(sector)) {
-    if (jurisdiction === 'UK') fw.push('UK ETS')
-    else if (['European Union', 'Global'].includes(jurisdiction)) fw.push('EU ETS')
+    if (jurisdiction === 'UK') plain('UK ETS')
+    else if (['European Union', 'Global'].includes(jurisdiction)) plain('EU ETS')
   }
 
-  return fw
+  return out
 }
+
+// Framework applicability — FLAT form. Unchanged contract for every existing consumer
+// (getObligations, getComplianceCost, mapFramework, the frameworks jsonb column): same strings,
+// same order, still string[]. `currency` defaults to USD so the old 4-arg call site still compiles.
+// Near-threshold frameworks are NOT silently promoted into this list — it stays the legal in/out.
+// Read getFrameworkApplicability when you need the marker.
+export const getApplicableFrameworks = (
+  jurisdiction: string, revenue: number, sector: string, dealType: string, currency: string = 'USD',
+  size: { total_assets?: number | null; employee_count?: number | null } = {},
+): string[] =>
+  getFrameworkApplicability(jurisdiction, revenue, sector, dealType, currency, size)
+    .filter(f => f.applies)
+    .map(f => f.framework)

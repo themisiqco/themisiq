@@ -4,7 +4,14 @@ import { useState, useEffect } from 'react'
 import Nav from '../../components/Nav'
 import { useEntitlement } from '../../../lib/useEntitlement'
 import { supabase } from '../../../lib/supabase'
-import { getObligations, getApplicableFrameworks, getComplianceCost, SECTOR_RISKS, DEFAULT_PIPELINE_TARGETS } from '../../../lib/deals/assessment'
+import {
+  getObligations, getApplicableFrameworks, getFrameworkApplicability, getComplianceCost,
+  SECTOR_RISKS, DEFAULT_PIPELINE_TARGETS, DEAL_CURRENCIES,
+  FX_SOURCE, FX_AS_OF, UNITS_PER_EUR, isDealCurrency, THRESHOLD_TESTS, isTestActive, NEAR_BAND_PCT,
+  isRevenueDeclared, assessmentView, notAssessedRevenueNote, partiallyAssessedNote,
+  nearThresholdNoneNote, obligationPriceLabel, resolveFieldsPrompt, FIELD_LABELS, FIELD_FORM_LABELS,
+  type FrameworkApplicability, type LimbResult, type DealCurrency,
+} from '../../../lib/deals/assessment'
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -48,7 +55,8 @@ const STEP_NAMES = ['Deal Setup', 'ESG Screening', 'Risk Findings', 'Cost Estima
 // Regime tokens a risk finding's Framework column may name, in display order, each paired with the
 // framework-list entry that LICENSES it. A token is emitted ONLY when its licensing entry is present
 // in the DETECTED `frameworks` array, so a finding can never name a statute the APPLICABLE
-// FRAMEWORKS section of the same report withheld on a revenue threshold (SB 253 >$1B; SECR >£36M).
+// FRAMEWORKS section of the same report withheld on a size test — SB 253 (turnover over USD 1bn)
+// or SECR (2 of 3 over turnover, balance-sheet total and headcount) — or could not evaluate at all.
 // Jurisdiction is deliberately NOT consulted here — `frameworks` already encodes it, and that is
 // what makes Global resolve correctly (CSRD IS detected for Global, so it must not be erased).
 const REGIME_CANDIDATES: { token: string; licensedBy: string }[] = [
@@ -63,6 +71,66 @@ const REGIME_CANDIDATES: { token: string; licensedBy: string }[] = [
 // emits unconditionally — never a statute.
 const REGIME_FALLBACK = ['GHG Protocol', 'IFRS S2']
 
+// ─── Revenue magnitude echo ───────────────────────────────────────────────────
+// Revenue is stored in WHOLE currency units, but the field is a bare <input type="number"> with no
+// unit affordance, so "2000" meaning $2m is silently 1000x low and the only visible symptom is a
+// shorter frameworks list. Echoing the magnitude in words under the field makes that misreading
+// self-evident before a report is generated. Display only — never parsed back.
+const ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+  'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen']
+const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety']
+const spellUnder1000 = (n: number): string => {
+  if (n < 20) return ONES[n]
+  if (n < 100) { const r = n % 10; return r ? `${TENS[Math.floor(n / 10)]}-${ONES[r]}` : TENS[Math.floor(n / 10)] }
+  const r = n % 100
+  return r ? `${ONES[Math.floor(n / 100)]} hundred ${spellUnder1000(r)}` : `${ONES[Math.floor(n / 100)]} hundred`
+}
+const SCALES: [number, string][] = [[1e12, 'trillion'], [1e9, 'billion'], [1e6, 'million'], [1e3, 'thousand']]
+const spellMagnitude = (n: number): string => {
+  if (!Number.isFinite(n) || n <= 0) return ''
+  for (const [size, name] of SCALES) {
+    if (n >= size) {
+      const v = n / size
+      // 2dp, trailing zeros trimmed: 1,050,000,000 must echo "1.05 billion", not "1.1 billion" —
+      // a rounded echo would defeat the point of echoing the figure back for checking.
+      return Number.isInteger(v) && v < 1000 ? `${spellUnder1000(v)} ${name}` : `${Number(v.toFixed(2))} ${name}`
+    }
+  }
+  return Number.isInteger(n) && n < 1000 ? spellUnder1000(n) : String(n)
+}
+
+// ─── Near-threshold presentation ──────────────────────────────────────────────
+// A framework inside the ±NEAR_THRESHOLD_BAND is NOT a changed legal answer — `applies` already
+// settled that in the engine. The marker says VERIFY, never "maybe". Wording below is deliberate:
+// an applying framework is still introduced as applying; a non-applying one is still introduced as
+// not applying "on the revenue entered". Neither is hedged into ambiguity.
+const NEAR_PCT = NEAR_BAND_PCT   // re-exported from the engine so band copy cannot drift from the band
+
+// One limb, rendered with the MEASURE it applied — never a bare "MET" against an unnamed measure.
+export const limbValueDisplay = (l: LimbResult): string =>
+  l.valueApplied == null ? 'not provided'
+  : l.limb.unit.unit === 'count' ? l.valueApplied.toLocaleString()
+  : `${l.limb.unit.currency} ${Math.round(l.valueApplied).toLocaleString()}`
+export const limbThresholdDisplay = (l: LimbResult): string =>
+  l.limb.unit.unit === 'count' ? l.limb.amount.toLocaleString() : `${l.limb.unit.currency} ${l.limb.amount.toLocaleString()}`
+const LIMB_STATE_LABEL: Record<LimbResult['state'], string> = {
+  'met': 'MET', 'not-met': 'NOT MET', 'not-assessed': 'NOT ASSESSED',
+}
+
+// Near-threshold sentence for a MULTI-LIMB outcome. The marker fires only when a marginal limb is
+// decisive (outcome flip), so the wording names that limb rather than implying the whole test is soft.
+const nearSentence = (f: FrameworkApplicability): string => {
+  const t = f.test
+  if (!t) return ''
+  const decisive = t.limbs.filter(l => l.near && l.state !== 'not-assessed')
+  const which = decisive.map(l => `${l.limb.measure.replace(/_/g, ' ')} (${limbValueDisplay(l)} vs ${limbThresholdDisplay(l)})`).join('; ')
+  const test = `${t.metCount} of ${t.requires} limb${t.requires === 1 ? '' : 's'} met`
+  return f.applies
+    ? `Applies — ${test}. Decisive limb is marginal: ${which}, inside the ${NEAR_PCT} band. If that limb moved, the test would no longer be met. Verify the measure and reporting-entity scope; this does not weaken the obligation.`
+    : `Does not apply on the figures entered — ${test}. A marginal limb could change that: ${which}, inside the ${NEAR_PCT} band. Verify before ruling it out.`
+}
+const verifyChip: React.CSSProperties = { fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#FEF3E2', color: '#ba7517', border: '0.5px solid rgba(186,117,23,0.35)' }
+
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -73,6 +141,11 @@ export default function DealsDashboard() {
     target_name: '',
     sector: '',
     revenue: 0,
+    // NULL, not 0: these sit in nullable columns, so undeclared stays distinct from a declared
+    // zero. A holding company with 0 employees definitively fails the employee limb; not knowing
+    // the headcount makes the OUTCOME indeterminate. The form must preserve that difference.
+    employee_count: null as number | null,
+    total_assets: null as number | null,
     jurisdiction: 'USA',
     deal_type: 'ma',
     deal_value: 0,
@@ -117,6 +190,8 @@ export default function DealsDashboard() {
         target_name: data.target_name ?? '',
         sector: data.sector ?? '',
         revenue: Number(data.revenue) || 0,
+        employee_count: data.employee_count == null ? null : Number(data.employee_count),
+        total_assets: data.total_assets == null ? null : Number(data.total_assets),
         jurisdiction: data.jurisdiction ?? 'USA',
         deal_type: data.deal_type ?? 'ma',
         deal_value: Number(data.deal_value) || 0,
@@ -133,13 +208,19 @@ export default function DealsDashboard() {
 
   // Auto-detect frameworks when deal changes
   useEffect(() => {
-    if (deal.sector && deal.jurisdiction && deal.revenue) {
-      const detected = getApplicableFrameworks(deal.jurisdiction, deal.revenue, deal.sector, deal.deal_type)
+    // NOT gated on revenue: only SB 253 and SECR consult it. The other thirteen frameworks resolve
+    // from jurisdiction and sector alone, and withholding them because revenue is blank made an
+    // undeclared field read as "no frameworks apply". The engine marks the two it cannot evaluate.
+    if (deal.sector && deal.jurisdiction) {
+      // deal.currency is load-bearing here: revenue is entered in it, and the SB 253 / SECR
+      // triggers are denominated in USD / GBP respectively. Omitting it treats every deal as USD.
+      const detected = getApplicableFrameworks(deal.jurisdiction, deal.revenue, deal.sector, deal.deal_type, deal.currency,
+        { total_assets: deal.total_assets, employee_count: deal.employee_count })
       setFrameworks(detected)
     } else {
       setFrameworks([])
     }
-  }, [deal.sector, deal.jurisdiction, deal.revenue, deal.deal_type])
+  }, [deal.sector, deal.jurisdiction, deal.revenue, deal.deal_type, deal.currency, deal.total_assets, deal.employee_count])
 
   const update = (field: string, value: any) => { setDeal(prev => ({ ...prev, [field]: value })); setSaved(false) }
 
@@ -155,6 +236,8 @@ export default function DealsDashboard() {
         target_name: deal.target_name,
         sector: deal.sector,
         revenue: deal.revenue,
+        employee_count: deal.employee_count,   // null when undeclared — never coerced to 0
+        total_assets: deal.total_assets,
         jurisdiction: deal.jurisdiction,
         deal_type: deal.deal_type,
         deal_value: deal.deal_value,
@@ -179,6 +262,119 @@ export default function DealsDashboard() {
   }
 
   const risks = SECTOR_RISKS[deal.sector] || []
+  // Rich applicability, computed from the SAME guard as the `frameworks` effect above so the two
+  // views of the same deal cannot disagree. `frameworks` stays the persisted legal in/out; this adds
+  // the near-threshold detail the flat string[] deliberately does not carry.
+  const evaluated = !!(deal.sector && deal.jurisdiction)   // revenue is NOT part of this gate
+  const applicability: FrameworkApplicability[] = evaluated
+    ? getFrameworkApplicability(deal.jurisdiction, deal.revenue, deal.sector, deal.deal_type, deal.currency,
+        { total_assets: deal.total_assets, employee_count: deal.employee_count })
+    : []
+  const nearThreshold = applicability.filter(f => f.status === 'near-threshold')
+  const nearByFramework = new Map(nearThreshold.map(f => [f.framework, f]))
+  // Near-but-below never reaches `frameworks` (it does not apply), so Step 1 has to list it
+  // separately or the reader never learns the deal sits just under a trigger.
+  const nearBelow = nearThreshold.filter(f => !f.applies)
+  // Absence of data is not a value. `frameworks` / `nearThreshold` come back empty for TWO
+  // different reasons — nothing was found, or nothing was evaluated — and the empty array cannot
+  // tell them apart. These states carry that distinction to every surface, so a blank revenue
+  // field can never render as "no frameworks apply" or "no threshold is nearby".
+  const revenueDeclared = isRevenueDeclared(deal.revenue)
+  const view = assessmentView(evaluated, applicability)
+  const frameworksState = view.frameworks
+  const nearState = view.nearThreshold
+  // Only the triggers actually in scope for THIS deal — a USA deal names SB 253, never SECR.
+  const notAssessedNote = notAssessedRevenueNote(
+    view.notAssessed.length ? view.notAssessed : undefined,
+    view.fieldsToResolve.length ? view.fieldsToResolve : undefined,
+  )
+  // One CSV row per limb of every size test actually run. `exactMeasure: false` must surface —
+  // where one collected figure stands in for a differently-defined statutory measure, the report
+  // says so rather than implying the instrument's own definition was applied.
+  const limbRows: string[][] = applicability
+    .filter(f => f.test)
+    .flatMap(f => f.test!.limbs.map(l => [
+      f.framework,
+      l.limb.measure.replace(/_/g, ' '),
+      l.limb.basis,
+      limbValueDisplay(l),
+      limbThresholdDisplay(l),
+      LIMB_STATE_LABEL[l.state] + (l.near && l.state !== 'not-assessed' ? ' (marginal)' : ''),
+      l.state === 'not-assessed'
+        ? `Not provided — enter ${FIELD_LABELS[l.limb.source]}`
+        : `${FIELD_FORM_LABELS[l.limb.source]}${l.limb.exactMeasure ? '' : ` — PROXY. ${l.limb.measureNote ?? ''}`}`,
+    ]))
+
+  // ─── FX basis ─────────────────────────────────────────────────────────────────
+  // The rate table is stored EUR-base (UNITS_PER_EUR) precisely so a reviewer can compare it digit
+  // for digit against the published ECB document. Printing only the derived USD cross-rate defeated
+  // that: it is a computed number that appears nowhere in the source. So the report now shows the
+  // transcribed figures, the derivation, and the result — labelled, so a reader can tell which
+  // numbers came from the document and which this system computed.
+  //
+  // Only currencies this deal actually exercised are described. `applicability` carries a `test`
+  // only for frameworks with an ACTIVE size test, so a pending or jurisdiction-only framework
+  // contributes nothing here and no conversion is claimed that did not happen.
+  const thresholdCurrencyUse = new Map<DealCurrency, string[]>()
+  for (const f of applicability)
+    for (const l of f.test?.limbs ?? [])
+      if (l.limb.unit.unit === 'currency') {
+        const names = thresholdCurrencyUse.get(l.limb.unit.currency) ?? []
+        if (!names.includes(f.framework)) names.push(f.framework)
+        thresholdCurrencyUse.set(l.limb.unit.currency, names)
+      }
+
+  // 6 dp for the derived cross-rate. The published figures carry at most 5 significant figures
+  // (GBP 0.85973), and every pair in this table lands between 0.5 and 1.5, so 6 decimal places
+  // preserve every digit the source can support while cutting the float tail that made this read
+  // `1.3240203319646866`. Display only — the comparison itself uses full precision.
+  const FX_DISPLAY_DP = 6
+  const fxBasisRows: string[][] = (() => {
+    const dealCur = deal.currency
+    if (!isDealCurrency(dealCur))
+      return [['Rate applied', `UNAVAILABLE — no published rate is held for ${dealCur}. Money limbs were not evaluated, so no framework was asserted or ruled out on a converted figure.`]]
+    const uses = [...thresholdCurrencyUse.entries()]
+    if (uses.length === 0)
+      return [['Conversion applied', 'None — no size-gated framework with a money limb is in scope for this jurisdiction.']]
+
+    // EUR has NO transcribed figure. It is the base the source quotes everything against, and
+    // UNITS_PER_EUR.EUR is 1 by definition — calling that "transcribed verbatim" would attribute a
+    // number to the source document that does not appear in it, which is the exact failure this
+    // block exists to prevent. So EUR never gets a published-rate row.
+    const published = (c: DealCurrency): string[][] =>
+      c === 'EUR' ? []
+        : [[`Published rate — ${c}`, `${c} ${UNITS_PER_EUR[c]} per EUR — transcribed verbatim from the source above`]]
+
+    const rows: string[][] = []
+    const shown = new Set<DealCurrency>()
+    // The deal-currency figure is printed once, and only if some conversion actually used it.
+    if (uses.some(([tc]) => tc !== dealCur)) { rows.push(...published(dealCur)); shown.add(dealCur) }
+
+    for (const [tc, frameworks] of uses) {
+      const scope = frameworks.join(', ')
+      if (tc === dealCur) {
+        // No rate is applied at all here, so stating one — even 1.000000 — would assert a
+        // conversion step that never ran.
+        rows.push([`Conversion ${dealCur} → ${tc} (${scope})`,
+          `None. The threshold is denominated in ${tc} and the deal is entered in ${tc}, so the figure is compared exactly as entered. No rate is applied and no FX error can enter this comparison.`])
+        continue
+      }
+      if (!shown.has(tc)) { rows.push(...published(tc)); shown.add(tc) }
+      const rate = (UNITS_PER_EUR[tc] / UNITS_PER_EUR[dealCur]).toFixed(FX_DISPLAY_DP)
+      // Which numbers are transcribed and which computed depends on whether EUR is one end of the
+      // pair. Saying "DERIVED from the two figures above" when one of them is the base would name a
+      // source figure that was never printed because it does not exist.
+      const how =
+        dealCur === 'EUR'
+          ? `this IS the published ${tc} figure above, applied directly — the source quotes every rate as units per 1 EUR, so a EUR-denominated deal needs no derivation`
+        : tc === 'EUR'
+          ? `DERIVED, not published: 1 ÷ ${UNITS_PER_EUR[dealCur]} — EUR is the base the source quotes against, so it carries no figure of its own`
+          : `DERIVED, not published: ${UNITS_PER_EUR[tc]} ÷ ${UNITS_PER_EUR[dealCur]}, computed from the two transcribed figures above`
+      rows.push([`Conversion ${dealCur} → ${tc} (${scope})`,
+        `1 ${dealCur} = ${rate} ${tc} — ${how}. Shown to ${FX_DISPLAY_DP} dp; the comparison itself uses full precision.`])
+    }
+    return rows
+  })()
   // Rewrite generic disclosure-regime labels (SB 253, bare CSRD) on a static sector risk template to
   // the regime the DETECTED frameworks actually support. Resolving against `frameworks` rather than
   // deal.jurisdiction is load-bearing: jurisdiction alone stamped "SB 253" on every USA deal, so a
@@ -186,14 +382,37 @@ export default function DealsDashboard() {
   // report correctly omitted. A token here can now only name a regime that section also asserts.
   // Activity-triggered EU instruments (CBAM, EUDR, AI Act, SFDR, CS3D, ETS) are still left intact —
   // they apply to UK/non-EU companies through EU-facing activity and have no domestic equivalent.
+  // CS3D is an activity-triggered instrument, so it gets THREE states, not the binary the regime
+  // tokens use. It reaches non-EU companies through EU-facing activity, which this screen cannot
+  // determine (no market multi-select yet), so "not in the resolved list" is not the same as
+  // "does not apply".
+  //   applies        → cite plainly
+  //   conditional    → cite as conditional, NEVER suppress (size undeclared, or non-EU)
+  //   not-applicable → relabel, i.e. drop the token — same treatment as SB 253
+  const cs3d: { state: 'applies' } | { state: 'conditional'; reason: string } | { state: 'not-applicable' } = (() => {
+    if (frameworks.includes('CS3D')) return { state: 'applies' as const }
+    const row = applicability.find(f => f.framework === 'CS3D')
+    if (row?.status === 'not-assessed') {
+      const prompt = resolveFieldsPrompt(row.test?.fieldsToResolve ?? [], ['CS3D'])
+      return { state: 'conditional' as const, reason: `size test incomplete${prompt ? ` — ${prompt}` : ''}` }
+    }
+    if (row?.status === 'not-applicable') return { state: 'not-applicable' as const }
+    // No row at all ⇒ non-EU jurisdiction.
+    return { state: 'conditional' as const, reason: 'CS3D reaches non-EU companies through EU-facing activity; this assessment does not capture the target’s markets, so applicability cannot be resolved here' }
+  })()
+
   const mapFramework = (fw: string): string => {
     const licensed = REGIME_CANDIDATES.filter(c => frameworks.includes(c.licensedBy)).map(c => c.token)
     const regime = licensed.length ? licensed : REGIME_FALLBACK
-    return fw
+    const out = fw
       .split(' / ')
-      .flatMap(tok => (tok === 'SB 253' || tok === 'SB253' || tok === 'CSRD') ? regime : [tok])
+      .flatMap(tok =>
+        (tok === 'SB 253' || tok === 'SB253' || tok === 'CSRD') ? regime
+        : tok === 'CS3D' ? (cs3d.state === 'applies' ? ['CS3D'] : cs3d.state === 'conditional' ? ['CS3D (conditional)'] : [])
+        : [tok])
       .filter((tok, i, arr) => arr.indexOf(tok) === i)   // dedupe ATOMIC tokens, post-expansion
-      .join(' / ')
+    // Dropping the only token would leave an empty label; fall back rather than render nothing.
+    return (out.length ? out : REGIME_FALLBACK).join(' / ')
   }
   const criticalRisks = risks.filter(r => r.severity === 'critical')
   const highRisks = risks.filter(r => r.severity === 'high')
@@ -234,15 +453,66 @@ export default function DealsDashboard() {
       ['ThemisIQ — ESG Deal Due Diligence Report'],
       ['Target company', deal.target_name],
       ['Sector', deal.sector],
-      ['Revenue', `${deal.currency} ${deal.revenue.toLocaleString()}`],
+      // "USD 0" would assert a revenue figure we were never given. Say what is true instead.
+      ['Revenue', revenueDeclared ? `${deal.currency} ${deal.revenue.toLocaleString()} (${spellMagnitude(deal.revenue)})` : 'Not provided'],
       ['Deal type', DEAL_TYPES.find(d => d.id === deal.deal_type)?.label || ''],
       ['Jurisdiction', deal.jurisdiction],
       ['Generated', new Date().toLocaleDateString()],
       [],
       ['APPLICABLE FRAMEWORKS'],
-      ...frameworks.map(f => [f]),
+      // Three states, never two: an empty list under this heading previously read as "no
+      // frameworks apply" whether or not anything had been evaluated.
+      ...(frameworksState === 'not-assessed'
+        ? [[notAssessedNote]]
+        : frameworksState === 'assessed-none'
+          ? [['None — no framework was triggered for this jurisdiction, sector and revenue.']]
+          : [
+              ...frameworks.map(f => [f, nearByFramework.has(f) ? 'APPLIES — near threshold, verify' : 'APPLIES']),
+              // Partial assessment: the list above stands, but naming what was withheld stops a
+              // reader inferring that the missing statutes were considered and excluded.
+              ...(view.notAssessed.length ? [[partiallyAssessedNote(view.notAssessed, view.fieldsToResolve)]] : []),
+            ]),
+      [],
+      // Near-threshold is reported as its own section rather than folded into the list above, so a
+      // reader cannot mistake "within the band" for "applies". Both sides appear; the Status column
+      // restates the legal answer verbatim so the marker never displaces it.
+      ['NEAR-THRESHOLD FRAMEWORKS'],
+      [`Raised only where a MARGINAL limb is decisive for the outcome — a limb within ${NEAR_PCT} of its figure that, if it moved, would change whether the test is met. The legal answer is unchanged: a framework that applies still applies.`],
+      ...(nearState === 'not-assessed'
+        ? [[notAssessedNote]]
+        : nearState === 'assessed-none'
+        ? [[nearThresholdNoneNote()]]
+        : [
+            ['Framework', 'Status', 'Limbs met', 'Decisive limb', 'Value applied', 'Threshold', 'Side'],
+            ...nearThreshold.map(f => {
+              const dec = f.test?.limbs.filter(l => l.near && l.state !== 'not-assessed') ?? []
+              return [
+                f.framework,
+                f.applies ? 'Applies — verify' : 'Does not apply on the figures entered — verify',
+                f.test ? `${f.test.metCount} of ${f.test.requires}` : '',
+                dec.map(l => l.limb.measure.replace(/_/g, ' ')).join('; '),
+                dec.map(limbValueDisplay).join('; '),
+                dec.map(limbThresholdDisplay).join('; '),
+                f.side === 'above' ? 'Above' : 'Below',
+              ]
+            }),
+          ]),
+      [],
+      // Every limb of every size test that was actually run, with the MEASURE it applied. A limb
+      // result without its measure is the same class of error as a framework label with no
+      // threshold behind it — "MET" against an unnamed measure asserts nothing checkable.
+      ['THRESHOLD LIMBS APPLIED'],
+      ...(limbRows.length === 0
+        ? [['No size-gated framework is in scope for this jurisdiction.']]
+        : [
+            ['Framework', 'Limb', 'Measure required', 'Value applied', 'Threshold', 'Result', 'Basis of value'],
+            ...limbRows,
+          ]),
       [],
       ['ESG RISK FINDINGS'],
+      // The Framework column resolves against the detected list; with nothing detected it falls
+      // back to a methodology label. Say so, rather than letting the fallback pass as a finding.
+      ...(revenueDeclared ? [] : [['Framework column shows a methodology fallback — no disclosure regime was resolved because target revenue was not provided.']]),
       ['Risk', 'Severity', 'Framework', 'Detail'],
       ...risks.map(r => [r.risk, r.severity.toUpperCase(), mapFramework(r.framework), r.detail]),
       [],
@@ -254,21 +524,38 @@ export default function DealsDashboard() {
       ['Included obligation', 'ThemisIQ', 'Consultant (reference)'],
       ...obligations.included.map(o => [
         o.scopeNote ? `${o.label} — ${o.scopeNote}` : o.label,
-        o.themisIqPrice == null ? 'Custom quote' : o.themisIqPrice === 0 ? 'Included (GHG module)' : `USD ${o.themisIqPrice.toLocaleString()}`,
+        obligationPriceLabel(o.pricing),
         `USD ${Math.round(o.consultantLow / 1000)}k–${Math.round(o.consultantHigh / 1000)}k`,
       ]),
       [],
       ['Also recommended (not in ThemisIQ total)', 'ThemisIQ', 'Consultant (reference)'],
-      ...obligations.recommended.map(o => [o.label, o.themisIqPrice != null ? `USD ${o.themisIqPrice.toLocaleString()}` : 'Custom quote', `USD ${Math.round(o.consultantLow / 1000)}k–${Math.round(o.consultantHigh / 1000)}k`]),
+      ...obligations.recommended.map(o => [o.label, obligationPriceLabel(o.pricing), `USD ${Math.round(o.consultantLow / 1000)}k–${Math.round(o.consultantHigh / 1000)}k`]),
       [],
       ['Flagged — separate specialist (in neither total)', 'ThemisIQ', 'Consultant (reference)'],
-      ...obligations.flagged.map(o => [o.scopeNote ? `${o.label} — ${o.scopeNote}` : o.label, 'Not included', 'Not included']),
+      ...obligations.flagged.map(o => [o.scopeNote ? `${o.label} — ${o.scopeNote}` : o.label, obligationPriceLabel(o.pricing), 'Not included']),
       ...(complianceCost ? [[`ESG value-at-risk exposure: ~${(complianceCost.pctLow * 100).toFixed(2)}%–${(complianceCost.pctHigh * 100).toFixed(2)}% of deal value (~USD ${Math.round(complianceCost.low).toLocaleString()}–${Math.round(complianceCost.high).toLocaleString()}) carries ESG-related risk to assess; indicative exposure, not a cost — requires specialist confirmation`]] : []),
       [],
       ['DATA ROOM GAPS'],
       ['Item', 'Status'],
       ['GHG inventory / emissions data', deal.has_ghg_data ? 'Available' : 'MISSING — request from target'],
       ['ESG report or sustainability disclosure', deal.has_esg_report ? 'Available' : 'MISSING — request from target'],
+      [],
+      // FX basis — every converted threshold call above has to be traceable to the PUBLISHED
+      // figures that produced it, not merely to the cross-rate this system computed from them.
+      ['FX BASIS FOR THRESHOLD TESTS'],
+      ['Revenue and balance-sheet figures are converted into each threshold’s statutory currency for comparison. The statutory figure itself is never converted.'],
+      ['Rates below marked "transcribed" are copied verbatim from the source document and can be checked against it digit for digit. Rates marked "DERIVED" are computed by ThemisIQ from those figures and appear nowhere in the source.'],
+      ['Rate source', FX_SOURCE],
+      ['Rates as of', FX_AS_OF],
+      ['Deal currency', deal.currency],
+      ...fxBasisRows,
+      ['Size tests available', Object.values(THRESHOLD_TESTS).filter(isTestActive)
+        .map(t => `${t.framework} (${t.requires} of ${t.limbs.length})`).join(' · ')],
+      // A test whose lookback is not modelled UNDER-calls a target that dipped since the prior year;
+      // the below-side marginal-limb flag is the mitigation. Say so in the report, not just in code.
+      ...(Object.values(THRESHOLD_TESTS).filter(isTestActive).filter(t => !t.lookbackModelled)
+        .map(t => [`Lookback NOT modelled — ${t.framework}`,
+          `Statute measures over ${t.lookback === 'either-of-two-most-recent-fy' ? 'either of the two most recent financial years' : 'the most recent financial year'}; only the most recent year is held. A target that met a limb in the prior year and has since dipped is UNDER-called — such a target surfaces as a marginal below-side limb.`])),
       [],
       ['Generated by ThemisIQ · www.themisiq.co · ESG Deal Diligence Platform'],
     ]
@@ -304,18 +591,43 @@ export default function DealsDashboard() {
           </select>
         </div>
         <div>
-          <label style={labelStyle}>Target annual revenue ({deal.currency})</label>
-          <input style={inputStyle} type="number" value={deal.revenue || ''} onChange={e => update('revenue', Number(e.target.value))} placeholder="0" />
+          <label style={labelStyle}>Target annual revenue ({deal.currency}, whole {deal.currency})</label>
+          <input style={inputStyle} type="number" value={deal.revenue || ''} onChange={e => update('revenue', Number(e.target.value))} placeholder="e.g. 2000000" />
+          {/* Echo the entered figure back in words. The statutory triggers are USD 1bn / GBP 36m, so a
+              1000x entry error changes which statutes are cited — it has to be visible at input time. */}
+          <div style={{ fontSize: 11, marginTop: 6, lineHeight: 1.5, color: deal.revenue > 0 ? '#0d0d0d' : '#888784' }}>
+            {deal.revenue > 0
+              ? <>Reading this as <strong style={{ fontWeight: 600 }}>{deal.currency} {deal.revenue.toLocaleString()}</strong> — {spellMagnitude(deal.revenue)}.</>
+              : <>Enter the full amount in whole {deal.currency} — 2000000 for two million, not 2 or 2000.</>}
+          </div>
         </div>
         <div>
           <label style={labelStyle}>Currency</label>
           <select style={inputStyle} value={deal.currency} onChange={e => update('currency', e.target.value)}>
-            {['USD', 'EUR', 'GBP', 'CAD', 'AUD'].map(c => <option key={c} value={c}>{c}</option>)}
+            {DEAL_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
         <div>
           <label style={labelStyle}>Deal / investment value ({deal.currency})</label>
           <input style={inputStyle} type="number" value={deal.deal_value || ''} onChange={e => update('deal_value', Number(e.target.value))} placeholder="0" />
+        </div>
+        {/* Size limbs. Blank stays NULL — `?? ''` and the '' → null branch below are what keep an
+            undeclared headcount distinct from a declared zero, which the N-of-M rule depends on. */}
+        <div>
+          <label style={labelStyle}>Employees (headcount)</label>
+          <input style={inputStyle} type="number" value={deal.employee_count ?? ''} placeholder="Leave blank if unknown"
+            onChange={e => update('employee_count', e.target.value === '' ? null : Number(e.target.value))} />
+          <div style={{ fontSize: 11, marginTop: 6, lineHeight: 1.5, color: '#888784' }}>
+            {deal.employee_count == null ? 'Undeclared — limbs needing headcount cannot be assessed.' : `Declared: ${deal.employee_count.toLocaleString()}.`}
+          </div>
+        </div>
+        <div>
+          <label style={labelStyle}>Balance-sheet total ({deal.currency})</label>
+          <input style={inputStyle} type="number" value={deal.total_assets ?? ''} placeholder="Leave blank if unknown"
+            onChange={e => update('total_assets', e.target.value === '' ? null : Number(e.target.value))} />
+          <div style={{ fontSize: 11, marginTop: 6, lineHeight: 1.5, color: '#888784' }}>
+            {deal.total_assets == null ? 'Undeclared — limbs needing total assets cannot be assessed.' : `Declared: ${deal.currency} ${deal.total_assets.toLocaleString()} — ${spellMagnitude(deal.total_assets)}.`}
+          </div>
         </div>
         <div>
           <label style={labelStyle}>Number of locations / sites</label>
@@ -347,18 +659,82 @@ export default function DealsDashboard() {
       <h2 style={sectionHead}>ESG framework screening</h2>
       <p style={sectionSub}>ThemisIQ has identified the frameworks that apply to this deal based on sector, jurisdiction and deal size. Review and confirm.</p>
 
-      {frameworks.length === 0 ? (
-        <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: '#888784' }}>
-          Complete deal setup first to see applicable frameworks.
+      {/* Same three states as the CSV — a blank revenue field must not render as a negative finding. */}
+      {frameworksState === 'not-assessed' ? (
+        <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 12, padding: '1.25rem', marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#ba7517', letterSpacing: '0.04em', marginBottom: 6 }}>NOT ASSESSED</div>
+          <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
+            {view.evaluated
+              ? <>Size test incomplete for {view.notAssessed.join(', ')} — <strong style={{ fontWeight: 600 }}>not evaluated</strong>, which is not a finding that none apply. {resolveFieldsPrompt(view.fieldsToResolve, view.notAssessed)}</>
+              : <>Enter sector and jurisdiction in Deal setup. Nothing has been evaluated yet — an empty list here is not a finding that no frameworks apply.</>}
+          </div>
+        </div>
+      ) : frameworksState === 'assessed-none' ? (
+        <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
+          <strong style={{ fontWeight: 600 }}>None.</strong> Assessed against this jurisdiction, sector and revenue — no framework was triggered.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-          {frameworks.map(fw => (
-            <div key={fw} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#fff', border: '1px solid #e8e7e4', borderRadius: 10 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{fw}</div>
-              <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#E1F5EE', color: '#0F6E56' }}>APPLIES</span>
-            </div>
-          ))}
+          {frameworks.map(fw => {
+            const near = nearByFramework.get(fw)
+            return (
+              <div key={fw} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '12px 16px', background: '#fff', border: `1px solid ${near ? 'rgba(186,117,23,0.35)' : '#e8e7e4'}`, borderRadius: 10 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{fw}</div>
+                  {near && <div style={{ fontSize: 11, color: '#ba7517', lineHeight: 1.55, marginTop: 5 }}>{nearSentence(near)}</div>}
+                </div>
+                {/* APPLIES is retained alongside VERIFY — near-ness annotates the finding, it does not soften it. */}
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  {near && <span style={verifyChip}>VERIFY</span>}
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#E1F5EE', color: '#0F6E56' }}>APPLIES</span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Partial assessment: the list above resolved from jurisdiction and sector, but a revenue
+          trigger was withheld. Naming it stops the reader inferring it was considered and excluded. */}
+      {frameworksState === 'assessed-findings' && view.notAssessed.length > 0 && (
+        <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '1rem', marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#ba7517', letterSpacing: '0.04em', marginBottom: 4 }}>PARTIAL — {view.notAssessed.join(', ')} NOT ASSESSED</div>
+          <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{partiallyAssessedNote(view.notAssessed, view.fieldsToResolve)}</div>
+        </div>
+      )}
+
+      {/* Near-threshold, not assessed. Silence here would read as "nothing is nearby" — the same
+          false negative the CSV section carried. */}
+      {nearState === 'not-assessed' && (
+        <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '1rem', marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#ba7517', letterSpacing: '0.04em', marginBottom: 4 }}>NEAR-THRESHOLD — NOT ASSESSED</div>
+          <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
+            {view.evaluated
+              ? <>No proximity check was run — the {view.notAssessed.join(' / ')} size test{view.notAssessed.length === 1 ? '' : 's'} could not be completed. {resolveFieldsPrompt(view.fieldsToResolve, view.notAssessed)}</>
+              : <>No proximity check was run — sector and jurisdiction are not set.</>}
+          </div>
+        </div>
+      )}
+
+      {/* Near-but-below: these are correctly absent from the list above. Surfaced so the reader
+          learns the deal sits just under a trigger, without implying it has crossed it. */}
+      {nearBelow.length > 0 && (
+        <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '1rem', marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 6 }}>Approaching a reporting threshold — verify</div>
+          <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, marginBottom: 10 }}>
+            The following do <strong style={{ fontWeight: 600 }}>not</strong> apply on the figures entered. Each has a limb within {NEAR_PCT} of its statutory trigger, so the answer turns on how that figure is measured and on reporting-entity scope — confirm before ruling them out.
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {nearBelow.map(f => (
+              <div key={f.framework} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '10px 12px', background: '#fff', borderRadius: 8, border: '0.5px solid rgba(186,117,23,0.2)' }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{f.framework}</div>
+                  <div style={{ fontSize: 11, color: '#ba7517', lineHeight: 1.55, marginTop: 5 }}>{nearSentence(f)}</div>
+                </div>
+                <span style={{ ...verifyChip, flexShrink: 0 }}>NEAR THRESHOLD</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -406,6 +782,14 @@ export default function DealsDashboard() {
         </div>
       ) : (
         <>
+          {/* The Framework badge on each finding resolves against the detected list. With nothing
+              detected it falls back to a methodology label — say so rather than let it read as a
+              resolved regime. */}
+          {view.notAssessed.length > 0 && (
+            <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '0.85rem 1rem', marginBottom: 14, fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
+              <strong style={{ fontWeight: 600, color: '#ba7517' }}>Framework column partially resolved.</strong> The {view.notAssessed.join(' / ')} size test could not be completed, so {view.notAssessed.length === 1 ? 'it does' : 'they do'} not appear in any label below. Labels reflect only the regimes determinable from the figures provided. {resolveFieldsPrompt(view.fieldsToResolve, view.notAssessed)}
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
             {[
               { label: 'Critical risks', count: criticalRisks.length, color: '#B91C1C', bg: '#FCEBEB' },
@@ -422,17 +806,31 @@ export default function DealsDashboard() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {risks.map((risk, i) => {
               const cfg = SEVERITY_CONFIG[risk.severity]
+              const label = mapFramework(risk.framework)
+              // A finding inherits the marker when the regime it cites is itself near-threshold.
+              const citedNear = label.split(' / ').map(t => nearByFramework.get(t)).filter(Boolean) as FrameworkApplicability[]
               return (
                 <div key={i} style={{ border: `1px solid ${cfg.border}20`, borderRadius: 12, overflow: 'hidden' }}>
                   <div style={{ background: risk.severity === 'critical' ? cfg.bg : '#fff', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `0.5px solid ${cfg.border}20` }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{risk.risk}</div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                      <span style={{ fontSize: 10, color: '#888784' }}>{mapFramework(risk.framework)}</span>
+                      <span style={{ fontSize: 10, color: '#888784' }}>{label}</span>
+                      {citedNear.length > 0 && <span style={verifyChip}>VERIFY</span>}
                       <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: cfg.bg, color: cfg.color, border: `0.5px solid ${cfg.border}` }}>{cfg.label}</span>
                     </div>
                   </div>
                   <div style={{ padding: '10px 16px', background: '#fff' }}>
                     <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{risk.detail}</div>
+                    {label.includes('CS3D (conditional)') && cs3d.state === 'conditional' && (
+                      <div style={{ fontSize: 11, color: '#ba7517', lineHeight: 1.55, marginTop: 8 }}>
+                        <strong style={{ fontWeight: 600 }}>CS3D conditional:</strong> {cs3d.reason}.
+                      </div>
+                    )}
+                    {citedNear.map(f => (
+                      <div key={f.framework} style={{ fontSize: 11, color: '#ba7517', lineHeight: 1.55, marginTop: 8 }}>
+                        <strong style={{ fontWeight: 600 }}>{f.framework}:</strong> {nearSentence(f)}
+                      </div>
+                    ))}
                   </div>
                 </div>
               )
@@ -524,7 +922,7 @@ export default function DealsDashboard() {
                 <div style={{ fontSize: 13, color: '#555553' }}>{o.label}</div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d' }}>{o.themisIqPrice != null ? `+ USD ${o.themisIqPrice.toLocaleString()}` : '+ Custom'}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d' }}>{o.pricing.kind === 'priced' ? `+ ${obligationPriceLabel(o.pricing)}` : obligationPriceLabel(o.pricing)}</div>
                 <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>consultant USD {Math.round(o.consultantLow / 1000)}k–{Math.round(o.consultantHigh / 1000)}k</div>
               </div>
             </div>
@@ -575,7 +973,9 @@ export default function DealsDashboard() {
           {[
             { label: 'Target', val: deal.target_name || '—' },
             { label: 'ESG risks', val: risks.length, urgent: criticalRisks.length > 0 },
-            { label: 'Frameworks', val: frameworks.length },
+            // A bare "0" in 1.6rem Georgia reads as an assessed count. Only render a number
+            // when something was actually assessed.
+            { label: 'Frameworks', val: view.evaluated ? frameworks.length : 'Not assessed' },
             { label: 'ThemisIQ est.', val: themisIqFigure },
           ].map(({ label, val, urgent }) => (
             <div key={label}>
@@ -585,6 +985,18 @@ export default function DealsDashboard() {
           ))}
         </div>
       </div>
+
+      {/* Export is reachable with revenue blank (the step tabs and Next are ungated, and the
+          confirm checkbox is a liability disclaimer, not a completeness check). The report stays
+          downloadable — it is still useful — but the reader is told what is missing from it. */}
+      {view.notAssessed.length > 0 && (
+        <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '1rem', marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#ba7517', letterSpacing: '0.04em', marginBottom: 4 }}>PARTIAL — REVENUE NOT PROVIDED</div>
+          <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
+            Frameworks determinable from jurisdiction and sector <strong style={{ fontWeight: 600 }}>have</strong> been assessed and appear in this report. {view.notAssessed.join(' and ')} {view.notAssessed.length === 1 ? 'is' : 'are'} marked <strong style={{ fontWeight: 600 }}>NOT ASSESSED</strong> — that is not a finding that {view.notAssessed.length === 1 ? 'it does' : 'they do'} not apply. {resolveFieldsPrompt(view.fieldsToResolve, view.notAssessed)}
+          </div>
+        </div>
+      )}
 
       {isPaid ? (
         <div>
@@ -680,7 +1092,7 @@ export default function DealsDashboard() {
                     { label: 'Sector', val: deal.sector || '—' },
                     { label: 'Deal type', val: DEAL_TYPES.find(d => d.id === deal.deal_type)?.label.split(' —')[0] || '—' },
                     { label: 'Critical risks', val: criticalRisks.length, urgent: criticalRisks.length > 0 },
-                    { label: 'Frameworks', val: frameworks.length },
+                    { label: 'Frameworks', val: view.evaluated ? frameworks.length : 'Not assessed' },
                     { label: 'ThemisIQ est.', val: themisIqFigure },
                   ].map(({ label, val, urgent }) => (
                     <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
