@@ -10,9 +10,13 @@ import {
   ROUTE_LABELS,
   CALC_MODE_LABELS,
   STEEL_GRADE_LABELS,
+  CC_MODE_LABELS,
+  STREAM_KIND_LABELS,
   routeLabel,
   calcModeLabel,
   steelGradeLabel,
+  ccModeLabel,
+  streamKindLabel,
 } from './labels';
 
 const EN_DASH = '–';
@@ -41,6 +45,20 @@ describe('labels — every mapped code returns its label', () => {
     expect(Object.keys(STEEL_GRADE_LABELS).length).toBe(3);
   });
 
+  it('ccModeLabel returns the label for every code in CC_MODE_LABELS', () => {
+    for (const [code, label] of Object.entries(CC_MODE_LABELS)) {
+      expect(ccModeLabel(code)).toBe(label);
+    }
+    expect(Object.keys(CC_MODE_LABELS).length).toBe(3);
+  });
+
+  it('streamKindLabel returns the label for every code in STREAM_KIND_LABELS', () => {
+    for (const [code, label] of Object.entries(STREAM_KIND_LABELS)) {
+      expect(streamKindLabel(code)).toBe(label);
+    }
+    expect(Object.keys(STREAM_KIND_LABELS).length).toBe(3);
+  });
+
   it('the exact specified strings, spelled out', () => {
     expect(routeLabel('bof')).toBe('Basic Oxygen Furnace (BOF)');
     expect(routeLabel('eaf_scrap')).toBe('Electric Arc Furnace (EAF) – Scrap');
@@ -59,6 +77,14 @@ describe('labels — every mapped code returns its label', () => {
     expect(steelGradeLabel('carbon')).toBe('Carbon Steel');
     expect(steelGradeLabel('low_alloy')).toBe('Low-Alloy Steel');
     expect(steelGradeLabel('high_alloy')).toBe('High-Alloy Steel (including Stainless Steel)');
+
+    expect(ccModeLabel('direct')).toBe('Carbon content');
+    expect(ccModeLabel('ef_per_t')).toBe('Emission factor per tonne (t CO₂ / t)');
+    expect(ccModeLabel('ef_per_tj')).toBe('Emission factor per terajoule (t CO₂ / TJ)');
+
+    expect(streamKindLabel('fuel')).toBe('Fuel');
+    expect(streamKindLabel('process_material')).toBe('Process material');
+    expect(streamKindLabel('output')).toBe('Output');
   });
 });
 
@@ -66,7 +92,7 @@ describe('labels — the fallback contract', () => {
   it('an unmapped code returns itself unchanged', () => {
     // A route seeded into cbam_production_routes but not yet labelled here must render as its
     // raw code — visibly unfinished — not blank and not an invented title-case guess.
-    for (const fn of [routeLabel, calcModeLabel, steelGradeLabel]) {
+    for (const fn of [routeLabel, calcModeLabel, steelGradeLabel, ccModeLabel, streamKindLabel]) {
       expect(fn('not_a_code')).toBe('not_a_code');
       expect(fn('some_new_route')).toBe('some_new_route');
       expect(fn('BOF')).toBe('BOF'); // case-sensitive: not the same key as 'bof'
@@ -76,7 +102,7 @@ describe('labels — the fallback contract', () => {
   it('an empty string returns an empty string', () => {
     // '' is how route_code and steel_grade represent "not set". Returning a placeholder would
     // put text on screen where the caller decided there should be none.
-    for (const fn of [routeLabel, calcModeLabel, steelGradeLabel]) {
+    for (const fn of [routeLabel, calcModeLabel, steelGradeLabel, ccModeLabel, streamKindLabel]) {
       expect(fn('')).toBe('');
     }
   });
@@ -86,6 +112,10 @@ describe('labels — the fallback contract', () => {
     expect(routeLabel('carbon')).toBe('carbon');
     expect(calcModeLabel('bof')).toBe('bof');
     expect(steelGradeLabel('actual')).toBe('actual');
+    // 'direct' is a carbon-content mode; 'output' is a stream kind. Neither is a route.
+    expect(routeLabel('direct')).toBe('direct');
+    expect(ccModeLabel('output')).toBe('output');
+    expect(streamKindLabel('direct')).toBe('direct');
   });
 
   it('does not resolve inherited Object.prototype keys', () => {
@@ -94,6 +124,11 @@ describe('labels — the fallback contract', () => {
     expect(routeLabel('toString')).toBe('toString');
     expect(routeLabel('constructor')).toBe('constructor');
     expect(calcModeLabel('hasOwnProperty')).toBe('hasOwnProperty');
+    // cc_mode and stream_kind are DB columns too — an inherited key must fall back, not resolve
+    // to Object.prototype.toString, which would put a function into the JSX.
+    expect(ccModeLabel('toString')).toBe('toString');
+    expect(streamKindLabel('toString')).toBe('toString');
+    expect(streamKindLabel('valueOf')).toBe('valueOf');
   });
 });
 

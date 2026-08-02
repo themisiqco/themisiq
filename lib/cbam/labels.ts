@@ -51,6 +51,34 @@ export const STEEL_GRADE_LABELS: Readonly<Record<string, string>> = {
 };
 
 /**
+ * Carbon-content mode. Keys are `cbam_source_streams.cc_mode`.
+ *
+ * SENTENCE CASE, deliberately — unlike ROUTE_LABELS and CALC_MODE_LABELS above. These labels
+ * carry units, and title case mangles them: 'Emission Factor Per Tonne (t CO₂ / T)' reads as a
+ * proper noun and puts a capital on a unit symbol. Do not "correct" these to match the others.
+ *
+ * The regulation has no name for these as modes. IR 2025/2547 Annex III names ONE quantity —
+ * carbon content, CC_k — and two ways of reaching it, distinguished only by the units of the
+ * emission factor (Eq 13, t CO₂/TJ; Eq 14, t CO₂/t). So the units ARE the distinction, which is
+ * why they are in the label rather than left to the field hint.
+ *
+ * 'direct' is not a regulatory term at all — it is our name for supplying CC_k with no
+ * conversion, hence the bare 'Carbon content'.
+ */
+export const CC_MODE_LABELS: Readonly<Record<string, string>> = {
+  direct: 'Carbon content',
+  ef_per_t: 'Emission factor per tonne (t CO₂ / t)',
+  ef_per_tj: 'Emission factor per terajoule (t CO₂ / TJ)',
+};
+
+/** Source-stream kind. Keys are `cbam_source_streams.stream_kind`. */
+export const STREAM_KIND_LABELS: Readonly<Record<string, string>> = {
+  fuel: 'Fuel',
+  process_material: 'Process material',
+  output: 'Output',
+};
+
+/**
  * Fall back to the raw code when unmapped — the same contract as categoryLabel in the setup
  * page, which returns `?? code`. An unmapped code is visible rather than hidden.
  *
@@ -75,4 +103,12 @@ export function calcModeLabel(code: string): string {
 
 export function steelGradeLabel(code: string): string {
   return labelFrom(STEEL_GRADE_LABELS, code);
+}
+
+export function ccModeLabel(code: string): string {
+  return labelFrom(CC_MODE_LABELS, code);
+}
+
+export function streamKindLabel(code: string): string {
+  return labelFrom(STREAM_KIND_LABELS, code);
 }

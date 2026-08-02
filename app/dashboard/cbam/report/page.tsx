@@ -753,6 +753,15 @@ function ErrorPanel({ err }: { err: ErrState }) {
       <div style={{ marginTop: '1.5rem', background: '#FEF3E2', border: '0.5px solid #f5d9ad', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
         <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>One more thing to confirm before the report</div>
         <div style={{ fontSize: 13, color: '#92400e', lineHeight: 1.7, fontWeight: 300 }}>{err.message}</div>
+        {/* The message names the goods by CN code; setup is where they are declared. NOT
+            deep-linked to the specific process — that needs useSearchParams, which needs a
+            Suspense split on the setup page, plus sequencing against its installation load
+            and seeding its step state. Worth doing on its own terms, not for a convenience
+            link. The reader matches the CN codes to the process list themselves. */}
+        <div style={{ fontSize: 13, color: '#92400e', lineHeight: 1.7, fontWeight: 300, marginTop: 8 }}>
+          Go to{' '}
+          <a href="/dashboard/cbam/setup" style={{ color: '#7425e3', textDecoration: 'underline' }}>setup</a> to declare them.
+        </div>
       </div>
     )
   }

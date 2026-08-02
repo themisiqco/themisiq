@@ -102,7 +102,10 @@ export default function DisclosureQuestion({
 // separate refactor and out of scope for this component.
 export const cbamInputStyle: React.CSSProperties = { width: '100%', fontSize: 13, padding: '9px 12px', border: '0.5px solid #e8e7e4', borderRadius: 8, outline: 'none', boxSizing: 'border-box', background: '#fff' }
 
-export function CbamField({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+// `hint` is a ReactNode, not a string: one hint needs the same <strong> emphasis the
+// sign-convention banner uses, and two treatments of one convention on one screen reads as
+// two different rules. Widening is backwards-compatible — every string is a ReactNode.
+export function CbamField({ label, hint, children }: { label: string; hint?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
       <label style={{ fontSize: 12, fontWeight: 500, color: '#0d0d0d', display: 'block', marginBottom: hint ? 4 : 6 }}>{label}</label>

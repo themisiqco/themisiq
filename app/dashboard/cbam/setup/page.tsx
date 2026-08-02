@@ -25,7 +25,7 @@ import { cbamInputStyle, CbamField } from '../components/DisclosureQuestion'
 import { massBalance } from '../../../../lib/cbam/engine'
 import { assessCnCategory, suggestCategory, normalizeCn } from '../../../../lib/cbam/cn'
 import { buildBoundaryGuidanceView } from '../../../../lib/cbam/boundaryGuidanceView'
-import { routeLabel, calcModeLabel, steelGradeLabel } from '../../../../lib/cbam/labels'
+import { routeLabel, calcModeLabel, steelGradeLabel, ccModeLabel, streamKindLabel } from '../../../../lib/cbam/labels'
 import type { SourceStream } from '../../../../lib/cbam/types'
 import type { CnMapRow } from '../../../../lib/cbam/cn'
 
@@ -167,6 +167,13 @@ const DECLARATION_REASONS: { value: string; label: string }[] = [
 ]
 const declarationReasonLabel = (v: string | null) =>
   DECLARATION_REASONS.find((r) => r.value === v)?.label ?? v ?? ''
+
+// The labels above are sentence-case because the dropdown shows them as standalone options.
+// Both other uses embed one MID-SENTENCE, where a leading capital reads oddly. Lowercase the
+// FIRST CHARACTER ONLY — a blanket .toLowerCase() also flattens the acronym, turning
+// 'Consumes no CBAM-listed inputs' into '…cbam-listed inputs' on the card while the dropdown
+// that set it still reads CBAM. One label source, two renderings; never two sources.
+const lowerFirst = (t: string) => (t === '' ? t : t[0].toLowerCase() + t.slice(1))
 
 // Per-process precursor state for the card status line: how many rows, and what the process
 // itself declares. Kept separate from ProcessForm so the process save payload is untouched.
@@ -1104,22 +1111,22 @@ export default function CbamSetupPage() {
     let ncv: number | null = null
     if (s.cc_mode === 'direct') {
       if (s.carbon_content.trim() === '' || Number.isNaN(Number(s.carbon_content))) {
-        setStreamError("cc_mode 'direct' requires carbon content — the engine throws if it is null."); return
+        setStreamError('Enter the carbon content for this stream, as a number.'); return
       }
       carbon = Number(s.carbon_content)
     } else if (s.cc_mode === 'ef_per_t') {
       if (s.emission_factor.trim() === '' || Number.isNaN(Number(s.emission_factor))) {
-        setStreamError("cc_mode 'ef_per_t' requires an emission factor (Eq 14: ef / 3.664)."); return
+        setStreamError('Enter the emission factor for this stream, as a number.'); return
       }
       ef = Number(s.emission_factor)
     } else {
       if (s.emission_factor.trim() === '' || Number.isNaN(Number(s.emission_factor)) || s.ncv.trim() === '' || Number.isNaN(Number(s.ncv))) {
-        setStreamError("cc_mode 'ef_per_tj' requires BOTH an emission factor and NCV (Eq 13: (ef × ncv) / 3.664)."); return
+        setStreamError('This mode needs both an emission factor and a net calorific value. Enter both as numbers.'); return
       }
       ef = Number(s.emission_factor); ncv = Number(s.ncv)
     }
     const bf = s.biomass_fraction.trim() === '' ? 0 : Number(s.biomass_fraction)
-    if (Number.isNaN(bf) || bf < 0 || bf > 1) { setStreamError('Biomass fraction must be between 0 and 1 (CHECK).'); return }
+    if (Number.isNaN(bf) || bf < 0 || bf > 1) { setStreamError('Biomass fraction must be a number between 0 and 1. Leave it blank if none of this stream is biomass.'); return }
     setStreamSaving(true)
     const payload = {
       company_id: companyId,
@@ -1138,7 +1145,14 @@ export default function CbamSetupPage() {
       ? supabase.from('cbam_source_streams').update(payload).eq('id', s.id)
       : supabase.from('cbam_source_streams').insert(payload)
     const { error } = await query
-    if (error) { setStreamError(error.message); setStreamSaving(false); return }
+    // The raw DB message stays in the console, not on screen — a customer cannot act on a
+    // constraint name, and the validation above already reports everything they can act on.
+    if (error) {
+      console.error('[cbam] stream save failed', error)
+      setStreamError("We couldn't save this stream. Please try again — if it keeps happening, get in touch and we'll look into it.")
+      setStreamSaving(false)
+      return
+    }
     setStreamSaving(false)
     setEditingStream(null)
     loadStreams(streamsProcId)
@@ -1148,7 +1162,11 @@ export default function CbamSetupPage() {
     if (!streamsProcId) return
     setStreamError(null)
     const { error } = await supabase.from('cbam_source_streams').delete().eq('id', id)
-    if (error) { setStreamError(error.message); return }
+    if (error) {
+      console.error('[cbam] stream delete failed', error)
+      setStreamError("We couldn't remove this stream. Please try again — if it keeps happening, get in touch.")
+      return
+    }
     loadStreams(streamsProcId)
   }
 
@@ -1266,7 +1284,7 @@ export default function CbamSetupPage() {
   // row first (which nulls the citing streams), then remove the object.
   async function deleteDocument(doc: CbamDocument) {
     const ok = window.confirm(
-      `Delete "${doc.file_name}"?\n\nThis removes both the file and its metadata. Any source stream citing this document will lose its provenance link: the stream is NOT deleted and its activity data stays, but source_doc_id becomes null, so a verifier can no longer trace that figure back to this evidence.`,
+      `Delete "${doc.file_name}"?\n\nThis removes the file and its record. Any source stream that cites it keeps its figures but loses the link to this evidence, so a verifier won't be able to trace that figure back to a document.`,
     )
     if (!ok) return
     setDocError(null)
@@ -1362,7 +1380,7 @@ export default function CbamSetupPage() {
             <CbamField label="(1)(b) Registration number" hint="Corporate or activity registration number of the operator.">
               <input value={operator.registration_no} onChange={(e) => setOp('registration_no', e.target.value)} style={cbamInputStyle} />
             </CbamField>
-            <CbamField label="(1)(c) Full address — in English" hint="Annex IV requires the address IN ENGLISH (Article 10(4)). Enter as much as you have; blanks are reported, not blocked.">
+            <CbamField label="(1)(c) Full address — in English" hint="Annex IV requires the address in English (Article 10(4)). Enter as much as you have; blanks are reported, not blocked.">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <input value={operator.address_line1} onChange={(e) => setOp('address_line1', e.target.value)} placeholder="Address line 1" style={cbamInputStyle} />
                 <input value={operator.address_line2} onChange={(e) => setOp('address_line2', e.target.value)} placeholder="Address line 2" style={cbamInputStyle} />
@@ -1441,7 +1459,7 @@ export default function CbamSetupPage() {
                 <CbamField label="(2)(c) UN/LOCODE">
                   <input value={editing.un_locode} onChange={(e) => setInst('un_locode', e.target.value)} placeholder="e.g. DEDUI" style={cbamInputStyle} />
                 </CbamField>
-                <CbamField label="(2)(d) Full address — in English" hint="Annex IV requires the address IN ENGLISH (Article 10(4)).">
+                <CbamField label="(2)(d) Full address — in English" hint="Annex IV requires the address in English (Article 10(4)).">
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <input value={editing.address_line1} onChange={(e) => setInst('address_line1', e.target.value)} placeholder="Address line 1" style={cbamInputStyle} />
                     <input value={editing.address_line2} onChange={(e) => setInst('address_line2', e.target.value)} placeholder="Address line 2" style={cbamInputStyle} />
@@ -1451,7 +1469,7 @@ export default function CbamSetupPage() {
                     </div>
                   </div>
                 </CbamField>
-                <CbamField label="(2)(e) Main emission source coordinates" hint="Coordinates of the MAIN emission source, not the postal address. Latitude −90 to 90, longitude −180 to 180. Optional.">
+                <CbamField label="(2)(e) Main emission source coordinates" hint="Coordinates of the main emission source, not the postal address. Latitude −90 to 90, longitude −180 to 180. Optional.">
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <input type="number" value={editing.latitude} onChange={(e) => setInst('latitude', e.target.value)} placeholder="Latitude" step="any" style={{ ...cbamInputStyle, width: 180 }} />
                     <input type="number" value={editing.longitude} onChange={(e) => setInst('longitude', e.target.value)} placeholder="Longitude" step="any" style={{ ...cbamInputStyle, width: 180 }} />
@@ -1578,7 +1596,7 @@ export default function CbamSetupPage() {
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                         <div>
                           <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>CN {proc.cn_code} <span style={{ color: '#888784', fontWeight: 300 }}>· {categoryLabel(goodsCategories, proc.category_code)}{proc.route_code ? ` · ${routeLabel(proc.route_code)}` : ''}</span></div>
-                          <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>AL {proc.activity_level} · {proc.reporting_period} · {calcModeLabel(proc.calc_mode)}{proc.steel_grade ? ` · ${steelGradeLabel(proc.steel_grade)}` : ''}</div>
+                          <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>Activity level {proc.activity_level} t · {proc.reporting_period} · {calcModeLabel(proc.calc_mode)}{proc.steel_grade ? ` · ${steelGradeLabel(proc.steel_grade)}` : ''}</div>
                           {/* Precursor status. Rows are the evidence of a declaration; the
                               declaration column only carries the state rows cannot express. */}
                           {(() => {
@@ -1587,7 +1605,7 @@ export default function CbamSetupPage() {
                               return <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>Precursors — {m.count} entered</div>
                             }
                             if (m && m.declaration === 'none') {
-                              return <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>Precursors — none, {declarationReasonLabel(m.reason).toLowerCase()}</div>
+                              return <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>Precursors — none, {lowerFirst(declarationReasonLabel(m.reason))}</div>
                             }
                             return <div style={{ fontSize: 12, color: '#92400e', fontWeight: 300 }}>Precursors — not yet declared</div>
                           })()}
@@ -1736,7 +1754,7 @@ export default function CbamSetupPage() {
                               ) : m?.declaration === 'none' ? (
                                 <div>
                                   <div style={{ fontSize: 12, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: 8 }}>
-                                    You have stated that this process consumes no CBAM precursors — {declarationReasonLabel(m.reason).toLowerCase()}.
+                                    You have stated that this process consumes no CBAM precursors — {lowerFirst(declarationReasonLabel(m.reason))}.
                                     {m.note ? <> Your note: “{m.note}”</> : null}
                                   </div>
                                   <button type="button" onClick={withdrawDeclaration} disabled={precursorSaving} style={linkBtn}>Withdraw this statement</button>
@@ -1828,7 +1846,7 @@ export default function CbamSetupPage() {
                               {streams.map((st) => (
                                 <div key={st.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: '#f8f7f5', borderRadius: 8, padding: '8px 12px' }}>
                                   <div style={{ fontSize: 12, color: '#0d0d0d' }}>
-                                    <div><span style={{ fontWeight: 500 }}>{st.name}</span> <span style={{ color: '#888784' }}>· {st.stream_kind} · AD {st.activity_data} · {st.cc_mode}{Number(st.biomass_fraction) > 0 ? ` · bf ${st.biomass_fraction}` : ''}</span></div>
+                                    <div><span style={{ fontWeight: 500 }}>{st.name}</span> <span style={{ color: '#888784' }}>· {streamKindLabel(st.stream_kind)} · Activity data {st.activity_data} · {ccModeLabel(st.cc_mode)}{Number(st.biomass_fraction) > 0 ? ` · Biomass ${st.biomass_fraction}` : ''}</span></div>
                                     {st.source_doc_id
                                       ? <div style={{ fontSize: 11, color: '#0F6E56', marginTop: 2 }}>📎 {documentName(st.source_doc_id) ?? 'linked document'}</div>
                                       : <div style={{ fontSize: 11, color: '#92400e', marginTop: 2 }}>no source document — a verifier cannot trace this figure</div>}
@@ -1846,12 +1864,26 @@ export default function CbamSetupPage() {
                           {streams.length > 0 && (() => {
                             const mb = massBalanceSum()
                             if (mb.error) {
-                              return <div style={{ fontSize: 12, color: '#92400e', marginBottom: 8 }}>Mass balance not computable — a saved stream is missing a required input for its carbon-content mode.</div>
+                              return <div style={{ fontSize: 12, color: '#92400e', marginBottom: 8 }}>One of the saved streams is missing a figure it needs, so the running total can&rsquo;t be shown yet.</div>
                             }
                             const v = mb.value as number
+                            // TWO DIFFERENT DECISIONS ABOUT NOTATION HERE, deliberately. Do not
+                            // make them consistent.
+                            //
+                            // The running line carries NO symbol. It once read '(DirEm*)', which
+                            // appears nowhere a customer or verifier can follow it — not in the
+                            // §1.2 report, the .xlsx export, the verifier view, or the workings
+                            // jsonb. An operator who learned it here could not carry it anywhere,
+                            // so it was notation for its own sake on a data-entry screen.
+                            //
+                            // The negative-balance note below KEEPS 'AttrEm_Dir' and its verbatim
+                            // Annex III quote. That symbol names the quantity the regulation
+                            // floors, and the quote is the operator's evidence that the flooring
+                            // is the regulation's rule and not ours. Strip it and the note becomes
+                            // an unsourced assertion about their number.
                             return (
                               <div style={{ fontSize: 12, color: v < 0 ? '#92400e' : '#555553', marginBottom: 8, lineHeight: 1.5 }}>
-                                Running mass balance (DirEm*): <strong>{v.toFixed(4)}</strong> t CO₂
+                                Running total from your streams: <strong>{v.toFixed(4)}</strong> t CO₂
                                 {v < 0 && (
                                   <div style={{ marginTop: 4 }}>
                                     Negative net — AttrEm_Dir will be floored to zero per Annex III (“Where AttrEm_Dir is calculated to have a negative value, it shall be set to zero”). A negative net usually indicates a data-entry error, e.g. an output entered positive or an input entered negative.
@@ -1874,12 +1906,14 @@ export default function CbamSetupPage() {
                                 </CbamField>
                                 <CbamField label="Stream kind — required">
                                   <select value={editingStream.stream_kind} onChange={(e) => setStreamF('stream_kind', e.target.value)} style={cbamInputStyle}>
-                                    <option value="fuel">fuel</option>
-                                    <option value="process_material">process_material</option>
-                                    <option value="output">output</option>
+                                    <option value="fuel">{streamKindLabel('fuel')}</option>
+                                    <option value="process_material">{streamKindLabel('process_material')}</option>
+                                    <option value="output">{streamKindLabel('output')}</option>
                                   </select>
                                 </CbamField>
-                                <CbamField label="Activity data — required" hint={editingStream.stream_kind === 'output' ? "OUTPUT stream: enter a NEGATIVE value — outputs net carbon OUT of the balance." : "Tonnes. Fuels and materials are positive."}>
+                                <CbamField label="Activity data — required" hint={editingStream.stream_kind === 'output'
+                                  ? <>An <strong>output</strong> stream must carry a <strong>negative</strong> value — outputs net carbon out of the balance.</>
+                                  : 'Tonnes. Fuels and materials are positive.'}>
                                   <input type="number" step="any" value={editingStream.activity_data} onChange={(e) => setStreamF('activity_data', e.target.value)} style={cbamInputStyle} />
                                   {editingStream.stream_kind === 'output' && editingStream.activity_data.trim() !== '' && Number(editingStream.activity_data) > 0 && (
                                     <div style={{ marginTop: 4, fontSize: 11, color: '#92400e' }}>This is an output stream but the value is positive — outputs should be negative, a positive value inflates the emissions. (Not blocked, but check this.)</div>
@@ -1887,24 +1921,24 @@ export default function CbamSetupPage() {
                                 </CbamField>
                                 <CbamField label="Carbon-content mode — required">
                                   <select value={editingStream.cc_mode} onChange={(e) => setStreamF('cc_mode', e.target.value)} style={cbamInputStyle}>
-                                    <option value="direct">direct — carbon content</option>
-                                    <option value="ef_per_t">ef_per_t — emission factor per tonne</option>
-                                    <option value="ef_per_tj">ef_per_tj — emission factor per TJ + NCV</option>
+                                    <option value="direct">{ccModeLabel('direct')}</option>
+                                    <option value="ef_per_t">{ccModeLabel('ef_per_t')}</option>
+                                    <option value="ef_per_tj">{ccModeLabel('ef_per_tj')}</option>
                                   </select>
                                 </CbamField>
                                 {editingStream.cc_mode === 'direct' && (
-                                  <CbamField label="Carbon content — required for this mode" hint="Carbon fraction. The engine throws if this is null in 'direct' mode.">
+                                  <CbamField label="Carbon content — required for this mode" hint="Carbon fraction of this stream, as a number.">
                                     <input type="number" step="any" value={editingStream.carbon_content} onChange={(e) => setStreamF('carbon_content', e.target.value)} style={cbamInputStyle} />
                                   </CbamField>
                                 )}
                                 {editingStream.cc_mode === 'ef_per_t' && (
-                                  <CbamField label="Emission factor — required for this mode" hint="t CO₂ / t. Eq 14: ef / 3.664.">
+                                  <CbamField label="Emission factor — required for this mode" hint="t CO₂ / t.">
                                     <input type="number" step="any" value={editingStream.emission_factor} onChange={(e) => setStreamF('emission_factor', e.target.value)} style={cbamInputStyle} />
                                   </CbamField>
                                 )}
                                 {editingStream.cc_mode === 'ef_per_tj' && (
                                   <>
-                                    <CbamField label="Emission factor — required for this mode" hint="t CO₂ / TJ. Eq 13: (ef × ncv) / 3.664.">
+                                    <CbamField label="Emission factor — required for this mode" hint="t CO₂ / TJ.">
                                       <input type="number" step="any" value={editingStream.emission_factor} onChange={(e) => setStreamF('emission_factor', e.target.value)} style={cbamInputStyle} />
                                     </CbamField>
                                     <CbamField label="NCV — required for this mode" hint="Net calorific value (TJ / t).">
@@ -1912,7 +1946,7 @@ export default function CbamSetupPage() {
                                     </CbamField>
                                   </>
                                 )}
-                                <CbamField label="Biomass fraction" hint="0 to 1. Applied as × (1 − biomass_fraction) per Eq 15. Default 0.">
+                                <CbamField label="Biomass fraction" hint="0 to 1. The biomass share is subtracted from this stream&rsquo;s emissions. Leave blank if none.">
                                   <input type="number" step="any" value={editingStream.biomass_fraction} onChange={(e) => setStreamF('biomass_fraction', e.target.value)} style={{ ...cbamInputStyle, width: 160 }} />
                                 </CbamField>
                                 <CbamField label="Source document" hint="The evidence this activity data came from. Optional — a stream without a document is valid, just unevidenced (a verifier cannot trace it). Upload documents in the Evidence documents panel above.">
