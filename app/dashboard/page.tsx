@@ -12,6 +12,7 @@ const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
 // Only the six flat-priced modules appear here; ghg/scope3/sbti/portal have no
 // flat price (GHG is tier-banded) and intentionally render "Preview free" only.
 const ID_TO_PRICE_KEY: Record<string, keyof typeof FLAT_MODULE_PRICES> = {
+  cbam: 'cbam',
   climate_risk: 'climate-risk',
   supply_chain: 'supply-chain',
   ai: 'ai-governance',
@@ -23,7 +24,28 @@ const ID_TO_PRICE_KEY: Record<string, keyof typeof FLAT_MODULE_PRICES> = {
 // Auto-expiring "New" badge on the SBTi card — no DB / per-user state, just a date compare.
 const SBTI_NEW_UNTIL = new Date('2026-08-01')
 
-const MODULES = [
+// `previewable` records whether the module's page renders anything to a customer with
+// no entitlement. TRUE = the page loads and the tool works, with the OUTPUT gated
+// (blurred results, or an unlock panel replacing the report section). FALSE = the page
+// early-returns a paywall and nothing renders at all.
+//
+// It exists because the locked-card footer said "Preview free" for every module, which is
+// a promise three of them cannot keep. Verified page by page, not inferred from the module
+// name — read the page's own !isPaid handling before changing a value here.
+type DashboardModule = {
+  id: string
+  name: string
+  sub: string
+  desc: string
+  href: string
+  color: string
+  bg: string
+  frameworks: string[]
+  urgency: string | null
+  previewable: boolean
+}
+
+const MODULES: DashboardModule[] = [
   {
     id: 'ghg',
     name: 'GHG Inventory',
@@ -34,6 +56,7 @@ const MODULES = [
     bg: '#E1F5EE',
     frameworks: ['SB 253', 'CSRD', 'CDP', 'GRI 305', 'IFRS S2'],
     urgency: null,
+    previewable: true,
   },
   {
     id: 'scope3',
@@ -45,6 +68,7 @@ const MODULES = [
     bg: '#E1F5EE',
     frameworks: ['GHG Protocol', 'CSRD', 'CDP', 'SBTi'],
     urgency: null,
+    previewable: true,
   },
   {
     id: 'sbti',
@@ -56,6 +80,19 @@ const MODULES = [
     bg: '#E1F5EE',
     frameworks: ['SBTi', 'Net-Zero V2.0', 'ACA'],
     urgency: null,
+    previewable: false,
+  },
+  {
+    id: 'cbam',
+    name: 'CBAM',
+    sub: 'Embedded emissions · Exporters',
+    desc: 'Specific embedded emissions for goods entering the EU, and the Annex IV §1.2 summary your customer needs.',
+    href: '/dashboard/cbam/setup',
+    color: '#0C447C',
+    bg: '#E6F1FB',
+    frameworks: ['(EU) 2023/956', 'IR (EU) 2025/2547', 'Annex IV §1.2'],
+    urgency: null,
+    previewable: false,
   },
   {
     id: 'climate_risk',
@@ -67,6 +104,7 @@ const MODULES = [
     bg: '#FEF3E2',
     frameworks: ['TCFD', 'IFRS S2', 'CSRD ESRS E1'],
     urgency: null,
+    previewable: true,
   },
   {
     id: 'supply_chain',
@@ -78,6 +116,7 @@ const MODULES = [
     bg: '#EDE9FE',
     frameworks: ['CS3D', 'EcoVadis', 'ESRS S2', 'Modern Slavery'],
     urgency: null,
+    previewable: true,
   },
   {
     id: 'portal',
@@ -89,6 +128,7 @@ const MODULES = [
     bg: '#EDE9FE',
     frameworks: ['EcoVadis', 'CS3D', 'Modern Slavery', 'CDP C12'],
     urgency: null,
+    previewable: false,
   },
   {
     id: 'people',
@@ -100,6 +140,7 @@ const MODULES = [
     bg: '#E6F1FB',
     frameworks: ['EU Pay Transparency', 'ESRS S1', 'CA Pay Data', 'GRI'],
     urgency: null,
+    previewable: true,
   },
   {
     id: 'ai',
@@ -111,6 +152,7 @@ const MODULES = [
     bg: '#FCEBEB',
     frameworks: ['EU AI Act', 'NIST AI RMF', 'ISO 42001'],
     urgency: 'Aug 2, 2026',
+    previewable: true,
   },
   {
     id: 'cyber',
@@ -122,6 +164,7 @@ const MODULES = [
     bg: '#FCEBEB',
     frameworks: ['NIS2', 'DORA', 'SEC Cyber', 'ISO 27001'],
     urgency: null,
+    previewable: true,
   },
   {
     id: 'deals',
@@ -133,6 +176,7 @@ const MODULES = [
     bg: '#E6F1FB',
     frameworks: ['IFRS S2', 'TCFD', 'SB 253', 'SFDR'],
     urgency: null,
+    previewable: true,
   },
 ]
 
@@ -171,6 +215,7 @@ export default function Dashboard() {
       // while 'supply-chain' unlocks the Supply Chain + Supplier Portal cards.
       const KEY_TO_CARD_IDS: Record<string, string[]> = {
         'ghg': ['ghg', 'scope3', 'sbti'],
+        'cbam': ['cbam'],
         'climate-risk': ['climate_risk'],
         'supply-chain': ['supply_chain', 'portal'],
         'people': ['people'],
@@ -364,8 +409,12 @@ export default function Dashboard() {
                         (() => {
                           const priceKey = ID_TO_PRICE_KEY[mod.id]
                           const price = priceKey ? FLAT_MODULE_PRICES[priceKey] : null
+                          // 'Preview free' only where a preview actually exists. A module that
+                          // early-returns a paywall reads 'Locked' — promising a preview the page
+                          // does not give is worse than saying nothing.
+                          const lead = mod.previewable ? 'Preview free' : 'Locked'
                           return (
-                            <span style={{ fontSize: 11, color: '#888784' }}>Preview free{price !== null && <> · <span style={{ color: '#7425e3', fontWeight: 500 }}>unlock for ${price.toLocaleString('en-US')}/yr</span></>}</span>
+                            <span style={{ fontSize: 11, color: '#888784' }}>{lead}{price !== null && <> · <span style={{ color: '#7425e3', fontWeight: 500 }}>unlock for ${price.toLocaleString('en-US')}/yr</span></>}</span>
                           )
                         })()
                       )}

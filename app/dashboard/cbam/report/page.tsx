@@ -255,7 +255,8 @@ export default function CbamReportPage() {
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '2rem', marginTop: '1rem' }}>
           <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>No installations yet</div>
           <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, fontWeight: 300 }}>
-            A report is generated for one installation and reporting period, so an installation must exist first. There is no installation-creation screen yet — it is not built. Once an installation and its production processes exist, you can generate its §1.2 summary here.
+            A report covers one installation and reporting period, so you&rsquo;ll need to add an installation and its production processes first. You can do that in{' '}
+            <a href="/dashboard/cbam/setup" style={{ color: '#7425e3', textDecoration: 'underline' }}>setup</a>, then come back here.
           </div>
         </div>
       </div>
