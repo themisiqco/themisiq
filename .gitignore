@@ -33,3 +33,6 @@ yarn-error.log*
 next-env.d.ts
 *.bak
 app/concierge-test/
+
+# generated CBAM reference data — rebuild with scripts/gen-cbam-defaults.ts
+public/data/
