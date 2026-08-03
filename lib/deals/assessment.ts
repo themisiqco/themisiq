@@ -547,7 +547,7 @@ export const assessmentView = (evaluated: boolean, rows: FrameworkApplicability[
   }
 }
 
-// Shared copy — the CSV and the screen must not drift. Defaults to every framework carrying an
+// Shared copy — the wizard screens and the report must not drift. Defaults to every framework carrying an
 // ACTIVE size test, derived from THRESHOLD_TESTS at call time, so adding a test cannot leave this
 // stale and a `pending` one is never named. Pass the in-scope subset to name only what actually
 // went unevaluated for this deal. (The `fields` default is still ['revenue'] alone, which

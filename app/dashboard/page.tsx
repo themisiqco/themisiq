@@ -171,7 +171,9 @@ const MODULES: DashboardModule[] = [
     name: 'Deals & Investment',
     sub: 'ESG due diligence',
     desc: 'ESG risk screening and compliance cost estimation for M&A and investments.',
-    href: '/dashboard/deals',
+    // Lands on the list of saved targets, not a blank form: a firm screening several targets
+    // needs to pick one, and a bare /dashboard/deals now starts a NEW deal.
+    href: '/dashboard/deals/list',
     color: '#0C447C',
     bg: '#E6F1FB',
     frameworks: ['IFRS S2', 'TCFD', 'SB 253', 'SFDR'],

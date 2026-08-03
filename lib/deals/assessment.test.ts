@@ -5,9 +5,10 @@ import {
   NEAR_THRESHOLD_BAND, NEAR_BAND_PCT, FX_AS_OF, FX_SOURCE,
   isRevenueDeclared, assessmentView, notAssessedRevenueNote, partiallyAssessedNote,
   nearThresholdNoneNote, resolveFieldsPrompt, FIELD_LABELS, FIELD_FORM_LABELS,
-  getObligations, obligationPriceLabel,
+  getObligations, obligationPriceLabel, SECTOR_RISKS,
   type DealCurrency, type FrameworkApplicability, type DealSize, type ThresholdLimb,
 } from './assessment'
+import { REGIME_COLUMNS } from './exportPipelineXlsx'
 
 // Tests assert the CONTRACT, never the current FX rates: cross-currency inputs are derived from
 // USD_PER_UNIT at runtime, so refreshing the dated rate table cannot turn them red.
@@ -563,5 +564,67 @@ describe('flat form stays the applies-filtered rich form', () => {
     for (const c of DEAL_CURRENCIES)
       expect(getApplicableFrameworks('European Union', 2_000_000, 'Financial Services', 'ma', c))
         .toEqual(['CSRD', 'SFDR', 'EU Taxonomy', 'CS3D', 'IFRS S2', 'TCFD', 'PCAF'])
+  })
+})
+
+// ── The pipeline spreadsheet's rule columns must keep up with the engine ─────────────────────────
+//
+// The pipeline export gives every framework its own TRUE / FALSE / NOT ASSESSED column so an
+// analyst can pivot on it (REGIME_COLUMNS in ./exportPipelineXlsx). That list is written by hand
+// and the engine's list is not, so the two can drift apart. When they do, nothing breaks loudly:
+// a new framework quietly loses its column and lands in the catch-all "Other rules" cell instead.
+// These two tests are what turn that silent drift into a failure that says what to do.
+
+// Mirrors the options the deal form offers (app/dashboard/deals/page.tsx). Sectors come from
+// SECTOR_RISKS so the sweep cannot fall behind a sector being added; 'Other' is the form's
+// no-template option and has no SECTOR_RISKS entry, so it is named here.
+const ALL_JURISDICTIONS = ['USA', 'European Union', 'UK', 'Canada', 'Australia', 'Global', 'Other']
+const ALL_SECTORS = [...Object.keys(SECTOR_RISKS), 'Other']
+
+// Every framework name the engine can put in front of a user, across every combination of the
+// inputs a deal can carry. Uses the RICH form deliberately: it returns a row for each framework it
+// EVALUATED, including ones that turned out not to apply, which is the full vocabulary the export
+// has to have a column for.
+function everyFrameworkTheEngineCanEmit(): string[] {
+  const seen = new Set<string>()
+  for (const jurisdiction of ALL_JURISDICTIONS)
+    for (const sector of ALL_SECTORS)
+      for (const revenue of [0, 2_000_000, 50_000_000, 2_000_000_000])
+        for (const size of [{}, { employee_count: 300, total_assets: 50_000_000 }, { employee_count: 0, total_assets: 0 }])
+          for (const currency of DEAL_CURRENCIES)
+            getFrameworkApplicability(jurisdiction, revenue, sector, 'ma', currency, size)
+              .forEach(r => seen.add(r.framework))
+  return [...seen].sort()
+}
+
+describe('pipeline export: every rule the engine can emit needs its own spreadsheet column', () => {
+  it('adding a framework to the engine also adds a column to the pipeline export', () => {
+    const columns = new Set<string>(REGIME_COLUMNS as readonly string[])
+    const missing = everyFrameworkTheEngineCanEmit().filter(f => !columns.has(f))
+
+    expect(missing,
+      `\n\nThe engine can emit ${missing.length} framework name(s) that the pipeline spreadsheet has no column for:\n` +
+      missing.map(f => `    ${f}`).join('\n') +
+      `\n\nWHAT THIS MEANS: each of these loses its own TRUE / FALSE column in the export and is lumped\n` +
+      `into the catch-all "Other rules" cell, so an analyst cannot filter or pivot on it.\n\n` +
+      `TO FIX: add the name — spelled EXACTLY as the engine emits it, above — to REGIME_COLUMNS in\n` +
+      `lib/deals/exportPipelineXlsx.ts. That is the only edit needed: the column width and the header\n` +
+      `both map over REGIME_COLUMNS, so they follow automatically.\n`,
+    ).toEqual([])
+  })
+
+  it('no column is left pointing at a framework the engine cannot emit', () => {
+    const emitted = new Set(everyFrameworkTheEngineCanEmit())
+    const dead = (REGIME_COLUMNS as readonly string[]).filter(c => !emitted.has(c))
+
+    expect(dead,
+      `\n\nThe pipeline spreadsheet has ${dead.length} column(s) for framework name(s) the engine never emits:\n` +
+      dead.map(c => `    ${c}`).join('\n') +
+      `\n\nWHAT THIS MEANS: these columns read FALSE in every row of every export, which tells the reader\n` +
+      `the rule applies to none of their targets — a finding, not the absence of one.\n\n` +
+      `TO FIX: this is almost always a spelling difference or a renamed framework, so check the name\n` +
+      `against getFrameworkApplicability in lib/deals/assessment.ts first. Remove the column only if\n` +
+      `the framework itself is genuinely gone.\n`,
+    ).toEqual([])
   })
 })

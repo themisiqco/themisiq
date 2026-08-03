@@ -14,7 +14,7 @@
 // 1. DERIVED, NOT SNAPSHOT. climate-risk and materiality read a STORED result row — the report
 //    renders what was computed when the assessment ran. Deals has no such row: `public.deals`
 //    stores the INPUTS, and every finding here is derived at render through the same engine the
-//    CSV uses. So this document is a view of the deal AS IT STANDS NOW, not a record of a past
+//    the wizard uses. So this document is a view of the deal AS IT STANDS NOW, not a record of a past
 //    assessment, and it says so on the cover and in the footer. Re-generating after the deal
 //    record changes produces different findings, by design.
 //
@@ -25,7 +25,7 @@
 //    an API route for one reader.
 //
 // Every figure comes from lib/deals/assessment.ts (what is true) rendered through
-// lib/deals/reportModel.ts (how it is said). Nothing is re-derived here — the CSV export and this
+// lib/deals/reportModel.ts (how it is said). Nothing is re-derived here — the wizard screens and this
 // document read the same rows, so they cannot state different figures or cite different regimes.
 
 import { useEffect, useState, Suspense } from 'react'
@@ -189,7 +189,7 @@ function Chip({ s }: { s: { label: string; color: string; bg: string; border: st
   return <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 99, background: s.bg, color: s.color, border: `0.5px solid ${s.border}`, whiteSpace: 'nowrap' }}>{s.label}</span>
 }
 // An amber panel for every "we did not evaluate this" statement. Absence of a finding is never
-// rendered as a finding — on screen, in the CSV, or here.
+// rendered as a finding — on the wizard screens or here.
 function NotAssessed({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="page" style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.25)', borderRadius: 8, padding: '12px 14px', margin: '0 0 14px' }}>
@@ -208,7 +208,7 @@ function DealReport({ deal, reportDate, reference }: { deal: DealRow; reportDate
   const dealValue = Number(deal.deal_value) || 0
   const locationCount = Number(deal.location_count) || 0
 
-  // Same gate the wizard and the CSV use: revenue is NOT part of it. Only two frameworks consult
+  // The same gate the wizard uses: revenue is NOT part of it. Only two frameworks consult
   // revenue; the rest resolve from jurisdiction and sector alone, and withholding them because
   // revenue is blank would render an undeclared field as "no frameworks apply".
   const evaluated = !!(sector && jurisdiction)
@@ -218,7 +218,7 @@ function DealReport({ deal, reportDate, reference }: { deal: DealRow; reportDate
     : []
 
   // The flat legal in/out. Derived from `applicability` rather than by a second engine call — a
-  // test in assessment.test.ts pins these two as equal, so this cannot drift from the CSV.
+  // test in assessment.test.ts pins these two as equal, so this cannot drift from the wizard.
   const frameworks = applicability.filter(f => f.applies).map(f => f.framework)
 
   const view = assessmentView(evaluated, applicability)

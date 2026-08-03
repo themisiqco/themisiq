@@ -3,16 +3,21 @@
 //
 // WHY THIS EXISTS. lib/deals/assessment.ts decides WHAT IS TRUE (which frameworks apply, which
 // limbs are met, what it costs). This module decides HOW THAT IS SAID — the labels, the sentences,
-// and the row models the surfaces render. It is deliberately pure: no React, no Supabase, no CSV.
+// and the row models the surfaces render. It is deliberately pure: no React, no Supabase, no I/O.
 //
-// It exists because there are now TWO customer-facing renderings of one assessment — the CSV export
-// and the printed report — and they must not be able to disagree. Re-deriving any of this per
-// surface is the regression: `mapFramework` in particular decides which STATUTE a risk finding is
-// allowed to cite, so two copies could cite different regimes for the same deal. Same rule the GHG
-// engine states for buildWorkings, and the same reason the CBAM .xlsx is built from the response
-// already on screen rather than a refetch.
+// It exists because one assessment is rendered in more than one place — the wizard screens a user
+// works through, and the printed report they hand to an investment committee — and those must not
+// be able to disagree. Re-deriving any of this per surface is the regression: `mapFramework` in
+// particular decides which STATUTE a risk finding is allowed to cite, so two copies could cite
+// different regimes for the same deal. Same rule the GHG engine states for buildWorkings, and the
+// same reason the CBAM .xlsx is built from the response already on screen rather than a refetch.
 //
-// Consumers: app/dashboard/deals/page.tsx (CSV export + wizard screens)
+// It was extracted when a per-deal CSV export was the second rendering. That CSV has since been
+// retired — it was a document flattened into a spreadsheet, and the printed report carries the same
+// content properly — so the second consumer is now the report itself. The reason for sharing did
+// not change with it: two renderings, one derivation.
+//
+// Consumers: app/dashboard/deals/page.tsx (wizard screens)
 //            app/dashboard/deals/report/page.tsx (printed report)
 
 import {
@@ -95,8 +100,9 @@ export const nearSentence = (f: FrameworkApplicability): string => {
 // One row per limb of every size test actually run. `exactMeasure: false` must surface — where one
 // collected figure stands in for a differently-defined statutory measure, the report says so rather
 // than implying the instrument's own definition was applied.
-// Structured, not pre-joined: the CSV wants strings, the printed report wants table cells it can
-// style independently. Both read the SAME row.
+// Structured, not pre-joined: the report renders each part into its own table cell, styled
+// independently — the measure plain, the proxy caveat marked. Keeping the parts separate also
+// leaves the row usable by any future rendering without this model having to know about it.
 export type LimbRow = {
   framework: string
   measure: string          // the limb's measure, humanised
@@ -130,9 +136,6 @@ export const buildLimbRows = (applicability: FrameworkApplicability[]): LimbRow[
         isProxy: l.state !== 'not-assessed' && !l.limb.exactMeasure,
       }
     }))
-
-export const limbRowsToCsv = (rows: LimbRow[]): string[][] =>
-  rows.map(r => [r.framework, r.measure, r.basis, r.valueApplied, r.threshold, r.result, r.basisOfValue])
 
 // ─── FX basis ─────────────────────────────────────────────────────────────────
 // The rate table is stored EUR-base (UNITS_PER_EUR) precisely so a reviewer can compare it digit

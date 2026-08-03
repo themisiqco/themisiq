@@ -1,24 +1,22 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Nav from '../../components/Nav'
 import { useEntitlement } from '../../../lib/useEntitlement'
 import { supabase } from '../../../lib/supabase'
-import { filenameDate, filenameSafe } from '../../../lib/filename'
 import {
   getObligations, getApplicableFrameworks, getFrameworkApplicability, getComplianceCost,
   SECTOR_RISKS, DEFAULT_PIPELINE_TARGETS, DEAL_CURRENCIES,
-  FX_SOURCE, FX_AS_OF, THRESHOLD_TESTS, isTestActive,
-  isRevenueDeclared, assessmentView, notAssessedRevenueNote, partiallyAssessedNote,
-  nearThresholdNoneNote, obligationPriceLabel, resolveFieldsPrompt,
+  assessmentView, partiallyAssessedNote,
+  obligationPriceLabel, resolveFieldsPrompt,
   type FrameworkApplicability,
 } from '../../../lib/deals/assessment'
-// Presentation model shared with app/dashboard/deals/report/page.tsx. The CSV and the printed
-// report render the SAME rows; neither re-derives them, so they cannot state different figures or
-// cite different regimes for one deal.
+// Presentation model shared with app/dashboard/deals/report/page.tsx. These wizard screens and the
+// printed report phrase one assessment the same way — neither re-derives it, so they cannot state
+// different figures or cite different regimes for one deal.
 import {
   DEAL_TYPES, spellMagnitude, NEAR_PCT, nearSentence,
-  limbValueDisplay, limbThresholdDisplay, buildLimbRows, limbRowsToCsv, buildFxBasisRows,
   resolveCs3d, makeMapFramework, themisIqFigure as themisIqFigureOf,
 } from '../../../lib/deals/reportModel'
 
@@ -51,14 +49,30 @@ const SEVERITY_CONFIG = {
   medium:   { label: 'MEDIUM', color: '#0C447C', bg: '#E6F1FB', border: '#0C447C' },
 }
 
-const STEP_NAMES = ['Deal Setup', 'ESG Screening', 'Risk Findings', 'Cost Estimate', 'Export']
+const STEP_NAMES = ['Deal Setup', 'ESG Screening', 'Risk Findings', 'Cost Estimate', 'Report']
 
 const verifyChip: React.CSSProperties = { fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#FEF3E2', color: '#ba7517', border: '0.5px solid rgba(186,117,23,0.35)' }
 
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Page wrapper ─────────────────────────────────────────────────────────────
 
 export default function DealsDashboard() {
+  // useSearchParams must be inside a Suspense boundary for Next.js to prerender this page.
+  return (
+    <Suspense fallback={
+      <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
+        <Nav />
+        <div style={{ maxWidth: 900, margin: '0 auto', padding: '3rem 1.5rem', fontSize: 14, color: '#888784' }}>Loading deal…</div>
+      </div>
+    }>
+      <DealsDashboardInner />
+    </Suspense>
+  )
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+function DealsDashboardInner() {
   const isPaid = useEntitlement('deals')
   const [step, setStep] = useState(0)
   const [deal, setDeal] = useState({
@@ -80,7 +94,6 @@ export default function DealsDashboard() {
     notes: '',
   })
   const [frameworks, setFrameworks] = useState<string[]>([])
-  const [dataConfirmed, setDataConfirmed] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [dealId, setDealId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -92,19 +105,35 @@ export default function DealsDashboard() {
   const [shareSaving, setShareSaving] = useState(false)
   const [copiedShare, setCopiedShare] = useState(false)
 
-  // Load the user's most recent saved deal on mount so a saved deal round-trips.
+  // Load the deal named by ?id=, or none at all.
+  //
+  // This USED to load the most recent deal unconditionally, which made a second target impossible:
+  // the load set dealId, and dealId is handleSave's insert/update discriminant, so after the first
+  // save the INSERT branch was unreachable and every later save UPDATEd the same row — a second
+  // target silently overwrote the first. Selecting by id is what makes dealId legitimately null
+  // again, and therefore what makes a new deal expressible at all.
+  //
+  // A bare /dashboard/deals is a NEW BLANK DEAL, not a random existing one (GHG's rule: "no id ->
+  // start clean (no auto-load of a random inventory)"). Auto-loading someone's most recent row into
+  // a form they opened to start fresh is the same class of error as the overwrite it caused.
+  //
+  // Owner scoping is belt-and-braces: the explicit user_id filter is kept from the previous query,
+  // and RLS on public.deals independently resolves another user's deal to no row rather than to a
+  // forbidden error — so a wrong id reads as "nothing loaded", never as a leak.
+  const searchParams = useSearchParams()
+  const dealIdParam = searchParams.get('id')
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (cancelled || !session) return
       setUserId(session.user.id)
+      if (!dealIdParam) return          // no id -> start clean; nothing is loaded and dealId stays null
       const { data, error } = await supabase
         .from('deals')
         .select('*')
+        .eq('id', dealIdParam)
         .eq('user_id', session.user.id)
-        .order('updated_at', { ascending: false })
-        .limit(1)
         .maybeSingle()
       if (cancelled || error || !data) return
       setDealId(data.id)
@@ -128,7 +157,10 @@ export default function DealsDashboard() {
       if (Array.isArray(data.frameworks)) setFrameworks(data.frameworks) // derive effect reconciles anyway
     })()
     return () => { cancelled = true }
-  }, [])
+    // Keyed on the extracted id, not the whole searchParams object: re-running on an unrelated
+    // query-param change would re-load and clobber in-progress edits. Same choice as
+    // app/dashboard/deals/report/page.tsx, which also deps on [id].
+  }, [dealIdParam])
 
   // Auto-detect frameworks when deal changes
   useEffect(() => {
@@ -203,22 +235,9 @@ export default function DealsDashboard() {
   // different reasons — nothing was found, or nothing was evaluated — and the empty array cannot
   // tell them apart. These states carry that distinction to every surface, so a blank revenue
   // field can never render as "no frameworks apply" or "no threshold is nearby".
-  const revenueDeclared = isRevenueDeclared(deal.revenue)
   const view = assessmentView(evaluated, applicability)
   const frameworksState = view.frameworks
   const nearState = view.nearThreshold
-  // Only the triggers actually in scope for THIS deal — a USA deal names SB 253, never SECR.
-  const notAssessedNote = notAssessedRevenueNote(
-    view.notAssessed.length ? view.notAssessed : undefined,
-    view.fieldsToResolve.length ? view.fieldsToResolve : undefined,
-  )
-  // One row per limb of every size test actually run — built by the shared model, so this CSV and
-  // the printed report name the same limbs, measures and proxy caveats.
-  const limbRows: string[][] = limbRowsToCsv(buildLimbRows(applicability))
-
-  // FX basis rows — shared model. Shows the transcribed EUR-base figures, the derivation and the
-  // result, so a reader can tell which numbers came from the ECB document and which we computed.
-  const fxBasisRows: string[][] = buildFxBasisRows(deal.currency, applicability)
   // Rewrite generic disclosure-regime labels (SB 253, bare CSRD) on a static sector risk template to
   // the regime the DETECTED frameworks actually support. Resolving against `frameworks` rather than
   // deal.jurisdiction is load-bearing: jurisdiction alone stamped "SB 253" on every USA deal, so a
@@ -263,138 +282,6 @@ export default function DealsDashboard() {
     navigator.clipboard.writeText(shareUrl)
     setCopiedShare(true)
     setTimeout(() => setCopiedShare(false), 2000)
-  }
-
-  const generateExport = () => {
-    // ONE instant for both the Generated row and the download filename. These were two separate
-    // `new Date()` calls with two formatters — the row local, the filename UTC — so a CSV exported
-    // after ~19:00 EDT was NAMED with tomorrow's date while saying today's inside.
-    const generatedAt = new Date()
-    const rows = [
-      ['ThemisIQ — ESG Deal Due Diligence Report'],
-      ['Target company', deal.target_name],
-      ['Sector', deal.sector],
-      // "USD 0" would assert a revenue figure we were never given. Say what is true instead.
-      ['Revenue', revenueDeclared ? `${deal.currency} ${deal.revenue.toLocaleString()} (${spellMagnitude(deal.revenue)})` : 'Not provided'],
-      ['Deal type', DEAL_TYPES.find(d => d.id === deal.deal_type)?.label || ''],
-      ['Jurisdiction', deal.jurisdiction],
-      ['Generated', generatedAt.toLocaleDateString()],
-      [],
-      ['APPLICABLE FRAMEWORKS'],
-      // Three states, never two: an empty list under this heading previously read as "no
-      // frameworks apply" whether or not anything had been evaluated.
-      ...(frameworksState === 'not-assessed'
-        ? [[notAssessedNote]]
-        : frameworksState === 'assessed-none'
-          ? [['None — no framework was triggered for this jurisdiction, sector and revenue.']]
-          : [
-              ...frameworks.map(f => [f, nearByFramework.has(f) ? 'APPLIES — near threshold, verify' : 'APPLIES']),
-              // Partial assessment: the list above stands, but naming what was withheld stops a
-              // reader inferring that the missing statutes were considered and excluded.
-              ...(view.notAssessed.length ? [[partiallyAssessedNote(view.notAssessed, view.fieldsToResolve)]] : []),
-            ]),
-      [],
-      // Near-threshold is reported as its own section rather than folded into the list above, so a
-      // reader cannot mistake "within the band" for "applies". Both sides appear; the Status column
-      // restates the legal answer verbatim so the marker never displaces it.
-      ['NEAR-THRESHOLD FRAMEWORKS'],
-      [`Raised only where a MARGINAL limb is decisive for the outcome — a limb within ${NEAR_PCT} of its figure that, if it moved, would change whether the test is met. The legal answer is unchanged: a framework that applies still applies.`],
-      ...(nearState === 'not-assessed'
-        ? [[notAssessedNote]]
-        : nearState === 'assessed-none'
-        ? [[nearThresholdNoneNote()]]
-        : [
-            ['Framework', 'Status', 'Limbs met', 'Decisive limb', 'Value applied', 'Threshold', 'Side'],
-            ...nearThreshold.map(f => {
-              const dec = f.test?.limbs.filter(l => l.near && l.state !== 'not-assessed') ?? []
-              return [
-                f.framework,
-                f.applies ? 'Applies — verify' : 'Does not apply on the figures entered — verify',
-                f.test ? `${f.test.metCount} of ${f.test.requires}` : '',
-                dec.map(l => l.limb.measure.replace(/_/g, ' ')).join('; '),
-                dec.map(limbValueDisplay).join('; '),
-                dec.map(limbThresholdDisplay).join('; '),
-                f.side === 'above' ? 'Above' : 'Below',
-              ]
-            }),
-          ]),
-      [],
-      // Every limb of every size test that was actually run, with the MEASURE it applied. A limb
-      // result without its measure is the same class of error as a framework label with no
-      // threshold behind it — "MET" against an unnamed measure asserts nothing checkable.
-      ['THRESHOLD LIMBS APPLIED'],
-      ...(limbRows.length === 0
-        ? [['No size-gated framework is in scope for this jurisdiction.']]
-        : [
-            ['Framework', 'Limb', 'Measure required', 'Value applied', 'Threshold', 'Result', 'Basis of value'],
-            ...limbRows,
-          ]),
-      [],
-      ['ESG RISK FINDINGS'],
-      // The Framework column resolves against the detected list; with nothing detected it falls
-      // back to a methodology label. Say so, rather than letting the fallback pass as a finding.
-      ...(revenueDeclared ? [] : [['Framework column shows a methodology fallback — no disclosure regime was resolved because target revenue was not provided.']]),
-      ['Risk', 'Severity', 'Framework', 'Detail'],
-      ...risks.map(r => [r.risk, r.severity.toUpperCase(), mapFramework(r.framework), r.detail]),
-      [],
-      ['COMPLIANCE COST ESTIMATE'],
-      ['ThemisIQ (scope-matched, included modules)', themisIqFigure],
-      ['Traditional consultant (first-year)', `USD ${Math.round(obligations.consultantLow / 1000)}k–${Math.round(obligations.consultantHigh / 1000)}k`],
-      ['Benchmark and ThemisIQ figures shown in USD.'],
-      [],
-      ['Included obligation', 'ThemisIQ', 'Consultant (reference)'],
-      ...obligations.included.map(o => [
-        o.scopeNote ? `${o.label} — ${o.scopeNote}` : o.label,
-        obligationPriceLabel(o.pricing),
-        `USD ${Math.round(o.consultantLow / 1000)}k–${Math.round(o.consultantHigh / 1000)}k`,
-      ]),
-      [],
-      ['Also recommended (not in ThemisIQ total)', 'ThemisIQ', 'Consultant (reference)'],
-      ...obligations.recommended.map(o => [o.label, obligationPriceLabel(o.pricing), `USD ${Math.round(o.consultantLow / 1000)}k–${Math.round(o.consultantHigh / 1000)}k`]),
-      [],
-      ['Flagged — separate specialist (in neither total)', 'ThemisIQ', 'Consultant (reference)'],
-      ...obligations.flagged.map(o => [o.scopeNote ? `${o.label} — ${o.scopeNote}` : o.label, obligationPriceLabel(o.pricing), 'Not included']),
-      ...(complianceCost ? [[`ESG value-at-risk exposure: ~${(complianceCost.pctLow * 100).toFixed(2)}%–${(complianceCost.pctHigh * 100).toFixed(2)}% of deal value (~USD ${Math.round(complianceCost.low).toLocaleString()}–${Math.round(complianceCost.high).toLocaleString()}) carries ESG-related risk to assess; indicative exposure, not a cost — requires specialist confirmation`]] : []),
-      [],
-      ['DATA ROOM GAPS'],
-      ['Item', 'Status'],
-      ['GHG inventory / emissions data', deal.has_ghg_data ? 'Available' : 'MISSING — request from target'],
-      ['ESG report or sustainability disclosure', deal.has_esg_report ? 'Available' : 'MISSING — request from target'],
-      [],
-      // FX basis — every converted threshold call above has to be traceable to the PUBLISHED
-      // figures that produced it, not merely to the cross-rate this system computed from them.
-      ['FX BASIS FOR THRESHOLD TESTS'],
-      ['Revenue and balance-sheet figures are converted into each threshold’s statutory currency for comparison. The statutory figure itself is never converted.'],
-      ['Rates below marked "transcribed" are copied verbatim from the source document and can be checked against it digit for digit. Rates marked "DERIVED" are computed by ThemisIQ from those figures and appear nowhere in the source.'],
-      ['Rate source', FX_SOURCE],
-      ['Rates as of', FX_AS_OF],
-      ['Deal currency', deal.currency],
-      ...fxBasisRows,
-      ['Size tests available', Object.values(THRESHOLD_TESTS).filter(isTestActive)
-        .map(t => `${t.framework} (${t.requires} of ${t.limbs.length})`).join(' · ')],
-      // A test whose lookback is not modelled UNDER-calls a target that dipped since the prior year;
-      // the below-side marginal-limb flag is the mitigation. Say so in the report, not just in code.
-      ...(Object.values(THRESHOLD_TESTS).filter(isTestActive).filter(t => !t.lookbackModelled)
-        .map(t => [`Lookback NOT modelled — ${t.framework}`,
-          `Statute measures over ${t.lookback === 'either-of-two-most-recent-fy' ? 'either of the two most recent financial years' : 'the most recent financial year'}; only the most recent year is held. A target that met a limb in the prior year and has since dipped is UNDER-called — such a target surfaces as a marginal below-side limb.`])),
-      [],
-      ['Generated by ThemisIQ · www.themisiq.co · ESG Deal Diligence Platform'],
-    ]
-    const esc = (v: string) => {
-      const s = String(v ?? '')
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
-    }
-    const csv = rows.map(r => r.map(esc).join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    // A target name is free text: "Smith / Jones Holdings" put a path separator in the download
-    // name. Sanitising also makes the existing 'Target' fallback actually cover a whitespace-only
-    // name, which is truthy and so slipped past `|| 'Target'` to produce a nameless file.
-    const targetName = filenameSafe(deal.target_name || '') || 'Target'
-    a.download = `${targetName}_ESGDiligence_${filenameDate(generatedAt)}.csv`
-    a.click()
   }
 
   // ─── Steps ──────────────────────────────────────────────────────────────────
@@ -484,7 +371,7 @@ export default function DealsDashboard() {
       <h2 style={sectionHead}>ESG framework screening</h2>
       <p style={sectionSub}>ThemisIQ has identified the frameworks that apply to this deal based on sector, jurisdiction and deal size. Review and confirm.</p>
 
-      {/* Same three states as the CSV — a blank revenue field must not render as a negative finding. */}
+      {/* Same three states the report uses — a blank revenue field must not render as a negative finding. */}
       {frameworksState === 'not-assessed' ? (
         <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 12, padding: '1.25rem', marginBottom: 20 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: '#ba7517', letterSpacing: '0.04em', marginBottom: 6 }}>NOT ASSESSED</div>
@@ -529,7 +416,7 @@ export default function DealsDashboard() {
       )}
 
       {/* Near-threshold, not assessed. Silence here would read as "nothing is nearby" — the same
-          false negative the CSV section carried. */}
+          false negative the report's own section guards against. */}
       {nearState === 'not-assessed' && (
         <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '1rem', marginBottom: 20 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: '#ba7517', letterSpacing: '0.04em', marginBottom: 4 }}>NEAR-THRESHOLD — NOT ASSESSED</div>
@@ -789,8 +676,8 @@ export default function DealsDashboard() {
 
   const renderStep4 = () => (
     <div>
-      <h2 style={sectionHead}>Export ESG diligence report</h2>
-      <p style={sectionSub}>Download your ESG due diligence summary for the deal memo, IC pack, or LP reporting.</p>
+      <h2 style={sectionHead}>Your diligence report</h2>
+      <p style={sectionSub}>The finished write-up of this deal, for your deal memo or IC pack. You can also share the findings with the target company.</p>
 
       <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.5rem', marginBottom: 20 }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Report summary</div>
@@ -825,15 +712,22 @@ export default function DealsDashboard() {
 
       {isPaid ? (
         <div>
-          <div style={{ background: '#fff', border: '1px solid #e8e7e4', borderRadius: 10, padding: '1rem', marginBottom: 16 }}>
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
-              <input type="checkbox" checked={dataConfirmed} onChange={e => setDataConfirmed(e.target.checked)} style={{ marginTop: 2 }} />
-              <span style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>I confirm this assessment is for planning purposes only and does not constitute legal, financial, or regulatory advice. Compliance costs are indicative estimates only.</span>
-            </label>
-          </div>
-          <button onClick={() => dataConfirmed && generateExport()} style={{ fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: dataConfirmed ? 'pointer' : 'not-allowed', opacity: dataConfirmed ? 1 : 0.4 }}>
-            ⬇ Download ESG Diligence Report (CSV)
-          </button>
+          {/* The report is the finished document; this screen is where you go to it. It needs a
+              saved deal because it loads by id, so the unsaved state matches the share block
+              below rather than offering a link that would open an empty page. */}
+          {!dealId ? (
+            <div style={{ fontSize: 12, color: '#888784', fontStyle: 'italic' }}>Save the deal to open its report.</div>
+          ) : (
+            <>
+              <a href={`/dashboard/deals/report?id=${dealId}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: '#0d0d0d', textDecoration: 'none' }}>
+                Open the full report →
+              </a>
+              <div style={{ fontSize: 12, color: '#888784', lineHeight: 1.6, marginTop: 10, maxWidth: 520 }}>
+                Opens in a new tab. It has the findings, the applicable rules, the cost estimate and the
+                important notice, written out in full. Print it or save it as a PDF from there.
+              </div>
+            </>
+          )}
 
           {/* Share with target — public /deals/[token] link. Gated on a saved deal with a token. */}
           <div style={{ marginTop: 24, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.25rem' }}>
@@ -863,7 +757,7 @@ export default function DealsDashboard() {
       ) : (
         <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', marginBottom: 8 }}>Unlock your full ESG diligence programme</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 20, lineHeight: 1.6 }}>Download your ESG diligence report, generate IC-ready compliance cost analysis, and access ThemisIQ's deal-specific ESG advisory.</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 20, lineHeight: 1.6 }}>Screen a target&rsquo;s ESG risk, work out which reporting rules apply to it and what compliance would cost, and produce a diligence report for your investment committee.</div>
           <a href="/pricing" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>See pricing & unlock reports →</a>
         </div>
       )}
