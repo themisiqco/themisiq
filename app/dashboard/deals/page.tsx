@@ -98,6 +98,11 @@ function DealsDashboardInner() {
   const [dealId, setDealId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  // Has the user actually typed something since the last load or save? Deliberately NOT `saved`:
+  // that starts false because it means "the form matches the database", which is untrue of a blank
+  // new deal — gating on it would warn someone who has entered nothing. `dirty` starts false and
+  // only a real edit sets it, matching GHG's flag of the same name.
+  const [dirty, setDirty] = useState(false)
   // Share-link state (C4) — kept SEPARATE from the deal object so they never enter handleSave's
   // row payload; token/share_enabled are DB-owned (token auto-generated, share_enabled toggled here).
   const [dealToken, setDealToken] = useState<string | null>(null)
@@ -175,6 +180,7 @@ function DealsDashboardInner() {
       // A just-loaded deal IS what is stored. `saved` means "the form matches the database", and the
       // share gate below relies on that meaning — without this it reads false on every page load.
       setSaved(true)
+      setDirty(false)   // a just-loaded deal is pristine until the user types
     })()
     return () => { cancelled = true }
     // Keyed on the extracted id, not the whole searchParams object: re-running on an unrelated
@@ -198,7 +204,17 @@ function DealsDashboardInner() {
     }
   }, [deal.sector, deal.jurisdiction, deal.revenue, deal.deal_type, deal.currency, deal.total_assets, deal.employee_count])
 
-  const update = (field: string, value: any) => { setDeal(prev => ({ ...prev, [field]: value })); setSaved(false) }
+  const update = (field: string, value: any) => { setDeal(prev => ({ ...prev, [field]: value })); setSaved(false); setDirty(true) }
+
+  // Warn before leaving with unsaved work. The links out of this page are plain <a> tags, so they
+  // are hard navigations and beforeunload fires; it would NOT fire for a client-side route change.
+  // GHG additionally gates on `mode !== 'wizard'` — there are no modes here, so `dirty` alone.
+  useEffect(() => {
+    if (!dirty) return
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [dirty])
 
   // Persist the deal for this user. token/share_enabled are intentionally NOT written —
   // the DB defaults own them (Build-C shareable link; unused this build).
@@ -253,6 +269,7 @@ function DealsDashboardInner() {
       // record what was actually sent, not what the form holds now.
       setSavedSector(row.sector)
       setSaved(true)
+      setDirty(false)   // reached only on a successful write; a failed save leaves the work dirty
     } finally { setSaving(false) }
   }
 
@@ -920,6 +937,11 @@ function DealsDashboardInner() {
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
+            {/* Names the DESTINATION rather than claiming where you came from: the wizard is reached
+                from the list, from a bookmark, and bare for a new deal, and only the arrow is true in
+                all three. "Your targets" is the list page's own heading, so the link says where it
+                lands. Same treatment as GHG trends' "← Back to GHG inventory". */}
+            <a href="/dashboard/deals/list" style={{ fontSize: 13, fontWeight: 600, color: '#7425e3', textDecoration: 'none', display: 'inline-block', marginBottom: 8 }}>← Your targets</a>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Deals & Investment</div>
             <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>ESG Deal Due Diligence</div>
           </div>

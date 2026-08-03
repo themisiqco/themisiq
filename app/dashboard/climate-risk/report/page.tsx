@@ -333,7 +333,7 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
             <Row k="Time horizon" v={`${a.horizon} term`} />
             <Row k="Asset profile" v={a.asset_profile} />
             <Row k="Model version" v={a.model_version || res.modelVersion || '—'} />
-            <Row k="Report date" v={reportDate} />
+            <Row k="Assessment date" v={reportDate} />
           </div>
         </section>
 
@@ -472,7 +472,7 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
         </section>
 
         <div style={{ marginTop: 32, paddingTop: 16, borderTop: '0.5px solid #e8e7e4', fontSize: 11, color: '#888784', textAlign: 'center' }}>
-          ThemisIQ Compliance Inc. · www.themisiq.co · Report ID {String(a.id).slice(0, 8)}… · Generated {reportDate}
+          ThemisIQ Compliance Inc. · www.themisiq.co · Report ID {String(a.id).slice(0, 8)}… · Assessment date {reportDate}
         </div>
       </div>
 

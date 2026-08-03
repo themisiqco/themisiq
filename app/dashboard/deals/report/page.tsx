@@ -250,7 +250,20 @@ function DealReport({ deal, reportDate, reference }: { deal: DealRow; reportDate
   return (
     <div className="report-root" style={{ background: '#fff', minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', color: '#0d0d0d' }}>
       <div className="no-print" style={{ position: 'sticky', top: 0, background: '#0d0d0d', color: '#fff', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>ThemisIQ · ESG deal due diligence report</div>
+        {/* In the .no-print bar deliberately — the print rule below hides this whole bar, so the
+            link never reaches the saved PDF. White on black, not the usual purple, which would be
+            unreadable here. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          <a href="/dashboard/deals/list" style={{ fontSize: 13, fontWeight: 600, color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap' }}>← Your targets</a>
+          {/* Back to the deal this report was built from — the likely next step after reading it is
+              correcting a figure, not browsing the whole list. No arrow: this is a move sideways to
+              the same target, not up to the collection. Same weight as its neighbour so neither
+              competes with Save as PDF, which is still the main control on this bar.
+              Uses deal.id — the row this report was actually built from — rather than the URL
+              param, which is not in scope in this component. */}
+          <a href={`/dashboard/deals?id=${deal.id}`} style={{ fontSize: 13, fontWeight: 600, color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap' }}>Edit this deal</a>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>ThemisIQ · ESG deal due diligence report</div>
+        </div>
         <button onClick={() => window.print()} style={{ fontSize: 13, fontWeight: 500, padding: '8px 20px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>⬇ Save as PDF (Cmd+P)</button>
       </div>
 
