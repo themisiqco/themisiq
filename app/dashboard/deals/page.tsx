@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Nav from '../../components/Nav'
 import { useEntitlement } from '../../../lib/useEntitlement'
@@ -101,8 +101,18 @@ function DealsDashboardInner() {
   // Share-link state (C4) — kept SEPARATE from the deal object so they never enter handleSave's
   // row payload; token/share_enabled are DB-owned (token auto-generated, share_enabled toggled here).
   const [dealToken, setDealToken] = useState<string | null>(null)
+  // Mirrors the sector as it exists IN THE DATABASE, not in the form. The share link serves the
+  // stored row, so the gate has to be judged against the stored row. Set in the two — and only two
+  // — places the row's sector can change: the load, and a successful save.
+  const [savedSector, setSavedSector] = useState('')
+  // The id of a deal this tab just created and wrote into the URL. Writing the id re-fires the load
+  // effect (Next 16: history.replaceState syncs useSearchParams — see the effect's own note), and
+  // re-fetching would replace `deal` wholesale and discard anything typed since the save. Consumed
+  // once, so a later genuine load of the same id is not skipped.
+  const justSavedId = useRef<string | null>(null)
   const [shareEnabled, setShareEnabled] = useState(false)
   const [shareSaving, setShareSaving] = useState(false)
+  const [shareError, setShareError] = useState<string | null>(null)
   const [copiedShare, setCopiedShare] = useState(false)
 
   // Load the deal named by ?id=, or none at all.
@@ -123,6 +133,12 @@ function DealsDashboardInner() {
   const searchParams = useSearchParams()
   const dealIdParam = searchParams.get('id')
   useEffect(() => {
+    // This tab just created this deal and put its id in the URL, which re-fires this effect.
+    // The form already holds the deal — re-fetching would clobber it. Skip exactly once.
+    if (justSavedId.current && justSavedId.current === dealIdParam) {
+      justSavedId.current = null
+      return
+    }
     let cancelled = false
     ;(async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -138,6 +154,7 @@ function DealsDashboardInner() {
       if (cancelled || error || !data) return
       setDealId(data.id)
       setDealToken(data.token ?? null)      // token isn't secret to the owner; drives the share UI
+      setSavedSector(data.sector ?? '')     // what the link would serve right now
       setShareEnabled(!!data.share_enabled)
       setDeal({
         target_name: data.target_name ?? '',
@@ -155,6 +172,9 @@ function DealsDashboardInner() {
         notes: data.notes ?? '',
       })
       if (Array.isArray(data.frameworks)) setFrameworks(data.frameworks) // derive effect reconciles anyway
+      // A just-loaded deal IS what is stored. `saved` means "the form matches the database", and the
+      // share gate below relies on that meaning — without this it reads false on every page load.
+      setSaved(true)
     })()
     return () => { cancelled = true }
     // Keyed on the extracted id, not the whole searchParams object: re-running on an unrelated
@@ -211,8 +231,27 @@ function DealsDashboardInner() {
       } else {
         const { data, error } = await supabase.from('deals').insert(row).select('id, token, share_enabled').single()
         if (error) { console.error('Deal save failed:', error); alert('Save failed: ' + error.message); return }
-        if (data) { setDealId(data.id); setDealToken(data.token ?? null); setShareEnabled(!!data.share_enabled) }
+        if (data) {
+          setDealId(data.id); setDealToken(data.token ?? null); setShareEnabled(!!data.share_enabled)
+          // Put the id in the URL so the address describes what the page is showing. Without this a
+          // newly created deal lives only in React state: the row is saved, but any remount — a
+          // refresh, or a hot reload in development — sends the load effect down its "no id, start
+          // clean" path and every field resets to blank while the row sits complete in the database.
+          //
+          // replaceState, not pushState: Back should not return to a URL that now renders an empty
+          // form. Next 16 syncs this into useSearchParams (docs: linking-and-navigating, "Native
+          // History API"), so it DOES re-fire the load effect — justSavedId is what stops that
+          // re-fetch clobbering the form.
+          justSavedId.current = data.id
+          window.history.replaceState(null, '', `/dashboard/deals?id=${data.id}`)
+        }
       }
+      // OUTSIDE the if/else deliberately. Setting this in the insert branch alone would leave it
+      // stale on every subsequent save: a deal loaded without a sector, given one, and saved takes
+      // the UPDATE path, which never touches the insert branch. Both paths return early on error,
+      // so reaching this line means the row was written. `row.sector` rather than `deal.sector` —
+      // record what was actually sent, not what the form holds now.
+      setSavedSector(row.sector)
       setSaved(true)
     } finally { setSaving(false) }
   }
@@ -263,17 +302,64 @@ function DealsDashboardInner() {
   // the Export "Report summary", and the sticky "Deal summary" so all three stay consistent.
   const themisIqFigure = themisIqFigureOf(obligations)
 
+  // What must be present before a link can be CREATED. Sector only.
+  //
+  // Jurisdiction was here too and was dead: JURISDICTIONS has no empty option, the state
+  // initialises to 'USA' and the load falls back to 'USA', so no path through the UI makes it
+  // falsy. Listing it made the gate read as though it checked two things when it checked one.
+  //
+  // Sector is the one that can genuinely be absent, and it is doubly load-bearing: it is a conjunct
+  // of the detection effect (so without it `frameworks` is empty) AND it keys SECTOR_RISKS (so
+  // without it the target sees no risk findings either). location_count is deliberately NOT here —
+  // unset renders "Custom quote" on the target's page, which is honest rather than broken.
+  //
+  // Judged on savedSector, NOT deal.sector: the link serves the database, so the gate must too.
+  // A sector typed but not saved is correctly still a blocker — the link would serve the row
+  // without it — and toggleShare's error message tells those two causes apart.
+  const shareBlockers: string[] = [
+    ...(savedSector ? [] : ['a sector']),
+  ]
+
   // Absolute public URL for the target-facing route (matches the verifier linkFor pattern).
   const shareUrl = dealToken ? `${typeof window !== 'undefined' ? window.location.origin : 'https://www.themisiq.co'}/deals/${dealToken}` : ''
 
   // Flip share_enabled — a normal owner-gated update (existing RLS covers it); no RPC, no policy change.
+  // The WRITE is where the gate has authority. A render-level check only decides what is on screen;
+  // it cannot stop a stale render, a second tab, or any future call site. So the condition lives in
+  // the UPDATE's own WHERE clause and Postgres decides — against the row as it actually is, at the
+  // instant of the write. No read-then-write pair, so nothing can change in between.
   const toggleShare = async (enabled: boolean) => {
     if (!dealId) return
     setShareSaving(true)
+    setShareError(null)
     try {
-      const { error } = await supabase.from('deals').update({ share_enabled: enabled }).eq('id', dealId)
-      if (error) { console.error('Share toggle failed:', error); alert('Could not update sharing: ' + error.message); return }
-      setShareEnabled(enabled) // only reflect state on a successful write
+      if (!enabled) {
+        // REVOKING IS NEVER GATED. Turning a live link off must work whatever state the deal is in
+        // — a deal that fails the create-gate is precisely one whose link most needs revoking.
+        const { error } = await supabase.from('deals').update({ share_enabled: false }).eq('id', dealId)
+        if (error) { console.error('Share revoke failed:', error); setShareError('Could not turn the link off: ' + error.message); return }
+        setShareEnabled(false)
+        return
+      }
+
+      // CREATING a link is gated on the STORED sector. `.in('sector', SECTORS)` rather than a
+      // not-empty test: it is unambiguous about how an empty string encodes, and it additionally
+      // rejects anything that is not a real sector.
+      const { data, error } = await supabase
+        .from('deals')
+        .update({ share_enabled: true })
+        .eq('id', dealId)
+        .in('sector', SECTORS)
+        .select('id')
+      if (error) { console.error('Share toggle failed:', error); setShareError('Could not create the link: ' + error.message); return }
+      if (!data || data.length === 0) {
+        // Zero rows means the row did not qualify, so no link was created. Say what to do.
+        setShareError(deal.sector
+          ? 'This deal has no sector saved yet — the sector you have chosen has not been saved. Use Save deal at the bottom of the page, then try again.'
+          : 'This deal has no sector, so the link would open to an empty assessment. Add one in Deal setup, save the deal, then try again.')
+        return
+      }
+      setShareEnabled(true) // only reflect state on a successful write
     } finally { setShareSaving(false) }
   }
 
@@ -486,14 +572,35 @@ function DealsDashboardInner() {
   const renderStep2 = () => (
     <div>
       <h2 style={sectionHead}>Material ESG findings</h2>
-      <p style={sectionSub}>Based on {deal.target_name || 'the target company'}'s sector and jurisdiction, ThemisIQ has identified the following material ESG risks for your deal memo.</p>
+      {/* The lead-in lives INSIDE the findings branch. It used to render above the ternary, so the
+          page announced "ThemisIQ has identified the following material ESG risks" and then, three
+          lines down, said there were none. Three states, not two: no sector chosen; a sector with no
+          risk template ("Other"); and findings to show. */}
 
       {risks.length === 0 ? (
-        <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: '#888784' }}>
-          Select a sector in Step 1 to see ESG risk findings.
-        </div>
+        deal.sector ? (
+          /* A sector IS chosen — "Other", or any future sector added to the dropdown without a
+             SECTOR_RISKS entry. "Select a sector" would be wrong advice for someone who selected
+             one, and silence would read as a clean bill of health. Neither is true: we simply have
+             nothing pre-written for this sector. */
+          <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '1.75rem 2rem', fontSize: 13, color: '#555553', lineHeight: 1.7 }}>
+            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', color: '#0d0d0d', marginBottom: 8 }}>No standard findings for this sector</div>
+            We keep a set of common ESG risks for each sector, and &ldquo;{deal.sector}&rdquo; isn&rsquo;t one of them, so
+            there is nothing pre-written to show here. <strong style={{ fontWeight: 600 }}>That is not a finding that this target has no
+            ESG risks.</strong> If one of the listed sectors is close to what it does, choosing it in{' '}
+            <button onClick={() => setStep(0)} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: '#7425e3', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Deal setup</button>
+            {' '}will bring up the risks that usually apply.
+          </div>
+        ) : (
+          <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: '#888784', fontSize: 13, lineHeight: 1.7 }}>
+            Choose a sector in{' '}
+            <button onClick={() => setStep(0)} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: '#7425e3', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Deal setup</button>
+            {' '}to see the ESG risks that usually come with it.
+          </div>
+        )
       ) : (
         <>
+          <p style={sectionSub}>Based on {deal.target_name || 'the target company'}&rsquo;s sector and jurisdiction, ThemisIQ has identified the following material ESG risks for your deal memo.</p>
           {/* The Framework badge on each finding resolves against the detected list. With nothing
               detected it falls back to a methodology label — say so rather than let it read as a
               resolved regime. */}
@@ -616,9 +723,6 @@ function DealsDashboardInner() {
                 )}
               </div>
             ))}
-            <div style={{ fontSize: 13, color: '#0d0d0d', marginBottom: 6 }}>✓ Immutable audit trail</div>
-            <div style={{ fontSize: 13, color: '#0d0d0d', marginBottom: 6 }}>✓ SBTi science-based target setting</div>
-            <div style={{ fontSize: 13, color: '#0d0d0d', marginBottom: 10 }}>✓ Assurance-ready verification package</div>
             {frameworks.length > 0 && (
               <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, borderTop: '0.5px solid rgba(15,110,86,0.15)', paddingTop: 8 }}>
                 Frameworks detected for this deal: {frameworks.join(', ')}.
@@ -735,17 +839,57 @@ function DealsDashboardInner() {
             <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, marginBottom: 14 }}>
               Share this assessment with the target company. They&rsquo;ll see the compliance findings and cost estimate — not your deal economics.
             </div>
+            {shareError && (
+              <div style={{ background: '#FCEBEB', border: '0.5px solid rgba(185,28,28,0.2)', borderRadius: 10, padding: '0.85rem 1rem', fontSize: 12, color: '#B91C1C', lineHeight: 1.6, marginBottom: 12 }}>
+                {shareError}
+              </div>
+            )}
+            {/* ORDER MATTERS. `shareEnabled` is tested BEFORE the blockers so that a live link is
+                always manageable. Putting the blockers first stranded the owner in exactly the state
+                the gate exists to prevent: a sectorless deal that had already been shared showed
+                "Add a sector first" and offered no way to turn the link off, while the link stayed
+                live and the target kept reading an empty assessment. Blockers gate CREATING a link.
+                They never gate managing one that already exists. */}
             {!dealId || !dealToken ? (
               <div style={{ fontSize: 12, color: '#888784', fontStyle: 'italic' }}>Save the deal to generate a shareable link.</div>
             ) : shareEnabled ? (
               <>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#0F6E56', marginBottom: 12 }}>🟢 Link active — anyone with this URL can view this assessment.</div>
+                {/* A live link on a deal that fails the create-gate is the urgent case: someone is
+                    reading an empty assessment right now, and only the owner can stop it. */}
+                {shareBlockers.length > 0 && (
+                  <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '0.85rem 1rem', fontSize: 12, color: '#555553', lineHeight: 1.6, marginBottom: 12 }}>
+                    <div style={{ fontWeight: 600, color: '#ba7517', marginBottom: 4 }}>Anyone opening this link right now sees an empty assessment</div>
+                    This deal has no sector saved, so there are no reporting rules or risk findings to show.
+                    Either turn the link off below, or{' '}
+                    <button onClick={() => setStep(0)} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: '#7425e3', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>add a sector in Deal setup</button>
+                    {' '}and save the deal.
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
                   <input readOnly value={shareUrl} onFocus={e => e.currentTarget.select()} style={{ flex: 1, minWidth: 220, fontSize: 12, padding: '9px 12px', borderRadius: 8, border: '0.5px solid #e8e7e4', background: '#fff', color: '#555553' }} />
                   <button onClick={copyShareLink} style={{ fontSize: 12, fontWeight: 500, padding: '9px 16px', borderRadius: 8, background: copiedShare ? '#E1F5EE' : '#fff', border: `0.5px solid ${copiedShare ? '#0F6E56' : '#e8e7e4'}`, color: copiedShare ? '#0F6E56' : '#555553', cursor: 'pointer', whiteSpace: 'nowrap' }}>{copiedShare ? '✓ Copied!' : 'Copy link'}</button>
                 </div>
                 <button onClick={() => toggleShare(false)} disabled={shareSaving} style={{ fontSize: 13, fontWeight: 600, padding: '10px 22px', borderRadius: 8, background: '#fff', border: '1px solid #B91C1C', color: '#B91C1C', cursor: shareSaving ? 'not-allowed' : 'pointer' }}>{shareSaving ? 'Updating…' : 'Revoke access'}</button>
               </>
+            ) : shareBlockers.length > 0 ? (
+              /* The target's page is priced from the frameworks list stored on this row, and that
+                 list is empty without a sector and a jurisdiction — so sharing before they are
+                 filled in sends the target an assessment showing no obligations and a GHG-only
+                 price. Name what to fill in and where, rather than reporting a fault. */
+              <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '0.85rem 1rem', fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
+                <div style={{ fontWeight: 600, color: '#ba7517', marginBottom: 4 }}>
+                  {deal.sector ? 'Save the deal first' : 'Add a sector first'}
+                </div>
+                {deal.sector ? (
+                  <>The link shows the saved version of this deal, and the sector you have chosen has not been saved yet —
+                  so the target would open the link to an empty assessment. Use <strong style={{ fontWeight: 600 }}>Save deal</strong> at the bottom of the page.</>
+                ) : (
+                  <>Without a sector there are no reporting rules or risk findings to show, so the target would open
+                  the link to an empty assessment.{' '}
+                  <button onClick={() => setStep(0)} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: '#7425e3', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Go to Deal setup</button></>
+                )}
+              </div>
             ) : (
               <>
                 <div style={{ fontSize: 12, color: '#888784', marginBottom: 12 }}>🔒 Not shared — only you can see this assessment.</div>

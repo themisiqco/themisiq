@@ -31,6 +31,7 @@ type Assessment = {
   frameworks: string[] | null
   has_ghg_data: boolean | null
   has_esg_report: boolean | null
+  updated_at: string | null   // when the frameworks snapshot below was written (see the note it dates)
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -92,16 +93,15 @@ export default function DealAssessmentPage() {
     </Shell>
   )
 
-  // ── Recompute the assessment from the safe fields via the shared C1 lib (no drift) ──
-  // TODO (PRE-LAUNCH): `frameworks` is read from the STORED jsonb column and is NOT recomputed
-  // here. Deals saved before the per-framework revenue fix stored `[]` whenever revenue was blank
-  // (the old guard withheld the whole list), so an already-shared link will UNDERSTATE both the
-  // obligations and the price shown to the target — an EU/Global deal misses CS3D/CSRD and so
-  // omits the $2,900 supply-chain module. It self-heals the moment the owner reopens and re-saves.
-  // Fix options: (a) recompute the non-revenue frameworks here from jurisdiction + sector, unioned
-  // with the stored revenue-triggered ones (revenue itself is deliberately absent from the RPC, so
-  // SB 253 / SECR can only come from storage); or (b) a one-off backfill. Do NOT ship the public
-  // page to customers before resolving this.
+  // ── The assessment, from the target-safe fields ──
+  // `frameworks` is a SNAPSHOT read from the stored jsonb column — it is NOT recomputed here, and
+  // deliberately so. revenue, currency, employee_count and total_assets are all excluded from the
+  // RPC whitelist, so a recompute could only redo the jurisdiction- and sector-derived rules while
+  // still relying on the snapshot for SB 253, SECR and every multi-limb test. That hybrid would be
+  // half live and half stored with nothing on the page able to say which half a reader is looking
+  // at. So the snapshot stands, and the page DATES it (see snapshotDate below) — a reader can then
+  // judge whether to rely on it. The wizard's share gate is what stops an empty snapshot being
+  // shared in the first place.
   const frameworks = Array.isArray(data.frameworks) ? data.frameworks : []
   const risks: SectorRisk[] = (data.sector && SECTOR_RISKS[data.sector]) || []
   const obligations = getObligations(data.location_count ?? 0, frameworks, data.sector ?? undefined)
@@ -128,6 +128,13 @@ export default function DealAssessmentPage() {
 
   const sectorJur = [data.sector, data.jurisdiction].filter(Boolean).join(' · ')
 
+  // Date-only, in the READER's locale. The RPC returns the raw timestamptz rather than casting to
+  // ::date server-side, because that cast runs in the server's timezone and would date a deal saved
+  // at 21:00 EDT as the following day.
+  const snapshotDate = data.updated_at
+    ? new Date(data.updated_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
+    : null
+
   return (
     <Shell>
       {/* Hero */}
@@ -137,6 +144,19 @@ export default function DealAssessmentPage() {
         {sectorJur && <div style={{ fontSize: 14, color: '#555553' }}>{sectorJur}</div>}
         <div style={{ fontSize: 12, color: '#888784', marginTop: 6 }}>Prepared via ThemisIQ — the ESG compliance platform for deals.</div>
       </div>
+
+      {/* Dates the snapshot. Placed BEFORE any finding or figure, because it governs all of them —
+          a reader who sees the numbers first has already relied on them. Mirrors the shape of the
+          deals report's "derived, not stored" note and states the opposite, true, fact: this page
+          IS the stored snapshot, so it carries a date and the report carries a generation instant. */}
+      {snapshotDate && (
+        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem 1.25rem', marginBottom: 28, fontSize: 12, color: '#555553', lineHeight: 1.7 }}>
+          <strong style={{ fontWeight: 600, color: '#0d0d0d' }}>Worked out on {snapshotDate}.</strong>{' '}
+          The rules and costs below come from the figures held for this company on that date. They are
+          not recalculated when you open this page, so if those figures have changed since, a newer
+          assessment may reach a different answer. Ask whoever sent you this link for an up-to-date one.
+        </div>
+      )}
 
       {/* Applicable frameworks */}
       {frameworks.length > 0 && (
@@ -211,9 +231,6 @@ export default function DealAssessmentPage() {
               )}
             </div>
           ))}
-          <div style={{ fontSize: 13, marginBottom: 6 }}>✓ Immutable audit trail</div>
-          <div style={{ fontSize: 13, marginBottom: 6 }}>✓ SBTi science-based target setting</div>
-          <div style={{ fontSize: 13, marginBottom: 0 }}>✓ Assurance-ready verification package</div>
         </div>
 
         {/* Also recommended — NOT summed into the ThemisIQ total */}
