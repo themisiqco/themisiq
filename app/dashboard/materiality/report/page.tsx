@@ -13,8 +13,10 @@ import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { supabase } from '../../../../lib/supabase'
 import { useEntitlement } from '../../../../lib/useEntitlement'
+import { useReportTitle, reportTitle } from '../../../../lib/useReportTitle'
 import PaywallCard from '../../../components/PaywallCard'
 import { REGION_LABEL } from '../../../../lib/climate/regions'
+import { DISCLAIMER_PARAS } from '../../../../lib/disclaimer'
 
 // ─── Lookup helpers (labels we don't store on the assessment row) ─────────────
 
@@ -43,17 +45,6 @@ const SCENARIO_LABEL: Record<string, { l: string; d: string }> = {
   ngfs_disorderly: { l: 'NGFS Disorderly', d: 'Late, abrupt' },
   ngfs_hothouse: { l: 'NGFS Hot House', d: 'Limited action' },
 }
-
-// Formal Important Notice — five paragraphs, rendered as a final section in both
-// the CSRD/IFRS S2 report and the resilience report.
-const DISCLAIMER_PARAS: string[] = [
-  'This document and all outputs generated through the ThemisIQ platform are provided for informational, screening, planning, and prioritization purposes only. They do not constitute legal, regulatory, accounting, financial, assurance, investment, or other professional advice and do not, by themselves, satisfy any reporting, disclosure, filing, compliance, assurance, or certification obligation under IFRS, ISSB, CSRD, ESRS, SEC, California climate disclosure regulations, or any other framework or jurisdiction.',
-  'Platform outputs are dependent upon information provided by users and other third-party sources. ThemisIQ Compliance Inc. does not independently verify such information and makes no representation or warranty, express or implied, regarding the completeness, accuracy, reliability, suitability, or fitness for a particular purpose of any output.',
-  'Sustainability-related laws, regulations, standards, guidance, and interpretations continue to evolve. Users remain solely responsible for determining the applicability of regulatory requirements and for obtaining independent legal, accounting, assurance, and other professional advice where appropriate.',
-  'Use of the platform does not create a professional-client, advisory, assurance, accounting, consulting, fiduciary, or legal relationship with ThemisIQ Compliance Inc.',
-  'To the maximum extent permitted by law, ThemisIQ Compliance Inc., its directors, officers, employees, contractors, and affiliates shall not be liable for any direct, indirect, incidental, consequential, special, punitive, or economic damages arising from the use of, or reliance upon, any platform output.',
-  'ThemisIQ is a software platform and is not an accredited assurance provider, certification body, or regulatory authority.',
-]
 
 // ─── Styled bits (print-friendly) ─────────────────────────────────────────────
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
@@ -204,6 +195,16 @@ function ReportInner() {
       router.replace(`/dashboard/climate-risk/report?id=${id}`)
     }
   }, [a, id, router])
+
+  // Names the saved PDF. Null until the assessment has loaded, and withheld for a resilience record
+  // — that one is being redirected to its own report and must not be titled as a materiality one.
+  const isResilienceRecord = !!a && (a.results || {}).analysisType === 'resilience'
+  useReportTitle(a && !isResilienceRecord
+    ? reportTitle(
+        a.workings?.disclosure?.legalEntity || a.company_name,
+        a.mode === 'csrd' ? 'CSRD Double Materiality Report' : 'IFRS S2 Single Materiality Report',
+      )
+    : null)
 
   if (!isPaid) return <PaywallCard />
   if (loading) return <Centered>Loading report…</Centered>

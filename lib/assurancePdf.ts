@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { DISCLAIMER_PARAS } from './disclaimer'
 
 // ── Types (mirror the wizard's shapes) ──
 export interface PdfSourceDoc { id: string; file_name: string; document_type: string; uploaded_at: string; file_path: string }
@@ -22,18 +23,9 @@ const INK = '#0d0d0d'
 const MUTE = '#888784'
 const PURPLE = '#7425e3'
 
-// Formal Important Notice — five paragraphs, matching the language used across
-// ThemisIQ generated reports. Rendered as a dedicated final page; this is in
-// addition to the assurance-specific (ISO 14064-3 / ISAE 3410) disclaimer on
-// the cover page, which is retained.
-const DISCLAIMER_PARAS: string[] = [
-  'This document and all outputs generated through the ThemisIQ platform are provided for informational, screening, planning, and prioritization purposes only. They do not constitute legal, regulatory, accounting, financial, assurance, investment, or other professional advice and do not, by themselves, satisfy any reporting, disclosure, filing, compliance, assurance, or certification obligation under IFRS, ISSB, CSRD, ESRS, SEC, California climate disclosure regulations, or any other framework or jurisdiction.',
-  'Platform outputs are dependent upon information provided by users and other third-party sources. ThemisIQ Compliance Inc. does not independently verify such information and makes no representation or warranty, express or implied, regarding the completeness, accuracy, reliability, suitability, or fitness for a particular purpose of any output.',
-  'Sustainability-related laws, regulations, standards, guidance, and interpretations continue to evolve. Users remain solely responsible for determining the applicability of regulatory requirements and for obtaining independent legal, accounting, assurance, and other professional advice where appropriate.',
-  'Use of the platform does not create a professional-client, advisory, assurance, accounting, consulting, fiduciary, or legal relationship with ThemisIQ Compliance Inc.',
-  'To the maximum extent permitted by law, ThemisIQ Compliance Inc., its directors, officers, employees, contractors, and affiliates shall not be liable for any direct, indirect, incidental, consequential, special, punitive, or economic damages arising from the use of, or reliance upon, any platform output.',
-  'ThemisIQ is a software platform and is not an accredited assurance provider, certification body, or regulatory authority.',
-]
+// The formal Important Notice is rendered as a dedicated final page. This is IN ADDITION to
+// the assurance-specific (ISO 14064-3 / ISAE 3410) disclaimer on the cover page, which is
+// retained. Text lives in lib/disclaimer.ts — one copy across every surface that carries it.
 
 const boundaryLabel = (b: string) =>
   ({ operational_control: 'Operational Control', financial_control: 'Financial Control', equity_share: 'Equity Share' }[b] || b)

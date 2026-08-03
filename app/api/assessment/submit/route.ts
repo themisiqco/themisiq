@@ -1,19 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { DISCLAIMER_PARAS } from '../../../../lib/disclaimer'
 
 const RESEND_API_KEY   = process.env.RESEND_API_KEY!
 const FROM_EMAIL       = process.env.RESEND_FROM_EMAIL || 'noreply@themisiq.co'
 const MONITOR_EMAIL    = process.env.RESEND_MONITOR_EMAIL!
 
-// Formal Important Notice — five paragraphs, matching the language used across
-// ThemisIQ generated reports. Rendered in the lead-email footer as fine print.
-const DISCLAIMER_PARAS: string[] = [
-  'This document and all outputs generated through the ThemisIQ platform are provided for informational, screening, planning, and prioritization purposes only. They do not constitute legal, regulatory, accounting, financial, assurance, investment, or other professional advice and do not, by themselves, satisfy any reporting, disclosure, filing, compliance, assurance, or certification obligation under IFRS, ISSB, CSRD, ESRS, SEC, California climate disclosure regulations, or any other framework or jurisdiction.',
-  'Platform outputs are dependent upon information provided by users and other third-party sources. ThemisIQ Compliance Inc. does not independently verify such information and makes no representation or warranty, express or implied, regarding the completeness, accuracy, reliability, suitability, or fitness for a particular purpose of any output.',
-  'Sustainability-related laws, regulations, standards, guidance, and interpretations continue to evolve. Users remain solely responsible for determining the applicability of regulatory requirements and for obtaining independent legal, accounting, assurance, and other professional advice where appropriate.',
-  'Use of the platform does not create a professional-client, advisory, assurance, accounting, consulting, fiduciary, or legal relationship with ThemisIQ Compliance Inc.',
-  'To the maximum extent permitted by law, ThemisIQ Compliance Inc., its directors, officers, employees, contractors, and affiliates shall not be liable for any direct, indirect, incidental, consequential, special, punitive, or economic damages arising from the use of, or reliance upon, any platform output.',
-  'ThemisIQ is a software platform and is not an accredited assurance provider, certification body, or regulatory authority.',
-]
+// The formal Important Notice is rendered in the lead-email footer as fine print.
+// Text lives in lib/disclaimer.ts — one copy across every surface that carries it.
 
 // Pre-rendered HTML for the email footer: an "Important Notice" heading followed
 // by each paragraph as fine print.
