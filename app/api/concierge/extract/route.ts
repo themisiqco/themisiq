@@ -21,8 +21,9 @@ import { getAuthedClient, bearerFrom, AuthError } from '../../../../lib/supabase
 
 // Fuel types we currently extract, with the unit(s) the GHG inventory expects.
 // Keep this list aligned with the GHG module's per-location fields.
-const SUPPORTED_FUELS = ['electricity', 'natural_gas', 'diesel', 'propane', 'gasoline'] as const
-type FuelType = typeof SUPPORTED_FUELS[number]
+// From the shared lib, NOT declared here: the wizard needs the same list, and it cannot import from
+// this module without pulling `next/server` into the client bundle. See lib/ghg/conciergeDocTypes.ts.
+import { SUPPORTED_FUELS, type FuelType } from '../../../../lib/ghg/conciergeDocTypes'
 
 const FUEL_GUIDANCE: Record<FuelType, string> = {
   electricity:
@@ -189,9 +190,16 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // model + usage are returned for OPERATOR TELEMETRY only — the wizard logs them so the
+    // per-document cost of a paid add-on is observable. They are metadata about the call, never
+    // about the document: no content, no source quotes, nothing derived from what was read.
     return NextResponse.json({
       success: true,
       fields,
+      model: data.model ?? null,
+      usage: data.usage
+        ? { input_tokens: data.usage.input_tokens ?? null, output_tokens: data.usage.output_tokens ?? null }
+        : null,
     })
 
   } catch (error) {

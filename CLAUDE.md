@@ -19,6 +19,7 @@ ThemisIQ (themisiq.co) is a B2B compliance SaaS platform. Solo founder/developer
   - `entitlements.location_allowance` (integer, nullable; `NULL` = uncapped)
   - the `enforce_ghg_location_allowance()` Postgres trigger (BEFORE INSERT/UPDATE on `ghg_inventories`)
   If the database is ever rebuilt, these two SQL statements must be re-run by hand. Do not assume the repo is the full source of truth for DB state.
+  - **No longer on this list:** the `source-documents` storage bucket. Its config and its three RLS policies were DB-only until 4 Aug 2026 and are now captured in `supabase/migrations/20260804_ghg_source_documents_bucket_hardening.sql` and `..._policies.sql` (run the hardening one first — it creates the bucket row the policies reference).
 
 ---
 

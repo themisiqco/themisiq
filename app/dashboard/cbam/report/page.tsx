@@ -584,8 +584,25 @@ function CbamVerifierInvite({ installationId, companyId, reportingPeriod }: { in
   return (
     <div style={{ marginTop: '2.5rem', borderTop: '0.5px solid #e8e7e4', paddingTop: '2rem' }}>
       <h3 style={itemHead}>Invite a verifier</h3>
+      {/* WHY THE SECOND PARAGRAPH. This block used to promise a "secure" link you could "revoke
+          access" to at any time. Both overstated. A verifier link is a bearer credential — whoever
+          holds it can open it — and revoking closes the PAGE, not anything the verifier has already
+          downloaded. A customer reading the old sentence would reasonably conclude otherwise.
+          The limit is stated together with the reason it is correct: a verifier keeping the
+          evidence behind their report is a working-paper obligation, not a leak in this product.
+          "Revoke one" rather than "revoke access", because access is the thing that does not fully
+          revoke.
+
+          DELIBERATELY NOT IDENTICAL to the GHG copy at app/dashboard/ghg/page.tsx. That surface
+          says "assurance provider" and "their opinion"; a CBAM verifier is accredited under
+          IR (EU) 2025/2547 and issues a verification REPORT, not an assurance opinion. Same
+          argument, different profession — keep the wording matched to each. (The claim about the
+          document LINKS themselves is shared and does live in one place: lib/verifierDocNotice.ts.) */}
+      <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.7, marginBottom: '0.75rem' }}>
+        Generate a read-only link for your independent verifier. They&apos;ll see this installation&apos;s Annex IV &sect;1.2 summary and source documents for {reportingPeriod}, with no ability to edit. Links expire in 90 days, and you can revoke one at any time.
+      </p>
       <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.7, marginBottom: '1.25rem' }}>
-        Generate a secure, read-only link for your independent verifier. They&apos;ll see this installation&apos;s Annex IV &sect;1.2 summary and source documents for {reportingPeriod}, with no ability to edit. Links expire in 90 days, and you can revoke access at any time.
+        Revoking closes the link: the page stops loading and no further documents can be opened. It does not reach anything already downloaded. That is normal and expected &mdash; an accredited CBAM verifier is required to keep the evidence behind their report in their own working papers.
       </p>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', flexWrap: 'wrap' }}>

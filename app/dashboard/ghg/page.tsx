@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, Suspense } from 'react'
+import { CONCIERGE_UNREAD_DOC_TYPES, SUPPORTED_FUELS } from '../../../lib/ghg/conciergeDocTypes'
 import { supabase } from '../../../lib/supabase'
 import { buildMonthlyEmissions } from '../../../lib/ghg/monthlyEmissions'
 import { useEntitlement, useHasConcierge, useGhgLocationAllowance } from '../../../lib/useEntitlement'
@@ -9,13 +10,14 @@ import { useSearchParams, useRouter } from 'next/navigation'
 
 import {
   EF_SOURCES,
-  US_STATES, US_SUBREGIONS, AU_STATES, EU_COUNTRIES, EU_COUNTRY_OPTIONS,
+  US_STATES, US_SUBREGIONS, AU_STATES, EU_COUNTRY_OPTIONS,
   GRID_REGIONS_CA, GRID_REGIONS_US, FRAMEWORKS,
   isResolvedGridRegion, getGridFactor, getResidualFactor,
   detectGridRegion, gridRegionForCountry, pickEF, combustionSource,
   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation, pctEstimated,
   applyResolutions, findUnresolvedCoverage, findUndeclaredStreams, STREAM_META,
-  ngUnitOptions, normalizeNgUnit, liquidUnitOptions, propaneUnitOptions,
+  ngUnitOptions, liquidUnitOptions, propaneUnitOptions, steamUnitOptions,
+  snapUnitsForCountry,
   validateElectricity, validateNaturalGas, validateCompleteness,
   parseLocalDate, periodFromYearAndEnd, analyzeCoverage,
 } from '../../../lib/ghg/engine'
@@ -188,22 +190,9 @@ function PaywallOverlay({ frameworks }: { frameworks: string[] }) {
   )
 } 
 
-// Document types the concierge does NOT read a figure from. Uploading them is still worth doing —
-// the file is the evidence a verifier traces the figure back to — but the number is typed in by hand.
-//
-//   service_record (refrigerants) — deliberately excluded. Refrigerant accounting is a judgment call
-//     (Tier-2/3 method choice, leak assumptions), not a figure to lift off a page.
-//   fuel_oil / purchased_steam / renewable_cert — their fuel types are NOT in the extract route's
-//     SUPPORTED_FUELS ('electricity', 'natural_gas', 'diesel', 'propane', 'gasoline'), so a call
-//     could only ever return figures the knownFuels filter discards. Sending them cost a model call
-//     and produced an empty result with no explanation, which reads to a paying customer as
-//     "it didn't work" rather than "it doesn't do this".
-//
-// ⚠️ KEEP IN STEP WITH SUPPORTED_FUELS in app/api/concierge/extract/route.ts. Teaching the route a
-// new fuel means REMOVING its document type from this set in the same edit, or the new capability
-// stays switched off. This set also drives the drop-zone copy in DocUpload, so the promise made to
-// the customer and the call actually made cannot disagree.
-const CONCIERGE_UNREAD_DOC_TYPES = new Set(['service_record', 'fuel_oil', 'purchased_steam', 'renewable_cert', 'biogenic'])
+// CONCIERGE_UNREAD_DOC_TYPES and the doc-type → fuel mapping now live in lib/ghg/conciergeDocTypes.ts
+// so a test can hold them against the extractor's own fuel list. See that file for why each
+// document type is or is not read.
 
 // File types the reader can actually open. The picker deliberately accepts MORE than this —
 // a spreadsheet of meter readings is exactly the evidence a verifier wants, and the non-concierge
@@ -386,7 +375,9 @@ const searchParams = useSearchParams()
      if (field === 'state') locs[idx].grid_region = detectGridRegion(value, locs[idx].country) // US states → US_<ST>; AU states → AU_<region>
 if (field === 'province') locs[idx].grid_region = value // Canadian provinces map directly
       if (field === 'country') {
-        locs[idx].natural_gas_unit = normalizeNgUnit(value, locs[idx].natural_gas_unit) as any
+        // Every unit at once, derived from the same option lists the selectors render, so a fuel
+        // cannot be snapped by one rule and offered by another. See UNIT_FIELDS in the engine.
+        Object.assign(locs[idx], snapUnitsForCountry(value, locs[idx] as any))
         // UK, EU and NZ grids are national — set grid_region directly from the country.
         // (AU returns '' here and resolves on the state pick; US resolves on the state pick.)
         const gr = gridRegionForCountry(value)
@@ -394,16 +385,6 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         // region so a country switch can't leave a stale wrong-country factor (e.g. US_CA on an AU loc).
         if (gr) locs[idx].grid_region = gr
         else locs[idx].grid_region = ''
-        // Metric countries (CA, UK, EU, AU, NZ) default liquid fuels to litres; US/other keep gallons.
-        // NZ LPG is the exception — MfE publishes it per kg, so propane defaults to kg for NZ.
-        const ctryUp = (value || '').toUpperCase().trim()
-        const metric = ctryUp === 'CA' || ctryUp === 'GB' || ctryUp === 'UK' || ctryUp === 'AU' || ctryUp === 'NZ' || EU_COUNTRIES.includes(ctryUp)
-        if (metric) {
-          locs[idx].propane_unit = ctryUp === 'NZ' ? 'kg' : 'litres'
-          locs[idx].diesel_stationary_unit = 'litres'
-          locs[idx].gasoline_unit = 'litres'
-          locs[idx].diesel_mobile_unit = 'litres'
-        }
       }
       return { ...inv, locations: locs }
     })
@@ -465,9 +446,11 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
             const json = await res.json()
             if (json?.success && Array.isArray(json.fields)) {
               const { convertToCanonical } = await import('../../../lib/unitConversions')
-              const knownFuels = ['electricity', 'natural_gas', 'propane', 'diesel', 'gasoline']
               doc.extracted = json.fields
-                .filter((f: any) => f && f.value != null && knownFuels.includes(f.fuelType))
+                // SUPPORTED_FUELS, not a local copy: this filter and the prompt the route builds must
+                // describe the same set, or the model is asked for a fuel whose figure is silently
+                // dropped here. This was the third copy of the same five names.
+                .filter((f: any) => f && f.value != null && (SUPPORTED_FUELS as readonly string[]).includes(f.fuelType))
                 .map((f: any): ExtractedProposal => {
                   const conv = convertToCanonical(f.fuelType, f.value, f.unit)
                   const needsReview = conv.tier === 3 || f.confidence === 'low'
@@ -488,6 +471,20 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                   }
                 })
               console.log('[concierge step5] proposals on doc:', doc.extracted)
+              // OPERATOR TELEMETRY — extraction is a paid add-on, so the per-document cost of a call
+              // should be observable rather than discarded. Deliberately console only: this is for
+              // whoever is watching the logs, not for the customer, who has no use for a token count.
+              //
+              // METADATA ONLY. Nothing here comes from the document: not a value, not a unit, not a
+              // source quote, not a period. `proposals` is a COUNT, and docType names the slot the
+              // upload went into — both describe the call, never its contents.
+              console.log('[concierge cost]', {
+                docType,
+                model: json.model ?? 'unknown',
+                inputTokens: json.usage?.input_tokens ?? null,
+                outputTokens: json.usage?.output_tokens ?? null,
+                proposals: doc.extracted?.length ?? 0,
+              })
               if ((doc.extracted?.length ?? 0) === 0) {
                 // (c) The document WAS read and no figure could be taken from it with confidence.
                 // The extractor is instructed to abstain rather than guess, so this is the system
@@ -1043,7 +1040,16 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             <QuestionCard question={streamQuestion('fuel_oil')} hint="Heating oil for boilers or furnaces — check delivery records" checked={loc.has_fuel_oil} onToggle={v => updateLocation(activeLocation, 'has_fuel_oil', v)}>
               {loc.has_fuel_oil && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
-                  <Field label={`Total fuel oil purchased — ${inventory.reporting_year} (gallons)`}>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+                    {/* liquidUnitOptions, not a hardcoded pair: it labels the US gallon explicitly
+                        (an imperial gallon is ~20% larger, so "Gallons" alone is a 20% error waiting
+                        to happen) AND withholds gallons entirely from metric countries, which is the
+                        policy every other liquid fuel here already follows. */}
+                    {liquidUnitOptions(loc.country).map(([val, label]) => (
+                      <button key={val} onClick={() => updateLocation(activeLocation, 'fuel_oil_unit', val as 'gallons' | 'litres')} style={unitBtn((loc.fuel_oil_unit ?? 'gallons') === val)}>{label}</button>
+                    ))}
+                  </div>
+                  <Field label={`Total fuel oil purchased — ${inventory.reporting_year} (${(loc.fuel_oil_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
                     <input type="number" value={loc.fuel_oil_gallons || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_gallons', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
                   {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
@@ -1165,9 +1171,26 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             <QuestionCard question={streamQuestion('purchased_steam')} hint="Purchased steam or hot water from a district energy system — Scope 2" checked={loc.has_purchased_steam} onToggle={v => updateLocation(activeLocation, 'has_purchased_steam', v)}>
               {loc.has_purchased_steam && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
-                  <Field label={`Total purchased steam — ${inventory.reporting_year} (mmbtu)`}>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+                    {/* Country-filtered like every other fuel — MMBtu is not a billing unit outside
+                        the US, so a metric inventory should never show it. */}
+                    {steamUnitOptions(loc.country).map(([val, label]) => (
+                      <button key={val} onClick={() => updateLocation(activeLocation, 'purchased_steam_unit', val as 'mmbtu' | 'gj')} style={unitBtn((loc.purchased_steam_unit ?? 'mmbtu') === val)}>{label}</button>
+                    ))}
+                  </div>
+                  <Field label={`Total purchased steam — ${inventory.reporting_year} (${(loc.purchased_steam_unit ?? 'mmbtu') === 'gj' ? 'GJ' : 'MMBtu'})`}>
                     <input type="number" value={loc.purchased_steam_mmbtu || ''} onChange={e => updateLocation(activeLocation, 'purchased_steam_mmbtu', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
+                  {/* A jurisdiction limitation, disclosed rather than hidden. There is ONE steam
+                      factor in the engine (EF.steam_mmbtu) with no UK/EU/CA variant, so every network
+                      gets the same figure. Same register as the market-based electricity hint: state
+                      what happens, state the better alternative, do not alarm. */}
+                  <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.5 }}>
+                    We apply one published emissions factor to purchased steam, whatever network supplies it.
+                    District-heating networks vary, so if your supplier publishes its own factor, that figure
+                    is more accurate than ours — worth giving your verifier where steam is a material part of
+                    your footprint.
+                  </div>
                   {isPaid ? <DocUpload label="Upload steam / district heating bills" locIdx={activeLocation} docType="purchased_steam" docs={loc.source_docs.filter(d => d.document_type === 'purchased_steam')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:purchased_steam`]} /> : <LockedDocUpload label="Upload steam / district heating bills" />}
                 </div>
               )}
@@ -1401,7 +1424,20 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                             const s2 = r.scope === 2
                             return <tr key={ri} style={s2 ? { background: '#f8f7f5' } : r.scope === 3 ? { background: '#faf7ff' } : undefined}>
                               <td style={wTd}>{r.source}</td>
-                              <td style={wTd}>{r.activity_data == null ? '—' : `${r.activity_data} ${r.activity_unit}`}</td>
+                              <td style={wTd}>
+                                {/* toLocaleString, matching the verifier surface's own rendering of the
+                                    same field (app/verify/[token]) — same function, same result, so the
+                                    two surfaces cannot show a verifier different figures. It caps at 3
+                                    decimals and adds thousands separators; the stored and computed value
+                                    stays full precision, this is display only. */}
+                                {r.activity_data == null ? '—' : `${r.activity_data.toLocaleString()} ${r.activity_unit}`}
+                                {/* The convert-then-apply step, where there was one. Without it a
+                                    verifier reads a gallons figure against a form that says litres with
+                                    nothing joining them — the divergence the note exists to prevent.
+                                    Only the two declaration branches rendered r.note before; the normal
+                                    fuel row had no cell for it. */}
+                                {r.note && <div style={{ fontSize: 10, color: '#888784', marginTop: 3, lineHeight: 1.4, whiteSpace: 'normal' }}>{r.note}</div>}
+                              </td>
                               <td style={wTd}>{r.emission_factor_display}</td>
                               <td style={wTd}>{r.ef_source}</td>
                               <td style={wTd}>{r.gwp_basis}</td>
@@ -2231,8 +2267,19 @@ function VerifierInvite({ inventoryId }: { inventoryId: string | null }) {
   return (
     <div style={{ marginTop: '2.5rem', borderTop: '0.5px solid #e8e7e4', paddingTop: '2rem' }}>
       <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Invite a verifier</h3>
+      {/* WHY THE SECOND PARAGRAPH. This block used to promise a "secure" link you could "revoke
+          access" to at any time. Both overstated. A verifier link is a bearer credential — whoever
+          holds it can open it — and revoking closes the PAGE, not anything the verifier has already
+          downloaded. A customer reading the old sentence would reasonably conclude otherwise.
+          The limit is stated together with the reason it is correct: an assurance provider keeping
+          the evidence behind their opinion is a working-paper obligation, not a leak in this
+          product. "Revoke one" rather than "revoke access", because access is the thing that does
+          not fully revoke. */}
+      <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.7, marginBottom: '0.75rem' }}>
+        Generate a read-only link for your independent assurance provider. They&apos;ll see this inventory&apos;s summary, methodology, and full audit trail &mdash; with no ability to edit. Links expire in 90 days, and you can revoke one at any time.
+      </p>
       <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.7, marginBottom: '1.25rem' }}>
-        Generate a secure, read-only link for your independent assurance provider. They&apos;ll see this inventory&apos;s summary, methodology, and full audit trail &mdash; with no ability to edit. Links expire in 90 days, and you can revoke access at any time.
+        Revoking closes the link: the page stops loading and no further documents can be opened. It does not reach anything already downloaded. That is normal and expected &mdash; an assurance provider is required to keep the evidence behind their opinion in their own working papers.
       </p>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', flexWrap: 'wrap' }}>

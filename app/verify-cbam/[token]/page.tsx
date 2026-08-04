@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
+import { VERIFIER_DOC_LINK_NOTICE, VERIFIER_DOC_TAB_DID_NOT_OPEN } from '../../../lib/verifierDocNotice'
 // Types imported (type-only → erased at runtime) so the render can never drift from
 // the builder's contract. Do not re-declare these shapes locally.
 import type {
@@ -265,7 +266,7 @@ export default function CbamVerifierPage() {
             not pre-baked — so this warns about the on-click flow, shown whenever documents exist. */}
         {report.documents.length > 0 && (
           <div style={{ background: '#fef3c7', border: '0.5px solid #fde68a', borderRadius: 10, padding: '10px 16px', marginBottom: '2rem', fontSize: 13, color: '#92400e', fontWeight: 500 }}>
-            Source document links are generated fresh each time you open one and expire shortly after. If a link stops working, click View again.
+            {VERIFIER_DOC_LINK_NOTICE}
           </div>
         )}
 
@@ -382,16 +383,35 @@ function GoodCard({ g }: { g: Item4Good }) {
 function DocRow({ doc, token }: { doc: { id: string; file_name: string; document_type: string }; token: string }) {
   const [signing, setSigning] = useState(false)
   const [failed, setFailed] = useState(false)
-  // Set only when the synchronous tab was blocked but signing SUCCEEDED — we surface
-  // the URL as a real anchor the verifier clicks themselves (a fresh user gesture the
-  // blocker won't suppress). A post-await window.open would be eaten by the same blocker.
+  // Set only when the tab did not open but signing SUCCEEDED — we surface the URL as a
+  // real anchor the verifier clicks themselves (a fresh user gesture a blocker won't
+  // suppress). A post-await window.open would be eaten by the same blocker.
   const [manualUrl, setManualUrl] = useState<string | null>(null)
 
   const openDoc = async () => {
     // Open the tab SYNCHRONOUSLY inside the click gesture, before any await — a strict
     // popup blocker (locked-down corporate browsers) suppresses tabs opened after an
     // async hop. We navigate this blank tab once the signed URL returns.
-    const tab = window.open('', '_blank', 'noopener,noreferrer')
+    //
+    // NO WINDOW FEATURES, DELIBERATELY. This call used to pass 'noopener,noreferrer', which cannot
+    // work here: noopener severs the handle BY DEFINITION and makes window.open return null, so
+    // `tab` was always null, the navigate-the-blank-tab path never once ran, and every successful
+    // click fell through to the manual link while orphaning an about:blank tab nobody could close.
+    // Dropping only noopener would not have fixed it either — per the HTML spec noreferrer sets
+    // noopener too, so both had to go.
+    //
+    // The opener is then severed the other way, immediately, while the tab is still about:blank and
+    // therefore same-origin. Per the WHATWG opener setter, assigning null sets the BROWSING
+    // CONTEXT's opener to null, so the disown survives the navigation below, closing reverse
+    // tabnabbing (opener.location stays permitted cross-origin). This bucket's MIME allowlist —
+    // pdf/png/jpeg/csv/xlsx, none of which run script — already makes that unreachable here; the
+    // GHG bucket has no allowlist and genuinely needs it. Kept identical on both surfaces so the
+    // protection does not depend on a bucket policy staying as it is today.
+    //
+    // noreferrer is not needed for privacy: the browser default (strict-origin-when-cross-origin)
+    // sends only the bare origin cross-origin, so the access token in this page's PATH is not sent.
+    const tab = window.open('', '_blank')
+    if (tab) tab.opener = null
     setSigning(true)
     setFailed(false)
     setManualUrl(null)
@@ -431,7 +451,7 @@ function DocRow({ doc, token }: { doc: { id: string; file_name: string; document
         {failed && <span style={{ fontSize: 11, color: '#B91C1C' }}>Unavailable — try again</span>}
         {manualUrl && (
           <span style={{ fontSize: 11, color: '#92400e' }}>
-            Your browser blocked the pop-up.{' '}
+            {VERIFIER_DOC_TAB_DID_NOT_OPEN}{' '}
             <a href={manualUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#7425e3', textDecoration: 'underline' }}>Open document</a>
           </span>
         )}
@@ -678,7 +698,7 @@ function ReportBody({ data, token, history, historyLoading }: { data: VerifierRe
       {/* Source documents */}
       <div style={{ marginBottom: '2rem' }}>
         <SectionHead>Source documents</SectionHead>
-        <p style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '1rem' }}>Each link is generated when you open it and expires shortly after. If a link stops working, click View again.</p>
+        <p style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '1rem' }}>{VERIFIER_DOC_LINK_NOTICE}</p>
         {documents.length === 0 ? (
           <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.5rem', textAlign: 'center', fontSize: 13, color: '#888784' }}>No source documents attached.</div>
         ) : documents.map((d) => (

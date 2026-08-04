@@ -35,9 +35,9 @@ export const SELECTOR_UNITS: Record<FuelType, readonly string[]> = {
 // ---------------------------------------------------------------------------
 // Anchor constants (documented). Everything below is derived from these.
 // ---------------------------------------------------------------------------
-const L_PER_GAL = 3.785411784;        // US liquid gallon → litres (exact, NIST)
+export const L_PER_GAL = 3.785411784;        // US liquid gallon → litres (exact, NIST)
 const LB_PER_KG = 1 / 0.45359237;     // kg → lb (exact, NIST avoirdupois)
-const GJ_PER_MMBTU = 1.05505585262;   // 1 MMBtu = 1.05505585262 GJ (IEA)
+export const GJ_PER_MMBTU = 1.05505585262;   // 1 MMBtu = 1.05505585262 GJ (IEA)
 const MJ_PER_KWH = 3.6;               // 1 kWh = 3.6 MJ (exact, SI)
 
 // PROPANE density anchor — VERIFY PROVENANCE before this goes near a real

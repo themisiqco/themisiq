@@ -11,6 +11,10 @@
 // share it instead of re-declaring a diverged copy.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// The two EXACT conversion anchors, from the repo's conversion authority. Imported rather than
+// copied: lib/unitConversions.ts is the single source and its header forbids inlining these.
+import { L_PER_GAL, GJ_PER_MMBTU } from '../unitConversions'
+
 // AR4/AR5 do not distinguish fossil vs biogenic methane — both keys carry the single published GWP100.
 // AR6 is the first IPCC set to split them (fossil 29.8 incl. oxidation; biogenic/non-fossil 27.0). N2O AR6 = 273.
 const GWP = {
@@ -538,11 +542,15 @@ interface Location {
   has_natural_gas: boolean; natural_gas_amount: number; natural_gas_unit: 'mcf' | 'therms' | 'mmbtu' | 'm3' | 'kwh'
   has_propane: boolean; propane_amount: number; propane_unit: 'gallons' | 'litres' | 'kg'
   has_diesel_stationary: boolean; diesel_stationary_amount: number; diesel_stationary_unit: 'gallons' | 'litres'
-  has_fuel_oil: boolean; fuel_oil_gallons: number
+  // fuel_oil_gallons is NOT renamed — the key exists in every stored locations_data row. It now
+  // holds the amount in `fuel_oil_unit`, which is 'gallons' when the key is absent. The name is
+  // therefore misleading, which is exactly why nothing reads it directly: go through fuelOilInGallons.
+  has_fuel_oil: boolean; fuel_oil_gallons: number; fuel_oil_unit?: 'gallons' | 'litres'
   has_mobile: boolean; gasoline_amount: number; gasoline_unit: 'gallons' | 'litres'; diesel_mobile_amount: number; diesel_mobile_unit: 'gallons' | 'litres'
   uses_ammonia: boolean; has_hfc_refrigerants: boolean; refrigerant_type: string; refrigerant_purchased_kg: number
   electricity_kwh: number; grid_region: string; renewable_electricity_kwh: number; residual_region: string
-  has_purchased_steam: boolean; purchased_steam_mmbtu: number
+  // Same as fuel_oil_gallons: key kept, unit added, 'mmbtu' when absent. Read via steamInMmbtu.
+  has_purchased_steam: boolean; purchased_steam_mmbtu: number; purchased_steam_unit?: 'mmbtu' | 'gj'
   biogenic_co2_mt: number
   // New Zealand-only (optional, default-safe): use-class picks the EF_NZ variant (Commercial default /
   // Industrial — no Residential in MfE data); nz_td_losses toggles the optional Scope 3 Cat 3 T&D line.
@@ -779,11 +787,11 @@ const emptyLocation = (id: string, name: string, state = ''): Location => ({
   has_natural_gas: false, natural_gas_amount: 0, natural_gas_unit: 'mcf',
   has_propane: false, propane_amount: 0, propane_unit: 'gallons',
   has_diesel_stationary: false, diesel_stationary_amount: 0, diesel_stationary_unit: 'gallons',
-  has_fuel_oil: false, fuel_oil_gallons: 0,
+  has_fuel_oil: false, fuel_oil_gallons: 0, fuel_oil_unit: 'gallons',
   has_mobile: false, gasoline_amount: 0, gasoline_unit: 'gallons', diesel_mobile_amount: 0, diesel_mobile_unit: 'gallons',
   uses_ammonia: false, has_hfc_refrigerants: false, refrigerant_type: 'r410a', refrigerant_purchased_kg: 0,
   electricity_kwh: 0, grid_region: 'us_average', renewable_electricity_kwh: 0, residual_region: '',
-  has_purchased_steam: false, purchased_steam_mmbtu: 0,
+  has_purchased_steam: false, purchased_steam_mmbtu: 0, purchased_steam_unit: 'mmbtu',
   biogenic_co2_mt: 0,
   nz_use_class: 'commercial', nz_td_losses: false,
   source_docs: [],
@@ -815,6 +823,23 @@ function liquidUnitOptions(country: string): Array<[string, string]> {
 }
 // Propane/LPG units are separate from other liquids: NZ publishes LPG per kg (MfE), so NZ offers kg
 // only; other metric countries (CA/UK/EU/AU) use litres; US/other keep gallons+litres.
+// District-heating / steam units offered per country. Same principle as liquidUnitOptions: never
+// show a unit a customer in that country would not see on a bill.
+//   US/default — MMBtu, the US district-steam convention. GJ also offered; some US campus systems
+//     bill metric and neither unit is ambiguous, so offering both costs nothing.
+//   Metric countries — GJ only. MMBtu is not a billing unit anywhere outside the US.
+//
+// ⚠️ KNOWN GAP, not an oversight: the ACTUAL billing unit for UK heat networks is kWh (Heat Network
+// (Metering and Billing) Regulations) and for much of Germany it is MWh. Neither is offered here, so
+// those customers must convert by hand. Adding them means a third unit plus an energy conversion —
+// deliberately out of scope of this change, and recorded so it is not mistaken for a decision that
+// kWh is wrong.
+function steamUnitOptions(country: string): Array<[string, string]> {
+  const ctry = (country || '').toUpperCase().trim()
+  const metric = ctry === 'CA' || ctry === 'GB' || ctry === 'UK' || ctry === 'AU' || ctry === 'NZ' || EU_COUNTRIES.includes(ctry)
+  return metric ? [['gj', 'GJ']] : [['mmbtu', 'MMBtu'], ['gj', 'GJ']]
+}
+
 function propaneUnitOptions(country: string): Array<[string, string]> {
   const ctry = (country || '').toUpperCase().trim()
   if (ctry === 'NZ') return [['kg', 'kg']]
@@ -822,6 +847,45 @@ function propaneUnitOptions(country: string): Array<[string, string]> {
   return metric ? [['litres', 'Litres']] : [['gallons', 'US gallons'], ['litres', 'Litres']]
 }
 
+
+// ── The unit registry: ONE place that says which option list governs which field ─────────────────
+// Every fuel with a selectable unit is listed here, and snapUnitsForCountry below derives entirely
+// from it. That makes the coupling STRUCTURAL rather than a comment asking two lists to agree: a
+// fuel added here is snapped automatically, and lib/ghg/unitSnap.test.ts fails if a *_unit field
+// exists on a Location without an entry.
+//
+// Replaces a hand-written `metric ? 'litres' : …` block in the wizard's country-change handler,
+// which listed the fuels a second time and silently omitted whichever was added last.
+export const UNIT_FIELDS = [
+  { field: 'natural_gas_unit',       label: 'natural gas',            options: ngUnitOptions,      list: 'ngUnitOptions' },
+  { field: 'propane_unit',           label: 'propane / LPG',          options: propaneUnitOptions, list: 'propaneUnitOptions' },
+  { field: 'diesel_stationary_unit', label: 'diesel (stationary)',    options: liquidUnitOptions,  list: 'liquidUnitOptions' },
+  { field: 'fuel_oil_unit',          label: 'fuel oil',               options: liquidUnitOptions,  list: 'liquidUnitOptions' },
+  { field: 'gasoline_unit',          label: 'petrol (mobile)',        options: liquidUnitOptions,  list: 'liquidUnitOptions' },
+  { field: 'diesel_mobile_unit',     label: 'diesel (mobile)',        options: liquidUnitOptions,  list: 'liquidUnitOptions' },
+  { field: 'purchased_steam_unit',   label: 'purchased steam',        options: steamUnitOptions,   list: 'steamUnitOptions' },
+] as const
+
+export type UnitFieldName = typeof UNIT_FIELDS[number]['field']
+
+// Snap every unit to one the country actually offers, keeping the current unit when it is still
+// valid. Derived from UNIT_FIELDS, so it cannot fall behind the option lists.
+//
+// This generalises what normalizeNgUnit did for natural gas alone. The old wizard block forced
+// litres on every metric country instead, which happened to agree for the fuels it listed and was
+// simply absent for the ones it did not — the stranding bug.
+export function snapUnitsForCountry(
+  country: string,
+  current: Partial<Record<UnitFieldName, string | undefined>> = {},
+): Record<UnitFieldName, string> {
+  const out = {} as Record<UnitFieldName, string>
+  for (const f of UNIT_FIELDS) {
+    const opts = f.options(country).map(([v]) => v)
+    const held = current[f.field]
+    out[f.field] = held && opts.includes(held) ? held : opts[0]
+  }
+  return out
+}
 
 function validateElectricity(kwh: number): string | null {
   if (kwh > 0 && kwh < 1000) return "⚠ This seems low for a commercial location — please confirm this is the annual total, not a single month."
@@ -845,6 +909,41 @@ function validateCompleteness(loc: Location): string[] {
 // Falls back to EF[key] if a country key is missing, so a location can never silently zero out.
 // Build the propane/LPG EF key from the stored unit. NZ adds a per-kg path (propane_kg); all other
 // jurisdictions use gallon/litre. Kept in one place so calc + workings + review stay in lock-step.
+// ── Fuel oil and purchased steam: CONVERT-THEN-APPLY ────────────────────────────────────────────
+// DELIBERATELY DIFFERENT from every other multi-unit fuel here. Natural gas and propane each carry a
+// PUBLISHED EMISSION FACTOR PER UNIT (natural_gas_mcf / _therms / _m3 …, propane_gallon / _litre /
+// _kg) and select between them. Fuel oil and steam instead convert the entered figure to the one
+// unit that HAS a published factor, then apply it.
+//
+// WHY: the conversions below are EXACT BY DEFINITION — a US liquid gallon is 231 in³ and an inch is
+// 25.4 mm, both exact; MMBtu uses the International Table Btu of exactly 1055.05585262 J. Neither
+// depends on temperature or composition (unlike the propane density anchor, which carries its own
+// "verify provenance" warning). Applying one is arithmetic on a published factor, not a new
+// methodology claim. Sourcing per-unit factors instead would mean a litre figure and a GJ figure
+// from EPA, ECCC, DEFRA and IPCC each — multiplying the citation surface in EF_SOURCES fourfold for
+// no gain in fidelity. Both constants come from lib/unitConversions.ts, the repo's conversion
+// authority, so nothing is inlined here.
+//
+// Each returns the note the workings row prints, so a verifier reads entered → conversion → factored
+// rather than an unexplained number. No note when no conversion happened.
+// Take (amount, unit) rather than the Location so the WORKINGS can convert the
+// resolution-applied figure rather than the raw stored one — otherwise a coverage-estimated
+// litres figure would be scaled and then converted from the wrong base.
+export function fuelOilToGallons(amount: number, unit?: 'gallons' | 'litres'): { gallons: number; note?: string } {
+  if ((unit ?? 'gallons') === 'gallons') return { gallons: amount }
+  const gallons = amount / L_PER_GAL
+  return { gallons, note: `${amount} litres ÷ ${L_PER_GAL} = ${gallons.toFixed(4)} US gallons (exact, NIST) — the published factor is per gallon` }
+}
+
+export function steamToMmbtu(amount: number, unit?: 'mmbtu' | 'gj'): { mmbtu: number; note?: string } {
+  if ((unit ?? 'mmbtu') === 'mmbtu') return { mmbtu: amount }
+  const mmbtu = amount / GJ_PER_MMBTU
+  return { mmbtu, note: `${amount} GJ ÷ ${GJ_PER_MMBTU} = ${mmbtu.toFixed(4)} MMBtu (exact, International Table Btu) — the published factor is per MMBtu` }
+}
+
+const fuelOilInGallons = (loc: Location) => fuelOilToGallons(loc.fuel_oil_gallons, loc.fuel_oil_unit)
+const steamInMmbtu = (loc: Location) => steamToMmbtu(loc.purchased_steam_mmbtu, loc.purchased_steam_unit)
+
 function propaneEfKey(unit: string): 'propane_gallon' | 'propane_litre' | 'propane_kg' {
   return unit === 'gallons' ? 'propane_gallon' : unit === 'kg' ? 'propane_kg' : 'propane_litre'
 }
@@ -926,7 +1025,7 @@ function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: numbe
     s1_stationary += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
   }
   if (loc.has_fuel_oil && loc.fuel_oil_gallons > 0) {
-    const g = calcGas(pickEF(loc, 'fuel_oil_gallon'), loc.fuel_oil_gallons, gwpVersion)
+    const g = calcGas(pickEF(loc, 'fuel_oil_gallon'), fuelOilInGallons(loc).gallons, gwpVersion)
     s1_stationary += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
   }
   if (loc.has_mobile) {
@@ -949,7 +1048,7 @@ function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: numbe
   // contribution — exactly like an absent Scope 1 fuel. Steam (grid-independent) is unaffected.
   const gridResolved = isResolvedGridRegion(loc.grid_region)
   const grid_ef = gridResolved ? getGridFactor(loc.grid_region, year).ef : 0
-  const steam_kg = loc.has_purchased_steam ? loc.purchased_steam_mmbtu * EF.steam_mmbtu : 0
+  const steam_kg = loc.has_purchased_steam ? steamInMmbtu(loc).mmbtu * EF.steam_mmbtu : 0
   const s2_location = ((gridResolved ? loc.electricity_kwh * grid_ef : 0) + steam_kg) / 1000
   // Market-based: covered (contractual) kWh @ 0 (RECs/PPAs/green tariffs assumed zero-emission — documented);
   // uncovered kWh @ residual-mix factor. If no residual mix applies (full-disclosure region, or US subregion
@@ -1001,7 +1100,7 @@ function fuelEmissionsByType(loc: Location, gwpVersion: GwpVersion, year: number
   if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0)
     add('diesel', calcGas(pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), loc.diesel_stationary_amount, gwpVersion).total)
   if (loc.has_fuel_oil && loc.fuel_oil_gallons > 0)
-    add('fuel_oil', calcGas(pickEF(loc, 'fuel_oil_gallon'), loc.fuel_oil_gallons, gwpVersion).total)
+    add('fuel_oil', calcGas(pickEF(loc, 'fuel_oil_gallon'), fuelOilInGallons(loc).gallons, gwpVersion).total)
   if (loc.has_mobile) {
     if (loc.gasoline_amount > 0)
       add('gasoline', calcGas(pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), loc.gasoline_amount, gwpVersion).total)
@@ -1238,12 +1337,14 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
   // every other unit (mcf, kg, therms, mmbtu…) passes through unchanged. emission_factor (the gas split)
   // is UNTOUCHED — the CSV / verifier path depends on it. emission_factor_display is display-only.
   const abbrevUnit = (u: string) => u === 'gallons' ? 'gal' : (u === 'litres' || u === 'liters') ? 'L' : u
-  const pushFuel = (loc: Location, source: string, scope: number, activity: number, unit: string, ef: { co2: number; ch4: number; n2o: number }, prov?: Provenance) => {
+  // `convNote` records a convert-then-apply step (fuel oil in litres, steam in GJ) so the workings
+  // show entered → conversion → factored rather than a number the reviewer cannot reproduce.
+  const pushFuel = (loc: Location, source: string, scope: number, activity: number, unit: string, ef: { co2: number; ch4: number; n2o: number }, prov?: Provenance, convNote?: string) => {
     const g = calcGas(ef, activity, gwpVersion)
     const gwp = GWP[gwpVersion]
     const efCo2e = ef.co2 + ef.ch4 * gwp.CH4_fossil + ef.n2o * gwp.N2O
     rows.push({ location: loc.name || 'Location', source, scope, activity_data: activity, activity_unit: unit,
-      emission_factor: `CO2 ${ef.co2}, CH4 ${ef.ch4}, N2O ${ef.n2o} kg/${unit}`, emission_factor_display: `${efCo2e.toFixed(3)} kg CO₂e/${abbrevUnit(unit)}`, ef_source: combustionSource(loc), gwp_basis: gwpVersion, result_tco2e: g.total, ...(prov ?? {}) })
+      emission_factor: `CO2 ${ef.co2}, CH4 ${ef.ch4}, N2O ${ef.n2o} kg/${unit}`, emission_factor_display: `${efCo2e.toFixed(3)} kg CO₂e/${abbrevUnit(unit)}`, ef_source: combustionSource(loc), gwp_basis: gwpVersion, result_tco2e: g.total, ...(convNote ? { note: convNote } : {}), ...(prov ?? {}) })
   }
   for (const loc of locations) {
     // applyResolutions is the single source of the figure AND its provenance/method, so the number
@@ -1270,7 +1371,15 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     if (loc.has_natural_gas && loc.natural_gas_amount > 0) pushFuel(loc, 'Natural gas', 1, figure('natural_gas_amount'), loc.natural_gas_unit, pickEF(loc, `natural_gas_${loc.natural_gas_unit}` as keyof typeof EF), provOf('natural_gas_amount'))
     if (loc.has_propane && loc.propane_amount > 0) pushFuel(loc, 'Propane', 1, figure('propane_amount'), loc.propane_unit, pickEF(loc, propaneEfKey(loc.propane_unit) as keyof typeof EF), provOf('propane_amount'))
     if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0) pushFuel(loc, 'Diesel (stationary)', 1, figure('diesel_stationary_amount'), loc.diesel_stationary_unit, pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provOf('diesel_stationary_amount'))
-    if (loc.has_fuel_oil && loc.fuel_oil_gallons > 0) pushFuel(loc, 'Fuel oil', 1, figure('fuel_oil_gallons'), 'gallons', pickEF(loc, 'fuel_oil_gallon'), provOf('fuel_oil_gallons'))
+    // Reports the figure AS ENTERED with its own unit, and the conversion as the note — the factored
+    // gallons figure is inside the note, so all three steps are on one row.
+    if (loc.has_fuel_oil && loc.fuel_oil_gallons > 0) {
+      // Convert AFTER applying resolutions, then hand pushFuel the gallons figure — the factor is
+      // published per gallon, so the activity it multiplies must be gallons or the row would state a
+      // result the engine did not compute. The note carries the entered figure and the arithmetic.
+      const fo = fuelOilToGallons(figure('fuel_oil_gallons'), loc.fuel_oil_unit)
+      pushFuel(loc, 'Fuel oil', 1, fo.gallons, 'gallons', pickEF(loc, 'fuel_oil_gallon'), provOf('fuel_oil_gallons'), fo.note)
+    }
     if (loc.has_mobile && loc.gasoline_amount > 0) pushFuel(loc, 'Gasoline (mobile)', 1, figure('gasoline_amount'), loc.gasoline_unit, pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provOf('gasoline_amount'))
     if (loc.has_mobile && loc.diesel_mobile_amount > 0) pushFuel(loc, 'Diesel (mobile)', 1, figure('diesel_mobile_amount'), loc.diesel_mobile_unit, pickEF(loc, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provOf('diesel_mobile_amount'))
     if (!loc.uses_ammonia && loc.has_hfc_refrigerants && loc.refrigerant_purchased_kg > 0) {
@@ -1297,7 +1406,10 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       }
     }
     if (loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0) {
-      rows.push({ location: loc.name || 'Location', source: 'Purchased steam', scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: 'mmbtu', emission_factor: `${EF.steam_mmbtu} kg/mmbtu`, ef_source: EF_SOURCES.combustion, gwp_basis: 'location-based', result_tco2e: loc.purchased_steam_mmbtu * EF.steam_mmbtu / 1000, entry_method: 'manual' })
+      // Same rule as fuel oil: the factor is published per MMBtu, so the activity it multiplies must
+      // be MMBtu. The note carries the entered GJ figure and the arithmetic.
+      const st = steamToMmbtu(loc.purchased_steam_mmbtu, loc.purchased_steam_unit)
+      rows.push({ location: loc.name || 'Location', source: 'Purchased steam', scope: 2, activity_data: st.mmbtu, activity_unit: 'mmbtu', emission_factor: `${EF.steam_mmbtu} kg/mmbtu`, ef_source: EF_SOURCES.combustion, gwp_basis: 'location-based', result_tco2e: st.mmbtu * EF.steam_mmbtu / 1000, entry_method: 'manual', ...(st.note ? { note: st.note } : {}) })
     }
     // ── Declaration rows: a row for EVERY stream that has no data, so absence is never silent ──
     // Streams WITH data are already emitted above. For the rest: attested_absent (result 0 = a claim of
@@ -1468,7 +1580,7 @@ export {
   detectGridRegion, gridRegionForCountry, propaneEfKey, pickEF,
   combustionSource, calcGas, calcLocation, calcInventory, fieldFor,
   buildWorkings, emptyLocation,
-  ngUnitOptions, normalizeNgUnit, liquidUnitOptions, propaneUnitOptions,
+  ngUnitOptions, normalizeNgUnit, liquidUnitOptions, propaneUnitOptions, steamUnitOptions,
   validateElectricity, validateNaturalGas, validateCompleteness,
   parseLocalDate, periodFromYearAndEnd, monthKey, monthLabel,
   daysBetween, exclusiveEnd, analyzeCoverage,

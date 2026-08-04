@@ -2,32 +2,56 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
+import { VERIFIER_DOC_LINK_NOTICE, VERIFIER_DOC_TAB_DID_NOT_OPEN } from '../../../lib/verifierDocNotice'
 
 interface AuditEntry {
   id: string; action: string; user_email: string | null; created_at: string
   old_values: Record<string, unknown> | null; new_values: Record<string, unknown> | null
 }
-interface VerifierDoc { file_name: string; document_type: string; location: string; file_path: string; signed_url: string | null }
+// METADATA ONLY. No signed_url and no file_path: URLs are minted per-document on click (see
+// openVerifierDoc below), so nothing on this page carries a clock the verifier cannot see. `id` is
+// null for a legacy document uploaded before ids existed — it cannot be signed, so its row says so.
+interface VerifierDoc { id: string | null; file_name: string; document_type: string; location: string }
 interface WorkingRow {
   location: string; source: string; scope: number
-  activity_data: number; activity_unit: string
+  // NULLABLE, because the engine emits null and always has. These were declared `number`, the RPC
+  // response is asserted rather than validated, and so tsc had nothing to check — the first thing to
+  // notice was a TypeError on the page an assurance provider reads. Coverage-resolution rows carry
+  // activity_data: null; undeclared-stream rows carry result_tco2e: null.
+  activity_data: number | null; activity_unit: string
   emission_factor: string; ef_source: string; gwp_basis: string
-  result_tco2e: number
+  result_tco2e: number | null
   // Concierge provenance (present only for bill-sourced rows). Lets a verifier trace a figure
   // back to the quote read off the bill; 'concierge-extrapolated' rows are grossed-up estimates.
   source_quotes?: string[]
   source_doc_ids?: string[]
-  // Index-aligned with source_quotes: the storage path behind quote[i], used to resolve a signed URL.
+  // Index-aligned with source_quotes: the storage path behind quote[i]. Used ONLY as a lookup key
+  // into pathToDocId below — the path is never sent anywhere; the document id it resolves to is.
+  // (source_doc_ids cannot serve here: the engine DEDUPES it while pushing filePaths once per quote,
+  // so source_doc_ids[i] is not "the document behind quote i".)
   source_file_paths?: string[]
   entry_method?: 'manual' | 'concierge' | 'concierge-extrapolated'
   extrapolation_note?: string
+  // A convert-then-apply step, where one was needed: fuel oil entered in litres and steam entered
+  // in GJ are converted to the unit their published factor is per, and this records the arithmetic.
+  // Distinct from extrapolation_note, which is about PROVENANCE (a grossed-up estimate) and renders
+  // beside the source quotes; this is about the ACTIVITY FIGURE and renders beside it.
+  note?: string
+  // Rows that record ABSENCE rather than a calculation. A verifier needs these more than the
+  // operator does: 'attested_absent' is evidence (someone confirmed there is none, and when),
+  // 'undeclared' is the absence of evidence (nobody answered). Filtering them off this page would
+  // hide the incomplete parts of an inventory from the surface used to assess completeness.
+  declaration?: 'attested_absent' | 'undeclared'
 }
 interface InventoryData {
   company_name: string; reporting_year: number; revenue_millions: number
   boundary_approach: string; selected_frameworks: string[]
   scope1_total: number; scope2_location_total: number; scope2_market_total: number
   scope1_intensity: number; scope2_intensity: number
-  locations_data: { name: string }[]
+  // get_verifier_inventory returns to_jsonb(i) — the whole inventory row — so source_docs come down
+  // with it. Declared here because the inline quote links need the path→id correlation, and taking
+  // it from data already in the payload avoids asking the documents route for paths as well.
+  locations_data: { name: string; source_docs?: { id?: string; file_path?: string }[] }[]
   workings?: WorkingRow[]
 }
 interface VerifierPayload {
@@ -71,6 +95,125 @@ function diffRow(oldV: Record<string, unknown> | null, newV: Record<string, unkn
   return out
 }
 
+// ── Opening a source document ───────────────────────────────────────────────────────────────────
+// Shared by the Source Documents list and the inline quote links inside the workings table. Both
+// mint their own URL at the moment of the click, so neither can go stale while the page is read —
+// which is what the pre-baked batch could not offer, since its clock started at page load.
+function useDocOpener(token: string) {
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+  // Set only when the tab did not open but signing SUCCEEDED — we surface the URL as a real anchor
+  // the verifier clicks themselves (a fresh user gesture a blocker won't suppress). A post-await
+  // window.open would be eaten by the same blocker.
+  const [manualUrl, setManualUrl] = useState<string | null>(null)
+
+  const open = async (docId: string) => {
+    // Open the tab SYNCHRONOUSLY inside the click gesture, before any await — a strict popup
+    // blocker (the locked-down browsers an assurance firm tends to run) suppresses tabs opened
+    // after an async hop. We navigate this blank tab once the signed URL returns.
+    //
+    // NO WINDOW FEATURES, DELIBERATELY. This call used to pass 'noopener,noreferrer', which cannot
+    // work here: noopener severs the handle BY DEFINITION and makes window.open return null, so
+    // `tab` was always null, the navigate-the-blank-tab path never once ran, and every successful
+    // click fell through to the manual link while orphaning an about:blank tab nobody could close.
+    // Dropping only noopener would not have fixed it either — per the HTML spec noreferrer sets
+    // noopener too, so both had to go.
+    //
+    // The opener is then severed the other way, immediately, while the tab is still about:blank and
+    // therefore same-origin. Per the WHATWG opener setter, assigning null sets the BROWSING
+    // CONTEXT's opener to null, so the disown survives the navigation below. That closes reverse
+    // tabnabbing — an opened page calling opener.location, which stays permitted cross-origin — and
+    // it matters more here than it looks: the GHG bucket has no MIME allowlist, so a customer can
+    // upload an HTML "bill" that Supabase serves as text/html and that runs script in the verifier's
+    // browser. The party who would benefit from redirecting a verifier is the party being verified.
+    //
+    // noreferrer is not needed for privacy: the browser default (strict-origin-when-cross-origin)
+    // sends only the bare origin cross-origin, so the access token in this page's PATH is not sent,
+    // and the recipient is Supabase, which stores the documents anyway.
+    const tab = window.open('', '_blank')
+    if (tab) tab.opener = null
+    setBusy(true); setFailed(false); setManualUrl(null)
+    try {
+      const res = await fetch('/api/verifier-documents/sign', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, docId }),
+      })
+      const body = res.ok ? ((await res.json()) as { url?: string }) : null
+      if (!body?.url) { if (tab) tab.close(); setFailed(true); return }
+      if (tab) tab.location = body.url
+      else setManualUrl(body.url)
+    } catch {
+      if (tab) tab.close()
+      setFailed(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return { busy, failed, manualUrl, open }
+}
+
+// One source-document row. Per-row state, so a failure on one document says nothing about another.
+function SourceDocRow({ doc, token }: { doc: VerifierDoc; token: string }) {
+  const { busy, failed, manualUrl, open } = useDocOpener(token)
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px', marginBottom: 8, flexWrap: 'wrap' }}>
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{doc.file_name}</div>
+        <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{doc.location} · {doc.document_type}</div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        {failed && <span style={{ fontSize: 11, color: '#B91C1C' }}>Couldn&rsquo;t open — try again</span>}
+        {manualUrl && (
+          <span style={{ fontSize: 11, color: '#92400e' }}>
+            {VERIFIER_DOC_TAB_DID_NOT_OPEN}{' '}
+            <a href={manualUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#7425e3', textDecoration: 'underline' }}>Open document</a>
+          </span>
+        )}
+        {doc.id ? (
+          <button onClick={() => open(doc.id!)} disabled={busy} style={{ fontSize: 12, padding: '6px 16px', borderRadius: 6, border: 'none', background: '#0d0d0d', color: '#fff', cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1 }}>
+            {busy ? 'Opening…' : 'View'}
+          </button>
+        ) : (
+          // A document stored before uploads carried an id. It cannot be resolved to a file, so we
+          // say that rather than offer a button certain to fail. The document is still listed: a
+          // verifier needs to know the evidence exists even when this page cannot serve it.
+          <span style={{ fontSize: 11, color: '#888784' }}>Not available here — ask the company for a copy</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// One quoted line lifted off a bill, inside the workings table. Rendered as a button rather than an
+// anchor because there is no URL until the click; styled as a link because that is what it is.
+function SourceQuoteLink({ quote, docId, token }: { quote: string; docId: string; token: string }) {
+  const { busy, failed, manualUrl, open } = useDocOpener(token)
+  const linkStyle: React.CSSProperties = {
+    color: '#7425e3', textDecoration: 'underline', textDecorationThickness: '0.5px', textUnderlineOffset: 2,
+    background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: busy ? 'wait' : 'pointer',
+  }
+  // Same state as the document list's fallback, and it must SAY so. This used to swap the button
+  // for an anchor silently: the quote simply stopped responding to the first click and needed a
+  // second, with nothing on screen explaining why. A verifier tracing a figure would reasonably
+  // conclude the link was broken. The quote itself is the link here, so the note points at it
+  // rather than offering a separate one.
+  if (manualUrl) {
+    return (
+      <>
+        <a href={manualUrl} target="_blank" rel="noopener noreferrer" style={linkStyle}>{`"${quote}"`}</a>
+        <span style={{ color: '#92400e', fontStyle: 'normal' }}> ({VERIFIER_DOC_TAB_DID_NOT_OPEN.replace(/\.$/, '')} — click the quote to open it)</span>
+      </>
+    )
+  }
+  return (
+    <>
+      <button onClick={() => open(docId)} disabled={busy} style={linkStyle}>{`"${quote}"`}</button>
+      {failed && <span style={{ color: '#B91C1C', fontStyle: 'normal' }}> (couldn&rsquo;t open — try again)</span>}
+    </>
+  )
+}
+
 export default function VerifierPage() {
   const params = useParams()
   const token = params.token as string
@@ -106,6 +249,11 @@ export default function VerifierPage() {
 
   // Documents fetch — gated on verifier access. Only fires once the token is
   // already accepted (accepted_at set on load) or has just been accepted in-session.
+  //
+  // METADATA ONLY. This used to batch-sign every document here, which started a ten-minute clock at
+  // PAGE LOAD: a verifier who read the workings for eleven minutes found every link on the page
+  // dead at once. URLs are now minted per-document on click, so this response holds nothing
+  // perishable and the page can sit open as long as the reading takes.
   useEffect(() => {
     if (!token) return
     const hasAccess = !!data?.accepted_at || accepted
@@ -219,10 +367,19 @@ export default function VerifierPage() {
 
   const inv = data.inventory
   const audit = data.audit || []
-  // Correlate a workings row's source_file_paths[i] to a short-lived signed URL from the docs fetch.
-  // Skip null signed_urls; a missing key just falls back to plain text (never a broken link).
-  const pathToSignedUrl: Record<string, string> = {}
-  for (const d of docs) { if (d.file_path && d.signed_url) pathToSignedUrl[d.file_path] = d.signed_url }
+  // Correlate a workings row's source_file_paths[i] to the DOCUMENT ID that quote came from, so an
+  // inline quote link can mint its own URL on click like any other document.
+  //
+  // Built from locations_data rather than from the documents fetch: the RPC already returns the
+  // whole inventory row, so the correlation is free here and the documents route need not hand out
+  // paths as well. An unmatched path falls back to plain text — a quote a verifier can still read,
+  // never a link that fails.
+  const pathToDocId: Record<string, string> = {}
+  for (const loc of inv.locations_data || []) {
+    for (const d of loc.source_docs || []) {
+      if (d.file_path && d.id) pathToDocId[d.file_path] = d.id
+    }
+  }
   const frameworks = (inv.selected_frameworks || []).map(f => FRAMEWORK_NAMES[f] || f)
 
   return (
@@ -272,7 +429,12 @@ export default function VerifierPage() {
               </thead>
               <tbody>
                 {inv.workings.map((w, i) => (
-                  <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#f8f7f5', borderBottom: '0.5px solid #e8e7e4' }}>
+                  <tr key={i} style={{
+                    background: w.declaration === 'undeclared' ? '#FEF3E2'
+                      : w.declaration === 'attested_absent' ? '#f4f4f2'
+                      : i % 2 === 0 ? '#fff' : '#f8f7f5',
+                    borderBottom: '0.5px solid #e8e7e4',
+                  }}>
                     <td style={{ padding: '8px 10px', color: '#555553' }}>{w.location}</td>
                     <td style={{ padding: '8px 10px', color: '#0d0d0d', fontWeight: 500 }}>
                       <span>{w.source}</span>
@@ -285,13 +447,11 @@ export default function VerifierPage() {
                       {w.source_quotes && w.source_quotes.length > 0 && (
                         <div style={{ marginTop: 4, fontSize: 11, fontStyle: 'italic', fontWeight: 400, color: '#888784' }}>From source: {w.source_quotes.map((q, qi) => {
                           const p = w.source_file_paths?.[qi]
-                          const url = p ? pathToSignedUrl[p] : undefined
+                          const docId = p ? pathToDocId[p] : undefined
                           return (
                             <span key={qi}>
                               {qi > 0 && '; '}
-                              {url ? (
-                                <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: '#7425e3', textDecoration: 'underline', textDecorationThickness: '0.5px', textUnderlineOffset: 2 }}>{`"${q}"`}</a>
-                              ) : `"${q}"`}
+                              {docId ? <SourceQuoteLink quote={q} docId={docId} token={token} /> : `"${q}"`}
                             </span>
                           )
                         })}</div>
@@ -299,12 +459,45 @@ export default function VerifierPage() {
                       {w.extrapolation_note && (
                         <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: '#888784' }}>Estimated — {w.extrapolation_note}</div>
                       )}
+                      {/* Written for a verifier, not reused from the operator's wizard. The operator
+                          is being told what to do next; a verifier is deciding what they can rely on,
+                          so each line says what the row IS as evidence. The engine's own note (which
+                          carries the attestation timestamp) renders beneath. */}
+                      {w.declaration === 'attested_absent' && (
+                        <>
+                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: '#555553', background: '#e8e7e4', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Confirmed absent</span>
+                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: '#888784' }}>
+                            The operator has confirmed this location has none of this. Nothing is omitted here.
+                          </div>
+                        </>
+                      )}
+                      {w.declaration === 'undeclared' && (
+                        <>
+                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: '#ba7517', background: 'rgba(186,117,23,0.12)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Not declared</span>
+                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: '#ba7517' }}>
+                            Nobody has said whether this location has this or not, so the inventory cannot be shown
+                            to be complete without it. This is not a figure of zero.
+                          </div>
+                        </>
+                      )}
                     </td>
                     <td style={{ padding: '8px 10px', color: '#555553' }}>{w.scope}</td>
-                    <td style={{ padding: '8px 10px', color: '#555553', whiteSpace: 'nowrap' }}>{w.activity_data.toLocaleString()} {w.activity_unit}</td>
+                    <td style={{ padding: '8px 10px', color: '#555553' }}>
+                      {/* '—' for null, as the wizard's own workings table renders it. Coverage
+                          resolution rows carry no activity figure — they record a decision, not a
+                          measurement. */}
+                      <span style={{ whiteSpace: 'nowrap' }}>{w.activity_data == null ? '—' : `${w.activity_data.toLocaleString()} ${w.activity_unit}`}</span>
+                      {/* Without this a verifier reads a gallons figure against an inventory the
+                          operator entered in litres, with nothing joining them — and unlike the
+                          wizard's reader, a verifier has no input form to reconcile it against.
+                          This page is the whole of what they see. */}
+                      {w.note && (
+                        <div style={{ marginTop: 3, fontSize: 11, fontWeight: 400, color: '#888784', lineHeight: 1.4 }}>{w.note}</div>
+                      )}
+                    </td>
                     <td style={{ padding: '8px 10px', color: '#888784', fontSize: 11 }}>{w.emission_factor}</td>
                     <td style={{ padding: '8px 10px', color: '#555553' }}>{w.gwp_basis}</td>
-                    <td style={{ padding: '8px 10px', color: '#7425e3', fontWeight: 600, whiteSpace: 'nowrap' }}>{w.result_tco2e.toFixed(3)}</td>
+                    <td style={{ padding: '8px 10px', color: '#7425e3', fontWeight: 600, whiteSpace: 'nowrap' }}>{w.result_tco2e == null ? '—' : w.result_tco2e.toFixed(3)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -319,7 +512,7 @@ export default function VerifierPage() {
 
         <SectionHead>Source Documents</SectionHead>
         <p style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '1rem' }}>
-          Supporting evidence uploaded for this inventory. View links are secure and expire after 10 minutes — trace each activity-data figure back to its source document.
+          Supporting evidence uploaded for this inventory — trace each activity-data figure back to its source document. {VERIFIER_DOC_LINK_NOTICE}
         </p>
         {docsLoading && <div style={{ fontSize: 13, color: '#888784', marginBottom: '2rem' }}>Loading documents…</div>}
         {!docsLoading && docs.length === 0 && (
@@ -328,17 +521,7 @@ export default function VerifierPage() {
         {!docsLoading && docs.length > 0 && (
           <div style={{ marginBottom: '2rem' }}>
             {docs.map((d, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px', marginBottom: 8, flexWrap: 'wrap' }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{d.file_name}</div>
-                  <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{d.location} · {d.document_type}</div>
-                </div>
-                {d.signed_url ? (
-                  <a href={d.signed_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, padding: '6px 16px', borderRadius: 6, background: '#0d0d0d', color: '#fff', textDecoration: 'none' }}>View</a>
-                ) : (
-                  <span style={{ fontSize: 11, color: '#888784' }}>Unavailable</span>
-                )}
-              </div>
+              <SourceDocRow key={d.id ?? `no-id-${i}`} doc={d} token={token} />
             ))}
           </div>
         )}
