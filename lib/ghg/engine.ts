@@ -521,6 +521,16 @@ interface SourceDoc {
   uploaded_at: string
   file_path: string
   extracted?: ExtractedProposal[]   // concierge proposals (one per fuel read from this doc)
+  // WHY this document carries no figures. Absent means the question does not arise — figures were
+  // read, or the customer holds no concierge tier. Persisted with the inventory deliberately: an
+  // uploaded document showing no figures and no reason is the silent state this field exists to
+  // prevent, and it has to still be answered when the customer comes back a week later.
+  //   'abstained'  — read, but no figure could be taken from it with confidence. NOT a failure:
+  //                  the extractor is instructed to abstain rather than guess.
+  //   'failed'     — the extraction call itself errored.
+  //   'not_read'   — no attempt was made (document type or file type the reader does not handle).
+  read_outcome?: 'abstained' | 'failed' | 'not_read'
+  read_note?: string                // one plain sentence shown to the customer
 }
 
 interface Location {

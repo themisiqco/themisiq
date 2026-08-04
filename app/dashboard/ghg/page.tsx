@@ -188,6 +188,31 @@ function PaywallOverlay({ frameworks }: { frameworks: string[] }) {
   )
 } 
 
+// Document types the concierge does NOT read a figure from. Uploading them is still worth doing —
+// the file is the evidence a verifier traces the figure back to — but the number is typed in by hand.
+//
+//   service_record (refrigerants) — deliberately excluded. Refrigerant accounting is a judgment call
+//     (Tier-2/3 method choice, leak assumptions), not a figure to lift off a page.
+//   fuel_oil / purchased_steam / renewable_cert — their fuel types are NOT in the extract route's
+//     SUPPORTED_FUELS ('electricity', 'natural_gas', 'diesel', 'propane', 'gasoline'), so a call
+//     could only ever return figures the knownFuels filter discards. Sending them cost a model call
+//     and produced an empty result with no explanation, which reads to a paying customer as
+//     "it didn't work" rather than "it doesn't do this".
+//
+// ⚠️ KEEP IN STEP WITH SUPPORTED_FUELS in app/api/concierge/extract/route.ts. Teaching the route a
+// new fuel means REMOVING its document type from this set in the same edit, or the new capability
+// stays switched off. This set also drives the drop-zone copy in DocUpload, so the promise made to
+// the customer and the call actually made cannot disagree.
+const CONCIERGE_UNREAD_DOC_TYPES = new Set(['service_record', 'fuel_oil', 'purchased_steam', 'renewable_cert', 'biogenic'])
+
+// File types the reader can actually open. The picker deliberately accepts MORE than this —
+// a spreadsheet of meter readings is exactly the evidence a verifier wants, and the non-concierge
+// copy has always invited XLSX and CSV — so the answer is to keep taking them and say plainly that
+// the figure is typed in, not to narrow the picker and lose the evidence.
+// ⚠️ MIRRORS the allow-list in app/api/concierge/extract/route.ts. Both must change together, or an
+// upload is either sent and rejected, or skipped when it could have been read.
+const CONCIERGE_READABLE_MEDIA = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+
 function LockedDocUpload({ label }: { label: string }) {
   return (
     <div style={{ background: '#f8f7f5', border: '0.5px dashed #e8e7e4', borderRadius: 8, padding: '10px 14px', opacity: 0.7 }}>
@@ -236,6 +261,10 @@ const searchParams = useSearchParams()
   const [showWorkings, setShowWorkings] = useState<Record<string, boolean>>({})
   const [activeExport, setActiveExport] = useState('sb253')
   const [dataConfirmed, setDataConfirmed] = useState(false)
+  // Keyed `${locIdx}:${docType}`. Only for failures with NO document to hang a note on — i.e. the
+  // storage upload itself. Everything after a successful upload is recorded on the doc instead, so
+  // it survives a reload.
+  const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({})
   const [mode, setMode] = useState<'loading' | 'list' | 'wizard'>('loading')
   const [inventoryList, setInventoryList] = useState<Array<{ id: string; company_name: string; reporting_year: number; updated_at: string }>>([])
   const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([])
@@ -401,16 +430,32 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     setUploading(true)
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { setUploading(false); return }
+    setUploadErrors(prev => { const next = { ...prev }; delete next[`${locIdx}:${docType}`]; return next })
     for (const file of Array.from(files)) {
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
       const path = `${session.user.id}/${inventory.reporting_year}/${inventory.locations[locIdx].name.replace(/\s+/g, '_')}/${Date.now()}_${safeName}`
       const { error } = await supabase.storage.from('source-documents').upload(path, file)
-      if (!error) {
+      if (error) {
+        // (d) The file never reached storage. There is no document to attach a note to, so this is
+        // the one case that needs a transient message. Silently doing nothing was indistinguishable
+        // from a successful upload that produced no figures.
+        console.error('[upload] storage failed', error)
+        setUploadErrors(prev => ({ ...prev, [`${locIdx}:${docType}`]: `${file.name} didn’t upload — ${error.message}. Please try again.` }))
+        continue
+      }
+      {
         const doc: SourceDoc = { id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, file_name: file.name, document_type: docType, uploaded_at: new Date().toISOString(), file_path: path }
 
         // ── Concierge step 5: read bill, convert via lib (single source of truth), attach proposals to the doc. No field write yet. ──
-        // Refrigerant service records are deliberately NOT concierge-read (judgment, Tier-2/3).
-        if (CONCIERGE_DEV && docType !== 'service_record') {
+        // Skipped entirely for the document types the concierge cannot read a figure from — see
+        // CONCIERGE_UNREAD_DOC_TYPES. The upload still happens; only the extraction call is skipped.
+        if (CONCIERGE_DEV && !CONCIERGE_READABLE_MEDIA.has(file.type)) {
+          // (a) A file the reader cannot open — a spreadsheet or CSV. Keeping it is the point: it is
+          // still the evidence behind whatever figure gets typed in. Say so rather than attempting a
+          // call the route would reject and then discarding its explanation.
+          doc.read_outcome = 'not_read'
+          doc.read_note = 'Kept as evidence. We read PDFs and photos — type this figure into the box above.'
+        } else if (CONCIERGE_DEV && !CONCIERGE_UNREAD_DOC_TYPES.has(docType)) {
           try {
   const res = await fetch('/api/concierge/extract', {
               method: 'POST',
@@ -443,9 +488,27 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                   }
                 })
               console.log('[concierge step5] proposals on doc:', doc.extracted)
+              if ((doc.extracted?.length ?? 0) === 0) {
+                // (c) The document WAS read and no figure could be taken from it with confidence.
+                // The extractor is instructed to abstain rather than guess, so this is the system
+                // working — the wording must not read as a fault, or a customer will re-upload a
+                // file that will abstain again for the same good reason.
+                doc.read_outcome = 'abstained'
+                doc.read_note = 'We read this one but couldn’t take a figure from it with confidence — type it into the box above.'
+              }
+            } else {
+              // (b) The route answered, but not with usable fields — a rejected file type, a bad
+              // request, an upstream error. Its own message is the most specific thing available.
+              doc.read_outcome = 'failed'
+              doc.read_note = typeof json?.error === 'string'
+                ? `We couldn’t read this one — ${json.error} Type the figure into the box above, or try uploading again.`
+                : 'We couldn’t read this one. Type the figure into the box above, or try uploading again.'
             }
           } catch (e) {
+            // (b) The call itself failed — network, timeout, malformed response.
             console.error('[concierge extract] failed', e)
+            doc.read_outcome = 'failed'
+            doc.read_note = 'We couldn’t read this one — the connection dropped. Type the figure into the box above, or try uploading again.'
           }
         }
 
@@ -943,7 +1006,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                       </div>
                     )}
                   </Field>
-                  {isPaid ? <DocUpload label="Upload gas bills" locIdx={activeLocation} docType="utility_bill_gas" docs={loc.source_docs.filter(d => d.document_type === 'utility_bill_gas')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} /> : <LockedDocUpload label="Upload gas bills" />}
+                  {isPaid ? <DocUpload label="Upload gas bills" locIdx={activeLocation} docType="utility_bill_gas" docs={loc.source_docs.filter(d => d.document_type === 'utility_bill_gas')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:utility_bill_gas`]} /> : <LockedDocUpload label="Upload gas bills" />}
                 </div>
               )}
             </QuestionCard>
@@ -958,7 +1021,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   <Field label={`Total propane purchased — ${inventory.reporting_year} (${loc.propane_unit})`}>
                     <input type="number" value={loc.propane_amount || ''} onChange={e => updateLocation(activeLocation, 'propane_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload propane delivery records" locIdx={activeLocation} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} /> : <LockedDocUpload label="Upload propane delivery records" />}
+                  {isPaid ? <DocUpload label="Upload propane delivery records" locIdx={activeLocation} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_propane`]} /> : <LockedDocUpload label="Upload propane delivery records" />}
                 </div>
               )}
             </QuestionCard>
@@ -973,7 +1036,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   <Field label={`Total diesel in stationary equipment — ${inventory.reporting_year}`}>
                     <input type="number" value={loc.diesel_stationary_amount || ''} onChange={e => updateLocation(activeLocation, 'diesel_stationary_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload diesel purchase records" locIdx={activeLocation} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} /> : <LockedDocUpload label="Upload diesel purchase records" />}
+                  {isPaid ? <DocUpload label="Upload diesel purchase records" locIdx={activeLocation} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_diesel`]} /> : <LockedDocUpload label="Upload diesel purchase records" />}
                 </div>
               )}
             </QuestionCard>
@@ -983,7 +1046,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   <Field label={`Total fuel oil purchased — ${inventory.reporting_year} (gallons)`}>
                     <input type="number" value={loc.fuel_oil_gallons || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_gallons', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
+                  {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
                 </div>
               )}
             </QuestionCard>
@@ -1010,7 +1073,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                       </select>
                     </div>
                   </Field>
-                  {isPaid ? <DocUpload label="Upload fleet fuel records" locIdx={activeLocation} docType="fleet_fuel" docs={loc.source_docs.filter(d => d.document_type === 'fleet_fuel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} /> : <LockedDocUpload label="Upload fleet fuel records" />}
+                  {isPaid ? <DocUpload label="Upload fleet fuel records" locIdx={activeLocation} docType="fleet_fuel" docs={loc.source_docs.filter(d => d.document_type === 'fleet_fuel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fleet_fuel`]} /> : <LockedDocUpload label="Upload fleet fuel records" />}
                 </div>
               )}
             </QuestionCard>
@@ -1030,7 +1093,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   <Field label="Refrigerant purchased for top-up this year (kg)" hint="From service records or supplier invoices">
                     <input type="number" value={loc.refrigerant_purchased_kg || ''} onChange={e => updateLocation(activeLocation, 'refrigerant_purchased_kg', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload service records" locIdx={activeLocation} docType="service_record" docs={loc.source_docs.filter(d => d.document_type === 'service_record')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} /> : <LockedDocUpload label="Upload service records" />}
+                  {isPaid ? <DocUpload label="Upload service records" locIdx={activeLocation} docType="service_record" docs={loc.source_docs.filter(d => d.document_type === 'service_record')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:service_record`]} /> : <LockedDocUpload label="Upload service records" />}
                 </div>
               )}
             </div>
@@ -1096,7 +1159,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                     <a href="https://www.epa.gov/egrid/power-profiler" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#0C447C', textDecoration: 'none', display: 'inline-block', marginTop: 6 }}>🔎 Find your subregion with EPA Power Profiler (enter your ZIP) →</a>
                   </div>
                 )}
-                {isPaid ? <DocUpload label="Upload electricity bills" locIdx={activeLocation} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} /> : <LockedDocUpload label="Upload electricity bills" />}
+                {isPaid ? <DocUpload label="Upload electricity bills" locIdx={activeLocation} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:utility_electricity`]} /> : <LockedDocUpload label="Upload electricity bills" />}
               </div>
             </div>
             <QuestionCard question={streamQuestion('purchased_steam')} hint="Purchased steam or hot water from a district energy system — Scope 2" checked={loc.has_purchased_steam} onToggle={v => updateLocation(activeLocation, 'has_purchased_steam', v)}>
@@ -1105,7 +1168,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   <Field label={`Total purchased steam — ${inventory.reporting_year} (mmbtu)`}>
                     <input type="number" value={loc.purchased_steam_mmbtu || ''} onChange={e => updateLocation(activeLocation, 'purchased_steam_mmbtu', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload steam / district heating bills" locIdx={activeLocation} docType="purchased_steam" docs={loc.source_docs.filter(d => d.document_type === 'purchased_steam')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} /> : <LockedDocUpload label="Upload steam / district heating bills" />}
+                  {isPaid ? <DocUpload label="Upload steam / district heating bills" locIdx={activeLocation} docType="purchased_steam" docs={loc.source_docs.filter(d => d.document_type === 'purchased_steam')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:purchased_steam`]} /> : <LockedDocUpload label="Upload steam / district heating bills" />}
                 </div>
               )}
             </QuestionCard>
@@ -1196,7 +1259,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   <Field label={`${loc.name} — Renewable electricity (kWh)`} hint="Enter kWh covered by PPAs, RECs, or green tariffs. Leave 0 if none.">
                     <input type="number" value={loc.renewable_electricity_kwh || ''} onChange={e => updateLocation(i, 'renewable_electricity_kwh', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label={`Upload RECs / PPAs — ${loc.name}`} locIdx={i} docType="renewable_cert" docs={loc.source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} /> : <LockedDocUpload label={`Upload RECs / PPAs — ${loc.name}`} />}
+                  {isPaid ? <DocUpload label={`Upload RECs / PPAs — ${loc.name}`} locIdx={i} docType="renewable_cert" docs={loc.source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${i}:renewable_cert`]} /> : <LockedDocUpload label={`Upload RECs / PPAs — ${loc.name}`} />}
                 </div>
               ))}
             </div>
@@ -1210,6 +1273,12 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   <Field label={`${loc.name} — Biogenic CO₂ (mtCO₂)`} hint="From burning biomass, wood waste, or agricultural residues — 0 if none">
                     <input type="number" value={loc.biogenic_co2_mt || ''} onChange={e => updateLocation(i, 'biogenic_co2_mt', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
+                  {/* Biogenic was the only figure in the wizard with no evidence path — every other
+                      number a verifier reads can be traced to a document. Nothing else needed wiring:
+                      docs live in the locations_data jsonb with no DB constraint on document_type,
+                      and /api/verifier-documents iterates source_docs generically, so this slot
+                      reaches the verifier surface on its own. */}
+                  {isPaid ? <DocUpload label={`Upload biomass records — ${loc.name}`} locIdx={i} docType="biogenic" docs={loc.source_docs.filter(d => d.document_type === 'biogenic')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${i}:biogenic`]} /> : <LockedDocUpload label={`Upload biomass records — ${loc.name}`} />}
                 </div>
               ))}
             </div>
@@ -1715,12 +1784,16 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
   )
 }
 
-function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateProposal, onAddCoverageResolution, uploading, reportingYear, fiscalYearEndMonth, locId, coverageResolutions }: { label: string; locIdx: number; docType: string; docs: SourceDoc[]; onUpload: (f: FileList, i: number, t: string) => void; onRemove: (i: number, id: string, path: string) => void; onUpdateProposal: (locIdx: number, docId: string, propIdx: number, patch: Partial<ExtractedProposal>) => void; onAddCoverageResolution: (res: CoverageResolution) => void; uploading: boolean; reportingYear: number; fiscalYearEndMonth: number; locId: string; coverageResolutions: CoverageResolution[] }) {
+function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateProposal, onAddCoverageResolution, uploading, reportingYear, fiscalYearEndMonth, locId, coverageResolutions, uploadError }: { label: string; locIdx: number; docType: string; uploadError?: string; docs: SourceDoc[]; onUpload: (f: FileList, i: number, t: string) => void; onRemove: (i: number, id: string, path: string) => void; onUpdateProposal: (locIdx: number, docId: string, propIdx: number, patch: Partial<ExtractedProposal>) => void; onAddCoverageResolution: (res: CoverageResolution) => void; uploading: boolean; reportingYear: number; fiscalYearEndMonth: number; locId: string; coverageResolutions: CoverageResolution[] }) {
   const ref = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState<string | null>(null)   // `${docId}:${propIdx}` being edited
   const [editVal, setEditVal] = useState<string>('')
   const [dragActive, setDragActive] = useState(false)
   const hasConcierge = useHasConcierge()   // concierge tier held → auto-extraction; else manual entry
+  // Reads the SAME set the upload handler skips on, so the drop zone can never promise a reading
+  // that will not happen. Three states, not two: no concierge; concierge on a type it reads;
+  // concierge on a type it does not.
+  const conciergeReads = hasConcierge && !CONCIERGE_UNREAD_DOC_TYPES.has(docType)
   return (
     <div
       onDragOver={e => { e.preventDefault(); setDragActive(true) }}
@@ -1735,12 +1808,16 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
           <span style={{ fontSize: 11, padding: '4px 12px', borderRadius: 6, background: '#fff', border: '0.5px solid #e8e7e4', color: '#555553' }}>{uploading ? 'Uploading…' : '+ Upload'}</span>
         </div>
         <div style={{ fontSize: 13, color: '#0d0d0d', fontWeight: 500 }}>
-          {hasConcierge ? 'Drag & drop your bill here, or click to upload' : 'Drag & drop your documents here, or click to upload'}
+          {conciergeReads ? 'Drag & drop your bill here, or click to upload' : 'Drag & drop your documents here, or click to upload'}
         </div>
         <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 4, lineHeight: 1.5 }}>
-          {hasConcierge
+          {conciergeReads
             ? 'We’ll read the consumption figures automatically — you confirm before anything’s saved. PDF or photo (JPG, PNG) — large phone photos are fine.'
-            : 'PDF, image, XLSX or CSV. Enter figures manually after uploading — large files are fine.'}
+            : hasConcierge
+              /* Leads with why the upload is worth making. The limitation comes last and is stated
+                 plainly — not as a downgrade, because the evidence is the point of the upload. */
+              ? 'Upload it so your figure is evidenced — this is the document a verifier traces your number back to. Type the figure into the box above; we don’t read these ones automatically. PDF, image, XLSX or CSV.'
+              : 'PDF, image, XLSX or CSV. Enter figures manually after uploading — large files are fine.'}
         </div>
       </div>
       <input ref={ref} type="file" multiple accept=".pdf,.xlsx,.csv,.jpg,.png" style={{ display: 'none' }} onChange={e => e.target.files && onUpload(e.target.files, locIdx, docType)} />
@@ -1844,12 +1921,28 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
           )
         })
       })()}
+      {uploadError && (
+        <div style={{ marginTop: 6, background: '#FCEBEB', border: '0.5px solid rgba(185,28,28,0.2)', borderRadius: 8, padding: '8px 10px', fontSize: 12, color: '#B91C1C', lineHeight: 1.5 }}>
+          {uploadError}
+        </div>
+      )}
       {docs.map(doc => (
         <div key={doc.id} style={{ padding: '3px 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
             <span style={{ color: '#0d0d0d' }}>✓ {doc.file_name}</span>
             <button onClick={() => onRemove(locIdx, doc.id, doc.file_path)} style={{ fontSize: 11, color: '#B91C1C', background: 'none', border: 'none' }}>Remove</button>
           </div>
+          {/* Why this document carries no figures. Abstention is NEUTRAL, not amber: the reader
+              declining to guess is the system working, and colouring it as a fault would push a
+              customer to re-upload a file that will rightly abstain again. */}
+          {doc.read_note && (
+            <div style={{
+              marginTop: 4, marginLeft: 14, fontSize: 11, lineHeight: 1.5,
+              color: doc.read_outcome === 'failed' ? '#ba7517' : '#555553',
+            }}>
+              {doc.read_outcome === 'failed' ? '⚠ ' : ''}{doc.read_note}
+            </div>
+          )}
           {doc.extracted && doc.extracted.length > 0 && (
             <div style={{ marginTop: 4, marginLeft: 14, display: 'flex', flexDirection: 'column', gap: 4 }}>
               {doc.extracted.map((p, pi) => (
