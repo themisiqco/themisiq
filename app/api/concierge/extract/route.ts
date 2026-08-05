@@ -179,7 +179,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         model: 'claude-opus-4-8',
-        max_tokens: 1024,
+        max_tokens: 8192,
         messages: [
           {
             role: 'user',
@@ -202,6 +202,19 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await anthropicRes.json()
+
+    // A truncated read is not a partial read — it is an unusable one. The model emits the JSON array
+    // in one pass, so hitting the cap severs it mid-array: what survives is a prefix of the fuels,
+    // possibly with the last object cut mid-number. Parsing it would either fail as malformed or,
+    // worse, succeed on a shorter array and hand the customer a subset of the figures with nothing
+    // marking the absence. Refuse the whole response and say which condition was observed.
+    if (data.stop_reason === 'max_tokens') {
+      console.error('[concierge/extract] response truncated at max_tokens; discarding')
+      return NextResponse.json(
+        { error: 'The document was too long to read in full.' },
+        { status: 502 },
+      )
+    }
 
     // The response content is an array of blocks; concatenate any text blocks.
     const rawText: string = Array.isArray(data.content)
