@@ -17,7 +17,14 @@
  */
 
 import { supabase } from "../supabase";
-import { buildCompanySeries, type InventoryRow, type CompanySeries } from "./series";
+import {
+  buildCompanySeries,
+  type InventoryRow,
+  type CompanySeries,
+  type YearDataStatus,
+  type YearExclusion,
+} from "./series";
+import { findUnpriceableLocations, type Location } from "./engine";
 
 export interface LoadSeriesResult {
   series: CompanySeries[];
@@ -31,6 +38,92 @@ export interface LoadSeriesResult {
   skippedNoTotals: number;
   /** Set when the load failed (auth, embed/FK missing, network). series is []. */
   error: string | null;
+}
+
+// ── Completeness of a stored year ────────────────────────────────────────────────────────────────
+// A saved total can be EXCLUSION-BEARING: the engine leaves out any location whose fuel unit has no
+// published factor for its country, so scope1_total may be a real number that omits a site. Read
+// unqualified, that plots as a reduction the company never achieved.
+//
+// TWO SOURCES, in this order, because neither alone is sufficient:
+//
+//   1. workings — the authoritative record. A saved inventory carries one `declaration:
+//      'unpriceable'` row per excluded location. When it is there we know exactly what the stored
+//      total omits, and why. → 'excluded'.
+//
+//   2. locations_data — re-derived. Inventories saved before the exclusion existed CANNOT carry the
+//      marker, so its absence is not evidence of completeness. locations_data is stored on the same
+//      row and findUnpriceableLocations is pure, so priceability is recomputable for any row, old or
+//      new — no backfill. But a recomputed hit on a marker-less row does NOT tell us what the stored
+//      total did with that location, only that it cannot be priced TODAY. That is 'unverifiable',
+//      not 'excluded': we would be guessing at the stored figure's composition.
+//
+// Recomputation runs against today's factor tables while the stored total was computed against the
+// tables of its day. That divergence can only move a year INTO 'unverifiable', never out of it —
+// it withholds a year rather than plotting it wrongly.
+//
+// A row we cannot evaluate at all (locations_data absent or not an array) is 'unverifiable'. It is
+// never assumed complete.
+
+/** The shape of the workings rows this file cares about; everything else passes through. */
+interface WorkingsRow {
+  location?: string;
+  declaration?: string;
+  unpriceable?: { fuel?: string; unit?: string; country?: string };
+}
+
+interface Completeness {
+  dataStatus: YearDataStatus;
+  exclusions: YearExclusion[] | null;
+  unverifiableReason: string | null;
+}
+
+function assessCompleteness(workings: unknown, locationsData: unknown): Completeness {
+  // 1. The recorded marker wins — it describes the stored total, which is what we are qualifying.
+  if (Array.isArray(workings)) {
+    const marked = (workings as WorkingsRow[]).filter((w) => w?.declaration === "unpriceable");
+    if (marked.length > 0) {
+      return {
+        dataStatus: "excluded",
+        exclusions: marked.map((w) => ({
+          locationName: w.location ?? "Location",
+          fuel: w.unpriceable?.fuel ?? "",
+          unit: w.unpriceable?.unit ?? "",
+          country: w.unpriceable?.country ?? "",
+        })),
+        unverifiableReason: null,
+      };
+    }
+  }
+
+  // 2. No marker. Establish completeness from the stored locations, or admit we cannot.
+  if (!Array.isArray(locationsData) || locationsData.length === 0) {
+    return {
+      dataStatus: "unverifiable",
+      exclusions: null,
+      unverifiableReason: "this year's saved inventory has no location detail to check against",
+    };
+  }
+  try {
+    const unpriceable = findUnpriceableLocations(locationsData as Location[]);
+    if (unpriceable.length > 0) {
+      const names = unpriceable.map((u) => u.locName).join(", ");
+      return {
+        dataStatus: "unverifiable",
+        exclusions: null,
+        unverifiableReason: `${unpriceable.length} location${unpriceable.length > 1 ? "s" : ""} in this year's inventory (${names}) can no longer be worked out, and this year was saved before we started recording that — so we can't tell whether its figures include them`,
+      };
+    }
+  } catch {
+    // findUnpriceableLocations re-throws anything that is not a pricing refusal. A malformed
+    // stored location lands here: unknown, never assumed complete.
+    return {
+      dataStatus: "unverifiable",
+      exclusions: null,
+      unverifiableReason: "this year's saved location detail could not be read",
+    };
+  }
+  return { dataStatus: "ok", exclusions: null, unverifiableReason: null };
 }
 
 /** Shape of a raw row back from the embedded select (loosely typed). */
@@ -50,11 +143,19 @@ interface RawRow {
     | { total_scope3_tco2e: number | null }
     | { total_scope3_tco2e: number | null }[]
     | null;
+  // Both jsonb. Needed to qualify the totals above — see assessCompleteness.
+  workings: unknown;
+  locations_data: unknown;
 }
 
+// ⚠️ workings and locations_data are FULL jsonb columns, and the larger ones on this table.
+// PostgREST cannot select inside a jsonb array, so there is no narrower projection available. They
+// are here because the numeric totals alone cannot be trusted without them — the payload cost buys
+// the difference between a plotted figure and a plotted guess.
 const SELECT =
   "company_id, company_name, reporting_year, scope1_total, scope2_location_total, " +
   "scope2_market_total, revenue_millions, employee_count, gwp_version, pct_estimated, " +
+  "workings, locations_data, " +
   "scope3_inventories(total_scope3_tco2e)";
 
 export async function loadCompanySeries(): Promise<LoadSeriesResult> {
@@ -97,7 +198,9 @@ export async function loadCompanySeries(): Promise<LoadSeriesResult> {
       const s3 = Array.isArray(r.scope3_inventories)
         ? r.scope3_inventories[0]
         : r.scope3_inventories;
+      const completeness = assessCompleteness(r.workings, r.locations_data);
       mapped.push({
+        ...completeness,
         company_id: r.company_id,
         company_name: r.company_name ?? "",
         reporting_year: r.reporting_year,

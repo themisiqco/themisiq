@@ -16,7 +16,7 @@ import {
   isResolvedGridRegion, getGridFactor, getResidualFactor,
   detectGridRegion, gridRegionForCountry, pickEF, combustionSource,
   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation, pctEstimated,
-  applyResolutions, findUnresolvedCoverage, findUndeclaredStreams, STREAM_META,
+  applyResolutions, findUnresolvedCoverage, findUndeclaredStreams, findUnpriceableLocations, STREAM_META,
   ngUnitOptions, liquidUnitOptions, propaneUnitOptions, steamUnitOptions,
   snapUnitsForCountry,
   validateElectricity, validateNaturalGas, validateCompleteness,
@@ -24,7 +24,7 @@ import {
 } from '../../../lib/ghg/engine'
 import type {
   GwpVersion, Location, Inventory, SourceDoc, ExtractedProposal,
-  ConciergeStatus, CoveragePeriod, CoverageResolution, DeclarableStream,
+  ConciergeStatus, CoveragePeriod, CoverageResolution, DeclarableStream, UnpriceableLocation,
 } from '../../../lib/ghg/engine'
 
 
@@ -232,6 +232,40 @@ function PaywallOverlay({ frameworks }: { frameworks: string[] }) {
 // ⚠️ MIRRORS the allow-list in app/api/concierge/extract/route.ts. Both must change together, or an
 // upload is either sent and rejected, or skipped when it could have been read.
 const CONCIERGE_READABLE_MEDIA = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+
+// ── Wording for a location we cannot price ───────────────────────────────────────────────────────
+// The engine refuses in its own vocabulary (fuel token, unit token, ISO country code) because it
+// has no business writing customer copy. Turning that into a sentence is presentation, so it lives
+// here. Nothing below leaks a field name, an enum value, or the phrase "emission factor" — the
+// customer did not choose those words and cannot act on them.
+//
+// Anything not in these maps falls back to the raw token rather than a blank: an unfamiliar word
+// the customer can still search for beats a sentence with a hole in it.
+const COUNTRY_WORDS: Record<string, string> = {
+  US: 'United States', CA: 'Canada', GB: 'the UK', UK: 'the UK', AU: 'Australia', NZ: 'New Zealand',
+  AT: 'Austria', BE: 'Belgium', BG: 'Bulgaria', HR: 'Croatia', CY: 'Cyprus', CZ: 'Czechia',
+  DK: 'Denmark', EE: 'Estonia', FI: 'Finland', FR: 'France', DE: 'Germany', EL: 'Greece',
+  HU: 'Hungary', IE: 'Ireland', IT: 'Italy', LV: 'Latvia', LT: 'Lithuania', LU: 'Luxembourg',
+  MT: 'Malta', NL: 'the Netherlands', PL: 'Poland', PT: 'Portugal', RO: 'Romania', SK: 'Slovakia',
+  SI: 'Slovenia', ES: 'Spain', SE: 'Sweden',
+}
+const UNIT_WORDS: Record<string, string> = {
+  m3: 'cubic metres', kwh: 'kilowatt-hours', mcf: 'thousand cubic feet', therms: 'therms',
+  mmbtu: 'MMBtu', gj: 'gigajoules', litres: 'litres', gallons: 'US gallons', kg: 'kilograms',
+}
+const FUEL_WORDS: Record<string, string> = {
+  natural_gas: 'gas', propane: 'propane', diesel: 'diesel', diesel_mobile: 'vehicle diesel',
+  gasoline: 'petrol', fuel_oil: 'fuel oil',
+}
+
+function unpriceableMessage(u: UnpriceableLocation): string {
+  const country = COUNTRY_WORDS[u.country] ?? (u.country === '(unset)' ? '' : u.country)
+  const unit = UNIT_WORDS[u.unit] ?? u.unit
+  const fuel = FUEL_WORDS[u.fuel] ?? u.fuel.replace(/_/g, ' ')
+  // No country picked yet is a different sentence: naming "(unset)" would read as a place.
+  if (!country) return `This location has no country set, and its ${fuel} figure is in ${unit}. Choose the country for this location, or check the unit on the bill.`
+  return `This location is set to ${country}, but its ${fuel} figure is in ${unit}. Check the country on this location, or the unit on the bill.`
+}
 
 function LockedDocUpload({ label }: { label: string }) {
   return (
@@ -644,6 +678,22 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // gridReady, with its own amber message; deliberately NOT gating the step-2 Continue.
   const undeclaredStreams = findUndeclaredStreams(inventory.locations)
   const declarationsReady = undeclaredStreams.length === 0
+  // Pricing gate. A location whose fuel unit has no published factor for its country cannot be
+  // priced at all; it is EXCLUDED from every total (never counted as zero) and named wherever a
+  // total that excludes it is shown.
+  //
+  // PROBED ONCE, AT AR6, AND REUSED FOR AR4/AR5 — deliberately not run per GWP. Whether a factor
+  // EXISTS is a property of the country's factor table and the unit, not of the GWP basis: the AR
+  // version only scales CH4/N2O once a factor has been found. So the answer is identical for all
+  // three, and calcInventory (called three times, one per basis) excludes the same locations each
+  // time. Running the probe per basis would triple a pure-arithmetic sweep to reach that same
+  // answer, and — worse — would invite a future reader to believe the sets could differ.
+  const unpriceableLocations = findUnpriceableLocations(inventory.locations, 'AR6', inventory.reporting_year)
+  const pricingReady = unpriceableLocations.length === 0
+  const unpriceableById = new Map(unpriceableLocations.map(u => [u.locId, u]))
+  // One phrasing of "this total leaves something out", used at every site that shows a total.
+  const exclusionNote = pricingReady ? null
+    : `Excludes ${unpriceableLocations.length} location${unpriceableLocations.length > 1 ? 's' : ''} we can't work out yet — ${unpriceableLocations.map(u => u.locName).join(', ')}.`
   const needsPriorYear = inventory.selected_frameworks.includes('cdp')
   const needsEmployees = inventory.selected_frameworks.includes('ecovadis')
   const needsBiogenic = inventory.selected_frameworks.includes('esrs') || inventory.selected_frameworks.includes('gri')
@@ -710,6 +760,13 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       scope2_intensity: inventory.revenue_millions > 0 ? totals_ar6.s2_location / inventory.revenue_millions : 0,
       gwp_version: 'AR6',
       status: 'draft',
+// ⚠️ THIS IS ALSO THE RECORD OF WHAT THE SAVED TOTALS LEFT OUT. scope1_total / scope2_* above are
+// computed with unpriceable locations EXCLUDED, and buildWorkings emits one `declaration:
+// 'unpriceable'` row per excluded location (result_tco2e null, with the reason in `note`). So the
+// omission travels with the figures, in the same column a verifier reads, and no schema change was
+// needed to record it. If that row is ever dropped from buildWorkings, these saved totals become
+// silently short — the stored inventory would assert a company-wide figure that omits a site with
+// nothing on the record saying so.
 workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, coverageResolutions, inventory.fiscal_year_end_month),
       updated_at: new Date().toISOString(),
     }
@@ -988,7 +1045,11 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
 
   const renderStep2 = () => {
     const loc = inventory.locations[activeLocation]
-    const calc = calcLocation(loc, 'AR6', inventory.reporting_year)
+    // SEAM: calcLocation refuses an unpriceable location, and this is the step the customer is sent
+    // to in order to FIX one — so an unguarded call here takes down the only screen that can undo
+    // the problem. The blocking panel below replaces the live-results figures entirely.
+    const blockedHere = unpriceableById.get(loc.id)
+    const calc = blockedHere ? null : calcLocation(loc, 'AR6', inventory.reporting_year)
     const detectedRegion = [...GRID_REGIONS_CA, ...GRID_REGIONS_US].find(r => r.value === loc.grid_region)
     // The question a user is asked and the absence they later attest MUST be the same words (STEP 3):
     // both derive from STREAM_META. See the attestation block below and the workings declaration rows.
@@ -1015,6 +1076,16 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             </div>
           )}
         </div>
+        {/* The blocking state for the location being edited, at the top of its own step — this is
+            where the two things named in the message (the country, and the unit on the bill) are
+            actually changed, so the customer is told next to the controls that fix it. */}
+        {unpriceableById.get(loc.id) && (
+          <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.3)', borderRadius: 10, padding: '0.9rem 1rem', marginBottom: '1.25rem' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#ba7517', marginBottom: 4 }}>⚠ We can&apos;t work out this location&apos;s emissions yet</div>
+            <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>{unpriceableMessage(unpriceableById.get(loc.id)!)}</div>
+            <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 4 }}>Until then this location is left out of your totals — it isn&apos;t counted as zero, and nothing else you&apos;ve entered here is lost.</div>
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '2rem', alignItems: 'start' }}>
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 20 }}>
             <QuestionCard question={streamQuestion('natural_gas')} hint="For heating, boilers, furnaces — check your gas utility bills" checked={loc.has_natural_gas} onToggle={v => updateLocation(activeLocation, 'has_natural_gas', v)}>
@@ -1258,12 +1329,23 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           <div style={{ position: 'sticky', top: 80 }}>
             <div style={{ background: '#111827', borderRadius: 12, padding: '1.5rem', marginBottom: 12 }}>
               <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: '#d1d5db', marginBottom: 12 }}>{loc.name} — live results</div>
-              {[
-                { label: 'Heating & fuel', val: calc.s1_stationary, color: '#a78bfa' },
-                { label: 'Vehicles', val: calc.s1_mobile, color: '#1fb1ff' },
-                { label: 'Refrigerants', val: calc.s1_fugitive, color: '#ba7517' },
-                { label: 'Scope 1 total', val: calc.s1_total, color: '#f9fafb', bold: true },
-                { label: 'Scope 2 (electricity)', val: calc.s2_location, color: '#64fe3e', bold: true },
+              {/* NOT five dashes. A "—" beside "Scope 1 total" sits in the same column, in the same
+                  row, as a figure — it reads as a measured zero rather than as an absent result.
+                  The rows are removed and the reason takes their place. */}
+              {blockedHere ? (
+                <div style={{ padding: '2px 0 6px' }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#fbbf24', marginBottom: 6 }}>⚠ No results for this location yet</div>
+                  <div style={{ fontSize: 12, color: '#d1d5db', lineHeight: 1.6 }}>{unpriceableMessage(blockedHere)}</div>
+                  <div style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.6, marginTop: 6 }}>
+                    Your other locations are unaffected, and nothing you&apos;ve entered here is lost.
+                  </div>
+                </div>
+              ) : [
+                { label: 'Heating & fuel', val: calc!.s1_stationary, color: '#a78bfa' },
+                { label: 'Vehicles', val: calc!.s1_mobile, color: '#1fb1ff' },
+                { label: 'Refrigerants', val: calc!.s1_fugitive, color: '#ba7517' },
+                { label: 'Scope 1 total', val: calc!.s1_total, color: '#f9fafb', bold: true },
+                { label: 'Scope 2 (electricity)', val: calc!.s2_location, color: '#64fe3e', bold: true },
               ].map(({ label, val, color, bold }) => (
                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '0.5px solid rgba(255,255,255,0.07)' }}>
                   <span style={{ fontSize: 12, color: bold ? '#f9fafb' : '#d1d5db', fontWeight: bold ? 600 : 300 }}>{label}</span>
@@ -1281,6 +1363,12 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
               {gridReady
                 ? <div style={{ fontSize: 14, fontWeight: 600, color: '#0F6E56', marginTop: 4 }}>{totals_ar6.s2_location.toFixed(2)} mt Scope 2</div>
                 : <div style={{ marginTop: 4 }}><div style={{ fontSize: 14, fontWeight: 600, color: '#888784' }}>— mt Scope 2</div><div style={{ fontSize: 10, color: '#888784', marginTop: 1 }}>Resolve grid regions to preview Scope 2</div></div>}
+              {/* Directly under the figure, not in a banner elsewhere on the page: a total that
+                  leaves a location out has to say so where it is read, or the omission is silent
+                  to anyone who does not scroll. */}
+              {exclusionNote && (
+                <div style={{ fontSize: 10, color: '#ba7517', marginTop: 6, lineHeight: 1.5 }}>⚠ {exclusionNote}</div>
+              )}
             </div>
           </div>
         </div>
@@ -1400,6 +1488,11 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                     )}
                     {rev > 0 && <div style={{ fontSize: 11, color: '#888784', marginTop: 4 }}>Intensity: {(totals.s1_total / rev).toFixed(4)} mt/$M</div>}
                     {emp > 0 && fw.id === 'ecovadis' && <div style={{ fontSize: 11, color: '#888784' }}>Per employee: {(totals.s1_total / emp * 1000).toFixed(2)} kgCO₂e</div>}
+                    {/* Every figure in this card — both scopes, biogenic, the intensities — is built
+                        from the same excluded set, so the note belongs to the card, not to one line. */}
+                    {exclusionNote && (
+                      <div style={{ fontSize: 10, color: '#ba7517', marginTop: 8, lineHeight: 1.5 }}>⚠ {exclusionNote}</div>
+                    )}
                   </div>
                 )
               })}
@@ -1411,15 +1504,23 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             // second, hand-rolled table derivation that used to live here is gone (Phase 4).
             const allRows = buildWorkings(inventory.locations, wGwp, inventory.reporting_year, coverageResolutions, inventory.fiscal_year_end_month)
             return inventory.locations.map((loc, i) => {
-              const c = calcLocation(loc, wGwp, inventory.reporting_year)
+              // calcLocation is the SAME call that refuses an unpriceable location, so it must not
+              // run for one — this line is a second unguarded render-path crash site, not just the
+              // totals at the top of the component.
+              const blocked = unpriceableById.get(loc.id)
+              const c = blocked ? null : calcLocation(loc, wGwp, inventory.reporting_year)
               const key = `loc_${i}`
               const locRows = allRows.filter(r => r.location === (loc.name || 'Location'))
               return (
-                <div key={loc.id} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, marginBottom: 12, overflow: 'hidden' }}>
+                <div key={loc.id} style={{ background: '#fff', border: blocked ? '0.5px solid rgba(186,117,23,0.4)' : '0.5px solid #e8e7e4', borderRadius: 12, marginBottom: 12, overflow: 'hidden' }}>
                   <div onClick={() => setShowWorkings(w => ({...w, [key]: !w[key]}))} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', }}>
                     <div>
                       <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>{loc.name}{loc.state && ` — ${loc.state}`}</div>
-                      <div style={{ fontSize: 12, color: '#888784', marginTop: 2 }}>S1: {c.s1_total.toFixed(2)} mt · S2: {c.s2_location.toFixed(2)} mt · Total: {(c.s1_total + c.s2_location).toFixed(2)} mt</div>
+                      {/* No numbers for a blocked location — not even a dash beside "S1:", which
+                          still reads as a measured scope. The reason takes the figures' place. */}
+                      {blocked
+                        ? <div style={{ fontSize: 12, color: '#ba7517', marginTop: 2, lineHeight: 1.5, maxWidth: 620 }}>⚠ Not included in any total. {unpriceableMessage(blocked)}</div>
+                        : <div style={{ fontSize: 12, color: '#888784', marginTop: 2 }}>S1: {c!.s1_total.toFixed(2)} mt · S2: {c!.s2_location.toFixed(2)} mt · Total: {(c!.s1_total + c!.s2_location).toFixed(2)} mt</div>}
                     </div>
                     <span style={{ fontSize: 12, color: '#888784' }}>{showWorkings[key] ? '▲ Hide' : '▼ Show workings'}</span>
                   </div>
@@ -1440,6 +1541,18 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                                 <td style={{ ...wTd, color: '#888784' }}>{r.note}</td>
                                 <td style={{ ...wTd, color: '#888784' }}>{r.gwp_basis}</td>
                                 <td style={{ ...wTd, color: '#888784', fontWeight: 600 }}>0.0000</td>
+                              </tr>
+                            }
+                            // Same treatment as 'undeclared', and for the same reason: the location
+                            // contributes nothing to any total, so a number here would be a claim.
+                            if (r.declaration === 'unpriceable') {
+                              return <tr key={ri} style={{ background: '#FEF3E2' }}>
+                                <td style={{ ...wTd, color: '#ba7517', fontWeight: 600 }}>{r.source}</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>{r.note}</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>{r.gwp_basis}</td>
+                                <td style={{ ...wTd, color: '#ba7517', fontWeight: 600 }}>—</td>
                               </tr>
                             }
                             if (r.declaration === 'undeclared') {
@@ -1475,7 +1588,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                               <td style={{ ...wTd, fontWeight: 600, color: s2 ? '#0F6E56' : '#7425e3' }}>{r.result_tco2e == null ? '—' : r.result_tco2e.toFixed(4)}</td>
                             </tr>
                           })}
-                          <tr style={{ background: '#0d0d0d' }}><td colSpan={5} style={{ ...wTd, color: '#fff', fontWeight: 700, background: '#0d0d0d' }}>TOTAL — {loc.name} (Scope 1 + Scope 2 location-based)</td><td style={{ ...wTd, color: '#fff', fontWeight: 700, background: '#0d0d0d' }}>{(c.s1_total + c.s2_location).toFixed(4)}</td></tr>
+                          {/* The per-location TOTAL row. A blocked location has no total to state —
+                              printing 0.0000 here would be the exact claim the exclusion exists to
+                              avoid, and it would contradict the row above it. */}
+                          <tr style={{ background: '#0d0d0d' }}><td colSpan={5} style={{ ...wTd, color: '#fff', fontWeight: 700, background: '#0d0d0d' }}>TOTAL — {loc.name} {c ? '(Scope 1 + Scope 2 location-based)' : '— excluded from all totals'}</td><td style={{ ...wTd, color: '#fff', fontWeight: 700, background: '#0d0d0d' }}>{c ? (c.s1_total + c.s2_location).toFixed(4) : '—'}</td></tr>
                         </tbody>
                       </table>
                     </div>
@@ -1597,8 +1713,15 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                         </div>
                       ))}
                     </div>
-                    {(!conciergeReady || !gridReady || !declarationsReady) && (
+                    {/* The export preview restates the totals, so it restates the omission. */}
+                    {exclusionNote && (
+                      <div style={{ fontSize: 11, color: '#ba7517', marginBottom: 16, lineHeight: 1.5 }}>⚠ {exclusionNote}</div>
+                    )}
+                    {(!conciergeReady || !gridReady || !declarationsReady || !pricingReady) && (
                       <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.3)', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
+                        {unpriceableLocations.length > 0 && (
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {unpriceableLocations.length} location{unpriceableLocations.length > 1 ? 's' : ''} can&apos;t be worked out and would be left out of this report: {unpriceableLocations.map(u => u.locName).join(', ')} — fix the country or the unit on the Energy &amp; fuel step</div>
+                        )}
                       {conciergePending.length > 0 && (
                           <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {conciergePending.length} uploaded figure{conciergePending.length > 1 ? 's' : ''} still need{conciergePending.length > 1 ? '' : 's'} your confirmation</div>
                         )}
@@ -1620,10 +1743,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                         <span style={{ fontSize: 12, color: "#555553", lineHeight: 1.6 }}>I confirm that the data entered is accurate to the best of my knowledge and has been sourced from actual utility bills and operational records. I understand that ThemisIQ applies the correct methodology to the data I provide, and that accuracy of the underlying data is my responsibility.</span>
                       </label>
                     </div>
-                    <button onClick={() => dataConfirmed && conciergeReady && gridReady && declarationsReady && generateExport(fw.id)} style={{ fontSize: 14, fontWeight: 500, opacity: (dataConfirmed && conciergeReady && gridReady && declarationsReady) ? 1 : 0.4, cursor: (dataConfirmed && conciergeReady && gridReady && declarationsReady) ? "pointer" : "not-allowed", padding: '12px 28px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', border: 'none', }}>
+                    <button onClick={() => dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && generateExport(fw.id)} style={{ fontSize: 14, fontWeight: 500, opacity: (dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady) ? 1 : 0.4, cursor: (dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady) ? "pointer" : "not-allowed", padding: '12px 28px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', border: 'none', }}>
                       ⬇ Download {fw.name} Report (CSV)
                     </button>
-                    <button onClick={() => dataConfirmed && conciergeReady && gridReady && declarationsReady && generateAssurance()} style={{ fontSize: 14, fontWeight: 500, opacity: (dataConfirmed && conciergeReady && gridReady && declarationsReady) ? 1 : 0.4, cursor: (dataConfirmed && conciergeReady && gridReady && declarationsReady) ? 'pointer' : 'not-allowed', padding: '12px 28px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', marginLeft: 10 }}>Download Full Assurance Package (PDF)</button>
+                    <button onClick={() => dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && generateAssurance()} style={{ fontSize: 14, fontWeight: 500, opacity: (dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady) ? 1 : 0.4, cursor: (dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady) ? 'pointer' : 'not-allowed', padding: '12px 28px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', marginLeft: 10 }}>Download Full Assurance Package (PDF)</button>
                   </div>
                   <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem', fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
                     <strong>Disclaimer:</strong>
@@ -1642,7 +1765,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           {/* SBTi nudge — shown once the inventory is saved AND its figures confirmed (a settled
               baseline). Affirmative next-step, not a warning. Always shows when gated (no sbti_targets
               read); copy reads fine whether or not targets already exist. GHG-gated page ⇒ no entitlement check. */}
-          {inventoryId && dataConfirmed && conciergeReady && gridReady && declarationsReady && (
+          {inventoryId && dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && (
             <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.25)', borderRadius: 10, padding: '1.25rem', marginTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' as const }}>
               <div style={{ flex: 1, minWidth: 280 }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Your inventory is the baseline for science-based targets.</div>
@@ -1726,10 +1849,21 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
       // Grid region, not State: loc.state is empty for CA (province), UK, EU, NZ — every non-US location
       // exported a blank jurisdiction. grid_region (US_PA / ON / NZ) is the key the factor was looked up
       // under, which is exactly what a verifier needs to reconcile the number.
-      ['Location', 'Grid region', 'S1 Total', 'S2 Location'],
+      // SEAM: calcLocation refuses an unpriceable location here too, across ALL locations rather
+      // than the one on screen — so one bad location would abort the whole CSV mid-generation.
+      // The export gate (pricingReady) currently makes this unreachable, but A GATE IS NOT A GUARD:
+      // it protects this call only for as long as nobody loosens it or adds a second caller. The
+      // 'Note' column carries the same claim as the `declaration: 'unpriceable'` row buildWorkings
+      // writes, so the breakdown and the workings in the same export cannot disagree.
+      ['Location', 'Grid region', 'S1 Total', 'S2 Location', 'Note'],
       ...inventory.locations.map(loc => {
+        const blocked = unpriceableById.get(loc.id)
+        if (blocked) {
+          return [loc.name, loc.grid_region, '—', '—',
+            `EXCLUDED FROM TOTALS — ${unpriceableMessage(blocked)} No figure for this location is included in any total on this report.`]
+        }
         const c = calcLocation(loc, fw.gwp as 'AR4' | 'AR5', inventory.reporting_year)
-        return [loc.name, loc.grid_region, c.s1_total.toFixed(4), c.s2_location.toFixed(4)]
+        return [loc.name, loc.grid_region, c.s1_total.toFixed(4), c.s2_location.toFixed(4), '']
       }),
       [''],
       ['DISCLAIMER'],
