@@ -53,11 +53,17 @@ import { WIZARD_STEP_NAMES, isWizardStep } from '../../../lib/ghg/wizardSteps'
 //     -d '{"model":"<the string>","max_tokens":16,"messages":[{"role":"user","content":"ping"}]}'
 // 200 means it resolves; 404 means it does not.
 //
-// WHY sonnet-5 AND NOT claude-opus-4-8, the app-side standard CLAUDE.md names: a deliberate
-// deviation, recorded there too so it is not "corrected" back. The retired string was a Sonnet, so
-// this keeps the tier its author chose; the guide answers from a fixed ~7 KB prompt rather than
-// reasoning over a document the way /api/concierge/extract does; and the rate limit below admits 30
-// calls per user per ten minutes, which is a great many glossary lookups to pay Opus prices for.
+// WHY sonnet-5 AND NOT an Opus: recorded in CLAUDE.md too, so it is not "corrected" back. The
+// retired string was a Sonnet, so this keeps the tier its author chose; the guide answers from a
+// fixed ~7 KB prompt rather than reasoning over a document the way /api/concierge/extract does; and
+// the rate limit below admits 30 calls per user per ten minutes, which is a great many glossary
+// lookups to pay Opus prices for.
+//
+// ⚠️ THIS NO LONGER DEVIATES FROM A SINGLE STANDARD, BECAUSE THERE ISN'T ONE. This comment used to
+// justify itself against "claude-opus-4-8, the app-side standard CLAUDE.md names". That standard is
+// gone: /api/concierge/extract moved to claude-opus-5 (with thinking on) on 5 Aug 2026, and CLAUDE.md
+// now records a per-route choice rather than one default. The reasoning above stands on its own —
+// it never depended on what the other route happened to use.
 const MODEL = 'claude-sonnet-5'
 
 // ⚠️ MAX_TOKENS IS NOT THE ANSWER'S LENGTH ANY MORE. On claude-sonnet-5 adaptive thinking runs by

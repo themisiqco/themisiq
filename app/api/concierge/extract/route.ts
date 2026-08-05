@@ -178,8 +178,25 @@ export async function POST(req: NextRequest) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-8',
+        model: 'claude-opus-5',
         max_tokens: 8192,
+        // THINKING IS ON DELIBERATELY, AND EXPLICITLY — not left to the model default.
+        // The prompt asks this route to tell a billed consumption figure apart from a cost, a rate,
+        // a tax line and a raw meter reading, and to return value:null when it cannot tell. That
+        // abstention is the route's safety property — a flagged blank is recoverable, a confident
+        // wrong number reaches a verifier — and reasoning is what makes the judgement reliable.
+        //
+        // ⚠️ `{ type: 'enabled', budget_tokens: N }` IS REJECTED. A fixed thinking budget no longer
+        // exists on the Opus family; the API answers 400 with: '"thinking.type.enabled" is not
+        // supported for this model. Use "thinking.type.adaptive" and "output_config.effort" to
+        // control thinking behavior.' Verified live against BOTH claude-opus-5 and claude-opus-4-8
+        // on 5 Aug 2026 — this is not a model-choice problem, and switching back does not restore it.
+        //
+        // `effort` is a DEPTH DIAL, NOT A TOKEN CAP: nothing here bounds thinking to a token count.
+        // What bounds the worst case is max_tokens (8192, shared by thinking AND response text) plus
+        // the stop_reason guard below, which refuses a truncated read outright.
+        thinking: { type: 'adaptive' },
+        output_config: { effort: 'medium' },
         messages: [
           {
             role: 'user',
@@ -204,6 +221,11 @@ export async function POST(req: NextRequest) {
     const data = await anthropicRes.json()
 
     // A truncated read is not a partial read — it is an unusable one. The model emits the JSON array
+    // (WITH THINKING ON, this guard matters MORE, not less: thinking draws on the same max_tokens
+    // budget, so a long deliberation can consume the cap before any text block is emitted. Verified
+    // live on 5 Aug 2026 — a truncated thinking turn returns content ['thinking'] with NO text block
+    // and stop_reason 'max_tokens'. Without this guard rawText would be '' and the customer would be
+    // told the read could not be parsed, which is the wrong diagnosis: it was cut off, not malformed.)
     // in one pass, so hitting the cap severs it mid-array: what survives is a prefix of the fuels,
     // possibly with the last object cut mid-number. Parsing it would either fail as malformed or,
     // worse, succeed on a shorter array and hand the customer a subset of the figures with nothing
@@ -217,6 +239,13 @@ export async function POST(req: NextRequest) {
     }
 
     // The response content is an array of blocks; concatenate any text blocks.
+    //
+    // ⚠️ THE `b.type === 'text'` TEST IS LOAD-BEARING NOW THAT THINKING IS ON. With thinking the
+    // response is `['thinking', 'text']`, and a thinking block has NO `.text` key at all (its field
+    // is `.thinking`, empty by default because `display` defaults to "omitted"). Reading `b.text`
+    // unconditionally would prepend the string "undefined" to the JSON and fail the parse — which is
+    // the ghg-bot defect in CLAUDE.md (a `.map` for `.text` over blocks that had none). Verified
+    // live on 5 Aug 2026: this filter yields the JSON array alone and parses cleanly.
     const rawText: string = Array.isArray(data.content)
       ? data.content.map((b: any) => (b.type === 'text' ? b.text : '')).join('').trim()
       : ''
