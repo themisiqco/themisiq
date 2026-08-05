@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { CONCIERGE_UNREAD_DOC_TYPES, SUPPORTED_FUELS } from '../../../lib/ghg/conciergeDocTypes'
+import { WIZARD_STEP_NAMES } from '../../../lib/ghg/wizardSteps'
 import { supabase } from '../../../lib/supabase'
 import { buildMonthlyEmissions } from '../../../lib/ghg/monthlyEmissions'
 import { useEntitlement, useHasConcierge, useGhgLocationAllowance } from '../../../lib/useEntitlement'
@@ -27,7 +28,54 @@ import type {
 } from '../../../lib/ghg/engine'
 
 
-interface BotMessage { role: 'user' | 'assistant'; content: string }
+interface BotMessage {
+  role: 'user' | 'assistant'
+  content: string
+  // The answer stopped before it finished. A fact ABOUT the message, kept off `content` so the note
+  // can be styled as ours and never becomes part of the text a customer copies out.
+  incomplete?: boolean
+}
+
+// The one instruction for "this ran long — narrow it". Shared by the error the customer sees when
+// NOTHING came back, and by the marker under an answer that came back cut short. Same situation,
+// same words: two phrasings would let a customer meet the problem twice and think it was two
+// different problems.
+const ASK_MORE_NARROWLY =
+  'Ask it again more narrowly — one location, one fuel, or one step at a time — and I’ll get there.'
+
+// Sits BENEATH a truncated answer, which stays exactly as it is. Not an error state: the text is
+// real and worth reading, it just stopped early. No stop_reason, no token budget — nothing a
+// customer would not say themselves.
+const BOT_INCOMPLETE_NOTE = `This answer stopped before the end — it ran longer than I can send in one piece. ${ASK_MORE_NARROWLY}`
+
+// What the guide says when the route refuses, keyed by the error code it returns. Written in the
+// register of LockedDocUpload — state the position plainly, say what it is for, and where there is
+// something the reader can do, say that too. None of these is a failure the customer caused.
+//
+// The entitlement line is a REAL CHANGE in who can use this: the guide answered anyone in the
+// wizard before, backed by the Anthropic key, whether or not they had bought the module.
+const BOT_ERRORS: Record<string, string> = {
+  unauthenticated:
+    'Your session has ended. Refresh the page and sign in again, and the guide will pick straight back up.',
+  entitlement_required:
+    'The guide is available on paid plans — it answers the boundary and data questions that come up as you build an inventory: what counts as yours, where a figure comes from, what a verifier will look for.',
+  entitlement_check_failed:
+    'We couldn’t confirm your plan just now. Give it a moment and ask again.',
+  rate_limited:
+    'That’s a lot of questions in a short stretch. Give it a few minutes and carry on — nothing is lost.',
+  conversation_too_long:
+    'This conversation has got long. Close the guide and open it again to start a fresh one — your inventory is untouched.',
+  message_too_long:
+    'That message is too long for me to take in one go. Try asking it in a couple of shorter parts.',
+  answer_too_long:
+    `That answer ran longer than I can send in one piece. ${ASK_MORE_NARROWLY}`,
+  empty_reply:
+    'I didn’t get an answer back that time. Ask again — it usually works on the second try.',
+  not_configured:
+    'The guide isn’t available right now. Everything else in the wizard works as normal.',
+  default:
+    'Something went wrong reaching the guide. Try again in a moment.',
+}
 
 function GHGBot({ currentStep }: { currentStep: number }) {
   const [open, setOpen] = useState(false)
@@ -35,7 +83,9 @@ function GHGBot({ currentStep }: { currentStep: number }) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const stepNames = ['framework selection', 'company setup', 'energy & fuel data', 'additional data', 'review & workings', 'export']
+  // Shared with /api/ghg-bot, which interpolates the same names into the system prompt. One copy,
+  // so a renamed step cannot leave the header and the model describing different things.
+  const stepNames = WIZARD_STEP_NAMES
 
   useEffect(() => {
     if (open && messages.length === 0) {
@@ -52,72 +102,42 @@ function GHGBot({ currentStep }: { currentStep: number }) {
     setMessages(m => [...m, { role: 'user', content: userMsg }])
     setLoading(true)
     try {
+      // The route requires a verified session: it authenticates the bearer token and checks the ghg
+      // entitlement before it will spend anything on the API key. Same two lines the upload handler
+      // runs before calling /api/concierge/extract.
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setMessages(m => [...m, { role: 'assistant', content: BOT_ERRORS.unauthenticated }])
+        setLoading(false)
+        return
+      }
       const res = await fetch('/api/ghg-bot', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', authorization: `Bearer ${session.access_token}` },
+        // ONLY these two fields. The system prompt, the model and max_tokens are the server's now —
+        // while they were sent from here, whoever called the route chose them.
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          system: `You are a friendly, expert GHG inventory guide built into the ThemisIQ platform. The user is on step ${currentStep + 1} of 6: ${stepNames[currentStep]}. Your job is to help them complete their GHG inventory with confidence, answer questions clearly, and guide them toward completing the assessment if they haven't already.
-
-ABOUT THEMISIQ: ThemisIQ is a compliance platform that helps companies complete GHG inventories for multiple frameworks at once — enter data once, get all reports automatically. The assessment at www.themisiq.co/assess helps companies determine which frameworks apply to them.
-
-FRAMEWORK GUIDANCE:
-- SB 253 (CARB): Required for companies with $1B+ global annual revenue AND California nexus (operations, employees, or sales in California). Deadline: November 10, 2026. If unsure whether they qualify, direct them to www.themisiq.co/assess.
-- CDP: Voluntary but widely requested by investors and large customers. If a customer or investor has asked them to complete CDP, they need this. Direct undecided users to www.themisiq.co/assess.
-- ESRS E1: Mandatory for large EU-incorporated companies under EU CSRD. Deadline was FY2024 for the largest companies. If they have EU operations or are incorporated in the EU, they likely need this.
-- GRI 305: Most widely used voluntary emissions standard globally. Used for sustainability reports, supply chain questionnaires, and stakeholder communications. Not mandatory but widely expected by customers and ESG raters.
-- EcoVadis: Required when a corporate customer has requested an EcoVadis supplier assessment. If a customer asked them to complete EcoVadis, they need this module.
-- IFRS S2: Emerging global standard for climate financial disclosures. Being adopted in Canada, UK, Australia, Singapore, and others. If they file financial statements in these jurisdictions, IFRS S2 may apply.
-- Not sure which frameworks apply? Always direct them to: www.themisiq.co/assess — the free 2-minute eligibility assessment.
-
-KEY TECHNICAL FACTS:
-- Scope 1 = direct emissions from owned/controlled sources (natural gas, propane, diesel, gasoline, refrigerants)
-- Scope 2 = indirect emissions from purchased electricity and steam
-- Scope 3 = all other indirect emissions (supply chain, business travel, employee commuting) — not covered in this tool
-- Mcf = thousand cubic feet of natural gas (common US utility billing unit)
-- Therms = unit of natural gas energy (1 therm = 100,000 BTU)
-- MMBtu = million British thermal units of natural gas
-- kWh = kilowatt hours of electricity (always shown on utility bills)
-- eGRID = US EPA electricity grid regions with different emission factors
-- AR4 GWP = IPCC 4th Assessment Report global warming potentials (selectable alternate; not the default basis)
-- AR5 GWP = IPCC 5th Assessment Report (selectable alternate; not the default basis)
-- AR6 GWP = IPCC 6th Assessment Report global warming potentials (ThemisIQ's default basis, applied across all frameworks)
-- Location-based Scope 2 = uses grid average emission factors
-- Market-based Scope 2 = accounts for renewable energy certificates (RECs) and PPAs
-- PPA = Power Purchase Agreement (contract for renewable electricity)
-- REC = Renewable Energy Certificate (proves renewable electricity was generated)
-- Organizational boundary = which entities/facilities are included (operational control is most common)
-
-COMMON QUESTIONS AND ANSWERS:
-- "What's California nexus?" = Having operations, employees, customers, or sales in California. Even one employee working remotely in California can create nexus.
-- "Our revenue is just under $1B" = SB 253 threshold is $1B+ global revenue. If under, you likely don't need to file but should monitor as thresholds may change.
-- "What if I miss the November 10 deadline?" = CARB can impose penalties. ThemisIQ can help you file on time — the wizard takes about 20 minutes with bills in hand.
-- "Operational vs financial control?" = Operational control means you include facilities where you control operations. Financial control means you include entities where you have financial control. Most companies use operational control.
-- "Do I include subsidiaries?" = Under operational control, yes — include any facility your company operates. Under equity share, include proportional to ownership.
-- "What if our landlord pays electricity?" = If you don't pay the utility bill directly, you may not have access to the data. Request consumption data from your landlord or property manager — this is increasingly common and often required.
-- "Do leased vehicles count?" = Yes, if your company pays for the fuel and controls the vehicle operations, include them in Scope 1 mobile combustion.
-- "What about employee personal vehicles?" = Personal vehicles used for business travel are Scope 3, not covered in this tool.
-- "We have rooftop solar — how do I handle it?" = Electricity you generate and consume on-site is not Scope 2 (it's not purchased). Only purchased grid electricity goes in Scope 2.
-- "What if I don't have 12 months of bills?" = Use what you have and annualize (e.g. 9 months of data × 12/9). Note this in your workings.
-- "Multiple meters at one location?" = Add them all together for that location's total.
-- "What's the difference between stationary and mobile diesel?" = Stationary = diesel in generators, boilers, heating equipment that doesn't move. Mobile = diesel in vehicles and mobile equipment.
-- "Which GWP basis does ThemisIQ use?" = ThemisIQ applies IPCC AR6 (2021) global warming potentials by default across all frameworks; AR4 and AR5 remain available as selectable alternates. The IPCC revises these values between assessments — methane's 100-year GWP is 25 under AR4 and roughly 28-30 under AR5 and AR6 — but for most companies the difference is small.
-- "What's an intensity ratio?" = Emissions per unit of economic output (e.g. mtCO2e per $million revenue). Allows comparison across companies of different sizes.
-- "Do I need a third-party verifier?" = SB 253 requires limited assurance from an accredited verifier. ThemisIQ's assurance-ready export is designed to make that process faster and cheaper.
-- "Can I submit the CSV directly to CARB?" = The CSV is your working document. CARB will have a specific submission portal — ThemisIQ's export gives you all the data you need to complete that submission.
-- "What does assurance-ready mean?" = Your inventory includes cited emission factors, documented calculation workings, and source document uploads — everything a third-party verifier needs to review your numbers.
-
-Always be encouraging, concise, and jargon-free. If someone seems confused about which frameworks they need, always suggest www.themisiq.co/assess. Never make up regulatory deadlines or requirements you're not sure about.
-`,
-          messages: [...messages, { role: 'user', content: userMsg }].map(m => ({ role: m.role, content: m.content }))
+          currentStep,
+          messages: [...messages, { role: 'user', content: userMsg }].map(m => ({ role: m.role, content: m.content })),
         })
       })
-      const data = await res.json()
-      const reply = data.content?.map((c: any) => c.text || '').join('') || 'Sorry, try again.'
-      setMessages(m => [...m, { role: 'assistant', content: reply }])
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        // Named refusals, so a customer is told what happened and what to do — never a bare
+        // "something went wrong" for a state the product understands perfectly well.
+        const code = typeof data?.error === 'string' ? data.error : ''
+        setMessages(m => [...m, { role: 'assistant', content: BOT_ERRORS[code] ?? BOT_ERRORS.default }])
+        setLoading(false)
+        return
+      }
+      setMessages(m => [...m, {
+        role: 'assistant',
+        content: data?.reply || BOT_ERRORS.default,
+        // Only meaningful alongside a real reply — the fallback text above is not a truncated answer.
+        incomplete: !!data?.reply && data?.incomplete === true,
+      }])
     } catch {
-      setMessages(m => [...m, { role: 'assistant', content: 'Something went wrong. Please try again.' }])
+      setMessages(m => [...m, { role: 'assistant', content: BOT_ERRORS.default }])
     }
     setLoading(false)
   }
@@ -135,8 +155,19 @@ Always be encouraging, concise, and jargon-free. If someone seems confused about
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {messages.map((msg, i) => (
-              <div key={i} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%', background: msg.role === 'user' ? '#7425e3' : '#f8f7f5', color: msg.role === 'user' ? '#fff' : '#0d0d0d', borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px', padding: '8px 12px', fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap' as const }}>
-                {msg.content}
+              /* Wrapper carries the alignment and width so a note can sit BENEATH the bubble without
+                 changing how the message itself looks. The answer is untouched and stays readable. */
+              <div key={i} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ background: msg.role === 'user' ? '#7425e3' : '#f8f7f5', color: msg.role === 'user' ? '#fff' : '#0d0d0d', borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px', padding: '8px 12px', fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap' as const }}>
+                  {msg.content}
+                </div>
+                {msg.incomplete && (
+                  /* Amber, matching the wizard's "needs your attention" tone — deliberately NOT the
+                     red used for failures. Nothing failed; the answer is real and just stops early. */
+                  <div style={{ fontSize: 11, lineHeight: 1.5, color: '#92400e', background: '#FEF3E2', borderRadius: 8, padding: '6px 10px' }}>
+                    {BOT_INCOMPLETE_NOTE}
+                  </div>
+                )}
               </div>
             ))}
             {loading && <div style={{ alignSelf: 'flex-start', background: '#f8f7f5', borderRadius: '12px 12px 12px 2px', padding: '8px 12px', fontSize: 12, color: '#888784' }}>Thinking...</div>}

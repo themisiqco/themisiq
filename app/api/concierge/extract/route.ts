@@ -82,6 +82,38 @@ export async function POST(req: NextRequest) {
     const token = bearerFrom(req)
     const { supabase } = await getAuthedClient(token)
 
+    // ── Entitlement: concierge, NOT ghg ──────────────────────────────
+    // These are separate purchases. Concierge is an add-on sold in three tiers on top of the GHG
+    // module, so a customer can hold ghg and not hold this. Gating on ghg would have let every GHG
+    // customer use bill extraction without buying it — the client gates on useHasConcierge(), and
+    // this is the same read: any one of the three tier rows.
+    //
+    // WHY IT MATTERS THAT THIS EXISTS AT ALL: until now the route checked only that the caller was
+    // signed in. Signup is self-serve, so any free account could post a document and have it read
+    // at our cost — and this is the more expensive of the two Anthropic endpoints, since it sends
+    // whole documents rather than a few lines of chat.
+    //
+    // No user_id filter: RLS scopes the read to the caller's own rows, exactly as the client's
+    // useHasConcierge() does. FAILS CLOSED — a fault here must not hand out extraction.
+    const { data: conciergeRows, error: entErr } = await supabase
+      .from('entitlements')
+      .select('module_key')
+      .in('module_key', ['concierge-basic', 'concierge-standard', 'concierge-enterprise'])
+      .limit(1)
+    if (entErr) {
+      console.error('[concierge/extract] entitlement read failed (denying):', entErr.message)
+      return NextResponse.json(
+        { error: 'We couldn’t confirm your plan just now. Please try again in a moment.' },
+        { status: 503 },
+      )
+    }
+    if (!conciergeRows || conciergeRows.length === 0) {
+      return NextResponse.json(
+        { error: 'Reading figures off a document is part of the concierge add-on. Your upload is still kept as evidence — type the figure into the box above.' },
+        { status: 403 },
+      )
+    }
+
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {
       return NextResponse.json(
