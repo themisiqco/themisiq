@@ -8,6 +8,7 @@ import PaywallCard from '../../components/PaywallCard'
 import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, progressForTarget, scopeActualField, resolveCommittedBaseline, baseYearDriftForSeries, type CategoryResult, type Scope, type TargetConfig, type TargetProgress, type Point } from '../../../lib/sbti'
 import { loadCompanySeries } from '../../../lib/ghg/loadSeries'
 import type { CompanySeries, SeriesYear } from '../../../lib/ghg/series'
+import { describeYearStatus } from '../../../lib/ghg/series'
 import { VERSION_DATES, NET_ZERO } from '../../../lib/sbti/params'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts'
 
@@ -229,13 +230,23 @@ export default function SbtiDashboard() {
 
       setCompanyId(series.companyId)
       setCompanyName(series.company)
+      // ── An unplottable year must not anchor a published commitment ───────────────────────────
+      // Stricter than the trend chart on purpose. A wrong trend line misinforms; a target anchored
+      // to a partial baseline is a commitment made against a number that was never the company's
+      // emissions, and every year of progress is then graded against it. Refuse both roles:
+      //   - latest actual  → the headline "your current emissions" figure
+      //   - baseline       → the base-year figure a target reduction is computed from
+      // Left unset rather than substituted with the nearest usable year: silently grading against
+      // a different year than the one named is the failure this is here to prevent.
       const latest = series.years[series.years.length - 1] // years ascending → last = latest
-      if (latest && Number.isFinite(latest.scope12Total)) setGhgScope12(latest.scope12Total)
+      if (latest && latest.dataStatus === 'ok' && latest.scope12Total != null) setGhgScope12(latest.scope12Total)
 
       // Baseline-year per-scope figures for Step 3 (reuse this series; no second fetch).
       setBaselineYear(series.baselineYear)
       const baseYr = series.years.find(y => y.year === series.baselineYear) ?? latest
-      if (baseYr) setBaselineByScope({ scope1: baseYr.scope1, scope2Location: baseYr.scope2Location, scope3: baseYr.scope3 })
+      if (baseYr && baseYr.dataStatus === 'ok' && baseYr.scope1 != null && baseYr.scope2Location != null) {
+        setBaselineByScope({ scope1: baseYr.scope1, scope2Location: baseYr.scope2Location, scope3: baseYr.scope3 })
+      }
       setSeries(series) // persist the full series alongside the baseline figures
 
       const { data: profile } = await supabase
@@ -911,6 +922,30 @@ export default function SbtiDashboard() {
                 {series && !series.estimationConsistent && (
                   <div style={{ background: '#FDF6EC', border: '0.5px solid #EAD9BE', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 12.5, color: '#8A5A12', lineHeight: 1.6 }}>
                     <span style={{ fontWeight: 600 }}>Evidence basis varies across years</span> — one or more reporting years include estimated data, so a year-over-year comparison may not be like-for-like.
+                  </div>
+                )}
+
+                {/* REFUSAL, not a caution. A target is a published commitment: if the base year's
+                    figures aren't whole, the reduction % is computed from a number that was never
+                    the company's emissions, and every later year is graded against it. Red, and
+                    the inputs below are absent because baselineByScope was never set. */}
+                {series && !series.baselineUsable && (
+                  <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 8, padding: '12px 16px', marginBottom: 12, fontSize: 12.5, color: '#991B1B', lineHeight: 1.6 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 4 }}>We can&rsquo;t set a target against {series.baselineYear} yet</div>
+                    <div>{describeYearStatus(series.years.find(y => y.year === series.baselineYear)!) ?? `${series.baselineYear} can’t be used as a base year.`}</div>
+                    <div style={{ marginTop: 4 }}>
+                      A target says &ldquo;we will cut emissions by X% from this year&rdquo;, so the base year has to be a
+                      complete figure. Fix that year in your inventory and it will appear here — we won&rsquo;t quietly
+                      use a different year instead.
+                    </div>
+                  </div>
+                )}
+
+                {/* The current-emissions figure is a separate refusal from the baseline: the latest
+                    year can be unusable while the base year is fine, and vice versa. */}
+                {series && series.years.length > 0 && series.years[series.years.length - 1].dataStatus !== 'ok' && (
+                  <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 12.5, color: '#8A5A12', lineHeight: 1.6 }}>
+                    <span style={{ fontWeight: 600 }}>Your most recent year isn&rsquo;t being used</span> — {describeYearStatus(series.years[series.years.length - 1])} Progress is graded against the most recent year we can stand behind, not that one.
                   </div>
                 )}
 

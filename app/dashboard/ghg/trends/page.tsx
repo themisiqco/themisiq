@@ -17,6 +17,7 @@
 import { useEffect, useState } from 'react'
 import { BarChart, ComposedChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer, ReferenceLine, LineChart, Line } from 'recharts'
 import { loadCompanySeries, type LoadSeriesResult } from '../../../../lib/ghg/loadSeries'
+import { describeYearStatus } from '../../../../lib/ghg/series'
 import { supabase } from '../../../../lib/supabase'
 import { computeTrajectory } from '../../../../lib/sbti'
 import { loadMonthly, type LoadMonthlyResult } from '../../../../lib/ghg/loadMonthly'
@@ -181,8 +182,15 @@ export default function TrendsPage() {
           .filter((v, i, a) => a.indexOf(v) === i)
       : undefined
 
+  // Years the chart deliberately leaves blank. Bars for these carry null, which recharts renders as
+  // NOTHING — no bar, and no line across the gap (only the SBTi target pathway sets connectNulls,
+  // and that is a computed trajectory, not measured data).
+  const brokenYears = selected ? selected.years.filter((y) => y.dataStatus !== 'ok') : []
+  // Scope 3 "not reported" is a different absence from an unplottable year, and listing an
+  // unplottable year here too would tell the customer to go and complete a Scope 3 that isn't the
+  // problem. Only 'ok' years can be missing *just* their Scope 3.
   const missingS3Years = selected
-    ? selected.years.filter((y) => y.scope3 === null).map((y) => y.year)
+    ? selected.years.filter((y) => y.dataStatus === 'ok' && y.scope3 === null).map((y) => y.year)
     : []
 
   const gwpVersion = selected?.years[0]?.gwpVersion ?? 'AR6'
@@ -243,6 +251,9 @@ export default function TrendsPage() {
             <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: '#0d0d0d' }}>{selected.company}</div>
             <div style={{ fontSize: 12, color: '#888784', marginTop: 4 }}>
               Baseline year {selected.baselineYear}
+              {!selected.baselineUsable && (
+                <span style={{ color: '#ba7517', fontWeight: 600 }}> — not usable, so no year is shown as a change against it</span>
+              )}
               {' · '}
               {selected.gwpConsistent ? (
                 <span>GWP basis: {gwpVersion}</span>
@@ -255,9 +266,17 @@ export default function TrendsPage() {
           {/* Metric cards — all derived from CompanySeries */}
           {latest && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
+              {/* The headline card shows the LATEST year, even when that year is unplottable — it
+                  must not quietly fall back to an older year and present it as current. */}
               <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
-                <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'Georgia, serif', color: '#0d0d0d' }}>{Math.round(latest.scope12Total).toLocaleString()}</div>
-                <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>tCO₂e · Scope 1+2 · {latest.year}</div>
+                <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'Georgia, serif', color: latest.scope12Total == null ? '#888784' : '#0d0d0d' }}>
+                  {latest.scope12Total == null ? '—' : Math.round(latest.scope12Total).toLocaleString()}
+                </div>
+                <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>
+                  {latest.scope12Total == null
+                    ? `${latest.year} can't be shown — see below`
+                    : `tCO₂e · Scope 1+2 · ${latest.year}`}
+                </div>
               </div>
               <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
                 <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'Georgia, serif', color: latest.vsBaselinePct == null ? '#888784' : latest.vsBaselinePct <= 0 ? '#0F6E56' : '#BA7517' }}>
@@ -293,7 +312,11 @@ export default function TrendsPage() {
                 />
                 <Tooltip />
                 <Legend />
-                <ReferenceLine y={selected.baselineScope12Total} stroke="#BA7517" strokeDasharray="4 4" label={{ value: 'baseline', position: 'insideTopRight', fontSize: 11, fill: '#854F0B' }} />
+                {/* No baseline line when the baseline year itself can't be plotted — a dashed rule
+                    at a partial figure would anchor every visual comparison on the chart to it. */}
+                {selected.baselineScope12Total != null && (
+                  <ReferenceLine y={selected.baselineScope12Total} stroke="#BA7517" strokeDasharray="4 4" label={{ value: 'baseline', position: 'insideTopRight', fontSize: 11, fill: '#854F0B' }} />
+                )}
                 <Bar dataKey="scope1" stackId="emissions" name="Scope 1" fill={COLORS.scope1} barSize={hasTarget ? 22 : undefined} />
                 <Bar dataKey="scope2" stackId="emissions" name="Scope 2 (location)" fill={COLORS.scope2} barSize={hasTarget ? 22 : undefined} />
                 <Bar dataKey="scope3" stackId="emissions" name="Scope 3" fill={COLORS.scope3} barSize={hasTarget ? 22 : undefined} />
@@ -304,12 +327,35 @@ export default function TrendsPage() {
             </ResponsiveContainer>
           </div>
 
+          {/* Why the chart has a gap. Immediately under the chart, because a gap with no
+              explanation reads as "no inventory that year" — which is a different, and wrong,
+              story. 'excluded' and 'unverifiable' get their own sentences from describeYearStatus:
+              one says what was left out, the other says we can't tell. */}
+          {brokenYears.length > 0 && (
+            <div style={{ marginTop: 12, background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.3)', borderRadius: 10, padding: '0.9rem 1.1rem' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 6 }}>
+                ⚠ {brokenYears.length === 1 ? 'One year is' : `${brokenYears.length} years are`} missing from this chart
+              </div>
+              {brokenYears.map((y) => (
+                <div key={y.year} style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginBottom: 4 }}>
+                  {describeYearStatus(y)}
+                </div>
+              ))}
+              <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 6 }}>
+                The gap is deliberate — the line is not drawn across it, because we have no figure for
+                {brokenYears.length === 1 ? ' that year' : ' those years'} to draw to.
+              </div>
+            </div>
+          )}
+
           {/* Per-year delta callouts (vs baseline, on Scope 1+2) */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 8, paddingLeft: 8, fontSize: 12 }}>
             {selected.years.map((y) => (
               <span key={y.year} style={{ color: '#555553' }}>
                 <strong style={{ color: '#0d0d0d' }}>{y.year}</strong>{' '}
-                {y.year === selected.baselineYear || y.vsBaselinePct == null ? (
+                {y.dataStatus !== 'ok' ? (
+                  <span style={{ color: '#ba7517', fontWeight: 600 }}>not shown</span>
+                ) : y.year === selected.baselineYear || y.vsBaselinePct == null ? (
                   <span style={{ color: '#888784' }}>baseline</span>
                 ) : (
                   <span style={{ color: y.vsBaselinePct <= 0 ? '#0F6E56' : '#BA7517', fontWeight: 600 }}>
