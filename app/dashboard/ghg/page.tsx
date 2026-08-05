@@ -1045,7 +1045,11 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
 
   const renderStep2 = () => {
     const loc = inventory.locations[activeLocation]
-    const calc = calcLocation(loc, 'AR6', inventory.reporting_year)
+    // SEAM: calcLocation refuses an unpriceable location, and this is the step the customer is sent
+    // to in order to FIX one — so an unguarded call here takes down the only screen that can undo
+    // the problem. The blocking panel below replaces the live-results figures entirely.
+    const blockedHere = unpriceableById.get(loc.id)
+    const calc = blockedHere ? null : calcLocation(loc, 'AR6', inventory.reporting_year)
     const detectedRegion = [...GRID_REGIONS_CA, ...GRID_REGIONS_US].find(r => r.value === loc.grid_region)
     // The question a user is asked and the absence they later attest MUST be the same words (STEP 3):
     // both derive from STREAM_META. See the attestation block below and the workings declaration rows.
@@ -1325,12 +1329,23 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           <div style={{ position: 'sticky', top: 80 }}>
             <div style={{ background: '#111827', borderRadius: 12, padding: '1.5rem', marginBottom: 12 }}>
               <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: '#d1d5db', marginBottom: 12 }}>{loc.name} — live results</div>
-              {[
-                { label: 'Heating & fuel', val: calc.s1_stationary, color: '#a78bfa' },
-                { label: 'Vehicles', val: calc.s1_mobile, color: '#1fb1ff' },
-                { label: 'Refrigerants', val: calc.s1_fugitive, color: '#ba7517' },
-                { label: 'Scope 1 total', val: calc.s1_total, color: '#f9fafb', bold: true },
-                { label: 'Scope 2 (electricity)', val: calc.s2_location, color: '#64fe3e', bold: true },
+              {/* NOT five dashes. A "—" beside "Scope 1 total" sits in the same column, in the same
+                  row, as a figure — it reads as a measured zero rather than as an absent result.
+                  The rows are removed and the reason takes their place. */}
+              {blockedHere ? (
+                <div style={{ padding: '2px 0 6px' }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#fbbf24', marginBottom: 6 }}>⚠ No results for this location yet</div>
+                  <div style={{ fontSize: 12, color: '#d1d5db', lineHeight: 1.6 }}>{unpriceableMessage(blockedHere)}</div>
+                  <div style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.6, marginTop: 6 }}>
+                    Your other locations are unaffected, and nothing you&apos;ve entered here is lost.
+                  </div>
+                </div>
+              ) : [
+                { label: 'Heating & fuel', val: calc!.s1_stationary, color: '#a78bfa' },
+                { label: 'Vehicles', val: calc!.s1_mobile, color: '#1fb1ff' },
+                { label: 'Refrigerants', val: calc!.s1_fugitive, color: '#ba7517' },
+                { label: 'Scope 1 total', val: calc!.s1_total, color: '#f9fafb', bold: true },
+                { label: 'Scope 2 (electricity)', val: calc!.s2_location, color: '#64fe3e', bold: true },
               ].map(({ label, val, color, bold }) => (
                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '0.5px solid rgba(255,255,255,0.07)' }}>
                   <span style={{ fontSize: 12, color: bold ? '#f9fafb' : '#d1d5db', fontWeight: bold ? 600 : 300 }}>{label}</span>
@@ -1834,10 +1849,21 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
       // Grid region, not State: loc.state is empty for CA (province), UK, EU, NZ — every non-US location
       // exported a blank jurisdiction. grid_region (US_PA / ON / NZ) is the key the factor was looked up
       // under, which is exactly what a verifier needs to reconcile the number.
-      ['Location', 'Grid region', 'S1 Total', 'S2 Location'],
+      // SEAM: calcLocation refuses an unpriceable location here too, across ALL locations rather
+      // than the one on screen — so one bad location would abort the whole CSV mid-generation.
+      // The export gate (pricingReady) currently makes this unreachable, but A GATE IS NOT A GUARD:
+      // it protects this call only for as long as nobody loosens it or adds a second caller. The
+      // 'Note' column carries the same claim as the `declaration: 'unpriceable'` row buildWorkings
+      // writes, so the breakdown and the workings in the same export cannot disagree.
+      ['Location', 'Grid region', 'S1 Total', 'S2 Location', 'Note'],
       ...inventory.locations.map(loc => {
+        const blocked = unpriceableById.get(loc.id)
+        if (blocked) {
+          return [loc.name, loc.grid_region, '—', '—',
+            `EXCLUDED FROM TOTALS — ${unpriceableMessage(blocked)} No figure for this location is included in any total on this report.`]
+        }
         const c = calcLocation(loc, fw.gwp as 'AR4' | 'AR5', inventory.reporting_year)
-        return [loc.name, loc.grid_region, c.s1_total.toFixed(4), c.s2_location.toFixed(4)]
+        return [loc.name, loc.grid_region, c.s1_total.toFixed(4), c.s2_location.toFixed(4), '']
       }),
       [''],
       ['DISCLAIMER'],
