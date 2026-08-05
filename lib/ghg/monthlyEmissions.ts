@@ -202,10 +202,18 @@ export function buildMonthlyEmissions(
           billTotal = (p.value * gf.ef) / 1000;
           efSource = `grid:${gf.usedRegion}:${gf.usedYear}`;
         } else {
-          let ef: EFFactor;
-          try { ef = deps.pickEF(loc, resolved.efKey); }
-          catch { skipped.push({ fuelType: p.fuelType, document_type: doc.document_type, reason: `pickEF failed for key ${resolved.efKey}` }); continue; }
-          billTotal = deps.calcGas(ef, p.value, gwp).total;
+          // The refusal now comes from calcGas, not pickEF: pickEF returns a uniform "no factor"
+          // marker for a key no table carries, and calcGas is what declines to price it. Guarding
+          // only the lookup left the throw one line outside the catch — a dead guard and an escaped
+          // error. Both calls sit inside, and an unpriceable bill lands in `skipped` where the
+          // caller already reads it, rather than taking the whole monthly write down.
+          try {
+            const ef: EFFactor = deps.pickEF(loc, resolved.efKey);
+            billTotal = deps.calcGas(ef, p.value, gwp).total;
+          } catch (e) {
+            skipped.push({ fuelType: p.fuelType, document_type: doc.document_type, reason: `cannot price ${resolved.efKey}: ${e instanceof Error ? e.message : String(e)}` });
+            continue;
+          }
           efSource = resolved.efKey;
         }
 

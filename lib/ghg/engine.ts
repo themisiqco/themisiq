@@ -1123,8 +1123,50 @@ function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: numbe
   return { s1_stationary, s1_mobile, s1_fugitive, s1_total, s2_location, s2_market, s3_td, gases, biogenic: loc.biogenic_co2_mt }
 }
 
+// ── Unpriceable locations: ONE decision, four consumers ──────────────────────────────────────────
+// A location is unpriceable when the factor tables carry nothing for the unit one of its fuels is
+// recorded in (e.g. a US location holding a gas figure in m3). calcGas refuses it by name; this is
+// the single place that decides what to DO about the refusal, so calcInventory, buildWorkings,
+// pctEstimated and the component's banner cannot disagree about which locations are in the total.
+//
+// EXCLUDED WHOLE, NOT PER-FUEL. calcLocation totals a location's streams together, so pricing the
+// rest and dropping the one that failed would put a knowingly-short figure into the total under
+// that location's name — the same defect as counting it as zero, just harder to see. A location
+// either contributes everything or nothing, and the exclusion is stated on screen and in the
+// workings. Its electricity is excluded too; that is the cost of not publishing a partial figure.
+//
+// Only MissingEmissionFactorError is absorbed. Any other error still propagates — a bug in the
+// arithmetic must not be silently converted into "this location is excluded".
+function unpriceableReason(loc: Location, gwpVersion: GwpVersion, year: number): MissingEmissionFactorError | null {
+  try { calcLocation(loc, gwpVersion, year); return null }
+  catch (e) { if (e instanceof MissingEmissionFactorError) return e; throw e }
+}
+
+export interface UnpriceableLocation {
+  locId: string
+  locName: string
+  fuel: string      // engine token, e.g. 'natural_gas' — the wording is the component's job
+  unit: string      // e.g. 'm3'
+  country: string   // e.g. 'US', or '(unset)' when the location has no country
+}
+
+// Pure probe, same shape as findUnresolvedCoverage / findUndeclaredStreams: a list of what is
+// wrong, which the component turns into a per-location state, a note on every affected total,
+// and an export gate.
+export function findUnpriceableLocations(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024): UnpriceableLocation[] {
+  const out: UnpriceableLocation[] = []
+  for (const loc of locations) {
+    const why = unpriceableReason(loc, gwpVersion, year)
+    if (why) out.push({ locId: loc.id, locName: loc.name || 'Location', fuel: why.fuel, unit: why.unit, country: why.country })
+  }
+  return out
+}
+
 function calcInventory(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024) {
   return locations.reduce((acc, loc) => {
+    // Excluded, never zeroed: a location that cannot be priced contributes nothing and is named on
+    // screen. Adding 0 would assert it emits nothing, which is a figure we have no evidence for.
+    if (unpriceableReason(loc, gwpVersion, year)) return acc
     const c = calcLocation(loc, gwpVersion, year)
     return {
       s1_total: acc.s1_total + c.s1_total,
@@ -1193,6 +1235,10 @@ export function pctEstimated(
   const extraps = resolutions.filter(r => r.kind === 'extrapolate' && !!r.monthsCovered && r.monthsCovered > 0)
   let estimated = 0
   for (const loc of locations) {
+    // Excluded from the denominator by calcInventory below, so it must be excluded from the
+    // numerator too — otherwise an unpriceable location's estimated share would be measured
+    // against a total it is not part of.
+    if (unpriceableReason(loc, gwpVersion, year)) continue
     const byFuel = fuelEmissionsByType(loc, gwpVersion, year)
     for (const r of extraps) {
       if (r.locId !== loc.id) continue
@@ -1404,6 +1450,19 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       emission_factor: `CO2 ${ef.co2}, CH4 ${ef.ch4}, N2O ${ef.n2o} kg/${unit}`, emission_factor_display: `${efCo2e.toFixed(3)} kg CO₂e/${abbrevUnit(unit)}`, ef_source: combustionSource(loc), gwp_basis: gwpVersion, result_tco2e: g.total, ...(convNote ? { note: convNote } : {}), ...(prov ?? {}) })
   }
   for (const loc of locations) {
+    // Decided BEFORE any row is emitted, and with the same helper calcInventory uses. A location
+    // the total excluded must not also appear here with priced rows — the audit trail would then
+    // show workings for emissions no total contains. One row stating the exclusion instead, with
+    // result_tco2e null, following the 'undeclared' row below: an absence never renders as 0.
+    const blocked = unpriceableReason(loc, gwpVersion, year)
+    if (blocked) {
+      rows.push({ location: loc.name || 'Location', source: 'All streams at this location', scope: 0,
+        activity_data: 0, activity_unit: '—', emission_factor: '—', emission_factor_display: '—',
+        ef_source: '—', gwp_basis: 'excluded', result_tco2e: null, declaration: 'unpriceable',
+        entry_method: 'excluded', unpriceable: { fuel: blocked.fuel, unit: blocked.unit, country: blocked.country },
+        note: `EXCLUDED FROM TOTALS — ${blocked.message} No figure for this location is included in any total on this report.` })
+      continue
+    }
     // applyResolutions is the single source of the figure AND its provenance/method, so the number
     // in the row and the claim in the audit trail cannot diverge (that divergence was the SEV 0 bug).
     const applied = applyResolutions(loc, resolutions, win.start, win.end)

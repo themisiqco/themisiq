@@ -15,7 +15,7 @@ import {
   buildWorkings, calcLocation, calcInventory, analyzeCoverage, exclusiveEnd,
   isResolvedGridRegion, detectGridRegion, getResidualFactor, getGridFactor,
   pickEF, calcGas, emptyLocation, findUnresolvedCoverage, findUndeclaredStreams, applyResolutions, pctEstimated,
-  MissingEmissionFactorError,
+  MissingEmissionFactorError, findUnpriceableLocations,
   type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal, type StreamAttestation,
 } from './engine';
 import { buildMonthlyEmissions, reconcile } from './monthlyEmissions';
@@ -563,9 +563,14 @@ describe('GROUP K — a factor the tables do not carry is refused, not priced', 
         expect(err.message).toContain(country);
       }
 
-      // …and the render path that actually crashed refuses the same way.
+      // calcLocation is the per-location price and still refuses outright…
       expect(() => calcLocation(l, 'AR6', 2024)).toThrow(MissingEmissionFactorError);
-      expect(() => calcInventory([l], 'AR6', 2024)).toThrow(MissingEmissionFactorError);
+      // …but calcInventory EXCLUDES rather than throws, so one bad location cannot take the
+      // dashboard down. Excluded, not zeroed: see GROUP L for what that distinction buys.
+      expect(() => calcInventory([l], 'AR6', 2024)).not.toThrow();
+      expect(findUnpriceableLocations([l], 'AR6', 2024)).toEqual([
+        { locId: l.id, locName: l.name, fuel: 'natural_gas', unit, country },
+      ]);
     });
   }
 
@@ -592,5 +597,80 @@ describe('GROUP K — a factor the tables do not carry is refused, not priced', 
       expect(Number.isFinite(total), `${country} + ${unit} should price`).toBe(true);
       expect(total).toBeGreaterThan(0);
     }
+  });
+});
+
+// ── GROUP L — one unpriceable location does not take the inventory with it ────
+// The isolation contract: the dashboard renders, priceable locations keep their figures, and the
+// blocked one is EXCLUDED (contributing nothing) rather than counted as zero — with the exclusion
+// stated in the workings, which is what the saved inventory persists.
+describe('GROUP L — unpriceable locations are isolated, excluded, and recorded', () => {
+  const good = () => loc({ id: 'GOOD', name: 'Priceable Site', country: 'US', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf' });
+  const bad = () => loc({ id: 'BAD', name: 'Blocked Site', country: 'US', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' });
+
+  it('L1 a mixed inventory still totals, and the priceable location keeps its exact figure', () => {
+    const aloneTotal = calcInventory([good()], 'AR6', 2024).s1_total;
+    const mixed = calcInventory([good(), bad()], 'AR6', 2024);
+    expect(aloneTotal).toBeGreaterThan(0);
+    expect(mixed.s1_total).toBe(aloneTotal); // unchanged by the blocked neighbour
+  });
+
+  it('L2 the blocked location is EXCLUDED, not counted as zero — order does not matter', () => {
+    const first = calcInventory([bad(), good()], 'AR6', 2024);
+    const last = calcInventory([good(), bad()], 'AR6', 2024);
+    expect(first).toEqual(last);
+    // Excluded means "absent from the sum", which is only distinguishable from a zero contribution
+    // by what the caller is told — hence findUnpriceableLocations and the workings row below.
+    expect(findUnpriceableLocations([good(), bad()], 'AR6', 2024).map(u => u.locId)).toEqual(['BAD']);
+  });
+
+  it('L3 every scope is excluded, including electricity the location COULD be priced for', () => {
+    // Whole-location exclusion (the decision): its electricity is priceable on its own, and is
+    // still left out, because a part-priced location would put a knowingly-short figure in a total.
+    const badWithPower = loc({ ...bad(), grid_region: 'US_CA', electricity_kwh: 50_000 });
+    const inv = calcInventory([badWithPower], 'AR6', 2024);
+    expect(inv.s1_total).toBe(0);
+    expect(inv.s2_location).toBe(0);
+    expect(calcInventory([loc({ ...good(), grid_region: 'US_CA', electricity_kwh: 50_000 })], 'AR6', 2024).s2_location).toBeGreaterThan(0);
+  });
+
+  it('L4 buildWorkings does not throw, emits NO priced rows for the blocked location, and records why', () => {
+    const rows = buildWorkings([good(), bad()], 'AR6', 2024, [], 12);
+    const badRows = rows.filter(r => r.location === 'Blocked Site');
+    expect(badRows).toHaveLength(1);
+    expect(badRows[0].declaration).toBe('unpriceable');
+    expect(badRows[0].result_tco2e).toBeNull();       // an absence never renders as 0
+    expect(badRows[0].note).toMatch(/EXCLUDED FROM TOTALS/);
+    expect(badRows[0].unpriceable).toEqual({ fuel: 'natural_gas', unit: 'm3', country: 'US' });
+    // …while the priceable location's rows are untouched.
+    expect(rows.filter(r => r.location === 'Priceable Site' && r.result_tco2e! > 0).length).toBeGreaterThan(0);
+  });
+
+  it('L5 pctEstimated measures the estimated share against the same excluded set', () => {
+    // Blocked location out of BOTH numerator and denominator — otherwise its estimated emissions
+    // would be weighed against a total it is not part of.
+    expect(() => pctEstimated([good(), bad()], [], 'AR6', 2024)).not.toThrow();
+    expect(pctEstimated([good(), bad()], [], 'AR6', 2024)).toBe(pctEstimated([good()], [], 'AR6', 2024));
+  });
+
+  it('L6 the probe is GWP-independent — the same locations are excluded on AR4, AR5 and AR6', () => {
+    // This is what licenses the component probing once at AR6 and reusing the answer for all three
+    // bases. Whether a factor EXISTS is a property of the table, not of the GWP version.
+    const ls = [good(), bad()];
+    const ids = (g: 'AR4' | 'AR5' | 'AR6') => findUnpriceableLocations(ls, g, 2024).map(u => u.locId);
+    expect(ids('AR4')).toEqual(['BAD']);
+    expect(ids('AR5')).toEqual(['BAD']);
+    expect(ids('AR6')).toEqual(['BAD']);
+  });
+
+  it('L7 a non-pricing error is NOT absorbed as an exclusion', () => {
+    // The catch is narrowed to MissingEmissionFactorError on purpose: a bug in the arithmetic must
+    // not quietly become "this location is excluded", which would hide it behind a customer-facing
+    // message about units.
+    const exploding = new Proxy(good(), {
+      get(t, p) { if (p === 'has_propane') throw new TypeError('boom'); return (t as any)[p] },
+    }) as Location;
+    expect(() => calcInventory([exploding], 'AR6', 2024)).toThrow(TypeError);
+    expect(() => findUnpriceableLocations([exploding], 'AR6', 2024)).toThrow(TypeError);
   });
 });
