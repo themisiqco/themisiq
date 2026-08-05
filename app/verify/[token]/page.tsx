@@ -4,9 +4,18 @@ import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 import { VERIFIER_DOC_LINK_NOTICE, VERIFIER_DOC_TAB_DID_NOT_OPEN } from '../../../lib/verifierDocNotice'
 
+// METADATA ONLY — no old_values / new_values. The RPC used to return full before/after row
+// snapshots of ghg_inventories, which put every column back within reach of a verifier regardless of
+// what the inventory projection withheld: revenue, headcount, prior-year figures, internal ids. The
+// page filtered them for DISPLAY, which did nothing about the payload itself.
+//
+// `changed_fields` carries the NAMES of the fields that changed, already intersected server-side
+// with the inventory whitelist — so a field the verifier cannot see is not named as having changed
+// either. Optional because it only arrives once the RPC change lands; until then an entry renders as
+// metadata alone rather than claiming nothing changed.
 interface AuditEntry {
   id: string; action: string; user_email: string | null; created_at: string
-  old_values: Record<string, unknown> | null; new_values: Record<string, unknown> | null
+  changed_fields?: string[] | null
 }
 // METADATA ONLY. No signed_url and no file_path: URLs are minted per-document on click (see
 // openVerifierDoc below), so nothing on this page carries a clock the verifier cannot see. `id` is
@@ -43,11 +52,17 @@ interface WorkingRow {
   // hide the incomplete parts of an inventory from the surface used to assess completeness.
   declaration?: 'attested_absent' | 'undeclared'
 }
+// ⚠️ THIS INTERFACE IS A SHAPE, NOT A FILTER. The RPC decides what a verifier receives; declaring a
+// field here does not request it, and omitting one does not withhold it. Fields are listed only when
+// the page renders them — revenue_millions, scope1_intensity and scope2_intensity were declared here
+// but never rendered, which made the payload look narrower than it was.
 interface InventoryData {
-  company_name: string; reporting_year: number; revenue_millions: number
+  company_name: string; reporting_year: number
   boundary_approach: string; selected_frameworks: string[]
   scope1_total: number; scope2_location_total: number; scope2_market_total: number
-  scope1_intensity: number; scope2_intensity: number
+  // ISO 14064-3 7.1.4.9(b): the verifier must be able to confirm which GWP set the figures use.
+  // Optional because a row saved before the RPC carried it will not have one — see the header render.
+  gwp_version?: string | null
   // get_verifier_inventory returns to_jsonb(i) — the whole inventory row — so source_docs come down
   // with it. Declared here because the inline quote links need the path→id correlation, and taking
   // it from data already in the payload avoids asking the documents route for paths as well.
@@ -73,27 +88,30 @@ const boundaryLabel = (b: string) =>
 // Bump this whenever the Terms or Privacy Policy are materially revised.
 const CONSENT_VERSION = '2026-07-v1'
 
-const AUDIT_FIELDS: Record<string, string> = {
-  company_name: 'Company name', reporting_year: 'Reporting year',
-  scope1_total: 'Scope 1 total', scope2_location_total: 'Scope 2 (location)',
-  scope2_market_total: 'Scope 2 (market)', revenue_millions: 'Revenue (USD M)',
-  employee_count: 'Employees', boundary_approach: 'Boundary approach',
-  selected_frameworks: 'Frameworks', status: 'Status',
+// ── Plain-language names for the fields an audit entry can report as changed ─────────────────────
+// A verifier reading "scope2_location_total" is reading our schema, not our inventory. Every value
+// the RPC can emit in changed_fields is named here in the words the standard and the customer use.
+//
+// ⚠️ THIS MAP MUST MIRROR THE `k in (…)` WHITELIST IN get_verifier_inventory. That list is what
+// bounds the possible values; this one is what makes them readable. A column added there without a
+// label here renders as "Another field" — informative enough not to break the trail, vague enough
+// that someone notices. It should never appear.
+const AUDIT_FIELD_LABELS: Record<string, string> = {
+  company_name:          'Company name',
+  reporting_year:        'Reporting year',
+  fiscal_year_end_month: 'Financial year end',
+  boundary_approach:     'Organisational boundary',
+  selected_frameworks:   'Reporting frameworks',
+  scope1_total:          'Scope 1 total',
+  scope2_location_total: 'Scope 2 total (location-based)',
+  scope2_market_total:   'Scope 2 total (market-based)',
+  locations_data:        'Location data',
+  workings:              'Calculation workings',
+  coverage_resolutions:  'Coverage resolutions',
+  gwp_version:           'GWP basis',
+  pct_estimated:         'Share of estimated data',
 }
-function fmt(v: unknown): string {
-  if (v === null || v === undefined || v === '') return '—'
-  if (Array.isArray(v)) return v.join(', ') || '—'
-  return String(v)
-}
-function diffRow(oldV: Record<string, unknown> | null, newV: Record<string, unknown> | null) {
-  const out: { label: string; from: string; to: string }[] = []
-  const o = oldV || {}, n = newV || {}
-  for (const key of Object.keys(AUDIT_FIELDS)) {
-    const before = fmt(o[key]), after = fmt(n[key])
-    if (before !== after) out.push({ label: AUDIT_FIELDS[key], from: before, to: after })
-  }
-  return out
-}
+const auditFieldLabel = (key: string): string => AUDIT_FIELD_LABELS[key] ?? 'Another field'
 
 // ── Opening a source document ───────────────────────────────────────────────────────────────────
 // Shared by the Source Documents list and the inline quote links inside the workings table. Both
@@ -391,14 +409,26 @@ export default function VerifierPage() {
 
         <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Independent Verification Review</div>
         <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem,3vw,2.4rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{inv.company_name || 'GHG Inventory'}</h1>
-        <p style={{ fontSize: 14, color: '#555553', fontWeight: 300, marginBottom: '2rem' }}>Reporting year {inv.reporting_year} · {frameworks.join(', ') || 'No framework selected'} · {boundaryLabel(inv.boundary_approach)}</p>
+        {/* GWP basis sits with the other inventory-level qualifiers, above the figures it qualifies.
+            ISO 14064-3 7.1.4.9(b) requires the verifier to confirm the GWP set used, so its ABSENCE
+            has to be visible too — a missing basis reads as "not stated", never as a silent omission.
+            The workings table carries a per-row gwp_basis as well, so the two can be cross-checked. */}
+        <p style={{ fontSize: 14, color: '#555553', fontWeight: 300, marginBottom: '2rem' }}>
+          Reporting year {inv.reporting_year} · {frameworks.join(', ') || 'No framework selected'} · {boundaryLabel(inv.boundary_approach)}
+          {' · '}
+          {inv.gwp_version
+            ? <>GWP basis: {inv.gwp_version}</>
+            : <span style={{ color: '#ba7517', fontWeight: 600 }}>GWP basis not stated</span>}
+        </p>
 
         <SectionHead>Emissions Summary</SectionHead>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10, marginBottom: '2rem' }}>
           <Stat label="Scope 1 (tCO2e)" value={(inv.scope1_total ?? 0).toFixed(3)} color="#B91C1C" />
           <Stat label="Scope 2 location (tCO2e)" value={(inv.scope2_location_total ?? 0).toFixed(3)} color="#0F6E56" />
           <Stat label="Scope 2 market (tCO2e)" value={(inv.scope2_market_total ?? 0).toFixed(3)} color="#0C447C" />
-          <Stat label="S1 intensity /$M" value={(inv.scope1_intensity ?? 0).toFixed(4)} color="#7425e3" />
+          {/* The S1-intensity tile was removed deliberately: intensity is derived from
+              revenue_millions, and revenue is no longer disclosed to a verifier. A tile reading
+              0.0000 because its numerator stopped arriving would be worse than no tile. */}
         </div>
 
         <SectionHead>Locations</SectionHead>
@@ -532,28 +562,30 @@ export default function VerifierPage() {
         </div>
         {audit.map((row, i) => {
           const isCreate = row.action === 'INSERT', isDelete = row.action === 'DELETE'
-          const changes = row.action === 'UPDATE' ? diffRow(row.old_values, row.new_values) : []
+          // WHICH fields changed, not what they changed to. The before/after values are no longer
+          // sent, so this reports the shape of a revision without disclosing the figures behind it.
+          const changed = row.action === 'UPDATE' ? (row.changed_fields ?? []) : []
           const color = isCreate ? '#0F6E56' : isDelete ? '#B91C1C' : '#7425e3'
           const label = isCreate ? 'Created' : isDelete ? 'Deleted' : 'Updated'
           return (
             <div key={row.id || i} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px', marginBottom: 8 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: changes.length ? 10 : 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: changed.length ? 10 : 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color, background: color + '18', padding: '3px 10px', borderRadius: 99 }}>{label}</span>
                   <span style={{ fontSize: 12, color: '#555553' }}>{row.user_email || 'System'}</span>
                 </div>
                 <span style={{ fontSize: 11, color: '#888784' }}>{new Date(row.created_at).toLocaleString()}</span>
               </div>
-              {changes.length > 0 && (
+              {changed.length > 0 && (
                 <div style={{ borderTop: '0.5px solid #f0efed', paddingTop: 10 }}>
-                  {changes.map((c, j) => (
-                    <div key={j} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 8, alignItems: 'center', fontSize: 12, padding: '3px 0' }}>
-                      <span style={{ color: '#555553' }}>{c.label}</span>
-                      <span style={{ color: '#888784', textDecoration: 'line-through' }}>{c.from}</span>
-                      <span style={{ color: '#888784' }}>→</span>
-                      <span style={{ color: '#0d0d0d', fontWeight: 500 }}>{c.to}</span>
-                    </div>
-                  ))}
+                  <div style={{ fontSize: 11, color: '#888784', marginBottom: 4 }}>Fields changed in this revision</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {changed.map((key, j) => (
+                      <span key={j} style={{ fontSize: 12, color: '#555553', background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 99, padding: '3px 10px' }}>
+                        {auditFieldLabel(key)}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
