@@ -15,6 +15,7 @@ import {
   buildWorkings, calcLocation, calcInventory, analyzeCoverage, exclusiveEnd,
   isResolvedGridRegion, detectGridRegion, getResidualFactor, getGridFactor,
   pickEF, calcGas, emptyLocation, findUnresolvedCoverage, findUndeclaredStreams, applyResolutions, pctEstimated,
+  MissingEmissionFactorError,
   type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal, type StreamAttestation,
 } from './engine';
 import { buildMonthlyEmissions, reconcile } from './monthlyEmissions';
@@ -517,5 +518,79 @@ describe('GROUP J — pctEstimated', () => {
       daysInYear: 20, totalDays: 31, note: 'prorated', acknowledgedAt: '2024-06-01T00:00:00Z',
     };
     expect(pctEstimated([l], [strad], 'AR6', 2024)).toBe(0);
+  });
+});
+
+// ── GROUP K — unpriceable (country, unit) pairs refuse by name ────────────────
+// Every natural-gas unit the Location type admits, against every country branch that does NOT
+// publish a factor for it. Before the guard these split two ways for no defensible reason: the
+// US/default branch returned a raw `undefined` and threw "undefined is not an object (evaluating
+// 'ef.co2')" during render, while the other five spread the same missing key into `{}` and priced
+// the figure as NaN — a wrong number rather than a visible failure. Both are now the same refusal.
+//
+// These pairs are REACHABLE, not hypothetical: SELECTOR_UNITS in lib/unitConversions.ts is the
+// global five-unit list with no country dimension, so a concierge proposal read off an m3 bill is
+// Tier-1 "already canonical" and its unit is written straight onto a US location.
+describe('GROUP K — a factor the tables do not carry is refused, not priced', () => {
+  const unpriceable: Array<{ country: string; unit: 'm3' | 'kwh'; key: string }> = [
+    { country: 'US', unit: 'm3',  key: 'natural_gas_m3' },   // ← the reported crash
+    { country: 'US', unit: 'kwh', key: 'natural_gas_kwh' },
+    { country: 'CA', unit: 'kwh', key: 'natural_gas_kwh' },
+    { country: 'GB', unit: 'm3',  key: 'natural_gas_m3' },
+    { country: 'FR', unit: 'kwh', key: 'natural_gas_kwh' },  // EU branch
+    { country: 'AU', unit: 'kwh', key: 'natural_gas_kwh' },
+    { country: 'NZ', unit: 'm3',  key: 'natural_gas_m3' },
+  ];
+
+  for (const { country, unit, key } of unpriceable) {
+    it(`K ${country} + ${unit} throws MissingEmissionFactorError naming fuel, unit and country`, () => {
+      const l = loc({ country, has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: unit });
+
+      expect(() => calcGas(pickEF(l, key as any), 1000, 'AR6')).toThrow(MissingEmissionFactorError);
+
+      // The message must carry enough for a customer-facing string to be built from it later.
+      try {
+        calcGas(pickEF(l, key as any), 1000, 'AR6');
+        throw new Error('expected a throw');
+      } catch (e) {
+        const err = e as MissingEmissionFactorError;
+        expect(err.name).toBe('MissingEmissionFactorError');
+        expect(err.fuel).toBe('natural_gas');
+        expect(err.unit).toBe(unit);
+        expect(err.country).toBe(country);
+        expect(err.factorKey).toBe(key);
+        expect(err.message).toContain(unit);
+        expect(err.message).toContain(country);
+      }
+
+      // …and the render path that actually crashed refuses the same way.
+      expect(() => calcLocation(l, 'AR6', 2024)).toThrow(MissingEmissionFactorError);
+      expect(() => calcInventory([l], 'AR6', 2024)).toThrow(MissingEmissionFactorError);
+    });
+  }
+
+  it('K blank country is still named, not reported as undefined', () => {
+    const l = loc({ country: '', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' });
+    expect(() => calcLocation(l, 'AR6', 2024)).toThrow(/\(unset\)/);
+  });
+
+  it('K every priceable (country, unit) pair still prices — the guard refuses absence, not everything', () => {
+    const priceable: Array<{ country: string; unit: 'mcf' | 'therms' | 'mmbtu' | 'm3' | 'kwh'; key: string }> = [
+      { country: 'US', unit: 'mcf',    key: 'natural_gas_mcf' },
+      { country: 'US', unit: 'therms', key: 'natural_gas_therms' },
+      { country: 'US', unit: 'mmbtu',  key: 'natural_gas_mmbtu' },
+      { country: 'CA', unit: 'm3',     key: 'natural_gas_m3' },
+      { country: 'CA', unit: 'mcf',    key: 'natural_gas_mcf' },
+      { country: 'GB', unit: 'kwh',    key: 'natural_gas_kwh' },
+      { country: 'FR', unit: 'm3',     key: 'natural_gas_m3' },
+      { country: 'AU', unit: 'm3',     key: 'natural_gas_m3' },
+      { country: 'NZ', unit: 'kwh',    key: 'natural_gas_kwh' },
+    ];
+    for (const { country, unit, key } of priceable) {
+      const l = loc({ country, grid_region: country === 'CA' ? 'ON' : '', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: unit });
+      const total = calcGas(pickEF(l, key as any), 1000, 'AR6').total;
+      expect(Number.isFinite(total), `${country} + ${unit} should price`).toBe(true);
+      expect(total).toBeGreaterThan(0);
+    }
   });
 });

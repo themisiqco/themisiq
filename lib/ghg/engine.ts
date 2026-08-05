@@ -947,32 +947,84 @@ const steamInMmbtu = (loc: Location) => steamToMmbtu(loc.purchased_steam_mmbtu, 
 function propaneEfKey(unit: string): 'propane_gallon' | 'propane_litre' | 'propane_kg' {
   return unit === 'gallons' ? 'propane_gallon' : unit === 'kg' ? 'propane_kg' : 'propane_litre'
 }
-function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof typeof EF_UK | keyof typeof EF_EU | keyof typeof EF_AU | keyof (typeof EF_NZ)['commercial']): { co2: number; ch4: number; n2o: number } {
+// A complete published factor: the three gases calcGas needs to price an activity figure.
+type CombustionEF = { co2: number; ch4: number; n2o: number }
+
+// What pickEF returns when NEITHER the country's own table NOR the US fallback carries the key.
+// It deliberately carries no gases — a blank must not be priced as zero — and instead records what
+// was looked up, so calcGas can name the fuel, unit and country it refused rather than guess.
+//
+// ⚠️ THE SHAPE IS THE POINT. Before this existed, five of pickEF's six country branches spread a
+// missing key (`{ ...undefined }` is legal JS and yields `{}`, so the figure silently became NaN)
+// while the sixth returned the raw `undefined` and crashed on `ef.co2`. The same absent factor was
+// a TypeError in the US and a silent NaN everywhere else, decided only by jurisdiction. Every
+// branch now returns THIS, and calcGas refuses it identically.
+interface MissingEF { co2?: undefined; ch4?: undefined; n2o?: undefined; __missing: { key: string; country: string } }
+
+const efMiss = (key: string, country: string): CombustionEF =>
+  ({ __missing: { key, country: country || '(unset)' } } as unknown as CombustionEF)
+
+// The ONE resolution step every branch below shares: take the table hit if there is one, else the
+// uniform miss. Scalar table entries (EF.ammonia, EF.steam_mmbtu) are not factors and count as a
+// miss — spreading a number yields `{}`, which would otherwise read as a complete factor of zero.
+const efOr = (base: unknown, key: string, ctry: string): CombustionEF =>
+  base && typeof base === 'object' ? { ...(base as CombustionEF) } : efMiss(key, ctry)
+
+// Thrown when an activity figure cannot be priced. Carries the fuel, unit and country as fields
+// (not just prose) so a customer-facing message can be composed from it without re-parsing text.
+export class MissingEmissionFactorError extends Error {
+  readonly name = 'MissingEmissionFactorError'
+  constructor(
+    readonly fuel: string,
+    readonly unit: string,
+    readonly country: string,
+    readonly factorKey: string,
+  ) {
+    super(`No published emission factor for ${fuel.replace(/_/g, ' ')} measured in ${unit} in ${country} (factor key "${factorKey}"). This figure cannot be priced.`)
+  }
+}
+
+// Factor keys are `<fuel>_<unit>` and fuels themselves contain underscores (natural_gas_m3,
+// diesel_mobile_litre, fuel_oil_gallon) — the unit is the segment after the LAST underscore.
+function splitFactorKey(key: string): { fuel: string; unit: string } {
+  const i = key.lastIndexOf('_')
+  return i < 0 ? { fuel: key || '(unknown fuel)', unit: '(unknown unit)' } : { fuel: key.slice(0, i), unit: key.slice(i + 1) }
+}
+
+// The refusal. Asserts rather than returns a boolean so callers narrow without a cast.
+function assertPriceable(ef: CombustionEF | MissingEF | null | undefined): asserts ef is CombustionEF {
+  if (ef && typeof ef.co2 === 'number' && typeof ef.ch4 === 'number' && typeof ef.n2o === 'number') return
+  const miss = (ef as MissingEF | null | undefined)?.__missing
+  const { fuel, unit } = splitFactorKey(miss?.key ?? '')
+  throw new MissingEmissionFactorError(fuel, unit, miss?.country ?? '(unknown country)', miss?.key ?? '(unknown key)')
+}
+
+function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof typeof EF_UK | keyof typeof EF_EU | keyof typeof EF_AU | keyof (typeof EF_NZ)['commercial']): CombustionEF {
   const ctry = (loc.country || '').toUpperCase().trim()
   if (ctry === 'GB' || ctry === 'UK') {
-    const ukBase = (EF_UK as any)[key] as { co2: number; ch4: number; n2o: number } | undefined
-    return ukBase ? { ...ukBase } : ({ ...((EF as any)[key] as { co2: number; ch4: number; n2o: number }) })
+    return efOr((EF_UK as any)[key] ?? (EF as any)[key], String(key), ctry)
   }
   if (EU_COUNTRIES.includes(ctry)) {
-    const euBase = (EF_EU as any)[key] as { co2: number; ch4: number; n2o: number } | undefined
-    return euBase ? { ...euBase } : ({ ...((EF as any)[key] as { co2: number; ch4: number; n2o: number }) })
+    return efOr((EF_EU as any)[key] ?? (EF as any)[key], String(key), ctry)
   }
   // Australia: EF_AU per-unit table; missing keys (e.g. fuel oil) fall back to US EF (UK/EU parity).
   if (ctry === 'AU') {
-    const auBase = (EF_AU as any)[key] as { co2: number; ch4: number; n2o: number } | undefined
-    return auBase ? { ...auBase } : ({ ...((EF as any)[key] as { co2: number; ch4: number; n2o: number }) })
+    return efOr((EF_AU as any)[key] ?? (EF as any)[key], String(key), ctry)
   }
   // New Zealand: EF_NZ is use-class keyed (commercial default / industrial); missing keys fall back to US EF.
   if (ctry === 'NZ') {
     const nzTable = (EF_NZ as any)[loc.nz_use_class ?? 'commercial']
-    const nzBase = nzTable?.[key] as { co2: number; ch4: number; n2o: number } | undefined
-    return nzBase ? { ...nzBase } : ({ ...((EF as any)[key] as { co2: number; ch4: number; n2o: number }) })
+    return efOr(nzTable?.[key] ?? (EF as any)[key], String(key), ctry)
   }
-  if (ctry !== 'CA') return (EF as any)[key] as { co2: number; ch4: number; n2o: number }
-  const caBase = (EF_CA as any)[key] as { co2: number; ch4: number; n2o: number } | undefined
-  const ef = caBase ? { ...caBase } : ({ ...((EF as any)[key] as { co2: number; ch4: number; n2o: number }) })
-  // Per-province natural gas CO2 override (CH4/N2O remain sector-based).
-  if (key === 'natural_gas_mcf' || key === 'natural_gas_m3') {
+  // US / default / any unlisted country. Structurally identical to the five above — it used to be
+  // the odd one out, returning the raw table value, and that asymmetry WAS the crash.
+  if (ctry !== 'CA') {
+    return efOr((EF as any)[key], String(key), ctry)
+  }
+  const ef = efOr((EF_CA as any)[key] ?? (EF as any)[key], String(key), ctry)
+  // Per-province natural gas CO2 override (CH4/N2O remain sector-based). Skipped on a miss — there
+  // is no base factor to override, and stamping co2 onto a blank would manufacture a factor.
+  if ((key === 'natural_gas_mcf' || key === 'natural_gas_m3') && typeof ef.co2 === 'number') {
     const prov = (loc.grid_region || loc.province || '').toUpperCase().trim()
     const provCo2M3 = EF_CA_NG_CO2_M3[prov]
     if (provCo2M3 !== undefined) {
@@ -995,7 +1047,12 @@ function combustionSource(loc: Location): string {
 
 type GwpVersion = 'AR4' | 'AR5' | 'AR6'
 
-function calcGas(ef: { co2: number; ch4: number; n2o: number }, amount: number, gwpVersion: GwpVersion, biogenic = false) {
+// `ef` is typed as POSSIBLY missing on purpose: the guard below is the only thing standing between
+// an unpriceable activity figure and a number, so the type must not assert the completeness the
+// caller's `as keyof typeof EF` cast was pretending to guarantee. Refuse, never substitute — a zero
+// here would export as an attested zero, which is a wrong figure rather than a visible failure.
+function calcGas(ef: CombustionEF | MissingEF | null | undefined, amount: number, gwpVersion: GwpVersion, biogenic = false) {
+  assertPriceable(ef)
   const gwp = GWP[gwpVersion]
   const ch4Gwp = biogenic ? gwp.CH4_biogenic : gwp.CH4_fossil
   return {
@@ -1586,6 +1643,7 @@ export {
   daysBetween, exclusiveEnd, analyzeCoverage,
 }
 export type {
+  CombustionEF,
   GwpVersion, ResidualGas, Location, Inventory, SourceDoc,
   ExtractedProposal, ConciergeStatus, CoveragePeriod, CoverageResult,
   CoverageResolution, Provenance,
