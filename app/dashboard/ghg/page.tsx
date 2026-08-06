@@ -6,6 +6,9 @@ import { WIZARD_STEP_NAMES } from '../../../lib/ghg/wizardSteps'
 import { supabase } from '../../../lib/supabase'
 import { buildMonthlyEmissions } from '../../../lib/ghg/monthlyEmissions'
 import { buildComparabilityDisclosure } from '../../../lib/ghg/comparability'
+import type { PriorYearState, InventorySummary } from '../../../lib/ghg/comparability'
+import { assessCompleteness } from '../../../lib/ghg/loadSeries'
+import type { YearDataStatus } from '../../../lib/ghg/series'
 import { useEntitlement, useHasConcierge, useGhgLocationAllowance } from '../../../lib/useEntitlement'
 import { generateAssurancePDF } from '../../../lib/assurancePdf'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -29,12 +32,48 @@ import type {
 } from '../../../lib/ghg/engine'
 
 
+// ── Prior-year lookup for the comparability step ─────────────────────────────────────────────────
+//
+// The wizard holds ONE inventory — this year's. Tier B of the comparability disclosure, and the
+// prior year's state, both need last year's row, so it is fetched on its own.
+//
+// FIVE OUTCOMES, kept distinct. Four of them end up passing 'not_stored' to the module, but they
+// are not the same fact and collapsing them into one boolean is how "we didn't look" becomes
+// indistinguishable from "there is nothing there" — the exact confusion this step exists to remove.
+// 'error' is the one where 'not_stored' is a GUESS rather than an observation; it is recorded here
+// so that persistence can refuse to write a basis built on it.
+type PriorYearLookup =
+  | { status: 'skipped' }                                     // no company_id — no identity to match on
+  | { status: 'none' }                                        // query ran, zero rows
+  | { status: 'ambiguous'; count: number }                    // >1 row for the same (company, year)
+  | { status: 'error'; message: string }                      // the query itself failed
+  | {
+      status: 'found'
+      state: PriorYearState
+      summary: InventorySummary | null                        // null when the row has no readable location detail
+      /**
+       * The prior row's OWN stored totals. Carried, deliberately NOT used as Tier A's input.
+       *
+       * Tier A compares the prior_year_s1 / prior_year_s2 the customer typed in — that is the
+       * doc's contract and what the customer can see on screen. Silently substituting the stored
+       * totals would change what the customer is being asked about without telling them, and the
+       * two can legitimately differ (a restated prior year, a different GWP basis). Here so the
+       * decision to prefer one is a visible edit rather than an accident.
+       */
+      storedScope1: number | null
+      storedScope2: number | null
+    }
+
+// The series layer says 'ok'; the comparability module says 'clean'. Same fact, two vocabularies —
+// mapped explicitly so a third name cannot be invented at the call site.
+const PRIOR_STATE_FROM_DATA_STATUS: Record<YearDataStatus, PriorYearState> = {
+  ok: 'clean',
+  excluded: 'excluded',
+  unverifiable: 'unverifiable',
+}
+
 // Fuel tokens present anywhere in an inventory, in the engine's own names — the shape
 // lib/ghg/comparability.ts compares year to year.
-//
-// Derived even though Tier B cannot run yet (the wizard holds no prior inventory, so priorSummary
-// is null and this whole summary is unread). A placeholder here would be discovered wrong on the
-// day the prior year is loaded, in front of a verifier rather than in a test.
 const fuelTypesPresent = (locs: Location[]): string[] => {
   const present = new Set<string>()
   for (const l of locs) {
@@ -49,6 +88,14 @@ const fuelTypesPresent = (locs: Location[]): string[] => {
   }
   return [...present].sort()
 }
+
+// The structural summary Tier B compares, from a set of locations.
+const summarize = (locs: Location[], boundaryApproach: string | null): InventorySummary => ({
+  locationCount: locs.length,
+  fuelTypes: fuelTypesPresent(locs),
+  jurisdictions: [...new Set(locs.map(l => l.country).filter(Boolean))],
+  boundaryApproach,
+})
 
 interface BotMessage {
   role: 'user' | 'assistant'
@@ -348,6 +395,11 @@ const searchParams = useSearchParams()
   // not the same as "nothing changed" and must not be collapsed into it when persistence lands.
   const [comparabilityAnswer, setComparabilityAnswer] = useState<'nothing_changed' | 'something_changed' | null>(null)
   const [comparabilityNote, setComparabilityNote] = useState('')
+  // The lookup result, TAGGED with the (company, year) it was fetched for. The tag is what keeps a
+  // result from outliving its question: switch company or reporting year and the stored result no
+  // longer matches the key, so it stops being used the same render — rather than describing the
+  // previous company's prior year until a new fetch lands.
+  const [priorYearLookup, setPriorYearLookup] = useState<{ key: string; result: PriorYearLookup } | null>(null)
   const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([])
   const [addingNewCompany, setAddingNewCompany] = useState(false)
   const isPaid = useEntitlement('ghg')
@@ -412,6 +464,70 @@ const searchParams = useSearchParams()
     })
     setMode('wizard')
   }
+
+  // ── Load last year's inventory for the comparability step ──────────────────────────────────────
+  //
+  // Scoped on company_id, NOT company_name. The database's unique index is on
+  // (user_id, company_name, reporting_year) — a different key from the company_id that series.ts
+  // groups on — so company_id + reporting_year is NOT unique by constraint, only by present fact.
+  // That is why >1 is a handled outcome below rather than an impossibility.
+  //
+  // No user_id filter: RLS already scopes the read to the owner, and a redundant client-side filter
+  // would be a second, weaker copy of that rule.
+  //
+  // .limit(2), not .maybeSingle(): maybeSingle ERRORS on a second row, turning "ambiguous" into
+  // "broken" and losing the ability to say which happened. Two rows is the least that distinguishes
+  // none / one / more-than-one.
+  useEffect(() => {
+    const companyId = inventory.company_id
+    // No stable identity to match on. company_name would match the wrong company after a rename and
+    // miss it after a typo fix, so we do not look up at all rather than look up badly. No setState
+    // here — 'skipped' is DERIVED below from the absence of a matching key, so nothing has to be
+    // written to say a query was never sent.
+    if (!companyId) return
+
+    let cancelled = false
+    const key = `${companyId}:${inventory.reporting_year}`
+    const set = (result: PriorYearLookup) => setPriorYearLookup({ key, result })
+    const priorReportingYear = inventory.reporting_year - 1
+    supabase
+      .from('ghg_inventories')
+      .select('workings, locations_data, scope1_total, scope2_location_total, boundary_approach')
+      .eq('company_id', companyId)
+      .eq('reporting_year', priorReportingYear)
+      .limit(2)
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) { set({ status: 'error', message: error.message }); return }
+        const rows = data ?? []
+        if (rows.length === 0) { set({ status: 'none' }); return }
+        // Ambiguous: do NOT pick one. Whichever we chose, "last year's figures" would name a row the
+        // customer never identified, and the other row says something different. Tier A still runs
+        // on the typed-in totals, which are unambiguous.
+        if (rows.length > 1) { set({ status: 'ambiguous', count: rows.length }); return }
+
+        const row = rows[0] as {
+          workings: unknown; locations_data: unknown
+          scope1_total: number | null; scope2_location_total: number | null
+          boundary_approach: string | null
+        }
+        // The one verdict on whether a stored total is complete, imported rather than reimplemented.
+        const verdict = assessCompleteness(row.workings, row.locations_data)
+        // A summary needs readable location detail. Without it there is nothing to compare, and a
+        // count of 0 would render as "your inventory went from 0 locations to 6" — a structural
+        // claim about a year we cannot read. Null instead: the module then withholds Tier B and
+        // records why, which is what assessCompleteness has already called 'unverifiable'.
+        const locs = Array.isArray(row.locations_data) ? (row.locations_data as Location[]) : null
+        set({
+          status: 'found',
+          state: PRIOR_STATE_FROM_DATA_STATUS[verdict.dataStatus],
+          summary: locs ? summarize(locs, row.boundary_approach) : null,
+          storedScope1: row.scope1_total,
+          storedScope2: row.scope2_location_total,
+        })
+      })
+    return () => { cancelled = true }
+  }, [inventory.company_id, inventory.reporting_year])
 
   useEffect(() => {
     if (skipSavedReset.current) { skipSavedReset.current = false; return }
@@ -738,35 +854,64 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // agreeing with what is on screen. Stated cost: a company whose prior Scope 1 was genuinely zero
   // reads as absent and gets no Scope 1 line.
   //
-  // ⚠️ priorYearState IS 'not_stored' BECAUSE THE WIZARD HOLDS ONE INVENTORY AND IT IS THIS YEAR'S.
-  // The prior year's row is never loaded here, so its structure cannot be summarised and its state
-  // cannot be established. Two consequences, both deliberate for this step:
-  //   • Tier B never runs — no location, fuel, jurisdiction or boundary line appears, even for a
-  //     customer whose prior year IS on the platform.
-  //   • basis.statement therefore says the prior period is not held on the platform. That is true
-  //     of what this call knows and FALSE of that customer, which is exactly why nothing here may
-  //     be persisted until the prior year is loaded. Loading it is the prerequisite for the write.
+  // 'skipped' until a result tagged with THIS (company, year) has arrived — which covers both "no
+  // company identity, so no query was sent" and "the query is still in flight". Neither has looked
+  // at a prior year, and neither may claim to have.
+  const priorYearKey = inventory.company_id ? `${inventory.company_id}:${inventory.reporting_year}` : null
+  const priorYear: PriorYearLookup =
+    priorYearKey && priorYearLookup?.key === priorYearKey ? priorYearLookup.result : { status: 'skipped' }
+
+  // 'not_stored' is what four of the five lookup outcomes resolve to, and it is honest for three of
+  // them — no company identity to match on, no row, or two rows that cannot be called "last year's".
+  // ⚠️ On 'error' it is a GUESS: the query failed, so whether a prior year exists is unknown, and
+  // basis.statement will still say it isn't held on the platform. Nothing renders or persists that
+  // sentence today, and a write path must refuse this case rather than record it.
   const totals_ar4 = calcInventory(inventory.locations, 'AR4', inventory.reporting_year)
   const totals_ar5 = calcInventory(inventory.locations, 'AR5', inventory.reporting_year)
   const totals_ar6 = calcInventory(inventory.locations, 'AR6', inventory.reporting_year)
   const totalsByGwp: Record<GwpVersion, typeof totals_ar4> = { AR4: totals_ar4, AR5: totals_ar5, AR6: totals_ar6 }
 
-  // AR6 is the basis the inventory is saved on (see the save payload), so the comparison is stated
-  // on the same basis the figures are stored on.
-  const comparability = buildComparabilityDisclosure({
-    priorScope1: inventory.prior_year_s1 > 0 ? inventory.prior_year_s1 : null,
-    priorScope2: inventory.prior_year_s2 > 0 ? inventory.prior_year_s2 : null,
-    thisScope1: totals_ar6.s1_total,
-    thisScope2: totals_ar6.s2_location,
-    priorYearState: 'not_stored',
-    priorSummary: null,
-    thisSummary: {
-      locationCount: inventory.locations.length,
-      fuelTypes: fuelTypesPresent(inventory.locations),
-      jurisdictions: [...new Set(inventory.locations.map(l => l.country).filter(Boolean))],
-      boundaryApproach: inventory.boundary_approach,
-    },
-  })
+  // Everything the comparability step hands forward. Assembled here rather than read out of
+  // scattered state at save time, so the write path takes FACTS and infers nothing.
+  const comparabilityDraft = {
+    // AR6 is the basis the inventory is saved on (see the save payload), so the comparison is
+    // stated on the same basis the figures are stored on.
+    disclosure: buildComparabilityDisclosure({
+      priorScope1: inventory.prior_year_s1 > 0 ? inventory.prior_year_s1 : null,
+      priorScope2: inventory.prior_year_s2 > 0 ? inventory.prior_year_s2 : null,
+      thisScope1: totals_ar6.s1_total,
+      thisScope2: totals_ar6.s2_location,
+      priorYearState: priorYear.status === 'found' ? priorYear.state : 'not_stored',
+      priorSummary: priorYear.status === 'found' ? priorYear.summary : null,
+      thisSummary: summarize(inventory.locations, inventory.boundary_approach),
+    }),
+    answer: comparabilityAnswer,
+    note: comparabilityNote,
+
+    /**
+     * TRUE when the prior-year lookup ITSELF FAILED — the query errored, so whether a prior year
+     * exists is unknown.
+     *
+     * NOT the same as a lookup that succeeded and found nothing. That one is an answer: there is no
+     * prior inventory, and 'not_stored' describes it correctly. This one is the absence of an
+     * answer, and the disclosure above nonetheless carries 'not_stored' because the module's
+     * PriorYearState has no fourth value for "we could not look" — so its basis says the prior
+     * period is not held on the platform, which here is a guess we cannot stand behind.
+     *
+     * A WRITE PATH MUST REFUSE ON THIS FLAG. It is a plain boolean, and false does not mean the
+     * lookup succeeded in some partial way — the four other outcomes are all real observations.
+     * Nothing about the failure is recoverable by reading the disclosure: a basis built on a failed
+     * lookup is indistinguishable from one built on a genuine absence, which is why the fact has to
+     * travel as its own field rather than be re-derived downstream.
+     */
+    priorYearLookupFailed: priorYear.status === 'error',
+    /** The error as reported, for the refusal to say what was observed rather than guess a cause. */
+    priorYearLookupErrorMessage: priorYear.status === 'error' ? priorYear.message : null,
+  }
+
+  // What the step renders. Unchanged — the customer still sees whatever Tier A can say from the
+  // typed-in figures, on a failed lookup exactly as on a successful one.
+  const comparability = comparabilityDraft.disclosure
 
   const STEPS = ['Reporting frameworks', 'Company setup', 'Energy & fuel data', 'Additional data', 'Review & workings', 'Export reports', 'Audit trail']
   const activeFrameworks = FRAMEWORKS.filter(f => inventory.selected_frameworks.includes(f.id))

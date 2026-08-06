@@ -72,13 +72,22 @@ interface WorkingsRow {
   unpriceable?: { fuel?: string; unit?: string; country?: string };
 }
 
-interface Completeness {
+export interface Completeness {
   dataStatus: YearDataStatus;
   exclusions: YearExclusion[] | null;
   unverifiableReason: string | null;
 }
 
-function assessCompleteness(workings: unknown, locationsData: unknown): Completeness {
+// EXPORTED for a second consumer: the GHG wizard's comparability step, which loads the prior year's
+// row directly and needs the same verdict on it. Exported rather than copied for the obvious reason
+// — two implementations of "is this stored total complete" would eventually disagree, and the one
+// that drifted would be the one qualifying a figure in front of a verifier.
+//
+// The wizard deliberately does NOT call loadCompanySeries for this: that function drops rows with a
+// null total or a null company_id, and a dropped row is indistinguishable from an absent one. The
+// whole point of the comparability step is to tell "no prior year" apart from "a prior year we
+// cannot describe", so it fetches its one row itself and brings it here for the verdict.
+export function assessCompleteness(workings: unknown, locationsData: unknown): Completeness {
   // 1. The recorded marker wins — it describes the stored total, which is what we are qualifying.
   if (Array.isArray(workings)) {
     const marked = (workings as WorkingsRow[]).filter((w) => w?.declaration === "unpriceable");
