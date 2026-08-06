@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 import { VERIFIER_DOC_LINK_NOTICE, VERIFIER_DOC_TAB_DID_NOT_OPEN } from '../../../lib/verifierDocNotice'
 import { docTypeLabel } from '../../../lib/ghg/conciergeDocTypes'
+import type { ComparabilityRecord } from '../../../lib/ghg/comparability'
 
 // METADATA ONLY — no old_values / new_values. The RPC used to return full before/after row
 // snapshots of ghg_inventories, which put every column back within reach of a verifier regardless of
@@ -49,9 +50,18 @@ interface WorkingRow {
   note?: string
   // Rows that record ABSENCE rather than a calculation. A verifier needs these more than the
   // operator does: 'attested_absent' is evidence (someone confirmed there is none, and when),
-  // 'undeclared' is the absence of evidence (nobody answered). Filtering them off this page would
-  // hide the incomplete parts of an inventory from the surface used to assess completeness.
-  declaration?: 'attested_absent' | 'undeclared'
+  // 'undeclared' is the absence of evidence (nobody answered), 'unpriceable' is a location the
+  // TOTALS THEMSELVES LEAVE OUT because no published factor exists for the unit its fuel is in.
+  // Filtering them off this page would hide the incomplete parts of an inventory from the surface
+  // used to assess completeness.
+  //
+  // 'unpriceable' was emitted by the engine and rendered here GENERICALLY — a row with a dash in
+  // every column and no badge, sitting in the ordinary striped background, because the union did
+  // not name it and neither branch matched. The one row on the page that says a total is short was
+  // the least visible thing in the table.
+  declaration?: 'attested_absent' | 'undeclared' | 'unpriceable'
+  // Present only on 'unpriceable' rows: what could not be priced. The engine's own tokens.
+  unpriceable?: { fuel?: string; unit?: string; country?: string }
 }
 // ⚠️ THIS INTERFACE IS A SHAPE, NOT A FILTER. The RPC decides what a verifier receives; declaring a
 // field here does not request it, and omitting one does not withhold it. Fields are listed only when
@@ -69,6 +79,13 @@ interface InventoryData {
   // it from data already in the payload avoids asking the documents route for paths as well.
   locations_data: { name: string; source_docs?: { id?: string; file_path?: string }[] }[]
   workings?: WorkingRow[]
+  // ISO 14064-3 6.3.1.5: the verifier determines whether changes from prior periods that make the
+  // periods incomparable have been disclosed. This is that disclosure. Inventory-level, so it is
+  // rendered with the other frame-setting fields above the figures, not as a workings row.
+  //
+  // Optional AND nullable, and the two mean different things at the render: absent = the RPC did
+  // not send it; null = the question was never answered. Neither renders anything.
+  comparability_disclosure?: ComparabilityRecord | null
 }
 interface VerifierPayload {
   inventory?: InventoryData
@@ -132,6 +149,7 @@ const AUDIT_FIELD_LABELS: Record<string, string> = {
   coverage_resolutions:  'Coverage resolutions',
   gwp_version:           'GWP basis',
   pct_estimated:         'Share of estimated data',
+  comparability_disclosure: 'Comparison with prior period',
 }
 const auditFieldLabel = (key: string): string => AUDIT_FIELD_LABELS[key] ?? 'Another field'
 
@@ -446,6 +464,86 @@ export default function VerifierPage() {
             : <span style={{ color: '#ba7517', fontWeight: 600 }}>GWP basis not stated</span>}
         </p>
 
+        {/*
+          COMPARISON WITH PRIOR PERIOD — ISO 14064-3:2019 clause 6.3.1.5.
+
+          Placed here, with the inventory-level context and above the figures, because that is where
+          6.3.1.5 is applied: a verifier reads the frame before the numbers. Not a workings row — the
+          disclosure attaches to no fuel and no location.
+
+          RENDERS NOTHING WHEN THE RECORD IS ABSENT OR NULL. No heading, no "not provided" state.
+          Null means the question was never answered, and an empty section headed "Comparison with
+          prior period" would read as an answer — the precise inference this disclosure exists to
+          make unnecessary.
+
+          Every sentence below is the record's own or the doc's. No disclaimer, no confidence badge,
+          no framing of how much weight to give it. The record is the record.
+        */}
+        {inv.comparability_disclosure && (
+          <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem', marginBottom: '2rem' }}>
+            <p style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.6, margin: 0 }}>
+              <strong>Comparison with prior period</strong>
+              {' — '}
+              {inv.comparability_disclosure.answer === 'nothing_changed'
+                ? 'The company states nothing changed that would affect comparability; the difference reflects normal business activity.'
+                : 'The company states something changed that would affect comparability.'}
+            </p>
+
+            {/* The company's own words, verbatim and unquoted. Empty is possible and is not filled
+                in: they were shown the field and left it blank, which the record distinguishes from
+                never having been shown one. */}
+            {inv.comparability_disclosure.answer === 'something_changed'
+              && !!inv.comparability_disclosure.note
+              && inv.comparability_disclosure.note.trim() !== '' && (
+              <p style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, margin: '10px 0 0', whiteSpace: 'pre-wrap' as const }}>
+                {inv.comparability_disclosure.note}
+              </p>
+            )}
+
+            {/* WHAT WAS PUT IN FRONT OF THE COMPANY. When the recomputed observation still matches,
+                one set needs no label. When it does not, both are shown and both are named — the
+                recomputed lines are never presented as what the company saw. */}
+            {!inv.comparability_disclosure.observationsChanged ? (
+              <div style={{ marginTop: 10 }}>
+                {inv.comparability_disclosure.observations.map((line, i) => (
+                  <div key={i} style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{line}</div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: '#888784', marginBottom: 4 }}>Shown to the company when they answered</div>
+                  {inv.comparability_disclosure.observations.map((line, i) => (
+                    <div key={i} style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{line}</div>
+                  ))}
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: '#888784', marginBottom: 4 }}>What the figures say now</div>
+                  {(inv.comparability_disclosure.observationsAtSave ?? []).map((line, i) => (
+                    <div key={i} style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{line}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Tier A only — the prior period is not on this platform, so the comparison rests on
+                figures the company supplied. A disclosure of the limits of the disclosure. */}
+            {inv.comparability_disclosure.basis.priorYearState === 'not_stored' && (
+              <p style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, margin: '12px 0 0' }}>
+                Prior-year figures were entered by the company and are not held on this platform. Prior-period inventory composition has not been verified here.
+              </p>
+            )}
+
+            {/* The boundary is the frame every figure sits inside, so a boundary that could not be
+                compared is stated rather than left as a silence indistinguishable from a match. */}
+            {inv.comparability_disclosure.basis.boundaryWithheldBecause && (
+              <p style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, margin: '12px 0 0' }}>
+                {inv.comparability_disclosure.basis.boundaryWithheldBecause}
+              </p>
+            )}
+          </div>
+        )}
+
         <SectionHead>Emissions Summary</SectionHead>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10, marginBottom: '2rem' }}>
           <Stat label="Scope 1 (tCO2e)" value={(inv.scope1_total ?? 0).toFixed(3)} color="#B91C1C" />
@@ -490,7 +588,10 @@ export default function VerifierPage() {
               <tbody>
                 {inv.workings.map((w, i) => (
                   <tr key={i} style={{
-                    background: w.declaration === 'undeclared' ? '#FEF3E2'
+                    // 'unpriceable' takes the same amber as 'undeclared'. Both are rows a verifier
+                    // must not read past: one says nobody established whether something is there,
+                    // the other says the totals on this page are short by a known site.
+                    background: w.declaration === 'undeclared' || w.declaration === 'unpriceable' ? '#FEF3E2'
                       : w.declaration === 'attested_absent' ? '#f4f4f2'
                       : i % 2 === 0 ? '#fff' : '#f8f7f5',
                     borderBottom: '0.5px solid #e8e7e4',
@@ -537,6 +638,20 @@ export default function VerifierPage() {
                           <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: '#ba7517' }}>
                             Nobody has said whether this location has this or not, so the inventory cannot be shown
                             to be complete without it. This is not a figure of zero.
+                          </div>
+                        </>
+                      )}
+                      {/* Says what the row is as EVIDENCE, like the two above. The engine's own note
+                          renders in the Result column and carries the factor-lookup reason verbatim;
+                          this states the consequence a verifier is deciding on — the totals shown
+                          elsewhere on this page do not include this site. */}
+                      {w.declaration === 'unpriceable' && (
+                        <>
+                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: '#ba7517', background: 'rgba(186,117,23,0.12)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Excluded from totals</span>
+                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: '#ba7517' }}>
+                            No published emission factor exists for the unit this location&apos;s figures are in, so it
+                            could not be calculated. Every total on this page is missing this location. This is not
+                            a figure of zero.
                           </div>
                         </>
                       )}
