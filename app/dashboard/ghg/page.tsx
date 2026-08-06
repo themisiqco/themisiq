@@ -5,8 +5,8 @@ import { CONCIERGE_UNREAD_DOC_TYPES, SUPPORTED_FUELS } from '../../../lib/ghg/co
 import { WIZARD_STEP_NAMES } from '../../../lib/ghg/wizardSteps'
 import { supabase } from '../../../lib/supabase'
 import { buildMonthlyEmissions } from '../../../lib/ghg/monthlyEmissions'
-import { buildComparabilityDisclosure } from '../../../lib/ghg/comparability'
-import type { PriorYearState, InventorySummary } from '../../../lib/ghg/comparability'
+import { buildComparabilityDisclosure, buildComparabilityRecord, observationLines } from '../../../lib/ghg/comparability'
+import type { PriorYearState, InventorySummary, ComparabilityCapture, ComparabilityAnswer, ComparabilityRecord } from '../../../lib/ghg/comparability'
 import { assessCompleteness } from '../../../lib/ghg/loadSeries'
 import type { YearDataStatus } from '../../../lib/ghg/series'
 import { useEntitlement, useHasConcierge, useGhgLocationAllowance } from '../../../lib/useEntitlement'
@@ -390,10 +390,13 @@ const searchParams = useSearchParams()
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({})
   const [mode, setMode] = useState<'loading' | 'list' | 'wizard'>('loading')
   const [inventoryList, setInventoryList] = useState<Array<{ id: string; company_name: string; reporting_year: number; updated_at: string }>>([])
-  // The customer's answer to the comparability question. LOCAL ONLY — nothing writes it to
-  // comparability_disclosure yet, and the payload shape is undecided. null = unanswered, which is
-  // not the same as "nothing changed" and must not be collapsed into it when persistence lands.
-  const [comparabilityAnswer, setComparabilityAnswer] = useState<'nothing_changed' | 'something_changed' | null>(null)
+  // The customer's answer, CAPTURED AT THE MOMENT THEY GIVE IT — with the observation they were
+  // looking at and the basis behind it. Not just the choice: by save time the inventory may have
+  // moved, and recomputing the observation then would attribute to them an answer to a question
+  // nobody asked. null = unanswered, which is not "nothing changed" and never becomes it.
+  const [comparabilityCapture, setComparabilityCapture] = useState<ComparabilityCapture | null>(null)
+  // Typed after the radio is chosen and still changing until save, so it is collected at save time
+  // rather than captured.
   const [comparabilityNote, setComparabilityNote] = useState('')
   // The lookup result, TAGGED with the (company, year) it was fetched for. The tag is what keeps a
   // result from outliving its question: switch company or reporting year and the stored result no
@@ -453,6 +456,10 @@ const searchParams = useSearchParams()
     setSaved(false)
     setDirty(false) // fresh inventory is pristine until the user types
     setStep(0)
+    // A capture belongs to the inventory it was answered against. Carried into a new one it would
+    // be written to that inventory's column as if the customer had answered a question about it.
+    setComparabilityCapture(null)
+    setComparabilityNote('')
     setInventory({
       company_name: '', company_id: null, reporting_year: 2024, revenue_millions: 0, employee_count: 0,
       boundary_approach: 'operational_control', california_nexus: false,
@@ -574,6 +581,38 @@ const searchParams = useSearchParams()
           // would turn "never asked" into "asked, nothing to report".
           comparability_disclosure: data.comparability_disclosure ?? null,
         }))
+        // ── Re-hydrate the comparability answer, or clear it ────────────────────────────────────
+        //
+        // The capture belongs to an inventory, so it is REPLACED on every load, never left behind:
+        // hydrated from this inventory's stored record, or cleared when there isn't one. An answer
+        // captured against the inventory that was open a moment ago must not follow the customer
+        // into this one.
+        //
+        // observations and basis come from the RECORD, not from a recompute. They are what was in
+        // front of the customer when they answered, and keeping them is what lets the next save
+        // notice that the observation has moved since. Re-hydrating them as "current" would make
+        // every reopened answer look permanently up to date.
+        //
+        // answeredAt is preserved for the same reason: reopening a page is not answering. The
+        // timestamp says when the customer answered against those observations, and only a fresh
+        // answer — a click, or an edit to the detail — moves it.
+        const storedComparability = data.comparability_disclosure as ComparabilityRecord | null | undefined
+        if (storedComparability) {
+          setComparabilityCapture({
+            observations: storedComparability.observations,
+            question: storedComparability.question,
+            answer: storedComparability.answer,
+            basis: storedComparability.basis,
+            answeredAt: storedComparability.answeredAt,
+          })
+          // null (the field was never shown) and '' (shown, left blank) both restore an empty box;
+          // which of the two it was is preserved on the record, and re-derived at the next save
+          // from the answer that is being restored here.
+          setComparabilityNote(storedComparability.note ?? '')
+        } else {
+          setComparabilityCapture(null)
+          setComparabilityNote('')
+        }
         setSaved(true)
         setDirty(false)
       }
@@ -885,7 +924,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       priorSummary: priorYear.status === 'found' ? priorYear.summary : null,
       thisSummary: summarize(inventory.locations, inventory.boundary_approach),
     }),
-    answer: comparabilityAnswer,
+    /** The answer as captured when given, with the observation and basis of that moment. */
+    capture: comparabilityCapture,
     note: comparabilityNote,
 
     /**
@@ -907,6 +947,28 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     priorYearLookupFailed: priorYear.status === 'error',
     /** The error as reported, for the refusal to say what was observed rather than guess a cause. */
     priorYearLookupErrorMessage: priorYear.status === 'error' ? priorYear.message : null,
+  }
+
+  // A RADIO CLICK IS THE EVENT. Takes the observation and the basis as they are on screen at that
+  // instant, with a new timestamp — choosing an option is answering, and the record belongs to the
+  // moment of the click.
+  //
+  // Editing the note is NOT this. That is elaboration on an answer already given: it changes the
+  // note and nothing else. Calling this from the textarea would let a typo fix rewrite answeredAt
+  // and re-take the observations, quietly erasing drift the save is supposed to record.
+  //
+  // Nothing to capture against means nothing to record: with no disclosure there was no question,
+  // and the radios are not rendered, so this cannot be reached with a null disclosure.
+  const captureComparabilityAnswer = (answer: ComparabilityAnswer) => {
+    const d = comparabilityDraft.disclosure
+    if (!d) return
+    setComparabilityCapture({
+      observations: observationLines(d),
+      question: d.question,
+      answer,
+      basis: d.basis,
+      answeredAt: new Date().toISOString(),
+    })
   }
 
   // What the step renders. Unchanged — the customer still sees whatever Tier A can say from the
@@ -947,6 +1009,25 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         resolvedCompanyId = created.id
       }
     }
+
+    // ── Comparability: drift check, then the record ────────────────────────────────────────────
+    //
+    // `comparabilityDraft.disclosure` is the CURRENT recompute — the observation the module would
+    // make from state as it stands now. The capture inside the draft is what the customer actually
+    // answered. buildComparabilityRecord compares the two and records a difference as a fact
+    // alongside the original; it never rewrites what was shown.
+    //
+    // No re-ask, no clearing the answer, no blocking the save. Drift is information for a verifier,
+    // not an error for the customer: an answer given honestly against last week's figures does not
+    // stop being an honest answer because a location was added since.
+    const comparabilityRecord = buildComparabilityRecord({
+      capture: comparabilityDraft.capture,
+      note: comparabilityDraft.note,
+      priorYearLookupFailed: comparabilityDraft.priorYearLookupFailed,
+      current: comparabilityDraft.disclosure,
+      checkedAt: new Date().toISOString(),
+    })
+
     const payload = {
       user_id: session.user.id,
       reporting_year: inventory.reporting_year,
@@ -959,11 +1040,15 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       california_nexus: inventory.california_nexus,
       prior_year_s1: inventory.prior_year_s1,
       prior_year_s2: inventory.prior_year_s2,
-      // Pure pass-through of whatever was loaded — nothing writes a disclosure yet. It is in the
-      // payload because a column absent from this object is dropped on EVERY save: the moment
-      // something does write one, an unwired field would erase it on the next save with no error.
-      // Null stays null; an inventory nobody asked the question of keeps saying so.
-      comparability_disclosure: inventory.comparability_disclosure ?? null,
+      // The comparability record, or what is already stored if this save has nothing to write.
+      //
+      // THE FALLBACK IS NOT COSMETIC. buildComparabilityRecord returns null for two different
+      // reasons — the question was not answered THIS session, or the prior-year lookup failed —
+      // and neither is a reason to destroy an answer given on an earlier visit. Writing a bare
+      // null here would erase a real disclosure because the customer reopened the inventory and
+      // saved without touching the question. "Do not write" means leave it as it is, which for a
+      // fresh inventory is null anyway.
+      comparability_disclosure: comparabilityRecord ?? inventory.comparability_disclosure ?? null,
       selected_frameworks: inventory.selected_frameworks,
       locations_data: inventory.locations,
       coverage_resolutions: coverageResolutions,
@@ -1219,10 +1304,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 <input
                   type="radio"
                   name="comparability_answer"
-                  checked={comparabilityAnswer === 'nothing_changed'}
+                  checked={comparabilityCapture?.answer === 'nothing_changed'}
                   // Clears the note as well as hiding it: text left in state behind a hidden field
                   // is text that reappears, or gets persisted against an answer that contradicts it.
-                  onChange={() => { setComparabilityAnswer('nothing_changed'); setComparabilityNote('') }}
+                  onChange={() => { captureComparabilityAnswer('nothing_changed'); setComparabilityNote('') }}
                 />
                 {/* The second clause is load-bearing: without it a customer whose figures moved on
                     volume alone reads "Nothing changed" as false and picks the other option. */}
@@ -1232,16 +1317,24 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 <input
                   type="radio"
                   name="comparability_answer"
-                  checked={comparabilityAnswer === 'something_changed'}
-                  onChange={() => setComparabilityAnswer('something_changed')}
+                  checked={comparabilityCapture?.answer === 'something_changed'}
+                  onChange={() => captureComparabilityAnswer('something_changed')}
                 />
                 Something changed
               </label>
             </div>
-            {comparabilityAnswer === 'something_changed' && (
+            {comparabilityCapture?.answer === 'something_changed' && (
               <div style={{ marginTop: 10 }}>
                 <textarea
                   value={comparabilityNote}
+                  // The note updates ON ITS OWN. Typing here is elaborating on an answer already
+                  // given, not giving a new one, so the capture is left exactly as it stands —
+                  // same answeredAt, same captured observations.
+                  //
+                  // ⚠️ DO NOT re-capture from this handler. It looks harmless and it makes drift
+                  // ERASABLE: an untouched re-hydrated answer drifts at save, but one where the
+                  // customer fixed a typo would silently become current. Same customer, same
+                  // figures, two different records, decided by whether they touched the box.
                   onChange={e => setComparabilityNote(e.target.value)}
                   rows={3}
                   style={{ ...inputStyle, resize: 'vertical' as const, fontFamily: 'inherit' }}

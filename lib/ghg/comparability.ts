@@ -459,3 +459,136 @@ function basisStatement(
   }
   return `No observation could be put in front of this question. ${aWithheld ?? ''} ${bWithheld ?? ''}`.trim()
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// PERSISTENCE — what gets stored in ghg_inventories.comparability_disclosure
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//
+// CAPTURE AT ANSWER TIME, DETECT DRIFT AT SAVE. The two are separate moments and the record keeps
+// them separate.
+//
+// The customer answers a question put in front of them at a particular moment, against a particular
+// observation. Then they keep working — add a location, correct a figure, change the boundary — and
+// by save time the observation the module would produce is not the one they answered. Recomputing
+// and storing THAT would attribute to the customer an answer to a question nobody asked them.
+//
+// So the answered observation is captured verbatim when they answer and is never rewritten. At save
+// the disclosure is recomputed and compared; a difference is recorded as a fact, alongside the
+// original, not in place of it. A verifier can then see both what was asked and that the ground
+// moved afterwards — which is more informative than either alone, and is not something the customer
+// has to be re-interrogated about.
+
+export type ComparabilityAnswer = 'nothing_changed' | 'something_changed'
+
+/**
+ * Taken the moment the customer picks an option — the immutable part of the record.
+ *
+ * The free text is NOT here: it is typed after the radio is chosen and keeps changing until save,
+ * so it is collected at save time. Everything in this interface is fixed at the instant of the
+ * answer and must never be recomputed.
+ */
+export interface ComparabilityCapture {
+  /** The lines exactly as rendered to the customer, in the order shown. */
+  observations: string[]
+  question: string
+  answer: ComparabilityAnswer
+  /** The basis as it stood when they answered — the tier evidence behind what they were shown. */
+  basis: ComparabilityBasis
+  /** ISO timestamp of the answer. */
+  answeredAt: string
+}
+
+/** The stored object. jsonb in `ghg_inventories.comparability_disclosure`. */
+export interface ComparabilityRecord {
+  /** WHAT THE CUSTOMER SAW. Never overwritten, never recomputed. */
+  observations: string[]
+  question: string
+  answer: ComparabilityAnswer
+  /**
+   * The free text as typed, verbatim and untrimmed. THREE DISTINCT VALUES, all meaningful:
+   *   null — the answer was 'nothing_changed'; the field was never shown, so there is nothing to
+   *          have left blank.
+   *   ''   — the field WAS shown and the customer left it empty. A real answer, and stored as one.
+   *   text — detail was given.
+   */
+  note: string | null
+  /**
+   * Whether the free text carries actual detail (non-whitespace). Stated as a fact rather than left
+   * to be re-derived, because `note ?? ''` downstream would silently merge the null and empty cases
+   * — the exact distinction the export gates will need. NOT a gate itself.
+   */
+  detailProvided: boolean
+  basis: ComparabilityBasis
+  answeredAt: string
+  /** ISO timestamp of the save at which drift was checked. Always present: the check always runs. */
+  checkedAt: string
+  /**
+   * Whether the recomputed observation differs from the one answered. ALWAYS present, so that
+   * absence never has to be read as "unchanged" — an inference this whole feature exists to remove.
+   */
+  observationsChanged: boolean
+  /**
+   * The recomputed lines, present ONLY when they differ. Alongside the originals, never replacing
+   * them. Absent when `observationsChanged` is false, which says so explicitly.
+   */
+  observationsAtSave?: string[]
+}
+
+/** The rendered lines of a disclosure, in order — what a customer actually read. */
+export const observationLines = (d: ComparabilityDisclosure): string[] =>
+  d.observations.map(o => o.text)
+
+const sameLines = (a: string[], b: string[]): boolean =>
+  a.length === b.length && a.every((line, i) => line === b[i])
+
+/**
+ * Build the record to store, or null to write nothing.
+ *
+ * TWO REFUSALS, both returning null so the column stays as it is:
+ *
+ *   priorYearLookupFailed — the prior-year query errored, so whether a prior year exists is
+ *     unknown. The disclosure nonetheless carries 'not_stored', because PriorYearState has no
+ *     value for "we could not look" — making a basis built on a failed lookup BYTE-IDENTICAL to
+ *     one built on a genuine absence. Persisting it would put a claim on the record that no one
+ *     could later tell apart from a true one. Refused before anything else is considered.
+ *
+ *   no capture — the question was never answered. NULL is the column's way of saying exactly that,
+ *     and an empty shell with a timestamp would say instead that someone answered and had nothing
+ *     to add. Those are the two states this disclosure exists to separate.
+ *
+ * Note the asymmetry with 'something_changed' and an empty note: that IS an answer — the customer
+ * was shown the field and left it blank — and it is stored.
+ */
+export function buildComparabilityRecord(input: {
+  capture: ComparabilityCapture | null
+  /** The free text as it stands at save. Ignored when the answer is 'nothing_changed'. */
+  note: string
+  priorYearLookupFailed: boolean
+  /** The disclosure recomputed from current state at save. Null when there is no longer one. */
+  current: ComparabilityDisclosure | null
+  /** ISO timestamp of this save. */
+  checkedAt: string
+}): ComparabilityRecord | null {
+  const { capture, note, priorYearLookupFailed, current, checkedAt } = input
+
+  if (priorYearLookupFailed) return null
+  if (!capture) return null
+
+  // A disclosure that has become null since the answer is a REAL difference, not a missing check:
+  // the customer answered an observation that no longer stands. Recorded as drift to an empty set.
+  const observationsAtSave = current ? observationLines(current) : []
+  const observationsChanged = !sameLines(capture.observations, observationsAtSave)
+
+  return {
+    observations: capture.observations,
+    question: capture.question,
+    answer: capture.answer,
+    note: capture.answer === 'something_changed' ? note : null,
+    detailProvided: capture.answer === 'something_changed' && note.trim().length > 0,
+    basis: capture.basis,
+    answeredAt: capture.answeredAt,
+    checkedAt,
+    observationsChanged,
+    ...(observationsChanged ? { observationsAtSave } : {}),
+  }
+}

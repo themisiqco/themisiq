@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildComparabilityDisclosure,
+  buildComparabilityRecord,
+  observationLines,
   type ComparabilityInput,
+  type ComparabilityCapture,
   type InventorySummary,
   type PriorYearState,
 } from './comparability'
@@ -581,5 +584,282 @@ describe('copy is plain language', () => {
         expect(o.text.toLowerCase(), `continuation: ${o.text}`).not.toMatch(/^(and|but|or)\b/)
       }
     }
+  })
+})
+
+// ── Persistence: what gets stored ───────────────────────────────────────────────────────────────
+//
+// The record separates two moments: what the customer was shown when they answered, and what the
+// module would say at save. The first is evidence and is never rewritten; the second is a check.
+
+const captureFrom = (
+  d: ReturnType<typeof buildComparabilityDisclosure>,
+  answer: 'nothing_changed' | 'something_changed',
+  answeredAt = '2026-08-06T10:00:00.000Z',
+): ComparabilityCapture => ({
+  observations: observationLines(d!),
+  question: d!.question,
+  answer,
+  basis: d!.basis,
+  answeredAt,
+})
+
+const SAVED_AT = '2026-08-06T11:30:00.000Z'
+
+const record = (over: Partial<Parameters<typeof buildComparabilityRecord>[0]> = {}) =>
+  buildComparabilityRecord({
+    capture: captureFrom(buildComparabilityDisclosure(base()), 'nothing_changed'),
+    note: '',
+    priorYearLookupFailed: false,
+    current: buildComparabilityDisclosure(base()),
+    checkedAt: SAVED_AT,
+    ...over,
+  })
+
+describe('refusals — the column is left alone', () => {
+  it('writes nothing when the prior-year lookup failed', () => {
+    // The disclosure carries 'not_stored' either way, so a basis built on a failed lookup is
+    // byte-identical to one built on a genuine absence. It must never reach the record.
+    expect(record({ priorYearLookupFailed: true })).toBeNull()
+  })
+
+  it('refuses on a failed lookup even when the customer answered in full', () => {
+    const r = record({
+      priorYearLookupFailed: true,
+      capture: captureFrom(buildComparabilityDisclosure(base()), 'something_changed'),
+      note: 'We acquired a plant in March.',
+    })
+    expect(r).toBeNull()
+  })
+
+  it('writes nothing when the question was never answered', () => {
+    expect(record({ capture: null })).toBeNull()
+  })
+
+  it('does not write an empty shell — no timestamp-only record', () => {
+    const r = record({ capture: null })
+    expect(r).toBeNull()
+    expect(r).not.toEqual(expect.objectContaining({ checkedAt: SAVED_AT }))
+  })
+})
+
+describe('an answer with no detail is still an answer', () => {
+  it("stores 'something_changed' with an empty note", () => {
+    const r = record({
+      capture: captureFrom(buildComparabilityDisclosure(base()), 'something_changed'),
+      note: '',
+    })!
+    expect(r).not.toBeNull()
+    expect(r.answer).toBe('something_changed')
+    expect(r.note).toBe('')          // shown and left blank — NOT null
+    expect(r.detailProvided).toBe(false)
+  })
+
+  it('distinguishes blank-but-shown from never-shown', () => {
+    const blank = record({
+      capture: captureFrom(buildComparabilityDisclosure(base()), 'something_changed'),
+      note: '',
+    })!
+    const neverShown = record({
+      capture: captureFrom(buildComparabilityDisclosure(base()), 'nothing_changed'),
+      note: '',
+    })!
+    expect(blank.note).toBe('')
+    expect(neverShown.note).toBeNull()
+    expect(blank.note).not.toBe(neverShown.note)
+  })
+
+  it('flags detail only when the note carries non-whitespace', () => {
+    const cap = captureFrom(buildComparabilityDisclosure(base()), 'something_changed')
+    expect(record({ capture: cap, note: 'Acquired a plant.' })!.detailProvided).toBe(true)
+    expect(record({ capture: cap, note: '   \n ' })!.detailProvided).toBe(false)
+    // ...and the whitespace is still stored verbatim. What they typed is what is on the record.
+    expect(record({ capture: cap, note: '   \n ' })!.note).toBe('   \n ')
+  })
+
+  it("ignores the note entirely on 'nothing_changed'", () => {
+    const r = record({
+      capture: captureFrom(buildComparabilityDisclosure(base()), 'nothing_changed'),
+      note: 'stale text from before they switched option',
+    })!
+    expect(r.note).toBeNull()
+    expect(r.detailProvided).toBe(false)
+  })
+})
+
+describe('drift between answering and saving', () => {
+  const answeredOn = buildComparabilityDisclosure(base())
+
+  it('records no change when the observation still stands', () => {
+    const r = record({ capture: captureFrom(answeredOn, 'nothing_changed'), current: answeredOn })!
+    expect(r.observationsChanged).toBe(false)
+    expect(r).not.toHaveProperty('observationsAtSave')
+    expect(r.checkedAt).toBe(SAVED_AT)
+  })
+
+  it('records the difference and keeps BOTH sets when the observation moved', () => {
+    // Answered against 4 → 6 locations; by save time this year holds 9.
+    const atSave = buildComparabilityDisclosure(
+      base({ thisSummary: { ...THIS_YEAR, locationCount: 9 } }),
+    )
+    const r = record({ capture: captureFrom(answeredOn, 'nothing_changed'), current: atSave })!
+
+    expect(r.observationsChanged).toBe(true)
+    expect(r.observationsAtSave).toEqual(observationLines(atSave!))
+    // The originals are UNTOUCHED — what the customer saw is the record.
+    expect(r.observations).toEqual(observationLines(answeredOn!))
+    expect(r.observations).toContain('Your inventory went from 4 locations to 6.')
+    expect(r.observationsAtSave).toContain('Your inventory went from 4 locations to 9.')
+  })
+
+  it('treats a disclosure that has since become null as a real difference', () => {
+    const r = record({ capture: captureFrom(answeredOn, 'nothing_changed'), current: null })!
+    expect(r.observationsChanged).toBe(true)
+    expect(r.observationsAtSave).toEqual([])
+    expect(r.observations.length).toBeGreaterThan(0)
+  })
+
+  it('never rewrites the answer, the question, or the basis at save', () => {
+    const atSave = buildComparabilityDisclosure(
+      base({ priorYearState: 'unverifiable', thisSummary: { ...THIS_YEAR, locationCount: 9 } }),
+    )
+    const cap = captureFrom(answeredOn, 'something_changed')
+    const r = record({ capture: cap, note: 'Bought a competitor.', current: atSave })!
+
+    expect(r.question).toBe(cap.question)
+    expect(r.answeredAt).toBe(cap.answeredAt)
+    expect(r.basis).toEqual(cap.basis)
+    expect(r.basis.tierA).toBe(true)               // as answered, not the 'unverifiable' recompute
+    expect(r.answer).toBe('something_changed')
+  })
+
+  it('keeps the answer timestamp and the check timestamp apart', () => {
+    const r = record({ capture: captureFrom(answeredOn, 'nothing_changed', '2026-08-06T09:00:00.000Z') })!
+    expect(r.answeredAt).toBe('2026-08-06T09:00:00.000Z')
+    expect(r.checkedAt).toBe(SAVED_AT)
+    expect(r.answeredAt).not.toBe(r.checkedAt)
+  })
+
+  it('carries the observation lines as the customer read them, in order', () => {
+    const r = record({ capture: captureFrom(answeredOn, 'nothing_changed') })!
+    expect(r.observations).toEqual(answeredOn!.observations.map(o => o.text))
+  })
+})
+
+// ── Re-hydration: an answer reopened, not re-given ──────────────────────────────────────────────
+//
+// Reopening an inventory restores the capture from the stored record — the observations as they
+// were shown, the basis of that moment, and the ORIGINAL answeredAt. A page load is not an answer.
+// The consequence that matters: the restored capture must still be able to drift.
+
+describe('an answer restored from a stored record', () => {
+  const answeredOn = buildComparabilityDisclosure(base())
+  const ANSWERED_AT = '2026-08-01T09:15:00.000Z'
+
+  /** What the wizard rebuilds on load: the record's own fields, none of them recomputed. */
+  const hydrated = (stored: NonNullable<ReturnType<typeof buildComparabilityRecord>>): ComparabilityCapture => ({
+    observations: stored.observations,
+    question: stored.question,
+    answer: stored.answer,
+    basis: stored.basis,
+    answeredAt: stored.answeredAt,
+  })
+
+  const firstSave = buildComparabilityRecord({
+    capture: captureFrom(answeredOn, 'something_changed', ANSWERED_AT),
+    note: 'Acquired a plant in March.',
+    priorYearLookupFailed: false,
+    current: answeredOn,
+    checkedAt: '2026-08-01T09:20:00.000Z',
+  })!
+
+  it('keeps the original answer timestamp across a reopen and re-save', () => {
+    const r = buildComparabilityRecord({
+      capture: hydrated(firstSave),
+      note: firstSave.note ?? '',
+      priorYearLookupFailed: false,
+      current: answeredOn,
+      checkedAt: '2026-08-06T14:00:00.000Z',
+    })!
+    expect(r.answeredAt).toBe(ANSWERED_AT)
+    expect(r.checkedAt).toBe('2026-08-06T14:00:00.000Z')
+  })
+
+  it('STILL records drift when the observation moved since the answer', () => {
+    // The whole point of not re-hydrating observations as current: this must not come back false.
+    const atSave = buildComparabilityDisclosure(
+      base({ thisSummary: { ...THIS_YEAR, locationCount: 11 } }),
+    )
+    const r = buildComparabilityRecord({
+      capture: hydrated(firstSave),
+      note: firstSave.note ?? '',
+      priorYearLookupFailed: false,
+      current: atSave,
+      checkedAt: '2026-08-06T14:00:00.000Z',
+    })!
+
+    expect(r.observationsChanged).toBe(true)
+    expect(r.observations).toEqual(firstSave.observations)          // what was shown then
+    expect(r.observationsAtSave).toContain('Your inventory went from 4 locations to 11.')
+    expect(r.answeredAt).toBe(ANSWERED_AT)
+  })
+
+  it('carries the answer and its detail back through unchanged', () => {
+    const r = buildComparabilityRecord({
+      capture: hydrated(firstSave),
+      note: firstSave.note ?? '',
+      priorYearLookupFailed: false,
+      current: answeredOn,
+      checkedAt: '2026-08-06T14:00:00.000Z',
+    })!
+    expect(r.answer).toBe('something_changed')
+    expect(r.note).toBe('Acquired a plant in March.')
+    expect(r.detailProvided).toBe(true)
+    expect(r.basis).toEqual(firstSave.basis)
+  })
+
+  it('an edit to the note alone does NOT erase drift', () => {
+    // The customer reopens an inventory whose observation has moved, fixes a typo in their note,
+    // and saves. Typing is elaboration, not a new answer — so the capture is untouched and the
+    // drift the save exists to record must survive.
+    //
+    // Without this, the same customer with the same figures produces two different records
+    // depending on whether they touched the box.
+    const atSave = buildComparabilityDisclosure(
+      base({ thisSummary: { ...THIS_YEAR, locationCount: 11 } }),
+    )
+    const r = buildComparabilityRecord({
+      capture: hydrated(firstSave),                      // unchanged by the edit
+      note: 'Acquired a plant in March 2026.',           // the only thing that moved
+      priorYearLookupFailed: false,
+      current: atSave,
+      checkedAt: '2026-08-06T14:00:00.000Z',
+    })!
+
+    expect(r.observationsChanged).toBe(true)
+    expect(r.observations).toEqual(firstSave.observations)
+    expect(r.observations).toContain('Your inventory went from 4 locations to 6.')
+    expect(r.observationsAtSave).toContain('Your inventory went from 4 locations to 11.')
+    expect(r.answeredAt).toBe(ANSWERED_AT)
+    // ...and the edit did land.
+    expect(r.note).toBe('Acquired a plant in March 2026.')
+  })
+
+  it('a re-answer is a NEW capture — fresh timestamp, current observations, no drift', () => {
+    // What the wizard builds when the customer clicks a radio or edits the note after reopening.
+    const atSave = buildComparabilityDisclosure(
+      base({ thisSummary: { ...THIS_YEAR, locationCount: 11 } }),
+    )
+    const r = buildComparabilityRecord({
+      capture: captureFrom(atSave, 'something_changed', '2026-08-06T14:05:00.000Z'),
+      note: 'Two more sites came online.',
+      priorYearLookupFailed: false,
+      current: atSave,
+      checkedAt: '2026-08-06T14:06:00.000Z',
+    })!
+    expect(r.answeredAt).toBe('2026-08-06T14:05:00.000Z')
+    expect(r.answeredAt).not.toBe(ANSWERED_AT)
+    expect(r.observationsChanged).toBe(false)
+    expect(r.observations).toContain('Your inventory went from 4 locations to 11.')
   })
 })

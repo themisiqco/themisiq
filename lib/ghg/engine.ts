@@ -17,7 +17,7 @@ import { L_PER_GAL, GJ_PER_MMBTU } from '../unitConversions'
 // Type only — erased at compile, no runtime dependency and nothing added to the bundle. The engine
 // neither builds nor reads a comparability disclosure; it carries the field so the stored inventory
 // shape stays in one place. See lib/ghg/comparability.ts.
-import type { ComparabilityDisclosure } from './comparability'
+import type { ComparabilityRecord } from './comparability'
 
 // AR4/AR5 do not distinguish fossil vs biogenic methane — both keys carry the single published GWP100.
 // AR6 is the first IPCC set to split them (fossil 29.8 incl. oxidation; biogenic/non-fossil 27.0). N2O AR6 = 273.
@@ -792,10 +792,11 @@ locations: Location[]
    * nothing to add" are the two states this whole feature exists to let a verifier tell apart, and
    * an `{}` written on save collapses them.
    *
-   * Nothing writes it yet. It is carried here so the wizard's save payload cannot silently drop it
-   * once something does.
+   * Holds the RECORD (what the customer was shown, their answer, the basis at answer time, and the
+   * save-time drift check) — not a bare disclosure. The disclosure is recomputed on every render;
+   * the record is evidence of one moment and is never recomputed.
    */
-  comparability_disclosure?: ComparabilityDisclosure | null
+  comparability_disclosure?: ComparabilityRecord | null
 }
 
 const emptyLocation = (id: string, name: string, state = ''): Location => ({
