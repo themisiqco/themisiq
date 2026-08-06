@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 import { VERIFIER_DOC_LINK_NOTICE, VERIFIER_DOC_TAB_DID_NOT_OPEN } from '../../../lib/verifierDocNotice'
+import { docTypeLabel } from '../../../lib/ghg/conciergeDocTypes'
 
 // METADATA ONLY — no old_values / new_values. The RPC used to return full before/after row
 // snapshots of ghg_inventories, which put every column back within reach of a verifier regardless of
@@ -178,7 +179,10 @@ function SourceDocRow({ doc, token }: { doc: VerifierDoc; token: string }) {
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px', marginBottom: 8, flexWrap: 'wrap' }}>
       <div>
         <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{doc.file_name}</div>
-        <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{doc.location} · {doc.document_type}</div>
+        {/* Labelled at RENDER, not in flattenSourceDocs: document_type is the join key the rest of
+            the system runs on, so the shape that crosses the wire keeps the token and only the
+            surface a person reads swaps it for a name. */}
+        <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{doc.location} · {docTypeLabel(doc.document_type)}</div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         {failed && <span style={{ fontSize: 11, color: '#B91C1C' }}>Couldn&rsquo;t open — try again</span>}
@@ -533,7 +537,14 @@ export default function VerifierPage() {
               </tbody>
             </table>
             </div>
-            <div style={{ fontSize: 11, color: '#888784', marginTop: 8 }}>Emission factor sources: US EPA (combustion), US EPA eGRID (electricity), IPCC (GWP). Verifier should confirm each sampled line independently.</div>
+            {/* This used to read "Emission factor sources: US EPA (combustion), US EPA eGRID
+                (electricity), IPCC (GWP)" — hardcoded, and wrong on 13 of the 15 inventories on
+                file, every one of which cites ECCC, DEFRA, IPCC 2006, DCCEEW, NZ MfE or AIB in the
+                table directly above it. A false methodology claim on an assurance surface.
+                It is not rebuilt from the rows because the real citations run to ~1,000 characters
+                on a multi-country inventory, and shortening a published citation would be the same
+                mistake in a new form. Each row already names its own source; this points there. */}
+            <div style={{ fontSize: 11, color: '#888784', marginTop: 8 }}>Each row above names the emission factor source it used, in the Factor source column — sources differ by country and by fuel, so read them per row rather than assuming one set applies throughout. Verifier should confirm each sampled line independently.</div>
           </div>
           </>
         ) : (

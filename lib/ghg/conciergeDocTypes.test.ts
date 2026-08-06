@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   SUPPORTED_FUELS, DOC_TYPE_FUELS, CONCIERGE_UNREAD_DOC_TYPES,
-  JUDGEMENT_EXCLUDED, docTypeIsReadable,
+  JUDGEMENT_EXCLUDED, docTypeIsReadable, DOC_TYPE_LABELS, docTypeLabel,
 } from './conciergeDocTypes'
 
 // ── What the concierge SENDS must match what the extractor can READ ─────────────────────────────
@@ -101,6 +101,57 @@ describe('the exception list stays honest', () => {
   // SUPPORTED_FUELS *because* of the judgement recorded against it — the decision is upstream of the
   // capability gap, not an alternative to it. Asserting the two are mutually exclusive would have
   // forced the reason to be deleted to go green, which is the opposite of what these guards are for.
+})
+
+// ── Every document type has a name a human chose ────────────────────────────────────────────────
+//
+// DOC_TYPE_FUELS says what a document HOLDS; DOC_TYPE_LABELS says what it is CALLED. They are keyed
+// the same way, and drift between them is not cosmetic: an unlabelled type reaches a verifier as a
+// raw token ("utility_bill_gas"), which is our schema on an assurance surface. A labelled type that
+// no longer exists is dead text that outlives the slot it named.
+//
+// Both directions are checked because they fail differently. Missing label → the token leaks.
+// Orphan label → nothing visible happens, and the map slowly stops describing the product.
+describe('every document type is named, and every name belongs to a document type', () => {
+  it('every DOC_TYPE_FUELS key has a label', () => {
+    const unlabelled = Object.keys(DOC_TYPE_FUELS).filter(d => !(d in DOC_TYPE_LABELS))
+    expect(unlabelled,
+      `\n\nThese document types have no entry in DOC_TYPE_LABELS:\n` +
+      unlabelled.map(d => `    ${d}`).join('\n') +
+      `\n\nWHAT THIS MEANS: app/verify/[token]/page.tsx renders the label for every uploaded document.\n` +
+      `Without one they fall back to "Source document", so a verifier is told less about the evidence\n` +
+      `than the product knows — and before this map existed they saw the raw token instead.\n\n` +
+      `TO FIX: add a NOUN naming the document to DOC_TYPE_LABELS in ${FILE} — "Gas bill", not\n` +
+      `"Upload gas bills". The wizard asks for a document; every other surface describes one.\n`,
+    ).toEqual([])
+  })
+
+  it('every DOC_TYPE_LABELS key is a real document type', () => {
+    const orphaned = Object.keys(DOC_TYPE_LABELS).filter(d => !(d in DOC_TYPE_FUELS))
+    expect(orphaned,
+      `\n\nDOC_TYPE_LABELS names document types that do not exist in DOC_TYPE_FUELS:\n` +
+      orphaned.map(d => `    ${d}`).join('\n') +
+      `\n\nTO FIX: correct the spelling against DOC_TYPE_FUELS in ${FILE}, or remove the entry. A label\n` +
+      `for a slot the wizard no longer offers is text nobody will ever see and nobody will delete.\n`,
+    ).toEqual([])
+  })
+
+  it('no label is empty, and none is an upload prompt', () => {
+    const bad = Object.entries(DOC_TYPE_LABELS).filter(([, l]) => l.trim().length < 3 || /^upload\b/i.test(l.trim()))
+    expect(bad,
+      `\n\nThese labels are empty or phrased as an instruction rather than a name:\n` +
+      bad.map(([d, l]) => `    ${d}: "${l}"`).join('\n') +
+      `\n\nTO FIX: use a noun describing the document — "Gas bill", not "Upload gas bills".\n`,
+    ).toEqual([])
+  })
+
+  it('an unknown token degrades to a neutral noun, never to the token itself', () => {
+    // The whole point of the map is that our schema does not reach a verifier. A raw-token fallback
+    // would put it back on the rarest path, which is the one nobody looks at.
+    expect(docTypeLabel('some_type_added_later')).toBe('Source document')
+    expect(docTypeLabel('')).toBe('Source document')
+    expect(docTypeLabel('utility_bill_gas')).toBe('Gas bill')
+  })
 })
 
 describe('the mapping covers what the wizard uploads', () => {

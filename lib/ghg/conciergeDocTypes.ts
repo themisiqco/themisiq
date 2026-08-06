@@ -37,6 +37,37 @@ export const DOC_TYPE_FUELS: Record<string, readonly string[]> = {
   biogenic:            ['biogenic_co2'],         // biomass records; no extractable fuel figure
 }
 
+// What each upload slot is CALLED, for anyone who did not choose the token.
+//
+// The verifier page was rendering `utility_bill_gas` verbatim, in front of an assurance provider —
+// our schema on screen where the name of a document should be. These are NOUNS naming the document
+// ("Gas bill"), not the wizard's upload prompts ("Upload gas bills"): the wizard is asking for
+// something, every other surface is describing something that already exists.
+//
+// It lives here rather than beside the wizard's <DocUpload label=…> props because those are inline
+// JSX, two of them interpolate the location name, and a second surface now needs the same words.
+// Keyed identically to DOC_TYPE_FUELS, and conciergeDocTypes.test.ts fails if the two ever diverge —
+// this file exists because two lists of these tokens drifted apart once already.
+export const DOC_TYPE_LABELS: Record<string, string> = {
+  utility_bill_gas:    'Gas bill',
+  utility_electricity: 'Electricity bill',
+  fuel_propane:        'Propane delivery record',
+  fuel_diesel:         'Diesel purchase record',
+  fleet_fuel:          'Fleet fuel record',
+  fuel_oil:            'Fuel oil delivery record',
+  purchased_steam:     'Steam / district heating bill',
+  service_record:      'Refrigeration service record',
+  renewable_cert:      'REC / PPA certificate',
+  biogenic:            'Biomass record',
+}
+
+// An unknown token falls back to a neutral noun, NOT to the token itself. Printing the raw token is
+// the defect this map removes; reintroducing it as a fallback would just move it to a rarer path.
+// The parity test makes an unlabelled-but-known type impossible, so this only fires for a document
+// type outside the mapping entirely.
+export const docTypeLabel = (docType: string): string =>
+  DOC_TYPE_LABELS[docType] ?? 'Source document'
+
 // Document types the concierge does NOT send for extraction.
 export const CONCIERGE_UNREAD_DOC_TYPES = new Set<string>([
   'service_record', 'fuel_oil', 'purchased_steam', 'renewable_cert', 'biogenic',
