@@ -5,6 +5,7 @@ import { CONCIERGE_UNREAD_DOC_TYPES, SUPPORTED_FUELS } from '../../../lib/ghg/co
 import { WIZARD_STEP_NAMES } from '../../../lib/ghg/wizardSteps'
 import { supabase } from '../../../lib/supabase'
 import { buildMonthlyEmissions } from '../../../lib/ghg/monthlyEmissions'
+import { buildComparabilityDisclosure } from '../../../lib/ghg/comparability'
 import { useEntitlement, useHasConcierge, useGhgLocationAllowance } from '../../../lib/useEntitlement'
 import { generateAssurancePDF } from '../../../lib/assurancePdf'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -27,6 +28,27 @@ import type {
   ConciergeStatus, CoveragePeriod, CoverageResolution, DeclarableStream, UnpriceableLocation,
 } from '../../../lib/ghg/engine'
 
+
+// Fuel tokens present anywhere in an inventory, in the engine's own names — the shape
+// lib/ghg/comparability.ts compares year to year.
+//
+// Derived even though Tier B cannot run yet (the wizard holds no prior inventory, so priorSummary
+// is null and this whole summary is unread). A placeholder here would be discovered wrong on the
+// day the prior year is loaded, in front of a verifier rather than in a test.
+const fuelTypesPresent = (locs: Location[]): string[] => {
+  const present = new Set<string>()
+  for (const l of locs) {
+    if (l.has_natural_gas) present.add('natural_gas')
+    if (l.has_propane) present.add('propane')
+    if (l.has_diesel_stationary) present.add('diesel')
+    if (l.has_fuel_oil) present.add('fuel_oil')
+    if (l.has_mobile && l.gasoline_amount > 0) present.add('gasoline')
+    if (l.has_mobile && l.diesel_mobile_amount > 0) present.add('diesel_mobile')
+    if (l.electricity_kwh > 0) present.add('electricity')
+    if (l.has_purchased_steam) present.add('steam')
+  }
+  return [...present].sort()
+}
 
 interface BotMessage {
   role: 'user' | 'assistant'
@@ -321,6 +343,11 @@ const searchParams = useSearchParams()
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({})
   const [mode, setMode] = useState<'loading' | 'list' | 'wizard'>('loading')
   const [inventoryList, setInventoryList] = useState<Array<{ id: string; company_name: string; reporting_year: number; updated_at: string }>>([])
+  // The customer's answer to the comparability question. LOCAL ONLY — nothing writes it to
+  // comparability_disclosure yet, and the payload shape is undecided. null = unanswered, which is
+  // not the same as "nothing changed" and must not be collapsed into it when persistence lands.
+  const [comparabilityAnswer, setComparabilityAnswer] = useState<'nothing_changed' | 'something_changed' | null>(null)
+  const [comparabilityNote, setComparabilityNote] = useState('')
   const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([])
   const [addingNewCompany, setAddingNewCompany] = useState(false)
   const isPaid = useEntitlement('ghg')
@@ -702,10 +729,44 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   const needsEmployees = inventory.selected_frameworks.includes('ecovadis')
   const needsBiogenic = inventory.selected_frameworks.includes('esrs') || inventory.selected_frameworks.includes('gri')
 
+  // ── Year-over-year comparability (ISO 14064-3:2019 cl. 6.3.1.5) ────────────────────────────────
+  // The observation and its basis come from lib/ghg/comparability.ts. NOTHING here re-derives a
+  // line — same rule as buildWorkings: one renderer, one source of the words.
+  //
+  // 0 IS THIS WIZARD'S "not entered". Both inputs render `value={... || ''}`, so a stored 0 already
+  // shows the customer a blank field; mapping it to null keeps the module's absent-figure contract
+  // agreeing with what is on screen. Stated cost: a company whose prior Scope 1 was genuinely zero
+  // reads as absent and gets no Scope 1 line.
+  //
+  // ⚠️ priorYearState IS 'not_stored' BECAUSE THE WIZARD HOLDS ONE INVENTORY AND IT IS THIS YEAR'S.
+  // The prior year's row is never loaded here, so its structure cannot be summarised and its state
+  // cannot be established. Two consequences, both deliberate for this step:
+  //   • Tier B never runs — no location, fuel, jurisdiction or boundary line appears, even for a
+  //     customer whose prior year IS on the platform.
+  //   • basis.statement therefore says the prior period is not held on the platform. That is true
+  //     of what this call knows and FALSE of that customer, which is exactly why nothing here may
+  //     be persisted until the prior year is loaded. Loading it is the prerequisite for the write.
   const totals_ar4 = calcInventory(inventory.locations, 'AR4', inventory.reporting_year)
   const totals_ar5 = calcInventory(inventory.locations, 'AR5', inventory.reporting_year)
   const totals_ar6 = calcInventory(inventory.locations, 'AR6', inventory.reporting_year)
   const totalsByGwp: Record<GwpVersion, typeof totals_ar4> = { AR4: totals_ar4, AR5: totals_ar5, AR6: totals_ar6 }
+
+  // AR6 is the basis the inventory is saved on (see the save payload), so the comparison is stated
+  // on the same basis the figures are stored on.
+  const comparability = buildComparabilityDisclosure({
+    priorScope1: inventory.prior_year_s1 > 0 ? inventory.prior_year_s1 : null,
+    priorScope2: inventory.prior_year_s2 > 0 ? inventory.prior_year_s2 : null,
+    thisScope1: totals_ar6.s1_total,
+    thisScope2: totals_ar6.s2_location,
+    priorYearState: 'not_stored',
+    priorSummary: null,
+    thisSummary: {
+      locationCount: inventory.locations.length,
+      fuelTypes: fuelTypesPresent(inventory.locations),
+      jurisdictions: [...new Set(inventory.locations.map(l => l.country).filter(Boolean))],
+      boundaryApproach: inventory.boundary_approach,
+    },
+  })
 
   const STEPS = ['Reporting frameworks', 'Company setup', 'Energy & fuel data', 'Additional data', 'Review & workings', 'Export reports', 'Audit trail']
   const activeFrameworks = FRAMEWORKS.filter(f => inventory.selected_frameworks.includes(f.id))
@@ -980,6 +1041,71 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 <input type="number" value={inventory.prior_year_s2 || ''} onChange={e => setInventory(i => ({...i, prior_year_s2: Number(e.target.value)}))} placeholder="0" style={inputStyle} />
               </Field>
             </div>
+          </div>
+        )}
+        {/*
+          Year-over-year comparability — ISO 14064-3:2019 clause 6.3.1.5.
+
+          Rendered ONLY when buildComparabilityDisclosure returns a disclosure. No heading and no
+          empty state otherwise: on a first inventory the question is noise, and an empty section
+          asking nothing is worse than no section.
+
+          Zero observations still renders the heading and the question. The question does not
+          depend on whether anything could be put in front of it — that difference is the basis's
+          job to record, not the question's to gate on.
+
+          Every string below is the module's or the doc's. Nothing is composed here.
+        */}
+        {comparability && (
+          <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
+            <div style={{ fontFamily: 'Georgia, serif', fontSize: 15, color: '#0d0d0d', marginBottom: 10 }}>
+              Comparing this year with last year
+            </div>
+            {comparability.observations.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 6, marginBottom: 12 }}>
+                {comparability.observations.map(o => (
+                  <div key={o.kind} style={{ fontSize: 13, color: '#555553', lineHeight: 1.5 }}>{o.text}</div>
+                ))}
+              </div>
+            )}
+            <div style={{ fontSize: 13, color: '#0d0d0d', marginBottom: 8 }}>{comparability.question}</div>
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 6 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#555553', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="comparability_answer"
+                  checked={comparabilityAnswer === 'nothing_changed'}
+                  // Clears the note as well as hiding it: text left in state behind a hidden field
+                  // is text that reappears, or gets persisted against an answer that contradicts it.
+                  onChange={() => { setComparabilityAnswer('nothing_changed'); setComparabilityNote('') }}
+                />
+                {/* The second clause is load-bearing: without it a customer whose figures moved on
+                    volume alone reads "Nothing changed" as false and picks the other option. */}
+                Nothing changed — the difference is normal business activity
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#555553', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="comparability_answer"
+                  checked={comparabilityAnswer === 'something_changed'}
+                  onChange={() => setComparabilityAnswer('something_changed')}
+                />
+                Something changed
+              </label>
+            </div>
+            {comparabilityAnswer === 'something_changed' && (
+              <div style={{ marginTop: 10 }}>
+                <textarea
+                  value={comparabilityNote}
+                  onChange={e => setComparabilityNote(e.target.value)}
+                  rows={3}
+                  style={{ ...inputStyle, resize: 'vertical' as const, fontFamily: 'inherit' }}
+                />
+                <div style={{ fontSize: 11, color: '#888784', marginTop: 6 }}>
+                  acquisitions, closed plants, boundary redraws, methodology changes
+                </div>
+              </div>
+            )}
           </div>
         )}
         <Field label="List your facilities" hint="Enter name and state — we'll collect energy data for each one">

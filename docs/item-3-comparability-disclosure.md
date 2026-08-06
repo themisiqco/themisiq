@@ -55,43 +55,98 @@ An `unverifiable` prior total makes the magnitude comparison meaningless —
 same reason SBTi already refuses an unknown year as baseline. It does not make
 locations uncountable. Do not gate the whole question on year validity.
 
-## Workings row
+## Where the disclosure lives — decided
 
-New row so the disclosure travels with the figures, matching where every other
-disclosure already sits. Carries:
+**Inventory-level attribute, not a workings row.**
+
+Every member of `WorkingRow.declaration` is per-row: this fuel, at this location,
+has no number, and here's why. A comparability disclosure is about the inventory
+year as a whole. It attaches to no fuel and no location, so putting it in the
+workings would require inventing a synthetic row to hang it on.
+
+It sits alongside `gwp_version`, `pct_estimated`, `fiscal_year_end_month` and
+`coverage_resolutions` in the verifier RPC (added `bf51fc1`), rendered once near
+the top of the verifier page — where a verifier reads context before figures,
+which is where 6.3.1.5 actually gets applied.
+
+Carries:
 
 - the observation as stated to the customer
 - the customer's answer
 - `basis` — which tier applied, and why the weaker one applied if it did
 
-Tier A rows must say in plain language that the prior period isn't held on the
-platform and the comparison rests on figures the customer supplied. That is a
-disclosure of the limits of the disclosure, and it's what lets a verifier tell
-"the customer confirmed nothing changed" from "nobody put an observation in
-front of them."
+Cost accepted: a new RPC field and a new render block rather than reuse of the
+row branch, plus one more unenforced mirror for the `AUDIT_FIELD_LABELS` ↔
+whitelist coupling (open defect 10).
 
-## Declaration union — resolve before building
+## Declaration union — separate fix, same change
 
-The verifier page has a single row branch handling declaration variants by badge
-and background colour, with `WorkingRow.declaration` typed
-`'attested_absent' | 'undeclared'`. A new type renders generically unless added.
+`unpriceable` is a genuine absence, belongs in the union, and currently renders
+generically without the amber treatment the other two get. Add it:
 
-Two things to settle:
+```
+'attested_absent' | 'undeclared' | 'unpriceable'
+```
 
-1. **Does a comparability disclosure belong in that union at all?** Both existing
-   members are statements about *absence*. This is a statement about *change*,
-   and it's present rather than missing. It may want its own field.
-2. **`unpriceable` is already rendering generically** — it's in the union's
-   conceptual space (a genuine absence) but not in the type. Fix it in this same
-   change rather than discovering it later.
+Unrelated to the disclosure above now that the disclosure has left the workings.
+Kept in the same change so it isn't rediscovered later.
 
-## Copy rules
+## Customer-facing copy — settled
 
-Plain language throughout — no table names, column names, enum values.
+Heading:
+
+> **Comparing this year with last year**
+
+Observation, Tier A:
+
+> You reported 1,240 tCO₂e in Scope 1 last year and 2,910 tCO₂e this year — an
+> increase of 135%.
+
+Tier B appends:
+
+> Your inventory covered 4 locations last year and covers 6 this year.
+
+State only what is held. If `prior_year_s2` is absent, say nothing about Scope 2.
+
+Question — forced choice, not an optional field:
+
+> Has anything changed that would make these two years hard to compare?
+>
+> ○ Nothing changed — the difference is normal business activity
+> ○ Something changed
+
+Second option reveals:
+
+> **What changed?**
+> For example: you bought or sold part of the business, opened or closed a site,
+> changed how you collect or measure your data, or corrected an error in last
+> year's figures.
+
+**Why forced choice.** An empty text box is ambiguous between "nothing changed"
+and "didn't answer" — absence of data is not a value. The verifier needs to know
+which. A radio makes "nothing changed" an affirmative statement the customer
+made, which is what 6.3.1.5 asks the verifier to find and is worthless if
+inferred from silence.
+
+**No threshold.** A flat year still gets asked. There is no basis for a number
+and the standards give none; a year that moved 1% can hide an acquisition offset
+by a closure.
 
 Do **not** ask whether the base year needs recalculating. The platform can't act
 on that answer today, and asking a question you can't act on is worse than not
 asking. Ask what changed.
+
+## Verifier-facing copy
+
+Mirrors the customer's answer without re-wording, plus the basis:
+
+> **Comparison with prior period** — The company states nothing changed that
+> would affect comparability; the difference reflects normal business activity.
+>
+> Prior-year figures were entered by the company and are not held on this
+> platform. Prior-period inventory composition has not been verified here.
+
+Second paragraph on Tier A only.
 
 ## Explicit non-goals
 
@@ -100,6 +155,16 @@ asking. Ask what changed.
 - Recalculating a base year
 
 All three belong to the separate item below.
+
+## Build order
+
+1. Detection function in the engine — returns observation + basis, pure, tested.
+2. Storage shape and save path.
+3. Customer-facing step (copy above).
+4. RPC field + verifier render block.
+5. `unpriceable` into the declaration union.
+
+Nothing touches the verifier page until 1 is green.
 
 ## Tests
 
