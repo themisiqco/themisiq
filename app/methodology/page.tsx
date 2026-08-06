@@ -4,6 +4,22 @@ import Nav from '../components/Nav'
 
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
 
+// A section's content is either one paragraph (42 of the 43 entries, unchanged) or an array of
+// them. The renderer used to drop the string straight into a <div>, so newlines collapsed and any
+// multi-paragraph text ran together — which is why every entry had been written as a single block
+// regardless of how many ideas it carried. An array now maps to <p> elements, spaced the same way
+// the disclaimer paragraphs at the foot of this page already are.
+function SectionContent({ content }: { content: string | string[] }) {
+  if (!Array.isArray(content)) return <>{content}</>
+  return (
+    <>
+      {content.map((para, i) => (
+        <p key={i} style={{ margin: i === content.length - 1 ? 0 : '0 0 10px' }}>{para}</p>
+      ))}
+    </>
+  )
+}
+
 const METHODOLOGIES = [
   {
     module: 'GHG Inventory — Scope 1 & 2',
@@ -30,6 +46,18 @@ const METHODOLOGIES = [
       {
         title: 'Assurance readiness',
         content: 'All calculation workings are documented per emission source with factor citations, unit conversions, and GWP references — aligned with ISO 14064-3 and ISAE 3410 limited assurance requirements.',
+      },
+      {
+        // The first section on this page whose content is an ARRAY rather than a string. Three
+        // paragraphs, because the argument has three parts — the requirement, what the platform
+        // does, and the distinction between the two states — and welding them into one block was
+        // the only alternative the renderer offered before SectionContent existed.
+        title: 'Comparability between reporting years',
+        content: [
+          'ISO 14064-3:2019 clause 6.3.1.5 requires a verifier to determine whether changes from prior periods that make those periods incomparable have been disclosed by the reporting organisation.',
+          'A year whose total omits a location is not comparable with a year that includes it. ThemisIQ therefore does not present such a year as a lower figure. The year is carried through as unknown: no value is plotted, no line is drawn across it, and year-on-year and baseline comparisons that would span it return no result rather than a number.',
+          'Two states are distinguished. Excluded means the stored workings record which location was left out and why. Unverifiable means a location cannot be priced today, but the composition of the saved total is unknown. Both withhold the figure; only the first can say what is missing.',
+        ],
       },
     ],
   },
@@ -304,7 +332,7 @@ export default function MethodologyPage() {
                     <div key={section.title} style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 24, paddingBottom: 16, borderBottom: '0.5px solid #f3f4f6' }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: method.color, lineHeight: 1.4 }}>{section.title}</div>
                       <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, fontWeight: 300 }}>
-                        {section.content}
+                        <SectionContent content={section.content} />
                         {(section as any).download && (
                           <div style={{ marginTop: 12 }}>
                             <a
