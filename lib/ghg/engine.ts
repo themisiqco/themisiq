@@ -14,6 +14,10 @@
 // The two EXACT conversion anchors, from the repo's conversion authority. Imported rather than
 // copied: lib/unitConversions.ts is the single source and its header forbids inlining these.
 import { L_PER_GAL, GJ_PER_MMBTU } from '../unitConversions'
+// Type only — erased at compile, no runtime dependency and nothing added to the bundle. The engine
+// neither builds nor reads a comparability disclosure; it carries the field so the stored inventory
+// shape stays in one place. See lib/ghg/comparability.ts.
+import type { ComparabilityDisclosure } from './comparability'
 
 // AR4/AR5 do not distinguish fossil vs biogenic methane — both keys carry the single published GWP100.
 // AR6 is the first IPCC set to split them (fossil 29.8 incl. oxidation; biogenic/non-fossil 27.0). N2O AR6 = 273.
@@ -780,6 +784,18 @@ interface Inventory {
   selected_frameworks: string[]
 locations: Location[]
   coverage_resolutions?: CoverageResolution[]
+  /**
+   * The year-over-year comparability disclosure — `ghg_inventories.comparability_disclosure`.
+   *
+   * NULL / absent means THE QUESTION WAS NEVER ASKED. It is not an empty disclosure, and must never
+   * be defaulted to one: "nobody put an observation in front of them" and "they were asked and had
+   * nothing to add" are the two states this whole feature exists to let a verifier tell apart, and
+   * an `{}` written on save collapses them.
+   *
+   * Nothing writes it yet. It is carried here so the wizard's save payload cannot silently drop it
+   * once something does.
+   */
+  comparability_disclosure?: ComparabilityDisclosure | null
 }
 
 const emptyLocation = (id: string, name: string, state = ''): Location => ({

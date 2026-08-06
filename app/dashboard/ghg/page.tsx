@@ -426,6 +426,10 @@ const searchParams = useSearchParams()
           prior_year_s2: data.prior_year_s2 || 0,
           selected_frameworks: data.selected_frameworks || ['sb253'],
           locations: data.locations_data || inv.locations,
+          // `?? null`, NOT `|| {}` like the defaults above. NULL means the comparability question
+          // was never asked, and that is a fact a verifier reads — substituting an empty disclosure
+          // would turn "never asked" into "asked, nothing to report".
+          comparability_disclosure: data.comparability_disclosure ?? null,
         }))
         setSaved(true)
         setDirty(false)
@@ -749,6 +753,11 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       california_nexus: inventory.california_nexus,
       prior_year_s1: inventory.prior_year_s1,
       prior_year_s2: inventory.prior_year_s2,
+      // Pure pass-through of whatever was loaded — nothing writes a disclosure yet. It is in the
+      // payload because a column absent from this object is dropped on EVERY save: the moment
+      // something does write one, an unwired field would erase it on the next save with no error.
+      // Null stays null; an inventory nobody asked the question of keeps saying so.
+      comparability_disclosure: inventory.comparability_disclosure ?? null,
       selected_frameworks: inventory.selected_frameworks,
       locations_data: inventory.locations,
       coverage_resolutions: coverageResolutions,

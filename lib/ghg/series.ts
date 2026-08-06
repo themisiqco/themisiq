@@ -153,7 +153,12 @@ const num = (v: number | null | undefined): number | null =>
 // ⚠️ DUPLICATE WORD MAPS. app/dashboard/ghg/page.tsx has its own COUNTRY_WORDS / UNIT_WORDS /
 // FUEL_WORDS for the wizard's own message. They should be collapsed onto these; that means editing
 // the wizard, which is outside this change. Until then, a unit added to one must be added to both.
-const COUNTRY_WORDS: Record<string, string> = {
+//
+// COUNTRY_WORDS and FUEL_WORDS are EXPORTED because lib/ghg/comparability.ts needs the same words
+// for its structural observations. Importing them is deliberate: a third copy is what this comment
+// is already warning about, and two surfaces naming the same country two ways in front of a
+// verifier is the defect these maps exist to prevent.
+export const COUNTRY_WORDS: Record<string, string> = {
   US: "United States", CA: "Canada", GB: "the UK", UK: "the UK", AU: "Australia", NZ: "New Zealand",
   AT: "Austria", BE: "Belgium", BG: "Bulgaria", HR: "Croatia", CY: "Cyprus", CZ: "Czechia",
   DK: "Denmark", EE: "Estonia", FI: "Finland", FR: "France", DE: "Germany", EL: "Greece",
@@ -165,7 +170,7 @@ const UNIT_WORDS: Record<string, string> = {
   m3: "cubic metres", kwh: "kilowatt-hours", mcf: "thousand cubic feet", therms: "therms",
   mmbtu: "MMBtu", gj: "gigajoules", litres: "litres", gallons: "US gallons", kg: "kilograms",
 };
-const FUEL_WORDS: Record<string, string> = {
+export const FUEL_WORDS: Record<string, string> = {
   natural_gas: "gas", propane: "propane", diesel: "diesel", diesel_mobile: "vehicle diesel",
   gasoline: "petrol", fuel_oil: "fuel oil",
 };
