@@ -40,8 +40,13 @@
 //     of the Tier A sentence. It cannot be one here: on 'unverifiable', Tier B renders with no
 //     Tier A in front of it, and a line opening with "and" would be broken. Each observation is a
 //     standalone sentence; the caller joins them and asks `question` once at the end.
-//   • "What changed?" is returned separately rather than tacked onto the Scope 1 line, so it is
-//     asked once no matter how many observations precede it.
+//   • `question` is returned separately rather than tacked onto the Scope 1 line, so it is asked
+//     once no matter how many observations precede it.
+//
+// `question` is the QUESTION — "Has anything changed that would make these two years hard to
+// compare?" — and not the free-text field's label. It carried "What changed?" for a while, which
+// presupposed a change and left the first option answering a premise the question had already
+// asserted. The label lives at the render site, on the field the second option reveals.
 //
 // Plain language throughout — no table names, no column names, no enum values. And per the doc, do
 // NOT ask whether the base year needs recalculating: the platform cannot act on that answer today,
@@ -185,8 +190,10 @@ const movementClause = (prior: number, current: number): string | null => {
   return rounded === 0 ? `${direction} of less than 1%` : `${direction} of ${rounded}%`
 }
 
+// Both figures carry the unit. A bare second number invites reading it as something other than
+// tonnes — a percentage, an index — next to a first that is explicitly labelled.
 const magnitudeText = (scope: 1 | 2, prior: number, current: number): string => {
-  const head = `You reported ${fmtTonnes(prior)} tCO₂e in Scope ${scope} last year and ${fmtTonnes(current)} this year`
+  const head = `You reported ${fmtTonnes(prior)} tCO₂e in Scope ${scope} last year and ${fmtTonnes(current)} tCO₂e this year`
   const clause = movementClause(prior, current)
   return clause ? `${head} — ${clause}.` : `${head}.`
 }
@@ -332,12 +339,16 @@ export function buildComparabilityDisclosure(
   if (priorSummary) {
     const before = observations.length
 
+    // TENSE SPLIT IS DELIBERATE: last year is settled, this year is current. "Went from 4 to 6"
+    // reads as a change narrative — it asserts a movement and, in doing so, pre-answers the very
+    // question about to be asked. Stating each year in its own tense reports two counts and leaves
+    // the question open, which is the whole point of putting an observation in front of it.
     if (priorSummary.locationCount !== thisSummary.locationCount) {
       const n = priorSummary.locationCount
       observations.push({
         kind: 'locations',
         tier: 'B',
-        text: `Your inventory went from ${n} location${n === 1 ? '' : 's'} to ${thisSummary.locationCount}.`,
+        text: `Your inventory covered ${n} location${n === 1 ? '' : 's'} last year and covers ${thisSummary.locationCount} this year.`,
       })
     }
 
@@ -410,7 +421,11 @@ export function buildComparabilityDisclosure(
 
   return {
     observations,
-    question: 'What changed?',
+    // THE QUESTION, not the free-text field's label. "What changed?" presupposes a change, which
+    // makes "Nothing changed" read as an answer denying the premise of the question it answers —
+    // and a forced choice whose first option contradicts the question is not a forced choice.
+    // "What changed?" belongs where the doc puts it: on the field revealed by "Something changed".
+    question: 'Has anything changed that would make these two years hard to compare?',
     basis: {
       priorYearState,
       tierA,

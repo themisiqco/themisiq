@@ -103,7 +103,7 @@ describe('which tier runs, by prior-year state', () => {
       const d = buildComparabilityDisclosure(
         base({ priorYearState: state, priorSummary: stored ? STORED : null }),
       )
-      expect(d!.question).toBe('What changed?')
+      expect(d!.question).toBe('Has anything changed that would make these two years hard to compare?')
     }
   })
 })
@@ -119,7 +119,7 @@ describe('suppressing Tier A does not suppress Tier B', () => {
     expect(kinds(d)).not.toContain('magnitude_scope2')
 
     expect(d.basis.tierB).toBe(true)
-    expect(textOf(d, 'locations')).toBe('Your inventory went from 4 locations to 6.')
+    expect(textOf(d, 'locations')).toBe('Your inventory covered 4 locations last year and covers 6 this year.')
 
     // No percentage anywhere: the movement is withheld, not softened into a hedged number.
     expect(allText(d)).not.toMatch(/%/)
@@ -153,7 +153,7 @@ describe('Tier A magnitude', () => {
   it("states the doc's worked example verbatim", () => {
     const d = buildComparabilityDisclosure(base())!
     expect(textOf(d, 'magnitude_scope1')).toBe(
-      'You reported 1,240 tCO₂e in Scope 1 last year and 2,910 this year — an increase of 135%.',
+      'You reported 1,240 tCO₂e in Scope 1 last year and 2,910 tCO₂e this year — an increase of 135%.',
     )
   })
 
@@ -165,12 +165,12 @@ describe('Tier A magnitude', () => {
   it('reports identical figures as identical figures, and does not answer the question', () => {
     const d = buildComparabilityDisclosure(base({ priorScope1: 1000, thisScope1: 1000 }))!
     expect(textOf(d, 'magnitude_scope1')).toBe(
-      'You reported 1,000 tCO₂e in Scope 1 last year and 1,000 this year — the same figure both years.',
+      'You reported 1,000 tCO₂e in Scope 1 last year and 1,000 tCO₂e this year — the same figure both years.',
     )
     // Not an increase, and not a claim that nothing changed — an acquisition offset by a closure
     // lands here too, and the question is still being asked.
     expect(textOf(d, 'magnitude_scope1')).not.toMatch(/increase|decrease|no change|unchanged/)
-    expect(d.question).toBe('What changed?')
+    expect(d.question).toBe('Has anything changed that would make these two years hard to compare?')
   })
 
   it('reports a rise that rounds to zero as a rise, not as identical figures', () => {
@@ -184,7 +184,7 @@ describe('Tier A magnitude', () => {
   it('parameterises direction for a fall that rounds to zero', () => {
     const d = buildComparabilityDisclosure(base({ priorScope1: 1000, thisScope1: 998 }))!
     expect(textOf(d, 'magnitude_scope1')).toBe(
-      'You reported 1,000 tCO₂e in Scope 1 last year and 998 this year — a decrease of less than 1%.',
+      'You reported 1,000 tCO₂e in Scope 1 last year and 998 tCO₂e this year — a decrease of less than 1%.',
     )
     expect(textOf(d, 'magnitude_scope1')).not.toContain('increase')
   })
@@ -192,7 +192,7 @@ describe('Tier A magnitude', () => {
   it('states both figures and no percentage when the prior total is zero', () => {
     const d = buildComparabilityDisclosure(base({ priorScope1: 0, thisScope1: 2910 }))!
     expect(textOf(d, 'magnitude_scope1')).toBe(
-      'You reported 0 tCO₂e in Scope 1 last year and 2,910 this year.',
+      'You reported 0 tCO₂e in Scope 1 last year and 2,910 tCO₂e this year.',
     )
     expect(textOf(d, 'magnitude_scope1')).not.toMatch(/%|Infinity|NaN/)
   })
@@ -214,7 +214,7 @@ describe('Scope 2 is never inferred', () => {
   it('emits a Scope 2 line when a prior Scope 2 figure exists', () => {
     const d = buildComparabilityDisclosure(base({ priorScope2: 400, thisScope2: 500 }))!
     expect(textOf(d, 'magnitude_scope2')).toBe(
-      'You reported 400 tCO₂e in Scope 2 last year and 500 this year — an increase of 25%.',
+      'You reported 400 tCO₂e in Scope 2 last year and 500 tCO₂e this year — an increase of 25%.',
     )
   })
 
@@ -264,14 +264,14 @@ describe('excluded prior year', () => {
 describe('Tier B structural observations', () => {
   it("states the location movement in the doc's words", () => {
     const d = buildComparabilityDisclosure(base())!
-    expect(textOf(d, 'locations')).toBe('Your inventory went from 4 locations to 6.')
+    expect(textOf(d, 'locations')).toBe('Your inventory covered 4 locations last year and covers 6 this year.')
   })
 
   it('says "location" in the singular', () => {
     const d = buildComparabilityDisclosure(
       base({ priorSummary: { ...STORED, locationCount: 1 } }),
     )!
-    expect(textOf(d, 'locations')).toBe('Your inventory went from 1 location to 6.')
+    expect(textOf(d, 'locations')).toBe('Your inventory covered 1 location last year and covers 6 this year.')
   })
 
   it('names an added fuel in words, not in engine tokens', () => {
@@ -407,7 +407,7 @@ describe('Tier B boundary', () => {
       }),
     )!
     expect(kinds(d)).not.toContain('boundary')
-    expect(textOf(d, 'locations')).toBe('Your inventory went from 4 locations to 6.')
+    expect(textOf(d, 'locations')).toBe('Your inventory covered 4 locations last year and covers 6 this year.')
     expect(d.basis.tierB).toBe(true)
   })
 
@@ -533,7 +533,7 @@ describe('basis statement', () => {
     expect(d.basis.tierA).toBe(false)
     expect(d.basis.tierB).toBe(false)
     expect(d.basis.statement).toContain('No observation could be put in front of this question')
-    expect(d.question).toBe('What changed?')
+    expect(d.question).toBe('Has anything changed that would make these two years hard to compare?')
   })
 })
 
@@ -708,8 +708,8 @@ describe('drift between answering and saving', () => {
     expect(r.observationsAtSave).toEqual(observationLines(atSave!))
     // The originals are UNTOUCHED — what the customer saw is the record.
     expect(r.observations).toEqual(observationLines(answeredOn!))
-    expect(r.observations).toContain('Your inventory went from 4 locations to 6.')
-    expect(r.observationsAtSave).toContain('Your inventory went from 4 locations to 9.')
+    expect(r.observations).toContain('Your inventory covered 4 locations last year and covers 6 this year.')
+    expect(r.observationsAtSave).toContain('Your inventory covered 4 locations last year and covers 9 this year.')
   })
 
   it('treats a disclosure that has since become null as a real difference', () => {
@@ -800,7 +800,7 @@ describe('an answer restored from a stored record', () => {
 
     expect(r.observationsChanged).toBe(true)
     expect(r.observations).toEqual(firstSave.observations)          // what was shown then
-    expect(r.observationsAtSave).toContain('Your inventory went from 4 locations to 11.')
+    expect(r.observationsAtSave).toContain('Your inventory covered 4 locations last year and covers 11 this year.')
     expect(r.answeredAt).toBe(ANSWERED_AT)
   })
 
@@ -838,8 +838,8 @@ describe('an answer restored from a stored record', () => {
 
     expect(r.observationsChanged).toBe(true)
     expect(r.observations).toEqual(firstSave.observations)
-    expect(r.observations).toContain('Your inventory went from 4 locations to 6.')
-    expect(r.observationsAtSave).toContain('Your inventory went from 4 locations to 11.')
+    expect(r.observations).toContain('Your inventory covered 4 locations last year and covers 6 this year.')
+    expect(r.observationsAtSave).toContain('Your inventory covered 4 locations last year and covers 11 this year.')
     expect(r.answeredAt).toBe(ANSWERED_AT)
     // ...and the edit did land.
     expect(r.note).toBe('Acquired a plant in March 2026.')
@@ -860,6 +860,6 @@ describe('an answer restored from a stored record', () => {
     expect(r.answeredAt).toBe('2026-08-06T14:05:00.000Z')
     expect(r.answeredAt).not.toBe(ANSWERED_AT)
     expect(r.observationsChanged).toBe(false)
-    expect(r.observations).toContain('Your inventory went from 4 locations to 11.')
+    expect(r.observations).toContain('Your inventory covered 4 locations last year and covers 11 this year.')
   })
 })

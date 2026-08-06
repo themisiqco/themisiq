@@ -1325,6 +1325,13 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             </div>
             {comparabilityCapture?.answer === 'something_changed' && (
               <div style={{ marginTop: 10 }}>
+                {/* The FIELD'S LABEL — the one place "What changed?" belongs. As the question above
+                    the radios it presupposed a change, which left "Nothing changed" denying the
+                    premise of the question it was answering. Here the premise is already true: the
+                    customer has just said something did. */}
+                <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 6 }}>
+                  What changed?
+                </div>
                 <textarea
                   value={comparabilityNote}
                   // The note updates ON ITS OWN. Typing here is elaborating on an answer already
@@ -1340,7 +1347,9 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   style={{ ...inputStyle, resize: 'vertical' as const, fontFamily: 'inherit' }}
                 />
                 <div style={{ fontSize: 11, color: '#888784', marginTop: 6 }}>
-                  acquisitions, closed plants, boundary redraws, methodology changes
+                  For example: you bought or sold part of the business, opened or closed a site,
+                  changed how you collect or measure your data, or corrected an error in last
+                  year&apos;s figures.
                 </div>
               </div>
             )}
