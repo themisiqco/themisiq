@@ -85,6 +85,27 @@ const FRAMEWORK_NAMES: Record<string, string> = {
 const boundaryLabel = (b: string) =>
   ({ operational_control: 'Operational Control', financial_control: 'Financial Control', equity_share: 'Equity Share' } as Record<string, string>)[b] || b
 
+// ── Two row shapes share one <td> set, and they disagree about what ef_source means ─────────────
+// Every workings row carries ef_source, but the coverage-resolution row uses that field for the
+// operator's explanation of an adjustment ("2 of 12 months evidenced by bills; remaining 10 month(s)
+// estimated by scaling metered data ×12/2") rather than a factor citation — see the row emitted at
+// the end of buildWorkings in lib/ghg/engine.ts.
+//
+// Rendering it verbatim under a heading that says "Factor source" would tell a verifier an
+// estimation note is a published factor. Dropping it would be worse: it is a required disclosure
+// under ISO 14064-3 6.1.3.6.3, and coverage rows set no `note`, so nothing else on this page carries
+// it. So it moves to the activity-data cell, where free-text row notes already render, and the
+// Factor source cell says '—' because that row cites no factor.
+const COVERAGE_ROW = 'coverage_resolution'
+
+/** The citation for the Factor source column. '—' where the row cites no factor at all. */
+const factorSourceOf = (w: WorkingRow): string =>
+  w.gwp_basis === COVERAGE_ROW ? '—' : (w.ef_source || '—')
+
+/** The free text that belongs beside the activity figure — including a coverage row's explanation. */
+const rowNoteOf = (w: WorkingRow): string | undefined =>
+  w.gwp_basis === COVERAGE_ROW ? (w.ef_source || undefined) : w.note
+
 // Consent wording version stamped onto the verifier's ToS/Privacy acceptance.
 // Bump this whenever the Terms or Privacy Policy are materially revised.
 const CONSENT_VERSION = '2026-07-v1'
@@ -456,7 +477,12 @@ export default function VerifierPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr style={{ background: '#0d0d0d' }}>
-                  {['Location', 'Source', 'Scope', 'Activity data', 'Emission factor', 'GWP', 'Result (tCO2e)'].map(h => (
+                  {/* 'Factor source' sits after 'Emission factor', matching the operator's own
+                      workings table (dashboard/ghg/page.tsx). The two surfaces show the same rows;
+                      differing column order between them would make a reconciliation harder than it
+                      needs to be. Until now this column existed there and not here, so ef_source was
+                      stored on every row and shown to the operator but never to the verifier. */}
+                  {['Location', 'Source', 'Scope', 'Activity data', 'Emission factor', 'Factor source', 'GWP', 'Result (tCO2e)'].map(h => (
                     <th key={h} style={{ color: '#fff', textAlign: 'left', padding: '8px 10px', fontWeight: 500, fontSize: 11, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -525,11 +551,25 @@ export default function VerifierPage() {
                           operator entered in litres, with nothing joining them — and unlike the
                           wizard's reader, a verifier has no input form to reconcile it against.
                           This page is the whole of what they see. */}
-                      {w.note && (
-                        <div style={{ marginTop: 3, fontSize: 11, fontWeight: 400, color: '#888784', lineHeight: 1.4 }}>{w.note}</div>
+                      {/* rowNoteOf, not w.note: a coverage-resolution row keeps its estimation
+                          disclosure in ef_source, and this is where it belongs — beside the figure
+                          it qualifies, not under the Factor source heading. */}
+                      {rowNoteOf(w) && (
+                        <div style={{ marginTop: 3, fontSize: 11, fontWeight: 400, color: '#888784', lineHeight: 1.4 }}>{rowNoteOf(w)}</div>
                       )}
                     </td>
                     <td style={{ padding: '8px 10px', color: '#888784', fontSize: 11 }}>{w.emission_factor}</td>
+                    {/* WIDTH-CAPPED, WRAPPED, NEVER TRUNCATED. The longest citation on file runs to
+                        349 characters (Green-e residual mix, with vintage and note appended), so the
+                        row grows tall rather than the citation being cut — a shortened citation is
+                        not a citation, and a verifier has to be able to look the source up.
+                        The cap lives on an inner <div> because a table-layout:auto cell largely
+                        ignores max-width; a block child honours it and the cell shrinks to fit. */}
+                    <td style={{ padding: '8px 10px', color: '#555553' }}>
+                      <div style={{ maxWidth: 320, whiteSpace: 'normal', overflowWrap: 'anywhere', fontSize: 11, lineHeight: 1.4 }}>
+                        {factorSourceOf(w)}
+                      </div>
+                    </td>
                     <td style={{ padding: '8px 10px', color: '#555553' }}>{w.gwp_basis}</td>
                     <td style={{ padding: '8px 10px', color: '#7425e3', fontWeight: 600, whiteSpace: 'nowrap' }}>{w.result_tco2e == null ? '—' : w.result_tco2e.toFixed(3)}</td>
                   </tr>
