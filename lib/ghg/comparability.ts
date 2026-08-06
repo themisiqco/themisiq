@@ -134,6 +134,21 @@ export interface ComparabilityBasis {
   /** Why the structural comparison was withheld. Null when it ran. */
   tierBWithheldBecause: string | null
   /**
+   * Why a scope's magnitude line was withheld even though Tier A itself ran. PER SCOPE, because a
+   * customer part-way through entry may hold gas but not electricity — the Scope 1 comparison is
+   * valid while the Scope 2 one is not, and suppressing both would withhold a true observation.
+   *
+   * DISTINCT FROM `tierAWithheldBecause`, which is about the PRIOR year: there, the prior total
+   * cannot be trusted, so no comparison against it means anything. Here the prior year is fine and
+   * THIS year's figure is not there yet. Collapsing the two would tell a verifier the baseline was
+   * doubted when what actually happened is that the current year had not been filled in.
+   *
+   * Null when the line was emitted, or when there was no prior figure for that scope — in that case
+   * no line was ever due, so nothing was withheld.
+   */
+  scope1MagnitudeWithheldBecause: string | null
+  scope2MagnitudeWithheldBecause: string | null
+  /**
    * Why the organisational boundary could not be compared. Null when it WAS compared — whether or
    * not it moved.
    *
@@ -160,8 +175,23 @@ export interface ComparabilityDisclosure {
 
 // ── Words ───────────────────────────────────────────────────────────────────────────────────────
 
-/** Matches the doc's "1,240" / "2,910". One decimal is kept so a real 0.4 tCO₂e is not printed "0". */
-const fmtTonnes = (v: number): string => v.toLocaleString('en-US', { maximumFractionDigits: 1 })
+/**
+ * SIGNIFICANT DIGITS, not fixed decimals — precision that scales inversely with magnitude.
+ *
+ * The doc's "1,240" and "2,910" keep no decimals they do not need, while a figure in the tens keeps
+ * five. That is the property a fixed `maximumFractionDigits` cannot have, and the reason this was
+ * wrong before: at 1 decimal, 16.9975 and 16.997472 BOTH printed "17" while the clause between them
+ * reported a fall. Two identical numbers with a movement claimed between them reads as a
+ * contradiction, and it is what hid a live defect for a day.
+ *
+ * 7 rather than 4: at 4 decimals those two values still collide ("16.9975" both), so the obvious
+ * raise would not have fixed the case it was raised for. It also fixes 0.04, which printed "0".
+ *
+ * COST, above about a million tonnes: sub-tonne precision is dropped — 1,000,000.5 renders
+ * "1,000,001". No fixed precision removes this class of collision; this choice puts the threshold
+ * where 0.5 tCO₂e is 0.00005% of the figure and the total is itself an estimate at that scale.
+ */
+const fmtTonnes = (v: number): string => v.toLocaleString('en-US', { maximumSignificantDigits: 7 })
 
 /**
  * The movement clause, or null when a percentage would be a fiction.
@@ -255,6 +285,20 @@ const UNVERIFIABLE_PRIOR =
   "Last year's total could not be shown to be complete, so a movement measured against it would " +
   'not mean anything.'
 
+/**
+ * States what was OBSERVED — the total is zero — and not what caused it, because the two causes are
+ * indistinguishable from here and only one of them is reportable.
+ *
+ * On the setup step, before any energy data is entered, this year's totals are zero and a movement
+ * against a real prior year renders "a decrease of 100%". That is a confident false statement, and
+ * it is worse than a missing line: the customer may answer while it is on screen, and the answer is
+ * captured with a timestamp against an observation that was never true.
+ */
+const currentYearZero = (scope: 1 | 2): string =>
+  `This year's Scope ${scope} total is currently zero, so no movement is stated. A zero total reads ` +
+  'the same whether the figures have not been entered yet or the company genuinely emitted nothing, ' +
+  'and stating a fall to nothing would assert the second.'
+
 const NOT_STORED_PRIOR =
   "Last year's inventory isn't held on the platform, so its locations, fuels and jurisdictions " +
   "could not be compared with this year's."
@@ -295,23 +339,37 @@ export function buildComparabilityDisclosure(
 
   const observations: ComparabilityObservation[] = []
 
+  // Withheld PER SCOPE when this year's figure for that scope is zero — see currentYearZero. Tier B
+  // is untouched by this: locations, fuels, jurisdictions and the boundary are real the moment they
+  // are entered, and the question is asked either way.
+  let scope1MagnitudeWithheldBecause: string | null = null
+  let scope2MagnitudeWithheldBecause: string | null = null
+
   if (tierA) {
     if (priorScope1 !== null) {
-      observations.push({
-        kind: 'magnitude_scope1',
-        tier: 'A',
-        text: magnitudeText(1, priorScope1, thisScope1),
-      })
+      if (thisScope1 === 0) {
+        scope1MagnitudeWithheldBecause = currentYearZero(1)
+      } else {
+        observations.push({
+          kind: 'magnitude_scope1',
+          tier: 'A',
+          text: magnitudeText(1, priorScope1, thisScope1),
+        })
+      }
     }
     // A Scope 2 line ONLY when a prior Scope 2 figure exists. Never inferred, never defaulted to
     // zero: "you reported 0 tCO₂e in Scope 2 last year" is a claim about the prior year, and a
     // customer who supplied only a Scope 1 total made no such claim.
     if (priorScope2 !== null) {
-      observations.push({
-        kind: 'magnitude_scope2',
-        tier: 'A',
-        text: magnitudeText(2, priorScope2, thisScope2),
-      })
+      if (thisScope2 === 0) {
+        scope2MagnitudeWithheldBecause = currentYearZero(2)
+      } else {
+        observations.push({
+          kind: 'magnitude_scope2',
+          tier: 'A',
+          text: magnitudeText(2, priorScope2, thisScope2),
+        })
+      }
     }
     // The exclusion is stated NEXT TO the movement it qualifies, not filed away in the basis. A
     // percentage against a partial total, printed without this sentence, overstates the movement
@@ -432,6 +490,8 @@ export function buildComparabilityDisclosure(
       tierB,
       tierAWithheldBecause,
       tierBWithheldBecause,
+      scope1MagnitudeWithheldBecause,
+      scope2MagnitudeWithheldBecause,
       boundaryWithheldBecause,
       statement: basisStatement(priorYearState, tierA, tierB, tierAWithheldBecause, tierBWithheldBecause),
     },

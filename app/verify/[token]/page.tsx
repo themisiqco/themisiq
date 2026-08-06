@@ -443,6 +443,14 @@ export default function VerifierPage() {
   }
   const frameworks = (inv.selected_frameworks || []).map(f => FRAMEWORK_NAMES[f] || f)
 
+  // Scopes whose magnitude comparison was NOT made, in the order their lines would have appeared.
+  // Distinct from the tier-level suppression already on the basis: there the prior year could not
+  // be trusted; here the prior year was fine and this year's figure was not yet available.
+  const withheldScopeReasons = [
+    inv.comparability_disclosure?.basis?.scope1MagnitudeWithheldBecause,
+    inv.comparability_disclosure?.basis?.scope2MagnitudeWithheldBecause,
+  ].filter(Boolean) as string[]
+
   return (
     <Shell>
       <div style={{ maxWidth: 920, minWidth: 0, margin: '0 auto', padding: '2.5rem 1.5rem 4rem' }}>
@@ -502,9 +510,22 @@ export default function VerifierPage() {
 
             {/* WHAT WAS PUT IN FRONT OF THE COMPANY. When the recomputed observation still matches,
                 one set needs no label. When it does not, both are shown and both are named — the
-                recomputed lines are never presented as what the company saw. */}
+                recomputed lines are never presented as what the company saw.
+
+                WITHHELD SCOPES LEAD, where their line would have been. A scope missing from the
+                observation with nothing said about it leaves a verifier to infer that no comparison
+                was needed; the recorded reason says one was not made, and why. Each reason names its
+                own scope, so it cannot be misread as belonging to the other.
+
+                Rendered as recorded, in the same neutral treatment as the observation lines — these
+                sentences were written for a verifier and are not re-worded here. Filtered on
+                truthiness rather than a null check, because a record written before these fields
+                existed carries neither. */}
             {!inv.comparability_disclosure.observationsChanged ? (
               <div style={{ marginTop: 10 }}>
+                {withheldScopeReasons.map((reason, i) => (
+                  <div key={`w${i}`} style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{reason}</div>
+                ))}
                 {inv.comparability_disclosure.observations.map((line, i) => (
                   <div key={i} style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{line}</div>
                 ))}
@@ -513,6 +534,12 @@ export default function VerifierPage() {
               <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
                 <div>
                   <div style={{ fontSize: 11, color: '#888784', marginBottom: 4 }}>Shown to the company when they answered</div>
+                  {/* Only in this group: `basis` is the basis AS AT THE ANSWER, and no recomputed
+                      basis is stored. Repeating these against the current figures would assert
+                      something about them that was never computed. */}
+                  {withheldScopeReasons.map((reason, i) => (
+                    <div key={`w${i}`} style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{reason}</div>
+                  ))}
                   {inv.comparability_disclosure.observations.map((line, i) => (
                     <div key={i} style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{line}</div>
                   ))}

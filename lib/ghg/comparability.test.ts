@@ -863,3 +863,117 @@ describe('an answer restored from a stored record', () => {
     expect(r.observations).toContain('Your inventory covered 4 locations last year and covers 11 this year.')
   })
 })
+
+// ── This year's figure is not there yet ─────────────────────────────────────────────────────────
+//
+// The comparability step sits on the setup page, BEFORE energy data is entered. This year's totals
+// are zero at that point, and a movement against a real prior year rendered "a decrease of 100%" —
+// a confident false statement, captured with a timestamp if the customer answered while it showed.
+//
+// Suppression is PER SCOPE. A customer who has entered gas but not electricity has a valid Scope 1
+// comparison and an invalid Scope 2 one; withholding both would suppress a true observation.
+
+describe("a zero figure this year withholds that scope's movement", () => {
+  const withPriorBothScopes = (over = {}) =>
+    buildComparabilityDisclosure(base({ priorScope1: 1240, priorScope2: 400, ...over }))!
+
+  it('never states a fall to nothing', () => {
+    const d = withPriorBothScopes({ thisScope1: 0, thisScope2: 0 })
+    expect(allText(d)).not.toMatch(/100%/)
+    expect(allText(d)).not.toMatch(/decrease/)
+  })
+
+  it('suppresses Scope 1 only, and Scope 2 still reports', () => {
+    const d = withPriorBothScopes({ thisScope1: 0, thisScope2: 500 })
+    expect(kinds(d)).not.toContain('magnitude_scope1')
+    expect(textOf(d, 'magnitude_scope2')).toBe(
+      'You reported 400 tCO₂e in Scope 2 last year and 500 tCO₂e this year — an increase of 25%.',
+    )
+    expect(d.basis.scope1MagnitudeWithheldBecause).toContain("Scope 1 total is currently zero")
+    expect(d.basis.scope2MagnitudeWithheldBecause).toBeNull()
+  })
+
+  it('suppresses Scope 2 only, and Scope 1 still reports', () => {
+    const d = withPriorBothScopes({ thisScope1: 2910, thisScope2: 0 })
+    expect(kinds(d)).not.toContain('magnitude_scope2')
+    expect(textOf(d, 'magnitude_scope1')).toBe(
+      'You reported 1,240 tCO₂e in Scope 1 last year and 2,910 tCO₂e this year — an increase of 135%.',
+    )
+    expect(d.basis.scope2MagnitudeWithheldBecause).toContain("Scope 2 total is currently zero")
+    expect(d.basis.scope1MagnitudeWithheldBecause).toBeNull()
+  })
+
+  it('leaves Tier B untouched — structure is real as soon as it is entered', () => {
+    const d = withPriorBothScopes({ thisScope1: 0, thisScope2: 0 })
+    expect(d.basis.tierB).toBe(true)
+    expect(textOf(d, 'locations')).toBe('Your inventory covered 4 locations last year and covers 6 this year.')
+    expect(d.question).toBe('Has anything changed that would make these two years hard to compare?')
+  })
+
+  it('is not the same fact as an untrustworthy prior year', () => {
+    const zeroThisYear = withPriorBothScopes({ thisScope1: 0, thisScope2: 0 })
+    const unverifiablePrior = buildComparabilityDisclosure(
+      base({ priorScope1: 1240, priorScope2: 400, priorYearState: 'unverifiable' }),
+    )!
+
+    // Tier A RAN in the first case — the prior year is fine, this year is not filled in yet.
+    expect(zeroThisYear.basis.tierA).toBe(true)
+    expect(zeroThisYear.basis.tierAWithheldBecause).toBeNull()
+    expect(zeroThisYear.basis.scope1MagnitudeWithheldBecause).toBeTruthy()
+
+    // Tier A did NOT run in the second — the prior total cannot be trusted at all.
+    expect(unverifiablePrior.basis.tierA).toBe(false)
+    expect(unverifiablePrior.basis.tierAWithheldBecause).toContain('could not be shown to be complete')
+    expect(unverifiablePrior.basis.scope1MagnitudeWithheldBecause).toBeNull()
+
+    expect(zeroThisYear.basis.scope1MagnitudeWithheldBecause)
+      .not.toBe(unverifiablePrior.basis.tierAWithheldBecause)
+  })
+
+  it('withholds nothing for a scope that had no prior figure to compare', () => {
+    // priorScope2 absent — no line was ever due, so nothing was withheld.
+    const d = buildComparabilityDisclosure(base({ priorScope2: null, thisScope2: 0 }))!
+    expect(d.basis.scope2MagnitudeWithheldBecause).toBeNull()
+    expect(kinds(d)).not.toContain('magnitude_scope2')
+  })
+})
+
+// ── Display precision ───────────────────────────────────────────────────────────────────────────
+//
+// A real difference must not render as two identical numbers with a movement claimed between them.
+// The live case: 16.9975 typed against a computed 16.997472, both printed "17" at one decimal.
+
+describe('figures are printed at a precision that supports the clause beside them', () => {
+  const scope1Line = (prior: number, current: number) =>
+    textOf(buildComparabilityDisclosure(base({ priorScope1: prior, thisScope1: current })), 'magnitude_scope1')!
+
+  it('separates the pair that collided live', () => {
+    const line = scope1Line(16.9975, 16.997472)
+    expect(line).toBe(
+      'You reported 16.9975 tCO₂e in Scope 1 last year and 16.99747 tCO₂e this year — a decrease of less than 1%.',
+    )
+    // The two figures in the sentence must differ, or the clause contradicts them.
+    const [a, b] = line.match(/[\d,]+\.?\d* tCO₂e/g)!
+    expect(a).not.toBe(b)
+  })
+
+  it('keeps a three-decimal figure whole', () => {
+    expect(scope1Line(15.953, 20)).toContain('15.953 tCO₂e')
+  })
+
+  it("gives the doc's round figures no decimals they do not need", () => {
+    expect(scope1Line(1240, 2910)).toBe(
+      'You reported 1,240 tCO₂e in Scope 1 last year and 2,910 tCO₂e this year — an increase of 135%.',
+    )
+  })
+
+  it('never prints a real figure as zero', () => {
+    expect(scope1Line(0.4, 0.8)).toContain('0.4 tCO₂e')
+    expect(scope1Line(0.04, 0.08)).toContain('0.04 tCO₂e')
+    expect(scope1Line(0.004, 0.008)).toContain('0.004 tCO₂e')
+  })
+
+  it('stays readable at large magnitudes', () => {
+    expect(scope1Line(1_240_000, 2_910_000)).toContain('1,240,000 tCO₂e')
+  })
+})
