@@ -368,9 +368,19 @@ export type ThresholdLimb = {
   comparison: 'gt' | 'gte'
 }
 
+// The SHAPE of the test, declared rather than inferred from the arithmetic. `requires` and
+// `limbs.length` together already imply it, which is exactly the problem: a three-limb test that
+// should be an AND reads as a valid 2-of-3 if someone adds a limb and leaves `requires` at 2, and
+// nothing objects. Declaring the intent lets validateThresholdTests() catch that disagreement.
+//   'and'     — every limb must be met (requires === limbs.length)
+//   'n-of-m'  — any N of M (requires < limbs.length)
+//   'trigger' — a single limb, met or not (requires === 1, one limb)
+export type ThresholdSemantics = 'and' | 'n-of-m' | 'trigger'
+
 export type ThresholdTest = {
   framework: string
   requires: number              // N of M
+  semantics: ThresholdSemantics // what the N-of-M above is MEANT to express; validated at load
   limbs: ThresholdLimb[]
   lookback: 'most-recent-fy' | 'either-of-two-most-recent-fy'
   lookbackModelled: boolean     // false ⇒ evaluated on the most recent year only; stated in-report
@@ -384,7 +394,7 @@ export type ThresholdTest = {
 export const THRESHOLD_TESTS: Record<string, ThresholdTest> = {
   'SB 253': {
     framework: 'SB 253',
-    requires: 1,
+    requires: 1, semantics: 'trigger',
     lookback: 'most-recent-fy', lookbackModelled: true,
     citation: 'California Health & Safety Code §38532 (SB 253)',
     limbs: [{
@@ -396,7 +406,7 @@ export const THRESHOLD_TESTS: Record<string, ThresholdTest> = {
   },
   'SECR': {
     framework: 'SECR',
-    requires: 2,
+    requires: 2, semantics: 'n-of-m',
     lookback: 'most-recent-fy', lookbackModelled: true,
     citation: 'Companies (Directors’ Report) and LLP (Energy and Carbon Report) Regulations 2018, applying the Companies Act 2006 s.465 "large company" test',
     limbs: [
@@ -416,7 +426,7 @@ export const THRESHOLD_TESTS: Record<string, ThresholdTest> = {
   },
   'Canada S-211': {
     framework: 'Canada S-211',
-    requires: 2,
+    requires: 2, semantics: 'n-of-m',
     // See the migration header: the statute measures over EITHER of the two most recent financial
     // years; two scalar columns hold one. Evaluated on the most recent year only. Failure mode is
     // UNDER-calling a target that crossed a limb last year and dipped this year; the below-side
@@ -445,12 +455,12 @@ export const THRESHOLD_TESTS: Record<string, ThresholdTest> = {
   // To activate: fill `limbs`, set lookback/lookbackModelled, DELETE `pending`. A test guards that
   // a pending entry cannot change applicability.
   'CSRD': {
-    framework: 'CSRD', requires: 2, limbs: [], pending: true,
+    framework: 'CSRD', requires: 2, semantics: 'and', limbs: [], pending: true,
     lookback: 'most-recent-fy', lookbackModelled: true,
     citation: 'Accounting Directive as amended (CSRD) — thresholds pending Omnibus verification',
   },
   'CS3D': {
-    framework: 'CS3D', requires: 2, limbs: [], pending: true,
+    framework: 'CS3D', requires: 2, semantics: 'and', limbs: [], pending: true,
     lookback: 'most-recent-fy', lookbackModelled: true,
     citation: 'Directive (EU) 2024/1760 (CS3D) — thresholds pending Omnibus verification',
   },
@@ -459,6 +469,36 @@ export const THRESHOLD_TESTS: Record<string, ThresholdTest> = {
 // Only tests that are ready to evaluate. Everything else keeps jurisdiction-only behaviour.
 export const isTestActive = (t: ThresholdTest | undefined): t is ThresholdTest =>
   !!t && !t.pending && t.limbs.length > 0
+
+// The declared `semantics` must agree with the arithmetic `requires`/`limbs.length` actually
+// perform. Without this, an AND test that gains a third limb while `requires` stays at 2 becomes a
+// 2-of-3 test — a real under-call, invisible in review, and the reason this check exists.
+//
+// A pending test with no limbs is SKIPPED, not passed: its `requires` cannot be reconciled against
+// limbs that do not exist yet. The check binds the moment the limbs are filled, which is the same
+// edit that would activate the test — so the guard arrives with the constants, not after them.
+export const validateThresholdTests = (
+  tests: Record<string, ThresholdTest> = THRESHOLD_TESTS,
+): void => {
+  for (const [key, t] of Object.entries(tests)) {
+    if (t.pending && t.limbs.length === 0) continue
+    const n = t.requires
+    const m = t.limbs.length
+    const shape = `requires ${n}, ${m} limb${m === 1 ? '' : 's'}`
+    const fail = (expected: string) => {
+      throw new Error(
+        `THRESHOLD_TESTS['${key}'] (${t.framework}): semantics '${t.semantics}' requires ${expected}, but the test declares ${shape}.`,
+      )
+    }
+    if (t.semantics === 'and' && n !== m) fail('requires === limbs.length')
+    if (t.semantics === 'n-of-m' && !(n < m && n >= 1)) fail('1 <= requires < limbs.length')
+    if (t.semantics === 'trigger' && !(n === 1 && m === 1)) fail('requires === 1 with exactly 1 limb')
+  }
+}
+
+// Load-time, not call-time: a malformed table is a coding error, so it should stop the build and
+// the test suite rather than reach a deal report. There is no user-facing path that can trigger it.
+validateThresholdTests()
 
 // Human labels for the fields a limb draws on — a not-assessed outcome must name the field that
 // would resolve it, so a disappearing framework reads as a prompt rather than an absence.

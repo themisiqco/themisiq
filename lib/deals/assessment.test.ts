@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   getApplicableFrameworks, getFrameworkApplicability, convertCurrency, isDealCurrency,
   DEAL_CURRENCIES, USD_PER_UNIT, UNITS_PER_EUR, THRESHOLD_TESTS, isTestActive, evaluateTest,
+  validateThresholdTests, type ThresholdTest,
   NEAR_THRESHOLD_BAND, NEAR_BAND_PCT, FX_AS_OF, FX_SOURCE,
   isRevenueDeclared, assessmentView, notAssessedRevenueNote, partiallyAssessedNote,
   nearThresholdNoneNote, resolveFieldsPrompt, FIELD_LABELS, FIELD_FORM_LABELS,
@@ -180,6 +181,67 @@ describe('pending tests are inert — the Omnibus safety net', () => {
   it('isTestActive rejects pending and empty-limbed tests', () => {
     expect(isTestActive(undefined)).toBe(false)
     expect(isTestActive(SECR)).toBe(true)
+  })
+})
+
+// ── declared semantics vs the arithmetic ──────────────────────────────────────────────────────
+
+describe('semantics is validated against requires/limbs, not merely documented', () => {
+  // A minimal well-formed limb; only requires/limbs.length/semantics matter to the validator.
+  const limb = (): ThresholdLimb => ({
+    measure: 'employees', amount: 250, unit: { unit: 'count' },
+    source: 'employee_count', exactMeasure: true, comparison: 'gt',
+    basis: 'More than 250 employees.',
+  })
+  const test = (over: Partial<ThresholdTest>): Record<string, ThresholdTest> => ({
+    'Test Framework': {
+      framework: 'Test Framework', requires: 1, semantics: 'trigger', limbs: [limb()],
+      lookback: 'most-recent-fy', lookbackModelled: true, citation: 'fixture',
+      ...over,
+    },
+  })
+
+  it('the real table passes — every declared shape matches its arithmetic', () => {
+    expect(() => validateThresholdTests()).not.toThrow()
+    expect(() => validateThresholdTests(THRESHOLD_TESTS)).not.toThrow()
+  })
+
+  it("every entry declares semantics, and the labels match what each test does today", () => {
+    for (const t of Object.values(THRESHOLD_TESTS)) expect(t.semantics).toBeTruthy()
+    expect(THRESHOLD_TESTS['SB 253'].semantics).toBe('trigger')
+    expect(THRESHOLD_TESTS['SECR'].semantics).toBe('n-of-m')
+    expect(THRESHOLD_TESTS['Canada S-211'].semantics).toBe('n-of-m')
+    expect(THRESHOLD_TESTS['CSRD'].semantics).toBe('and')
+    expect(THRESHOLD_TESTS['CS3D'].semantics).toBe('and')
+  })
+
+  // THE CASE THIS GUARDS: an AND test that gains a limb while `requires` stays at 2 silently
+  // becomes 2-of-3 — met on turnover + headcount alone, under-calling nothing and OVER-calling a
+  // target that fails a limb the instrument requires.
+  it("'and' with requires 2 and three limbs throws, naming the framework", () => {
+    expect(() => validateThresholdTests(test({ semantics: 'and', requires: 2, limbs: [limb(), limb(), limb()] })))
+      .toThrow(/Test Framework.*'and'.*requires === limbs\.length.*requires 2, 3 limbs/)
+  })
+
+  it("'n-of-m' that is really an AND throws", () => {
+    expect(() => validateThresholdTests(test({ semantics: 'n-of-m', requires: 3, limbs: [limb(), limb(), limb()] })))
+      .toThrow(/Test Framework.*'n-of-m'/)
+    // requires: 0 would make every limb optional — the test would apply to everything.
+    expect(() => validateThresholdTests(test({ semantics: 'n-of-m', requires: 0, limbs: [limb(), limb()] })))
+      .toThrow(/Test Framework.*'n-of-m'/)
+  })
+
+  it("'trigger' with more than one limb throws", () => {
+    expect(() => validateThresholdTests(test({ semantics: 'trigger', requires: 1, limbs: [limb(), limb()] })))
+      .toThrow(/Test Framework.*'trigger'.*requires === 1 with exactly 1 limb/)
+  })
+
+  it('a pending, limbless entry is skipped — and stops being skipped the moment limbs arrive', () => {
+    expect(() => validateThresholdTests(test({ semantics: 'and', requires: 2, limbs: [], pending: true })))
+      .not.toThrow()
+    // Same entry once the Omnibus constants land, with `requires` left stale: now it must fail.
+    expect(() => validateThresholdTests(test({ semantics: 'and', requires: 2, limbs: [limb(), limb(), limb()], pending: true })))
+      .toThrow(/Test Framework/)
   })
 })
 
