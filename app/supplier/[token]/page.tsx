@@ -26,7 +26,7 @@ const TEMPLATES: Record<string, { sections: Section[] }> = {
           { id: 'env_ghg_year', type: 'text', label: 'Emissions reporting year', hint: 'e.g. 2024' },
           { id: 'env_renewable', type: 'radio', label: 'Do you use renewable energy?', options: ['Yes — more than 50%', 'Yes — less than 50%', 'In progress', 'No'] },
           { id: 'env_target', type: 'radio', label: 'Has your company set a carbon reduction target?', options: ['Yes — science-based (SBTi)', 'Yes — internal target', 'In development', 'No'] },
-          { id: 'env_reporting', type: 'radio', label: 'Do you report to any environmental framework?', options: ['CDP', 'GRI', 'ESRS/CSRD', 'EcoVadis', 'Other', 'None'] },
+          { id: 'env_reporting', type: 'checkbox', label: 'Do you report to any environmental framework?', options: ['CDP', 'GRI', 'ESRS/CSRD', 'EcoVadis', 'Other', 'None'] },
         ],
       },
       {
@@ -402,6 +402,37 @@ export default function SupplierQuestionnaire() {
                       ))}
                     </div>
                   )}
+
+                  {/* Multi-select. Stored as one comma-space-joined string in q.options order,
+                      so a single tick is byte-identical to the old scalar answer and existing
+                      rows keep reading correctly without a migration. */}
+                  {q.type === 'checkbox' && q.options && (() => {
+                    const opts = q.options
+                    const selected = (responses[q.id] || '').split(',').map(s => s.trim()).filter(Boolean)
+                    const toggle = (opt: string) => {
+                      // 'None' is exclusive: it clears the rest, and any other tick clears it.
+                      const next = selected.includes(opt)
+                        ? selected.filter(s => s !== opt)
+                        : opt === 'None'
+                          ? ['None']
+                          : [...selected.filter(s => s !== 'None'), opt]
+                      // Filter q.options rather than join `next` — order is the question's, not the click order.
+                      saveResponse(q.id, opts.filter(o => next.includes(o)).join(', '))
+                    }
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {opts.map((opt: string) => (
+                          <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, border: `1px solid ${selected.includes(opt) ? currentSection.color : '#e8e7e4'}`, background: selected.includes(opt) ? currentSection.bg : '#fff', transition: 'all 0.1s' }}>
+                            <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${selected.includes(opt) ? currentSection.color : '#e8e7e4'}`, background: selected.includes(opt) ? currentSection.color : '#fff', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {selected.includes(opt) && <span style={{ fontSize: 10, lineHeight: 1, color: '#fff', fontWeight: 700 }}>✓</span>}
+                            </div>
+                            <input type="checkbox" name={q.id} value={opt} checked={selected.includes(opt)} onChange={() => toggle(opt)} style={{ display: 'none' }} />
+                            <span style={{ fontSize: 13, color: '#0d0d0d' }}>{opt}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )
+                  })()}
 
                   {q.type === 'number' && (
                     <input style={{ ...inputStyle, maxWidth: 200 }} type="number" value={responses[q.id] || ''} onChange={e => saveResponse(q.id, e.target.value)} placeholder="0" min="0" />

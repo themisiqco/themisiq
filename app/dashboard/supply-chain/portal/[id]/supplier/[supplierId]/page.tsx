@@ -124,6 +124,16 @@ const TEMPLATE_SECTIONS: Record<string, { id: string; title: string; color: stri
 const POSITIVE_RESPONSES = ['yes', 'yes —', 'no incidents', 'fully', 'always', 'gold', 'silver', 'bronze']
 const NEGATIVE_RESPONSES = ['no', 'none', 'unknown', 'yes — unresolved', 'yes — ongoing', 'not applicable']
 
+// Prefix-matches the stored answer against NEGATIVE_RESPONSES / POSITIVE_RESPONSES.
+//
+// ⚠️ Multi-value answers are comma-joined strings ("CDP, GRI"). This function is
+// order-sensitive: it reads only the start of the string. That is currently safe
+// ONLY because env_reporting's 'None' option is mutually exclusive in the portal
+// (app/supplier/[token]/page.tsx), so 'None' can never appear after another value.
+//
+// If 'None' is ever made non-exclusive, or another question becomes type:'checkbox'
+// with an option starting 'no'/'none', this chip will report a colour that depends
+// on join order. Fix by matching against the split parts, not the raw string.
 const getResponseColor = (response: string): string => {
   const lower = response.toLowerCase()
   if (POSITIVE_RESPONSES.some(p => lower.startsWith(p))) return '#0F6E56'
