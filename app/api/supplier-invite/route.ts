@@ -31,7 +31,7 @@ const inviteEmailHtml = ({
   template: string
 }) => {
   const templateLabels: Record<string, string> = {
-    ecovadis: 'Full Sustainability Assessment (EcoVadis-style)',
+    ecovadis: 'Sustainability Questionnaire',
     scope3: 'Scope 3 Emissions Assessment',
     modern_slavery: 'Modern Slavery Act Questionnaire',
     cs3d: 'CS3D Human Rights Due Diligence',
