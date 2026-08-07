@@ -17,7 +17,7 @@ import {
 // different figures or cite different regimes for one deal.
 import {
   DEAL_TYPES, spellMagnitude, NEAR_PCT, nearSentence,
-  resolveCs3d, makeMapFramework, themisIqFigure as themisIqFigureOf,
+  resolveCs3d, makeMapFramework, themisIqFigure as themisIqFigureOf, CS3D_NOT_ASSESSED_LABEL,
 } from '../../../lib/deals/reportModel'
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
@@ -306,7 +306,10 @@ function DealsDashboardInner() {
   // determine (no market multi-select yet), so "not in the resolved list" is not the same as
   // "does not apply".
   //   applies        → cite plainly
-  //   conditional    → cite as conditional, NEVER suppress (size undeclared, or non-EU)
+  //   conditional    → cite as CS3D_NOT_ASSESSED_LABEL, NEVER suppress (size undeclared, or non-EU)
+  // The internal state is 'conditional'; the PRINTED label is "not assessed" — "conditional"
+  // describes a status without explaining it, and reads as "applies conditionally", the opposite
+  // of what is true. The label states what happened: the test was not run.
   //   not-applicable → relabel, i.e. drop the token — same treatment as SB 253
   const cs3d = resolveCs3d(frameworks, applicability)
   const mapFramework = makeMapFramework(frameworks, cs3d)
@@ -657,9 +660,9 @@ function DealsDashboardInner() {
                   </div>
                   <div style={{ padding: '10px 16px', background: '#fff' }}>
                     <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{risk.detail}</div>
-                    {label.includes('CS3D (conditional)') && cs3d.state === 'conditional' && (
+                    {label.includes(CS3D_NOT_ASSESSED_LABEL) && cs3d.state === 'conditional' && (
                       <div style={{ fontSize: 11, color: '#ba7517', lineHeight: 1.55, marginTop: 8 }}>
-                        <strong style={{ fontWeight: 600 }}>CS3D conditional:</strong> {cs3d.reason}.
+                        <strong style={{ fontWeight: 600 }}>CS3D not assessed:</strong> {cs3d.reason}.
                       </div>
                     )}
                     {citedNear.map(f => (
@@ -776,7 +779,7 @@ function DealsDashboardInner() {
           <div style={{ background: '#FCEBEB', border: '0.5px solid rgba(185,28,28,0.2)', borderRadius: 10, padding: '0.85rem 1.25rem', marginBottom: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#B91C1C', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>ESG value-at-risk exposure</div>
             <div style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.6 }}>
-              ~{(complianceCost.pctLow * 100).toFixed(2)}%–{(complianceCost.pctHigh * 100).toFixed(2)}% of deal value (~USD {Math.round(complianceCost.low).toLocaleString()}–{Math.round(complianceCost.high).toLocaleString()}) carries ESG-related risk to assess.
+              ~{(complianceCost.pctLow * 100).toFixed(2)}%–{(complianceCost.pctHigh * 100).toFixed(2)}% of deal value (~{deal.currency} {Math.round(complianceCost.low).toLocaleString()}–{Math.round(complianceCost.high).toLocaleString()}) carries ESG-related risk to assess.
             </div>
             <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.6, marginTop: 4 }}>
               {deal.sector || '—'}, {deal.jurisdiction}, {frameworks.length} applicable frameworks · indicative exposure, not a cost · requires specialist confirmation.

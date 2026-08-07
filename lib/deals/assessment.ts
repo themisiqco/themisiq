@@ -768,6 +768,25 @@ export const csrdNonEuAbstention = (): FrameworkApplicability => ({
   framework: 'CSRD', applies: false, status: 'not-assessed', reason: CSRD_NON_EU_REASON,
 })
 
+// CS3D's THRESHOLD_TESTS entry is still `pending` — no limbs, so no size test runs. Routing it
+// through `plain()` therefore fell through to an unconditional `applies: true` for every EU deal,
+// which asserted the statute against targets that fail its limbs by a wide margin (observed: 1,850
+// employees, EUR 620m revenue, reported as APPLIES). Directly under a CSRD row that now shows its
+// full statutory workings, a bare unqualified APPLIES is both wrong and conspicuous.
+//
+// So CS3D abstains until its constants land: NOT 'applies' (asserts a statute never tested) and NOT
+// 'not-applicable' (a false negative, the worse error in diligence). Same shape as the CSRD non-EU
+// abstention above.
+//
+// No trailing full stop: the report appends one at the render site (deals/report/page.tsx), and
+// resolveCs3d strips any trailing period defensively.
+export const CS3D_PENDING_REASON =
+  'CS3D applies above 5,000 employees and EUR 1.5bn net worldwide turnover (Directive (EU) 2026/470). This assessment does not yet run that size test, so applicability is not resolved here'
+
+export const cs3dPendingAbstention = (): FrameworkApplicability => ({
+  framework: 'CS3D', applies: false, status: 'not-assessed', reason: CS3D_PENDING_REASON,
+})
+
 const applyTest = (test: ThresholdTest, size: DealSize): FrameworkApplicability => {
   const { status, applies, outcome } = evaluateTest(test, size)
   // Near-threshold is a PRESENTATION of a decided outcome, never a replacement for it: the marker
@@ -812,7 +831,9 @@ export const getFrameworkApplicability = (
   else if (jurisdiction === 'Global') out.push(csrdNonEuAbstention())
   if (jurisdiction === 'European Union' && sector === 'Financial Services') plain('SFDR')
   if (['European Union', 'Global'].includes(jurisdiction)) plain('EU Taxonomy')
-  if (['European Union', 'Global'].includes(jurisdiction)) plain('CS3D')
+  // CS3D stays in scope for the same jurisdictions, but ABSTAINS rather than asserting — its size
+  // test is still pending, so nothing has been evaluated. See cs3dPendingAbstention.
+  if (['European Union', 'Global'].includes(jurisdiction)) out.push(cs3dPendingAbstention())
 
   // UK — distinct regime, NOT CSRD
   if (jurisdiction === 'UK') {

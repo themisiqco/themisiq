@@ -3,7 +3,7 @@ import {
   getApplicableFrameworks, getFrameworkApplicability, convertCurrency, isDealCurrency,
   DEAL_CURRENCIES, USD_PER_UNIT, UNITS_PER_EUR, THRESHOLD_TESTS, isTestActive, evaluateTest,
   validateThresholdTests, type ThresholdTest,
-  CSRD_NON_EU_REASON, csrdNonEuAbstention,
+  CSRD_NON_EU_REASON, csrdNonEuAbstention, CS3D_PENDING_REASON, cs3dPendingAbstention,
   NEAR_THRESHOLD_BAND, NEAR_BAND_PCT, FX_AS_OF, FX_SOURCE,
   isRevenueDeclared, assessmentView, notAssessedRevenueNote, partiallyAssessedNote,
   nearThresholdNoneNote, resolveFieldsPrompt, FIELD_LABELS, FIELD_FORM_LABELS,
@@ -11,6 +11,7 @@ import {
   type DealCurrency, type FrameworkApplicability, type DealSize, type ThresholdLimb,
 } from './assessment'
 import { REGIME_COLUMNS } from './exportPipelineXlsx'
+import { resolveCs3d } from './reportModel'
 
 // Tests assert the CONTRACT, never the current FX rates: cross-currency inputs are derived from
 // USD_PER_UNIT at runtime, so refreshing the dated rate table cannot turn them red.
@@ -170,11 +171,17 @@ describe('pending tests are inert — the Omnibus safety net', () => {
     expect(isTestActive(THRESHOLD_TESTS['CSRD'])).toBe(true)
   })
 
-  it('a pending test cannot change applicability — CS3D keeps jurisdiction-only behaviour', () => {
+  it('a pending test is never ROUTED — CS3D abstains rather than asserting', () => {
     // A 2-of-0 test would resolve "not-applicable" and silently under-call if it were ever routed.
+    // Falling through to a plain `applies` is the opposite error, and the one that was live: an EU
+    // target with 1,850 employees and EUR 620m revenue was told CS3D APPLIES on no test at all.
     for (const rev of [0, 1, 1e12]) {
-      const fws = getApplicableFrameworks('European Union', rev, 'Technology', 'ma', 'USD')
-      expect(fws).toContain('CS3D')
+      const row = find(getFrameworkApplicability('European Union', rev, 'Technology', 'ma', 'USD',
+        { employee_count: 1_850, total_assets: 1e9 }), 'CS3D')!
+      expect(row.status).toBe('not-assessed')
+      expect(row.applies).toBe(false)
+      expect(row.reason).toBe(CS3D_PENDING_REASON)
+      expect(row.test).toBeUndefined()
     }
   })
 
@@ -509,6 +516,66 @@ describe('CSRD — Directive (EU) 2026/470 two-limb AND', () => {
   })
 })
 
+describe('CS3D abstains while its size test is pending', () => {
+  const row = (j: string) => find(getFrameworkApplicability(j, 620_000_000, 'Technology', 'ma', 'EUR',
+    { employee_count: 1_850, total_assets: 1e9 }), 'CS3D')
+
+  it('never asserts APPLIES on a target that was never tested', () => {
+    // The live defect: 1,850 employees / EUR 620m reported as APPLIES, directly under a CSRD row
+    // showing full statutory workings. CS3D's real limbs are >5,000 staff AND >EUR 1.5bn.
+    for (const j of ['European Union', 'Global']) {
+      expect(row(j)!.applies).toBe(false)
+      expect(row(j)!.status).toBe('not-assessed')
+      expect(row(j)!.status).not.toBe('not-applicable')
+    }
+  })
+
+  it('stays in scope — it is unresolved, not absent', () => {
+    for (const j of ['European Union', 'Global']) expect(row(j)).toBeDefined()
+    // ...and out of scope entirely elsewhere, as before.
+    for (const j of ['USA', 'UK', 'Canada', 'Australia', 'Other']) expect(row(j)).toBeUndefined()
+  })
+
+  it('names the real threshold and the amending directive in its reason', () => {
+    expect(CS3D_PENDING_REASON).toContain('5,000 employees')
+    expect(CS3D_PENDING_REASON).toContain('EUR 1.5bn')
+    expect(CS3D_PENDING_REASON).toContain('2026/470')
+    // No trailing period: the report appends one at the render site.
+    expect(CS3D_PENDING_REASON.endsWith('.')).toBe(false)
+  })
+
+  it('is not promoted into the flat applies-filtered list', () => {
+    expect(getApplicableFrameworks('European Union', 620_000_000, 'Technology', 'ma', 'EUR',
+      { employee_count: 1_850, total_assets: 1e9 })).not.toContain('CS3D')
+  })
+
+  it('blocks a proximity claim and is named as not-assessed', () => {
+    const v = assessmentView(true, [cs3dPendingAbstention()])
+    expect(v.notAssessed).toEqual(['CS3D'])
+    expect(v.fieldsToResolve).toEqual([])   // no field the deal form collects would resolve it
+    expect(v.nearThreshold).toBe('not-assessed')
+  })
+
+  // The report has its own three-state resolver. Both describe the same fact, so they must not
+  // word it differently — the row's reason wins where it has one.
+  it('resolveCs3d agrees with the engine rather than deriving a second, vaguer reason', () => {
+    const rows = getFrameworkApplicability('European Union', 620_000_000, 'Technology', 'ma', 'EUR',
+      { employee_count: 1_850, total_assets: 1e9 })
+    const state = resolveCs3d(getApplicableFrameworks('European Union', 620_000_000, 'Technology', 'ma', 'EUR',
+      { employee_count: 1_850, total_assets: 1e9 }), rows)
+    expect(state.state).toBe('conditional')
+    expect(state.state === 'conditional' && state.reason).toBe(CS3D_PENDING_REASON)
+    // Never the old placeholder, and never 'applies' or 'not-applicable'.
+    expect(state.state === 'conditional' && state.reason).not.toBe('size test incomplete')
+  })
+
+  it('resolveCs3d still falls back where a row carries no reason of its own', () => {
+    const noReason: FrameworkApplicability = { framework: 'CS3D', applies: false, status: 'not-assessed' }
+    const state = resolveCs3d([], [noReason])
+    expect(state.state === 'conditional' && state.reason).toBe('size test incomplete')
+  })
+})
+
 describe('Canada S-211', () => {
   it('is in scope for Canada only', () => {
     expect(getFrameworkApplicability('Canada', 0, 'Technology', 'ma', 'CAD').some(r => r.framework === 'Canada S-211')).toBe(true)
@@ -627,10 +694,13 @@ describe('blank revenue resolves everything that does not need revenue', () => {
     const fws = getApplicableFrameworks('European Union', 0, 'Technology', 'ma', 'USD')
     // CSRD is absent: post-Omnibus it is size-gated, and with revenue and headcount blank it is
     // not-assessed rather than applied. The rich form carries the caveat; the flat list is in/out.
-    expect(fws).toEqual(['EU Taxonomy', 'CS3D', 'IFRS S2', 'TCFD'])
+    // CS3D is absent for a different reason — it abstains until its size test lands.
+    expect(fws).toEqual(['EU Taxonomy', 'IFRS S2', 'TCFD'])
     const o = getObligations(1, fws, 'Technology')
-    expect(o.included.find(x => x.short === 'supply chain')!.pricing).toEqual({ kind: 'priced', priceUSD: 2900 })
-    expect(o.themisIqTotal).toBe(4900 + 2900)
+    // KNOCK-ON: supply chain was triggered by CS3D. With CS3D abstaining and CSRD unresolved,
+    // nothing triggers it, so it is no longer priced. Pricing follows the applies-filtered list.
+    expect(o.included.find(x => x.short === 'supply chain')).toBeUndefined()
+    expect(o.themisIqTotal).toBe(4900)
   })
 
   it('USA resolves IFRS S2/TCFD, reports SB 253 not-assessed, and prices nothing extra', () => {
@@ -690,10 +760,11 @@ describe('pricing is unchanged by the multi-limb work', () => {
         for (const loc of [1, 10, 20]) {
           const fws = getApplicableFrameworks(j, 2_000_000_000, s, 'ma', 'USD', { employee_count: 300, total_assets: 1e9 })
           const o = getObligations(loc, fws, s)
-          const euish = ['European Union', 'Global'].includes(j)
+          // CS3D no longer triggers it (abstains), and CSRD needs >1,000 employees — this fixture
+          // has 300 — so SFDR is the only remaining trigger.
           const sfdr = j === 'European Union' && s === 'Financial Services'
           const ghg = loc <= 3 ? 4900 : loc <= 15 ? 11900 : null
-          const supply = (euish || sfdr) ? 2900 : 0
+          const supply = sfdr ? 2900 : 0
           expect(o.themisIqTotal).toBe(ghg == null ? (supply || null) : ghg + supply)
         }
   })
@@ -725,7 +796,7 @@ describe('flat form stays the applies-filtered rich form', () => {
   it('leaves non-size-gated frameworks untouched by currency and size', () => {
     for (const c of DEAL_CURRENCIES)
       expect(getApplicableFrameworks('European Union', 2_000_000, 'Financial Services', 'ma', c))
-        .toEqual(['SFDR', 'EU Taxonomy', 'CS3D', 'IFRS S2', 'TCFD', 'PCAF'])
+        .toEqual(['SFDR', 'EU Taxonomy', 'IFRS S2', 'TCFD', 'PCAF'])
   })
 })
 

@@ -46,7 +46,7 @@ import {
 import {
   dealTypeLabel, spellMagnitude, NEAR_PCT, nearSentence,
   buildLimbRows, buildFxBasisRows, limbValueDisplay, limbThresholdDisplay,
-  resolveCs3d, makeMapFramework, themisIqFigure,
+  resolveCs3d, makeMapFramework, themisIqFigure, CS3D_NOT_ASSESSED_LABEL,
 } from '../../../../lib/deals/reportModel'
 
 // ─── The deal row ─────────────────────────────────────────────────────────────
@@ -475,8 +475,8 @@ function DealReport({ deal, reportDate, reference }: { deal: DealRow; reportDate
                         <td style={td}>
                           <div style={{ fontWeight: 500 }}>{r.risk}</div>
                           <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, marginTop: 3 }}>{r.detail}</div>
-                          {label.includes('CS3D (conditional)') && cs3d.state === 'conditional' && (
-                            <p style={{ ...cite, fontStyle: 'normal', color: '#ba7517' }}><strong style={{ fontWeight: 600 }}>CS3D conditional:</strong> {cs3d.reason}.</p>
+                          {label.includes(CS3D_NOT_ASSESSED_LABEL) && cs3d.state === 'conditional' && (
+                            <p style={{ ...cite, fontStyle: 'normal', color: '#ba7517' }}><strong style={{ fontWeight: 600 }}>CS3D not assessed:</strong> {cs3d.reason}.</p>
                           )}
                         </td>
                         <td style={td}>{label}</td>
@@ -584,9 +584,16 @@ function DealReport({ deal, reportDate, reference }: { deal: DealRow; reportDate
             </table>
           )}
 
+          {/* The cost table is driven by the APPLIES-filtered framework list, so a regime that
+              abstains prices nothing. Stated here because the omission is otherwise invisible: the
+              reader sees a total, not the module that is missing from it. */}
+          <p style={note}>
+            This estimate covers only the regimes established as applying above. Where a framework is shown as not assessed, no module is priced for it.
+          </p>
+
           {complianceCost && (
             <p style={note}>
-              <strong style={{ fontWeight: 600 }}>ESG value-at-risk exposure:</strong> approximately {(complianceCost.pctLow * 100).toFixed(2)}%–{(complianceCost.pctHigh * 100).toFixed(2)}% of deal value (USD {Math.round(complianceCost.low).toLocaleString()}–{Math.round(complianceCost.high).toLocaleString()}) carries ESG-related risk to assess. This is an indicative exposure, not a cost, and requires specialist confirmation.
+              <strong style={{ fontWeight: 600 }}>ESG value-at-risk exposure:</strong> approximately {(complianceCost.pctLow * 100).toFixed(2)}%–{(complianceCost.pctHigh * 100).toFixed(2)}% of deal value ({currency} {Math.round(complianceCost.low).toLocaleString()}–{Math.round(complianceCost.high).toLocaleString()}) carries ESG-related risk to assess. This is an indicative exposure, not a cost, and requires specialist confirmation.
             </p>
           )}
         </section>

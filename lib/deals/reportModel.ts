@@ -234,8 +234,12 @@ export const REGIME_FALLBACK = ['GHG Protocol', 'IFRS S2']
 // determine (no market multi-select yet), so "not in the resolved list" is not the same as "does
 // not apply".
 //   applies        → cite plainly
-//   conditional    → cite as conditional, NEVER suppress (size undeclared, or non-EU)
+//   conditional    → cite as CS3D_NOT_ASSESSED_LABEL, NEVER suppress (size undeclared, or non-EU)
 //   not-applicable → relabel, i.e. drop the token — same treatment as SB 253
+//
+// The internal state is 'conditional'; the PRINTED label is "not assessed". They differ on purpose:
+// "conditional" describes a status without explaining it, and reads as "applies conditionally",
+// which is the opposite of what is true. The label states what happened — the test was not run.
 export type Cs3dState =
   | { state: 'applies' }
   | { state: 'conditional'; reason: string }
@@ -245,6 +249,11 @@ export const resolveCs3d = (frameworks: string[], applicability: FrameworkApplic
   if (frameworks.includes('CS3D')) return { state: 'applies' }
   const row = applicability.find(f => f.framework === 'CS3D')
   if (row?.status === 'not-assessed') {
+    // The row's OWN reason wins where it has one. An abstention the deal form cannot cure by
+    // entering a number (CS3D's pending size test) carries its explanation on the row; deriving a
+    // second, vaguer one here would let the engine and the report state the same fact differently.
+    // Trailing period stripped because the render site appends one.
+    if (row.reason) return { state: 'conditional', reason: row.reason.replace(/\.$/, '') }
     const prompt = resolveFieldsPrompt(row.test?.fieldsToResolve ?? [], ['CS3D'])
     return { state: 'conditional', reason: `size test incomplete${prompt ? ` — ${prompt}` : ''}` }
   }
@@ -260,6 +269,12 @@ export const resolveCs3d = (frameworks: string[], applicability: FrameworkApplic
 // report correctly omitted. A token here can now only name a regime that section also asserts.
 // Activity-triggered EU instruments (CBAM, EUDR, AI Act, SFDR, CS3D, ETS) are left intact — they
 // apply to UK/non-EU companies through EU-facing activity and have no domestic equivalent.
+// The token mapFramework emits for an unresolved CS3D, and the string both surfaces match on to
+// decide whether to print the explanatory line beneath a finding. ONE definition: as three separate
+// literals, editing the emitter and missing a call site left the label rendering with its
+// explanation silently gone — the reader sees a qualified regime and no reason for the qualifier.
+export const CS3D_NOT_ASSESSED_LABEL = 'CS3D (not assessed)'
+
 export const makeMapFramework = (frameworks: string[], cs3d: Cs3dState) => (fw: string): string => {
   const licensed = REGIME_CANDIDATES.filter(c => frameworks.includes(c.licensedBy)).map(c => c.token)
   const regime = licensed.length ? licensed : REGIME_FALLBACK
@@ -267,7 +282,7 @@ export const makeMapFramework = (frameworks: string[], cs3d: Cs3dState) => (fw: 
     .split(' / ')
     .flatMap(tok =>
       (tok === 'SB 253' || tok === 'SB253' || tok === 'CSRD') ? regime
-      : tok === 'CS3D' ? (cs3d.state === 'applies' ? ['CS3D'] : cs3d.state === 'conditional' ? ['CS3D (conditional)'] : [])
+      : tok === 'CS3D' ? (cs3d.state === 'applies' ? ['CS3D'] : cs3d.state === 'conditional' ? [CS3D_NOT_ASSESSED_LABEL] : [])
       : [tok])
     .filter((tok, i, arr) => arr.indexOf(tok) === i)   // dedupe ATOMIC tokens, post-expansion
   // Dropping the only token would leave an empty label; fall back rather than render nothing.
