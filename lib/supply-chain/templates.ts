@@ -221,3 +221,21 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
     ],
   },
 }
+
+// id -> label, flattened across every template. Three ids (s3cat1_allocated,
+// s3cat1_method, s3cat1_quality) appear in both ecovadis and scope3; their labels
+// are byte-identical in both, so the flattening is lossless. If a future edit gives
+// one of them different wording per template, this Map silently keeps whichever
+// template is defined last — so keep shared ids worded the same, or key by template.
+const LABEL_BY_QUESTION_ID: Map<string, string> = new Map(
+  Object.values(TEMPLATES)
+    .flatMap(t => t.sections)
+    .flatMap(s => s.questions)
+    .map(q => [q.id, q.label] as [string, string]),
+)
+
+// Returns null — not the id — when unknown, so the caller decides what an
+// unrecognised question looks like in its own output.
+export function labelForQuestionId(id: string): string | null {
+  return LABEL_BY_QUESTION_ID.get(id) ?? null
+}

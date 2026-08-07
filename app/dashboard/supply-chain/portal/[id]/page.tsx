@@ -8,6 +8,7 @@ import { supabase } from '../../../../../lib/supabase'
 import { useEntitlement } from '../../../../../lib/useEntitlement'
 import PaywallCard from '../../../../components/PaywallCard'
 import Papa from 'papaparse'
+import { labelForQuestionId } from '../../../../../lib/supply-chain/templates'
 
 interface CampaignSupplier {
   id: string
@@ -81,7 +82,11 @@ export default function CampaignDetail() {
 
     // Build CSV — one row per supplier, one column per question
     const allQuestionIds = [...new Set(Object.values(allResponses).flatMap(r => Object.keys(r)))]
-    const header = ['Supplier', 'Email', 'Contact', 'Status', 'Completed', 'Annual spend', 'Spend currency', ...allQuestionIds]
+    // Columns stay discovered from the DATA, not from a template — that is why this
+    // export kept carrying answers the template copy had dropped. An id with no known
+    // label still gets a column, headed by the raw id: visible and ugly beats absent.
+    const header = ['Supplier', 'Email', 'Contact', 'Status', 'Completed', 'Annual spend', 'Spend currency',
+      ...allQuestionIds.map(qid => labelForQuestionId(qid) ?? qid)]
     const rows = [
       [`ThemisIQ — Bulk Supplier Response Export`],
       [`Campaign: ${campaign?.name}`],
