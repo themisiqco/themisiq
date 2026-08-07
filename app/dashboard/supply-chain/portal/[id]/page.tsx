@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import Link from 'next/link'
 import Nav from '../../../../components/Nav'
 import { supabase } from '../../../../../lib/supabase'
 import { useEntitlement } from '../../../../../lib/useEntitlement'
@@ -351,7 +352,18 @@ export default function CampaignDetail() {
               return (
                 <div key={s.id} style={{ display: 'grid', gridTemplateColumns: GRID_COLS, padding: '12px 16px', borderBottom: i < suppliers.length - 1 ? '0.5px solid #e8e7e4' : 'none', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{s.supplier_name}</div>
+                    {/* Only the name links through — the row also holds the spend input and
+                        the action buttons, so a row-level click target would misfire. */}
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>
+                      <Link
+                        href={`/dashboard/supply-chain/portal/${id}/supplier/${s.id}`}
+                        style={{ color: '#7425e3', textDecoration: 'none', cursor: 'pointer' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.textDecoration = 'underline' }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.textDecoration = 'none' }}
+                      >
+                        {s.supplier_name}
+                      </Link>
+                    </div>
                     <div style={{ fontSize: 11, color: '#888784' }}>{s.supplier_email}</div>
                     {s.contact_name && <div style={{ fontSize: 11, color: '#888784' }}>{s.contact_name}</div>}
                   </div>
