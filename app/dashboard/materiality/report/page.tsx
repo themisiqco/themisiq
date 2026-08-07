@@ -548,7 +548,21 @@ function ReportInner() {
           .no-print { display: none !important; }
           .report-body { padding: 0 !important; max-width: none !important; }
           body { background: white !important; }
-          .page { page-break-inside: avoid; break-inside: avoid; }
+          /* Avoid breaking short sections across pages. Sections that cannot fit on one
+             page must be allowed to split: an unbreakable box taller than the page box
+             gets pushed whole and clipped, which silently drops content. */
+          .page { page-break-inside: auto; break-inside: auto; }
+          .page > h2 { page-break-after: avoid; break-after: avoid; }
+          .page > *  { page-break-inside: avoid; break-inside: avoid; }
+          /* ...except anything that can ITSELF exceed a page box. The rule above would make a
+             long table — or the wrapper div some of them sit in, or a nested .page section —
+             unbreakable, reintroducing the same defect one level down. Those stay breakable
+             and the protection moves to the row. */
+          .page .page, .page table, .page tbody, .page div:has(table) {
+            page-break-inside: auto; break-inside: auto;
+          }
+          .page tr { page-break-inside: avoid; break-inside: avoid; }
+          .page thead { display: table-header-group; }   /* repeat the header on each page */
           .report-body svg { max-height: 16cm !important; width: 100% !important; height: auto !important; }
           section.page { margin-top: 24px !important; }
           h2 { page-break-after: avoid; }

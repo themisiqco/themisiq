@@ -24,3 +24,34 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Print: release the viewport-sized layout so pagination can run.
+ *
+ * On screen the layout sizes against the VIEWPORT so the app fills the window —
+ * app/layout.tsx gives html `h-full` (height: 100%) and body `min-h-full flex flex-col`,
+ * and each report page adds .report-root { min-height: 100vh }. In print there is no
+ * viewport to size against: a fixed-height flex ancestor gives pagination a single page
+ * box and everything past it is DROPPED rather than flowed onto page two. The symptom is
+ * a valid one-page PDF with an empty content stream and no embedded fonts, while the
+ * on-screen print preview looks correct.
+ *
+ * PRINT SCOPE ONLY. app/layout.tsx wraps every page in the product, so none of this may
+ * change what is rendered on screen. Confirmed against both report pages — the derived
+ * one (deals) and the stored-row one (climate-risk) — which failed identically.
+ *
+ * The three per-report @media print blocks stay where they are; they style the document,
+ * this releases the shell.
+ */
+@media print {
+  html, body {
+    height: auto !important;
+    min-height: 0 !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+  .report-root {
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+}
