@@ -6,120 +6,7 @@ import Nav from '../../../../../../components/Nav'
 import { supabase } from '../../../../../../../lib/supabase'
 import { useEntitlement } from '../../../../../../../lib/useEntitlement'
 import PaywallCard from '../../../../../../components/PaywallCard'
-
-const TEMPLATE_SECTIONS: Record<string, { id: string; title: string; color: string; bg: string; questions: { id: string; label: string }[] }[]> = {
-  ecovadis: [
-    { id: 'environment', title: 'Environment', color: '#0F6E56', bg: '#E1F5EE', questions: [
-      { id: 'env_policy', label: 'Formal environmental policy?' },
-      { id: 'env_iso14001', label: 'ISO 14001 certified?' },
-      { id: 'env_ghg_scope1', label: 'Scope 1 emissions (mt CO₂e)' },
-      { id: 'env_ghg_scope2', label: 'Scope 2 emissions (mt CO₂e)' },
-      { id: 'env_ghg_scope3', label: 'Scope 3 emissions (mt CO₂e)' },
-      { id: 'env_ghg_year', label: 'Emissions reporting year' },
-      { id: 'env_renewable', label: 'Renewable energy use?' },
-      { id: 'env_target', label: 'Carbon reduction target?' },
-      { id: 'env_reporting', label: 'Environmental framework reporting?' },
-    ]},
-    { id: 'labour', title: 'Labour & Human Rights', color: '#7425e3', bg: '#EDE9FE', questions: [
-      { id: 'lab_policy', label: 'Health & safety policy?' },
-      { id: 'lab_iso45001', label: 'ISO 45001 certified?' },
-      { id: 'lab_ltifr', label: 'LTIFR (injuries per million hours)' },
-      { id: 'lab_fatalities', label: 'Work-related fatalities' },
-      { id: 'lab_hours', label: 'Working hours compliance?' },
-      { id: 'lab_wages', label: 'Minimum wage compliance?' },
-      { id: 'lab_freedom', label: 'Freedom of association?' },
-      { id: 'lab_forced', label: 'Forced labour risk assessment?' },
-      { id: 'lab_child', label: 'Child labour incidents?' },
-      { id: 'lab_hrdd', label: 'Human rights due diligence?' },
-    ]},
-    { id: 'ethics', title: 'Ethics', color: '#0C447C', bg: '#E6F1FB', questions: [
-      { id: 'eth_anticorruption', label: 'Anti-corruption policy?' },
-      { id: 'eth_training', label: 'Anti-corruption training?' },
-      { id: 'eth_incidents', label: 'Corruption incidents?' },
-      { id: 'eth_whistleblower', label: 'Whistleblower mechanism?' },
-      { id: 'eth_conflicts', label: 'Conflicts of interest policy?' },
-      { id: 'eth_gdpr', label: 'GDPR compliance?' },
-      { id: 'eth_sanctions', label: 'Regulatory sanctions?' },
-    ]},
-    { id: 'procurement', title: 'Sustainable Procurement', color: '#ba7517', bg: '#FEF3E2', questions: [
-      { id: 'proc_code', label: 'Supplier code of conduct?' },
-      { id: 'proc_assess', label: 'Supplier sustainability assessments?' },
-      { id: 'proc_audit', label: 'Third-party supplier audits?' },
-      { id: 'proc_traceability', label: 'Raw material traceability?' },
-      { id: 'proc_ecovadis', label: 'EcoVadis rating?' },
-      { id: 'proc_scope3cat1', label: 'Primary emissions data from suppliers?' },
-    ]},
-  ],
-  scope3: [
-    { id: 'emissions', title: 'GHG Emissions Data', color: '#0F6E56', bg: '#E1F5EE', questions: [
-      { id: 's3_scope1', label: 'Scope 1 emissions (mt CO₂e)' },
-      { id: 's3_scope2_lb', label: 'Scope 2 — location-based (mt CO₂e)' },
-      { id: 's3_scope2_mb', label: 'Scope 2 — market-based (mt CO₂e)' },
-      { id: 's3_scope3', label: 'Scope 3 emissions — total (mt CO₂e)' },
-      { id: 's3_year', label: 'Reporting year' },
-      { id: 's3_boundary', label: 'Organisational boundary' },
-      { id: 's3_renewable', label: 'Renewable electricity %' },
-      { id: 's3_target', label: 'Carbon reduction target' },
-      { id: 's3_assurance', label: 'Independent assurance?' },
-    ]},
-  ],
-  modern_slavery: [
-    { id: 'forced_labour', title: 'Forced & Compulsory Labour', color: '#B91C1C', bg: '#FCEBEB', questions: [
-      { id: 'ms_policy', label: 'Modern slavery policy?' },
-      { id: 'ms_risk_assess', label: 'Modern slavery risk assessment?' },
-      { id: 'ms_forced', label: 'Forced labour identified?' },
-      { id: 'ms_recruitment', label: 'Recruitment fee prohibition?' },
-    ]},
-    { id: 'child_labour', title: 'Child Labour', color: '#ba7517', bg: '#FEF3E2', questions: [
-      { id: 'ms_child_policy', label: 'Minimum age policy (ILO 138)?' },
-      { id: 'ms_child_incidents', label: 'Child labour incidents?' },
-    ]},
-    { id: 'due_diligence', title: 'Due Diligence & Remediation', color: '#0C447C', bg: '#E6F1FB', questions: [
-      { id: 'ms_dd_suppliers', label: 'Modern slavery due diligence on suppliers?' },
-      { id: 'ms_grievance', label: 'Worker grievance mechanism?' },
-      { id: 'ms_training', label: 'Modern slavery training?' },
-      { id: 'ms_statement', label: 'Modern Slavery Act statement published?' },
-      { id: 'ms_kpis', label: 'KPIs to measure effectiveness?' },
-      { id: 'ms_incidents_reported', label: 'Concerns reported via grievance mechanism' },
-    ]},
-  ],
-  cs3d: [
-    { id: 'hrdd_governance', title: 'HRDD Governance', color: '#0C447C', bg: '#E6F1FB', questions: [
-      { id: 'cs_policy', label: 'Human rights policy (UNGP-aligned)?' },
-      { id: 'cs_governance', label: 'Board/management HRDD accountability?' },
-      { id: 'cs_scope', label: 'HRDD covers full value chain?' },
-    ]},
-    { id: 'hrdd_identification', title: 'Risk Identification', color: '#7425e3', bg: '#EDE9FE', questions: [
-      { id: 'cs_risk_assess', label: 'Human rights risk assessments?' },
-      { id: 'cs_risk_method', label: 'Risk assessment methodology?' },
-      { id: 'cs_salient', label: 'Salient human rights issues identified?' },
-      { id: 'cs_high_risk', label: 'High-risk geographies/sectors identified?' },
-    ]},
-    { id: 'hrdd_action', title: 'Prevention & Remediation', color: '#0F6E56', bg: '#E1F5EE', questions: [
-      { id: 'cs_prevention', label: 'Action plans to prevent/mitigate HR risks?' },
-      { id: 'cs_supplier_code', label: 'Supplier code covers ILO core conventions?' },
-      { id: 'cs_grievance', label: 'Grievance mechanism for stakeholders?' },
-      { id: 'cs_remediation', label: 'Remediation provided for HR harm?' },
-    ]},
-    { id: 'hrdd_monitoring', title: 'Monitoring & Disclosure', color: '#ba7517', bg: '#FEF3E2', questions: [
-      { id: 'cs_monitoring', label: 'HRDD effectiveness monitoring?' },
-      { id: 'cs_disclosure', label: 'HRDD approach publicly disclosed?' },
-      { id: 'cs_stakeholder', label: 'Stakeholder engagement in HRDD?' },
-      { id: 'cs_incidents', label: 'HR incidents identified in value chain' },
-    ]},
-  ],
-  custom: [
-    { id: 'custom', title: 'Sustainability Questionnaire', color: '#7425e3', bg: '#EDE9FE', questions: [
-      { id: 'custom_overview', label: 'Sustainability approach overview' },
-      { id: 'custom_env', label: 'Environmental management practices' },
-      { id: 'custom_social', label: 'Labour rights & human rights approach' },
-      { id: 'custom_ethics', label: 'Ethics & governance practices' },
-      { id: 'custom_supply', label: 'Supply chain sustainability management' },
-      { id: 'custom_certifications', label: 'Sustainability certifications held' },
-      { id: 'custom_contact', label: 'Sustainability contact for follow-up' },
-    ]},
-  ],
-}
+import { TEMPLATES } from '../../../../../../../lib/supply-chain/templates'
 
 const POSITIVE_RESPONSES = ['yes', 'yes —', 'no incidents', 'fully', 'always', 'gold', 'silver', 'bronze']
 const NEGATIVE_RESPONSES = ['no', 'none', 'unknown', 'yes — unresolved', 'yes — ongoing', 'not applicable']
@@ -152,7 +39,7 @@ export default function SupplierResponseViewer() {
 
   const [supplier, setSupplier] = useState<any>(null)
   const [campaign, setCampaign] = useState<any>(null)
-  const [sections, setSections] = useState(TEMPLATE_SECTIONS.ecovadis)
+  const [sections, setSections] = useState(TEMPLATES.ecovadis.sections)
   const [responses, setResponses] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [activeSection, setActiveSection] = useState(0)
@@ -179,7 +66,7 @@ export default function SupplierResponseViewer() {
       const camp = sup.supplier_campaigns
       setCampaign(camp)
       const template = camp?.questionnaire_template || 'ecovadis'
-      setSections(TEMPLATE_SECTIONS[template] || TEMPLATE_SECTIONS.ecovadis)
+      setSections((TEMPLATES[template] || TEMPLATES.ecovadis).sections)
     }
     if (resps) {
       const map: Record<string, string> = {}
