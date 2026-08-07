@@ -13,6 +13,16 @@ const sendEmail = async (to: string, subject: string, html: string) => {
   return res.json()
 }
 
+// Buyer-entered free text reaches these templates (campaign name, buyer company).
+// It comes from the database rather than the request body, but it is still
+// user-authored, so escape it before it lands in HTML.
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, '&amp;')
+   .replace(/</g, '&lt;')
+   .replace(/>/g, '&gt;')
+   .replace(/"/g, '&quot;')
+   .replace(/'/g, '&#39;')
+
 const inviteEmailHtml = ({
   supplierName,
   contactName,
@@ -38,7 +48,9 @@ const inviteEmailHtml = ({
     custom: 'Sustainability Questionnaire',
   }
   const templateLabel = templateLabels[template] || 'Sustainability Questionnaire'
-  const greeting = contactName ? `Dear ${contactName},` : `Dear ${supplierName} team,`
+  const buyer = escapeHtml(buyerCompany)
+  const campaignLabel = escapeHtml(campaignName)
+  const greeting = contactName ? `Dear ${escapeHtml(contactName)},` : `Dear ${escapeHtml(supplierName)} team,`
   const deadlineText = deadline ? `<p style="margin:0 0 16px;color:#555553;">Please complete the questionnaire by <strong>${new Date(deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</strong>.</p>` : ''
 
   return `<!DOCTYPE html>
@@ -61,13 +73,13 @@ const inviteEmailHtml = ({
       <p style="margin:0 0 16px;color:#0d0d0d;font-size:15px;">${greeting}</p>
       
       <p style="margin:0 0 16px;color:#555553;font-size:14px;line-height:1.6;">
-        <strong style="color:#0d0d0d;">${buyerCompany}</strong> has invited you to complete a sustainability questionnaire as part of their supply chain programme.
+        <strong style="color:#0d0d0d;">${buyer}</strong> has invited you to complete a sustainability questionnaire as part of their supply chain programme.
       </p>
 
       <!-- Campaign box -->
       <div style="background:#f8f7f5;border:0.5px solid #e8e7e4;border-radius:12px;padding:20px;margin:0 0 24px;">
         <div style="font-size:11px;font-weight:700;color:#888784;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Campaign details</div>
-        <div style="font-size:14px;font-weight:600;color:#0d0d0d;margin-bottom:4px;">${campaignName}</div>
+        <div style="font-size:14px;font-weight:600;color:#0d0d0d;margin-bottom:4px;">${campaignLabel}</div>
         <div style="font-size:12px;color:#888784;">${templateLabel}</div>
       </div>
 
@@ -91,7 +103,7 @@ const inviteEmailHtml = ({
 
       <div style="border-top:0.5px solid #e8e7e4;padding-top:20px;">
         <p style="margin:0;color:#9ca3af;font-size:11px;line-height:1.6;">
-          This invitation was sent on behalf of ${buyerCompany} via ThemisIQ. If you have questions about this request, please contact ${buyerCompany} directly. Your responses are stored securely and only shared with ${buyerCompany}.
+          This invitation was sent on behalf of ${buyer} via ThemisIQ. If you have questions about this request, please contact ${buyer} directly. Your responses are stored securely and only shared with ${buyer}.
         </p>
       </div>
     </div>
@@ -120,7 +132,9 @@ const reminderEmailHtml = ({
   deadline: string | null
   portalUrl: string
 }) => {
-  const greeting = contactName ? `Dear ${contactName},` : `Dear ${supplierName} team,`
+  const buyer = escapeHtml(buyerCompany)
+  const campaignLabel = escapeHtml(campaignName)
+  const greeting = contactName ? `Dear ${escapeHtml(contactName)},` : `Dear ${escapeHtml(supplierName)} team,`
   const deadlineText = deadline ? `<strong>The deadline is ${new Date(deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</strong>. ` : ''
 
   return `<!DOCTYPE html>
@@ -135,7 +149,7 @@ const reminderEmailHtml = ({
     <div style="padding:32px;">
       <p style="margin:0 0 16px;color:#0d0d0d;font-size:15px;">${greeting}</p>
       <p style="margin:0 0 16px;color:#555553;font-size:14px;line-height:1.6;">
-        This is a friendly reminder that <strong style="color:#0d0d0d;">${buyerCompany}</strong> is still waiting for your response to the <strong>${campaignName}</strong> sustainability questionnaire.
+        This is a friendly reminder that <strong style="color:#0d0d0d;">${buyer}</strong> is still waiting for your response to the <strong>${campaignLabel}</strong> sustainability questionnaire.
       </p>
       <p style="margin:0 0 24px;color:#555553;font-size:14px;line-height:1.6;">
         ${deadlineText}Your previous responses have been saved — just click below to continue where you left off.
@@ -165,8 +179,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid or expired session' }, { status: 401 })
   }
   const supabase = authed.supabase
+  const userId = authed.userId
   const body = await req.json()
-  const { supplier_id, type = 'invite', buyer_company } = body
+  // buyer_company is deliberately NOT read from the body — it is derived from the
+  // campaign below, so a client cannot choose the name the email is sent under.
+  const { supplier_id, type = 'invite' } = body
 
   if (!supplier_id) {
     return NextResponse.json({ error: 'Missing supplier_id' }, { status: 400 })
@@ -184,17 +201,28 @@ export async function POST(req: NextRequest) {
   }
 
   const campaign = cs.supplier_campaigns
+
+  // RLS (suppliers_select_own) already blocks a cross-tenant supplier_id, so this
+  // is belt-and-braces — but it keeps the ownership dependency visible in the
+  // route, so switching to a service-role client cannot silently remove it.
+  if (campaign.buyer_id !== userId) {
+    return NextResponse.json({ error: 'Not your campaign' }, { status: 403 })
+  }
+
+  // Single source for the sender name across subject, invite body and reminder.
+  const buyerCompany = campaign.buyer_company || campaign.name
   const portalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.themisiq.co'}/supplier/${cs.token}`
 
+  // Not escaped: a subject is a header, not HTML.
   const subject = type === 'reminder'
-    ? `Reminder: ${campaign.name} — sustainability questionnaire`
-    : `${buyer_company || 'A company'} has invited you to complete a sustainability questionnaire`
+    ? `Reminder: ${buyerCompany} — sustainability questionnaire`
+    : `${buyerCompany} has invited you to complete a sustainability questionnaire`
 
   const html = type === 'reminder'
     ? reminderEmailHtml({
         supplierName: cs.supplier_name,
         contactName: cs.contact_name,
-        buyerCompany: buyer_company || 'Our company',
+        buyerCompany,
         campaignName: campaign.name,
         deadline: campaign.deadline,
         portalUrl,
@@ -202,7 +230,7 @@ export async function POST(req: NextRequest) {
     : inviteEmailHtml({
         supplierName: cs.supplier_name,
         contactName: cs.contact_name,
-        buyerCompany: buyer_company || 'Our company',
+        buyerCompany,
         campaignName: campaign.name,
         deadline: campaign.deadline,
         portalUrl,

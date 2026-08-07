@@ -201,7 +201,7 @@ export default function CampaignDetail() {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${session?.access_token ?? ''}`,
       },
-      body: JSON.stringify({ supplier_id: s.id, type, buyer_company: campaign?.name?.split(' ')[0] || 'ThemisIQ' }),
+      body: JSON.stringify({ supplier_id: s.id, type }),
     })
     const data = await res.json()
     setSending(null)
