@@ -39,7 +39,7 @@ export const SECTOR_RISKS: Record<string, SectorRisk[]> = {
   'Technology': [
     { risk: 'Data centre energy intensity', severity: 'medium', framework: 'SB 253 / CSRD', detail: 'Data centre operations carry significant Scope 2 exposure. PPA and renewable energy coverage assessment needed.' },
     { risk: 'AI governance exposure', severity: 'medium', framework: 'EU AI Act', detail: 'Technology products may contain high-risk AI systems requiring EU AI Act conformity assessment by August 2026.' },
-    { risk: 'Supply chain minerals risk', severity: 'high', framework: 'CS3D / ESRS S2', detail: 'Hardware products may rely on conflict minerals. CS3D HRDD obligations apply from 2027.' },
+    { risk: 'Supply chain minerals risk', severity: 'high', framework: 'CS3D / ESRS S2', detail: 'Hardware products may rely on conflict minerals. CS3D due diligence obligations apply to in-scope companies from 26 July 2029 (Directive (EU) 2026/470).' },
   ],
   'Healthcare & Pharma': [
     { risk: 'Cold chain emissions', severity: 'medium', framework: 'SB 253 / GHG Protocol', detail: 'Pharmaceutical cold chain carries significant Scope 3 Cat.4 emissions from refrigerant leakage and transport.' },
@@ -48,12 +48,12 @@ export const SECTOR_RISKS: Record<string, SectorRisk[]> = {
   ],
   'Industrials & Manufacturing': [
     { risk: 'Scope 1 process emissions', severity: 'critical', framework: 'SB 253 / CSRD', detail: 'Industrial manufacturing typically carries significant Scope 1 process emissions requiring full GHG inventory.' },
-    { risk: 'Carbon border adjustment exposure', severity: 'high', framework: 'EU CBAM', detail: 'EU Carbon Border Adjustment Mechanism applies to steel, cement, aluminium, fertilisers and electricity imports from 2026.' },
+    { risk: 'Carbon border adjustment exposure', severity: 'high', framework: 'EU CBAM', detail: 'EU Carbon Border Adjustment Mechanism covers iron and steel, cement, aluminium, fertilisers, hydrogen and electricity. The definitive period began 1 January 2026, with a 50-tonne annual net-mass exemption for all but electricity and hydrogen (Regulation (EU) 2023/956 as amended by (EU) 2025/2083).' },
     { risk: 'Chemical and hazardous materials', severity: 'high', framework: 'REACH / CSRD', detail: 'Industrial operations may carry significant environmental liability from chemical usage and historical contamination.' },
   ],
   'Consumer & Retail': [
     { risk: 'Scope 3 Cat.1 supplier emissions', severity: 'high', framework: 'SB 253 / CSRD', detail: 'Consumer goods companies typically carry 70-90% of emissions in Scope 3 Cat.1. Supplier engagement programme needed.' },
-    { risk: 'Deforestation exposure', severity: 'high', framework: 'EU EUDR', detail: 'Consumer goods with exposure to cattle, soy, palm oil, cocoa, coffee, wood or rubber face EU Deforestation Regulation from 2025.' },
+    { risk: 'Deforestation exposure', severity: 'high', framework: 'EU EUDR', detail: 'Consumer goods with exposure to cattle, soy, palm oil, cocoa, coffee, wood or rubber fall under the EU Deforestation Regulation, applying to large and medium operators from 30 December 2026 and to micro and small enterprises from 30 June 2027 (Regulation (EU) 2023/1115 as amended by (EU) 2025/2650).' },
     { risk: 'Labour rights in supply chain', severity: 'high', framework: 'CS3D / Modern Slavery', detail: 'Consumer goods supply chains carry significant forced labour and child labour risk in sourcing countries.' },
   ],
   'Agriculture & Food': [
@@ -448,17 +448,38 @@ export const THRESHOLD_TESTS: Record<string, ThresholdTest> = {
         measureNote: 'Employees of the entity. LOOKBACK NOT MODELLED — most recent year only.' },
     ],
   },
-  // ⚠️ TODO (OMNIBUS) — CSRD and CS3D are employee AND turnover tests (requires === limbs.length).
+  // POST-OMNIBUS. Directive (EU) 2026/470 (Omnibus I), OJ 26 Feb 2026, in force 18 Mar 2026,
+  // amending the Accounting Directive as amended by CSRD. The pre-Omnibus balance-sheet limb is
+  // REMOVED — this is a TWO-limb AND, not a 2-of-3, so `requires` must stay equal to `limbs.length`
+  // (validateThresholdTests enforces that; see `semantics`).
+  //
+  // SCOPE OF THESE CONSTANTS: they are the EU-UNDERTAKING test only. CSRD also reaches
+  // third-country undertakings on entirely separate figures (EUR 450m EU-generated parent turnover,
+  // EUR 200m subsidiary/branch turnover), which this model has no jurisdiction shape to express.
+  // See csrdNonEuAbstention() — a non-EU target must ABSTAIN, never resolve 'not-applicable' off
+  // these limbs.
+  'CSRD': {
+    framework: 'CSRD',
+    requires: 2, semantics: 'and',
+    lookback: 'most-recent-fy', lookbackModelled: true,
+    citation: 'Accounting Directive as amended by Directive (EU) 2026/470 (Omnibus I), arts. 19a/29a — >1,000 employees and >EUR 450m net turnover',
+    limbs: [
+      { measure: 'employees', amount: 1_000, unit: { unit: 'count' },
+        source: 'employee_count', exactMeasure: false, comparison: 'gt',
+        basis: 'More than 1,000 employees (Accounting Directive art. 3, as amended by Omnibus I).',
+        measureNote: 'The Directive measures the AVERAGE number of employees during the financial year. The figure applied is the deal’s single point-in-time headcount input.' },
+      { measure: 'turnover', amount: 450_000_000, unit: { unit: 'currency', currency: 'EUR' },
+        source: 'revenue', exactMeasure: false, comparison: 'gt',
+        basis: 'Net turnover of more than EUR 450,000,000 (Accounting Directive art. 3, as amended by Omnibus I).',
+        measureNote: 'The Directive measures NET turnover, and for a parent the consolidated figure. The figure applied is the deal’s single revenue input, converted at the dated ECB rate in FX_SOURCE.' },
+    ],
+  },
+  // ⚠️ TODO (OMNIBUS) — CS3D is an employee AND turnover test (requires === limbs.length).
   // Constants are NOT written: the post-Omnibus figures are being verified against the amending
-  // directive separately. `pending: true` means these are never evaluated and never routed, so
-  // CSRD/CS3D keep their current jurisdiction-only behaviour and no size test is asserted.
+  // directive separately. `pending: true` means it is never evaluated and never routed, so CS3D
+  // keeps its current jurisdiction-only behaviour and no size test is asserted.
   // To activate: fill `limbs`, set lookback/lookbackModelled, DELETE `pending`. A test guards that
   // a pending entry cannot change applicability.
-  'CSRD': {
-    framework: 'CSRD', requires: 2, semantics: 'and', limbs: [], pending: true,
-    lookback: 'most-recent-fy', lookbackModelled: true,
-    citation: 'Accounting Directive as amended (CSRD) — thresholds pending Omnibus verification',
-  },
   'CS3D': {
     framework: 'CS3D', requires: 2, semantics: 'and', limbs: [], pending: true,
     lookback: 'most-recent-fy', lookbackModelled: true,
@@ -581,8 +602,10 @@ export const assessmentView = (evaluated: boolean, rows: FrameworkApplicability[
     // revenue question — a test goes unassessed on ANY undeclared limb (revenue, balance-sheet
     // total or headcount), or on a deal currency with no published rate.
     // Where no size-gated framework is in scope at all, nothing was withheld and "none nearby" is a
-    // real, fully-assessed finding. That is EU, Global, Australia and Other today, because CSRD and
-    // CS3D are still pending. Canada is NO LONGER in that set — S-211 is an active 2-of-3 test.
+    // real, fully-assessed finding. That is Australia and Other today. Canada is NOT in that set
+    // (S-211 is an active 2-of-3 test), nor is the EU (CSRD is active post-Omnibus), nor Global
+    // (CSRD abstains there — see csrdNonEuAbstention, which is permanently not-assessed and so
+    // permanently blocks a proximity claim for a Global target).
     nearThreshold: notAssessed.length ? 'not-assessed' : near > 0 ? 'assessed-findings' : 'assessed-none',
   }
 }
@@ -723,7 +746,27 @@ export type FrameworkApplicability = {
   status: FrameworkStatus
   side?: 'above' | 'below'          // set only when status === 'near-threshold'
   test?: ThresholdOutcome           // per-limb detail behind the decision
+  // Why the framework could not be resolved, where no size test can answer it. Set only alongside
+  // status 'not-assessed' for an abstention the deal form cannot cure by entering a number — so a
+  // reader is told what is missing (a fact about the target) rather than prompted for a field.
+  reason?: string
 }
+
+// CSRD's limbs above are the EU-undertaking test. A 'Global' target may still be caught as a
+// third-country undertaking on separate constants (EUR 450m EU-generated parent turnover, EUR 200m
+// subsidiary/branch turnover), and this assessment does not capture an EU footprint at all — no
+// market multi-select, no EU-subsidiary field. So it ABSTAINS.
+//
+// Not 'not-applicable': answering a third-country target with the EU-undertaking limbs would turn a
+// false positive into a FALSE NEGATIVE, which in diligence is the worse of the two — a buyer told a
+// statute does not apply stops looking. Same three-state treatment resolveCs3d gives CS3D
+// (lib/deals/reportModel.ts).
+export const CSRD_NON_EU_REASON =
+  'CSRD also reaches non-EU parents through EU subsidiaries and branches on separate thresholds; this assessment does not capture the target’s EU footprint, so applicability cannot be resolved here.'
+
+export const csrdNonEuAbstention = (): FrameworkApplicability => ({
+  framework: 'CSRD', applies: false, status: 'not-assessed', reason: CSRD_NON_EU_REASON,
+})
 
 const applyTest = (test: ThresholdTest, size: DealSize): FrameworkApplicability => {
   const { status, applies, outcome } = evaluateTest(test, size)
@@ -763,8 +806,10 @@ export const getFrameworkApplicability = (
   // US — California SB 253 (statutory trigger is USD 1bn total annual revenue, doing business in CA)
   if (jurisdiction === 'USA') plain('SB 253')
 
-  // EU
-  if (['European Union', 'Global'].includes(jurisdiction)) plain('CSRD')
+  // EU — the CSRD size test is the EU-UNDERTAKING test, so it is applied ONLY to an EU target.
+  // 'Global' keeps CSRD in scope but abstains: in scope to consider, not resolvable here.
+  if (jurisdiction === 'European Union') plain('CSRD')
+  else if (jurisdiction === 'Global') out.push(csrdNonEuAbstention())
   if (jurisdiction === 'European Union' && sector === 'Financial Services') plain('SFDR')
   if (['European Union', 'Global'].includes(jurisdiction)) plain('EU Taxonomy')
   if (['European Union', 'Global'].includes(jurisdiction)) plain('CS3D')

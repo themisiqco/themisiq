@@ -3,6 +3,7 @@ import {
   getApplicableFrameworks, getFrameworkApplicability, convertCurrency, isDealCurrency,
   DEAL_CURRENCIES, USD_PER_UNIT, UNITS_PER_EUR, THRESHOLD_TESTS, isTestActive, evaluateTest,
   validateThresholdTests, type ThresholdTest,
+  CSRD_NON_EU_REASON, csrdNonEuAbstention,
   NEAR_THRESHOLD_BAND, NEAR_BAND_PCT, FX_AS_OF, FX_SOURCE,
   isRevenueDeclared, assessmentView, notAssessedRevenueNote, partiallyAssessedNote,
   nearThresholdNoneNote, resolveFieldsPrompt, FIELD_LABELS, FIELD_FORM_LABELS,
@@ -161,19 +162,18 @@ describe('THRESHOLD_TESTS declaration', () => {
 })
 
 describe('pending tests are inert — the Omnibus safety net', () => {
-  it('CSRD and CS3D are declared pending with no constants', () => {
-    for (const k of ['CSRD', 'CS3D']) {
-      expect(THRESHOLD_TESTS[k].pending).toBe(true)
-      expect(THRESHOLD_TESTS[k].limbs).toEqual([])
-      expect(isTestActive(THRESHOLD_TESTS[k])).toBe(false)
-    }
+  it('CS3D is declared pending with no constants (CSRD was activated post-Omnibus)', () => {
+    expect(THRESHOLD_TESTS['CS3D'].pending).toBe(true)
+    expect(THRESHOLD_TESTS['CS3D'].limbs).toEqual([])
+    expect(isTestActive(THRESHOLD_TESTS['CS3D'])).toBe(false)
+    expect(THRESHOLD_TESTS['CSRD'].pending).toBeUndefined()
+    expect(isTestActive(THRESHOLD_TESTS['CSRD'])).toBe(true)
   })
 
-  it('a pending test cannot change applicability — CSRD/CS3D keep jurisdiction-only behaviour', () => {
+  it('a pending test cannot change applicability — CS3D keeps jurisdiction-only behaviour', () => {
     // A 2-of-0 test would resolve "not-applicable" and silently under-call if it were ever routed.
     for (const rev of [0, 1, 1e12]) {
       const fws = getApplicableFrameworks('European Union', rev, 'Technology', 'ma', 'USD')
-      expect(fws).toContain('CSRD')
       expect(fws).toContain('CS3D')
     }
   })
@@ -421,6 +421,94 @@ describe('SECR no longer over-calls on turnover alone', () => {
   })
 })
 
+// ── CSRD, post-Omnibus ────────────────────────────────────────────────────────────────────────
+
+describe('CSRD — Directive (EU) 2026/470 two-limb AND', () => {
+  const CSRD = THRESHOLD_TESTS['CSRD']
+  const [CSRD_STAFF, CSRD_TURNOVER] = CSRD.limbs
+  const eu = (revenue: number, o: Partial<DealSize> = {}) =>
+    find(getFrameworkApplicability('European Union', revenue, 'Technology', 'ma', o.currency ?? 'USD',
+      { total_assets: o.total_assets ?? null, employee_count: o.employee_count ?? null }), 'CSRD')!
+
+  it('is a two-limb AND — the pre-Omnibus balance-sheet limb is gone', () => {
+    expect([CSRD.requires, CSRD.limbs.length]).toEqual([2, 2])
+    expect(CSRD.semantics).toBe('and')
+    expect(CSRD.limbs.map(l => l.measure).sort()).toEqual(['employees', 'turnover'])
+    expect(CSRD.limbs.some(l => l.measure === 'balance_sheet_total')).toBe(false)
+    expect(CSRD.citation).toContain('2026/470')
+  })
+
+  it('states the limbs in the Directive’s own figures and currency', () => {
+    expect(CSRD_STAFF.amount).toBe(1_000);          expect(CSRD_STAFF.unit).toEqual({ unit: 'count' })
+    expect(CSRD_TURNOVER.amount).toBe(450_000_000); expect(limbCur(CSRD_TURNOVER)).toBe('EUR')
+    expect(CSRD_STAFF.comparison).toBe('gt')        // "more than"
+    expect(CSRD_TURNOVER.comparison).toBe('gt')
+  })
+
+  it('AND means both: either limb alone is not enough', () => {
+    // Headcounts are kept well clear of the ±10% near band (900 would be marginal, not decided).
+    const overTurnover = money(1.5, CSRD_TURNOVER, 'USD')
+    expect(eu(overTurnover, { employee_count: 1_500 }).applies).toBe(true)
+    const staffShort = eu(overTurnover, { employee_count: 500 })
+    expect(staffShort.applies).toBe(false); expect(staffShort.status).toBe('not-applicable')
+    const revShort = eu(money(0.5, CSRD_TURNOVER, 'USD'), { employee_count: 1_500 })
+    expect(revShort.applies).toBe(false);   expect(revShort.status).toBe('not-applicable')
+  })
+
+  it('a target 5% under the headcount limb is near-threshold, not a clean out', () => {
+    // Under an AND, one marginal limb IS decisive — which is exactly when the marker should fire.
+    const r = eu(money(1.5, CSRD_TURNOVER, 'USD'), { employee_count: 950 })
+    expect(r.status).toBe('near-threshold')
+    expect(r.side).toBe('below')
+    expect(r.applies).toBe(false)          // near-ness never changes the legal in/out
+  })
+
+  it('converts the EUR limb through the dated table — first live EUR limb in the table', () => {
+    // Just over and just under 450m EUR, expressed in every deal currency.
+    for (const c of DEAL_CURRENCIES) {
+      expect(eu(money(1.5, CSRD_TURNOVER, c), { employee_count: 2_000, currency: c }).applies).toBe(true)
+      expect(eu(money(0.5, CSRD_TURNOVER, c), { employee_count: 2_000, currency: c }).applies).toBe(false)
+    }
+  })
+
+  it('an undeclared limb is not-assessed, not not-applicable', () => {
+    // Headcount blank with turnover clearly over: the answer is unknown, not "no".
+    const r = eu(money(1.5, CSRD_TURNOVER, 'USD'))
+    expect(r.status).toBe('not-assessed')
+    expect(r.applies).toBe(false)
+    expect(r.test!.fieldsToResolve).toEqual(['employee_count'])
+  })
+
+  it('Global ABSTAINS — never not-applicable on the EU-undertaking limbs', () => {
+    // The worse error in diligence is the false negative: a buyer told CSRD does not apply
+    // stops looking. A non-EU parent can still be caught through EU subsidiaries and branches.
+    for (const rev of [0, 1, 1e12]) {
+      const r = find(getFrameworkApplicability('Global', rev, 'Technology', 'ma', 'USD',
+        { total_assets: 1e12, employee_count: 50_000 }), 'CSRD')!
+      expect(r.status).toBe('not-assessed')
+      expect(r.status).not.toBe('not-applicable')
+      expect(r.applies).toBe(false)
+      expect(r.reason).toBe(CSRD_NON_EU_REASON)
+      expect(r.test).toBeUndefined()          // no size test was run at all
+    }
+  })
+
+  it('the Global abstention names the EU footprint, and prompts for no field', () => {
+    // Nothing the deal form collects would resolve it — so it must not read as a data prompt.
+    expect(CSRD_NON_EU_REASON).toContain('EU footprint')
+    expect(CSRD_NON_EU_REASON).not.toMatch(/enter|revenue|headcount/i)
+    expect(assessmentView(true, [csrdNonEuAbstention()]).fieldsToResolve).toEqual([])
+    expect(assessmentView(true, [csrdNonEuAbstention()]).notAssessed).toEqual(['CSRD'])
+  })
+
+  it('is applied to EU targets only — no other jurisdiction runs the size test', () => {
+    for (const j of ['USA', 'UK', 'Canada', 'Australia', 'Other']) {
+      expect(find(getFrameworkApplicability(j, 1e12, 'Technology', 'ma', 'USD',
+        { total_assets: 1e12, employee_count: 50_000 }), 'CSRD')).toBeUndefined()
+    }
+  })
+})
+
 describe('Canada S-211', () => {
   it('is in scope for Canada only', () => {
     expect(getFrameworkApplicability('Canada', 0, 'Technology', 'ma', 'CAD').some(r => r.framework === 'Canada S-211')).toBe(true)
@@ -465,12 +553,22 @@ describe('assessmentView — per-framework, not per-section', () => {
     expect(v.nearThreshold).toBe('not-assessed')
   })
 
-  it('blank revenue + EU/Global/Australia: nothing is withheld at all', () => {
-    for (const j of ['European Union', 'Global', 'Australia', 'Other']) {
+  it('blank revenue + Australia/Other: nothing is withheld at all', () => {
+    for (const j of ['Australia', 'Other']) {
       const v = viewFor(j, 0)
       expect(v.notAssessed).toEqual([])
       expect(v.frameworks).toBe('assessed-findings')
       expect(v.nearThreshold).toBe('assessed-none')
+    }
+  })
+
+  it('EU and Global now withhold CSRD — for different reasons, both not-assessed', () => {
+    // EU: the size test is real but its limbs are undeclared. Global: no size test can settle it.
+    for (const j of ['European Union', 'Global']) {
+      const v = viewFor(j, 0)
+      expect(v.notAssessed).toContain('CSRD')
+      expect(v.frameworks).toBe('assessed-findings')   // the rest of the EU stack still resolves
+      expect(v.nearThreshold).toBe('not-assessed')     // one unassessed limb blocks any proximity claim
     }
   })
 
@@ -527,7 +625,9 @@ describe('not-assessed reads as a prompt, naming the field', () => {
 describe('blank revenue resolves everything that does not need revenue', () => {
   it('EU resolves CS3D/CSRD and prices supply chain at $2,900', () => {
     const fws = getApplicableFrameworks('European Union', 0, 'Technology', 'ma', 'USD')
-    expect(fws).toEqual(['CSRD', 'EU Taxonomy', 'CS3D', 'IFRS S2', 'TCFD'])
+    // CSRD is absent: post-Omnibus it is size-gated, and with revenue and headcount blank it is
+    // not-assessed rather than applied. The rich form carries the caveat; the flat list is in/out.
+    expect(fws).toEqual(['EU Taxonomy', 'CS3D', 'IFRS S2', 'TCFD'])
     const o = getObligations(1, fws, 'Technology')
     expect(o.included.find(x => x.short === 'supply chain')!.pricing).toEqual({ kind: 'priced', priceUSD: 2900 })
     expect(o.themisIqTotal).toBe(4900 + 2900)
@@ -625,7 +725,7 @@ describe('flat form stays the applies-filtered rich form', () => {
   it('leaves non-size-gated frameworks untouched by currency and size', () => {
     for (const c of DEAL_CURRENCIES)
       expect(getApplicableFrameworks('European Union', 2_000_000, 'Financial Services', 'ma', c))
-        .toEqual(['CSRD', 'SFDR', 'EU Taxonomy', 'CS3D', 'IFRS S2', 'TCFD', 'PCAF'])
+        .toEqual(['SFDR', 'EU Taxonomy', 'CS3D', 'IFRS S2', 'TCFD', 'PCAF'])
   })
 })
 
