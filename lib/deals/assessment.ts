@@ -613,8 +613,10 @@ export const assessmentView = (evaluated: boolean, rows: FrameworkApplicability[
 // Shared copy — the wizard screens and the report must not drift. Defaults to every framework carrying an
 // ACTIVE size test, derived from THRESHOLD_TESTS at call time, so adding a test cannot leave this
 // stale and a `pending` one is never named. Pass the in-scope subset to name only what actually
-// went unevaluated for this deal. (The `fields` default is still ['revenue'] alone, which
-// under-describes a multi-limb test; every call site in the app passes the resolved list instead.)
+// went unevaluated for this deal. The `fields` list must be DERIVED FROM LIMBS — it is required on
+// every note helper below, with no default, because a note helper must never name a field it has not
+// been given. A default filled that gap by guessing, and named revenue at a reader who had entered
+// it: an abstention with no limbs (CS3D) yields an empty list, which is the true answer.
 // A size-gated framework that vanishes must read as a PROMPT, not an absence. Every not-assessed
 // note therefore names the specific field(s) that would resolve it.
 export const resolveFieldsPrompt = (fields: LimbSource[], frameworks: string[]): string =>
@@ -623,12 +625,12 @@ export const resolveFieldsPrompt = (fields: LimbSource[], frameworks: string[]):
 
 export const notAssessedRevenueNote = (
   frameworks: string[] = Object.keys(THRESHOLD_TESTS).filter(k => isTestActive(THRESHOLD_TESTS[k])),
-  fields: LimbSource[] = ['revenue'],
+  fields: LimbSource[],
 ): string =>
   `NOT ASSESSED — size test incomplete for ${frameworks.join(', ')}. ${resolveFieldsPrompt(fields, frameworks)}`.trim()
 
 // Used where a list DID resolve but a size test was withheld — the caveat must not read as a finding.
-export const partiallyAssessedNote = (frameworks: string[], fields: LimbSource[] = ['revenue']): string => {
+export const partiallyAssessedNote = (frameworks: string[], fields: LimbSource[]): string => {
   const one = frameworks.length === 1
   return `Determined from jurisdiction and sector. NOT ASSESSED: ${frameworks.join(', ')} — the size test could not be completed, so ${one ? 'this trigger was' : 'these triggers were'} not evaluated. This is not a finding that ${one ? 'it does' : 'they do'} not apply. ${resolveFieldsPrompt(fields, frameworks)}`.trim()
 }

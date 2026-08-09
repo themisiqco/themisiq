@@ -669,6 +669,20 @@ describe('not-assessed reads as a prompt, naming the field', () => {
     expect(partiallyAssessedNote(v.notAssessed, v.fieldsToResolve)).toContain('not a finding that it does not apply')
   })
 
+  // Covers the report call site at report/page.tsx:229, which passes view.fieldsToResolve directly;
+  // a CS3D-only abstention makes that list empty. CS3D's size test is pending with no limbs, so no
+  // limb was ever consulted and no field would settle it — the note must name none. The removed
+  // `= ['revenue']` default prompted for a figure the same report printed at the top.
+  it('notAssessedRevenueNote names no field when fieldsToResolve is empty', () => {
+    const v = viewFor('European Union', 620_000_000, 'Industrials & Manufacturing', 'EUR', { total_assets: 400_000_000, employee_count: 1850 })
+    expect(v.notAssessed).toEqual(['CS3D'])
+    expect(v.fieldsToResolve).toEqual([])
+    const note = notAssessedRevenueNote(v.notAssessed, v.fieldsToResolve)
+    expect(note).toContain('NOT ASSESSED')
+    expect(note).not.toContain('Enter')
+    expect(note).not.toContain('revenue')
+  })
+
   it('has a label for every limb source in both registers, and never exposes a column name', () => {
     const sources = new Set(Object.values(THRESHOLD_TESTS).flatMap(t => t.limbs.map(l => l.source)))
     for (const s of sources) {
@@ -681,9 +695,9 @@ describe('not-assessed reads as a prompt, naming the field', () => {
   })
 
   it('keeps assessed-none distinct from not-assessed', () => {
-    expect(nearThresholdNoneNote()).not.toBe(notAssessedRevenueNote())
+    expect(nearThresholdNoneNote()).not.toBe(notAssessedRevenueNote(undefined, ['revenue']))
     expect(nearThresholdNoneNote()).toContain(NEAR_BAND_PCT)
-    expect(notAssessedRevenueNote()).toContain('NOT ASSESSED')
+    expect(notAssessedRevenueNote(undefined, ['revenue'])).toContain('NOT ASSESSED')
   })
 })
 

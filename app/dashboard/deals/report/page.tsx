@@ -228,7 +228,7 @@ function DealReport({ deal, reportDate, reference }: { deal: DealRow; reportDate
   const nearBelow = nearThreshold.filter(f => !f.applies)
   const notAssessedNote = notAssessedRevenueNote(
     view.notAssessed.length ? view.notAssessed : undefined,
-    view.fieldsToResolve.length ? view.fieldsToResolve : undefined,
+    view.fieldsToResolve,
   )
 
   const limbRows = buildLimbRows(applicability)

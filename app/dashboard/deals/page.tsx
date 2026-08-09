@@ -822,12 +822,16 @@ function DealsDashboardInner() {
         </div>
       </div>
 
-      {/* Export is reachable with revenue blank (the step tabs and Next are ungated, and the
-          confirm checkbox is a liability disclaimer, not a completeness check). The report stays
-          downloadable — it is still useful — but the reader is told what is missing from it. */}
+      {/* Renders whenever view.notAssessed is non-empty — ANY withheld framework, not a blank
+          revenue field: an abstention no field can cure (CS3D's pending size test) reaches here
+          too. So the heading names the frameworks, as :519 and report/page.tsx:338 do; naming a
+          field the condition never checked told a reader who had entered revenue to enter it.
+          Export is reachable in this state (the step tabs and Next are ungated, and the confirm
+          checkbox is a liability disclaimer, not a completeness check). The report stays
+          downloadable — it is still useful — but the reader is told which frameworks it withheld. */}
       {view.notAssessed.length > 0 && (
         <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '1rem', marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#ba7517', letterSpacing: '0.04em', marginBottom: 4 }}>PARTIAL — REVENUE NOT PROVIDED</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#ba7517', letterSpacing: '0.04em', marginBottom: 4 }}>PARTIAL — {view.notAssessed.join(', ')} NOT ASSESSED</div>
           <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
             Frameworks determinable from jurisdiction and sector <strong style={{ fontWeight: 600 }}>have</strong> been assessed and appear in this report. {view.notAssessed.join(' and ')} {view.notAssessed.length === 1 ? 'is' : 'are'} marked <strong style={{ fontWeight: 600 }}>NOT ASSESSED</strong> — that is not a finding that {view.notAssessed.length === 1 ? 'it does' : 'they do'} not apply. {resolveFieldsPrompt(view.fieldsToResolve, view.notAssessed)}
           </div>
