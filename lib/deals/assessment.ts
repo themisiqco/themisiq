@@ -385,11 +385,37 @@ export type ThresholdTest = {
   lookback: 'most-recent-fy' | 'either-of-two-most-recent-fy'
   lookbackModelled: boolean     // false ⇒ evaluated on the most recent year only; stated in-report
   citation: string
+  // A test's limbs are assumed to be the WHOLE statutory scope test. Set FALSE where the modelled
+  // limbs are ONE ROUTE among several the instrument provides, so failing them does not establish
+  // that the framework does not apply — only that this route was not triggered. ABSENT means
+  // exhaustive, the safe default for a test whose limbs are the entire scope provision (CSRD
+  // arts. 19a/29a). It is the falsehood that has to be declared, not the truth: a new test is
+  // exhaustive until someone knowingly says otherwise, so forgetting the field cannot turn a
+  // partial model into a confident negative.
+  exhaustive?: false
+  // The sentence shown when a non-exhaustive test's modelled route WAS evaluated and NOT met. Set by
+  // applyTest as the row's `reason`, so the surfaces state why the framework was withheld without
+  // re-deriving it. REQUIRED IN PRACTICE for any test declaring `exhaustive: false`: without it the
+  // row is withheld carrying no explanation at all, which is the absence-rendered-as-a-finding
+  // failure this whole three-state machinery exists to prevent. Typed optional only because it is
+  // meaningless on an exhaustive test.
+  routeNotMetReason?: string
   // TRUE ⇒ constants not yet verified. A pending test is NEVER evaluated and NEVER routed: the
   // framework keeps its existing jurisdiction-only behaviour. This is the safety net for scaffolded
   // tests — a 2-of-0 test would otherwise resolve "not-applicable" and silently under-call.
   pending?: true
 }
+
+// For an EU target that FAILS the art. 2(1)(a) limbs. `exhaustive: false` makes that outcome
+// 'not-assessed' rather than 'not-applicable' (see evaluateTest), and this is the sentence that says
+// why: the route assessed here was not met, and the routes that were not modelled are still open.
+// Declared above THRESHOLD_TESTS because the CS3D entry references it — the table's own order is
+// unchanged.
+//
+// No trailing full stop: the report appends one at the render site (deals/report/page.tsx), and
+// resolveCs3d strips any trailing period defensively.
+export const CS3D_ROUTE_NOT_MET_REASON =
+  'below the size route assessed here; CS3D can also reach companies through group parentage and through franchising or licensing arrangements, which this assessment does not model'
 
 export const THRESHOLD_TESTS: Record<string, ThresholdTest> = {
   'SB 253': {
@@ -474,16 +500,47 @@ export const THRESHOLD_TESTS: Record<string, ThresholdTest> = {
         measureNote: 'The Directive measures NET turnover, and for a parent the consolidated figure. The figure applied is the deal’s single revenue input, converted at the dated ECB rate in FX_SOURCE.' },
     ],
   },
-  // ⚠️ TODO (OMNIBUS) — CS3D is an employee AND turnover test (requires === limbs.length).
-  // Constants are NOT written: the post-Omnibus figures are being verified against the amending
-  // directive separately. `pending: true` means it is never evaluated and never routed, so CS3D
-  // keeps its current jurisdiction-only behaviour and no size test is asserted.
-  // To activate: fill `limbs`, set lookback/lookbackModelled, DELETE `pending`. A test guards that
-  // a pending entry cannot change applicability.
+  // POST-OMNIBUS. Directive (EU) 2024/1760 (CS3D) as amended by Directive (EU) 2026/470 (Omnibus I).
+  // A TWO-limb AND, so `requires` must stay equal to `limbs.length` (validateThresholdTests
+  // enforces that; see `semantics`).
+  //
+  // SCOPE OF THESE CONSTANTS: art. 2(1)(a) ONLY — the EU-company employee-and-turnover route.
+  // CS3D catches a company by three further routes this model does NOT express:
+  //   (b) group parentage — an ultimate parent of a group meeting the figures on a consolidated
+  //       basis, which needs a group/standalone distinction the deal form does not collect;
+  //   (c) franchising and licensing — EUR 75m in royalties with EUR 275m net worldwide turnover,
+  //       and no royalty figure is collected at all.
+  // So a target BELOW these limbs is NOT out of scope — it is only outside route (a). 'not-met' on
+  // these two limbs means route (a) was not triggered, never that CS3D does not apply.
+  //
+  // ART. 2(8) EXCLUSIONS ARE NOT APPLIED: AIFs and UCITS are excluded from CS3D outright regardless
+  // of size, and this model has no entity-type field to recognise one — so a fund meeting the
+  // figures resolves 'applies' here when the Directive excludes it. That is an OVER-call, the safer
+  // direction, but it is a real divergence and must be stated wherever this test is reported.
+  //
+  // lookbackModelled: FALSE. Art. 2(5) requires the figures be met in EACH OF THE TWO consecutive
+  // financial years preceding the reporting year; two scalar columns hold one year, so a target that
+  // crossed both limbs once is over-called and one that dipped in the second year is not caught as
+  // the Directive would catch it. The report states this rather than implying a two-year test ran.
   'CS3D': {
-    framework: 'CS3D', requires: 2, semantics: 'and', limbs: [], pending: true,
-    lookback: 'most-recent-fy', lookbackModelled: true,
-    citation: 'Directive (EU) 2024/1760 (CS3D) — thresholds pending Omnibus verification',
+    framework: 'CS3D',
+    requires: 2, semantics: 'and',
+    lookback: 'most-recent-fy', lookbackModelled: false,
+    // Routes (b) and (c) above are not modelled, so these limbs are not the whole scope test:
+    // failing them cannot resolve 'not-applicable'. See evaluateTest's status mapping.
+    exhaustive: false,
+    routeNotMetReason: CS3D_ROUTE_NOT_MET_REASON,
+    citation: 'Directive (EU) 2024/1760 as amended by Directive (EU) 2026/470 (Omnibus I), art. 2(1)(a) — >5,000 employees and >EUR 1.5bn net worldwide turnover',
+    limbs: [
+      { measure: 'employees', amount: 5_000, unit: { unit: 'count' },
+        source: 'employee_count', exactMeasure: false, comparison: 'gt',
+        basis: 'More than 5,000 employees on average (Directive (EU) 2024/1760 art. 2(1)(a), as amended by Omnibus I).',
+        measureNote: 'The Directive measures the AVERAGE number of employees during the financial year. The figure applied is the deal’s single point-in-time headcount input.' },
+      { measure: 'turnover', amount: 1_500_000_000, unit: { unit: 'currency', currency: 'EUR' },
+        source: 'revenue', exactMeasure: false, comparison: 'gt',
+        basis: 'Net worldwide turnover of more than EUR 1,500,000,000 (Directive (EU) 2024/1760 art. 2(1)(a), as amended by Omnibus I).',
+        measureNote: 'The Directive measures NET WORLDWIDE turnover. The figure applied is the deal’s single revenue input, converted at the dated ECB rate in FX_SOURCE.' },
+    ],
   },
 }
 
@@ -590,6 +647,10 @@ export const assessmentView = (evaluated: boolean, rows: FrameworkApplicability[
   const fieldsToResolve = [...new Set(rows.filter(r => r.status === 'not-assessed').flatMap(r => r.test?.fieldsToResolve ?? []))]
   const applied = rows.filter(r => r.applies).length
   const near = rows.filter(r => r.status === 'near-threshold').length
+  // Withheld rows split two ways and only one of them bears on proximity — see the note on
+  // `nearThreshold` below. Counted from `rows` because the distinction lives on the row's `test`,
+  // and `notAssessed` is a list of names that cannot carry it.
+  const unevaluated = rows.filter(r => r.status === 'not-assessed' && (!r.test || r.test.unknownCount > 0)).length
   return {
     evaluated: true,
     notAssessed,
@@ -597,16 +658,30 @@ export const assessmentView = (evaluated: boolean, rows: FrameworkApplicability[
     // Reports what it could determine. Only fully unassessed when NOTHING resolved and something
     // was withheld — otherwise the resolved list stands and `notAssessed` carries the caveat.
     frameworks: applied > 0 ? 'assessed-findings' : notAssessed.length ? 'not-assessed' : 'assessed-none',
-    // Conservative by design: ONE framework whose size test could not be completed blocks any
-    // proximity claim, because a limb that was never evaluated could be the marginal one. Not a
-    // revenue question — a test goes unassessed on ANY undeclared limb (revenue, balance-sheet
-    // total or headcount), or on a deal currency with no published rate.
+    // Conservative by design: ONE limb that could not be evaluated blocks any proximity claim,
+    // because a limb that was never evaluated could be the marginal one. Not a revenue question — a
+    // limb goes unevaluated on ANY undeclared figure (revenue, balance-sheet total or headcount), or
+    // on a deal currency with no published rate.
+    //
+    // THE TEST IS WHETHER A LIMB WENT UNEVALUATED, NOT WHETHER A FRAMEWORK WAS WITHHELD. The two
+    // stopped being the same thing once a test could be non-exhaustive (`exhaustive: false`): a
+    // framework withheld because the MODELLED ROUTE WAS NOT MET had every limb evaluated, and a
+    // fully-evaluated route that simply did not catch this target tells us nothing about proximity on
+    // any OTHER framework. Suppressing on it would delete a real marginal CSRD or SECR limb from the
+    // report to caveat a question that was actually answered — and since CS3D's figures are high,
+    // that would be the normal case for an EU deal rather than an edge case.
+    //   `test.unknownCount` is the discriminator: it counts the limbs that could not be settled, so
+    //   > 0 is exactly the condition the rationale above describes.
+    //   NO `test` AT ALL also suppresses — a hand-built abstention (csrdNonEuAbstention,
+    //   cs3dNonEuAbstention) ran no limbs whatsoever, so nothing about the target's size was
+    //   established and it is the strongest case for withholding a proximity claim, not the weakest.
+    //
     // Where no size-gated framework is in scope at all, nothing was withheld and "none nearby" is a
     // real, fully-assessed finding. That is Australia and Other today. Canada is NOT in that set
     // (S-211 is an active 2-of-3 test), nor is the EU (CSRD is active post-Omnibus), nor Global
     // (CSRD abstains there — see csrdNonEuAbstention, which is permanently not-assessed and so
     // permanently blocks a proximity claim for a Global target).
-    nearThreshold: notAssessed.length ? 'not-assessed' : near > 0 ? 'assessed-findings' : 'assessed-none',
+    nearThreshold: unevaluated > 0 ? 'not-assessed' : near > 0 ? 'assessed-findings' : 'assessed-none',
   }
 }
 
@@ -710,6 +785,13 @@ export type ThresholdOutcome = {
 //   otherwise              → not-assessed   (genuinely undetermined; name the fields)
 // So a 2-of-3 test with two declared limbs both met APPLIES regardless of the third, and with two
 // declared limbs both unmet is DEFINITIVELY out. Only the ambiguous middle is not-assessed.
+//
+// EXCEPT where the test is non-exhaustive (`exhaustive: false`): its limbs are one route among
+// several, so the ARITHMETIC is unchanged but the CLAIM is weaker — failing every modelled limb
+// establishes that this route was not triggered, not that the framework does not apply. That maps to
+// 'not-assessed', the absence of a finding, rather than 'not-applicable', which is a finding. The
+// gap it leaves is real and visible: no field would resolve it, so `fieldsToResolve` stays empty and
+// the surfaces prompt for nothing. What is missing is a route this model does not express.
 export const evaluateTest = (test: ThresholdTest, size: DealSize): { status: FrameworkStatus; applies: boolean; outcome: ThresholdOutcome } => {
   const limbs = test.limbs.map(l => evaluateLimb(l, size))
   const metCount = limbs.filter(l => l.state === 'met').length
@@ -718,7 +800,9 @@ export const evaluateTest = (test: ThresholdTest, size: DealSize): { status: Fra
 
   const applies = metCount >= test.requires
   const definitivelyOut = ceiling < test.requires
-  const status: FrameworkStatus = applies ? 'applies' : definitivelyOut ? 'not-applicable' : 'not-assessed'
+  const status: FrameworkStatus = applies ? 'applies'
+    : definitivelyOut ? (test.exhaustive === false ? 'not-assessed' : 'not-applicable')
+    : 'not-assessed'
 
   // Outcome-flip near-threshold: mark only when a MARGINAL limb is decisive, not whenever any limb
   // happens to sit near its figure. A near limb that cannot change the answer is noise.
@@ -748,9 +832,16 @@ export type FrameworkApplicability = {
   status: FrameworkStatus
   side?: 'above' | 'below'          // set only when status === 'near-threshold'
   test?: ThresholdOutcome           // per-limb detail behind the decision
-  // Why the framework could not be resolved, where no size test can answer it. Set only alongside
-  // status 'not-assessed' for an abstention the deal form cannot cure by entering a number — so a
-  // reader is told what is missing (a fact about the target) rather than prompted for a field.
+  // Why the framework's applicability could not be ESTABLISHED FROM THE MODELLED TEST. That covers an
+  // abstention no size test can answer (no EU-footprint field, no entity-type field) AND a
+  // NON-EXHAUSTIVE test whose modelled route was evaluated and NOT met — the route is settled, the
+  // framework is not, because other routes exist that this model does not express.
+  // SO IT MAY ACCOMPANY EITHER 'not-assessed' OR 'near-threshold', and a consumer MUST NOT GATE ON
+  // STATUS WHEN READING IT: a marginal-but-unmet non-exhaustive test raises the near-threshold marker
+  // while still carrying its reason, and resolveCs3d silently lost that reason for as long as it
+  // checked the status first.
+  // In every case a reader is told what is missing (a fact about the target, or about this model)
+  // rather than prompted for a field.
   reason?: string
 }
 
@@ -768,6 +859,22 @@ export const CSRD_NON_EU_REASON =
 
 export const csrdNonEuAbstention = (): FrameworkApplicability => ({
   framework: 'CSRD', applies: false, status: 'not-assessed', reason: CSRD_NON_EU_REASON,
+})
+
+// CS3D's limbs above are the art. 2(1)(a) EU-COMPANY test. For a company formed outside the EU the
+// Directive changes the measure rather than the figure: art. 2(2) turns on net turnover generated IN
+// THE UNION, and a single worldwide revenue input cannot answer that. So a non-EU target ABSTAINS on
+// the same reasoning as CSRD — resolving it against the EU-company limbs would answer a question the
+// Directive does not ask, and a 'not-applicable' would be the false negative that stops a buyer
+// looking.
+//
+// No trailing full stop: the report appends one at the render site (deals/report/page.tsx), and
+// resolveCs3d strips any trailing period defensively.
+export const CS3D_NON_EU_REASON =
+  'For a company formed outside the EU, CS3D turns on net turnover generated IN THE UNION; this assessment collects a single revenue figure and does not capture the target’s EU turnover, so applicability cannot be resolved here'
+
+export const cs3dNonEuAbstention = (): FrameworkApplicability => ({
+  framework: 'CS3D', applies: false, status: 'not-assessed', reason: CS3D_NON_EU_REASON,
 })
 
 // CS3D's THRESHOLD_TESTS entry is still `pending` — no limbs, so no size test runs. Routing it
@@ -794,12 +901,19 @@ const applyTest = (test: ThresholdTest, size: DealSize): FrameworkApplicability 
   // Near-threshold is a PRESENTATION of a decided outcome, never a replacement for it: the marker
   // is raised only when a marginal limb is decisive, and `applies` is untouched either way.
   const near = outcome.nearOutcomeFlip
+  // The ONE case where an evaluated test carries a reason. A non-exhaustive test that cannot reach
+  // `requires` was fully evaluated and still withheld (see evaluateTest's status mapping), so the row
+  // would otherwise be the one thing this module refuses to produce: a framework removed from the
+  // findings with nothing said about why. Same arithmetic as `definitivelyOut`, read back off the
+  // outcome rather than recomputed from `size`.
+  const routeNotMet = test.exhaustive === false && outcome.ceiling < outcome.requires
   return {
     framework: test.framework,
     applies,
     status: near ? 'near-threshold' : status,
     ...(near && outcome.flipSide ? { side: outcome.flipSide } : {}),
     test: outcome,
+    ...(routeNotMet && test.routeNotMetReason ? { reason: test.routeNotMetReason } : {}),
   }
 }
 
@@ -833,9 +947,11 @@ export const getFrameworkApplicability = (
   else if (jurisdiction === 'Global') out.push(csrdNonEuAbstention())
   if (jurisdiction === 'European Union' && sector === 'Financial Services') plain('SFDR')
   if (['European Union', 'Global'].includes(jurisdiction)) plain('EU Taxonomy')
-  // CS3D stays in scope for the same jurisdictions, but ABSTAINS rather than asserting — its size
-  // test is still pending, so nothing has been evaluated. See cs3dPendingAbstention.
-  if (['European Union', 'Global'].includes(jurisdiction)) out.push(cs3dPendingAbstention())
+  // CS3D — the art. 2(1)(a) limbs are the EU-COMPANY test, so they are applied ONLY to an EU target.
+  // 'Global' keeps CS3D in scope but abstains: art. 2(2) measures turnover generated IN THE UNION,
+  // which this assessment does not collect. Same split as CSRD above.
+  if (jurisdiction === 'European Union') plain('CS3D')
+  else if (jurisdiction === 'Global') out.push(cs3dNonEuAbstention())
 
   // UK — distinct regime, NOT CSRD
   if (jurisdiction === 'UK') {

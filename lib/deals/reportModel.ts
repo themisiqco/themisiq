@@ -248,18 +248,28 @@ export type Cs3dState =
 export const resolveCs3d = (frameworks: string[], applicability: FrameworkApplicability[]): Cs3dState => {
   if (frameworks.includes('CS3D')) return { state: 'applies' }
   const row = applicability.find(f => f.framework === 'CS3D')
+  // The row's OWN reason wins WHEREVER IT EXISTS. Deriving a second, vaguer one here would let the
+  // engine and the report state the same fact differently — and the status gate this used to sit
+  // behind is what stopped that being true: a near-threshold row (both limbs marginal and unmet, so
+  // the route WAS evaluated and not met) carried a reason and still fell past every branch to the
+  // non-EU sentence below, telling the reader of an EU target that the target was outside the EU.
+  // Trailing period stripped because the render site appends one.
+  if (row?.reason) return { state: 'conditional', reason: row.reason.replace(/\.$/, '') }
   if (row?.status === 'not-assessed') {
-    // The row's OWN reason wins where it has one. An abstention the deal form cannot cure by
-    // entering a number (CS3D's pending size test) carries its explanation on the row; deriving a
-    // second, vaguer one here would let the engine and the report state the same fact differently.
-    // Trailing period stripped because the render site appends one.
-    if (row.reason) return { state: 'conditional', reason: row.reason.replace(/\.$/, '') }
+    // Withheld with no reason of its own ⇒ name the field(s) that would settle it, where any would.
     const prompt = resolveFieldsPrompt(row.test?.fieldsToResolve ?? [], ['CS3D'])
     return { state: 'conditional', reason: `size test incomplete${prompt ? ` — ${prompt}` : ''}` }
   }
   if (row?.status === 'not-applicable') return { state: 'not-applicable' }
-  // No row at all ⇒ non-EU jurisdiction.
-  return { state: 'conditional', reason: 'CS3D reaches non-EU companies through EU-facing activity; this assessment does not capture the target’s markets, so applicability cannot be resolved here' }
+  // No row at all ⇒ CS3D was never in scope for this jurisdiction. CHECKED rather than assumed: this
+  // sentence asserts facts about the target (formed outside the EU, markets not captured), so it must
+  // not be the fall-through for a row that merely matched no branch above.
+  if (!row) return { state: 'conditional', reason: 'CS3D reaches non-EU companies through EU-facing activity; this assessment does not capture the target’s markets, so applicability cannot be resolved here' }
+  // A row that matched nothing above. States ONLY what is known — no claim about jurisdiction, about
+  // markets, or about a missing field, because none of those has been established here. An honest
+  // non-answer, because an error message that guesses at a cause it cannot verify eventually names
+  // the wrong one; the branch above is what that looked like.
+  return { state: 'conditional', reason: 'CS3D applicability was not resolved by this assessment' }
 }
 
 // Rewrite generic disclosure-regime labels (SB 253, bare CSRD) on a static sector risk template to

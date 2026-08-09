@@ -4,6 +4,7 @@ import {
   DEAL_CURRENCIES, USD_PER_UNIT, UNITS_PER_EUR, THRESHOLD_TESTS, isTestActive, evaluateTest,
   validateThresholdTests, type ThresholdTest,
   CSRD_NON_EU_REASON, csrdNonEuAbstention, CS3D_PENDING_REASON, cs3dPendingAbstention,
+  CS3D_ROUTE_NOT_MET_REASON,
   NEAR_THRESHOLD_BAND, NEAR_BAND_PCT, FX_AS_OF, FX_SOURCE,
   isRevenueDeclared, assessmentView, notAssessedRevenueNote, partiallyAssessedNote,
   nearThresholdNoneNote, resolveFieldsPrompt, FIELD_LABELS, FIELD_FORM_LABELS,
@@ -163,25 +164,51 @@ describe('THRESHOLD_TESTS declaration', () => {
 })
 
 describe('pending tests are inert — the Omnibus safety net', () => {
-  it('CS3D is declared pending with no constants (CSRD was activated post-Omnibus)', () => {
-    expect(THRESHOLD_TESTS['CS3D'].pending).toBe(true)
-    expect(THRESHOLD_TESTS['CS3D'].limbs).toEqual([])
-    expect(isTestActive(THRESHOLD_TESTS['CS3D'])).toBe(false)
-    expect(THRESHOLD_TESTS['CSRD'].pending).toBeUndefined()
+  // Asserted against a LOCALLY CONSTRUCTED test, never a THRESHOLD_TESTS entry. CS3D was the last
+  // pending one and its constants have now landed, so pinning this to the live table would tie the
+  // safety net to whichever framework happens to be scaffolded today — and delete the coverage the
+  // moment it activates. The machinery has to hold for the NEXT one, whatever that turns out to be.
+  it('the pending machinery still holds for the next scaffolded test', () => {
+    const limb: ThresholdLimb = {
+      measure: 'employees', amount: 5_000, unit: { unit: 'count' },
+      source: 'employee_count', exactMeasure: true, comparison: 'gt',
+      basis: 'More than 5,000 employees.',
+    }
+    const base: ThresholdTest = {
+      framework: 'Not Yet Verified', requires: 2, semantics: 'and', limbs: [limb, limb],
+      lookback: 'most-recent-fy', lookbackModelled: true, citation: 'constants pending',
+    }
+    expect(isTestActive({ ...base, pending: true })).toBe(false)   // flagged ⇒ inert even WITH limbs
+    expect(isTestActive({ ...base, limbs: [] })).toBe(false)       // no limbs ⇒ inert even UNFLAGGED
+    // Both, i.e. a freshly scaffolded entry. The validator SKIPS it rather than failing: 'and' with
+    // requires 2 and no limbs cannot be reconciled until the limbs exist, and the check binds on the
+    // edit that adds them — which is the same edit that deletes `pending`.
+    const scaffold: ThresholdTest = { ...base, limbs: [], pending: true }
+    expect(isTestActive(scaffold)).toBe(false)
+    expect(() => validateThresholdTests({ 'Not Yet Verified': scaffold })).not.toThrow()
+    // Written and unflagged ⇒ active. CSRD is the live counterpart of that state.
+    expect(isTestActive(base)).toBe(true)
     expect(isTestActive(THRESHOLD_TESTS['CSRD'])).toBe(true)
+    expect(THRESHOLD_TESTS['CSRD'].pending).toBeUndefined()
   })
 
-  it('a pending test is never ROUTED — CS3D abstains rather than asserting', () => {
-    // A 2-of-0 test would resolve "not-applicable" and silently under-call if it were ever routed.
-    // Falling through to a plain `applies` is the opposite error, and the one that was live: an EU
-    // target with 1,850 employees and EUR 620m revenue was told CS3D APPLIES on no test at all.
+  it('a non-exhaustive test that fails its modelled route is NOT-ASSESSED, never not-applicable', () => {
+    // The live defect this fixture caught: an EU target with 1,850 employees and EUR 620m revenue was
+    // told CS3D APPLIES on no test at all. The route now runs and its limbs are unmet — but CS3D also
+    // reaches companies through group parentage and through franchising/licensing, neither modelled,
+    // so failing route (a) cannot establish that the framework does not apply. `exhaustive: false`
+    // is what holds that line.
     for (const rev of [0, 1, 1e12]) {
       const row = find(getFrameworkApplicability('European Union', rev, 'Technology', 'ma', 'USD',
         { employee_count: 1_850, total_assets: 1e9 }), 'CS3D')!
       expect(row.status).toBe('not-assessed')
       expect(row.applies).toBe(false)
-      expect(row.reason).toBe(CS3D_PENDING_REASON)
-      expect(row.test).toBeUndefined()
+      // The false-negative guard, kept explicit: 'not-applicable' would tell a buyer CS3D does not
+      // apply, and a buyer told that stops looking.
+      expect(row.status).not.toBe('not-applicable')
+      // The route DID run — this is a weak claim about an evaluated test, not an abstention that
+      // skipped one. That is what distinguishes it from cs3dNonEuAbstention.
+      expect(row.test).toBeDefined()
     }
   })
 
@@ -564,9 +591,30 @@ describe('CS3D abstains while its size test is pending', () => {
     const state = resolveCs3d(getApplicableFrameworks('European Union', 620_000_000, 'Technology', 'ma', 'EUR',
       { employee_count: 1_850, total_assets: 1e9 }), rows)
     expect(state.state).toBe('conditional')
-    expect(state.state === 'conditional' && state.reason).toBe(CS3D_PENDING_REASON)
+    expect(state.state === 'conditional' && state.reason).toBe(CS3D_ROUTE_NOT_MET_REASON)
     // Never the old placeholder, and never 'applies' or 'not-applicable'.
     expect(state.state === 'conditional' && state.reason).not.toBe('size test incomplete')
+  })
+
+  // 4,700 employees and EUR 1.4bn put BOTH art. 2(1)(a) limbs inside the 10% band and unmet, so
+  // nearOutcomeFlip raises 'near-threshold' over the 'not-assessed' the route-not-met outcome maps to.
+  // The row therefore carries a reason under a status resolveCs3d did not branch on, and every branch
+  // missed it: an EU target was told CS3D reaches non-EU companies and its markets were not captured.
+  // Neither statement was true, and neither was checkable — the sentence was the fall-through, not a
+  // finding.
+  it('a near-threshold row keeps its OWN reason — resolveCs3d must not fall through to the non-EU sentence', () => {
+    const size = { employee_count: 4_700 }
+    const rows = getFrameworkApplicability('European Union', 1_400_000_000, 'Technology', 'ma', 'EUR', size)
+    const row = find(rows, 'CS3D')!
+    expect(row.status).toBe('near-threshold')
+    expect(row.reason).toBe(CS3D_ROUTE_NOT_MET_REASON)
+    const state = resolveCs3d(
+      getApplicableFrameworks('European Union', 1_400_000_000, 'Technology', 'ma', 'EUR', size), rows)
+    expect(state.state).toBe('conditional')
+    expect(state.state === 'conditional' && state.reason).toBe(CS3D_ROUTE_NOT_MET_REASON)
+    // The specific false statement this protects against, pinned rather than described.
+    expect(state.state === 'conditional' && state.reason).not.toContain('non-EU')
+    expect(state.state === 'conditional' && state.reason).not.toContain('markets')
   })
 
   it('resolveCs3d still falls back where a row carries no reason of its own', () => {
@@ -646,6 +694,23 @@ describe('assessmentView — per-framework, not per-section', () => {
 
   it('a fully-declared UK deal withholds nothing', () => {
     expect(viewFor('UK', 50_000_000, 'Technology', 'GBP', { employee_count: 300, total_assets: 20_000_000 }).notAssessed).toEqual([])
+  })
+
+  // EUR 460,000,000 — 2.2% ABOVE CSRD's EUR 450m turnover limb, so that limb is MARGINAL, and with
+  // headcount met it is DECISIVE: drop it and CSRD no longer reaches 2 of 2, which is what raises
+  // near-threshold rather than merely noting a nearby figure. The same revenue is 69% BELOW CS3D's
+  // EUR 1.5bn, and 1,850 is below its 5,000, so CS3D fails route (a) with BOTH limbs evaluated —
+  // unknownCount 0, which is exactly the row that must NOT suppress. Before the predicate keyed on
+  // unevaluated limbs, CS3D's presence in notAssessed deleted this whole finding from both surfaces.
+  // Denominated in EUR against a EUR limb, so no rate is exercised and refreshing FX cannot turn
+  // this red.
+  it('a framework withheld because the modelled route was not met does not suppress a real proximity finding', () => {
+    const rows = getFrameworkApplicability('European Union', 460_000_000, 'Technology', 'ma', 'EUR', { employee_count: 1_850 })
+    const v = assessmentView(true, rows)
+    expect(find(rows, 'CSRD')!.status).toBe('near-threshold')
+    expect(v.notAssessed).toContain('CS3D')
+    expect(v.fieldsToResolve).toEqual([])
+    expect(v.nearThreshold).toBe('assessed-findings')
   })
 })
 
