@@ -25,11 +25,42 @@ const URGENCY_TEXT: Record<string, string> = {
 
 export async function POST(req: NextRequest) {
   try {
-    const { lead, obligations } = await req.json()
+    const { lead, obligations, profile } = await req.json()
 
     if (!lead?.email || !lead.email.includes('@')) {
       return NextResponse.json({ error: 'Invalid email' }, { status: 400 })
     }
+
+    // ── LEAD FIELDS — company, first, last and role are OPTIONAL BY DESIGN ──────
+    // The form requires an email and nothing else, deliberately, and that is not changing here: the
+    // fix for a blank slot is a fallback, not a new required field. Only `email` is guaranteed, by
+    // the guard directly above.
+    //
+    // `??` IS THE WRONG OPERATOR AND WILL NOT FIRE. An untouched input posts '' — present, defined,
+    // and not null — so nullish coalescing passes it straight through. Every fallback below is `||`
+    // over a TRIMMED value, because a space-only input is empty to a reader and '' is not the only
+    // way to be blank.
+    const val = (s: unknown) => (typeof s === 'string' ? s.trim() : '')
+    const leadFirst   = val(lead.first)
+    const leadLast    = val(lead.last)
+    const leadCompany = val(lead.company)
+    const leadRole    = val(lead.role)
+    const leadEmail   = val(lead.email)          // non-empty: the guard above requires an '@'
+    const leadName    = [leadFirst, leadLast].filter(Boolean).join(' ')
+
+    // CUSTOMER-FACING: the sentence has to read as English with nothing filled in. 'your company' is
+    // a phrase; '[company]', '(not provided)' or an empty slot is a hole with a label in it, and a
+    // customer reading one learns that the email was generated badly rather than that they skipped
+    // a field. Never show an absence marker to the person whose absence it is.
+    const theirCompany = leadCompany || 'your company'
+
+    // INTERNAL ALERT: the same absence is INFORMATION — "this lead would not give a company" is
+    // worth seeing, and a blank table cell reads as a rendering fault rather than a fact.
+    const NOT_GIVEN = '— not given'
+
+    // Subject lines must still identify the lead in a full inbox. Name and company are both
+    // optional, so the last resort is the email address: the one field that cannot be empty here.
+    const leadIdent = [leadName, leadCompany].filter(Boolean).join(' · ') || leadEmail
 
     const total    = obligations.length
     const critical = obligations.filter((o: any) => o.urgency === 'critical').length
@@ -37,7 +68,20 @@ export async function POST(req: NextRequest) {
     const date     = new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })
 
     // ── BUILD OBLIGATION ROWS ──────────────────────────────────────
-    const obligationRows = obligations.map((ob: any, i: number) => `
+    // Grouped to MIRROR THE RESULTS PAGE. The two carry the same list and must not tell different
+    // stories: the reader forwards the email to a board or a lawyer, and a regulatory duty sitting
+    // in an undifferentiated list next to 'At your own pace' reads as equally optional.
+    //
+    // Rows are partitioned by `group`, which the client sends. An entry with NO group — an older
+    // client, or a cached page mid-deploy — is NOT dropped: it falls through to a third bucket that
+    // says the classification is missing rather than silently omitting a row from a compliance
+    // email. Losing an obligation quietly is the one failure this table cannot have.
+    const GROUP_HEADINGS: { key: string; title: string; sub: string }[] = [
+      { key: 'regulatory', title: 'Regulatory / compliance', sub: 'Rules that apply to you, based on where you operate, your size and your sector.' },
+      { key: 'market',     title: 'Market-driven',           sub: 'What your customers, investors and lenders are asking for — often because they have a reporting obligation of their own.' },
+      { key: '__ungrouped', title: 'Not classified',          sub: 'These entries arrived without a group. They are listed so nothing is lost; check them against the online results.' },
+    ]
+    const row = (ob: any, i: number) => `
       <tr style="background:${i % 2 === 0 ? '#fff' : '#f8f7f5'}">
         <td style="padding:10px 14px;border-bottom:1px solid #e8e7e4;font-size:12px;font-weight:600;color:#0d0d0d;vertical-align:top;">
           ${ob.name}
@@ -46,9 +90,50 @@ export async function POST(req: NextRequest) {
         <td style="padding:10px 14px;border-bottom:1px solid #e8e7e4;vertical-align:top;">
           <span style="font-size:10px;font-weight:700;color:${URGENCY_TEXT[ob.urgency]};background:${URGENCY_BG[ob.urgency]};padding:3px 8px;border-radius:99px;white-space:nowrap;">${ob.urgency_label}</span>
         </td>
-        <td style="padding:10px 14px;border-bottom:1px solid #e8e7e4;font-size:12px;color:#555553;vertical-align:top;">${ob.deadline}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #e8e7e4;font-size:12px;color:#555553;vertical-align:top;">${ob.timing}</td>
         <td style="padding:10px 14px;border-bottom:1px solid #e8e7e4;font-size:12px;color:#7425e3;font-weight:600;vertical-align:top;">${ob.module}</td>
-      </tr>`).join('')
+      </tr>`
+    // 'Obligation', not 'Regulation'. This one headerRow is rendered above BOTH group tables, so
+    // under Market-driven it sat directly over EcoVadis and 'Customer Supplier Questionnaire' —
+    // neither of which is a regulation. A column header is a claim about every row beneath it.
+    const headerRow = `
+      <tr style="background:#f8f7f5;">
+        <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:600;color:#888784;letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid #e8e7e4;">Obligation</th>
+        <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:600;color:#888784;letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid #e8e7e4;">Priority</th>
+        <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:600;color:#888784;letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid #e8e7e4;">Timing</th>
+        <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:600;color:#888784;letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid #e8e7e4;">Module</th>
+      </tr>`
+    // ── QUALIFICATION PROFILE (internal alert only) ────────────────
+    // The visitor's answers, already resolved to display labels by the client — this route does NOT
+    // re-derive them, because the slider stores an index into a label table only the page holds and
+    // a second copy here would drift the day an option is reworded.
+    //
+    // ABSENT IS NOT EMPTY. An older client, or a cached page mid-deploy, sends no `profile` at all;
+    // that is a different fact from a visitor who answered nothing, and the alert says which rather
+    // than rendering a blank block that reads as "this lead told us nothing".
+    const profileRows = !Array.isArray(profile)
+      ? `<div style="margin-top:16px;font-size:11px;color:#888;">Qualification profile not sent by the client — this submission predates the profile field, or the page was cached from an earlier deploy.</div>`
+      : profile.length === 0
+      ? `<div style="margin-top:16px;font-size:11px;color:#888;">Qualification profile sent, but empty — the visitor reached the email gate without a recorded answer.</div>`
+      : `
+    <div style="font-size:11px;font-weight:600;color:#888;letter-spacing:0.06em;text-transform:uppercase;margin:16px 0 6px;">What they told us</div>
+    <table width="100%" style="border:1px solid #e8e7e4;border-radius:6px;overflow:hidden;">
+      ${profile.map((p: any, i: number) => `<tr style="background:${i % 2 === 0 ? '#fff' : '#f8f7f5'}"><td width="45%" style="padding:6px 10px;border-bottom:1px solid #e8e7e4;font-size:11px;color:#888;vertical-align:top;">${p.q}</td><td style="padding:6px 10px;border-bottom:1px solid #e8e7e4;font-size:11px;color:#0d0d0d;font-weight:600;vertical-align:top;">${p.a}</td></tr>`).join('')}
+    </table>`
+
+    const obligationRows = GROUP_HEADINGS.map(g => {
+      const rows = g.key === '__ungrouped'
+        ? obligations.filter((o: any) => o.group !== 'regulatory' && o.group !== 'market')
+        : obligations.filter((o: any) => o.group === g.key)
+      if (rows.length === 0) return ''
+      return `
+    <div style="font-size:13px;font-weight:600;color:#0d0d0d;font-family:Georgia,serif;margin:0 0 2px;">${g.title}</div>
+    <div style="font-size:11px;color:#888784;line-height:1.55;margin-bottom:8px;">${g.sub}</div>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e8e7e4;border-radius:8px;overflow:hidden;margin-bottom:18px;">
+      ${headerRow}
+      ${rows.map(row).join('')}
+    </table>`
+    }).join('')
 
     // ── LEAD EMAIL HTML ────────────────────────────────────────────
     const leadHtml = `<!DOCTYPE html>
@@ -72,9 +157,9 @@ export async function POST(req: NextRequest) {
 
   <!-- HERO -->
   <tr><td style="background:#111;padding:28px 32px 24px;">
-    <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.35);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:10px;">Prepared for ${lead.first} ${lead.last} · ${lead.company}</div>
-    <div style="font-size:22px;font-weight:400;color:#fff;line-height:1.25;font-family:Georgia,serif;margin-bottom:10px;">We identified <span style="font-style:italic;">${total} regulations</span> that apply to ${lead.company}.</div>
-    <div style="font-size:13px;color:rgba(255,255,255,0.5);line-height:1.65;margin-bottom:20px;">${critical} require immediate action. ${high} are high priority. Review your full Compliance Obligation Map below.</div>
+    <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.35);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:10px;">Prepared for ${leadIdent}</div>
+    <div style="font-size:22px;font-weight:400;color:#fff;line-height:1.25;font-family:Georgia,serif;margin-bottom:10px;">We identified <span style="font-style:italic;">${total} ${total === 1 ? 'obligation' : 'obligations'}</span> that apply to ${theirCompany}.</div>
+    <div style="font-size:13px;color:rgba(255,255,255,0.5);line-height:1.65;margin-bottom:20px;">${critical} ${critical === 1 ? 'requires' : 'require'} immediate action. ${high} ${high === 1 ? 'is' : 'are'} high priority. Review your full Compliance Obligation Map below.</div>
     <table cellpadding="0" cellspacing="0" border="0"><tr>
       <td style="padding-right:8px;"><span style="font-size:11px;font-weight:700;color:#B91C1C;background:#FCEBEB;padding:4px 12px;border-radius:99px;">${critical} immediate</span></td>
       <td style="padding-right:8px;"><span style="font-size:11px;font-weight:700;color:#633806;background:#FEF3E2;padding:4px 12px;border-radius:99px;">${high} high priority</span></td>
@@ -85,15 +170,7 @@ export async function POST(req: NextRequest) {
   <!-- WHITE BODY -->
   <tr><td style="background:#fff;padding:32px;">
     <div style="font-size:11px;font-weight:600;color:#888784;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:12px;">Your compliance obligations</div>
-    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e8e7e4;border-radius:8px;overflow:hidden;">
-      <tr style="background:#f8f7f5;">
-        <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:600;color:#888784;letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid #e8e7e4;">Regulation</th>
-        <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:600;color:#888784;letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid #e8e7e4;">Priority</th>
-        <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:600;color:#888784;letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid #e8e7e4;">Deadline</th>
-        <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:600;color:#888784;letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid #e8e7e4;">Module</th>
-      </tr>
-      ${obligationRows}
-    </table>
+    ${obligationRows}
 
     <div style="height:1px;background:linear-gradient(90deg,#7425e3,#1fb1ff,#64fe3e);margin:28px 0;"></div>
 
@@ -101,7 +178,7 @@ export async function POST(req: NextRequest) {
 
     <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:14px;"><tr>
       <td width="32" valign="top" style="padding-right:12px;"><div style="width:28px;height:28px;border-radius:50%;background:#0d0d0d;font-size:12px;font-weight:700;color:#fff;text-align:center;line-height:28px;">1</div></td>
-      <td valign="top"><div style="font-size:13px;font-weight:600;color:#0d0d0d;margin-bottom:3px;">Review your full Compliance Obligation Map</div><div style="font-size:12px;color:#555553;line-height:1.6;">Each obligation above has a specific deadline and recommended first action. Start with the ones marked IMMEDIATE ACTION.</div></td>
+      <td valign="top"><div style="font-size:13px;font-weight:600;color:#0d0d0d;margin-bottom:3px;">Review your full Compliance Obligation Map</div><div style="font-size:12px;color:#555553;line-height:1.6;">Each obligation above carries its timing and a recommended first action. Some are fixed dates, others apply from today or run on request. Start with the ones marked IMMEDIATE ACTION.</div></td>
     </tr></table>
 
     <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:14px;"><tr>
@@ -153,22 +230,23 @@ export async function POST(req: NextRequest) {
   </div>
   <div style="padding:20px;">
     <table width="100%" style="margin-bottom:16px;">
-      <tr><td width="140" style="font-size:12px;color:#888;font-weight:600;padding:4px 0;">Name</td><td style="font-size:12px;color:#0d0d0d;font-weight:600;">${lead.first} ${lead.last}</td></tr>
-      <tr><td style="font-size:12px;color:#888;font-weight:600;padding:4px 0;">Company</td><td style="font-size:12px;color:#0d0d0d;">${lead.company}</td></tr>
-      <tr><td style="font-size:12px;color:#888;font-weight:600;padding:4px 0;">Role</td><td style="font-size:12px;color:#0d0d0d;">${lead.role}</td></tr>
-      <tr><td style="font-size:12px;color:#888;font-weight:600;padding:4px 0;">Email</td><td style="font-size:12px;color:#7425e3;">${lead.email}</td></tr>
+      <tr><td width="140" style="font-size:12px;color:#888;font-weight:600;padding:4px 0;">Name</td><td style="font-size:12px;color:#0d0d0d;font-weight:600;">${leadName || NOT_GIVEN}</td></tr>
+      <tr><td style="font-size:12px;color:#888;font-weight:600;padding:4px 0;">Company</td><td style="font-size:12px;color:#0d0d0d;">${leadCompany || NOT_GIVEN}</td></tr>
+      <tr><td style="font-size:12px;color:#888;font-weight:600;padding:4px 0;">Role</td><td style="font-size:12px;color:#0d0d0d;">${leadRole || NOT_GIVEN}</td></tr>
+      <tr><td style="font-size:12px;color:#888;font-weight:600;padding:4px 0;">Email</td><td style="font-size:12px;color:#7425e3;">${leadEmail}</td></tr>
     </table>
     <div style="background:#FCEBEB;border-radius:6px;padding:10px 14px;margin-bottom:16px;">
       <span style="font-size:13px;font-weight:700;color:#501313;">${total} obligations identified · ${critical} requiring immediate action</span>
     </div>
     <table width="100%" style="border:1px solid #e8e7e4;border-radius:6px;overflow:hidden;">
       <tr style="background:#f8f7f5;">
-        <th style="padding:6px 10px;text-align:left;font-size:10px;color:#888;font-weight:600;border-bottom:1px solid #e8e7e4;">Regulation</th>
+        <th style="padding:6px 10px;text-align:left;font-size:10px;color:#888;font-weight:600;border-bottom:1px solid #e8e7e4;">Obligation</th>
         <th style="padding:6px 10px;text-align:left;font-size:10px;color:#888;font-weight:600;border-bottom:1px solid #e8e7e4;">Priority</th>
-        <th style="padding:6px 10px;text-align:left;font-size:10px;color:#888;font-weight:600;border-bottom:1px solid #e8e7e4;">Deadline</th>
+        <th style="padding:6px 10px;text-align:left;font-size:10px;color:#888;font-weight:600;border-bottom:1px solid #e8e7e4;">Timing</th>
       </tr>
-      ${obligations.map((ob: any) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #e8e7e4;font-size:12px;font-weight:600;color:#0d0d0d;">${ob.name.substring(0, 50)}</td><td style="padding:6px 10px;border-bottom:1px solid #e8e7e4;font-size:11px;font-weight:700;color:${URGENCY_COLOR[ob.urgency]};">${ob.urgency_label}</td><td style="padding:6px 10px;border-bottom:1px solid #e8e7e4;font-size:11px;color:#555;">${ob.deadline}</td></tr>`).join('')}
+      ${obligations.map((ob: any) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #e8e7e4;font-size:12px;font-weight:600;color:#0d0d0d;">${ob.name.substring(0, 50)}</td><td style="padding:6px 10px;border-bottom:1px solid #e8e7e4;font-size:11px;font-weight:700;color:${URGENCY_COLOR[ob.urgency]};">${ob.urgency_label}</td><td style="padding:6px 10px;border-bottom:1px solid #e8e7e4;font-size:11px;color:#555;">${ob.timing}</td></tr>`).join('')}
     </table>
+    ${profileRows}
   </div>
 </div>
 </body></html>`
@@ -181,9 +259,13 @@ export async function POST(req: NextRequest) {
         from: `ThemisIQ <${FROM_EMAIL}>`,
         to: [lead.email],
         reply_to: 'hello@themisiq.co',
-        subject: `Your ThemisIQ Compliance Obligation Map — ${total} regulations identified for ${lead.company}`,
+        // 'obligations', not 'regulations', and matching the body's singular/plural handling. The
+        // list has carried market-driven entries since the results were split into two groups —
+        // EcoVadis, a customer questionnaire, a board request — and none of those is a regulation.
+        // This was the last surface still using the old word, so subject and body disagreed.
+        subject: `Your ThemisIQ Compliance Obligation Map — ${total} ${total === 1 ? 'obligation' : 'obligations'} identified for ${theirCompany}`,
         html: leadHtml,
-        text: `ThemisIQ identified ${total} regulations that apply to ${lead.company}. ${critical} require immediate action. Visit www.themisiq.co to get started.`,
+        text: `ThemisIQ identified ${total} ${total === 1 ? 'obligation' : 'obligations'} that apply to ${theirCompany}. ${critical} ${critical === 1 ? 'requires' : 'require'} immediate action. Visit www.themisiq.co to get started.`,
       }),
     })
 
@@ -196,9 +278,9 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         from: `ThemisIQ <${FROM_EMAIL}>`,
         to: [MONITOR_EMAIL],
-        subject: `🔔 New lead: ${lead.first} ${lead.last} · ${lead.company} · ${critical} critical obligations`,
+        subject: `🔔 New lead: ${leadIdent} · ${critical} critical obligations`,
         html: notifyHtml,
-        text: `New lead: ${lead.first} ${lead.last} · ${lead.company} · ${lead.email} · ${total} obligations · ${critical} critical`,
+        text: `New lead: ${leadName || NOT_GIVEN} · ${leadCompany || NOT_GIVEN} · ${leadEmail} · ${total} obligations · ${critical} critical`,
       }),
     })
 
