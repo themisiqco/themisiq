@@ -1,0 +1,53 @@
+// lib/sb253.ts
+// SINGLE SOURCE for the California SB 253 first-report date — and, as importantly, for the fact that
+// THE DATE IS NOT SETTLED.
+//
+// IT HAS BEEN SET THREE TIMES. CARB staff first floated 30 June 2026; the Board adopted 10 August 2026
+// in the initial regulation on 26 February 2026; the modified regulation of 27 July 2026 proposes
+// 10 November 2026. Public comment on that modification closed 11 August 2026 and it still requires
+// Office of Administrative Law approval. Until CARB finalises and OAL approves, 10 November 2026 is a
+// PROPOSAL, not law — which is why SB253_DATE_STATUS exists and why every surface must carry it.
+//
+// ⚠️ VERIFIED AGAINST SECONDARY SOURCES ONLY, 10 August 2026. PRIMARY SOURCE NOT YET CHECKED —
+// confirm against CARB's own rulemaking page before relying on this, and before any customer-facing
+// claim is treated as final. This is the one constant in the repo whose provenance is weaker than the
+// surfaces that consume it, and it should not be promoted to "settled" without that check.
+//
+// WHY THIS FILE EXISTS. The date lived as eight prose literals in five spellings — 'November 10, 2026',
+// 'Nov 10, 2026', 'Nov 10', 'November 10', '2026' — and as FIVE independent countdown blocks with
+// THREE different hardcoded seeds (81, 81, 83), each asserting the date as a settled deadline counting
+// down to it. One of those countdowns rendered in the site-wide nav, above CBAM and AI Governance
+// content. All five clamped at zero or flipped branch, so the day after the date they would have read
+// "0 days away" rather than reading as wrong. No surface cited an instrument for the date.
+// ANY SURFACE NAMING THE SB 253 FIRST-REPORT DATE IMPORTS FROM HERE, AND NAMES THE POSTURE.
+//
+// NOTE ON SCOPE. The engine (THRESHOLD_TESTS['SB 253'] in lib/deals/assessment.ts) asserts the
+// $1bn revenue THRESHOLD and no date at all — deliberately. Nothing here is used to decide
+// applicability; these are display strings for copy.
+
+export const SB253_FIRST_REPORT_DATE = '10 November 2026'
+
+// 'proposed', never 'final', until CARB finalises and OAL approves. A surface that prints the date
+// without this word states as settled something that has already moved twice.
+export const SB253_DATE_STATUS = 'proposed'
+
+export const SB253_SCOPE3_FROM = '2027'
+
+export const SB253_CITATION =
+  'California Health & Safety Code §38532; CARB initial regulation adopted 26 February 2026, modified 27 July 2026'
+
+// The full posture, for any surface with room for a sentence. States what is proposed, what it covers,
+// that it is not final, what remains outstanding, and that it has moved — so a reader can judge how
+// much to rely on it rather than being handed a countdown.
+export const SB253_STATUS_SENTENCE =
+  'CARB has proposed 10 November 2026 for the first SB 253 report — Scope 1 and 2 for the prior fiscal year. The date is not final: the modified regulation closed public comment on 11 August 2026 and still requires OAL approval. It has moved twice already.'
+
+// For a chip, tag or nav-width slot where the sentence will not fit. Carries the posture in the
+// shortest honest form; if even this does not fit, the surface should name no date.
+export const SB253_SHORT = 'SB 253 · 10 Nov 2026 proposed'
+
+// For a slot whose siblings read 'Annual — July' / 'FY2024 (large EU companies)' / 'Jurisdiction
+// dependent' — i.e. FRAMEWORKS.deadline in lib/ghg/engine.ts, rendered in the GHG export summary
+// beside computed totals under the label "Deadline". Short by necessity, but it must still carry the
+// posture: this was the only sibling naming a specific day, and it named it as settled.
+export const SB253_FRAMEWORK_DEADLINE = '10 Nov 2026 — proposed, not final'

@@ -1,16 +1,16 @@
 'use client'
 import Nav from '../components/Nav'
 import { GHG_TIERS } from '@/lib/pricing'
-import { useState, useEffect } from 'react'
 import Footer from '@/app/components/Footer'
+import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_STATUS_SENTENCE, SB253_SCOPE3_FROM } from '../../lib/sb253'
 export default function Page() {
-  const [daysLeft, setDaysLeft] = useState(83)
-  useEffect(() => {
-    const deadline = new Date('2026-11-10')
-    const today = new Date()
-    const diff = Math.ceil((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-    setDaysLeft(Math.max(0, diff))
-  }, [])
+  // The stat card takes a large `val` and small `unit`, and the tables want a short date. DERIVED,
+  // never retyped — a date split across two fields is invisible to a whole-string guard (see the
+  // KNOWN LIMIT note in lib/aiAct.test.ts). '10 November 2026' → '10 Nov' + '2026'.
+  const [sbDay, sbMonth, sbYear] = SB253_FIRST_REPORT_DATE.split(' ')
+  const sbStatVal = `${sbDay} ${sbMonth.slice(0, 3)}`
+  const sbStatUnit = sbYear
+  const sbShortDate = `${sbStatVal} ${sbYear}`
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d' }}>
       <Nav />
@@ -18,7 +18,7 @@ export default function Page() {
       {/* URGENCY BANNER */}
       <div style={{ background: '#B91C1C', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, position: 'sticky', top: 64, zIndex: 99 }}>
         <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff', animation: 'pulse 1.5s infinite' }} />
-        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>SB 253 first-year deadline: November 10, 2026 —  {daysLeft} days away. Scope 1 + 2 disclosure required.</span>
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>SB 253 first report: {SB253_FIRST_REPORT_DATE}, {SB253_DATE_STATUS} — Scope 1 + 2 for the prior fiscal year.</span>
         <a href="/dashboard/ghg" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>Check if SB 253 applies to you →</a>
       </div>
 
@@ -48,7 +48,7 @@ export default function Page() {
           {/* STAT CARDS */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {[
-              { val: 'Nov 10', unit: '2026', label: 'SB 253 first deadline', color: '#B91C1C', bg: '#FCEBEB' },
+              { val: sbStatVal, unit: sbStatUnit, label: `SB 253 first report — ${SB253_DATE_STATUS}, not final`, color: '#B91C1C', bg: '#FCEBEB' },
               { val: '15', unit: 'Scope 3', label: 'categories covered', color: '#7425e3', bg: '#EDE9FE' },
               { val: '100%', unit: 'audit', label: 'trail — every edit logged', color: '#0F6E56', bg: '#E1F5EE' },
               { val: '5+', unit: 'frameworks', label: 'from one inventory', color: '#0C447C', bg: '#E6F1FB' },
@@ -81,12 +81,12 @@ export default function Page() {
           <div>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>SB 253 — California</div>
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
-              November 10 is  {daysLeft} days away.<br />Are you ready?
+              {SB253_FIRST_REPORT_DATE} is {SB253_DATE_STATUS}.<br />Are you ready?
             </h2>
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
-              SB 253 requires California-nexus companies with global revenue over $1B to disclose Scope 1 and 2 emissions by November 10, 2026. ThemisIQ can have your inventory complete and the CARB template pre-filled in days — not months.
+              SB 253 requires California-nexus companies with global revenue over $1B to disclose Scope 1 and 2 emissions. {SB253_STATUS_SENTENCE} ThemisIQ can have your inventory complete and the CARB template pre-filled in days — not months.
             </p>
-            {['Guided inventory wizard — no spreadsheets', 'IPCC AR6 emission factors (AR4 on CARB export)', 'Pre-filled CARB SB 253 official template', 'Good-faith enforcement confirmed by CARB for year one', 'Scope 3 preparation for 2027 deadline'].map((item, i) => (
+            {['Guided inventory wizard — no spreadsheets', 'IPCC AR6 emission factors (AR4 on CARB export)', 'Pre-filled CARB SB 253 official template', 'Good-faith enforcement confirmed by CARB for year one', `Scope 3 preparation for ${SB253_SCOPE3_FROM}`].map((item, i) => (
               <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8, alignItems: 'flex-start' }}>
                 <span style={{ color: '#64fe3e', flexShrink: 0, marginTop: 2 }}>✓</span>
                 <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 300, lineHeight: 1.5 }}>{item}</span>
@@ -96,8 +96,8 @@ export default function Page() {
           <div style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: '2rem' }}>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 12 }}>SB 253 timeline</div>
             {[
-              { date: 'Nov 10, 2026', event: 'Scope 1 + 2 first disclosure', status: 'critical', days: `${daysLeft} days` },
-              { date: '2027', event: 'Scope 3 disclosure begins', status: 'upcoming', days: '~1 year' },
+              { date: sbShortDate, event: 'Scope 1 + 2 first disclosure', status: 'critical', days: SB253_DATE_STATUS },
+              { date: SB253_SCOPE3_FROM, event: 'Scope 3 disclosure begins', status: 'upcoming', days: 'Plan now' },
               { date: '2027+', event: 'Limited assurance required (Scope 1 + 2)', status: 'upcoming', days: 'Plan now' },
               { date: '2030+', event: 'Reasonable assurance (Scope 1 + 2)', status: 'future', days: 'Build toward' },
             ].map(({ date, event, status, days }) => (
@@ -189,7 +189,7 @@ export default function Page() {
           </thead>
           <tbody>
             {[
-              ['SB 253 · CARB template', 'California, USA', '$1B+ global revenue', 'Nov 10, 2026', '✓ Full — pre-filled export'],
+              ['SB 253 · CARB template', 'California, USA', '$1B+ global revenue', `${sbShortDate} (${SB253_DATE_STATUS})`, '✓ Full — pre-filled export'],
               ['CDP Climate (C6, C7, C11)', 'Global', 'Investor-requested', 'Annual · July', '✓ Full — direct mapping'],
               ['ESRS E1 · CSRD', 'European Union', '500+ employees (large)', 'FY2024 reporting', '✓ Full — ESRS E1-6'],
               ['IFRS S2', '30+ jurisdictions', 'Adopted by jurisdiction', 'Jurisdiction-dependent', '✓ Full — scenario analysis'],
@@ -241,7 +241,10 @@ export default function Page() {
       {/* CTA */}
       <section style={{ padding: '6rem 2.5rem', textAlign: 'center' }}>
         <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
-           {daysLeft} days to SB 253.<br />
+          {/* A LABEL, not a claim. This slot was "{daysLeft} days to SB 253." — a countdown to a date
+              CARB has moved twice — and neither the date nor "proposed" fits at clamp(2rem, 4vw, 3rem)
+              beside the gradient line. It names the subject; the paragraph below carries the posture. */}
+          SB 253 Scope 1 + 2.<br />
           <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Start today.</span>
         </h2>
         <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>

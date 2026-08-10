@@ -4,6 +4,7 @@ import { useState } from 'react'
 import {
   AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED, AI_ACT_HIGH_RISK_SENTENCE,
 } from '../../lib/aiAct'
+import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_STATUS_SENTENCE, SB253_SCOPE3_FROM } from '../../lib/sb253'
 
 interface Answers {
   driver?: string 
@@ -52,7 +53,7 @@ function computeObligations(a: Answers): Obligation[] {
   const isPE       = lst === 'pe_backed'
   const regs: Obligation[] = []
 
-  if (hasCA && rev >= 1000) regs.push({ name: 'SB 253 — California Climate Corporate Data Accountability Act', jurisdiction: 'California, USA', urgency: 'critical', urgency_label: 'IMMEDIATE ACTION', deadline: 'November 10, 2026', module: 'Climate · GHG Emissions', what: 'Your company has California nexus and global revenue over $1B. SB 253 applies. Scope 1 and 2 GHG disclosure is required by November 10, 2026. Scope 3 follows from 2027.', action: 'Start Scope 1 + 2 GHG inventory immediately using the CARB-approved GHG Protocol methodology.' })
+  if (hasCA && rev >= 1000) regs.push({ name: 'SB 253 — California Climate Corporate Data Accountability Act', jurisdiction: 'California, USA', urgency: 'critical', urgency_label: 'IMMEDIATE ACTION', deadline: `${SB253_FIRST_REPORT_DATE} (${SB253_DATE_STATUS})`, module: 'Climate · GHG Emissions', what: `Your company has California nexus and global revenue over $1B. SB 253 applies. ${SB253_STATUS_SENTENCE} Scope 3 follows from ${SB253_SCOPE3_FROM}.`, action: 'Start Scope 1 + 2 GHG inventory immediately using the CARB-approved GHG Protocol methodology.' })
   if (hasCA && rev >= 500) regs.push({ name: 'SB 261 — California Climate-Related Financial Risk Act', jurisdiction: 'California, USA', urgency: 'monitor', urgency_label: 'MONITOR', deadline: 'Paused — Ninth Circuit injunction', module: 'Climate · Risk', what: 'Your company meets the $500M revenue threshold. SB 261 is currently paused by a Ninth Circuit injunction. Prepare TCFD-aligned disclosure now.', action: 'Prepare TCFD disclosure as precaution while monitoring injunction status.' })
   if (hasEU && largeCo) regs.push({ name: 'CSRD / ESRS — Corporate Sustainability Reporting Directive', jurisdiction: 'European Union', urgency: 'critical', urgency_label: 'ACTIVE NOW', deadline: 'FY2024 reporting — active now', module: 'Climate · GHG + Risk + People + Supply Chain', what: 'You meet the EU large entity threshold (500+ employees). Full ESRS suite applies — E1 (climate), S1 (workforce), S2 (value chain), G1 (business conduct).', action: 'Conduct ESRS double materiality assessment and close disclosure gaps across E1, S1, S2, and G1.' })
   else if (hasEU && midCo) regs.push({ name: 'CSRD / ESRS — Mid-size company scope', jurisdiction: 'European Union', urgency: 'high', urgency_label: 'HIGH PRIORITY', deadline: 'FY2025 reporting', module: 'Climate · GHG + Risk + People', what: 'Mid-size companies (250+ employees) enter CSRD scope from FY2025. Same ESRS standards apply as for large companies.', action: 'Begin ESRS gap assessment for FY2025 reporting.' })

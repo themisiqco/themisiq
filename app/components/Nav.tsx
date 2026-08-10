@@ -3,14 +3,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 
-function daysUntil(dateStr: string): number {
-  const target = new Date(dateStr)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const diff = target.getTime() - today.getTime()
-  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
-}
-
 // Single source of truth for the header's module links — consumed by BOTH the
 // desktop Platform ▾ dropdown (full `label` + `sub`) and the mobile overlay
 // (full `label` + `sub`). `labelShort` is retained for any short-label surface.
@@ -31,7 +23,6 @@ const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
 
 export default function Nav() {
   const [menuOpen, setMenuOpen] = useState(false)
-  const [days, setDays] = useState(0)
   const [isAuthed, setIsAuthed] = useState(false)
   const [userEmail, setUserEmail] = useState('')
   const [platformOpen, setPlatformOpen] = useState(false)
@@ -49,10 +40,6 @@ export default function Nav() {
       setUserEmail(session?.user?.email ?? '')
     })
     return () => sub.subscription.unsubscribe()
-  }, [])
-
-  useEffect(() => {
-    setDays(daysUntil('2026-11-10'))
   }, [])
 
   // Close the Platform / avatar menus on outside-click and on Escape.
@@ -260,19 +247,6 @@ export default function Nav() {
               color: '#fff', textDecoration: 'none',
             }}>Build your platform →</a>
           </div>
-          {days > 0 && (
-            <div style={{
-              marginTop: '1rem', background: '#FCEBEB', borderRadius: 8,
-              padding: '12px 14px', textAlign: 'center',
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#B91C1C' }}>
-                SB 253 deadline: November 10, 2026
-              </div>
-              <div style={{ fontSize: 12, color: '#888784', marginTop: 2 }}>
-                {days} days away
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -290,4 +264,3 @@ export default function Nav() {
   )
 }
 
-export { daysUntil }

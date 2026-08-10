@@ -1,19 +1,12 @@
 'use client'
 import HomePricing from './components/HomePricing'
-import { useState, useEffect } from 'react'
+import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS } from '../lib/sb253'
 import { PACKS, NEW_PRICING_ACTIVE } from '../lib/pricing'
 import { PACK_SLUG_MODULES } from '../lib/packEntryPoints'
 import Nav from './components/Nav'
 import Footer from './components/Footer'
 
 export default function Home() {
-  const [daysLeft, setDaysLeft] = useState(81)
-  useEffect(() => {
-    const deadline = new Date('2026-11-10')
-    const today = new Date()
-    const diff = Math.ceil((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-    setDaysLeft(Math.max(0, diff))
-  }, [])
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d', margin: 0, padding: 0 }}>
       <Nav />
@@ -40,7 +33,7 @@ export default function Home() {
           </div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#555553', background: '#f8f7f5', border: '0.5px solid #e8e7e4', padding: '8px 16px', borderRadius: 99 }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#B91C1C', display: 'inline-block', animation: 'pulse 1.8s infinite' }} />
-            SB 253 first-year deadline: November 10, 2026 — {daysLeft} days away
+            SB 253 first report: {SB253_FIRST_REPORT_DATE} ({SB253_DATE_STATUS}) — Scope 1 + 2
           </div>
         </div>
       </section>
@@ -287,7 +280,7 @@ export default function Home() {
       {/* ── CTA ── */}
       <section style={{ padding: '6rem 2.5rem', textAlign: 'center', borderTop: '0.5px solid #e8e7e4' }}>
         <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
-          The SB 253 deadline is <em style={gradText}> {daysLeft} days away.</em>
+          The first SB 253 report is <em style={gradText}> {SB253_FIRST_REPORT_DATE}, {SB253_DATE_STATUS}.</em>
         </h2>
         <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
           ThemisIQ can have your Scope 1 and 2 inventory complete and the CARB template pre-filled in days — not months.

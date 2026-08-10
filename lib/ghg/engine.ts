@@ -11,6 +11,11 @@
 // share it instead of re-declaring a diverged copy.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// DISPLAY CONSTANTS ONLY — no functions, no I/O, so the purity note above still holds. The SB 253
+// first-report date is a CARB PROPOSAL that has moved twice; it is not the engine's to assert, and
+// FRAMEWORKS.deadline renders to a customer beside computed totals. See lib/sb253.ts.
+import { SB253_FRAMEWORK_DEADLINE } from '../sb253'
+
 // The two EXACT conversion anchors, from the repo's conversion authority. Imported rather than
 // copied: lib/unitConversions.ts is the single source and its header forbids inlining these.
 import { L_PER_GAL, GJ_PER_MMBTU } from '../unitConversions'
@@ -462,7 +467,7 @@ const GRID_REGIONS_US = US_STATES.map(s => { const y = GRID_EF['US_' + s]; const
 const FRAMEWORKS = [
   {
     id: 'sb253', name: 'SB 253', full: 'California SB 253 — CARB', color: '#B91C1C', bg: '#FCEBEB',
-    gwp: 'AR6', deadline: 'November 10, 2026',
+    gwp: 'AR6', deadline: SB253_FRAMEWORK_DEADLINE,
     desc: 'Scope 1 + 2 disclosure for California-nexus companies with $1B+ global revenue',
     requires: ['revenue_millions', 'california_nexus'],
     intensity_denominator: 'revenue',

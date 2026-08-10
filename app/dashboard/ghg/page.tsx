@@ -11,6 +11,7 @@ import { assessCompleteness } from '../../../lib/ghg/loadSeries'
 import type { YearDataStatus } from '../../../lib/ghg/series'
 import { useEntitlement, useHasConcierge, useGhgLocationAllowance } from '../../../lib/useEntitlement'
 import { generateAssurancePDF } from '../../../lib/assurancePdf'
+import { SB253_SCOPE3_FROM } from '../../../lib/sb253'
 import { useSearchParams, useRouter } from 'next/navigation'
 
 import {
@@ -2031,7 +2032,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.2)', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#0C447C', marginBottom: 4 }}>SB 253 — Scope 3 not required for your first reporting year</div>
-                <div style={{ fontSize: 12, color: '#555553' }}>Scope 3 becomes mandatory from FY2025 data (due 2026). Start your inventory now to get ahead of the deadline.</div>
+                <div style={{ fontSize: 12, color: '#555553' }}>Scope 3 is expected from {SB253_SCOPE3_FROM}, under a separate CARB rulemaking that is still in workshops — the final regulation is expected by the end of 2026, so the requirement is not settled. Starting now puts the data in place either way.</div>
               </div>
               <a href={inventoryId ? `/dashboard/scope3?inventoryId=${inventoryId}` : '/dashboard/scope3?from=ghg'} style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, background: '#0C447C', color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>Start Scope 3 inventory →</a>
             </div>

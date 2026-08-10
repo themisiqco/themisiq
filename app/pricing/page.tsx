@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -9,6 +9,7 @@ import ConsentForm, { type ConsentPayload } from '../components/ConsentForm'
 import { LEGACY_PRICING_PAGE_ID, tierPrice, tierStrikethrough, volumeDiscount, ADDONS, conciergeTierForLocations, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, FLAT_MODULE_PRICES, type Tier, type GhgTier, type ModuleKey, type AddOnKey } from '../../lib/pricing'
 import { AI_ACT_HIGH_RISK_STANDALONE } from '../../lib/aiAct'
 import { CS3D_APPLIES_FROM } from '../../lib/cs3d'
+import { SB253_SHORT } from '../../lib/sb253'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,7 +35,7 @@ const MODULES: Module[] = [
     tags: [
       { label: 'Scope 1, 2 & 3', color: 'blue' },
       { label: 'Live now', color: 'green' },
-      { label: 'SB 253 · Nov 10', color: 'orange' },
+      { label: SB253_SHORT, color: 'orange' },
     ],
     cta: {
       headline: 'Ready to see your emissions?',
@@ -62,7 +63,11 @@ const MODULES: Module[] = [
     id: 'risk',
     name: 'Climate Risk',
     description: 'SB 261 · TCFD · IFRS S2 · ESRS E1 · CDP (P-series) · SASB · scenario analysis · physical & transition risk',
-    tags: [{ label: 'SB 261 · Jan 2026', color: 'orange' }],
+    // NOT 'SB 261 · Jan 2026'. The Ninth Circuit issued a preliminary injunction applying only to
+    // SB 261, and CARB's 1 December 2025 enforcement advisory confirmed it will not enforce the
+    // 1 January 2026 deadline and will set an alternate date once the appeal resolves. Naming that
+    // date on the page where a customer decides to buy asserts a deadline nobody is enforcing.
+    tags: [{ label: 'SB 261 · enforcement paused', color: 'orange' }],
     cta: {
       headline: 'Ready to assess your climate risk?',
       sub: 'Physical and transition risk quantified. TCFD and SB 261 ready.',
@@ -175,18 +180,11 @@ function PricingPageInner() {
   })()
   const [tier, setTier] = useState<Tier>('starter')
   const [selected, setSelected] = useState<Set<ModuleId>>(initialModules)
-  const [daysLeft, setDaysLeft] = useState(81)
   // Add-on selection state
   const [conciergeOn, setConciergeOn] = useState(false)
   const [conciergeLocations, setConciergeLocations] = useState(1)
   const [verificationOn, setVerificationOn] = useState(false)
 
-  useEffect(() => {
-    const deadline = new Date('2026-11-10')
-    const today = new Date()
-    const diff = Math.ceil((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-    setDaysLeft(Math.max(0, diff))
-  }, [])
 
   // Pricing logic
   const unitPrice = tierPrice(tier)
@@ -472,7 +470,7 @@ function PricingPageInner() {
             { label: 'Methodology', val: 'EPA 2024 · IPCC AR4+AR5 · ISO 14064-3 · GHG Protocol' },
             { label: 'Frameworks', val: 'SB 253 · CDP · ESRS E1 · GRI 305 · IFRS S2 · EcoVadis' },
             { label: 'Built by', val: 'Practitioners with Big 4 & climate consulting experience' },
-            { label: 'Next Reporting Deadline', val: `SB 253 · Nov 10, 2026 · ${daysLeft} days`, red: true },
+            { label: 'Next reporting date', val: SB253_SHORT, red: true },
           ].map((item, i) => (
             <div key={i} style={{ ...s.credItem, ...(i > 0 ? { borderLeft: '1px solid #e8e7e4', paddingLeft: 12 } : {}) }}>
               <div style={s.credLabel}>{item.label}</div>
