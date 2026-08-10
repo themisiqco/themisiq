@@ -50,8 +50,11 @@ export type ObligationId =
   | 'sec-cyber'
   | 'eu-pay-transparency'
   | 'ca-pay-data'
+  | 'sec-item-101'
   | 'modern-slavery'
   | 'cdp'
+  | 'ecovadis'
+  | 'lp-lender-esg'
 
 export interface Obligation {
   id: ObligationId
@@ -188,6 +191,22 @@ export const OBLIGATIONS: Record<ObligationId, Obligation> = {
     },
   },
 
+  // MAPPED TO `people` ON THE MODULE'S OWN CLAIM, NOT ON THE NAME MATCHING. The People dashboard
+  // already lists SEC Item 101 in its framework picker, and its inputs were checked one by one
+  // against what /assess says the disclosure covers — workforce size, turnover, safety, training.
+  // Three of the four are collected; TURNOVER IS NOT, anywhere in the module. The `does` line says
+  // so, on the same reasoning as `cs3d`: a buyer reading this must not infer that buying People
+  // fills the whole 10-K section. It is also HOURS the module records, not spend — a near-miss that
+  // would have been easy to write as "training investment" because /assess uses that phrase.
+  'sec-item-101': {
+    id: 'sec-item-101',
+    name: 'SEC Item 101 — Human Capital Disclosure',
+    modules: ['people'],
+    does: {
+      people: 'Supplies three of the four figures the 10-K human capital section reports: global headcount and headcount by job band, LTIFR and TRIR for safety, and average training hours by gender — hours, not spend. Turnover is not collected and has to come from your HR system.',
+    },
+  },
+
   'modern-slavery': {
     id: 'modern-slavery',
     name: 'Modern Slavery Act — UK and Australia',
@@ -197,6 +216,12 @@ export const OBLIGATIONS: Record<ObligationId, Obligation> = {
     },
   },
 
+  // CDP AND ECOVADIS ARE BOTH REQUEST-DRIVEN AND ANSWER TO DIFFERENT MODULES. Neither has a size
+  // test — a customer or investor asks, and that is the whole trigger — so a buyer meets them
+  // together and needs to know they are not one purchase. CDP's scored sections are emissions, so it
+  // is GHG; EcoVadis's are procurement practice, so it is Supply Chain. Each `does` line names the
+  // SECTIONS OR THEMES the module actually fills, because "supports EcoVadis" told a buyer nothing
+  // about which of the four scored themes they would still be answering by hand.
   'cdp': {
     id: 'cdp',
     name: 'CDP Climate — annual disclosure',
@@ -205,6 +230,109 @@ export const OBLIGATIONS: Record<ObligationId, Obligation> = {
       ghg: 'Feeds the C6, C7 and C11 emissions sections directly from your inventory, on the CDP-required GWP basis.',
     },
   },
+
+  // GHG FIRST: the inventory is the input, and the Environment theme is scored on it. Supply Chain
+  // alone left one of the four scored themes unanswerable, which is a gap a buyer would only find
+  // after paying — so it is closed by the mapping rather than disclosed in the copy.
+  'ecovadis': {
+    id: 'ecovadis',
+    name: 'EcoVadis Sustainability Rating',
+    modules: ['ghg', 'supply-chain'],
+    does: {
+      ghg: 'Produces the Scope 1, 2 and 3 figures the Environment theme is scored on, as a dated inventory traceable to source documents rather than a self-declared number.',
+      'supply-chain': 'Answers the Sustainable Procurement theme with documents rather than assertions — a supplier risk register, the questionnaires you issued and the responses returned — and gap-analyses the scorecard to show which criteria you hold no evidence for.',
+    },
+  },
+
+  // TWO HALVES OF ONE ASK, and an LP wants both: diligence at the point of capital deployment, and
+  // emissions across what is already held. Deals leads because it is the artefact the LP asks for by
+  // name; GHG carries the portfolio half — financed emissions live behind the GHG entitlement.
+  'lp-lender-esg': {
+    id: 'lp-lender-esg',
+    name: 'LP and lender ESG requirements',
+    modules: ['deals', 'ghg'],
+    does: {
+      deals: 'Turns "we diligence ESG" into a file an LP can audit: per-target screening, material findings by sector and jurisdiction, and a remediation cost estimate carried as a percentage of deal value into the IC memo.',
+      ghg: 'Covers the portfolio half — financed emissions by PCAF asset class, on the denominator each class requires, so climate exposure is reported across holdings and not only at the point of investment.',
+    },
+  },
+}
+
+// ── Drivers ──────────────────────────────────────────────────────────────────
+//
+// A SEPARATE MAP WITH ITS OWN TYPE, AND DELIBERATELY NOT PART OF `OBLIGATIONS`.
+//
+// /assess asks what is prompting the visitor. An obligation has an identity independent of the
+// company — SB 253 is SB 253 for every reader — whereas a driver is a fact ABOUT the visitor, and
+// "our board wants it" names no instrument. They are circumstances, not rules.
+//
+// KEEPING THEM OUT OF `OBLIGATIONS` IS WHAT STOPS `obligationsForModule` RETURNING A CIRCUMSTANCE AS
+// COVERAGE. That accessor exists so a module page can list what the module answers; add a driver as
+// an obligation row and it returns 'Board ESG Governance Programme' among the things GHG covers,
+// which then renders on a module page as a coverage claim about the product. A distinct type makes
+// that unrepresentable rather than merely discouraged.
+//
+// SAME FILE, though, because the module vocabulary, the SHORTHAND inversion and the price helpers
+// all live here. Rebuilding any of them in /assess is exactly the three-copies drift this file was
+// created to end — the reason it exists is that /assess, /materiality and /pricing each kept their
+// own module lists.
+export type DriverId = 'regulatory' | 'customer' | 'investor' | 'bank' | 'board' | 'ahead'
+
+// PRIVATE, and keyed so that `regulatory` HAS NO ENTRY TO WRITE. It was `regulatory: []`, and that
+// empty array meant "defer to the obligations" — a value that is PRESENT, VALID, AND MEANS SOMETHING
+// OTHER THAN WHAT IT LOOKS LIKE. A comment asked readers not to render it as a list; a comment is not
+// a type. That is the same shape as the `ghg_location_allowance` metadata key documented on
+// `obligationPrice` below: the writer omitted it, the webhook read absence as null, the trigger read
+// null as UNCAPPED, and every manually-invoiced GHG customer silently received unlimited locations.
+// Nothing failed — a wrong value was simply available to anyone who read it without checking.
+//
+// So the deferral is REMOVED RATHER THAN ENCODED. There is no arm to misread, because the thing
+// `regulatory` was deferring to is available at the call site: /assess runs computeObligations()
+// before it renders anything, so the obligations that actually fired can be passed in and the answer
+// computed instead of pointed at. Excluding the key here means the placeholder cannot be written back.
+//
+// The five fixed lists live on, in buyer order — same convention as `Obligation.modules`, producer
+// module first — and each is non-empty by construction.
+const FIXED_DRIVER_MODULES: Record<Exclude<DriverId, 'regulatory'>, ModuleKey[]> = {
+  customer: ['ghg', 'supply-chain'],
+  investor: ['deals', 'ghg'],
+  bank: ['ghg', 'climate-risk'],
+  board: ['ghg', 'supply-chain'],
+  ahead: ['ghg'],
+}
+
+// The modules that answer a driver.
+//
+// `fired` is REQUIRED FOR EVERY id, not optional and not only for 'regulatory'. The five fixed
+// drivers ignore it, but a caller that cannot supply it has not yet computed the obligations — and
+// that caller must not be able to reach the 'regulatory' path and receive a plausible answer built
+// on nothing. Requiring the argument everywhere is what makes the dependency visible at every call
+// site rather than at one.
+//
+// ORDER: canonical — `ALL_OBLIGATION_IDS` (declaration order of OBLIGATIONS), then each obligation's
+// own `modules` order, first occurrence wins. NOT the order of `fired`. /assess sorts its results by
+// urgency, so passing that order through would make the module list depend on how severe a visitor's
+// obligations happen to be: the same set of rules would yield a different buying order for two
+// companies. Canonical order is a property of the set alone, so the same obligations always produce
+// the same sequence, and it is already buyer-shaped — GHG leads, because the record opens with the
+// GHG-bearing entries and GHG is the producer several other modules consume.
+//
+// AN EMPTY RETURN FROM 'regulatory' IS NOW A TRUE STATEMENT, not a placeholder: no obligation fired
+// on the answers given. It is still not something to render as a heading with nothing under it —
+// a caller must render NOTHING, the same rule /assess applies to an empty obligation group, because
+// "we checked and found none" and "you have not answered enough for us to check" look identical once
+// they are both an empty box. The five fixed drivers never return empty.
+export function driverModules(id: DriverId, fired: ObligationId[]): ModuleKey[] {
+  if (id !== 'regulatory') return FIXED_DRIVER_MODULES[id]
+  const firedSet = new Set(fired)
+  const out: ModuleKey[] = []
+  for (const obligationId of ALL_OBLIGATION_IDS) {
+    if (!firedSet.has(obligationId)) continue
+    for (const m of OBLIGATIONS[obligationId].modules) {
+      if (!out.includes(m)) out.push(m)
+    }
+  }
+  return out
 }
 
 // ── Derived accessors ────────────────────────────────────────────────────────
