@@ -266,27 +266,21 @@ export const PACKS: Record<
 
 // ── Add-ons ──────────────────────────────────────────────────────────────────
 // Add-ons are extras that attach to a module — they are NOT modules themselves.
-// Verification Readiness ($1,499/yr) layers on top of GHG: it requires the `ghg`
-// module, and can be bought either on its own (if GHG is already owned) or
-// bundled with a fresh GHG purchase in the same checkout.
+// Concierge is the only add-on: it requires the `ghg` module, is priced on actual
+// location count (Basic ≤5 / Standard 6–15 / Enterprise 16+ custom quote), and does
+// NOT count toward the 2-/3-module volume discount.
 //
-// Design decisions (confirmed with Lisa):
-//  - Flat $1,499 — does NOT follow the founding-offer switch.
-//  - Does NOT count toward the 2-/3-module volume discount.
-//  - Its own entitlement key `verification`, gated separately from `ghg`.
-export type AddOnKey = 'verification' | 'concierge-basic' | 'concierge-standard' | 'concierge-enterprise'
+// RETIRED 10 Aug 2026 — Verification Readiness ($1,499/yr, key `verification`). Its entitlement
+// was written by the webhook and never read by anything, and half its claims duplicated what GHG
+// Essentials already includes. It was also the ONLY user of `requiresAddOnAnyOf`, which went with
+// it. The six claims that were genuinely its own are recorded in
+// docs/ghg-verifier-grade-roadmap.md — read that before reviving any of this.
+export type AddOnKey = 'concierge-basic' | 'concierge-standard' | 'concierge-enterprise'
 
 export const ADDONS: Record<
   AddOnKey,
-{ key: AddOnKey; label: string; price: number; requires: ModuleKey[]; requiresAddOnAnyOf?: AddOnKey[]; isCustomQuote?: boolean }
+{ key: AddOnKey; label: string; price: number; requires: ModuleKey[]; isCustomQuote?: boolean }
 > = {
-verification: {
-    key: 'verification',
-    label: 'Verification Readiness',
-    price: 1499,
-    requires: ['ghg'],
-    requiresAddOnAnyOf: ['concierge-basic', 'concierge-standard', 'concierge-enterprise'],
-  },
   'concierge-basic': {
     key: 'concierge-basic',
     label: 'Concierge — Basic (up to 5 locations)',
@@ -323,8 +317,11 @@ export function conciergeTierForLocations(locations: number): {
 }
 // Single authority on whether an add-on is allowed in a given cart/account.
 // `requires` lists prerequisite modules (ALL must be present).
-// `requiresAddOnAnyOf` lists prerequisite add-ons (at least one must be present).
 // Returns ok=false with a human-readable reason the routes surface verbatim.
+//
+// The `requiresAddOnAnyOf` branch was removed with Verification Readiness on 10 Aug 2026 — that
+// add-on was its only user, so the mechanism had no remaining caller. `addOnsOwnedOrInCart` is kept
+// in the signature: both routes pass it, and an add-on-depends-on-add-on rule is plausible again.
 export function addOnRequirementsMet(
   addOn: AddOnKey,
   modulesOwnedOrInCart: ModuleKey[],
@@ -343,16 +340,6 @@ export function addOnRequirementsMet(
     return {
       ok: false,
       reason: `${def.label} requires ${def.requires.join(', ')}. Add it to your cart or purchase it first.`,
-    }
-  }
-  if (def.requiresAddOnAnyOf && def.requiresAddOnAnyOf.length > 0) {
-    const hasOne = def.requiresAddOnAnyOf.some((a) => addOnsOwnedOrInCart.includes(a))
-    if (!hasOne) {
-      const names = def.requiresAddOnAnyOf.map((a) => ADDONS[a].label).join(' or ')
-      return {
-        ok: false,
-        reason: `${def.label} requires ${names}. Add Concierge to your cart or purchase it first.`,
-      }
     }
   }
   return { ok: true }

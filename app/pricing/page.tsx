@@ -183,7 +183,6 @@ function PricingPageInner() {
   // Add-on selection state
   const [conciergeOn, setConciergeOn] = useState(false)
   const [conciergeLocations, setConciergeLocations] = useState(1)
-  const [verificationOn, setVerificationOn] = useState(false)
 
 
   // Pricing logic
@@ -192,19 +191,17 @@ function PricingPageInner() {
   const gross = count * unitPrice
   const discount = volumeDiscount(count)
   const net = Math.round(gross * (1 - discount))
-  // Add-on logic. Concierge tier is resolved from the location count; Verification
+  // Add-on logic. Concierge tier is resolved from the location count. Verification Readiness was
+  // retired 10 Aug 2026 — see docs/ghg-verifier-grade-roadmap.md.
   // is only available once Concierge is added (mirrors the server dependency rule).
   const ghgSelected = selected.has('ghg')
   const conciergeResolved = conciergeTierForLocations(conciergeLocations)
   const conciergeActive = ghgSelected && conciergeOn
-  const verificationActive = conciergeActive && verificationOn && !conciergeResolved.isCustomQuote
   const selectedAddOns: AddOnKey[] = [
     ...(conciergeActive && !conciergeResolved.isCustomQuote ? [conciergeResolved.key] : []),
-    ...(verificationActive ? ['verification' as AddOnKey] : []),
   ]
   const addOnsTotal =
-    (conciergeActive && !conciergeResolved.isCustomQuote ? ADDONS[conciergeResolved.key].price : 0) +
-    (verificationActive ? ADDONS.verification.price : 0)
+    (conciergeActive && !conciergeResolved.isCustomQuote ? ADDONS[conciergeResolved.key].price : 0)
   // Grand total shown in the panel/CTA = modules + add-ons (matches Stripe).
   const totalNet = net + addOnsTotal
   const handleBuy = () => {
@@ -706,21 +703,6 @@ function PricingPageInner() {
                   )}
                 </div>
               )}
-            </div>
-
-            {/* Verification — locked until Concierge added */}
-            <div style={{ padding: 14, background: '#fff', borderRadius: 10, border: verificationActive ? '2px solid #7425e3' : '1px solid #e8e7e4', opacity: conciergeActive && !conciergeResolved.isCustomQuote ? 1 : 0.55 }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>Verification Readiness · $1,499/yr</div>
-                  <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, marginTop: 2 }}>Assurance-ready package built on your Concierge-reviewed data.</div>
-                </div>
-                {conciergeActive && !conciergeResolved.isCustomQuote ? (
-                  <button onClick={() => setVerificationOn(v => !v)} style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', background: verificationOn ? '#7425e3' : '#0d0d0d', color: '#fff' }}>{verificationOn ? 'Added ✓' : 'Add'}</button>
-                ) : (
-                  <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: '#888784', padding: '6px 10px', background: '#f0efed', borderRadius: 8 }}>🔒 Requires Concierge</span>
-                )}
-              </div>
             </div>
           </div>
         )}

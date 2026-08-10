@@ -30,7 +30,12 @@ ThemisIQ (themisiq.co) is a B2B compliance SaaS platform. Solo founder/developer
 - **Hosting:** Vercel (auto-deploy on push to `main`)
 - **Repo:** `themisiqco/themisiq`
 - **Dev machine:** macOS, local user `maj`
-- **App-side AI model string:** `claude-opus-4-8` (e.g. the bill-extract route). Do not change this without an explicit reason.
+- **App-side AI model strings — there is no longer ONE standard.** Each route names its own, and the choice is recorded with it. Do not "align" them without an explicit reason.
+  - **`/api/concierge/extract` uses `claude-opus-5`, with thinking ON** (`thinking: { type: 'adaptive' }`, `output_config: { effort: 'medium' }`). The thinking is deliberate: the prompt asks the model to tell a billed consumption figure apart from a cost, a rate, a tax line and a meter reading, and to return `value: null` when it cannot tell. **That abstention judgement is the route's safety property** — a flagged blank is recoverable, a confident wrong number reaches a verifier — and reasoning is what makes it reliable. Do not disable it to save tokens.
+    - **A fixed thinking budget is not available.** `thinking: { type: 'enabled', budget_tokens: N }` returns 400 on the whole Opus family — verified live against `claude-opus-5` AND `claude-opus-4-8` on 5 Aug 2026 — with the API naming its own replacement: *use `thinking.type.adaptive` and `output_config.effort`*. `effort` is a depth dial, NOT a token cap. The worst case is bounded by `max_tokens` (8192, shared by thinking and response text) and by the route's `stop_reason === 'max_tokens'` guard.
+    - **Thinking changes the response shape, and the parse depends on it.** With thinking on, `content` is `['thinking', 'text']`, and a thinking block has **no `.text` key** (its field is `.thinking`, empty by default — `display` defaults to `"omitted"`). The route's `b.type === 'text'` filter is what keeps this working; reading `b.text` unconditionally would prepend `"undefined"` to the JSON. That is exactly the ghg-bot defect below, one model generation later.
+  - **`/api/ghg-bot` uses `claude-sonnet-5`.** Not a mistake, and not to be "corrected" back to opus. It answers from a fixed ~7 KB prompt rather than reasoning over an uploaded document, its rate limit admits 30 calls per user per 10 minutes, and the string it replaced was itself a Sonnet — so this keeps the tier the original author chose at a price that suits a glossary-and-boundary Q&A box.
+  - **A retired model string fails as an upstream 404, not as a build error.** `tsc`, eslint, the tests and `npm run build` all pass with a model that no longer exists, because it is only a string; the customer just sees the feature fail. `/api/ghg-bot` carried a dead `claude-sonnet-4-20250514` undetected this way. **Before changing any model string, send one live call and check for 200** — do not trust a model list in place of a response. The exact curl is in the comment above `MODEL` in `app/api/ghg-bot/route.ts`. All three strings — `claude-opus-5`, `claude-sonnet-5`, `claude-opus-4-8` — were last verified live on 5 Aug 2026.
 - **Jurisdictions served:** primarily California (SB 253 / SB 261), UK, and EU; company incorporated in Ontario, Canada.
 
 Lisa is a non-expert in terminal/git workflows. When a manual step is genuinely required of her, give it as a clear, copy-pasteable, one-step-at-a-time instruction.
@@ -46,7 +51,7 @@ Lisa is a non-expert in terminal/git workflows. When a manual step is genuinely 
 | Unit conversions | `lib/unitConversions.ts` | 3-tier cascade (exact match → documented factor → flag `needs_manual_review`). |
 | Entitlement reads | `lib/useEntitlement.ts` | e.g. `useGhgLocationAllowance()`, user-scoped, fails open to null. |
 | Checkout intent | `lib/checkout.ts` | Stores intent in `sessionStorage`, resumes after login. |
-| Add-on prerequisites | `addOnRequirementsMet` | Single authority enforcing the `ghg → concierge → verification` dependency chain. Both `/api/checkout` and `/api/admin/create-invoice` defer to it. |
+| Add-on prerequisites | `addOnRequirementsMet` | Single authority enforcing the `ghg → concierge` dependency chain, and the quote-only guard that keeps Concierge Enterprise unsellable through checkout. Both `/api/checkout` and `/api/admin/create-invoice` defer to it. (Was `ghg → concierge → verification` until 10 Aug 2026 — see the retirement note under **Pricing model**.) |
 
 ---
 
@@ -71,7 +76,7 @@ The engine is pure calc (no React/Supabase): all factor tables, coverage analysi
 - **Monthly = evidenced only. Annual = evidenced + estimated. They are SUPPOSED to diverge on extrapolated inventories.** Never gross up monthly slices — a dated slice must not assert consumption no bill supports. `reconcile()` models the expected gap; a non-zero `unexplained_delta` is a real defect. (`reconcile` is exported + tested but not yet surfaced in the UI — separate design.)
 - **Coverage gate is keyed per `(document_type, fuelType)` and iterates `cov.issues` (all conditions present), not the scalar `status`.** A fleet_fuel doc's gasoline and diesel are separate groups; a gap masked by an overlap must still block.
 - **`s3_td` (NZ electricity T&D, Scope 3 Cat 3) is a DISTINCT total — never folded into S1/S2.** `calcInventory` surfaces it separately.
-- **Run `npx vitest run lib/ghg/engine.test.ts` (27 green) before and after any engine change.** If a previously-green test breaks, stop.
+- **Run `npx vitest run lib/ghg/engine.test.ts` (50 green) before and after any engine change.** If a previously-green test breaks, stop.
 
 ---
 
@@ -79,9 +84,41 @@ The engine is pure calc (no React/Supabase): all factor tables, coverage analysi
 
 - Preserve **verbatim source values** where a verifier may cross-check against the source document (e.g. bill period end dates — do not silently normalize "May 01" to "Apr 30").
 - When a value can't be confidently derived, **flag it for manual review** rather than guessing.
+- **An empty result is a result, and must be reported as one.** This is the API-surface counterpart to the rule above and to the engine's *"a dated slice must not assert consumption no bill supports"*: the engine must not invent a figure it has no evidence for, and a route must not pass off "nothing came back" as either an answer or ordinary trouble. A route that returns `''`, `null`, or `[]` where a value was expected must say **which** of those happened and **why**. It must never hand the client something that renders as generic failure text.
+  - **The corollary is the part that gets lost: an error message that guesses at a cause it cannot verify will eventually name the wrong one, and hide the real defect for months.** State what was observed, not what probably caused it. "Didn't open" is checkable; "your browser blocked it" is a guess wearing the clothes of a diagnosis.
+  - Four instances in three days, 2–4 Aug 2026, each invisible until someone looked directly at it:
+    1. **The concierge returned nothing, silently, for three document types its extractor cannot read** (fuel oil, purchased steam, RECs). The upload burned a model call, the client discarded every figure, and the customer saw an upload that appeared to do nothing. Now structurally prevented by `lib/ghg/conciergeDocTypes.ts` + its test, not by a comment.
+    2. **`window.open(url, '_blank', 'noopener')` returns `null` UNCONDITIONALLY** — `noopener` severs the handle by definition, and `noreferrer` sets `noopener` too. Both verifier pages therefore showed *"Your browser blocked the pop-up"* on every successful click, naming a cause that had never once occurred, while the real blank tab was orphaned. The code could not distinguish blocked from severed and guessed.
+    3. **`/api/ghg-bot` carried a retired model string**, and the 404 error body was `.map`ped for `.text` into `''` — surfacing as *"Sorry, try again."* for an unknown stretch. The feature was dead and looked flaky. See the model-string rule under **Stack & environment** for the check that catches this class.
+    4. **Same route, `max_tokens` exhausted during adaptive thinking** — thinking tokens draw on the same budget — producing the same empty string by a different path. Caught before shipping only because (3) had just made `stop_reason` the first thing to read.
 - **`mr_jurisdictions.active` is a DORMANT column — no route reads it.** All three queries (`api/materiality/reference`, `api/materiality`, `api/materiality/resilience`) omit `active` from both the filter and the select, so setting `active = false` is a silent no-op: the row is still fetched and still scored. Retiring a jurisdiction today requires a hard delete, not deactivation. If jurisdictions are ever wired to the DB the way `mr_regions` was, `active` must be added to the filter in all three routes IN THE SAME PASS, or deactivation will keep doing nothing. (Contrast: `mr_regions` DOES filter on `active`.)
 - The six-paragraph legal disclaimer is propagated across all Category-A surfaces (assurance PDF, climate-risk report, materiality report, assessment API, public methodology page, GHG inline report, climate-risk page disclaimers) and the per-module methodology Word docs. Keep these in sync; don't edit one in isolation.
 - Citations/attributions for GWP and emission factors must stay accurate (AR4/AR5/AR6 sourcing in `EF_SOURCES`).
+
+---
+
+## Known defects (OPEN)
+
+### Unit switch relabels without converting (OPEN — live in production)
+
+Changing the unit selector on a location that already holds a figure
+relabels the number rather than converting it. 332 m3 becomes 332 Mcf —
+roughly 28x the actual gas — with a confirmed source document underneath
+still reading "332m3". No error, no flag, no review state.
+
+Worse than an ordinary defect for three reasons: the customer performs
+the action believing they are fixing something (the unpriceable-location
+message tells them to check the unit); it presents as clean and
+high-confidence; and the provenance chain actively contradicts the
+stored figure.
+
+Decision needed before fixing: does the figure convert, or clear and
+ask? unitConversions.ts already converts as an audited step, and m3 to
+Mcf is fixed geometry rather than an estimate — but it silently changes
+a number the customer typed. Clearing invents nothing but destroys
+entered data.
+
+Found 5 Aug 2026 while testing the unpriceable-location isolation.
 
 ---
 
@@ -111,7 +148,18 @@ The engine is pure calc (no React/Supabase): all factor tables, coverage analysi
   enforcement, upgrade wall, no auto-downgrade.
 - **Concierge add-on** (requires GHG) is a separate axis priced on actual
   location count: Basic ≤5 $799, Standard 6–15 $1,499, Enterprise 16+ custom
-  quote.
+  quote. It is now the ONLY add-on.
+- **Verification Readiness ($1,499/yr) was RETIRED 10 Aug 2026** — `ADDONS.verification`,
+  its `AddOnKey` member, the `requiresAddOnAnyOf` type field and the
+  `addOnRequirementsMet` branch reading it are all removed, along with
+  `app/verification-readiness/page.tsx` and its nav/footer entries. Two reasons: its
+  entitlement was **written by the webhook and never read** — no
+  `useEntitlement('verification')` existed or could (that hook takes `ModuleKey`), so
+  no surface rendered differently for a holder; and half its claims duplicated what GHG
+  Essentials already lists (`'Audit trail + assurance package'`), with `assurancePdf.ts`
+  and `/verify/[token]` already citing the same ISO 14064-3 / ISAE 3410. The six claims
+  that were genuinely its own are in `docs/ghg-verifier-grade-roadmap.md` — read that
+  before reviving any of it. Do not re-add the add-on to restore the page.
 - **`CARD_THRESHOLD_USD` = $10,000.** Above that, self-serve card is off and
   the order routes to request-an-invoice.
 - `allow_promotion_codes: true` is permanent.

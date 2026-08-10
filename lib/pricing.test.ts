@@ -94,15 +94,6 @@ describe('LEGACY_PRICING_PAGE_ID — cart reachability', () => {
   })
 })
 
-describe('add-on pricing', () => {
-  // Locks the Verification Readiness add-on price at the source of truth. ADDONS
-  // .verification.price is charged directly by /api/checkout + /api/admin/create-invoice
-  // (it does NOT flow through cartQuote), so this guards what customers actually pay.
-  it('Verification Readiness add-on = $1,499', () => {
-    expect(ADDONS.verification.price).toBe(1499)
-  })
-})
-
 // ── SECURITY — quote-only add-ons must never be purchasable through checkout ──
 // Concierge Enterprise has price 0 (a custom-quote placeholder). Without a server-side guard,
 // POST /api/checkout { addOns:['concierge-enterprise'] } with GHG owned would mint a real

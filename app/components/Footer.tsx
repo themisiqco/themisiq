@@ -35,7 +35,6 @@ export default function Footer() {
             { label: 'People & Workforce', href: '/people' },
             { label: 'Cyber Governance', href: '/cyber' },
             { label: 'Advisory', href: '/advisory' },
-            { label: 'Verification Readiness', href: '/verification-readiness' },
           ] },
           { heading: 'Frameworks', links: [
             { label: 'Frameworks we support', href: '/frameworks' },

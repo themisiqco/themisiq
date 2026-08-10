@@ -3,7 +3,7 @@
 // Creates a Stripe Checkout Session for a logged-in customer.
 //
 // SECURITY SPINE: the browser tells us WHAT the customer wants to buy (a pack, a
-// tier + modules, and/or the verification add-on). It does NOT get to tell us the
+// tier + modules, and/or the Concierge add-on). It does NOT get to tell us the
 // price. We recompute every price here, server-side, from lib/pricing.ts. So even
 // if someone tampers with the browser to claim "price = $1", we ignore it.
 //

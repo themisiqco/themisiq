@@ -15,7 +15,6 @@ const MODULES_NAV: { href: string; label: string; labelShort: string; sub: strin
   { href: '/people', label: 'People & Workforce', labelShort: 'People', sub: 'ESRS S1 · EU Pay Transparency · CA Pay Data' },
   { href: '/ai-governance', label: 'AI Governance', labelShort: 'AI Governance', sub: 'EU AI Act · NIST AI RMF · ISO 42001' },
   { href: '/cyber', label: 'Cyber Governance', labelShort: 'Cyber', sub: 'NIS2 · DORA · SEC cyber · ISO 27001' },
-  { href: '/verification-readiness', label: 'GHG Verification', labelShort: 'GHG Verification', sub: 'ISO 14064-3 · ISAE 3410 · verifier-ready package' },
   { href: '/cbam', label: 'CBAM', labelShort: 'CBAM', sub: 'Regulation (EU) 2023/956 · verifier-ready' },
 ]
 
@@ -65,8 +64,9 @@ export default function Nav() {
 
   // Platform menu groups: GHG Emissions + GHG Verification paired at the top.
   const ghg = MODULES_NAV.find(m => m.href === '/climate-ghg')!
-  const ghgVerification = MODULES_NAV.find(m => m.href === '/verification-readiness')!
-  const otherModules = MODULES_NAV.filter(m => m.href !== '/climate-ghg' && m.href !== '/verification-readiness')
+  // Verification Readiness was retired 10 Aug 2026 — its nav entry and the ghgVerification lookup
+  // went with it. GHG is still pulled out separately; everything else is 'other'.
+  const otherModules = MODULES_NAV.filter(m => m.href !== '/climate-ghg')
 
   const navLinkStyle: React.CSSProperties = { fontSize: 15, color: '#555553', textDecoration: 'none', whiteSpace: 'nowrap', fontWeight: 400 }
   const platformItemStyle: React.CSSProperties = { display: 'block', padding: '9px 12px', borderRadius: 8, textDecoration: 'none' }
@@ -115,7 +115,6 @@ export default function Nav() {
                   padding: 8, zIndex: 200, display: 'flex', flexDirection: 'column',
                 }}>
                   {moduleRow(ghg)}
-                  {moduleRow(ghgVerification)}
                   <div style={{ height: '0.5px', background: '#e8e7e4', margin: '6px 4px' }} />
                   {otherModules.map(moduleRow)}
                 </div>
