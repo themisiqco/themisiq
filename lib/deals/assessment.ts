@@ -8,6 +8,7 @@ import { GHG_TIERS, FLAT_MODULE_PRICES } from '../pricing'
 // Sector risk copy must not retype an AI Act date — see lib/aiAct.ts. Constants only, no I/O, so this
 // import does not compromise the purity note above.
 import { AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED, AI_ACT_CITATION } from '../aiAct'
+import { CS3D_APPLIES_FROM, CS3D_CITATION } from '../cs3d'
 
 // Fields the assessment functions read off a deal. The functions take explicit primitive
 // params (below); this type documents the deal shape both surfaces hydrate from.
@@ -42,7 +43,7 @@ export const SECTOR_RISKS: Record<string, SectorRisk[]> = {
   'Technology': [
     { risk: 'Data centre energy intensity', severity: 'medium', framework: 'SB 253 / CSRD', detail: 'Data centre operations carry significant Scope 2 exposure. PPA and renewable energy coverage assessment needed.' },
     { risk: 'AI governance exposure', severity: 'medium', framework: 'EU AI Act', detail: `Technology products may contain high-risk AI systems. Conformity assessment applies from ${AI_ACT_HIGH_RISK_STANDALONE} for stand-alone systems, and from ${AI_ACT_HIGH_RISK_EMBEDDED} where the AI is built into a product already covered by EU product-safety law (${AI_ACT_CITATION}).` },
-    { risk: 'Supply chain minerals risk', severity: 'high', framework: 'CS3D / ESRS S2', detail: 'Hardware products may rely on conflict minerals. CS3D due diligence obligations apply to in-scope companies from 26 July 2029 (Directive (EU) 2026/470).' },
+    { risk: 'Supply chain minerals risk', severity: 'high', framework: 'CS3D / ESRS S2', detail: `Hardware products may rely on conflict minerals. CS3D due diligence obligations apply to in-scope companies from ${CS3D_APPLIES_FROM} (${CS3D_CITATION}).` },
   ],
   'Healthcare & Pharma': [
     { risk: 'Cold chain emissions', severity: 'medium', framework: 'SB 253 / GHG Protocol', detail: 'Pharmaceutical cold chain carries significant Scope 3 Cat.4 emissions from refrigerant leakage and transport.' },

@@ -1,8 +1,12 @@
 'use client'
 import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
+import { FLAT_MODULE_PRICES } from '../../lib/pricing'
+import { CS3D_APPLIES_FROM, CS3D_EMPLOYEE_THRESHOLD, CS3D_TURNOVER_THRESHOLD } from '../../lib/cs3d'
 
 export default function Page() {
+  // Price from the single source of truth, formatted as app/cbam/page.tsx does.
+  const supplyPrice = FLAT_MODULE_PRICES['supply-chain'].toLocaleString('en-US')
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d' }}>
       <Nav />
@@ -21,6 +25,8 @@ export default function Page() {
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
               <a href="/dashboard/supply-chain" style={{ ...btnPrimary, textDecoration: 'none' }}>Map your supply chain →</a>
               <a href="/dashboard/supply-chain" style={{ ...btnSecondary, textDecoration: 'none' }}>See how supplier data feeds Scope 3 →</a>
+              <a href="/order?modules=supply" style={{ ...btnSecondary, textDecoration: 'none' }}>${supplyPrice}/yr</a>
+              <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
               {['Scope 3 Cat.1', 'ESRS S2', 'CS3D', 'EcoVadis', 'CDP C12', 'Modern Slavery', 'UNGP', 'GRI 414'].map(tag => (
@@ -33,7 +39,7 @@ export default function Page() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {[
               { val: '70%', unit: 'of emissions', label: 'typically in Scope 3 Cat.1 for manufacturers', color: '#7425e3', bg: '#EDE9FE' },
-              { val: 'CS3D', unit: '2027', label: 'EU supply chain due diligence — civil liability for failures', color: '#B91C1C', bg: '#FCEBEB' },
+              { val: 'CS3D', unit: CS3D_APPLIES_FROM, label: 'EU supply chain due diligence — civil liability for failures', color: '#B91C1C', bg: '#FCEBEB' },
               { val: '5+', unit: 'frameworks', label: 'CS3D · EcoVadis · Modern Slavery · CDP C12 · ESRS S2 — one platform', color: '#0F6E56', bg: '#E1F5EE' },
               { val: '$2,900', unit: 'portal/yr', label: 'vs $15,000–$50,000 for EcoVadis supplier outreach — same outcome', color: '#0C447C', bg: '#E6F1FB' },
             ].map(({ val, unit, label, color, bg }) => (
@@ -56,7 +62,10 @@ export default function Page() {
               Civil liability for supply chain failures.<br />Start preparing now.
             </h2>
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
-              CS3D introduces civil liability for harm caused by inadequate human rights and environmental due diligence across your value chain — not just tier 1. Large companies must comply from 2027. Preparation starts now.
+              {/* "Large companies" scoped nothing a reader could check, and (EU) 2026/470 raised the
+                  limbs fivefold on headcount — so the word now means something far narrower than when
+                  this copy was written. Both limbs, and the AND, stated so a non-lawyer can self-assess. */}
+              CS3D introduces civil liability for harm caused by inadequate human rights and environmental due diligence across your value chain — not just tier 1. If your company has {CS3D_EMPLOYEE_THRESHOLD} and {CS3D_TURNOVER_THRESHOLD}, you must comply from {CS3D_APPLIES_FROM}. Preparation starts now.
             </p>
             {['Human rights due diligence (HRDD) across full value chain', 'Accessible grievance mechanisms for value chain workers', 'Risk-based supplier prioritisation and monitoring', 'Civil liability for failures — not just regulatory fines', 'ESRS G1 and S2 disclosure integration'].map((item, i) => (
               <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
@@ -68,7 +77,7 @@ export default function Page() {
           <div style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: '2rem' }}>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 16 }}>Key supply chain frameworks</div>
             {[
-              { fw: 'EU CS3D', scope: 'Human rights + environmental HRDD', deadline: '2027 (large companies)', urgency: 'critical' },
+              { fw: 'EU CS3D', scope: 'Human rights + environmental HRDD', deadline: `${CS3D_APPLIES_FROM} (large companies)`, urgency: 'critical' },
               { fw: 'ESRS S2 + G1', scope: 'Value chain workers + business conduct', deadline: 'FY2024 (large EU)', urgency: 'critical' },
               { fw: 'SB 253 Scope 3', scope: 'Category 1 purchased goods', deadline: '2027 (California)', urgency: 'high' },
               { fw: 'CDP C12', scope: 'Supplier engagement programme', deadline: 'Annual · July', urgency: 'medium' },
@@ -142,7 +151,7 @@ export default function Page() {
       {/* CTA */}
       <section style={{ padding: '6rem 2.5rem', textAlign: 'center' }}>
         <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
-          CS3D applies from 2027.<br />
+          CS3D applies from {CS3D_APPLIES_FROM}.<br />
           <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Start building now.</span>
         </h2>
         <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
@@ -150,7 +159,8 @@ export default function Page() {
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
           <a href="/dashboard/supply-chain" style={{ ...btnPrimary, textDecoration: 'none' }}>Map your supply chain →</a>
-          <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to a specialist</a>
+          <a href="/order?modules=supply" style={{ ...btnSecondary, textDecoration: 'none' }}>${supplyPrice}/yr</a>
+          <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
         </div>
       </section>
 

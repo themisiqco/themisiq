@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import Nav from '../../components/Nav'
 import Papa from 'papaparse'
 import { useEntitlement } from '../../../lib/useEntitlement'
+import { CS3D_APPLIES_FROM } from '../../../lib/cs3d'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -143,7 +144,7 @@ const RISK_CONFIG: Record<RiskLevel, { label: string; color: string; bg: string;
 }
 
 const FRAMEWORK_CONFIG: Record<Framework, { label: string; desc: string }> = {
-  cs3d:          { label: 'EU CS3D', desc: 'Human rights & environmental due diligence · 2027' },
+  cs3d:          { label: 'EU CS3D', desc: `Human rights & environmental due diligence · ${CS3D_APPLIES_FROM}` },
   ecovadis:      { label: 'EcoVadis', desc: 'Supplier sustainability ratings · customer-requested' },
   modern_slavery:{ label: 'Modern Slavery Act', desc: 'UK & Australia transparency statement · annual' },
   cdp_c12:       { label: 'CDP C12', desc: 'Supplier engagement programme · annual · July' },
@@ -605,7 +606,7 @@ export default function SupplyChainDashboard() {
       <Nav />
       <div style={{ background: '#0F6E56', padding: '8px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
-        <span style={{ fontSize: 12, fontWeight: 500, color: '#fff' }}>EU CS3D applies from 2027 · ESRS S2 active now · SB 253 Scope 3 deadline 2027. Map your supply chain today.</span>
+        <span style={{ fontSize: 12, fontWeight: 500, color: '#fff' }}>EU CS3D applies from {CS3D_APPLIES_FROM} · ESRS S2 active now · SB 253 Scope 3 deadline 2027. Map your supply chain today.</span>
       </div>
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -666,7 +667,7 @@ export default function SupplyChainDashboard() {
               )}
               <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.2)', borderRadius: 10, padding: '0.75rem' }}>
                 <div style={{ fontSize: 11, color: '#0F6E56', lineHeight: 1.6 }}>
-                  <strong>EU CS3D · 2027</strong><br />
+                  <strong>EU CS3D · {CS3D_APPLIES_FROM}</strong><br />
                   Risk-based HRDD across your full value chain
                 </div>
               </div>
