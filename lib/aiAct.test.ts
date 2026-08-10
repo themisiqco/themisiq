@@ -19,6 +19,20 @@ const SCAN_DIRS = ['app', 'lib']
 
 // Every spelling that has appeared, plus the two CURRENT dates — the point is that even a correct
 // date must not be written twice.
+//
+// KNOWN LIMIT: A DATE SPLIT ACROSS TWO ADJACENT FIELDS EVADES EVERY PATTERN HERE. These are
+// whole-string matches, so `{ val: '2 Dec', unit: '2027' }` contains no forbidden substring while
+// rendering as "2 Dec 2027" — a hardcoded date, invisible to this test. That is not hypothetical: the
+// AI Governance stat tile at app/ai-governance/page.tsx did exactly that, and it was found on
+// 10 August 2026 by the SIBLING guard in lib/cs3d.test.ts, in the same session this file was written.
+// It surfaced there only because that list briefly carried an over-broad `unit: '2027'` pattern, which
+// was removed for crying wolf on three other regimes dated 2027.
+//
+// THE DEFENCE IS DERIVATION, NOT A LONGER PATTERN LIST. Lengthening this array chases fragments and
+// will always lose: a date can be split at any boundary, in any field pair, with any abbreviation. A
+// consumer that needs the date in pieces must SLICE THE CONSTANT at render time — see how that tile
+// now derives `val` and `unit` from AI_ACT_HIGH_RISK_STANDALONE. This list catches the retyped date;
+// only derivation prevents the split one.
 const FORBIDDEN = [
   'August 2, 2026', 'Aug 2, 2026', 'August 2 2026', '2026-08-02',
   'August 2, 2027', 'Aug 2, 2027', 'August 2 2027', '2027-08-02',

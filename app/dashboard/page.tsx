@@ -22,9 +22,6 @@ const ID_TO_PRICE_KEY: Record<string, keyof typeof FLAT_MODULE_PRICES> = {
   people: 'people',
 }
 
-// Auto-expiring "New" badge on the SBTi card — no DB / per-user state, just a date compare.
-const SBTI_NEW_UNTIL = new Date('2026-08-01')
-
 // `previewable` records whether the module's page renders anything to a customer with
 // no entitlement. TRUE = the page loads and the tool works, with the OUTPUT gated
 // (blurred results, or an unlock panel replacing the report section). FALSE = the page
@@ -253,7 +250,6 @@ export default function Dashboard() {
   const activePack = subscriptions.find(s => s.pack)?.pack
   const activeModuleCount = subscriptions.length
   const unlockedModuleIds = subscriptions.map(s => s.module_id)
-  const sbtiIsNew = new Date() < SBTI_NEW_UNTIL // true until the cutoff; gates the SBTi "New" badge
 
   if (loading) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
@@ -373,14 +369,6 @@ export default function Dashboard() {
                     {mod.urgency && (
                       <div style={{ position: 'absolute', top: 12, right: unlocked ? 12 : 44, fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 99, background: '#FCEBEB', color: '#B91C1C', border: '0.5px solid #B91C1C33' }}>
                         {mod.urgency}
-                      </div>
-                    )}
-
-                    {/* Auto-expiring "New" badge — SBTi card only, before the cutoff AND only when unlocked
-                        (never surface "New" on a feature a non-GHG user can't access). Affirmative green. */}
-                    {mod.id === 'sbti' && sbtiIsNew && unlocked && (
-                      <div style={{ position: 'absolute', top: 12, right: 12, fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '2px 6px', borderRadius: 99, background: '#E1F5EE', color: '#0F6E56', border: '0.5px solid #0F6E5633' }}>
-                        New
                       </div>
                     )}
 

@@ -1,6 +1,7 @@
 'use client'
 import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
+import { FLAT_MODULE_PRICES } from '../../lib/pricing'
 import {
   AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED, AI_ACT_CITATION,
 } from '../../lib/aiAct'
@@ -10,6 +11,15 @@ import {
 // counting down to a date Regulation (EU) 2026/1744 had already moved. A date the reader can check
 // against the OJ is worth more than an interval that silently expires.
 export default function Page() {
+  // Price from the single source of truth, formatted as app/cbam/page.tsx does.
+  const aiPrice = FLAT_MODULE_PRICES['ai-governance'].toLocaleString('en-US')
+  // The stat tile below takes a large `val` and a small `unit`, so the date has to arrive in two
+  // pieces. DERIVED, never retyped: day + three-letter month, then the year, both sliced from
+  // AI_ACT_HIGH_RISK_STANDALONE. Hardcoding either half is how a date escapes lib/aiAct.test.ts —
+  // a whole-string pattern cannot see '2 Dec' beside '2027' as one date. That is exactly what this
+  // tile did until 10 August 2026, in the same session the guard was written.
+  const [hrDay, hrMonth, hrYear] = AI_ACT_HIGH_RISK_STANDALONE.split(' ')
+  const hrStatVal = `${hrDay} ${hrMonth.slice(0, 3)}`
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d' }}>
       <Nav />
@@ -36,7 +46,8 @@ export default function Page() {
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
               <a href="/dashboard/ai-governance" style={{ ...btnPrimary, textDecoration: 'none' }}>Start your AI inventory →</a>
-              <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to a specialist</a>
+              <a href="/order?modules=ai" style={{ ...btnSecondary, textDecoration: 'none' }}>${aiPrice}/yr</a>
+              <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
               {['EU AI Act', 'NIST AI RMF', 'ISO 42001', 'Model risk', 'SR 11-7', 'GDPR Art. 22', 'Bill C-27 AIDA', 'Board AI oversight'].map(tag => (
@@ -48,7 +59,7 @@ export default function Page() {
           {/* STAT CARDS */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {[
-              { val: '2 Dec', unit: '2027', label: `High-risk obligations for stand-alone systems; ${AI_ACT_HIGH_RISK_EMBEDDED} where the AI is inside a regulated product`, color: '#B91C1C', bg: '#FCEBEB' },
+              { val: hrStatVal, unit: hrYear, label: `High-risk obligations for stand-alone systems; ${AI_ACT_HIGH_RISK_EMBEDDED} where the AI is inside a regulated product`, color: '#B91C1C', bg: '#FCEBEB' },
               // 'Stand-alone', not 'Annex III': this was the only annex citation on a public marketing
               // page, and the tile beside it already says "stand-alone systems". Same register.
               { val: 'Stand-alone', unit: 'high-risk', label: 'HR, hiring, credit, education AI — full conformity assessment required', color: '#7425e3', bg: '#EDE9FE' },
@@ -216,8 +227,9 @@ export default function Page() {
           The first step is knowing what AI systems you have and whether they're high-risk. ThemisIQ's AI inventory wizard walks you through every system in days — not months.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-          <a href="/ai-governance" style={{ fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none', display: 'inline-block' }}>Start your AI inventory →</a>
-          <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: 'rgba(255,255,255,0.7)', border: '0.5px solid rgba(255,255,255,0.2)', textDecoration: 'none', display: 'inline-block' }}>Talk to a specialist</a>
+          <a href="/dashboard/ai-governance" style={{ fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none', display: 'inline-block' }}>Start your AI inventory →</a>
+          <a href="/order?modules=ai" style={{ fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: 'rgba(255,255,255,0.7)', border: '0.5px solid rgba(255,255,255,0.2)', textDecoration: 'none', display: 'inline-block' }}>${aiPrice}/yr</a>
+          <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: 'rgba(255,255,255,0.5)', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
         </div>
       </section>
 

@@ -8,6 +8,7 @@ import { startCheckout } from '../../lib/checkout'
 import ConsentForm, { type ConsentPayload } from '../components/ConsentForm'
 import { LEGACY_PRICING_PAGE_ID, tierPrice, tierStrikethrough, volumeDiscount, ADDONS, conciergeTierForLocations, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, FLAT_MODULE_PRICES, type Tier, type GhgTier, type ModuleKey, type AddOnKey } from '../../lib/pricing'
 import { AI_ACT_HIGH_RISK_STANDALONE } from '../../lib/aiAct'
+import { CS3D_APPLIES_FROM } from '../../lib/cs3d'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -75,7 +76,7 @@ const MODULES: Module[] = [
     description: 'Supplier portal · EcoVadis (Environment, Labour & Human Rights, Ethics, Procurement) · CDP C12 · EU CS3D · ESRS S2+G1 · Modern Slavery Act · GRI 308/414 · UN Guiding Principles · feeds Scope 3 Cat.1 in the GHG module',
     tags: [
       { label: 'Supplier Portal', color: 'purple' },
-      { label: 'CS3D · 2027', color: 'orange' },
+      { label: `CS3D · ${CS3D_APPLIES_FROM}`, color: 'orange' },
     ],
     cta: {
       headline: 'Ready to map your supply chain?',

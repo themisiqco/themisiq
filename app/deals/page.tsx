@@ -1,8 +1,11 @@
 'use client'
 import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
+import { FLAT_MODULE_PRICES } from '../../lib/pricing'
 
 export default function Page() {
+  // Price from the single source of truth, formatted as app/cbam/page.tsx does.
+  const dealsPrice = FLAT_MODULE_PRICES['deals'].toLocaleString('en-US')
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d' }}>
       <Nav />
@@ -21,7 +24,8 @@ export default function Page() {
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
               <a href="/dashboard/deals" style={{ ...btnPrimary, textDecoration: 'none' }}>Assess your M&A exposure →</a>
-              <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to a specialist</a>
+              <a href="/order?modules=deals" style={{ ...btnSecondary, textDecoration: 'none' }}>${dealsPrice}/yr</a>
+              <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
               {['M&A diligence', 'PE / family office', 'IFRS S2', 'TCFD', 'SB 253', 'LP ESG', 'IC reporting', 'Portfolio monitoring'].map(tag => (
@@ -170,7 +174,8 @@ export default function Page() {
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
           <a href="/dashboard/deals" style={{ ...btnPrimary, textDecoration: 'none' }}>Assess your M&A exposure →</a>
-          <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to a specialist</a>
+          <a href="/order?modules=deals" style={{ ...btnSecondary, textDecoration: 'none' }}>${dealsPrice}/yr</a>
+          <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
         </div>
       </section>
 
