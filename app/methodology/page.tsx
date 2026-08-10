@@ -238,7 +238,7 @@ const METHODOLOGIES = [
       },
       {
         title: 'Regulatory status note',
-        content: 'ThemisIQ monitors EU AI Act implementation guidance and updates its classification logic as Commission guidance evolves. The operative deadline for high-risk AI obligations remains August 2, 2026 under enacted law. A proposed amendment (AI Act Omnibus) reached political agreement in May 2026 but is not yet enacted law.',
+        content: 'ThemisIQ monitors EU AI Act implementation guidance and updates its classification logic as Commission guidance evolves. Regulation (EU) 2026/1744 — published in the Official Journal on 24 July 2026 and in force from 27 July 2026 — replaced Article 113(3)(c) of Regulation (EU) 2024/1689, deferring the high-risk obligations. They now apply from 2 December 2027 for stand-alone systems within Article 6(2) and Annex III, and from 2 August 2028 where the AI is a safety component of a product already covered by the EU product-safety instruments listed in Annex I (Article 6(1)). This supersedes the previous dates of 2 August 2026 and 2 August 2027. Nothing else in the application timetable moved: the Article 5 prohibitions have applied since 2 February 2025 (with the prohibitions added by Regulation (EU) 2026/1744 applying from 2 December 2026), general-purpose AI obligations since 2 August 2025, and the Article 50 transparency obligations retain their original schedule.',
       },
     ],
   },

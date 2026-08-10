@@ -7,6 +7,7 @@ import Image from 'next/image'
 import { startCheckout } from '../../lib/checkout'
 import ConsentForm, { type ConsentPayload } from '../components/ConsentForm'
 import { LEGACY_PRICING_PAGE_ID, tierPrice, tierStrikethrough, volumeDiscount, ADDONS, conciergeTierForLocations, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, FLAT_MODULE_PRICES, type Tier, type GhgTier, type ModuleKey, type AddOnKey } from '../../lib/pricing'
+import { AI_ACT_HIGH_RISK_STANDALONE } from '../../lib/aiAct'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -111,10 +112,13 @@ const MODULES: Module[] = [
     id: 'ai',
     name: 'AI Governance',
     description: 'EU AI Act · NIST AI RMF · ISO 42001 · GDPR Art.22 · Bill C-27 AIDA · SR 11-7 (Fed Reserve)',
-    tags: [{ label: 'EU AI Act · Aug 2', color: 'orange' }],
+    // Was 'EU AI Act · Aug 2' / 'deadline is August 2' — a bare day and month with NO YEAR, on the
+    // page where a customer decides to buy. Both named the pre-deferral date; neither could be checked
+    // against anything. The tag now names the regime, and the sub names the obligation.
+    tags: [{ label: 'EU AI Act · high-risk', color: 'orange' }],
     cta: {
       headline: 'Do you know which of your AI systems are high-risk?',
-      sub: 'EU AI Act deadline is August 2. Start your inventory today.',
+      sub: `Annex III classification, Article 11 documentation and registration — high-risk obligations apply from ${AI_ACT_HIGH_RISK_STANDALONE}.`,
       btn: 'Start your AI inventory →',
       href: '/ai-governance',
     },

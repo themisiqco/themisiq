@@ -1,24 +1,24 @@
 'use client'
-import { useState, useEffect } from 'react'
 import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
+import {
+  AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED, AI_ACT_CITATION,
+} from '../../lib/aiAct'
 
+// NO COUNTDOWN. This page ran `Math.max(0, days until 2026-08-02)`, so once the date passed the
+// headline read "0 days to the EU AI Act deadline" rather than reading as broken — and it kept
+// counting down to a date Regulation (EU) 2026/1744 had already moved. A date the reader can check
+// against the OJ is worth more than an interval that silently expires.
 export default function Page() {
-  const [daysLeft, setDaysLeft] = useState(71)
-  useEffect(() => {
-    const deadline = new Date('2026-08-02')
-    const today = new Date()
-    const diff = Math.ceil((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-    setDaysLeft(Math.max(0, diff))
-  }, [])
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d' }}>
       <Nav />
 
-      {/* URGENCY BANNER */}
+      {/* STATUS BANNER — states the dates, not an interval. Was an urgency banner counting down to a
+          date that had already moved. */}
       <div style={{ background: '#7425e3', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, position: 'sticky', top: 64, zIndex: 99 }}>
         <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff', flexShrink: 0 }} />
-        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>EU AI Act high-risk AI deadline: August 2, 2026. A proposed delay is under discussion — but it is not yet law. Prepare now.</span>
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>EU AI Act high-risk obligations: {AI_ACT_HIGH_RISK_STANDALONE} for stand-alone systems, {AI_ACT_HIGH_RISK_EMBEDDED} where the AI is inside a regulated product.</span>
         <a href="/dashboard/ai-governance" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>Check if EU AI Act applies to you →</a>
       </div>
 
@@ -48,8 +48,10 @@ export default function Page() {
           {/* STAT CARDS */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {[
-              { val: 'Aug 2', unit: '2026', label: 'Current operative deadline for high-risk AI obligations — still binding law', color: '#B91C1C', bg: '#FCEBEB' },
-              { val: 'Annex III', unit: 'high-risk', label: 'HR, hiring, credit, education AI — full conformity assessment required', color: '#7425e3', bg: '#EDE9FE' },
+              { val: '2 Dec', unit: '2027', label: `High-risk obligations for stand-alone systems; ${AI_ACT_HIGH_RISK_EMBEDDED} where the AI is inside a regulated product`, color: '#B91C1C', bg: '#FCEBEB' },
+              // 'Stand-alone', not 'Annex III': this was the only annex citation on a public marketing
+              // page, and the tile beside it already says "stand-alone systems". Same register.
+              { val: 'Stand-alone', unit: 'high-risk', label: 'HR, hiring, credit, education AI — full conformity assessment required', color: '#7425e3', bg: '#EDE9FE' },
               { val: '€35M', unit: 'or 7%', label: 'maximum EU AI Act fine for prohibited AI practices', color: '#ba7517', bg: '#FEF3E2' },
               { val: 'Feb 2025', unit: 'active', label: 'prohibited AI practices already banned — manipulation, social scoring, real-time biometrics', color: '#0F6E56', bg: '#E1F5EE' },
             ].map(({ val, unit, label, color, bg }) => (
@@ -67,12 +69,16 @@ export default function Page() {
       <section style={{ background: '#0d0d0d', padding: '4rem 2.5rem' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>EU AI Act — Regulation (EU) 2024/1689</div>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>EU AI Act — {AI_ACT_CITATION}</div>
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
-              The August 2, 2026<br />deadline is still law.
+              The high-risk dates<br />moved. The scope did not.
             </h2>
+            {/* The deferral is ENACTED. This copy previously argued the opposite — "not yet enacted law",
+                "treat any deferral as a bonus, not a plan" — which was true when written and false from
+                27 July 2026. What moved is the application date; what a company is in scope FOR is
+                unchanged, which is the distinction this paragraph has to carry. */}
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
-              If your company uses AI for HR decisions, hiring, credit scoring, or education in the EU, you are in scope for the EU AI Act Annex III high-risk provisions. The operative deadline remains August 2, 2026. A proposed amendment (the AI Act Omnibus, political agreement reached May 2026) would defer some obligations — but it is not yet enacted law. The prudent position: prepare for August 2, 2026 and treat any deferral as a bonus, not a plan.
+              If your company uses AI for HR decisions, hiring, credit scoring, or education in the EU, you are in scope for the EU AI Act Annex III high-risk provisions. Regulation (EU) 2026/1744 — published 24 July 2026, in force 27 July 2026 — deferred those obligations to {AI_ACT_HIGH_RISK_STANDALONE} for stand-alone systems, and to {AI_ACT_HIGH_RISK_EMBEDDED} where the AI is built into a product already covered by EU product-safety law. Nothing else moved: the Article 5 prohibitions have applied since February 2025, GPAI obligations since August 2025, and the Article 50 transparency duties keep their original schedule. Classification, technical documentation and registration are unchanged in substance — only the date by which they must be done.
             </p>
             {[
               'AI system inventory and Annex III risk classification',
@@ -93,12 +99,12 @@ export default function Page() {
           <div style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: '2rem' }}>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 16 }}>EU AI Act Annex III — High-risk categories</div>
             {[
-              { cat: 'Employment & HR', examples: 'CV screening, candidate ranking, performance management, task allocation', deadline: 'Aug 2, 2026' },
-              { cat: 'Credit & finance', examples: 'Credit scoring, loan approval, insurance risk assessment', deadline: 'Aug 2, 2026' },
-              { cat: 'Education', examples: 'Student assessment, admissions, monitoring during exams', deadline: 'Aug 2, 2026' },
-              { cat: 'Essential services', examples: 'Access to public benefits, emergency services dispatch', deadline: 'Aug 2, 2026' },
-              { cat: 'Law enforcement', examples: 'Polygraphs, risk assessment, evidence evaluation', deadline: 'Aug 2, 2026' },
-              { cat: 'Migration & border', examples: 'Risk assessment, document verification, applications', deadline: 'Aug 2, 2026' },
+              { cat: 'Employment & HR', examples: 'CV screening, candidate ranking, performance management, task allocation', deadline: AI_ACT_HIGH_RISK_STANDALONE },
+              { cat: 'Credit & finance', examples: 'Credit scoring, loan approval, insurance risk assessment', deadline: AI_ACT_HIGH_RISK_STANDALONE },
+              { cat: 'Education', examples: 'Student assessment, admissions, monitoring during exams', deadline: AI_ACT_HIGH_RISK_STANDALONE },
+              { cat: 'Essential services', examples: 'Access to public benefits, emergency services dispatch', deadline: AI_ACT_HIGH_RISK_STANDALONE },
+              { cat: 'Law enforcement', examples: 'Polygraphs, risk assessment, evidence evaluation', deadline: AI_ACT_HIGH_RISK_STANDALONE },
+              { cat: 'Migration & border', examples: 'Risk assessment, document verification, applications', deadline: AI_ACT_HIGH_RISK_STANDALONE },
             ].map(({ cat, examples, deadline }) => (
               <div key={cat} style={{ padding: '10px 0', borderBottom: '0.5px solid rgba(255,255,255,0.07)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 3 }}>
@@ -181,8 +187,11 @@ export default function Page() {
           {[
             { date: 'Feb 2, 2025', status: 'Active', label: 'Prohibited AI', desc: 'Manipulation, social scoring, real-time biometric surveillance in public spaces, and emotion recognition in workplaces banned. Non-compliance: fines up to €35M or 7% global revenue.', color: '#B91C1C', bg: '#FCEBEB' },
             { date: 'May 2, 2025', status: 'Active', label: 'GPAI obligations', desc: 'General Purpose AI models (GPT-4-class and above) subject to transparency, copyright, and systemic risk provisions. GPAI providers must publish technical documentation.', color: '#ba7517', bg: '#FEF3E2' },
-            { date: 'Aug 2, 2026', status: `${daysLeft} days`, label: 'High-risk AI (Annex III)', desc: 'HR, hiring, credit, education, essential services AI — full conformity assessment, Article 11 documentation, EU database registration required. Fines up to €15M or 3% global revenue.', color: '#7425e3', bg: '#EDE9FE' },
-            { date: 'Aug 2, 2027', status: 'Prepare now', label: 'High-risk AI (Annex II)', desc: 'AI embedded in regulated products (medical devices, machinery, vehicles) subject to full Annex III obligations. CE marking integration required.', color: '#0C447C', bg: '#E6F1FB' },
+            { date: AI_ACT_HIGH_RISK_STANDALONE, status: 'Prepare now', label: 'High-risk AI (Annex III)', desc: 'Stand-alone high-risk systems under Article 6(2) — HR, hiring, credit, education, essential services AI. Full conformity assessment, Article 11 documentation, EU database registration required. Fines up to €15M or 3% global revenue.', color: '#7425e3', bg: '#EDE9FE' },
+            // Annex I, not Annex III: the products limb is Article 6(1), which reaches AI as a safety
+            // component of goods already covered by EU product-safety law and lists those instruments
+            // in Annex I. The card previously said "Annex II" and described the obligations as Annex III.
+            { date: AI_ACT_HIGH_RISK_EMBEDDED, status: 'Prepare now', label: 'High-risk AI (Annex I)', desc: 'AI embedded in regulated products under Article 6(1) — medical devices, machinery, vehicles. Same high-risk obligations, with CE marking integration into the existing product conformity route.', color: '#0C447C', bg: '#E6F1FB' },
           ].map(({ date, status, label, desc, color, bg }) => (
             <div key={date} style={{ background: '#fff', padding: '2rem', borderTop: `4px solid ${color}` }}>
               <span style={{ fontSize: 10, fontWeight: 700, color, background: bg, padding: '2px 8px', borderRadius: 99 }}>{status}</span>
@@ -197,8 +206,11 @@ export default function Page() {
       {/* CTA */}
       <section style={{ background: '#0d0d0d', padding: '6rem 2.5rem', textAlign: 'center' }}>
         <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2, color: '#fff' }}>
-          {daysLeft} days to the EU AI Act deadline.<br />
-          <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Start your inventory today.</span>
+          {/* The reason to act is that you cannot classify what you have not inventoried, and the
+              inventory is the input to every other obligation — not that a date is close. A countdown
+              headline expires; this one does not. */}
+          You cannot classify what you<br />have not inventoried.<br />
+          <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Start with what you have.</span>
         </h2>
         <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
           The first step is knowing what AI systems you have and whether they're high-risk. ThemisIQ's AI inventory wizard walks you through every system in days — not months.

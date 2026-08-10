@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
 import { supabase } from '../../lib/supabase'
 import { FLAT_MODULE_PRICES } from '../../lib/pricing'
+import { AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED } from '../../lib/aiAct'
 
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
 
@@ -146,12 +147,14 @@ const MODULES: DashboardModule[] = [
     id: 'ai',
     name: 'AI Governance',
     sub: 'EU AI Act',
-    desc: 'Classify your AI systems under EU AI Act Annex III and prepare for August 2026.',
+    // Not 'Annex III': the module covers BOTH high-risk limbs, and has no field distinguishing a
+    // stand-alone system from one embedded in a regulated product — so the card names both dates.
+    desc: `Classify every AI system under the EU AI Act. High-risk duties from ${AI_ACT_HIGH_RISK_STANDALONE}, or ${AI_ACT_HIGH_RISK_EMBEDDED} in regulated products.`,
     href: '/dashboard/ai-governance',
     color: '#B91C1C',
     bg: '#FCEBEB',
     frameworks: ['EU AI Act', 'NIST AI RMF', 'ISO 42001'],
-    urgency: 'Aug 2, 2026',
+    urgency: AI_ACT_HIGH_RISK_STANDALONE,
     previewable: true,
   },
   {
@@ -317,7 +320,7 @@ export default function Dashboard() {
             { label: 'Modules active', val: activeModuleCount, color: activeModuleCount > 0 ? '#0F6E56' : '#888784', bg: activeModuleCount > 0 ? '#E1F5EE' : '#f8f7f5' },
             { label: 'Modules available', val: MODULES.length - activeModuleCount, color: '#888784', bg: '#f8f7f5' },
             { label: 'Frameworks covered', val: activeModuleCount > 0 ? unlockedModuleIds.flatMap(id => MODULES.find(m => m.id === id)?.frameworks || []).length : 0, color: '#7425e3', bg: '#EDE9FE' },
-            { label: 'Active deadline', val: 'Aug 2, 2026', color: '#B91C1C', bg: '#FCEBEB' },
+            { label: 'AI Act high-risk from', val: AI_ACT_HIGH_RISK_STANDALONE, color: '#B91C1C', bg: '#FCEBEB' },
           ].map(({ label, val, color, bg }) => (
             <div key={label} style={{ background: bg, borderRadius: 12, padding: '1rem', textAlign: 'center', border: '0.5px solid #e8e7e4' }}>
               <div style={{ fontFamily: typeof val === 'number' ? 'Georgia, serif' : 'inherit', fontSize: typeof val === 'number' ? '1.8rem' : '1rem', fontWeight: typeof val === 'number' ? 400 : 600, color, lineHeight: 1.2, marginBottom: 4 }}>{val}</div>
