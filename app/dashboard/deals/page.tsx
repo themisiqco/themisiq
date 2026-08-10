@@ -8,7 +8,7 @@ import { supabase } from '../../../lib/supabase'
 import {
   getObligations, getApplicableFrameworks, getFrameworkApplicability, getComplianceCost,
   SECTOR_RISKS, DEFAULT_PIPELINE_TARGETS, DEAL_CURRENCIES,
-  assessmentView, partiallyAssessedNote,
+  assessmentView, partiallyAssessedNote, routeNotMetNote, partialHeadingPhrase,
   obligationPriceLabel, resolveFieldsPrompt,
   type FrameworkApplicability,
 } from '../../../lib/deals/assessment'
@@ -483,13 +483,16 @@ function DealsDashboardInner() {
       <h2 style={sectionHead}>ESG framework screening</h2>
       <p style={sectionSub}>ThemisIQ has identified the frameworks that apply to this deal based on sector, jurisdiction and deal size. Review and confirm.</p>
 
-      {/* Same three states the report uses — a blank revenue field must not render as a negative finding. */}
-      {frameworksState === 'not-assessed' ? (
+      {/* Same three states the report uses — a blank revenue field must not render as a negative finding.
+          The `unevaluated` conjunct is what keeps the copy and the gate describing the same rows:
+          `frameworksState` is driven by the UNION, so on a routeNotMet-only deal this branch would
+          open and then interpolate an empty name list into "Size test incomplete for  —". */}
+      {frameworksState === 'not-assessed' && (!view.evaluated || view.unevaluated.length > 0) ? (
         <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 12, padding: '1.25rem', marginBottom: 20 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: '#ba7517', letterSpacing: '0.04em', marginBottom: 6 }}>NOT ASSESSED</div>
           <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
             {view.evaluated
-              ? <>Size test incomplete for {view.notAssessed.join(', ')} — <strong style={{ fontWeight: 600 }}>not evaluated</strong>, which is not a finding that none apply. {resolveFieldsPrompt(view.fieldsToResolve, view.notAssessed)}</>
+              ? <>Size test incomplete for {view.unevaluated.join(', ')} — <strong style={{ fontWeight: 600 }}>not evaluated</strong>, which is not a finding that none apply. {resolveFieldsPrompt(view.fieldsToResolve, view.unevaluated)}</>
               : <>Enter sector and jurisdiction in Deal setup. Nothing has been evaluated yet — an empty list here is not a finding that no frameworks apply.</>}
           </div>
         </div>
@@ -522,19 +525,29 @@ function DealsDashboardInner() {
           trigger was withheld. Naming it stops the reader inferring it was considered and excluded. */}
       {frameworksState === 'assessed-findings' && view.notAssessed.length > 0 && (
         <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '1rem', marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#ba7517', letterSpacing: '0.04em', marginBottom: 4 }}>PARTIAL — {view.notAssessed.join(', ')} NOT ASSESSED</div>
-          <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{partiallyAssessedNote(view.notAssessed, view.fieldsToResolve)}</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#ba7517', letterSpacing: '0.04em', marginBottom: 4 }}>PARTIAL — {view.notAssessed.join(', ')} {partialHeadingPhrase(view)}</div>
+          {/* Heading keeps the UNION — it only claims something was withheld, and must name all of it.
+              The body explains WHY, which is population-specific and cannot be said of both. */}
+          {view.unevaluated.length > 0 && (
+            <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{partiallyAssessedNote(view.unevaluated, view.fieldsToResolve)}</div>
+          )}
+          {view.routeNotMet.length > 0 && (
+            <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{routeNotMetNote(view.routeNotMet)}</div>
+          )}
         </div>
       )}
 
       {/* Near-threshold, not assessed. Silence here would read as "nothing is nearby" — the same
-          false negative the report's own section guards against. */}
+          false negative the report's own section guards against.
+          Names the UNEVALUATED population, matching this panel's gate: `nearState` is raised by an
+          unevaluated LIMB, never by a withheld framework, so the union named rows the sentence
+          misdescribes — a routeNotMet framework had every limb evaluated. */}
       {nearState === 'not-assessed' && (
         <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '1rem', marginBottom: 20 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: '#ba7517', letterSpacing: '0.04em', marginBottom: 4 }}>NEAR-THRESHOLD — NOT ASSESSED</div>
           <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
             {view.evaluated
-              ? <>No proximity check was run — the {view.notAssessed.join(' / ')} size test{view.notAssessed.length === 1 ? '' : 's'} could not be completed. {resolveFieldsPrompt(view.fieldsToResolve, view.notAssessed)}</>
+              ? <>No proximity check was run — the {view.unevaluated.join(' / ')} size test{view.unevaluated.length === 1 ? '' : 's'} could not be completed. {resolveFieldsPrompt(view.fieldsToResolve, view.unevaluated)}</>
               : <>No proximity check was run — sector and jurisdiction are not set.</>}
           </div>
         </div>
@@ -629,10 +642,14 @@ function DealsDashboardInner() {
           <p style={sectionSub}>Based on {deal.target_name || 'the target company'}&rsquo;s sector and jurisdiction, ThemisIQ has identified the following material ESG risks for your deal memo.</p>
           {/* The Framework badge on each finding resolves against the detected list. With nothing
               detected it falls back to a methodology label — say so rather than let it read as a
-              resolved regime. */}
-          {view.notAssessed.length > 0 && (
+              resolved regime.
+              UNEVALUATED only, the report's twin of this banner: a routeNotMet framework was fully
+              evaluated AND still appears in the labels below (its token is emitted, qualified), so both
+              claims here would be false of it. Silence on a routeNotMet-only deal is correct — nothing
+              vanished from the Framework column. */}
+          {view.unevaluated.length > 0 && (
             <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '0.85rem 1rem', marginBottom: 14, fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
-              <strong style={{ fontWeight: 600, color: '#ba7517' }}>Framework column partially resolved.</strong> The {view.notAssessed.join(' / ')} size test could not be completed, so {view.notAssessed.length === 1 ? 'it does' : 'they do'} not appear in any label below. Labels reflect only the regimes determinable from the figures provided. {resolveFieldsPrompt(view.fieldsToResolve, view.notAssessed)}
+              <strong style={{ fontWeight: 600, color: '#ba7517' }}>Framework column partially resolved.</strong> The {view.unevaluated.join(' / ')} size test could not be completed, so {view.unevaluated.length === 1 ? 'it does' : 'they do'} not appear in any label below. Labels reflect only the regimes determinable from the figures provided. {resolveFieldsPrompt(view.fieldsToResolve, view.unevaluated)}
             </div>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>

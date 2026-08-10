@@ -38,7 +38,8 @@ import PaywallCard from '../../../components/PaywallCard'
 import { DISCLAIMER_PARAS } from '../../../../lib/disclaimer'
 import {
   getFrameworkApplicability, getObligations, getComplianceCost, SECTOR_RISKS,
-  assessmentView, isRevenueDeclared, notAssessedRevenueNote, partiallyAssessedNote,
+  assessmentView, isRevenueDeclared, notAssessedNote as notAssessedNoteOf, partiallyAssessedNote,
+  routeNotMetNote, partialHeadingPhrase,
   nearThresholdNoneNote, obligationPriceLabel, resolveFieldsPrompt,
   FX_SOURCE, FX_AS_OF, THRESHOLD_TESTS, isTestActive,
   type FrameworkApplicability, type SectorRisk,
@@ -226,8 +227,11 @@ function DealReport({ deal, reportDate, reference }: { deal: DealRow; reportDate
   const nearThreshold = applicability.filter(f => f.status === 'near-threshold')
   const nearByFramework = new Map(nearThreshold.map(f => [f.framework, f]))
   const nearBelow = nearThreshold.filter(f => !f.applies)
-  const notAssessedNote = notAssessedRevenueNote(
-    view.notAssessed.length ? view.notAssessed : undefined,
+  // The UNEVALUATED population, not the union: this note says "size test incomplete", which is false
+  // of a routeNotMet row (its test completed). Its render gate — view.nearThreshold — already means
+  // "a limb went unevaluated", so passing the union let the names and the claim describe different rows.
+  const notAssessedNote = notAssessedNoteOf(
+    view.unevaluated.length ? view.unevaluated : undefined,
     view.fieldsToResolve,
   )
 
@@ -342,8 +346,13 @@ function DealReport({ deal, reportDate, reference }: { deal: DealRow; reportDate
               {/* Partial assessment: the list above stands, but naming what was withheld stops a
                   reader inferring that the missing statutes were considered and excluded. */}
               {view.notAssessed.length > 0 && (
-                <NotAssessed title={`PARTIAL — ${view.notAssessed.join(', ')} NOT ASSESSED`}>
-                  {partiallyAssessedNote(view.notAssessed, view.fieldsToResolve)}
+                <NotAssessed title={`PARTIAL — ${view.notAssessed.join(', ')} ${partialHeadingPhrase(view)}`}>
+                  {/* Title keeps the UNION — "was anything withheld" is the only claim it makes, and
+                      it must name everything. The BODY explains WHY, which differs per population and
+                      cannot be said of both: one had a limb it could not settle, the other was fully
+                      evaluated and fell outside the modelled route. Only one is non-empty today. */}
+                  {view.unevaluated.length > 0 && partiallyAssessedNote(view.unevaluated, view.fieldsToResolve)}
+                  {view.routeNotMet.length > 0 && routeNotMetNote(view.routeNotMet)}
                 </NotAssessed>
               )}
             </>
@@ -459,9 +468,13 @@ function DealReport({ deal, reportDate, reference }: { deal: DealRow; reportDate
           ) : (
             <>
               <p style={note}>Sector-specific risks for {sector}. The framework named on each finding resolves against the frameworks actually detected above, so a finding can never cite a statute this report withheld.</p>
-              {view.notAssessed.length > 0 && (
+              {/* UNEVALUATED only. A routeNotMet framework was fully evaluated AND still appears in the
+                  labels below (its token is emitted, qualified), so both of this banner's claims would
+                  be false of it. Silence on a routeNotMet-only deal is correct: nothing vanished from
+                  the Framework column, and the PARTIAL panel above still names what is unresolved. */}
+              {view.unevaluated.length > 0 && (
                 <NotAssessed title="FRAMEWORK COLUMN PARTIALLY RESOLVED">
-                  The {view.notAssessed.join(' / ')} size test could not be completed, so {view.notAssessed.length === 1 ? 'it does' : 'they do'} not appear in any label below. {resolveFieldsPrompt(view.fieldsToResolve, view.notAssessed)}
+                  The {view.unevaluated.join(' / ')} size test could not be completed, so {view.unevaluated.length === 1 ? 'it does' : 'they do'} not appear in any label below. {resolveFieldsPrompt(view.fieldsToResolve, view.unevaluated)}
                 </NotAssessed>
               )}
               <table style={tbl}>

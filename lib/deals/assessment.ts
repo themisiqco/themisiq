@@ -732,16 +732,60 @@ export const resolveFieldsPrompt = (fields: LimbSource[], frameworks: string[]):
   fields.length === 0 ? ''
   : `Enter ${fields.map(f => FIELD_LABELS[f]).join(' and ')} to assess ${frameworks.join(' and ')}.`
 
-export const notAssessedRevenueNote = (
+// NOT revenue-specific, and has not been since the multi-limb work: a test goes unassessed on ANY
+// undeclared figure, or on a deal currency with no published rate. The old name said revenue and
+// was the same wrong default that once prompted a reader for a figure they had already entered.
+export const notAssessedNote = (
   frameworks: string[] = Object.keys(THRESHOLD_TESTS).filter(k => isTestActive(THRESHOLD_TESTS[k])),
   fields: LimbSource[],
 ): string =>
   `NOT ASSESSED — size test incomplete for ${frameworks.join(', ')}. ${resolveFieldsPrompt(fields, frameworks)}`.trim()
 
-// Used where a list DID resolve but a size test was withheld — the caveat must not read as a finding.
+// THE UNEVALUATED-POPULATION NOTE. Used where a list DID resolve but a size test could not be
+// completed — the caveat must not read as a finding. Its claim ("could not be completed", "not
+// evaluated") is TRUE ONLY of `view.unevaluated`; for a routeNotMet row the test completed and every
+// limb was evaluated, which is what routeNotMetNote below says instead.
+//
+// Signature deliberately unchanged — (frameworks, fields), ONE population per call. A MIXED deal is
+// currently unreachable: `routeNotMet` can only ever contain CS3D (the only test declaring
+// `exhaustive: false`), CS3D reaches that outcome only with BOTH revenue and headcount declared, and
+// with both declared CSRD — which draws on the same two figures — resolves definitively rather than
+// being withheld. Verified by sweep, not assumed. So no caller needs to render both notes at once
+// today; when a second non-exhaustive test lands, they will, and each keeps its own sentence.
 export const partiallyAssessedNote = (frameworks: string[], fields: LimbSource[]): string => {
   const one = frameworks.length === 1
   return `Determined from jurisdiction and sector. NOT ASSESSED: ${frameworks.join(', ')} — the size test could not be completed, so ${one ? 'this trigger was' : 'these triggers were'} not evaluated. This is not a finding that ${one ? 'it does' : 'they do'} not apply. ${resolveFieldsPrompt(fields, frameworks)}`.trim()
+}
+
+// THE ROUTENOTMET-POPULATION NOTE. Its counterpart above, for the other half of the partition: the
+// size test RAN, every limb was evaluated, and the target is under the figure — yet applicability is
+// still open because the instrument reaches companies by routes this assessment does not model.
+//
+// NO `fields` PARAMETER, BY DEFINITION. A routeNotMet row has unknownCount 0, so `fieldsToResolve`
+// contributes nothing for it; there is no figure the form collects that would change the answer. A
+// fields argument could only ever be empty here, and accepting one would invite a caller to pass the
+// union's fields and prompt for a number that settles nothing — the defect this split exists to end.
+// The trailing phrase on a PARTIAL panel heading. The heading names the UNION — it must, because it
+// is claiming that these frameworks were withheld and it has to name all of them — but the phrase
+// says HOW, and the union cannot carry that:
+//   'NOT ASSESSED' reads to a customer as NOTHING HAPPENED, which is false of a row where every limb
+//   was evaluated against a real figure and the target simply fell under it. Saying it there
+//   contradicts the near-threshold table on the same page, which shows that row's limbs and values.
+//   'NOT RESOLVED' says the answer is open without claiming the work was not done.
+// A MIXED deal takes 'NOT ASSESSED' deliberately: it is the WEAKER claim and therefore true of both
+// populations — unresolved either way — where 'NOT RESOLVED' would imply every named framework was
+// actually tested. Mixed is unreachable today (see partiallyAssessedNote), so this is the forward
+// case, and it must fail toward the claim that cannot be wrong.
+export const partialHeadingPhrase = (
+  populations: Pick<DealAssessmentView, 'unevaluated' | 'routeNotMet'>,
+): string =>
+  populations.routeNotMet.length > 0 && populations.unevaluated.length === 0
+    ? 'NOT RESOLVED'
+    : 'NOT ASSESSED'
+
+export const routeNotMetNote = (frameworks: string[]): string => {
+  const one = frameworks.length === 1
+  return `Determined from jurisdiction and sector. NOT RESOLVED: ${frameworks.join(', ')} — tested against company size, and the target is below that threshold. ${one ? 'It can' : 'They can'} also apply through a parent company, or through franchising or licensing arrangements — neither of which this assessment checks. This is not a finding that ${one ? 'it does' : 'they do'} not apply.`
 }
 // The near check runs over EVERY limb — turnover, balance-sheet total and headcount — so this must
 // not name revenue. Saying "revenue" describes the old single-limb model and would understate what

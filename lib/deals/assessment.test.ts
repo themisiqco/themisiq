@@ -6,7 +6,8 @@ import {
   CSRD_NON_EU_REASON, csrdNonEuAbstention, CS3D_PENDING_REASON, cs3dPendingAbstention,
   CS3D_ROUTE_NOT_MET_REASON,
   NEAR_THRESHOLD_BAND, NEAR_BAND_PCT, FX_AS_OF, FX_SOURCE,
-  isRevenueDeclared, assessmentView, notAssessedRevenueNote, partiallyAssessedNote,
+  isRevenueDeclared, assessmentView, notAssessedNote, partiallyAssessedNote, routeNotMetNote,
+  partialHeadingPhrase,
   nearThresholdNoneNote, resolveFieldsPrompt, FIELD_LABELS, FIELD_FORM_LABELS,
   getObligations, obligationPriceLabel, SECTOR_RISKS,
   type DealCurrency, type FrameworkApplicability, type DealSize, type ThresholdLimb,
@@ -785,7 +786,7 @@ describe('not-assessed reads as a prompt, naming the field', () => {
 
   it('carries the prompt into both notes', () => {
     const v = viewFor('UK', 50_000_000, 'Technology', 'GBP', { total_assets: 0 })
-    expect(notAssessedRevenueNote(v.notAssessed, v.fieldsToResolve)).toContain('Enter headcount to assess SECR.')
+    expect(notAssessedNote(v.notAssessed, v.fieldsToResolve)).toContain('Enter headcount to assess SECR.')
     expect(partiallyAssessedNote(v.notAssessed, v.fieldsToResolve)).toContain('Enter headcount to assess SECR.')
     expect(partiallyAssessedNote(v.notAssessed, v.fieldsToResolve)).toContain('not a finding that it does not apply')
   })
@@ -794,14 +795,82 @@ describe('not-assessed reads as a prompt, naming the field', () => {
   // a CS3D-only abstention makes that list empty. CS3D's size test is pending with no limbs, so no
   // limb was ever consulted and no field would settle it — the note must name none. The removed
   // `= ['revenue']` default prompted for a figure the same report printed at the top.
-  it('notAssessedRevenueNote names no field when fieldsToResolve is empty', () => {
+  it('notAssessedNote names no field when fieldsToResolve is empty', () => {
     const v = viewFor('European Union', 620_000_000, 'Industrials & Manufacturing', 'EUR', { total_assets: 400_000_000, employee_count: 1850 })
     expect(v.notAssessed).toEqual(['CS3D'])
     expect(v.fieldsToResolve).toEqual([])
-    const note = notAssessedRevenueNote(v.notAssessed, v.fieldsToResolve)
+    const note = notAssessedNote(v.notAssessed, v.fieldsToResolve)
     expect(note).toContain('NOT ASSESSED')
     expect(note).not.toContain('Enter')
     expect(note).not.toContain('revenue')
+  })
+
+  // ── the routeNotMet counterpart ─────────────────────────────────────────────
+  // The other half of the partition needs its OWN sentence, not a parameterised one: this population's
+  // test COMPLETED, so every "size test could not be completed" wording is false of it, and there is
+  // no field to prompt for.
+  it('routeNotMetNote states the route was tested and names the unmodelled routes — one framework', () => {
+    const note = routeNotMetNote(['CS3D'])
+    expect(note).toContain('NOT RESOLVED: CS3D')
+    expect(note).toContain('tested against company size, and the target is below that threshold')
+    expect(note).toContain('It can also apply')
+    expect(note).toContain('parent company')
+    expect(note).toContain('franchising or licensing')
+    expect(note).toContain('not a finding that it does not apply')
+  })
+
+  it('routeNotMetNote pluralises for more than one framework', () => {
+    const note = routeNotMetNote(['CS3D', 'Some Other Rule'])
+    expect(note).toContain('NOT RESOLVED: CS3D, Some Other Rule')
+    expect(note).toContain('They can also apply')
+    expect(note).not.toContain('It can also apply')
+    expect(note).toContain('not a finding that they do not apply')
+  })
+
+  it('routeNotMetNote carries NO field prompt and never says the test was incomplete', () => {
+    for (const names of [['CS3D'], ['CS3D', 'Some Other Rule']]) {
+      const note = routeNotMetNote(names)
+      // No prompt: there is no figure the form collects that would change this answer.
+      expect(note).not.toContain('Enter')
+      // And no wording that would contradict the near-threshold table, which shows this row's limbs
+      // and their evaluated values.
+      expect(note).not.toContain('size test')
+      expect(note).not.toContain('not evaluated')
+      expect(note).not.toContain('could not be completed')
+      expect(note).not.toContain('NOT ASSESSED')
+    }
+  })
+
+  // ── the PARTIAL heading phrase ───────────────────────────────────────────────
+  // The heading names the UNION but the phrase says HOW, which the union cannot carry. 'NOT ASSESSED'
+  // on a fully-evaluated row reads as "nothing happened" and contradicts the near-threshold table.
+  it('partialHeadingPhrase reads NOT RESOLVED where every named row WAS evaluated', () => {
+    expect(partialHeadingPhrase({ unevaluated: [], routeNotMet: ['CS3D'] })).toBe('NOT RESOLVED')
+  })
+
+  it('partialHeadingPhrase reads NOT ASSESSED where a limb went unevaluated', () => {
+    expect(partialHeadingPhrase({ unevaluated: ['SB 253'], routeNotMet: [] })).toBe('NOT ASSESSED')
+  })
+
+  it('partialHeadingPhrase takes the WEAKER claim on a mixed deal — true of both populations', () => {
+    // 'NOT RESOLVED' would imply every framework named in the heading was actually tested, which is
+    // false of the unevaluated half. Unreachable today; it must fail toward the safe claim when it is not.
+    expect(partialHeadingPhrase({ unevaluated: ['CSRD'], routeNotMet: ['CS3D'] })).toBe('NOT ASSESSED')
+  })
+
+  it('partialHeadingPhrase defaults to NOT ASSESSED when nothing was withheld', () => {
+    // The panel is gated on the union being non-empty, so this is unreachable through a render — the
+    // phrase must still not invent a claim of having tested anything.
+    expect(partialHeadingPhrase({ unevaluated: [], routeNotMet: [] })).toBe('NOT ASSESSED')
+  })
+
+  it('partialHeadingPhrase agrees with the engine on both live populations', () => {
+    // Driven from real deals rather than hand-built lists, so the phrase cannot drift from what
+    // assessmentView actually produces.
+    const routeOnly = viewFor('European Union', 620_000_000, 'Technology', 'EUR', { employee_count: 1_850 })
+    expect(partialHeadingPhrase(routeOnly)).toBe('NOT RESOLVED')
+    const unevaluatedOnly = viewFor('USA', 0, 'Technology', 'USD')
+    expect(partialHeadingPhrase(unevaluatedOnly)).toBe('NOT ASSESSED')
   })
 
   it('has a label for every limb source in both registers, and never exposes a column name', () => {
@@ -816,9 +885,9 @@ describe('not-assessed reads as a prompt, naming the field', () => {
   })
 
   it('keeps assessed-none distinct from not-assessed', () => {
-    expect(nearThresholdNoneNote()).not.toBe(notAssessedRevenueNote(undefined, ['revenue']))
+    expect(nearThresholdNoneNote()).not.toBe(notAssessedNote(undefined, ['revenue']))
     expect(nearThresholdNoneNote()).toContain(NEAR_BAND_PCT)
-    expect(notAssessedRevenueNote(undefined, ['revenue'])).toContain('NOT ASSESSED')
+    expect(notAssessedNote(undefined, ['revenue'])).toContain('NOT ASSESSED')
   })
 })
 
