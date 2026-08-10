@@ -8,6 +8,10 @@ export default function Page() {
   // never retyped — a date split across two fields is invisible to a whole-string guard (see the
   // KNOWN LIMIT note in lib/aiAct.test.ts). '10 November 2026' → '10 Nov' + '2026'.
   const [sbDay, sbMonth, sbYear] = SB253_FIRST_REPORT_DATE.split(' ')
+  // Price and allowances from the single source of truth. The ANCHOR on the buy links is
+  // load-bearing: /pricing?modules=ghg alone lands five sections above the tier picker.
+  const ghgFrom = GHG_TIERS.starter.priceUSD?.toLocaleString('en-US')
+  const allowanceLabel = (a: number | null) => (a == null ? 'Unlimited locations' : `Up to ${a} locations`)
   const sbStatVal = `${sbDay} ${sbMonth.slice(0, 3)}`
   const sbStatUnit = sbYear
   const sbShortDate = `${sbStatVal} ${sbYear}`
@@ -36,7 +40,8 @@ export default function Page() {
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
               <a href="/dashboard/ghg" style={{ ...btnPrimary, textDecoration: 'none' }}>See your emissions instantly →</a>
-              <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Book a demo</a>
+              <a href="/pricing?modules=ghg#build-your-stack" style={{ ...btnSecondary, textDecoration: 'none' }}>From ${ghgFrom}/yr</a>
+              <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Book a demo</a>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
               {['SB 253', 'CDP C6', 'ESRS E1', 'GHG Protocol', 'IFRS S2', 'EcoVadis', 'CARB template', 'SBTi'].map(tag => (
@@ -216,8 +221,8 @@ export default function Page() {
           <p style={sectionSub}>Essentials covers your full GHG inventory — Scope 1, 2 &amp; 3 across all frameworks — everything you need for SB 253. Step up to Professional for more locations and hands-on advisory.</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: '2.5rem', textAlign: 'left' }}>
             {[
-              { plan: 'Essentials', price: '$' + GHG_TIERS.starter.priceUSD?.toLocaleString(), cadence: '/ reporting year', features: ['Scope 1 + 2 · CARB SB 253 ready', 'Scope 3 · all 15 categories', 'IPCC AR6 · IEA 2024 factors', 'Audit trail + assurance package', 'All reporting frameworks included', 'Multi-year trends dashboard', 'Up to 3 locations'], featured: false },
-              { plan: 'Professional', price: '$' + GHG_TIERS.professional.priceUSD?.toLocaleString(), cadence: '/ reporting year', features: ['Everything in Essentials', 'Up to 15 locations', '10 hours of expert advisory / year', 'Quarterly sector roundtables', 'Regulatory Monitor — weekly alerts'], featured: true },
+              { plan: 'Essentials', price: '$' + GHG_TIERS.starter.priceUSD?.toLocaleString(), cadence: '/ reporting year', features: ['Scope 1 + 2 · CARB SB 253 ready', 'Scope 3 · all 15 categories', 'IPCC AR6 · IEA 2024 factors', 'Audit trail + assurance package', 'All reporting frameworks included', 'Multi-year trends dashboard', allowanceLabel(GHG_TIERS.starter.locationAllowance)], featured: false },
+              { plan: 'Professional', price: '$' + GHG_TIERS.professional.priceUSD?.toLocaleString(), cadence: '/ reporting year', features: ['Everything in Essentials', allowanceLabel(GHG_TIERS.professional.locationAllowance), '10 hours of expert advisory / year', 'Quarterly sector roundtables', 'Regulatory Monitor — weekly alerts'], featured: true },
             ].map(({ plan, price, cadence, features, featured }) => (
               <div key={plan} style={{ background: featured ? '#0d0d0d' : '#fff', borderRadius: 12, padding: '2rem', border: featured ? 'none' : '0.5px solid #e8e7e4' }}>
                 <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: featured ? 'rgba(255,255,255,0.4)' : '#888784', marginBottom: 8 }}>{plan}</div>
@@ -229,12 +234,17 @@ export default function Page() {
                     <span style={{ fontSize: 13, color: featured ? 'rgba(255,255,255,0.65)' : '#555553', fontWeight: 300 }}>{f}</span>
                   </div>
                 ))}
-                <a href="/dashboard/ghg" style={{ display: 'block', textAlign: 'center', padding: '11px', borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: 'none', background: featured ? 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)' : '#0d0d0d', color: featured ? '#0d0d0d' : '#fff', marginTop: '1.5rem' }}>
-                  See your emissions instantly →
+                <a href="/pricing?modules=ghg#build-your-stack" style={{ display: 'block', textAlign: 'center', padding: '11px', borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: 'none', background: featured ? 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)' : '#0d0d0d', color: featured ? '#0d0d0d' : '#fff', marginTop: '1.5rem' }}>
+                  Choose your plan →
                 </a>
               </div>
             ))}
           </div>
+          {/* What counts as a location — directly beneath the two plan cards, because the only
+              difference between them a buyer must self-assess against is the location count. */}
+          <p style={{ fontSize: 12, color: '#888784', lineHeight: 1.7, marginTop: '1.25rem', maxWidth: 620 }}>
+            One location = one site with its own electricity supply. All of that site’s energy goes in together — electricity, gas, vehicle fuel, refrigerants — so a site with separate gas and electricity accounts is still one location.
+          </p>
         </div>
       </section>
 
@@ -252,7 +262,8 @@ export default function Page() {
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
           <a href="/dashboard/ghg" style={{ ...btnPrimary, textDecoration: 'none' }}>See your emissions instantly →</a>
-          <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to an advisor</a>
+          <a href="/pricing?modules=ghg#build-your-stack" style={{ ...btnSecondary, textDecoration: 'none' }}>From ${ghgFrom}/yr</a>
+          <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Talk to an advisor</a>
           <a href="/dashboard/ghg" style={{ ...btnSecondary, textDecoration: 'none' }}>Check if SB 253 applies to you →</a>
         </div>
       </section>

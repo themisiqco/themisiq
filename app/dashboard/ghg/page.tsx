@@ -1356,7 +1356,11 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             )}
           </div>
         )}
-        <Field label="List your facilities" hint="Enter name and state — we'll collect energy data for each one">
+        {/* "Locations", not "facilities": the plan sells a location allowance and the wizard counts
+            locations_data entries, so a third word for the same thing left the customer to guess
+            what they were being metered on. The hint carries the short form of the definition used
+            on /climate-ghg and /pricing. */}
+        <Field label="List your locations" hint="One location = one site with its own electricity supply; all of that site's energy goes in together. Enter name and state — we'll collect energy data for each one.">
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
             {inventory.locations.map((loc, i) => (
               <div key={loc.id} style={{ display: 'flex', gap: 8 }}>

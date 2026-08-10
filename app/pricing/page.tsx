@@ -652,7 +652,10 @@ function PricingPageInner() {
                       {(['starter', 'professional', 'advisory'] as GhgTier[]).map(t => {
                         const tp = GHG_TIERS[t].priceUSD
                         const label = t === 'starter' ? 'Essentials' : t === 'professional' ? 'Professional' : 'Advisory'
-                        const cap = t === 'starter' ? '≤3 locations' : t === 'professional' ? '≤15 locations' : 'unlimited'
+                        // Derived, not three literals. null = uncapped (Advisory), which the copy must
+                        // say rather than leaving the reader to infer from a missing number.
+                        const alw = GHG_TIERS[t].locationAllowance
+                        const cap = alw == null ? 'unlimited locations' : `≤${alw} locations`
                         const active = tier === t
                         return (
                           <button key={t} onClick={(e) => { e.stopPropagation(); setTier(t) }} style={{ flex: 1, minWidth: 130, textAlign: 'left', padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: active ? '#0d0d0d' : '#fff', color: active ? '#fff' : '#0d0d0d', border: active ? '2px solid #7425e3' : '1px solid #e8e7e4' }}>
@@ -662,6 +665,11 @@ function PricingPageInner() {
                           </button>
                         )
                       })}
+                      {/* What counts as a location — placed at the point of CHOICE, because the tier
+                          the buyer picks is a location count and nothing else on this page defines it. */}
+                      <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.6, marginTop: 10, flexBasis: '100%' }}>
+                        One location = one site with its own electricity supply. All of that site’s energy goes in together — electricity, gas, vehicle fuel, refrigerants — so a site with separate gas and electricity accounts is still one location.
+                      </div>
                     </div>
                   )}
                 </div>
