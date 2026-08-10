@@ -3,11 +3,19 @@
 // ADMIN-ONLY. Creates a DRAFT Stripe invoice for an enterprise customer.
 //
 // Security: caller must be logged in AND their email must match ADMIN_EMAIL.
-// The invoice carries the SAME metadata shape as checkout
-// ({ user_id, entitlements }), so when it is marked paid, the existing
-// `invoice.paid` webhook branch grants the modules automatically — whether the
-// customer paid by card through Stripe, or by wire to our bank and we marked it
-// paid manually.
+// The invoice carries the SAME metadata shape as checkout, so when it is marked paid, the
+// existing `invoice.paid` webhook branch grants the modules automatically — whether the
+// customer paid by card through Stripe, or by wire to our bank and we marked it paid manually.
+//
+// THE FULL SHAPE IS FOUR KEYS: { user_id, entitlements, source, ghg_location_allowance }.
+// This comment previously named only the first two, and that is how the omission survived: this
+// route sent no ghg_location_allowance at all. grantFromMetadata reads it as
+// `raw ? Number(raw) : null` and writes that to entitlements.location_allowance, where the
+// enforce_ghg_location_allowance() trigger treats NULL as UNCAPPED — so A WRITER THAT OMITS THE
+// KEY GRANTS UNLIMITED LOCATIONS. It fails open, silently, on the paid path. Every writer must
+// satisfy the whole contract, including the empty-string convention for a null allowance.
+// (Consequence while it was missing: GHG Professional is $11,900, above CARD_THRESHOLD_USD, so
+// every self-serve Professional purchase routes HERE — none of them was ever capped at 15.)
 //
 // Pricing is computed server-side from lib/pricing.ts — identical source of
 // truth as checkout, so the amount charged and the modules granted cannot drift.
@@ -33,6 +41,7 @@ import {
   ADDONS,
   addOnRequirementsMet,
   configuratorPrice,
+  locationAllowanceForTier,
   cartQuote,
   NEW_PRICING_ACTIVE,
   type Tier,
@@ -91,6 +100,9 @@ export async function POST(req: NextRequest) {
     const lines: { label: string; amount: number }[] = []
     const entitlements = new Set<string>()
     const sources: string[] = []
+    // GHG location ceiling for the ghg entitlement row. Mirrors app/api/checkout/route.ts:67 —
+    // null means the metadata key is written EMPTY, which the webhook reads as uncapped.
+    let ghgAllowance: number | null = null
 
     if (body.packId) {
       if (NEW_PRICING_ACTIVE) {
@@ -136,6 +148,9 @@ export async function POST(req: NextRequest) {
       }
       moduleKeys.forEach((m) => entitlements.add(m))
       sources.push('configurator')
+      // Same derivation as app/api/checkout/route.ts:124 — one helper, one source of truth.
+      // Omitting this is what made every manually-invoiced GHG customer uncapped.
+      if (moduleKeys.includes('ghg')) ghgAllowance = locationAllowanceForTier(tier)
     }
 
     if (body.addOns && body.addOns.length > 0) {
@@ -175,6 +190,10 @@ export async function POST(req: NextRequest) {
       user_id: userId,
       entitlements: Array.from(entitlements).join(','),
       source: 'admin-invoice' + (sources.length ? ` | ${sources.join(' | ')}` : ''),
+      // Stringified EXACTLY as app/api/checkout/route.ts:202 does, empty-string convention included:
+      // Stripe metadata values are strings, and the webhook's `raw ? Number(raw) : null` reads '' as
+      // null → uncapped. Deviating in either direction here silently changes what the customer gets.
+      ghg_location_allowance: ghgAllowance != null ? String(ghgAllowance) : '',
     }
 
     // 8) Create the DRAFT invoice FIRST, then attach each line item to it.

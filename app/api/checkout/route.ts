@@ -82,7 +82,10 @@ export async function POST(req: NextRequest) {
         entitlementsToGrant.add(m)
       })
       sources.push(`pack:${body.packId}`)
-      if (pack.modules.includes('ghg')) ghgAllowance = 3 // packs have no tier; Starter floor
+      // Packs have no tier, so they take the Starter/Essentials floor — same figure, now read
+      // through the same helper as the module path below rather than a literal 3, so both writers
+      // derive from GHG_TIERS. What a pack grants is unchanged.
+      if (pack.modules.includes('ghg')) ghgAllowance = locationAllowanceForTier('starter')
     }
 
     // 2b) Build-your-own (tier + modules)
