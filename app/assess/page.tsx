@@ -5,6 +5,11 @@ import {
   AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED, AI_ACT_HIGH_RISK_SENTENCE,
 } from '../../lib/aiAct'
 import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_STATUS_SENTENCE, SB253_SCOPE3_FROM } from '../../lib/sb253'
+// FX from the SAME dated ECB table lib/deals/assessment.ts uses — no second rate table. The engine's
+// rule is that the DEAL's figure converts into the limb's currency, never the reverse, so a statutory
+// threshold is never restated in another currency. FX_AS_OF/FX_SOURCE are printed in the copy so a
+// reader can see which fixing a borderline call was made on.
+import { convertCurrency, FX_AS_OF } from '../../lib/deals/assessment'
 
 interface Answers {
   driver?: string 
@@ -47,31 +52,131 @@ function computeObligations(a: Answers): Obligation[] {
   const isEnergy    = sec.includes('energy')
   const isHealth    = sec.includes('health')
   const isTransport = sec.includes('transport')
-  const largeCo = ['500_999','1000_4999','5000plus'].includes(emp)
-  const midCo   = ['250_499','500_999','1000_4999','5000plus'].includes(emp)
+  // ── Size bands vs statutory thresholds ──────────────────────────────────────
+  // The form collects headcount as a BAND. Several statutes test a number, and a band cannot always
+  // answer: '50_249' spans the Pay Transparency 100 AND 150 boundaries, and '1000_4999' sits ON the
+  // CSRD >1,000 test at its lower edge. Where a band cannot determine an obligation, the entry SAYS
+  // SO rather than guessing — the same rule the Deals engine applies with `not-assessed`.
+  const empAtLeast = (n: number): boolean | null => {
+    switch (emp) {
+      case 'under50':    return n <= 0 ? true : false
+      case '50_249':     return n <= 50 ? true : n > 249 ? false : null   // straddles 100 and 150
+      case '250_499':    return n <= 250 ? true : n > 499 ? false : null
+      case '500_999':    return n <= 500 ? true : n > 999 ? false : null
+      case '1000_4999':  return n <= 1000 ? true : n > 4999 ? false : null
+      case '5000plus':   return n <= 5000 ? true : null
+      default:           return null                                     // unanswered
+    }
+  }
+  // Revenue arrives as a USD-millions slider index. Statutory limbs are in their own currency, so the
+  // COMPANY figure converts to the limb's currency — GBP 36m, EUR 450m, EUR 10m, AUD 100m are never
+  // restated in dollars. Same direction as lib/deals/assessment.ts's evaluateLimb.
+  const revUSD = rev * 1_000_000
+  const revIn = (c: 'EUR' | 'GBP' | 'AUD'): number => convertCurrency(revUSD, 'USD', c)
+  const fxNote = `Converted from your USD figure at the ECB reference rate of ${FX_AS_OF}; confirm against your reported figure in the statutory currency.`
+
   const isPublicUS = lst === 'us_public'
   const isPE       = lst === 'pe_backed'
   const regs: Obligation[] = []
 
-  if (hasCA && rev >= 1000) regs.push({ name: 'SB 253 — California Climate Corporate Data Accountability Act', jurisdiction: 'California, USA', urgency: 'critical', urgency_label: 'IMMEDIATE ACTION', deadline: `${SB253_FIRST_REPORT_DATE} (${SB253_DATE_STATUS})`, module: 'Climate · GHG Emissions', what: `Your company has California nexus and global revenue over $1B. SB 253 applies. ${SB253_STATUS_SENTENCE} Scope 3 follows from ${SB253_SCOPE3_FROM}.`, action: 'Start Scope 1 + 2 GHG inventory immediately using the CARB-approved GHG Protocol methodology.' })
-  if (hasCA && rev >= 500) regs.push({ name: 'SB 261 — California Climate-Related Financial Risk Act', jurisdiction: 'California, USA', urgency: 'monitor', urgency_label: 'MONITOR', deadline: 'Paused — Ninth Circuit injunction', module: 'Climate · Risk', what: 'Your company meets the $500M revenue threshold. SB 261 is currently paused by a Ninth Circuit injunction. Prepare TCFD-aligned disclosure now.', action: 'Prepare TCFD disclosure as precaution while monitoring injunction status.' })
-  if (hasEU && largeCo) regs.push({ name: 'CSRD / ESRS — Corporate Sustainability Reporting Directive', jurisdiction: 'European Union', urgency: 'critical', urgency_label: 'ACTIVE NOW', deadline: 'FY2024 reporting — active now', module: 'Climate · GHG + Risk + People + Supply Chain', what: 'You meet the EU large entity threshold (500+ employees). Full ESRS suite applies — E1 (climate), S1 (workforce), S2 (value chain), G1 (business conduct).', action: 'Conduct ESRS double materiality assessment and close disclosure gaps across E1, S1, S2, and G1.' })
-  else if (hasEU && midCo) regs.push({ name: 'CSRD / ESRS — Mid-size company scope', jurisdiction: 'European Union', urgency: 'high', urgency_label: 'HIGH PRIORITY', deadline: 'FY2025 reporting', module: 'Climate · GHG + Risk + People', what: 'Mid-size companies (250+ employees) enter CSRD scope from FY2025. Same ESRS standards apply as for large companies.', action: 'Begin ESRS gap assessment for FY2025 reporting.' })
+  // ── SB 253 ──────────────────────────────────────────────────────────────────
+  // STRICT >, not >=: the statute is "in excess of" $1bn. And CARB measures worldwide GROSS RECEIPTS
+  // with no deduction for cost of goods sold — materially larger than revenue as a visitor reads it,
+  // so a company near the line can be in scope on gross receipts while under $1bn on net revenue.
+  if (hasCA && revUSD > 1_000_000_000) regs.push({ name: 'SB 253 — California Climate Corporate Data Accountability Act', jurisdiction: 'California, USA', urgency: 'critical', urgency_label: 'IMMEDIATE ACTION', deadline: `${SB253_FIRST_REPORT_DATE} (${SB253_DATE_STATUS})`, module: 'Climate · GHG Emissions', what: `California Health & Safety Code §38532: total annual revenues in excess of $1,000,000,000 for an entity doing business in California. CARB measures WORLDWIDE GROSS RECEIPTS with no deduction for cost of goods sold — larger than net revenue, so check the gross figure if you are near the line. ${SB253_STATUS_SENTENCE} Scope 3 follows from ${SB253_SCOPE3_FROM}.`, action: 'Start Scope 1 + 2 GHG inventory immediately using the CARB-approved GHG Protocol methodology.' })
+
+  // ── SB 261 ──────────────────────────────────────────────────────────────────
+  if (hasCA && revUSD >= 500_000_000) regs.push({ name: 'SB 261 — California Climate-Related Financial Risk Act', jurisdiction: 'California, USA', urgency: 'monitor', urgency_label: 'MONITOR', deadline: 'Enforcement paused — alternate date to follow the appeal', module: 'Climate · Risk', what: 'You meet the $500m revenue threshold. A Ninth Circuit PRELIMINARY INJUNCTION applies to SB 261 only, and CARB\u2019s enforcement advisory of 1 December 2025 confirmed it will not enforce the 1 January 2026 deadline and will set an alternate date once the appeal resolves. Reporting is VOLUNTARY in the meantime.', action: 'Prepare the TCFD-aligned report now; it is the same deliverable whenever the alternate date lands.' })
+
+  // ── CSRD ────────────────────────────────────────────────────────────────────
+  // ONE entry, not two. The 250-employee tier DOES NOT EXIST post-Omnibus: Directive (EU) 2026/470
+  // amends the Accounting Directive arts. 19a/29a to >1,000 employees AND >EUR 450m net turnover — a
+  // two-limb AND, matching THRESHOLD_TESTS['CSRD']. The old 500+ / 250+ gates asserted a scope the
+  // amending directive removed, and neither consulted turnover at all.
+  const csrdStaff = empAtLeast(1_001)          // ">1,000" — 1,001 is the first qualifying headcount
+  const csrdTurnover = revIn('EUR') > 450_000_000
+  if (hasEU && csrdTurnover && csrdStaff !== false) {
+    const staffIndeterminate = csrdStaff === null
+    regs.push({
+      name: 'CSRD / ESRS — Corporate Sustainability Reporting Directive',
+      jurisdiction: 'European Union',
+      urgency: staffIndeterminate ? 'high' : 'critical',
+      urgency_label: staffIndeterminate ? 'CONFIRM HEADCOUNT' : 'ACTIVE NOW',
+      deadline: staffIndeterminate ? 'Applies if the headcount limb is met' : 'Active — first report on the amended thresholds',
+      module: 'Climate · GHG + Risk + People + Supply Chain',
+      what: staffIndeterminate
+        ? `Post-Omnibus CSRD is a TWO-LIMB AND: more than 1,000 employees AND more than EUR 450,000,000 net turnover (Directive (EU) 2026/470 amending the Accounting Directive, arts. 19a/29a). Your turnover limb is met. YOUR HEADCOUNT BAND CANNOT SETTLE THE OTHER LIMB — it spans the 1,000 boundary, so a figure at or below 1,000 is out of scope. Confirm the exact average headcount for the financial year. ${fxNote}`
+        : `Post-Omnibus CSRD is a TWO-LIMB AND: more than 1,000 employees AND more than EUR 450,000,000 net turnover (Directive (EU) 2026/470 amending the Accounting Directive, arts. 19a/29a). Both limbs are met on the figures given. The 250-employee tier no longer exists. ${fxNote}`,
+      action: 'Conduct the ESRS double materiality assessment and close disclosure gaps across E1, S1, S2 and G1.',
+    })
+  }
+
   if (hasEU || hasUK || hasAU || jur.includes('canada') || jur.includes('apac')) regs.push({ name: 'IFRS S2 — Climate-related Disclosures', jurisdiction: '30+ jurisdictions globally', urgency: 'high', urgency_label: 'HIGH PRIORITY', deadline: 'Active — jurisdiction dependent', module: 'Climate · Risk', what: 'IFRS S2 has been adopted by 30+ jurisdictions including the EU, UK, Australia, Canada, Singapore, and Japan.', action: 'Run IFRS S2 physical and transition risk assessment.' })
   // Both deadline arms named 2 August 2026, and the critical arm appended a HARDCODED '— 77 days',
   // which was an interval to a date that has since both passed and moved. The two dates are printed
   // together because this screen never learns whether a system is stand-alone or embedded in a
   // regulated product, and must not pick one.
   if (hasEU && ai !== 'no') { const urgency = (ai === 'yes_hr' || ai === 'yes_credit') ? 'critical' : 'high'; regs.push({ name: 'EU AI Act — Artificial Intelligence Regulation', jurisdiction: 'European Union (global scope)', urgency, urgency_label: urgency === 'critical' ? 'IMMEDIATE ACTION' : 'HIGH PRIORITY', deadline: `${AI_ACT_HIGH_RISK_STANDALONE} (stand-alone) · ${AI_ACT_HIGH_RISK_EMBEDDED} (in a regulated product)`, module: 'AI Governance', what: ai === 'yes_hr' ? `CV screening and hiring AI are Annex III high-risk. ${AI_ACT_HIGH_RISK_SENTENCE}` : 'Your AI systems require risk classification under EU AI Act.', action: 'Inventory all AI systems and begin Article 11 technical documentation.' }) }
+
+  // ── NIS2 / DORA ─────────────────────────────────────────────────────────────
+  // DORA IS LEX SPECIALIS. NIS2 art. 4(2) disapplies its risk-management and incident provisions
+  // where a sector-specific act imposes at least equivalent requirements, and the ESAs and the
+  // Commission have confirmed DORA meets that test. An EU financial entity therefore gets DORA, NOT
+  // both — the old logic fired both and told a bank it had two overlapping regimes.
   const nis2Sectors = isEnergy || isFinancial || isHealth || isTransport || sec.includes('tech')
-  if (hasEU && (nis2Sectors || largeCo)) regs.push({ name: 'EU NIS2 Directive — Network and Information Security', jurisdiction: 'European Union · 18 sectors', urgency: 'critical', urgency_label: 'ACTIVE NOW', deadline: 'Active since October 2024', module: 'Cyber Governance', what: 'Your sector and size place you in NIS2 scope. Board-level accountability, mandatory security measures, and 24h/72h incident notification are required.', action: 'Conduct NIS2 gap assessment and document board cyber governance immediately.' })
-  if (isFinancial && hasEU) regs.push({ name: 'DORA — Digital Operational Resilience Act', jurisdiction: 'EU financial services', urgency: 'critical', urgency_label: 'ACTIVE NOW', deadline: 'Active since January 2025', module: 'Cyber Governance', what: 'As a financial services entity with EU operations, DORA applies in full. ICT risk management framework and third-party ICT risk management are mandatory.', action: 'ICT risk framework and Critical Third-Party Provider register required immediately.' })
+  const doraApplies = isFinancial && hasEU
+  // NIS2's real scope test: an Annex I or II sector AND exceeding the medium-enterprise ceiling —
+  // 50+ headcount OR EUR 10m+ turnover. The old gate used "sector OR 500+ employees", which both
+  // over-called (a 600-person EU retailer in no Annex sector) and under-called (a 60-person energy
+  // operator). Either limb suffices, so an indeterminate headcount band with turnover met still lands.
+  const nis2Staff = empAtLeast(50)
+  const nis2Size = nis2Staff === true || revIn('EUR') >= 10_000_000
+  if (hasEU && nis2Sectors && nis2Size && !doraApplies) regs.push({ name: 'EU NIS2 Directive — Network and Information Security', jurisdiction: 'European Union · 18 sectors', urgency: 'critical', urgency_label: 'ACTIVE NOW', deadline: 'Active since October 2024', module: 'Cyber Governance', what: `NIS2 reaches entities in an Annex I or Annex II sector that exceed the medium-enterprise thresholds — 50 or more staff, or EUR 10,000,000 or more turnover. Your sector and size place you in scope. Board-level accountability, mandatory security measures and 24-hour / 72-hour incident notification apply. ${fxNote}`, action: 'Conduct NIS2 gap assessment and document board cyber governance immediately.' })
+  if (doraApplies) regs.push({ name: 'DORA — Digital Operational Resilience Act', jurisdiction: 'EU financial services', urgency: 'critical', urgency_label: 'ACTIVE NOW', deadline: 'Active since January 2025', module: 'Cyber Governance', what: 'As a financial services entity with EU operations, DORA applies in full: ICT risk-management framework, incident classification and reporting, resilience testing, and a critical third-party provider register. DORA is LEX SPECIALIS under NIS2 art. 4(2) — the ESAs and the Commission have confirmed it meets the equivalence test, so NIS2\u2019s risk-management and incident provisions do not additionally apply to you.', action: 'ICT risk framework and Critical Third-Party Provider register required immediately.' })
+
   if (isPublicUS) regs.push({ name: 'SEC Cybersecurity Disclosure Rules', jurisdiction: 'United States · public companies', urgency: 'critical', urgency_label: 'ACTIVE NOW', deadline: 'Active since December 2023', module: 'Cyber Governance', what: 'Material cybersecurity incidents must be disclosed on Form 8-K within 4 business days. Annual 10-K must describe your cybersecurity risk management programme.', action: 'Document cyber governance programme for 10-K disclosure.' })
   if (isPublicUS) regs.push({ name: 'SEC Item 101 — Human Capital Disclosure', jurisdiction: 'United States · public companies', urgency: 'high', urgency_label: 'HIGH PRIORITY', deadline: 'Active · annual Form 10-K', module: 'People & Workforce', what: 'US public companies must include material human capital disclosures in Form 10-K — workforce size, turnover, safety, training investment.', action: 'Audit current 10-K human capital disclosure against peer benchmarks.' })
-  if (hasEU && (midCo || largeCo)) regs.push({ name: 'EU Pay Transparency Directive (2023/970)', jurisdiction: 'European Union', urgency: 'high', urgency_label: 'HIGH PRIORITY', deadline: 'June 2026 — 13 months', module: 'People & Workforce', what: 'Employers with 100+ EU employees must report gender pay gap. A gap exceeding 5% triggers a mandatory joint pay assessment.', action: 'Calculate gender pay gap by job band now.' })
-  if (hasCA) regs.push({ name: 'California Pay Data Reporting Act', jurisdiction: 'California, USA', urgency: 'high', urgency_label: 'HIGH PRIORITY', deadline: 'Annual · second Wednesday in May', module: 'People & Workforce', what: 'Employers with 100+ California employees must submit annual pay data by race/ethnicity, sex, and job category.', action: 'Prepare DFEH pay data submission for next annual deadline.' })
+
+  // ── EU Pay Transparency (Directive (EU) 2023/970) ────────────────────────────
+  // DAY-ONE obligations bind EVERY EU employer with no size threshold at all — the old logic gated
+  // the whole directive on 250+, so a 40-person EU employer was told nothing applied.
+  if (hasEU) regs.push({ name: 'EU Pay Transparency Directive (2023/970) — day-one obligations', jurisdiction: 'European Union', urgency: 'high', urgency_label: 'ALL EMPLOYERS', deadline: 'On national transposition — no size threshold', module: 'People & Workforce', what: 'Directive (EU) 2023/970 imposes obligations on EVERY EU employer regardless of headcount: salary ranges must be given in job postings or before interview, candidates may not be asked about salary history, and employees may request information on their own pay level and the average levels for work of equal value.', action: 'Publish pay ranges in postings, remove salary-history questions from your process, and prepare a pay-information response route.' })
+  // Reporting bands. 250+ annual from 7 June 2027; 150–249 triennial from 7 June 2027; 100–149
+  // triennial from 7 June 2031; under 100 not required by the Directive. The '50_249' band spans BOTH
+  // the 100 and 150 boundaries, so it determines nothing — that entry says so.
+  const pt250 = empAtLeast(250)
+  if (hasEU && pt250 === true) regs.push({ name: 'EU Pay Transparency (2023/970) — gender pay gap reporting', jurisdiction: 'European Union', urgency: 'high', urgency_label: 'HIGH PRIORITY', deadline: '7 June 2027, then annually', module: 'People & Workforce', what: 'At 250 or more workers you report the gender pay gap by 7 June 2027 and ANNUALLY thereafter. A reported gap above 5% is NOT automatically unlawful: the trigger is an unjustified gap that is not remedied within six months, at which point a JOINT PAY ASSESSMENT with worker representatives follows.', action: 'Calculate the gap by category of worker performing equal work, and prepare the objective justification for any gap you find.' })
+  if (hasEU && pt250 === null) regs.push({ name: 'EU Pay Transparency (2023/970) — reporting band undetermined', jurisdiction: 'European Union', urgency: 'monitor', urgency_label: 'CONFIRM HEADCOUNT', deadline: 'Depends on exact headcount', module: 'People & Workforce', what: 'Your headcount band (50–249) SPANS THREE DIFFERENT DUTIES under Directive (EU) 2023/970 and cannot determine which applies: 150–249 workers report by 7 June 2027 every three years; 100–149 report by 7 June 2031 every three years; under 100 are not required to report at all. Confirm your exact worker count. The day-one obligations above apply to you either way.', action: 'Establish your exact worker count for the reference period, then set the reporting cycle from it.' })
+
+  // ── California pay data (Gov Code §12999, as amended by SB 1162 and SB 464) ──
+  // The test is 100+ PAYROLL EMPLOYEES ANYWHERE IN THE US with AT LEAST ONE working in California —
+  // TOTAL headcount, not California headcount. The old gate fired on `hasCA` alone with no size test
+  // while its own copy asserted a 100+ threshold. NOTE the form collects GLOBAL headcount, which is
+  // not the same population as US payroll headcount — stated in the copy rather than assumed away.
+  const caStaff = empAtLeast(100)
+  if (hasCA && caStaff !== false) regs.push({
+    name: 'California Pay Data Reporting (Gov. Code §12999)',
+    jurisdiction: 'California, USA',
+    urgency: caStaff === null ? 'monitor' : 'high',
+    urgency_label: caStaff === null ? 'CONFIRM HEADCOUNT' : 'HIGH PRIORITY',
+    deadline: 'Second Wednesday of May, annually',
+    module: 'People & Workforce',
+    what: caStaff === null
+      ? 'Government Code §12999, as amended by SB 1162 and SB 464, applies to employers with 100 or more PAYROLL EMPLOYEES ANYWHERE IN THE UNITED STATES where at least one works in California — it is total US headcount that counts, not California headcount. Your band (50–249) cannot settle whether you cross 100. Confirm your US payroll count. Filing is due the second Wednesday of May each year, and penalties are now MANDATORY under SB 464 rather than discretionary.'
+      : 'Government Code §12999, as amended by SB 1162 and SB 464, applies to employers with 100 or more PAYROLL EMPLOYEES ANYWHERE IN THE UNITED STATES where at least one works in California — total US headcount, not California headcount. Note this form collects GLOBAL headcount, so confirm the US figure. Pay data by race, ethnicity, sex and job category is due the second Wednesday of May each year, and penalties are now MANDATORY under SB 464 rather than discretionary.',
+    action: 'Assemble pay and hours-worked data by establishment, job category and demographic group for the US payroll population.',
+  })
+
   if (rev >= 500 || hasGlobal) regs.push({ name: 'CDP Climate — Annual Disclosure', jurisdiction: 'Global · investor-driven', urgency: 'medium', urgency_label: 'ANNUAL', deadline: 'Annual · July submission', module: 'Climate · GHG + Risk', what: 'CDP is requested by investors representing over $130 trillion AUM. CDP C6, C7, C11, and Section P all flow from your GHG inventory.', action: 'Complete GHG inventory to feed CDP C6 and run scenario analysis for CDP Section P.' })
-  if ((hasUK && rev >= 36) || (hasAU && rev >= 100)) regs.push({ name: 'Modern Slavery Act — UK / Australia', jurisdiction: hasUK && hasAU ? 'UK + Australia' : hasUK ? 'United Kingdom' : 'Australia', urgency: 'medium', urgency_label: 'ANNUAL', deadline: 'Annual · 6 months after financial year end', module: 'Supply Chain', what: 'An annual transparency statement is required covering steps to ensure no modern slavery in your supply chains.', action: 'Conduct supply chain human rights assessment and draft Modern Slavery statement.' })
+
+  // ── Modern Slavery ──────────────────────────────────────────────────────────
+  // Both thresholds are in their OWN currency and were previously compared against the raw USD
+  // slider figure, which OVER-CALLS: £36m is about $41m at the dated rate, so a $38m UK company was
+  // told it had to file. Converted via lib/deals/assessment.ts's convertCurrency — one rate table.
+  const msUK = hasUK && revIn('GBP') > 36_000_000
+  const msAU = hasAU && revIn('AUD') >= 100_000_000
+  if (msUK || msAU) regs.push({ name: 'Modern Slavery Act — UK / Australia', jurisdiction: msUK && msAU ? 'UK + Australia' : msUK ? 'United Kingdom' : 'Australia', urgency: 'medium', urgency_label: 'ANNUAL', deadline: 'Annual · 6 months after financial year end', module: 'Supply Chain', what: `${msUK ? 'UK Modern Slavery Act 2015 s.54: GBP 36,000,000 total GLOBAL turnover including subsidiaries, for any body corporate carrying on business in any part of the UK. ' : ''}${msAU ? 'Australian Modern Slavery Act 2018: AUD 100,000,000 consolidated revenue — the threshold is UNDER REVIEW, with a reduction to AUD 50,000,000 proposed. ' : ''}An annual transparency statement is required covering the steps taken to ensure no modern slavery in your operations and supply chains. ${fxNote}`, action: 'Conduct supply chain human rights assessment and draft the Modern Slavery statement.' })
+
   if (isPE) regs.push({ name: 'LP & Lender ESG Requirements', jurisdiction: 'Global · capital markets', urgency: 'high', urgency_label: 'HIGH PRIORITY', deadline: 'Varies by LP agreement', module: 'Deals & Investment', what: 'Institutional LPs and lenders are requiring documented ESG diligence as a condition of capital deployment.', action: 'Establish portfolio climate monitoring and LP ESG reporting framework.' })
    const driver = a.driver || ''
   if (driver === 'customer') regs.push({ name: 'Customer Supplier Questionnaire', jurisdiction: 'Global · your customers', urgency: 'high', urgency_label: 'HIGH PRIORITY', deadline: 'As requested by your customer', module: 'Supply Chain', what: 'Your customer is asking you to complete a sustainability questionnaire covering GHG emissions, labour practices, ethics and environmental management.', action: 'Complete a sustainability self-assessment using the ThemisIQ Supplier Portal questionnaire.' })
