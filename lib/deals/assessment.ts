@@ -633,27 +633,61 @@ export type AssessmentState = 'not-assessed' | 'assessed-none' | 'assessed-findi
 // other thirteen resolve from jurisdiction and sector alone. A report with revenue blank therefore
 // lists everything it CAN determine and names only the triggers it cannot — blanking the whole
 // section was itself a form of "absence rendered as a finding".
+// WITHHELD IS TWO POPULATIONS, NOT ONE. `notAssessed` answers "was anything withheld", which is the
+// only question the union can answer honestly. WHY it was withheld differs, and the difference changes
+// what the reader should do about it:
+//
+//   unevaluated — a limb could not be settled: an undeclared figure, a deal currency with no
+//                 published rate, or no size test at all (a hand-built abstention with no `test`).
+//                 The size test did NOT complete. `fieldsToResolve`, where non-empty, names what
+//                 would settle it, so the reader's next action is to enter a figure.
+//   routeNotMet — every modelled limb WAS evaluated and the modelled route was not triggered, yet
+//                 applicability is still open because the instrument reaches companies by routes this
+//                 model does not express (CS3D's group-parentage and franchising routes; see
+//                 `exhaustive: false`). The test COMPLETED. No figure the form collects would change
+//                 the answer, so there is nothing for the reader to enter.
+//
+// The two PARTITION notAssessed: every withheld row is in exactly one, and
+// unevaluated.length + routeNotMet.length === notAssessed.length by construction.
+//
+// A CONSUMER MAKING A CLAIM ABOUT WHY A FRAMEWORK WAS WITHHELD MUST SPEAK ABOUT ONE POPULATION. The
+// union cannot carry that claim: "the size test could not be completed" is false of every routeNotMet
+// row, and "no field would resolve it" is false of every unevaluated one. Only a claim that says
+// nothing about the cause — "marked NOT ASSESSED, which is not a finding that it does not apply" —
+// may be made about the union.
 export type DealAssessmentView = {
   evaluated: boolean          // false when sector/jurisdiction are missing — nothing was run at all
-  notAssessed: string[]       // size-gated frameworks in scope that could not be evaluated
-  fieldsToResolve: LimbSource[]  // the fields that would settle them — a prompt, not an absence
+  notAssessed: string[]       // THE UNION: size-gated frameworks in scope whose applicability is unresolved
+  unevaluated: string[]       // a limb could not be settled — the size test did not complete
+  routeNotMet: string[]       // every limb evaluated, modelled route not met — the test DID complete
+  // The fields that would settle them — a prompt, not an absence. Derivable as the UNEVALUATED
+  // population's fields: a routeNotMet row has unknownCount 0, so `test.fieldsToResolve` is empty and
+  // it contributes nothing here BY DEFINITION, not by coincidence. A non-empty list therefore always
+  // refers to `unevaluated`, and pairing it with the union would name a field against a framework it
+  // cannot settle.
+  fieldsToResolve: LimbSource[]
   frameworks: AssessmentState
   nearThreshold: AssessmentState
 }
 
 export const assessmentView = (evaluated: boolean, rows: FrameworkApplicability[]): DealAssessmentView => {
-  if (!evaluated) return { evaluated: false, notAssessed: [], fieldsToResolve: [], frameworks: 'not-assessed', nearThreshold: 'not-assessed' }
-  const notAssessed = rows.filter(r => r.status === 'not-assessed').map(r => r.framework)
-  const fieldsToResolve = [...new Set(rows.filter(r => r.status === 'not-assessed').flatMap(r => r.test?.fieldsToResolve ?? []))]
+  if (!evaluated) return { evaluated: false, notAssessed: [], unevaluated: [], routeNotMet: [], fieldsToResolve: [], frameworks: 'not-assessed', nearThreshold: 'not-assessed' }
+  const withheld = rows.filter(r => r.status === 'not-assessed')
+  const notAssessed = withheld.map(r => r.framework)
+  const fieldsToResolve = [...new Set(withheld.flatMap(r => r.test?.fieldsToResolve ?? []))]
   const applied = rows.filter(r => r.applies).length
   const near = rows.filter(r => r.status === 'near-threshold').length
-  // Withheld rows split two ways and only one of them bears on proximity — see the note on
-  // `nearThreshold` below. Counted from `rows` because the distinction lives on the row's `test`,
-  // and `notAssessed` is a list of names that cannot carry it.
-  const unevaluated = rows.filter(r => r.status === 'not-assessed' && (!r.test || r.test.unknownCount > 0)).length
+  // The two populations documented on DealAssessmentView. ONE definition of the predicate: the
+  // proximity gate below reads `unevaluated.length` rather than re-deriving it, so the count and the
+  // list cannot disagree about which rows they describe. Split from `rows`, not from `notAssessed`,
+  // because the distinction lives on the row's `test` and a list of names cannot carry it.
+  const unevaluated = withheld.filter(r => !r.test || r.test.unknownCount > 0).map(r => r.framework)
+  const routeNotMet = withheld.filter(r => r.test && r.test.unknownCount === 0).map(r => r.framework)
   return {
     evaluated: true,
     notAssessed,
+    unevaluated,
+    routeNotMet,
     fieldsToResolve,
     // Reports what it could determine. Only fully unassessed when NOTHING resolved and something
     // was withheld — otherwise the resolved list stands and `notAssessed` carries the caveat.
@@ -681,7 +715,7 @@ export const assessmentView = (evaluated: boolean, rows: FrameworkApplicability[
     // (S-211 is an active 2-of-3 test), nor is the EU (CSRD is active post-Omnibus), nor Global
     // (CSRD abstains there — see csrdNonEuAbstention, which is permanently not-assessed and so
     // permanently blocks a proximity claim for a Global target).
-    nearThreshold: unevaluated > 0 ? 'not-assessed' : near > 0 ? 'assessed-findings' : 'assessed-none',
+    nearThreshold: unevaluated.length ? 'not-assessed' : near > 0 ? 'assessed-findings' : 'assessed-none',
   }
 }
 

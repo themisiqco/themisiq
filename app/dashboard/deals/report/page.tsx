@@ -46,7 +46,7 @@ import {
 import {
   dealTypeLabel, spellMagnitude, NEAR_PCT, nearSentence,
   buildLimbRows, buildFxBasisRows, limbValueDisplay, limbThresholdDisplay,
-  resolveCs3d, makeMapFramework, themisIqFigure, CS3D_NOT_ASSESSED_LABEL,
+  resolveCs3d, makeMapFramework, regimeLabel, themisIqFigure,
 } from '../../../../lib/deals/reportModel'
 
 // ─── The deal row ─────────────────────────────────────────────────────────────
@@ -233,8 +233,15 @@ function DealReport({ deal, reportDate, reference }: { deal: DealRow; reportDate
 
   const limbRows = buildLimbRows(applicability)
   const fxBasisRows = buildFxBasisRows(currency, applicability)
+  // `cs3d` supplies the REASON printed beneath a finding; the ROW supplies the token's text and
+  // caveat flag, which the three-state summary cannot express (it has no 'near-threshold').
   const cs3d = resolveCs3d(frameworks, applicability)
-  const mapFramework = makeMapFramework(frameworks, cs3d)
+  // Narrowed HERE, not in the render gate: only the 'conditional' variant carries a reason, and the
+  // gate is now `qualified` on the token. Reading `.reason` at the render site would put the state
+  // check back in the gate and imply it decides whether the line prints, which it does not.
+  const cs3dReason = cs3d.state === 'conditional' ? cs3d.reason : null
+  const cs3dRow = applicability.find(f => f.framework === 'CS3D')
+  const mapFramework = makeMapFramework(frameworks, cs3dRow)
 
   const risks: SectorRisk[] = SECTOR_RISKS[sector] || []
   const obligations = getObligations(locationCount, frameworks, sector)
@@ -467,7 +474,7 @@ function DealReport({ deal, reportDate, reference }: { deal: DealRow; reportDate
                 </thead>
                 <tbody>
                   {risks.map((r, i) => {
-                    const label = mapFramework(r.framework)
+                    const tokens = mapFramework(r.framework)
                     const cfg = SEV[r.severity]
                     return (
                       <tr key={i} style={tr}>
@@ -475,11 +482,11 @@ function DealReport({ deal, reportDate, reference }: { deal: DealRow; reportDate
                         <td style={td}>
                           <div style={{ fontWeight: 500 }}>{r.risk}</div>
                           <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, marginTop: 3 }}>{r.detail}</div>
-                          {label.includes(CS3D_NOT_ASSESSED_LABEL) && cs3d.state === 'conditional' && (
-                            <p style={{ ...cite, fontStyle: 'normal', color: '#ba7517' }}><strong style={{ fontWeight: 600 }}>CS3D not assessed:</strong> {cs3d.reason}.</p>
+                          {tokens.some(t => t.framework === 'CS3D' && t.qualified) && (
+                            <p style={{ ...cite, fontStyle: 'normal', color: '#ba7517' }}><strong style={{ fontWeight: 600 }}>CS3D not assessed:</strong> {cs3dReason}.</p>
                           )}
                         </td>
-                        <td style={td}>{label}</td>
+                        <td style={td}>{regimeLabel(tokens)}</td>
                       </tr>
                     )
                   })}

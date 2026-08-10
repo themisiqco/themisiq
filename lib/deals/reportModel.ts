@@ -210,6 +210,27 @@ export const buildFxBasisRows = (currency: string, applicability: FrameworkAppli
 }
 
 // ─── Regime tokens on a risk finding ──────────────────────────────────────────
+// A regime token names a rule on a risk finding. It carries DISPLAY TEXT and, separately, the
+// FrameworkApplicability IDENTITY whose status it inherits — the two are not the same string, and
+// collapsing them into one joined label is what forced consumers to re-parse the output to recover
+// the identity. 'ESRS E1' is the case that proves it: text 'ESRS E1', identity 'CSRD'.
+//   framework  absent ⇒ DISPLAY-ONLY. No row's status governs it, so no surface can look it up:
+//              'GHG Protocol', 'ESRS S2', 'Modern Slavery', 'EU AI Act' and every other
+//              pass-through token from a SECTOR_RISKS template.
+//   qualified  the text carries a caveat, so a surface may owe the reader an explanation of it.
+//              A FLAG rather than a re-reading of `text`, because deciding "is this qualified" by
+//              matching the display string is the coupling this shape removes.
+//
+// REGIME_CANDIDATES.licensedBy below answers TWO questions at once: what PERMITS emitting a token,
+// and whose status it INHERITS. Those coincide for all five rows today — four are self-licensing and
+// ESRS E1's licensor is also the row whose near-ness it shares. A token licensed by X but describing
+// framework Y would need the two separated into distinct fields; nothing needs that yet.
+export type RegimeToken = {
+  text: string
+  framework?: string
+  qualified?: true
+}
+
 // Regime tokens a risk finding's Framework column may name, in display order, each paired with the
 // framework-list entry that LICENSES it. A token is emitted ONLY when its licensing entry is present
 // in the DETECTED `frameworks` array, so a finding can never name a statute the APPLICABLE
@@ -227,7 +248,13 @@ export const REGIME_CANDIDATES: { token: string; licensedBy: string }[] = [
 // Used when NO candidate is licensed (sub-threshold USA, Canada/Australia/Other, or frameworks not
 // yet computed). Names a methodology and the investor-baseline standard that getApplicableFrameworks
 // emits unconditionally — never a statute.
-export const REGIME_FALLBACK = ['GHG Protocol', 'IFRS S2']
+// 'IFRS S2' IS a framework name the engine emits, so it carries identity; 'GHG Protocol' is a
+// methodology with no row behind it, so it is display-only. That asymmetry is the point of the
+// optional field: a fallback label must not imply a row exists to check.
+export const REGIME_FALLBACK: RegimeToken[] = [
+  { text: 'GHG Protocol' },
+  { text: 'IFRS S2', framework: 'IFRS S2' },
+]
 
 // CS3D is an activity-triggered instrument, so it gets THREE states, not the binary the regime
 // tokens use. It reaches non-EU companies through EU-facing activity, which this assessment cannot
@@ -279,24 +306,57 @@ export const resolveCs3d = (frameworks: string[], applicability: FrameworkApplic
 // report correctly omitted. A token here can now only name a regime that section also asserts.
 // Activity-triggered EU instruments (CBAM, EUDR, AI Act, SFDR, CS3D, ETS) are left intact — they
 // apply to UK/non-EU companies through EU-facing activity and have no domestic equivalent.
-// The token mapFramework emits for an unresolved CS3D, and the string both surfaces match on to
-// decide whether to print the explanatory line beneath a finding. ONE definition: as three separate
-// literals, editing the emitter and missing a call site left the label rendering with its
-// explanation silently gone — the reader sees a qualified regime and no reason for the qualifier.
+// The DISPLAY TEXT for an unresolved CS3D. It is no longer what a surface matches on — that is now
+// `RegimeToken.qualified` plus `framework === 'CS3D'`, so the decision is made on structure rather
+// than by re-reading a rendered string. It stays a single named constant because it is verifier-
+// facing copy that appears in a Framework column, and because cs3dToken() below reads it: the
+// near-threshold wording lives in that function beside this one, so both CS3D spellings are produced
+// in ONE place and cannot drift the way three separate literals once did.
 export const CS3D_NOT_ASSESSED_LABEL = 'CS3D (not assessed)'
 
-export const makeMapFramework = (frameworks: string[], cs3d: Cs3dState) => (fw: string): string => {
-  const licensed = REGIME_CANDIDATES.filter(c => frameworks.includes(c.licensedBy)).map(c => c.token)
+// All four CS3D outcomes and BOTH display strings, from the ROW rather than from Cs3dState — which
+// collapses four statuses into three and cannot distinguish an abstention from an evaluated row
+// sitting just below its limbs. The identity is 'CS3D' in every case; only the text and the caveat
+// flag move. null ⇒ emit no token at all, the 'not-applicable' relabel.
+//   applies (incl. a marginal limb ABOVE, which still applies) → plain, no caveat
+//   near-threshold, not applying                               → evaluated, just under its limbs
+//   not-assessed                                              → withheld
+//   no row at all                                             → CS3D not in scope for this
+//                                                               jurisdiction; still not a negative
+export const cs3dToken = (row: FrameworkApplicability | undefined): RegimeToken | null => {
+  if (!row) return { text: CS3D_NOT_ASSESSED_LABEL, framework: 'CS3D', qualified: true }
+  if (row.applies) return { text: 'CS3D', framework: 'CS3D' }
+  if (row.status === 'not-applicable') return null
+  if (row.status === 'near-threshold') return { text: 'CS3D (near threshold)', framework: 'CS3D', qualified: true }
+  return { text: CS3D_NOT_ASSESSED_LABEL, framework: 'CS3D', qualified: true }
+}
+
+// Joins tokens for display. THE ONLY PLACE ' / ' IS WRITTEN ON THE OUTPUT SIDE — the separator used
+// to appear three times: here, in the input split below, and in a consumer re-splitting this
+// function's own result to recover identities. That round-trip is what RegimeToken removes.
+export const regimeLabel = (tokens: RegimeToken[]): string => tokens.map(t => t.text).join(' / ')
+
+export const makeMapFramework = (frameworks: string[], cs3dRow: FrameworkApplicability | undefined) => (fw: string): RegimeToken[] => {
+  const licensed: RegimeToken[] = REGIME_CANDIDATES
+    .filter(c => frameworks.includes(c.licensedBy))
+    .map(c => ({ text: c.token, framework: c.licensedBy }))
   const regime = licensed.length ? licensed : REGIME_FALLBACK
+  const cs3d = cs3dToken(cs3dRow)
   const out = fw
+    // The INPUT side: SECTOR_RISKS templates still hold ' / '-joined strings, so this split stays.
     .split(' / ')
-    .flatMap(tok =>
+    .flatMap((tok): RegimeToken[] =>
       (tok === 'SB 253' || tok === 'SB253' || tok === 'CSRD') ? regime
-      : tok === 'CS3D' ? (cs3d.state === 'applies' ? ['CS3D'] : cs3d.state === 'conditional' ? [CS3D_NOT_ASSESSED_LABEL] : [])
-      : [tok])
-    .filter((tok, i, arr) => arr.indexOf(tok) === i)   // dedupe ATOMIC tokens, post-expansion
+      : tok === 'CS3D' ? (cs3d ? [cs3d] : [])
+      // Pass-through: no row governs it, so no identity. A token that happens to share a framework's
+      // name is NOT given one — inferring identity by name is the string matching being removed.
+      : [{ text: tok }])
+    // Dedupe on TEXT, post-expansion. NOT arr.indexOf(t): these are freshly built objects, so
+    // indexOf compares references, never matches, and would silently keep every duplicate — the
+    // string version of this line worked only because strings compare by value.
+    .filter((t, i, arr) => arr.findIndex(o => o.text === t.text) === i)
   // Dropping the only token would leave an empty label; fall back rather than render nothing.
-  return (out.length ? out : REGIME_FALLBACK).join(' / ')
+  return out.length ? out : REGIME_FALLBACK
 }
 
 // ─── Headline ThemisIQ figure ─────────────────────────────────────────────────

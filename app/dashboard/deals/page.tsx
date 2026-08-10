@@ -17,7 +17,7 @@ import {
 // different figures or cite different regimes for one deal.
 import {
   DEAL_TYPES, spellMagnitude, NEAR_PCT, nearSentence,
-  resolveCs3d, makeMapFramework, themisIqFigure as themisIqFigureOf, CS3D_NOT_ASSESSED_LABEL,
+  resolveCs3d, makeMapFramework, regimeLabel, themisIqFigure as themisIqFigureOf,
 } from '../../../lib/deals/reportModel'
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
@@ -301,18 +301,24 @@ function DealsDashboardInner() {
   // report correctly omitted. A token here can now only name a regime that section also asserts.
   // Activity-triggered EU instruments (CBAM, EUDR, AI Act, SFDR, CS3D, ETS) are still left intact —
   // they apply to UK/non-EU companies through EU-facing activity and have no domestic equivalent.
-  // CS3D is an activity-triggered instrument, so it gets THREE states, not the binary the regime
-  // tokens use. It reaches non-EU companies through EU-facing activity, which this screen cannot
-  // determine (no market multi-select yet), so "not in the resolved list" is not the same as
-  // "does not apply".
-  //   applies        → cite plainly
-  //   conditional    → cite as CS3D_NOT_ASSESSED_LABEL, NEVER suppress (size undeclared, or non-EU)
-  // The internal state is 'conditional'; the PRINTED label is "not assessed" — "conditional"
-  // describes a status without explaining it, and reads as "applies conditionally", the opposite
-  // of what is true. The label states what happened: the test was not run.
-  //   not-applicable → relabel, i.e. drop the token — same treatment as SB 253
+  // CS3D is an activity-triggered instrument: it reaches non-EU companies through EU-facing activity,
+  // which this screen cannot determine (no market multi-select yet), so "not in the resolved list" is
+  // NOT the same as "does not apply" and the token is never simply suppressed.
+  //
+  // TWO INPUTS, TWO JOBS. `Cs3dState` is consumed here for ONE thing only — `cs3d.reason`, the
+  // sentence printed beneath a finding. The token's display TEXT and its `qualified` flag come from
+  // the CS3D ROW, via makeMapFramework. The split is not tidiness: the ROW carries FOUR statuses
+  // (applies / near-threshold / not-assessed / not-applicable) where `Cs3dState` carries THREE, so
+  // the summary cannot tell an abstention apart from an evaluated row sitting just below its limbs.
+  // Deriving the token from the state is what once printed "not assessed" over a row the
+  // near-threshold panel on this same screen showed with its limbs, its values and "0 of 2 limbs met".
   const cs3d = resolveCs3d(frameworks, applicability)
-  const mapFramework = makeMapFramework(frameworks, cs3d)
+  // Narrowed HERE, not in the render gate: only the 'conditional' variant carries a reason, and the
+  // gate is now `qualified` on the token. Reading `.reason` at the render site would put the state
+  // check back in the gate and imply it decides whether the line prints, which it does not.
+  const cs3dReason = cs3d.state === 'conditional' ? cs3d.reason : null
+  const cs3dRow = applicability.find(f => f.framework === 'CS3D')
+  const mapFramework = makeMapFramework(frameworks, cs3dRow)
   const criticalRisks = risks.filter(r => r.severity === 'critical')
   const highRisks = risks.filter(r => r.severity === 'high')
   const mediumRisks = risks.filter(r => r.severity === 'medium')
@@ -645,24 +651,33 @@ function DealsDashboardInner() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {risks.map((risk, i) => {
               const cfg = SEVERITY_CONFIG[risk.severity]
-              const label = mapFramework(risk.framework)
+              const tokens = mapFramework(risk.framework)
               // A finding inherits the marker when the regime it cites is itself near-threshold.
-              const citedNear = label.split(' / ').map(t => nearByFramework.get(t)).filter(Boolean) as FrameworkApplicability[]
+              // Looked up by token IDENTITY, not by display text — 'ESRS E1' carries identity 'CSRD'
+              // and used to miss the map entirely. DEDUPED BY FRAMEWORK for the same reason: 'CSRD'
+              // and 'ESRS E1' both resolve to the CSRD row, so without this the near-sentence would
+              // print twice under one finding.
+              const citedNear = [...new Map(
+                tokens
+                  .map(t => (t.framework ? nearByFramework.get(t.framework) : undefined))
+                  .filter(Boolean)
+                  .map(f => [f!.framework, f!] as const),
+              ).values()]
               return (
                 <div key={i} style={{ border: `1px solid ${cfg.border}20`, borderRadius: 12, overflow: 'hidden' }}>
                   <div style={{ background: risk.severity === 'critical' ? cfg.bg : '#fff', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `0.5px solid ${cfg.border}20` }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{risk.risk}</div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                      <span style={{ fontSize: 10, color: '#888784' }}>{label}</span>
+                      <span style={{ fontSize: 10, color: '#888784' }}>{regimeLabel(tokens)}</span>
                       {citedNear.length > 0 && <span style={verifyChip}>VERIFY</span>}
                       <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: cfg.bg, color: cfg.color, border: `0.5px solid ${cfg.border}` }}>{cfg.label}</span>
                     </div>
                   </div>
                   <div style={{ padding: '10px 16px', background: '#fff' }}>
                     <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{risk.detail}</div>
-                    {label.includes(CS3D_NOT_ASSESSED_LABEL) && cs3d.state === 'conditional' && (
+                    {tokens.some(t => t.framework === 'CS3D' && t.qualified) && (
                       <div style={{ fontSize: 11, color: '#ba7517', lineHeight: 1.55, marginTop: 8 }}>
-                        <strong style={{ fontWeight: 600 }}>CS3D not assessed:</strong> {cs3d.reason}.
+                        <strong style={{ fontWeight: 600 }}>CS3D not assessed:</strong> {cs3dReason}.
                       </div>
                     )}
                     {citedNear.map(f => (

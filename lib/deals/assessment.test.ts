@@ -657,7 +657,7 @@ const viewFor = (j: string, rev: number, sector = 'Technology', cur: DealCurrenc
 
 describe('assessmentView — per-framework, not per-section', () => {
   it('reports nothing evaluated when sector/jurisdiction are missing', () => {
-    expect(assessmentView(false, [])).toEqual({ evaluated: false, notAssessed: [], fieldsToResolve: [], frameworks: 'not-assessed', nearThreshold: 'not-assessed' })
+    expect(assessmentView(false, [])).toEqual({ evaluated: false, notAssessed: [], unevaluated: [], routeNotMet: [], fieldsToResolve: [], frameworks: 'not-assessed', nearThreshold: 'not-assessed' })
   })
 
   it('blank revenue + USA: frameworks resolve, only SB 253 is withheld', () => {
@@ -694,6 +694,62 @@ describe('assessmentView — per-framework, not per-section', () => {
 
   it('a fully-declared UK deal withholds nothing', () => {
     expect(viewFor('UK', 50_000_000, 'Technology', 'GBP', { employee_count: 300, total_assets: 20_000_000 }).notAssessed).toEqual([])
+  })
+
+  // ── the two withheld populations ────────────────────────────────────────────
+  // `notAssessed` answers "was anything withheld"; it CANNOT say why, and every consumer that claims
+  // a cause ("the size test could not be completed") is false of one population or the other. These
+  // assert MEMBERSHIP, not just counts — a partition that balances numerically while putting a row in
+  // the wrong population would let exactly that false claim through.
+
+  it('an EU deal below the CS3D limbs is routeNotMet — the test COMPLETED', () => {
+    // Every limb declared and evaluated: 1,850 < 5,000 and EUR 620m < 1.5bn, so unknownCount is 0.
+    const v = viewFor('European Union', 620_000_000, 'Technology', 'EUR', { employee_count: 1_850, total_assets: 4e8 })
+    expect(v.notAssessed).toEqual(['CS3D'])
+    expect(v.routeNotMet).toEqual(['CS3D'])
+    expect(v.unevaluated).toEqual([])
+    // No figure the form collects would settle it — the missing thing is a route, not a number.
+    expect(v.fieldsToResolve).toEqual([])
+    expect(v.unevaluated.length + v.routeNotMet.length).toBe(v.notAssessed.length)
+  })
+
+  it('an EU deal with blank revenue is unevaluated — a limb could not be settled', () => {
+    // Revenue coerces to 0 ⇒ undeclared, so CSRD's turnover limb and CS3D's both go unevaluated.
+    const v = viewFor('European Union', 0, 'Technology', 'EUR', { employee_count: 1_850 })
+    expect(v.notAssessed).toEqual(['CSRD', 'CS3D'])
+    expect(v.unevaluated).toEqual(['CSRD', 'CS3D'])
+    expect(v.routeNotMet).toEqual([])
+    expect(v.fieldsToResolve).toEqual(['revenue'])
+    expect(v.unevaluated.length + v.routeNotMet.length).toBe(v.notAssessed.length)
+  })
+
+  it('a Global deal is unevaluated via the no-test abstentions — no limb ran at all', () => {
+    // csrdNonEuAbstention and cs3dNonEuAbstention carry NO `test`, which is the !r.test arm of the
+    // predicate. The figures are irrelevant: both clear every limb on paper and still resolve nothing.
+    const v = viewFor('Global', 2_000_000_000, 'Technology', 'EUR', { employee_count: 6_000, total_assets: 1e9 })
+    expect(v.notAssessed).toEqual(['CSRD', 'CS3D'])
+    expect(v.unevaluated).toEqual(['CSRD', 'CS3D'])
+    expect(v.routeNotMet).toEqual([])
+    // Nothing to enter, but for the OTHER reason: no limb was consulted, so no field is named either.
+    expect(v.fieldsToResolve).toEqual([])
+    expect(v.unevaluated.length + v.routeNotMet.length).toBe(v.notAssessed.length)
+  })
+
+  it('the two populations partition notAssessed across every jurisdiction', () => {
+    for (const j of ['USA', 'European Union', 'UK', 'Canada', 'Australia', 'Global', 'Other']) {
+      for (const rev of [0, 620_000_000, 2e9]) {
+        const v = viewFor(j, rev, 'Technology', 'EUR', { employee_count: 1_850 })
+        expect([...v.unevaluated, ...v.routeNotMet].sort()).toEqual([...v.notAssessed].sort())
+        // Disjoint as well as covering — a row in both would balance the counts and still be wrong.
+        expect(v.unevaluated.filter(f => v.routeNotMet.includes(f))).toEqual([])
+      }
+    }
+  })
+
+  it('the !evaluated early return carries both populations as empty', () => {
+    const v = assessmentView(false, [])
+    expect(v.unevaluated).toEqual([])
+    expect(v.routeNotMet).toEqual([])
   })
 
   // EUR 460,000,000 — 2.2% ABOVE CSRD's EUR 450m turnover limb, so that limb is MARGINAL, and with
