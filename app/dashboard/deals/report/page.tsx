@@ -99,6 +99,14 @@ export default function DealsReportPage() {
   )
 }
 
+// Which of this user's deals a free-tier reader may open, as a union rather than a nullable id.
+// `null` inside the resolved arm means "asked, and they have saved nothing" — distinct from not yet
+// having asked, which is the 'loading' arm. Collapsing the two would let an unresolved lookup read
+// as "this is not your free deal" and paywall a report the reader is entitled to.
+type FreeTierScope =
+  | { state: 'loading' }
+  | { state: 'resolved'; newestOwnDealId: string | null }
+
 function DealsReportInner() {
   const params = useSearchParams()
   // State form, not the bare boolean: `isPaid` starts false, so the paywall below rendered for
@@ -108,6 +116,7 @@ function DealsReportInner() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [deal, setDeal] = useState<DealRow | null>(null)
+  const [freeTier, setFreeTier] = useState<FreeTierScope>({ state: 'loading' })
 
   useEffect(() => {
     // A missing `id` is a render-time fact about the URL, not fetched state, so it is reported by
@@ -117,15 +126,61 @@ function DealsReportInner() {
     ;(async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        if (!session?.access_token) { setError('Please sign in to view the report.'); setLoading(false); return }
-        // Owner-scoped RLS on public.deals means a deal belonging to another user resolves to no
-        // row, not to a forbidden error — surfaced as "not found" rather than leaking existence.
-        const { data, error: err } = await supabase.from('deals').select('*').eq('id', id).maybeSingle()
+        // Signed out: no row is readable and no free-tier scope exists. Resolve the scope anyway —
+        // leaving it on 'loading' would hold the loading state up forever instead of showing the
+        // sign-in message.
+        if (!session?.access_token) {
+          setError('Please sign in to view the report.'); setLoading(false)
+          setFreeTier({ state: 'resolved', newestOwnDealId: null })
+          return
+        }
+
+        // TWO QUERIES, CONCURRENT AND UNCONDITIONAL.
+        //
+        // The first is the report's own row and is unchanged. Owner-scoped RLS on public.deals
+        // means a deal belonging to another user resolves to no row, not to a forbidden error —
+        // surfaced as "not found" rather than leaking existence.
+        //
+        // The second establishes which deal a FREE reader may open. It is not branched on `isPaid`
+        // because the entitlement resolves asynchronously: branching would make this fetch wait on
+        // it and delay the report for every paying customer to gate a case that is not theirs. Two
+        // columns, one row — an entitled reader pays for a lookup whose answer is never consumed.
+        //
+        // NEWEST BY updated_at, matching app/dashboard/deals/page.tsx exactly. Its wall renders
+        // "Open your saved deal — {name} →" from that same ordering and sends the reader into the
+        // wizard, from which they click through to this report. Choosing the oldest here would hand
+        // them a deal this page then refuses.
+        const [rowRes, newestRes] = await Promise.all([
+          supabase.from('deals').select('*').eq('id', id).maybeSingle(),
+          supabase.from('deals').select('id')
+            .eq('user_id', session.user.id)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+        ])
+
+        // Resolved BEFORE the row result is inspected, and independently of it: the two questions
+        // are separate, and a row that failed to load must not leave the scope unresolved.
+        //
+        // ⚠️ A FAILED LOOKUP RESOLVES TO "NO FREE DEAL", WHICH IS THE OPPOSITE POLARITY TO THE
+        // WIZARD. There, a failed count resolves to "do not wall" — a network error must not lock
+        // someone out of their own work, and the DB trigger is the real enforcement anyway. Here
+        // there is no second enforcement: if this cannot confirm the deal is their free one, the
+        // safe direction is the paywall, because the thing at risk is the paid artefact itself.
+        if (newestRes.error) {
+          console.error('Free-tier scope lookup failed:', newestRes.error)
+          setFreeTier({ state: 'resolved', newestOwnDealId: null })
+        } else {
+          setFreeTier({ state: 'resolved', newestOwnDealId: newestRes.data?.id ?? null })
+        }
+
+        const { data, error: err } = rowRes
         if (err) { setError(err.message || 'Failed to load deal.'); setLoading(false); return }
         if (!data) { setError('Deal not found, or you do not have access to it.'); setLoading(false); return }
         setDeal(data as DealRow); setLoading(false)
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Something went wrong.'); setLoading(false)
+        setFreeTier({ state: 'resolved', newestOwnDealId: null })
       }
     })()
   }, [id])
@@ -145,12 +200,30 @@ function DealsReportInner() {
     ? reportTitle(deal.target_name, `ESG Diligence Report - ${filenameDate(generatedAt)}`)
     : null)
 
-  // BEFORE the paywall. An unresolved entitlement is not a refusal, and this page is printed —
-  // a paywall flashing into a print preview is worse than on screen. Reuses the page's own
-  // waiting state so no new one appears.
-  if (entLoading) return <Centered>Loading report…</Centered>
-  if (!isPaid) return <PaywallCard />
+  // FIRST, because it is knowable without any fetch. It also has to precede the loading guard
+  // below: the effect returns early on a missing id, so the free-tier scope never resolves in that
+  // case and the page would wait forever on a fact it was never going to be told.
   if (!id) return <Centered>No deal id provided.</Centered>
+
+  // BEFORE the paywall, and covering BOTH facts. An unresolved entitlement is not a refusal, and
+  // nor is an unresolved free-tier scope. This page is printed, so a paywall flashing into a print
+  // preview is worse than on screen. Reuses the page's own waiting state so no new one appears.
+  if (entLoading || freeTier.state === 'loading') return <Centered>Loading report…</Centered>
+
+  // THE FREE DEAL OPENS ITS REPORT. Gating the whole report on `isPaid` meant a free deal could be
+  // screened end to end and then produced nothing to take away, which is the thing the free tier
+  // exists to demonstrate.
+  //
+  // Identity, not count: the reader may open THIS deal because it is the one their free tier
+  // covers, not because they happen to have exactly one. That also settles the lapsed case — an
+  // entitled user who saved several and then lapsed keeps the most recently worked on.
+  //
+  // A deal that is not theirs cannot satisfy this, because `newestOwnDealId` is selected under the
+  // owner filter AND under RLS, so a foreign id can never equal it — the unentitled reader gets the
+  // paywall, and the row itself was never readable in the first place.
+  const freeDealAllowed = freeTier.state === 'resolved' && freeTier.newestOwnDealId !== null && freeTier.newestOwnDealId === id
+  if (!isPaid && !freeDealAllowed) return <PaywallCard />
+
   if (loading) return <Centered>Loading report…</Centered>
   if (error) return <Centered>{error}</Centered>
   if (!deal) return <Centered>No deal data.</Centered>
