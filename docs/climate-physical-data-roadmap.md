@@ -75,10 +75,11 @@ so this is a choice about which to read when, not about which to acquire.
 taxonomy, and choosing CCKP does not change that — it closes two hazards properly and puts a
 labelled proxy under a third.
 
-> **This table is the CCKP-only assessment and is now partly superseded.** `water` and `flood`
-> moved after the Aqueduct work below. The current position for all eight hazards is the status
-> table at the end of *Water and flood — WRI Aqueduct 4.0*. This table is kept as the record of
-> what CCKP alone could close.
+> **This table is the CCKP-only assessment and is now superseded in three places.** `water` and
+> `flood` moved under Aqueduct; `wildfire` moved to the ETH Zurich FWI set; and **`drought` no
+> longer uses `cdd` — it uses `spei12`**, for the reasons in *CCKP — heat and drought retrieved*.
+> The current position for all eight hazards is the *Hazard sourcing status* table below. This
+> table is kept as the record of what CCKP alone was expected to close.
 
 ### 4 · Provenance must be per-hazard, not per-table
 
@@ -93,6 +94,96 @@ covering `mr_region_hazards` as a whole could not be true of all eight.
 distinct `source_ref` values under *Data provenance*, so the mechanism exists. What changes is
 that the mix within one table becomes meaningful, and a reader comparing two assessments will
 see different provenance profiles depending on which hazards their sector is sensitive to.
+
+---
+
+## CCKP — heat and drought retrieved
+
+**Retrieved 11 August 2026, via the CCKP API rather than the download wizard.** 20 populated
+JSON files, ~2 MB total, held at `~/climate-data/cckp/` outside the repo.
+
+### The API
+
+Base: `https://cckpapi.worldbank.org/api/v1/`
+
+The format string, **returned by the API itself in its error message**:
+
+```
+{collection}_{type}_{variable}_{product}_{aggregation}_{period}_
+{percentile}_{scenario}_{model}_{model-calculation}_{grid}_
+{statistic}/{geo}?_format=json
+```
+
+**11 parameters are required. Supplying 10 returns a parameter mismatch error** rather than
+failing silently — which is the helpful behaviour, and is how the format string above was
+obtained in the first place.
+
+> Note for whoever automates this: the string above carries **12** placeholders before `/{geo}`,
+> against the 11 the API reports as required. One is evidently optional or folded into another.
+> Worth resolving before scripting rather than at the point of a failed call.
+
+**The wizard UI produces a valid URL, but a global multi-variable query returns zero bytes.**
+The query has to be split. **32 single-combination calls succeeded where one combined call did
+not** — a silent empty response from a well-formed URL, which is exactly the failure mode that
+costs an afternoon if it is not written down.
+
+### What was taken
+
+| Parameter | Value |
+|---|---|
+| collection | `cmip6-x0.25` |
+| type | `climatology` |
+| aggregation | `annual` |
+| percentile | `median` — 50th of the multi-model ensemble |
+| geo | `global_countries_subnationals` |
+| variables | `hi35` (days with heat index above 35 °C) · `spei12` (annual SPEI drought index) |
+| scenarios | `historical`, `ssp126`, `ssp245`, `ssp585` |
+| periods | `1995-2014` baseline · `2040-2059` · `2060-2079` · `2080-2099` |
+
+**The 12 empty responses are the data's structure, not failures.** `historical` carries only
+the baseline period; the SSPs carry only future periods. Per variable that is 1 + (3 × 3) = 10
+populated of 16 attempted; across two variables, **20 populated of 32** — which is the file
+count above.
+
+**Note the percentile choice.** CCKP ships the ensemble already reduced to a median, where the
+ETH wildfire archive ships the models. That difference is the whole of the wildfire caveat
+below.
+
+### Drought — `spei12` replaces `cdd`
+
+The index mapping in *Decisions §3* named `cdd`, maximum consecutive dry days. **That is
+superseded.**
+
+SPEI is the standard meteorological drought index and **accounts for evaporative demand as well
+as precipitation**. Under warming a region can receive the same rainfall and still be in
+drought because it is hotter — which `cdd` cannot see, since it counts only days without rain.
+
+It is also **an index a verifier will recognise**, where "maximum consecutive dry days" needs
+explaining every time it appears.
+
+**CONSEQUENCE — SPEI needs its own banding rule.** It is **signed, roughly −3 to +3, negative
+meaning drier**. That is a different shape from a day count: `hi35` and `fwixd` both band from
+a count with a natural floor at zero and a monotone direction, whereas SPEI is centred, runs
+both ways, and its useful range sits on the negative side. The 0–3 ordinal cannot be derived
+from it by the same rule. **Recorded as open.**
+
+### Two join problems
+
+**1 · Identifiers do not join.** CCKP uses `AFG`, `AFG.111`. Aqueduct uses GADM `gid_1` in the
+form `AFG.11_1`. The two do not join without a mapping — same underlying GADM geography, two
+serialisations of it.
+
+**2 · Period windows do not align across sources.**
+
+| Source | Window |
+|---|---|
+| CCKP | **20 years** — `2040-2059` |
+| Aqueduct | **30 years, centred differently** — its `2050` is 2035–2065 |
+| ETH wildfire | **Annual** — would be averaged to whatever window we choose |
+
+**Mapping all three onto `mr_horizons` is an open decision.** No window is shared by any two
+sources, so any alignment involves either re-averaging what can be re-averaged (only the ETH
+set) or accepting that a single reported horizon means three slightly different spans.
 
 ---
 
@@ -280,11 +371,13 @@ expected fire has been misled by an omission we could have prevented at the cell
 
 **Held outside the repo.**
 
-- Wildfire: `~/climate-data/wildfire/`
+- CCKP: `~/climate-data/cckp/` — 20 JSON files, ~2 MB
 - Aqueduct: `~/climate-data/aqueduct/`
+- Wildfire: `~/climate-data/wildfire/` — 1,486 files, 1.2 GB
 
 **Reference archives of this size must never enter git.** The wildfire set alone is 1.2 GB
-across 1,486 files. What belongs in the repo is the derived ordinal, its source note and its
+across 1,486 files. The CCKP set is small enough to be tempting; it lives with the others
+anyway, because a retrieval archive is a retrieval archive whatever it weighs. What belongs in the repo is the derived ordinal, its source note and its
 provenance — not the source archive.
 
 ---
@@ -293,19 +386,29 @@ provenance — not the source archive.
 
 The current position across all sources. This supersedes the CCKP-only table in *Decisions §3*.
 
+**Two statuses, and the difference matters.** *Sourced* means the licence, the variable and the
+version are settled. **Retrieved** means the data is in hand and in a form the transcription can
+read. A hazard can be sourced and still be weeks of work away.
+
 | Hazard | Source | Status |
 |---|---|---|
-| **heat** | CCKP `hi35` | **sourced** |
-| **drought** | CCKP `cdd` + Aqueduct `drr` (3.0, baseline only) | **sourced** |
+| **heat** | CCKP `hi35` (median of ensemble) | **RETRIEVED** |
+| **drought** | CCKP `spei12` (median of ensemble) + Aqueduct `drr` (3.0, baseline only) | **RETRIEVED** |
 | **water** | Aqueduct `bws` (4.0, full futures) | **sourced** |
-| **wildfire** | ETH Zurich `fwixd` (CMIP6, 36 models, full trio) | **sourced** |
+| **wildfire** | ETH Zurich `fwixd` (CMIP6, 36 models, full trio) | **sourced, not yet usable** |
 | **flood** | Aqueduct `rfr` (3.0, baseline only) | **partial** |
 | **coastal** | — | **GAP** — raster only |
 | **cyclone** | — | **GAP** — candidate: CLIMADA (ETH Zurich, open source) |
 | **permafrost** | — | **GAP** — candidate: ESA Permafrost CCI |
 
-**Four sourced, one partial, three gaps** — against two sourced, one proxy and five gaps at the
-start of this work.
+**Two retrieved, two sourced, one partial, three gaps** — against two sourced, one proxy and
+five gaps at the start of this work.
+
+**Wildfire is sourced but not retrieved in usable form.** The ETH archive is raw per-model
+CMIP6 — 36 models, up to 5 members each — and needs the ensemble reduction doing before it can
+be banded. CCKP has already done that reduction and ships the 50th percentile. That is the
+single largest difference in effort between the sources, and it is invisible from the licence
+or the variable name.
 
 **Three licences, all CC BY 4.0**, all permitting commercial use with attribution: World Bank
 CCKP, WRI Aqueduct, ETH Zurich. Attribution copy must name each and, for CCKP, must not imply
@@ -359,21 +462,29 @@ are two different questions that happen to share a word.
    closed under the ETH Zurich FWI set.*
 3. **Ensemble reduction for wildfire** — 36 models with up to 5 members each are shipped
    unreduced. Which statistic (median, mean, a percentile) and across which members is a
-   methodology decision the other two sources made for us before delivery.
-4. **Which Aqueduct scenario stands in for the ThemisIQ middle case** — SSP3-7.0 substituted
+   methodology decision the other two sources made for us before delivery. CCKP's choice — the
+   50th percentile of the multi-model ensemble — is the obvious precedent to match.
+4. **A banding rule for SPEI.** It is signed and centred, roughly −3 to +3 with negative
+   meaning drier, so the rule that bands a day count does not transfer. Open.
+5. **Joining CCKP and Aqueduct identifiers** — `AFG.111` against GADM `gid_1` `AFG.11_1`. Same
+   geography, two serialisations, no join without a mapping.
+6. **Mapping three different period windows onto `mr_horizons`** — CCKP's 20-year spans,
+   Aqueduct's 30-year spans centred differently, and the ETH set's annual values. Only the
+   annual data can be re-averaged to fit; the other two are as published.
+7. **Which Aqueduct scenario stands in for the ThemisIQ middle case** — SSP3-7.0 substituted
    and disclosed (recommended), interpolated, or water stress run on two scenarios only.
    *Note the ETH Zurich set ships `ssp370` as well, so a future decision to align the middle
    case across sources has data on both sides.*
-5. **Whether ThemisIQ sectors map onto Aqueduct's `ind` / `irr` / `dom` weightings**, making
+8. **Whether ThemisIQ sectors map onto Aqueduct's `ind` / `irr` / `dom` weightings**, making
    the geography sector-specific.
-6. **Calibration of the 0–3 ordinal from a continuous index.** *Partly settled for water
+9. **Calibration of the 0–3 ordinal from a continuous index.** *Partly settled for water
    stress:* Aqueduct's band edges are absolute percentage thresholds, and the decision above
    keeps the 0–3 scale with the Aqueduct label carried in `source_note`. Still open for the
    CCKP-sourced hazards, and still open in general as to whether band edges should be
    **absolute** or **relative to the global distribution** — an absolute threshold and a
    percentile threshold answer different questions and will disagree most in the regions where
    the data is thinnest.
-7. **Whether subnational units replace AR6 regions or sit alongside them.**
+10. **Whether subnational units replace AR6 regions or sit alongside them.**
 
 ---
 
