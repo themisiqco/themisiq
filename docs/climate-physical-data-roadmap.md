@@ -211,21 +211,105 @@ These must travel into the methodology rather than being dropped at the border.
 3. **Future demand holds livestock constant from 2014**, and bases irrigation on **crop extent
    projections ending 2050** — so the 2080 horizon extrapolates beyond its own demand inputs.
 
-### Hazard sourcing status after this work
+---
+
+## Wildfire — ETH Zurich Fire Weather Index (CMIP6)
+
+Recorded as **sourced**. This supersedes the earlier candidate — the roadmap previously named
+the Copernicus Fire Weather Index, which was never examined.
+
+### Source
+
+Quilcaille, Y., Batibeniz, F., Ribeiro, A.F.S., Padrón, R.S., and Seneviratne, S.I.
+*"Fire weather index data under historical and SSP projections in CMIP6 from 1850 to 2100."*
+ETH Zurich Research Collection, 2022. <https://doi.org/10.3929/ethz-b-000583391>
+
+**Licence: CC BY 4.0** — commercial use permitted with attribution. Same terms as CCKP and
+Aqueduct. Published in *Earth System Science Data*.
+
+### Variable taken — `fwixd`
+
+**Number of days with extreme fire weather**, computed using daily **average** relative
+humidity.
+
+**The dataset also offers a daily-minimum-RH variant, which yields higher fire danger.**
+Average is the more conservative choice, and that is **a methodology decision to disclose, not
+a default** — a reader comparing our wildfire scores against another tool's may be comparing
+against the minimum-RH variant.
+
+**Two other variables were available and not taken:** length of the fire season, and seasonal
+average FWI.
+
+The reason is the same one that governs every hazard on this scale: **a day count bands to a
+0–3 ordinal without inventing a rule**, in the same shape as CCKP's `hi35`. An index mean does
+not — turning a seasonal average FWI into an ordinal would require a threshold rule we would
+have authored ourselves, on a quantity with no natural break points.
+
+### What the archive contains
+
+**1,486 files, 1.2 GB**, named `fwixd_ann_<MODEL>_<scenario>_<variant>_g025.nc`
+
+- **36 CMIP6 models**
+- Up to **5 ensemble members** each (`r1i1p1f1` … `r5i1p1f1`)
+- Scenarios: `historical`, `ssp126`, `ssp245`, `ssp370`, `ssp585`
+- **Annual**, already aggregated from daily
+- Regridded to **0.25°** — the same resolution as CCKP
+
+**This covers the ThemisIQ trio exactly.** `ssp126`, `ssp245` and `ssp585` are all present, so
+**no scenario substitution is needed** — unlike Aqueduct, whose middle case is SSP3-7.0 against
+our SSP2-4.5.
+
+**A 36-model ensemble is a stronger basis than Aqueduct's five-model median** — at the cost of
+doing the ensemble reduction ourselves. Aqueduct ships a reduced figure; this ships the models.
+
+### The limitation that must travel with it
+
+**FWI measures fire WEATHER, not fire.**
+
+It captures meteorological conditions favourable to ignition and spread in a **generalised fuel
+type — mature pine stands** — and says nothing about fuel load, land cover or ignition sources.
+**A region can have extreme fire weather and little to burn.**
+
+**This belongs in the source note, not only in this document.** A wildfire score derived from
+`fwixd` is a statement about conditions, and a reader who takes it as a statement about
+expected fire has been misled by an omission we could have prevented at the cell.
+
+---
+
+## Reference archives — storage
+
+**Held outside the repo.**
+
+- Wildfire: `~/climate-data/wildfire/`
+- Aqueduct: `~/climate-data/aqueduct/`
+
+**Reference archives of this size must never enter git.** The wildfire set alone is 1.2 GB
+across 1,486 files. What belongs in the repo is the derived ordinal, its source note and its
+provenance — not the source archive.
+
+---
+
+## Hazard sourcing status
+
+The current position across all sources. This supersedes the CCKP-only table in *Decisions §3*.
 
 | Hazard | Source | Status |
 |---|---|---|
 | **heat** | CCKP `hi35` | **sourced** |
 | **drought** | CCKP `cdd` + Aqueduct `drr` (3.0, baseline only) | **sourced** |
 | **water** | Aqueduct `bws` (4.0, full futures) | **sourced** |
+| **wildfire** | ETH Zurich `fwixd` (CMIP6, 36 models, full trio) | **sourced** |
 | **flood** | Aqueduct `rfr` (3.0, baseline only) | **partial** |
 | **coastal** | — | **GAP** — raster only |
-| **wildfire** | — | **GAP** — candidate: Copernicus Fire Weather Index |
 | **cyclone** | — | **GAP** — candidate: CLIMADA (ETH Zurich, open source) |
 | **permafrost** | — | **GAP** — candidate: ESA Permafrost CCI |
 
-**Three sourced, one partial, four gaps** — against two sourced, one proxy and five gaps before
-this work.
+**Four sourced, one partial, three gaps** — against two sourced, one proxy and five gaps at the
+start of this work.
+
+**Three licences, all CC BY 4.0**, all permitting commercial use with attribution: World Bank
+CCKP, WRI Aqueduct, ETH Zurich. Attribution copy must name each and, for CCKP, must not imply
+World Bank endorsement.
 
 ---
 
@@ -268,23 +352,28 @@ are two different questions that happen to share a word.
 ## What remains open
 
 1. **Site input mechanism** — whether a map picker or coordinate entry.
-2. **Sources for the four remaining gap hazards** — coastal, wildfire, cyclone, permafrost.
-   Candidates named but not decided: Copernicus Fire Weather Index (wildfire), CLIMADA
-   (cyclone), ESA Permafrost CCI (permafrost). Coastal has no candidate short of aggregating
-   the Aqueduct Floods rasters and deciding what a depth map means for a province.
-   *Water closed under Aqueduct 4.0; flood partially closed.*
-3. **Which Aqueduct scenario stands in for the ThemisIQ middle case** — SSP3-7.0 substituted
+2. **Sources for the three remaining gap hazards** — coastal, cyclone, permafrost. Candidates
+   named but not decided: CLIMADA (cyclone), ESA Permafrost CCI (permafrost). Coastal has no
+   candidate short of aggregating the Aqueduct Floods rasters and deciding what a depth map
+   means for a province. *Water closed under Aqueduct 4.0; flood partially closed; wildfire
+   closed under the ETH Zurich FWI set.*
+3. **Ensemble reduction for wildfire** — 36 models with up to 5 members each are shipped
+   unreduced. Which statistic (median, mean, a percentile) and across which members is a
+   methodology decision the other two sources made for us before delivery.
+4. **Which Aqueduct scenario stands in for the ThemisIQ middle case** — SSP3-7.0 substituted
    and disclosed (recommended), interpolated, or water stress run on two scenarios only.
-4. **Whether ThemisIQ sectors map onto Aqueduct's `ind` / `irr` / `dom` weightings**, making
+   *Note the ETH Zurich set ships `ssp370` as well, so a future decision to align the middle
+   case across sources has data on both sides.*
+5. **Whether ThemisIQ sectors map onto Aqueduct's `ind` / `irr` / `dom` weightings**, making
    the geography sector-specific.
-5. **Calibration of the 0–3 ordinal from a continuous index.** *Partly settled for water
+6. **Calibration of the 0–3 ordinal from a continuous index.** *Partly settled for water
    stress:* Aqueduct's band edges are absolute percentage thresholds, and the decision above
    keeps the 0–3 scale with the Aqueduct label carried in `source_note`. Still open for the
    CCKP-sourced hazards, and still open in general as to whether band edges should be
    **absolute** or **relative to the global distribution** — an absolute threshold and a
    percentile threshold answer different questions and will disagree most in the regions where
    the data is thinnest.
-6. **Whether subnational units replace AR6 regions or sit alongside them.**
+7. **Whether subnational units replace AR6 regions or sit alongside them.**
 
 ---
 
