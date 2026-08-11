@@ -458,6 +458,121 @@ second pattern for one hazard.
 
 ---
 
+## Permafrost — ESA Permafrost_CCI
+
+Recorded as **retrieved**.
+
+### Source
+
+Westermann, S., Barboux, C., Bartsch, A., et al. (2024). *"ESA Permafrost Climate Change
+Initiative (Permafrost_cci): Permafrost active layer thickness for the Northern Hemisphere,
+v4.0."* NERC EDS Centre for Environmental Data Analysis.
+<https://doi.org/10.5285/d34330ce3f604e368c06d76de1987ce5>
+
+### Licence — the only source not under CC BY 4.0
+
+ESA CCI terms state the data **"may be used by any user for any purpose"**, so commercial use
+is permitted. **But the instrument differs from the other five:** IPR remains with the
+researchers and producing organisations rather than rights being granted by a licence. There is
+no CC grant to point at.
+
+**Attribution is three-part and mandatory** — the ESA Climate Change Initiative, the Permafrost
+CCI project, and the individual data providers, plus the dataset DOI.
+
+The terms also carry an **explicit no-warranty clause** as to quality, accuracy or suitability
+for any use. Public access, no registration.
+
+### What was retrieved
+
+`ESACCI-PERMAFROST-L4-ALT-MODISLST_CRYOGRID-AREA4_PP-2021-fv04.0.nc` — **35 MB**, held at
+`~/climate-data/permafrost/`.
+
+| | |
+|---|---|
+| Variable | **`ALT`** — permafrost active layer thickness in metres, the maximum depth of seasonal thaw. Sibling `ALT_uncertainty` carries within-pixel variability |
+| Resolution | **0.01°** — about 1 km. 6,000 × 36,000 cells |
+| Extent | **25 °N to 85 °N**, global longitude. **Northern Hemisphere only** |
+| Year | **2021**, single |
+
+**The 1997–2021 series was not taken in full**, for two reasons. There are no projections in
+this product, so one recent year gives the present-day level and 25 years would only give an
+*observed* trend across an era that is not the forecast horizon. And **the series changes method
+mid-way** — `ERA5_MODISLST_BIASCORRECTED` for 1997–2002, `MODISLST_CRYOGRID` from 2003 — which
+is a second reason not to mix years.
+
+### No projections
+
+**Like STORM, this is an observational record with no SSP scenarios.** Permafrost therefore has
+a present-day **level** and **no trend** from this source.
+
+**Recorded as a known asymmetry** against heat, drought, water, wildfire and cyclone, all of
+which carry futures. It also means permafrost cannot complete the LEVEL/TREND rubric in
+methodology §4.1b from this source alone.
+
+### Absence is a finding, not a gap
+
+**About 83% of cells carry no value.** For permafrost **that is the answer** — there is no
+permafrost in most of the world — so an empty cell means **assessed and absent, scoring 0**.
+
+**This is the one hazard where an empty cell is a finding rather than a gap, and it inverts the
+rule the 14 July visibility fix exists to enforce.** Everywhere else, missing means *not
+assessed* and must be surfaced as such. Here, missing means *no permafrost* and must be scored.
+
+**It must be handled explicitly, or permafrost will read as unassessed everywhere it does not
+exist** — which is most of the world, and would make the hazard useless while looking careful.
+
+**One boundary case to settle with it.** The grid stops at 25 °N, so a province further south
+has no cell at all rather than an empty one. For permafrost the answer is the same — score 0 —
+but it arrives from the product's extent rather than from a cell, and the two need distinguishing
+in the transcription. **Northern Hemisphere only is also a real coverage limit** for southern
+permafrost: the high Andes, the New Zealand Southern Alps and Antarctica are outside this
+product entirely.
+
+### What `ALT` actually measures — and why the scale is monotonic
+
+Distribution across sampled valid cells: **median 0.6 m · p75 1.0 m · p90 1.4 m · p99 3.2 m.**
+A tight distribution.
+
+Regional medians show the highest values at the **warm southern margin**, not the high Arctic:
+
+| Region | Cover | Median | Max |
+|---|---|---|---|
+| Alaska North Slope | 87% | **0.40 m** | 0.70 m |
+| E Siberia / Chukotka | 95% | 0.60 m | 2.60 m |
+| C Siberia / Yakutia | 99.6% | 0.90 m | 4.00 m |
+| N Mongolia | 86% | **1.10 m** | 6.00 m |
+| Tibetan Plateau | 72% | 0.80 m | **8.00 m** |
+
+**The coldest, most continuous permafrost has the shallowest active layer.** A deep active layer
+means marginal, warm permafrost — the same information ground temperature would give, arriving
+from the other direction.
+
+**So `ALT` is monotonic with instability after all: deeper is warmer is less stable, and it
+rises with warming.** The model's scenario multipliers therefore act in the correct direction.
+
+**This resolves the concern recorded in methodology §3.2a** — that permafrost might be a
+diminishing hazard the model cannot score, since the multipliers scale every hazard upward with
+warming. It is not. Cold *extremes* diminish; active layer thickness increases. The redefinition
+of the hazard from "cold" to "permafrost and ground instability" is what makes the scale work.
+
+**Commercially this matters:** the warm margin is where the railways, roads, mines and pipelines
+are.
+
+### Banding — decided
+
+| Score | Meaning |
+|---|---|
+| **0** | No permafrost — **assessed and absent** |
+| **1** | Thin active layer, cold stable permafrost (high Arctic, North Slope) |
+| **2** | Around a metre — marginal |
+| **3** | Above roughly 1.5 m — warm marginal permafrost, actively degrading |
+
+**The direction and the three-state structure are settled. The exact cut points are still to be
+confirmed against the full distribution rather than the sample** these regional medians were
+drawn from.
+
+---
+
 ## Reference archives — storage
 
 **Held outside the repo.**
@@ -465,6 +580,7 @@ second pattern for one hazard.
 - CCKP: `~/climate-data/cckp/` — 20 JSON files, ~2 MB
 - Aqueduct: `~/climate-data/aqueduct/`
 - Wildfire: `~/climate-data/wildfire/` — 1,486 files, 1.2 GB
+- Permafrost: `~/climate-data/permafrost/` — 1 NetCDF, 35 MB
 
 **Reference archives of this size must never enter git.** The wildfire set alone is 1.2 GB
 across 1,486 files. The CCKP set is small enough to be tempting; it lives with the others
@@ -487,13 +603,17 @@ read. A hazard can be sourced and still be weeks of work away.
 | **drought** | CCKP `spei12` (median of ensemble) + Aqueduct `drr` (3.0, baseline only) | **RETRIEVED** |
 | **water** | Aqueduct `bws` (4.0, full futures) | **sourced** |
 | **wildfire** | ETH Zurich `fwixd` (CMIP6, 36 models, full trio) | **sourced, not yet usable** |
+| **permafrost** | ESA Permafrost_CCI `ALT` (2021, observed; no projections) | **RETRIEVED** |
 | **cyclone** | CHAZ coastal wind hazard maps (intensity; no SSP1-2.6) | **sourced** |
 | **flood** | Aqueduct `rfr` (3.0, baseline only) | **partial** |
 | **coastal** | — | **GAP** — raster only |
-| **permafrost** | — | **GAP** — candidate: ESA Permafrost CCI |
 
-**Four sourced — of which two retrieved — one partial, two gaps** (coastal and permafrost),
-against two sourced, one proxy and five gaps at the start of this work.
+**Three retrieved, two sourced, one partial, one gap — coastal alone** — against two sourced,
+one proxy and five gaps at the start of this work.
+
+**Two hazards carry a level but no trend.** Permafrost has no SSP scenarios in this product, and
+STORM would be the same if taken. Every other hazard carries futures. That asymmetry has to
+surface in the scoring, not just here.
 
 **Wildfire is sourced but not retrieved in usable form.** The ETH archive is raw per-model
 CMIP6 — 36 models, up to 5 members each — and needs the ensemble reduction doing before it can
@@ -501,14 +621,22 @@ be banded. CCKP has already done that reduction and ships the 50th percentile. T
 single largest difference in effort between the sources, and it is invisible from the licence
 or the variable name.
 
-**Five sources, all CC BY 4.0**, all permitting commercial use with attribution: World Bank
-CCKP, WRI Aqueduct, ETH Zurich (FWI), Columbia/Dryad (CHAZ), and STORM if it is taken as a
-level anchor. Attribution copy must name each and, for CCKP, must not imply World Bank
-endorsement.
+**Six sources in hand. None restricts commercial use.** The hazard layer can be built entirely
+on data ThemisIQ may sell against, provided every attribution is carried.
 
-**No source in this roadmap carries a licence that restricts commercial use.** That is worth
-stating once: the hazard layer can be built entirely on data ThemisIQ may sell against,
-provided every attribution is carried.
+| Source | Instrument |
+|---|---|
+| World Bank CCKP | CC BY 4.0 — and must not imply World Bank endorsement |
+| WRI Aqueduct | CC BY 4.0 |
+| ETH Zurich (FWI) | CC BY 4.0 |
+| Columbia / Dryad (CHAZ) | CC BY 4.0 |
+| STORM, if taken as a level anchor | CC BY 4.0 |
+| **ESA Permafrost_CCI** | **Not CC BY.** ESA CCI terms — "any user for any purpose", IPR retained by producers, three-part attribution mandatory, explicit no-warranty |
+
+**Permafrost is the exception and should be treated as one.** Five sources grant rights under a
+licence; the sixth permits use while retaining IPR. The practical difference is that attribution
+there is not a licence condition to satisfy but a term of use, and it names three parties rather
+than one.
 
 ---
 
@@ -551,23 +679,32 @@ are two different questions that happen to share a word.
 ## What remains open
 
 1. **Site input mechanism** — whether a map picker or coordinate entry.
-2. **Sources for the two remaining gap hazards** — coastal and permafrost. ESA Permafrost CCI
-   is named as a candidate but not decided. **Coastal has no candidate** short of aggregating
-   the Aqueduct Floods rasters and deciding what a depth map means for a province — and it is
-   now the only hazard with no path at all. *Water closed under Aqueduct 4.0; flood partially
-   closed; wildfire closed under the ETH Zurich FWI set; cyclone closed under CHAZ.*
-3. **Ensemble reduction for wildfire** — 36 models with up to 5 members each are shipped
+2. **A source for coastal — the last gap.** No candidate exists short of aggregating the
+   Aqueduct Floods inundation-depth rasters and deciding what a depth map means for a province.
+   Every other hazard now has a path. *Water under Aqueduct 4.0; flood partially; wildfire under
+   the ETH Zurich FWI set; cyclone under CHAZ; permafrost under ESA Permafrost_CCI.*
+3. **Permafrost cut points** — the direction and the three-state structure are settled; the
+   exact metre thresholds are to be confirmed against the full distribution rather than the
+   regional sample.
+4. **How a level-only hazard sits in a LEVEL/TREND rubric.** Methodology §4.1b bands from two
+   AR6 anchors. Permafrost has no trend from its source, and STORM would be the same. Either
+   those hazards band on level alone and say so, or a trend is taken from a second source.
+5. **Empty-cell handling for permafrost, which inverts the rule.** Everywhere else a missing
+   value means *not assessed* and must be surfaced; for permafrost it means *no permafrost* and
+   must score 0. The transcription must also distinguish an empty cell inside the 25 °N–85 °N
+   grid from a province outside it entirely.
+6. **Ensemble reduction for wildfire** — 36 models with up to 5 members each are shipped
    unreduced. Which statistic (median, mean, a percentile) and across which members is a
    methodology decision the other two sources made for us before delivery. CCKP's choice — the
    50th percentile of the multi-model ensemble — is the obvious precedent to match.
-4. **A banding rule for SPEI.** It is signed and centred, roughly −3 to +3 with negative
+7. **A banding rule for SPEI.** It is signed and centred, roughly −3 to +3 with negative
    meaning drier, so the rule that bands a day count does not transfer. Open.
-5. **Joining CCKP and Aqueduct identifiers** — `AFG.111` against GADM `gid_1` `AFG.11_1`. Same
+8. **Joining CCKP and Aqueduct identifiers** — `AFG.111` against GADM `gid_1` `AFG.11_1`. Same
    geography, two serialisations, no join without a mapping.
-6. **Mapping three different period windows onto `mr_horizons`** — CCKP's 20-year spans,
+9. **Mapping three different period windows onto `mr_horizons`** — CCKP's 20-year spans,
    Aqueduct's 30-year spans centred differently, and the ETH set's annual values. Only the
    annual data can be re-averaged to fit; the other two are as published.
-7. **Scenario alignment, now a question across two hazards rather than one.**
+10. **Scenario alignment, now a question across two hazards rather than one.**
    *Water stress:* the ends align and the middle does not — SSP3-7.0 substituted and disclosed
    (recommended), interpolated, or run on two scenarios only. The ETH Zurich wildfire set ships
    `ssp370` as well, so aligning the middle across sources has data on both sides.
@@ -575,22 +712,22 @@ are two different questions that happen to share a word.
    entirely**. Either cyclone runs on two scenarios, or SSP2-4.5 stands in for the optimistic
    case and is disclosed as doing so.
    A single rule covering both would be better than two per-hazard exceptions.
-8. **Whether STORM is added as a present-day LEVEL anchor for cyclone**, with CHAZ carrying
+11. **Whether STORM is added as a present-day LEVEL anchor for cyclone**, with CHAZ carrying
    TREND — mirroring methodology §4.1b rather than scoring cyclone on a different structure
    from every other hazard.
-9. **How an inland province reads for cyclone.** CHAZ is coastal-only by the authors'
+12. **How an inland province reads for cyclone.** CHAZ is coastal-only by the authors'
    instruction, so inland must resolve to *not assessed* rather than *low* — which is a scoring
    rule, not just a note, and needs the same treatment as a missing region row.
-10. **Whether ThemisIQ sectors map onto Aqueduct's `ind` / `irr` / `dom` weightings**, making
+13. **Whether ThemisIQ sectors map onto Aqueduct's `ind` / `irr` / `dom` weightings**, making
    the geography sector-specific.
-11. **Calibration of the 0–3 ordinal from a continuous index.** *Partly settled for water
+14. **Calibration of the 0–3 ordinal from a continuous index.** *Partly settled for water
    stress:* Aqueduct's band edges are absolute percentage thresholds, and the decision above
    keeps the 0–3 scale with the Aqueduct label carried in `source_note`. Still open for the
    CCKP-sourced hazards, and still open in general as to whether band edges should be
    **absolute** or **relative to the global distribution** — an absolute threshold and a
    percentile threshold answer different questions and will disagree most in the regions where
    the data is thinnest.
-12. **Whether subnational units replace AR6 regions or sit alongside them.**
+15. **Whether subnational units replace AR6 regions or sit alongside them.**
 
 ---
 
