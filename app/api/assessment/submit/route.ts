@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { DISCLAIMER_PARAS } from '../../../../lib/disclaimer'
+// Derived here, NOT posted by the client. The client already sends `obligationId` on each entry, and
+// an id is a small stable token; a ready-made href would put the /order-vs-/pricing branch in two
+// places and let a cached page email a link nothing could audit. The route resolves label, href and
+// price from the same accessors /assess renders, so the two cannot quote different figures.
+import { OBLIGATIONS, obligationHref, obligationPrice, modulesLabel, priceLabel } from '../../../../lib/obligations'
 
 const RESEND_API_KEY   = process.env.RESEND_API_KEY!
 const FROM_EMAIL       = process.env.RESEND_FROM_EMAIL || 'noreply@themisiq.co'
+
+// EVERY LINK IN AN EMAIL MUST BE ABSOLUTE. The hrefs lib/obligations.ts returns are relative, because
+// the page renders them into its own document; dropped into an inbox they resolve against the mail
+// client and go nowhere. This prefixes them. It also replaces the two hardcoded
+// 'https://www.themisiq.co/...' that were inline below, so the host is stated once.
+const SITE_URL = 'https://www.themisiq.co'
 const MONITOR_EMAIL    = process.env.RESEND_MONITOR_EMAIL!
 
 // The formal Important Notice is rendered in the lead-email footer as fine print.
@@ -81,6 +92,21 @@ export async function POST(req: NextRequest) {
       { key: 'market',     title: 'Market-driven',           sub: 'What your customers, investors and lenders are asking for — often because they have a reporting obligation of their own.' },
       { key: '__ungrouped', title: 'Not classified',          sub: 'These entries arrived without a group. They are listed so nothing is lost; check them against the online results.' },
     ]
+    // MODULE CELL — a priced link where the entry maps, plain text where it does not.
+    //
+    // MEMBERSHIP IS GUARDED, not assumed. A cached page mid-deploy can post an id this build no
+    // longer holds, and indexing OBLIGATIONS blindly would throw inside the row map and take the
+    // whole email down — losing every obligation to save one cell. An unknown id falls back to
+    // `ob.module` as plain text, which is exactly what an unmapped entry renders anyway, so the
+    // failure mode is the ordinary one rather than a new one.
+    const moduleCell = (ob: any): string => {
+      const id = ob.obligationId
+      if (typeof id !== 'string' || !Object.prototype.hasOwnProperty.call(OBLIGATIONS, id)) return ob.module
+      const known = id as keyof typeof OBLIGATIONS
+      const label = modulesLabel(OBLIGATIONS[known].modules)
+      // SITE_URL prefix: obligationHref is relative for the page's benefit and is dead in an inbox.
+      return `<a href="${SITE_URL}${obligationHref(known)}" style="color:#7425e3;text-decoration:none;">${label} · ${priceLabel(obligationPrice(known))} →</a>`
+    }
     const row = (ob: any, i: number) => `
       <tr style="background:${i % 2 === 0 ? '#fff' : '#f8f7f5'}">
         <td style="padding:10px 14px;border-bottom:1px solid #e8e7e4;font-size:12px;font-weight:600;color:#0d0d0d;vertical-align:top;">
@@ -91,7 +117,7 @@ export async function POST(req: NextRequest) {
           <span style="font-size:10px;font-weight:700;color:${URGENCY_TEXT[ob.urgency]};background:${URGENCY_BG[ob.urgency]};padding:3px 8px;border-radius:99px;white-space:nowrap;">${ob.urgency_label}</span>
         </td>
         <td style="padding:10px 14px;border-bottom:1px solid #e8e7e4;font-size:12px;color:#555553;vertical-align:top;">${ob.timing}</td>
-        <td style="padding:10px 14px;border-bottom:1px solid #e8e7e4;font-size:12px;color:#7425e3;font-weight:600;vertical-align:top;">${ob.module}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #e8e7e4;font-size:12px;color:#7425e3;font-weight:600;vertical-align:top;">${moduleCell(ob)}</td>
       </tr>`
     // 'Obligation', not 'Regulation'. This one headerRow is rendered above BOTH group tables, so
     // under Market-driven it sat directly over EcoVadis and 'Customer Supplier Questionnaire' —
@@ -194,8 +220,8 @@ export async function POST(req: NextRequest) {
     <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
       <td align="center">
         <table cellpadding="0" cellspacing="0" border="0"><tr>
-          <td style="padding-right:10px;"><a href="https://www.themisiq.co/signup" style="display:inline-block;font-size:13px;font-weight:600;color:#0d0d0d;background:linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e);padding:11px 24px;border-radius:8px;text-decoration:none;">Sign Up Today</a></td>
-          <td><a href="https://www.themisiq.co/advisory" style="display:inline-block;font-size:13px;font-weight:500;color:#0d0d0d;background:#fff;border:1px solid #e8e7e4;padding:11px 24px;border-radius:8px;text-decoration:none;">Book Free Consultation</a></td>
+          <td style="padding-right:10px;"><a href="${SITE_URL}/signup" style="display:inline-block;font-size:13px;font-weight:600;color:#0d0d0d;background:linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e);padding:11px 24px;border-radius:8px;text-decoration:none;">Sign Up Today</a></td>
+          <td><a href="${SITE_URL}/advisory" style="display:inline-block;font-size:13px;font-weight:500;color:#0d0d0d;background:#fff;border:1px solid #e8e7e4;padding:11px 24px;border-radius:8px;text-decoration:none;">Book Free Consultation</a></td>
         </tr></table>
       </td>
     </tr></table>

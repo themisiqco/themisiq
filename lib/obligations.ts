@@ -23,10 +23,15 @@ import {
   FLAT_MODULE_PRICES,
   GHG_TIERS,
   LEGACY_PRICING_PAGE_ID,
+  MODULES,
   cartQuote,
   type GhgTier,
   type ModuleKey,
 } from './pricing'
+
+// Module display names, keyed. Derived from MODULES rather than restated, for the same reason
+// SHORTHAND inverts LEGACY_PRICING_PAGE_ID instead of listing the shorthands again.
+const MODULE_NAME = Object.fromEntries(MODULES.map((m) => [m.key, m.name])) as Record<ModuleKey, string>
 
 // The shorthand vocabulary /order and /pricing accept ('risk', 'supply', 'ai', …) is DERIVED by
 // inverting LEGACY_PRICING_PAGE_ID, never restated. That map's own comment records the hazard:
@@ -339,17 +344,59 @@ export function driverModules(id: DriverId, fired: ObligationId[]): ModuleKey[] 
 
 export const ALL_OBLIGATION_IDS = Object.keys(OBLIGATIONS) as ObligationId[]
 
+// EVERY ACCESSOR BELOW COMES IN A PAIR: a `modules…` primitive over a ModuleKey[], and an
+// `obligation…` wrapper that supplies OBLIGATIONS[id].modules. The primitives exist because the
+// driver line on /assess prices and links a set of modules that belongs to no single obligation —
+// driverModules() returns a union across several. Without them that surface would have had to
+// rebuild the shorthand join, the /order-vs-/pricing branch and the price formatting, which is three
+// copies of three facts on the page whose whole purpose is to quote a figure a customer will be
+// charged.
+
 // The `?modules=` value for a /order or /pricing link. Shorthand comes from SHORTHAND above, which
 // inverts LEGACY_PRICING_PAGE_ID — so this cannot name a module the cart would silently drop.
-// Order is preserved from `modules`, which is buyer order, so the link and the copy agree.
+// Order is preserved from the array, which is buyer order, so the link and the copy agree.
+export function modulesParam(modules: ModuleKey[]): string {
+  return modules.map((m) => SHORTHAND[m]).join(',')
+}
+
 export function obligationModulesParam(id: ObligationId): string {
-  return OBLIGATIONS[id].modules.map((m) => SHORTHAND[m]).join(',')
+  return modulesParam(OBLIGATIONS[id].modules)
 }
 
 // /pricing lands five sections above the tier picker without the anchor, so a link built for a
 // GHG-bearing obligation must carry it. app/climate-ghg/page.tsx documents the same hazard.
+export function modulesPricingHref(modules: ModuleKey[]): string {
+  return `/pricing?modules=${modulesParam(modules)}#build-your-stack`
+}
+
 export function obligationPricingHref(id: ObligationId): string {
-  return `/pricing?modules=${obligationModulesParam(id)}#build-your-stack`
+  return modulesPricingHref(OBLIGATIONS[id].modules)
+}
+
+// WHERE A MODULE CELL LEADS — ONE DEFINITION, because /assess and the lead email both render it and
+// a link that disagrees between the two is a customer arriving at a page that cannot sell what the
+// email said it would. This branch was written inside the /assess client component first; the route
+// cannot import from a 'use client' file, and copying it there is the drift this file exists to end.
+//
+// A single flat non-GHG module can be bought outright, so it goes to /order. Anything tiered or
+// multi-module has to be configured first, so it goes to the pricing configurator. That is the same
+// test modulesPrice() applies below to decide whether to read FLAT_MODULE_PRICES directly.
+//
+// RELATIVE, deliberately. The page needs a relative href; the email needs an absolute one and
+// prefixes SITE_URL itself. Returning an absolute URL here would bake a host into the page's markup.
+export function modulesHref(modules: ModuleKey[]): string {
+  const singleFlat = modules.length === 1 && !modules.includes('ghg')
+  return singleFlat ? `/order?modules=${modulesParam(modules)}` : modulesPricingHref(modules)
+}
+
+export function obligationHref(id: ObligationId): string {
+  return modulesHref(OBLIGATIONS[id].modules)
+}
+
+// Display label for a module set. Names come from MODULES, the same list the configurator renders,
+// so a cell cannot name a module by a string the pricing page has never heard of.
+export function modulesLabel(modules: ModuleKey[]): string {
+  return modules.map((m) => MODULE_NAME[m]).join(' + ')
 }
 
 // Price for the modules that answer an obligation.
@@ -373,8 +420,13 @@ export type ObligationPrice =
   | { kind: 'priced'; totalUSD: number; isFrom: boolean }
   | { kind: 'quote' }
 
-export function obligationPrice(id: ObligationId, ghgTier: GhgTier = 'starter'): ObligationPrice {
-  const { modules } = OBLIGATIONS[id]
+export function modulesPrice(modules: ModuleKey[], ghgTier: GhgTier = 'starter'): ObligationPrice {
+  // AN EMPTY SELECTION HAS NO PRICE, and cartQuote answers it with `totalUSD: 0` — the exact wrong
+  // value this union exists to make unrepresentable. It resolves to the `quote` arm, which carries no
+  // number to print, so an empty set cannot reach a customer as "$0" or "from $0". Callers should not
+  // be passing one: driverModules() returns [] to mean no obligation fired, and its contract is to
+  // render nothing at all rather than to price nothing.
+  if (modules.length === 0) return { kind: 'quote' }
   const bearsGhg = modules.includes('ghg')
   // Single flat module: read FLAT_MODULE_PRICES directly — cartQuote would apply no discount to one
   // module anyway, and going through it would imply a cart where there is only a module. Cannot be a
@@ -390,6 +442,26 @@ export function obligationPrice(id: ObligationId, ghgTier: GhgTier = 'starter'):
   // isFrom on every GHG-bearing entry: GHG is the only tiered module, so a single figure would state
   // the entry tier as if it were the price.
   return { kind: 'priced', totalUSD: q.totalUSD, isFrom: bearsGhg }
+}
+
+export function obligationPrice(id: ObligationId, ghgTier: GhgTier = 'starter'): ObligationPrice {
+  return modulesPrice(OBLIGATIONS[id].modules, ghgTier)
+}
+
+// The rendered figure. HERE rather than at each call site: /assess and the lead email both print it,
+// and a 'from' dropped in one of them is a tiered module quoted at its entry tier as if that were the
+// price. Narrowing is forced by the union — the quote arm has no `totalUSD` to format.
+export function priceLabel(price: ObligationPrice): string {
+  if (price.kind === 'quote') return 'price on request'
+  return `${price.isFrom ? 'from ' : ''}$${price.totalUSD.toLocaleString('en-US')}`
+}
+
+// Narrowing for a driver value that arrived as a plain string — a form answer, a query param. Derived
+// from FIXED_DRIVER_MODULES plus the one key it deliberately excludes, so the six are never listed
+// twice. Without this a caller would hand-write the vocabulary to test it.
+export function isDriverId(value: unknown): value is DriverId {
+  if (typeof value !== 'string') return false
+  return value === 'regulatory' || Object.prototype.hasOwnProperty.call(FIXED_DRIVER_MODULES, value)
 }
 
 // Every obligation a given module answers — the inverse view, for a module page that wants to list

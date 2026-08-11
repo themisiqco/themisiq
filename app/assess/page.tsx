@@ -13,6 +13,15 @@ import { CS3D_APPLIES_FROM, CS3D_CITATION, CS3D_EMPLOYEE_THRESHOLD, CS3D_TURNOVE
 // threshold is never restated in another currency. FX_AS_OF/FX_SOURCE are printed in the copy so a
 // reader can see which fixing a borderline call was made on.
 import { convertCurrency, FX_AS_OF } from '../../lib/deals/assessment'
+// The obligation → module mapping, its link vocabulary and its prices. NONE of this is restated
+// here: the shorthand comes from obligationModulesParam (which inverts LEGACY_PRICING_PAGE_ID, so a
+// module the cart would silently drop is a type error rather than a lost purchase), and the figure
+// comes from obligationPrice, which routes through the same cartQuote that /api/checkout charges
+// from. A price shown here and a price charged at checkout therefore cannot disagree.
+import {
+  OBLIGATIONS, obligationHref, obligationPrice, modulesHref, modulesPrice, modulesLabel,
+  priceLabel, driverModules, isDriverId, type ObligationId,
+} from '../../lib/obligations'
 
 interface Answers {
   driver?: string
@@ -32,6 +41,16 @@ interface Answers {
 interface Obligation {
   name: string
   jurisdiction: string
+  // Set ONLY where lib/obligations.ts holds a counterpart that genuinely answers this entry. Its
+  // presence is what turns the module cell into a priced link, so an id here is a claim that the
+  // linked modules can be bought and will do the job. Absent means the cell stays plain text.
+  //
+  // NOT SET, DELIBERATELY, on: CSRD (no module covers ESRS G1); the CS3D group-parentage entry (the
+  // lib `cs3d` entry answers the chain of activities, not the group route this entry is about); the
+  // Pay Transparency DAY-ONE entry (the lib entry answers the gap-REPORTING duty — the People module
+  // holds nothing for posting salary ranges or the salary-history ban); and all six driver entries,
+  // which are circumstances rather than instruments. Those render exactly as they do today.
+  obligationId?: ObligationId
   // 'regulatory' = a rule that applies to you by operation of law. 'market' = something a
   // counterparty asks of you. The distinction is load-bearing for the reader: it separates
   // what carries a penalty from what carries a lost contract. Required, not optional, so a
@@ -106,10 +125,10 @@ function computeObligations(a: Answers): Obligation[] {
   // STRICT >, not >=: the statute is "in excess of" $1bn. And CARB measures worldwide GROSS RECEIPTS
   // with no deduction for cost of goods sold — materially larger than revenue as a visitor reads it,
   // so a company near the line can be in scope on gross receipts while under $1bn on net revenue.
-  if (hasCA && revUSD > 1_000_000_000) regs.push({ name: 'SB 253 — California Climate Corporate Data Accountability Act', jurisdiction: 'California, USA', group: 'regulatory', urgency: 'critical', urgency_label: 'IMMEDIATE ACTION', timing: `${SB253_FIRST_REPORT_DATE} (${SB253_DATE_STATUS})`, module: 'Climate · GHG Emissions', what: `California Health & Safety Code §38532: total annual revenues in excess of $1,000,000,000 for an entity doing business in California. CARB measures WORLDWIDE GROSS RECEIPTS with no deduction for cost of goods sold — larger than net revenue, so check the gross figure if you are near the line. ${SB253_STATUS_SENTENCE} Scope 3 follows from ${SB253_SCOPE3_FROM}.`, action: 'Start Scope 1 + 2 GHG inventory immediately using the CARB-approved GHG Protocol methodology.' })
+  if (hasCA && revUSD > 1_000_000_000) regs.push({ name: 'SB 253 — California Climate Corporate Data Accountability Act', obligationId: 'sb253', jurisdiction: 'California, USA', group: 'regulatory', urgency: 'critical', urgency_label: 'IMMEDIATE ACTION', timing: `${SB253_FIRST_REPORT_DATE} (${SB253_DATE_STATUS})`, module: 'Climate · GHG Emissions', what: `California Health & Safety Code §38532: total annual revenues in excess of $1,000,000,000 for an entity doing business in California. CARB measures WORLDWIDE GROSS RECEIPTS with no deduction for cost of goods sold — larger than net revenue, so check the gross figure if you are near the line. ${SB253_STATUS_SENTENCE} Scope 3 follows from ${SB253_SCOPE3_FROM}.`, action: 'Start Scope 1 + 2 GHG inventory immediately using the CARB-approved GHG Protocol methodology.' })
 
   // ── SB 261 ──────────────────────────────────────────────────────────────────
-  if (hasCA && revUSD >= 500_000_000) regs.push({ name: 'SB 261 — California Climate-Related Financial Risk Act', jurisdiction: 'California, USA', group: 'regulatory', urgency: 'monitor', urgency_label: 'MONITOR', timing: 'Enforcement paused — alternate date to follow the appeal', module: 'Climate · Risk', what: 'You meet the $500m revenue threshold. A Ninth Circuit PRELIMINARY INJUNCTION applies to SB 261 only, and CARB\u2019s enforcement advisory of 1 December 2025 confirmed it will not enforce the 1 January 2026 deadline and will set an alternate date once the appeal resolves. Reporting is VOLUNTARY in the meantime.', action: 'Prepare the TCFD-aligned report now; it is the same deliverable whenever the alternate date lands.' })
+  if (hasCA && revUSD >= 500_000_000) regs.push({ name: 'SB 261 — California Climate-Related Financial Risk Act', obligationId: 'sb261', jurisdiction: 'California, USA', group: 'regulatory', urgency: 'monitor', urgency_label: 'MONITOR', timing: 'Enforcement paused — alternate date to follow the appeal', module: 'Climate · Risk', what: 'You meet the $500m revenue threshold. A Ninth Circuit PRELIMINARY INJUNCTION applies to SB 261 only, and CARB\u2019s enforcement advisory of 1 December 2025 confirmed it will not enforce the 1 January 2026 deadline and will set an alternate date once the appeal resolves. Reporting is VOLUNTARY in the meantime.', action: 'Prepare the TCFD-aligned report now; it is the same deliverable whenever the alternate date lands.' })
 
   // ── CSRD ────────────────────────────────────────────────────────────────────
   // ONE entry, not two. The 250-employee tier DOES NOT EXIST post-Omnibus: Directive (EU) 2026/470
@@ -167,12 +186,12 @@ function computeObligations(a: Answers): Obligation[] {
     action: 'Ask your parent whether the group is in CS3D scope on its consolidated figures, and whether your operations and suppliers fall inside a group due-diligence programme.',
   })
 
-  if (hasEU || hasUK || hasAU || jur.includes('canada') || jur.includes('apac')) regs.push({ name: 'IFRS S2 — Climate-related Disclosures', jurisdiction: '30+ jurisdictions globally', group: 'regulatory', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: 'Active — jurisdiction dependent', module: 'Climate · Risk', what: 'IFRS S2 has been adopted by 30+ jurisdictions including the EU, UK, Australia, Canada, Singapore, and Japan.', action: 'Run IFRS S2 physical and transition risk assessment.' })
+  if (hasEU || hasUK || hasAU || jur.includes('canada') || jur.includes('apac')) regs.push({ name: 'IFRS S2 — Climate-related Disclosures', obligationId: 'ifrs-s2', jurisdiction: '30+ jurisdictions globally', group: 'regulatory', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: 'Active — jurisdiction dependent', module: 'Climate · Risk', what: 'IFRS S2 has been adopted by 30+ jurisdictions including the EU, UK, Australia, Canada, Singapore, and Japan.', action: 'Run IFRS S2 physical and transition risk assessment.' })
   // Both timing arms named 2 August 2026, and the critical arm appended a HARDCODED '— 77 days',
   // which was an interval to a date that has since both passed and moved. The two dates are printed
   // together because this screen never learns whether a system is stand-alone or embedded in a
   // regulated product, and must not pick one.
-  if (hasEU && ai !== 'no') { const urgency = (ai === 'yes_hr' || ai === 'yes_credit') ? 'critical' : 'high'; regs.push({ name: 'EU AI Act — Artificial Intelligence Regulation', jurisdiction: 'European Union (global scope)', group: 'regulatory', urgency, urgency_label: urgency === 'critical' ? 'IMMEDIATE ACTION' : 'HIGH PRIORITY', timing: `${AI_ACT_HIGH_RISK_STANDALONE} (stand-alone) · ${AI_ACT_HIGH_RISK_EMBEDDED} (in a regulated product)`, module: 'AI Governance', what: ai === 'yes_hr' ? `CV screening and hiring AI are Annex III high-risk. ${AI_ACT_HIGH_RISK_SENTENCE}` : 'Your AI systems require risk classification under EU AI Act.', action: 'Inventory all AI systems and begin Article 11 technical documentation.' }) }
+  if (hasEU && ai !== 'no') { const urgency = (ai === 'yes_hr' || ai === 'yes_credit') ? 'critical' : 'high'; regs.push({ name: 'EU AI Act — Artificial Intelligence Regulation', obligationId: 'eu-ai-act', jurisdiction: 'European Union (global scope)', group: 'regulatory', urgency, urgency_label: urgency === 'critical' ? 'IMMEDIATE ACTION' : 'HIGH PRIORITY', timing: `${AI_ACT_HIGH_RISK_STANDALONE} (stand-alone) · ${AI_ACT_HIGH_RISK_EMBEDDED} (in a regulated product)`, module: 'AI Governance', what: ai === 'yes_hr' ? `CV screening and hiring AI are Annex III high-risk. ${AI_ACT_HIGH_RISK_SENTENCE}` : 'Your AI systems require risk classification under EU AI Act.', action: 'Inventory all AI systems and begin Article 11 technical documentation.' }) }
 
   // ── NIS2 / DORA ─────────────────────────────────────────────────────────────
   // DORA IS LEX SPECIALIS. NIS2 art. 4(2) disapplies its risk-management and incident provisions
@@ -187,11 +206,11 @@ function computeObligations(a: Answers): Obligation[] {
   // operator). Either limb suffices, so an indeterminate headcount band with turnover met still lands.
   const nis2Staff = empAtLeast(50)
   const nis2Size = nis2Staff === true || revIn('EUR') >= 10_000_000
-  if (hasEU && nis2Sectors && nis2Size && !doraApplies) regs.push({ name: 'EU NIS2 Directive — Network and Information Security', jurisdiction: 'European Union · 18 sectors', group: 'regulatory', urgency: 'critical', urgency_label: 'ACTIVE NOW', timing: 'Active since October 2024', module: 'Cyber Governance', what: `NIS2 reaches entities in an Annex I or Annex II sector that exceed the medium-enterprise thresholds — 50 or more staff, or EUR 10,000,000 or more turnover. Your sector and size place you in scope. Board-level accountability, mandatory security measures and 24-hour / 72-hour incident notification apply. ${fxNote}`, action: 'Conduct NIS2 gap assessment and document board cyber governance immediately.' })
-  if (doraApplies) regs.push({ name: 'DORA — Digital Operational Resilience Act', jurisdiction: 'EU financial services', group: 'regulatory', urgency: 'critical', urgency_label: 'ACTIVE NOW', timing: 'Active since January 2025', module: 'Cyber Governance', what: 'As a financial services entity with EU operations, DORA applies in full: ICT risk-management framework, incident classification and reporting, resilience testing, and a critical third-party provider register. DORA is LEX SPECIALIS under NIS2 art. 4(2) — the ESAs and the Commission have confirmed it meets the equivalence test, so NIS2\u2019s risk-management and incident provisions do not additionally apply to you.', action: 'ICT risk framework and Critical Third-Party Provider register required immediately.' })
+  if (hasEU && nis2Sectors && nis2Size && !doraApplies) regs.push({ name: 'EU NIS2 Directive — Network and Information Security', obligationId: 'nis2', jurisdiction: 'European Union · 18 sectors', group: 'regulatory', urgency: 'critical', urgency_label: 'ACTIVE NOW', timing: 'Active since October 2024', module: 'Cyber Governance', what: `NIS2 reaches entities in an Annex I or Annex II sector that exceed the medium-enterprise thresholds — 50 or more staff, or EUR 10,000,000 or more turnover. Your sector and size place you in scope. Board-level accountability, mandatory security measures and 24-hour / 72-hour incident notification apply. ${fxNote}`, action: 'Conduct NIS2 gap assessment and document board cyber governance immediately.' })
+  if (doraApplies) regs.push({ name: 'DORA — Digital Operational Resilience Act', obligationId: 'dora', jurisdiction: 'EU financial services', group: 'regulatory', urgency: 'critical', urgency_label: 'ACTIVE NOW', timing: 'Active since January 2025', module: 'Cyber Governance', what: 'As a financial services entity with EU operations, DORA applies in full: ICT risk-management framework, incident classification and reporting, resilience testing, and a critical third-party provider register. DORA is LEX SPECIALIS under NIS2 art. 4(2) — the ESAs and the Commission have confirmed it meets the equivalence test, so NIS2\u2019s risk-management and incident provisions do not additionally apply to you.', action: 'ICT risk framework and Critical Third-Party Provider register required immediately.' })
 
-  if (isPublicUS) regs.push({ name: 'SEC Cybersecurity Disclosure Rules', jurisdiction: 'United States · public companies', group: 'regulatory', urgency: 'critical', urgency_label: 'ACTIVE NOW', timing: 'Active since December 2023', module: 'Cyber Governance', what: 'Material cybersecurity incidents must be disclosed on Form 8-K within 4 business days. Annual 10-K must describe your cybersecurity risk management programme.', action: 'Document cyber governance programme for 10-K disclosure.' })
-  if (isPublicUS) regs.push({ name: 'SEC Item 101 — Human Capital Disclosure', jurisdiction: 'United States · public companies', group: 'regulatory', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: 'Active · annual Form 10-K', module: 'People & Workforce', what: 'US public companies must include material human capital disclosures in Form 10-K — workforce size, turnover, safety, training investment.', action: 'Audit current 10-K human capital disclosure against peer benchmarks.' })
+  if (isPublicUS) regs.push({ name: 'SEC Cybersecurity Disclosure Rules', obligationId: 'sec-cyber', jurisdiction: 'United States · public companies', group: 'regulatory', urgency: 'critical', urgency_label: 'ACTIVE NOW', timing: 'Active since December 2023', module: 'Cyber Governance', what: 'Material cybersecurity incidents must be disclosed on Form 8-K within 4 business days. Annual 10-K must describe your cybersecurity risk management programme.', action: 'Document cyber governance programme for 10-K disclosure.' })
+  if (isPublicUS) regs.push({ name: 'SEC Item 101 — Human Capital Disclosure', obligationId: 'sec-item-101', jurisdiction: 'United States · public companies', group: 'regulatory', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: 'Active · annual Form 10-K', module: 'People & Workforce', what: 'US public companies must include material human capital disclosures in Form 10-K — workforce size, turnover, safety, training investment.', action: 'Audit current 10-K human capital disclosure against peer benchmarks.' })
 
   // ── EU Pay Transparency (Directive (EU) 2023/970) ────────────────────────────
   // DAY-ONE obligations bind EVERY EU employer with no size threshold at all — the old logic gated
@@ -201,8 +220,8 @@ function computeObligations(a: Answers): Obligation[] {
   // triennial from 7 June 2031; under 100 not required by the Directive. The '50_249' band spans BOTH
   // the 100 and 150 boundaries, so it determines nothing — that entry says so.
   const pt250 = empAtLeast(250)
-  if (hasEU && pt250 === true) regs.push({ name: 'EU Pay Transparency (2023/970) — gender pay gap reporting', jurisdiction: 'European Union', group: 'regulatory', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: '7 June 2027, then annually', module: 'People & Workforce', what: 'At 250 or more workers you report the gender pay gap by 7 June 2027 and ANNUALLY thereafter. A reported gap above 5% is NOT automatically unlawful: the trigger is an unjustified gap that is not remedied within six months, at which point a JOINT PAY ASSESSMENT with worker representatives follows.', action: 'Calculate the gap by category of worker performing equal work, and prepare the objective justification for any gap you find.' })
-  if (hasEU && pt250 === null) regs.push({ name: 'EU Pay Transparency (2023/970) — reporting band undetermined', jurisdiction: 'European Union', group: 'regulatory', urgency: 'monitor', urgency_label: 'CONFIRM HEADCOUNT', timing: 'Depends on exact headcount', module: 'People & Workforce', what: 'Your headcount band (50–249) SPANS THREE DIFFERENT DUTIES under Directive (EU) 2023/970 and cannot determine which applies: 150–249 workers report by 7 June 2027 every three years; 100–149 report by 7 June 2031 every three years; under 100 are not required to report at all. Confirm your exact worker count. The day-one obligations above apply to you either way.', action: 'Establish your exact worker count for the reference period, then set the reporting cycle from it.' })
+  if (hasEU && pt250 === true) regs.push({ name: 'EU Pay Transparency (2023/970) — gender pay gap reporting', obligationId: 'eu-pay-transparency', jurisdiction: 'European Union', group: 'regulatory', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: '7 June 2027, then annually', module: 'People & Workforce', what: 'At 250 or more workers you report the gender pay gap by 7 June 2027 and ANNUALLY thereafter. A reported gap above 5% is NOT automatically unlawful: the trigger is an unjustified gap that is not remedied within six months, at which point a JOINT PAY ASSESSMENT with worker representatives follows.', action: 'Calculate the gap by category of worker performing equal work, and prepare the objective justification for any gap you find.' })
+  if (hasEU && pt250 === null) regs.push({ name: 'EU Pay Transparency (2023/970) — reporting band undetermined', obligationId: 'eu-pay-transparency', jurisdiction: 'European Union', group: 'regulatory', urgency: 'monitor', urgency_label: 'CONFIRM HEADCOUNT', timing: 'Depends on exact headcount', module: 'People & Workforce', what: 'Your headcount band (50–249) SPANS THREE DIFFERENT DUTIES under Directive (EU) 2023/970 and cannot determine which applies: 150–249 workers report by 7 June 2027 every three years; 100–149 report by 7 June 2031 every three years; under 100 are not required to report at all. Confirm your exact worker count. The day-one obligations above apply to you either way.', action: 'Establish your exact worker count for the reference period, then set the reporting cycle from it.' })
 
   // ── California pay data (Gov Code §12999, as amended by SB 1162 and SB 464) ──
   // The test is 100+ PAYROLL EMPLOYEES ANYWHERE IN THE US with AT LEAST ONE working in California —
@@ -211,7 +230,7 @@ function computeObligations(a: Answers): Obligation[] {
   // not the same population as US payroll headcount — stated in the copy rather than assumed away.
   const caStaff = empAtLeast(100)
   if (hasCA && caStaff !== false) regs.push({
-    name: 'California Pay Data Reporting (Gov. Code §12999)',
+    name: 'California Pay Data Reporting (Gov. Code §12999)', obligationId: 'ca-pay-data',
     jurisdiction: 'California, USA',
     group: 'regulatory',
     urgency: caStaff === null ? 'monitor' : 'high',
@@ -230,12 +249,12 @@ function computeObligations(a: Answers): Obligation[] {
   // told it had to file. Converted via lib/deals/assessment.ts's convertCurrency — one rate table.
   const msUK = hasUK && revIn('GBP') > 36_000_000
   const msAU = hasAU && revIn('AUD') >= 100_000_000
-  if (msUK || msAU) regs.push({ name: 'Modern Slavery Act — UK / Australia', jurisdiction: msUK && msAU ? 'UK + Australia' : msUK ? 'United Kingdom' : 'Australia', group: 'regulatory', urgency: 'medium', urgency_label: 'ANNUAL', timing: 'Annual · 6 months after financial year end', module: 'Supply Chain', what: `${msUK ? 'UK Modern Slavery Act 2015 s.54: GBP 36,000,000 total GLOBAL turnover including subsidiaries, for any body corporate carrying on business in any part of the UK. ' : ''}${msAU ? 'Australian Modern Slavery Act 2018: AUD 100,000,000 consolidated revenue — the threshold is UNDER REVIEW, with a reduction to AUD 50,000,000 proposed. ' : ''}An annual transparency statement is required covering the steps taken to ensure no modern slavery in your operations and supply chains. ${fxNote}`, action: 'Conduct supply chain human rights assessment and draft the Modern Slavery statement.' })
+  if (msUK || msAU) regs.push({ name: 'Modern Slavery Act — UK / Australia', obligationId: 'modern-slavery', jurisdiction: msUK && msAU ? 'UK + Australia' : msUK ? 'United Kingdom' : 'Australia', group: 'regulatory', urgency: 'medium', urgency_label: 'ANNUAL', timing: 'Annual · 6 months after financial year end', module: 'Supply Chain', what: `${msUK ? 'UK Modern Slavery Act 2015 s.54: GBP 36,000,000 total GLOBAL turnover including subsidiaries, for any body corporate carrying on business in any part of the UK. ' : ''}${msAU ? 'Australian Modern Slavery Act 2018: AUD 100,000,000 consolidated revenue — the threshold is UNDER REVIEW, with a reduction to AUD 50,000,000 proposed. ' : ''}An annual transparency statement is required covering the steps taken to ensure no modern slavery in your operations and supply chains. ${fxNote}`, action: 'Conduct supply chain human rights assessment and draft the Modern Slavery statement.' })
 
   // ── MARKET-DRIVEN ───────────────────────────────────────────────────────────
   // Nothing below carries a statutory penalty. These fire on who is ASKING — the ownership answer
   // and the driver answer — not on a jurisdiction, a size limb or a sector.
-  if (isPE) regs.push({ name: 'LP & Lender ESG Requirements', jurisdiction: 'Global · capital markets', group: 'market', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: 'Varies by LP agreement', module: 'Deals & Investment', what: 'Institutional LPs and lenders are requiring documented ESG diligence as a condition of capital deployment.', action: 'Establish portfolio climate monitoring and LP ESG reporting framework.' })
+  if (isPE) regs.push({ name: 'LP & Lender ESG Requirements', obligationId: 'lp-lender-esg', jurisdiction: 'Global · capital markets', group: 'market', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: 'Varies by LP agreement', module: 'Deals & Investment', what: 'Institutional LPs and lenders are requiring documented ESG diligence as a condition of capital deployment.', action: 'Establish portfolio climate monitoring and LP ESG reporting framework.' })
   if (driver === 'customer') regs.push({ name: 'Customer Supplier Questionnaire', jurisdiction: 'Global · your customers', group: 'market', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: 'As requested by your customer', module: 'Supply Chain', what: 'Your customer is asking you to complete a sustainability questionnaire covering GHG emissions, labour practices, ethics and environmental management.', action: 'Complete a sustainability self-assessment using the ThemisIQ Supplier Portal questionnaire.' })
   if (driver === 'customer') regs.push({ name: 'GHG Inventory — Scope 1 & 2', jurisdiction: 'Global · customer requirement', group: 'market', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: 'As requested by your customer', module: 'Climate · GHG', what: 'Most customer sustainability questionnaires require your Scope 1 and Scope 2 GHG emissions — the baseline metric every sustainability programme starts with.', action: 'Complete your GHG inventory using the ThemisIQ Climate module.' })
   if (driver === 'bank') regs.push({ name: 'Bank / Insurer ESG Questionnaire', jurisdiction: 'Global · your lender', group: 'market', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: 'As requested by your bank or insurer', module: 'Climate · GHG + Risk', what: 'Banks and insurers are requiring ESG data for loan renewals and sustainability-linked financing. Climate risk and GHG emissions are the most commonly requested data points.', action: 'Complete your GHG inventory and climate risk assessment.' })
@@ -249,8 +268,8 @@ function computeObligations(a: Answers): Obligation[] {
   // in the other direction: a $60m manufacturer whose largest customer had just sent a CDP supply
   // chain request was told CDP did not concern it. Both now fire on the ASK.
   const requested = driver === 'customer' || driver === 'investor'
-  if (requested) regs.push({ name: 'CDP Climate — Annual Disclosure', jurisdiction: 'Global · customer & investor requests', group: 'market', urgency: 'medium', urgency_label: 'ON REQUEST', timing: 'On request · annual July submission window', module: 'Climate · GHG + Risk', what: 'CDP is a disclosure REQUEST, not a filing obligation: investors representing over $130 trillion AUM, and large buyers running CDP Supply Chain programmes, ask companies to respond. There is no revenue or headcount threshold — a request from one customer or one investor is what puts you in scope. CDP C6, C7, C11 and Section P all flow from your GHG inventory.', action: 'Complete GHG inventory to feed CDP C6 and run scenario analysis for CDP Section P.' })
-  if (requested) regs.push({ name: 'EcoVadis Sustainability Rating', jurisdiction: 'Global · customer & investor requests', group: 'market', urgency: 'medium', urgency_label: 'ON REQUEST', timing: 'On request · rating valid 12 months', module: 'Supply Chain', what: 'EcoVadis is a request-driven supplier sustainability rating: a customer or investor asks you to be scored across Environment, Labour & Human Rights, Ethics and Sustainable Procurement, and the scorecard is then visible to everyone who requests it. The evidence it wants — a GHG inventory, published policies, and supplier due diligence — is the same evidence behind the questionnaires above, so it is assembled once and reused.', action: 'Assemble the evidence set once — GHG inventory, policy documents, supplier due diligence — and reuse it across EcoVadis and your customers’ own questionnaires.' })
+  if (requested) regs.push({ name: 'CDP Climate — Annual Disclosure', obligationId: 'cdp', jurisdiction: 'Global · customer & investor requests', group: 'market', urgency: 'medium', urgency_label: 'ON REQUEST', timing: 'On request · annual July submission window', module: 'Climate · GHG + Risk', what: 'CDP is a disclosure REQUEST, not a filing obligation: investors representing over $130 trillion AUM, and large buyers running CDP Supply Chain programmes, ask companies to respond. There is no revenue or headcount threshold — a request from one customer or one investor is what puts you in scope. CDP C6, C7, C11 and Section P all flow from your GHG inventory.', action: 'Complete GHG inventory to feed CDP C6 and run scenario analysis for CDP Section P.' })
+  if (requested) regs.push({ name: 'EcoVadis Sustainability Rating', obligationId: 'ecovadis', jurisdiction: 'Global · customer & investor requests', group: 'market', urgency: 'medium', urgency_label: 'ON REQUEST', timing: 'On request · rating valid 12 months', module: 'Supply Chain', what: 'EcoVadis is a request-driven supplier sustainability rating: a customer or investor asks you to be scored across Environment, Labour & Human Rights, Ethics and Sustainable Procurement, and the scorecard is then visible to everyone who requests it. The evidence it wants — a GHG inventory, published policies, and supplier due diligence — is the same evidence behind the questionnaires above, so it is assembled once and reused.', action: 'Assemble the evidence set once — GHG inventory, policy documents, supplier due diligence — and reuse it across EcoVadis and your customers’ own questionnaires.' })
 
   const order = { critical: 0, high: 1, medium: 2, monitor: 3 }
   return regs.sort((a, b) => order[a.urgency] - order[b.urgency])
@@ -267,6 +286,18 @@ type Question = {
   type: 'options' | 'slider' | 'multiselect'
   options?: { value: string; label: string; sub: string }[]
 }
+
+// ── Module cell, for entries that map to an ObligationId ─────────────────────
+//
+// THE LABEL IS DERIVED FROM THE OBLIGATION, NOT FROM THE ENTRY'S OWN `module` STRING. The two
+// disagree today and the disagreement is not cosmetic: this page calls EcoVadis 'Supply Chain',
+// while lib/obligations maps it to ghg + supply-chain and prices it at the pair. A cell labelled
+// 'Supply Chain' above a two-module price is a figure that does not match what the link sells.
+// Where an entry maps, the mapping wins; the entry's `module` prose is used only where it does not.
+//
+// The href, the price and the formatting all come from lib/obligations.ts — the lead email renders
+// the same three things and neither surface may hold its own copy.
+const obligationModuleLabel = (id: ObligationId): string => modulesLabel(OBLIGATIONS[id].modules)
 
 // Order is the render order: what the law requires of you first, what the market asks of you second.
 const OBLIGATION_GROUPS: { key: Obligation['group']; title: string; sub: string }[] = [
@@ -382,6 +413,37 @@ export default function AssessPage() {
             We identified <span style={{ background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', fontStyle: 'italic' }}>{obligations.length} {obligations.length === 1 ? 'obligation' : 'obligations'}</span> that apply to your company.
           </h2>
           <p style={{ fontSize: 14, color: '#555553', fontWeight: 300 }}>{critical} {critical === 1 ? 'requires' : 'require'} immediate action. {high} {high === 1 ? 'is' : 'are'} high priority. Click each to expand.</p>
+          {/* WHERE TO START — the only place the driver answer is shown back. It shapes which entries
+              appear and was otherwise never surfaced, so a visitor got a list sorted by urgency with
+              no indication of where to begin. The cells below answer "what buys this rule"; this
+              answers "what do I buy first", which is the question the driver was asked to settle.
+
+              CAPPED AT TWO MODULES, and the cap applies to the LINK as well as the label. Showing two
+              while linking five would put a customer in a configurator holding modules the line never
+              named — the same label-and-cart disagreement that made the module cells derive their
+              label from the obligation rather than from `ob.module`.
+
+              NO FIGURE ON THE REGULATORY UNION. Its module set is assembled across every obligation
+              that fired, so a price would be the cost of everything at once, presented as a starting
+              point — and it would move with the urgency mix rather than with anything the visitor
+              chose. The five fixed drivers name a deliberate pair, so they carry theirs. */}
+          {(() => {
+            if (!isDriverId(answers.driver)) return null
+            const fired = obligations.map(o => o.obligationId).filter((id): id is ObligationId => !!id)
+            const start = driverModules(answers.driver, fired).slice(0, 2)
+            // Empty is a TRUE statement — nothing fired that any module answers — and it renders as
+            // nothing. A "Start with" heading over no modules reads as a rendering fault.
+            if (start.length === 0) return null
+            const priced = answers.driver !== 'regulatory'
+            return (
+              <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, marginTop: 10 }}>
+                Start with{' '}
+                <a href={modulesHref(start)} style={{ color: '#7425e3', fontWeight: 500, textDecoration: 'none' }}>
+                  {modulesLabel(start)}{priced ? ` · ${priceLabel(modulesPrice(start))}` : ''} →
+                </a>
+              </p>
+            )
+          })()}
         </div>
         <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.2)', borderRadius: 10, padding: '12px 16px', marginBottom: '1.5rem', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
           <span style={{ flexShrink: 0, marginTop: 1, color: '#0C447C' }}>✉</span>
@@ -428,8 +490,30 @@ export default function AssessPage() {
                     {expanded[ob.name] && (
                       <div style={{ padding: '0 14px 14px', borderTop: '0.5px solid #e8e7e4' }}>
                         <p style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, margin: '10px 0 8px', fontWeight: 300 }}>{ob.what}</p>
+                        {/* MODULE CELL. Linked and priced ONLY where the entry maps to an
+                            ObligationId. Where it does not — CSRD, the CS3D group route, the Pay
+                            Transparency day-one duties, the six driver entries — it stays plain
+                            text with NO href. Deliberately no /advisory or /pricing fallback: a
+                            linked module is a promise that the thing on the other end can be bought
+                            and will answer this entry, and a link that lands on a page which cannot
+                            sell what the label names is worse than no link at all. */}
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' as const, marginBottom: 10 }}>
+                          <span style={{ fontSize: 11, color: '#888784', flexShrink: 0 }}>Answered by</span>
+                          {ob.obligationId ? (
+                            <a href={obligationHref(ob.obligationId)} style={{ fontSize: 12, fontWeight: 500, color: '#7425e3', textDecoration: 'none' }}>
+                              {obligationModuleLabel(ob.obligationId)} · {priceLabel(obligationPrice(ob.obligationId))} →
+                            </a>
+                          ) : (
+                            <span style={{ fontSize: 12, color: '#555553' }}>{ob.module}</span>
+                          )}
+                        </div>
+                        {/* ONE CTA. There were two, both pointing at /advisory, and the primary read
+                            'ThemisIQ: {module} →' — styled as the action, worded like a module link,
+                            landing on a page that sells nothing. With the module cell above carrying
+                            the purchase, it also printed the module name twice. Commerce is the cell;
+                            conversation is this. It stays on every card, mapped or not, because for
+                            the entries that map to nothing an advisor is the only honest next step. */}
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
-                          <a href="/advisory" style={{ fontSize: 12, fontWeight: 500, padding: '6px 14px', borderRadius: 7, background: '#0d0d0d', color: '#fff', textDecoration: 'none' }}>ThemisIQ: {ob.module} →</a>
                           <a href="/advisory" style={{ fontSize: 12, padding: '6px 14px', borderRadius: 7, background: 'none', color: '#555553', border: '0.5px solid #e8e7e4', textDecoration: 'none' }}>Talk to an advisor</a>
                         </div>
                       </div>
