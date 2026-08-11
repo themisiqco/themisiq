@@ -47,7 +47,7 @@ import {
 import {
   dealTypeLabel, spellMagnitude, NEAR_PCT, nearSentence,
   buildLimbRows, buildFxBasisRows, limbValueDisplay, limbThresholdDisplay,
-  resolveCs3d, makeMapFramework, regimeLabel, themisIqFigure,
+  resolveCs3d, makeMapFramework, regimeLabel, themisIqFigure, cs3dNoteReport,
 } from '../../../../lib/deals/reportModel'
 
 // ─── The deal row ─────────────────────────────────────────────────────────────
@@ -316,13 +316,15 @@ function DealReport({ deal, reportDate, reference }: { deal: DealRow; reportDate
 
   const limbRows = buildLimbRows(applicability)
   const fxBasisRows = buildFxBasisRows(currency, applicability)
-  // `cs3d` supplies the REASON printed beneath a finding; the ROW supplies the token's text and
-  // caveat flag, which the three-state summary cannot express (it has no 'near-threshold').
+  // `cs3d` supplies the SENTENCE printed beneath a finding; the ROW supplies the token's text and
+  // caveat flag. Both carry the same four outcomes since 11 Aug 2026, and they must not disagree —
+  // on this page the near-threshold heading IS the token's constant, so they cannot.
   const cs3d = resolveCs3d(frameworks, applicability)
-  // Narrowed HERE, not in the render gate: only the 'conditional' variant carries a reason, and the
-  // gate is now `qualified` on the token. Reading `.reason` at the render site would put the state
-  // check back in the gate and imply it decides whether the line prints, which it does not.
-  const cs3dReason = cs3d.state === 'conditional' ? cs3d.reason : null
+  // RENDERED, not re-derived — the exhaustive switch lives in reportModel beside `Cs3dState`.
+  // DIFFERS FROM THE WIZARD ON ONE STATE, deliberately: this document has no `citedNear` line, so
+  // 'near-threshold' gets its own note here rather than being deferred to one that does not exist.
+  // Its `body` may be null, meaning heading only — the render below owns that punctuation.
+  const cs3dNote = cs3dNoteReport(cs3d)
   const cs3dRow = applicability.find(f => f.framework === 'CS3D')
   const mapFramework = makeMapFramework(frameworks, cs3dRow)
 
@@ -582,8 +584,14 @@ function DealReport({ deal, reportDate, reference }: { deal: DealRow; reportDate
                           {r.scope === 'conditional' && (
                             <p style={{ ...cite, fontStyle: 'normal', color: '#ba7517' }}>{r.condition}</p>
                           )}
-                          {tokens.some(t => t.framework === 'CS3D' && t.qualified) && (
-                            <p style={{ ...cite, fontStyle: 'normal', color: '#ba7517' }}><strong style={{ fontWeight: 600 }}>CS3D not assessed:</strong> {cs3dReason}.</p>
+                          {/* Per-finding token check AND per-deal note — see the wizard's note on
+                              why both. The colon and full stop belong to the BODY, not the heading:
+                              a heading-only line must not trail punctuation introducing nothing. */}
+                          {cs3dNote && tokens.some(t => t.framework === 'CS3D' && t.qualified) && (
+                            <p style={{ ...cite, fontStyle: 'normal', color: '#ba7517' }}>
+                              <strong style={{ fontWeight: 600 }}>{cs3dNote.heading}{cs3dNote.body ? ':' : ''}</strong>
+                              {cs3dNote.body ? ` ${cs3dNote.body}.` : ''}
+                            </p>
                           )}
                         </td>
                         <td style={td}>{regimeLabel(tokens)}</td>

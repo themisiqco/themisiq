@@ -584,8 +584,8 @@ describe('CS3D abstains while its size test is pending', () => {
     expect(v.nearThreshold).toBe('not-assessed')
   })
 
-  // The report has its own three-state resolver. Both describe the same fact, so they must not
-  // word it differently — the row's reason wins where it has one.
+  // The report has its own four-state resolver, mirroring FrameworkStatus. Both describe the same
+  // fact, so they must not word it differently — the row's reason wins where it has one.
   it('resolveCs3d agrees with the engine rather than deriving a second, vaguer reason', () => {
     const rows = getFrameworkApplicability('European Union', 620_000_000, 'Technology', 'ma', 'EUR',
       { employee_count: 1_850, total_assets: 1e9 })
@@ -603,7 +603,7 @@ describe('CS3D abstains while its size test is pending', () => {
   // missed it: an EU target was told CS3D reaches non-EU companies and its markets were not captured.
   // Neither statement was true, and neither was checkable — the sentence was the fall-through, not a
   // finding.
-  it('a near-threshold row keeps its OWN reason — resolveCs3d must not fall through to the non-EU sentence', () => {
+  it('a near-threshold row keeps its OWN reason AND its own state — never the non-EU sentence, never "not assessed"', () => {
     const size = { employee_count: 4_700 }
     const rows = getFrameworkApplicability('European Union', 1_400_000_000, 'Technology', 'ma', 'EUR', size)
     const row = find(rows, 'CS3D')!
@@ -611,11 +611,28 @@ describe('CS3D abstains while its size test is pending', () => {
     expect(row.reason).toBe(CS3D_ROUTE_NOT_MET_REASON)
     const state = resolveCs3d(
       getApplicableFrameworks('European Union', 1_400_000_000, 'Technology', 'ma', 'EUR', size), rows)
-    expect(state.state).toBe('conditional')
-    expect(state.state === 'conditional' && state.reason).toBe(CS3D_ROUTE_NOT_MET_REASON)
+    // BOTH halves. Asserting the reason alone is what let the collapse survive: the sentence was
+    // right while the state carrying it said the test had not been run, and only the state decides
+    // which of the two CS3D headings a surface prints above it.
+    expect(state.state).toBe('near-threshold')
+    expect(state.state === 'near-threshold' && state.reason).toBe(CS3D_ROUTE_NOT_MET_REASON)
+    // The row's status is the authority; the state must not re-derive a different one.
+    expect(state.state).toBe(row.status)
     // The specific false statement this protects against, pinned rather than described.
-    expect(state.state === 'conditional' && state.reason).not.toContain('non-EU')
-    expect(state.state === 'conditional' && state.reason).not.toContain('markets')
+    expect(state.state === 'near-threshold' && state.reason).not.toContain('non-EU')
+    expect(state.state === 'near-threshold' && state.reason).not.toContain('markets')
+  })
+
+  // The other near-threshold sub-case: a marginal limb flipped the outcome, but no route was
+  // evaluated-and-withheld, so the engine attaches no reason. Built by hand rather than driven
+  // through a size, because the point is the BRANCH — a near-threshold row with `reason` absent
+  // must still resolve as near-threshold, not fall through to the not-assessed arm below it.
+  it('a near-threshold row with no reason of its own resolves near-threshold with reason null', () => {
+    const noReason: FrameworkApplicability = { framework: 'CS3D', applies: false, status: 'near-threshold' }
+    const state = resolveCs3d([], [noReason])
+    expect(state.state).toBe('near-threshold')
+    // null, not a manufactured sentence and not the field prompt the abstention arm would produce.
+    expect(state.state === 'near-threshold' && state.reason).toBeNull()
   })
 
   it('resolveCs3d still falls back where a row carries no reason of its own', () => {

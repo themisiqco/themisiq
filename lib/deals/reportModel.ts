@@ -256,30 +256,59 @@ export const REGIME_FALLBACK: RegimeToken[] = [
   { text: 'IFRS S2', framework: 'IFRS S2' },
 ]
 
-// CS3D is an activity-triggered instrument, so it gets THREE states, not the binary the regime
+// CS3D is an activity-triggered instrument, so it gets FOUR states, not the binary the regime
 // tokens use. It reaches non-EU companies through EU-facing activity, which this assessment cannot
 // determine (no market multi-select yet), so "not in the resolved list" is not the same as "does
 // not apply".
 //   applies        → cite plainly
+//   near-threshold → the test RAN and was not met, with a marginal limb decisive
 //   conditional    → cite as CS3D_NOT_ASSESSED_LABEL, NEVER suppress (size undeclared, or non-EU)
 //   not-applicable → relabel, i.e. drop the token — same treatment as SB 253
 //
 // The internal state is 'conditional'; the PRINTED label is "not assessed". They differ on purpose:
 // "conditional" describes a status without explaining it, and reads as "applies conditionally",
 // which is the opposite of what is true. The label states what happened — the test was not run.
+//
+// 'near-threshold' is SEPARATE FROM 'conditional' because the two make opposite claims about
+// whether anything was evaluated, and the old three-state form asserted the wrong one: a row the
+// engine had fully evaluated printed "CS3D not assessed" beneath a panel showing its limbs, its
+// values and "0 of 2 limbs met". Its `reason` is `string | null`, not optional, because the two
+// sub-cases are both real and a consumer must handle each: a non-exhaustive route that was
+// evaluated and not met carries the engine's own reason, while an ordinary marginal-limb flip
+// carries none — and there, silence is the honest answer, since the near-threshold panel already
+// states the arithmetic. `null` means "nothing further to say", not "not yet looked up".
 export type Cs3dState =
   | { state: 'applies' }
+  | { state: 'near-threshold'; reason: string | null }
   | { state: 'conditional'; reason: string }
   | { state: 'not-applicable' }
 
 export const resolveCs3d = (frameworks: string[], applicability: FrameworkApplicability[]): Cs3dState => {
   if (frameworks.includes('CS3D')) return { state: 'applies' }
   const row = applicability.find(f => f.framework === 'CS3D')
+  // ABOVE the reason branch, and that placement is the whole fix. A near-threshold row carrying a
+  // routeNotMet reason satisfies BOTH conditions, so whichever branch comes first decides what the
+  // report claims — and with the reason branch first the answer was 'conditional', i.e. "not
+  // assessed", about a row whose limbs the very next panel printed. Ordering by the more specific
+  // condition is what keeps the two surfaces telling one story.
+  //
+  // Only reachable for a row that does NOT apply: an applying near-threshold row (a marginal limb
+  // ABOVE its figure, still met) is in `frameworks` and already returned 'applies' above. Near-ness
+  // never softens the legal answer, so that ordering must not be disturbed either.
+  if (row?.status === 'near-threshold') {
+    // Same trailing-period strip as the branch below, for the same reason: the render site appends
+    // one. Absent reason ⇒ null rather than a manufactured sentence — the engine evaluated the test
+    // and withheld nothing, so there is no fact here this function knows and the row does not.
+    return { state: 'near-threshold', reason: row.reason ? row.reason.replace(/\.$/, '') : null }
+  }
   // The row's OWN reason wins WHEREVER IT EXISTS. Deriving a second, vaguer one here would let the
   // engine and the report state the same fact differently — and the status gate this used to sit
   // behind is what stopped that being true: a near-threshold row (both limbs marginal and unmet, so
   // the route WAS evaluated and not met) carried a reason and still fell past every branch to the
   // non-EU sentence below, telling the reader of an EU target that the target was outside the EU.
+  // That row is now caught above, so what reaches here is the 'not-assessed' population: a genuine
+  // abstention, with or without a reason of its own. The rule is unchanged — this branch must stay
+  // ungated on status, because status is not what makes a reason worth printing.
   // Trailing period stripped because the render site appends one.
   if (row?.reason) return { state: 'conditional', reason: row.reason.replace(/\.$/, '') }
   if (row?.status === 'not-assessed') {
@@ -308,16 +337,97 @@ export const resolveCs3d = (frameworks: string[], applicability: FrameworkApplic
 // apply to UK/non-EU companies through EU-facing activity and have no domestic equivalent.
 // The DISPLAY TEXT for an unresolved CS3D. It is no longer what a surface matches on — that is now
 // `RegimeToken.qualified` plus `framework === 'CS3D'`, so the decision is made on structure rather
-// than by re-reading a rendered string. It stays a single named constant because it is verifier-
-// facing copy that appears in a Framework column, and because cs3dToken() below reads it: the
-// near-threshold wording lives in that function beside this one, so both CS3D spellings are produced
-// in ONE place and cannot drift the way three separate literals once did.
+// than by re-reading a rendered string. Both stay named constants because they are verifier-facing
+// copy that appears in a Framework column AND, now, as the heading of the sentence printed beneath a
+// finding. Two surfaces, one spelling each: the report's near-threshold heading MUST read the same
+// as the token in the Framework column beside it, or the page names the same row two ways. That is
+// the drift three separate literals once produced, so neither string is ever written inline again.
 export const CS3D_NOT_ASSESSED_LABEL = 'CS3D (not assessed)'
+export const CS3D_NEAR_THRESHOLD_LABEL = 'CS3D (near threshold)'
+// The abstention HEADING is not the abstention LABEL, and the difference is not an oversight. The
+// label is a cell in a Framework column, where the parentheses separate the caveat from the
+// instrument's name; the heading opens a sentence, where they would read as an aside. Near-threshold
+// needs no second spelling — its heading IS its label, so the parenthesised form appears there.
+export const CS3D_NOT_ASSESSED_HEADING = 'CS3D not assessed'
 
-// All four CS3D outcomes and BOTH display strings, from the ROW rather than from Cs3dState — which
-// collapses four statuses into three and cannot distinguish an abstention from an evaluated row
-// sitting just below its limbs. The identity is 'CS3D' in every case; only the text and the caveat
-// flag move. null ⇒ emit no token at all, the 'not-applicable' relabel.
+// Exhaustiveness guard. Every `switch` over a discriminated union ends in `default: assertNever(x)`,
+// so ADDING A MEMBER BREAKS THE BUILD AT EVERY CONSUMER rather than silently falling to an else-arm.
+// This exists because the opposite happened: both deal surfaces narrowed `Cs3dState` with
+// `state === 'conditional' ? … : null`, so widening the union to four states type-checked cleanly
+// and shipped a heading with no sentence under it. A ternary cannot be exhaustive; only this can.
+export const assertNever = (x: never): never => {
+  throw new Error(`Unhandled discriminated union member: ${JSON.stringify(x)}`)
+}
+
+// The CS3D sentence printed beneath a finding, as DATA. `body: null` ⇒ render the heading alone;
+// the whole note null ⇒ render nothing at all. Both are outcomes, not absences to paper over.
+export type Cs3dNote = { heading: string; body: string | null } | null
+
+// TWO SURFACES, TWO FUNCTIONS, AND THEY DISAGREE ON EXACTLY ONE STATE. Not an inconsistency: the
+// wizard prints `citedNear` beneath the same finding — the row's limbs, its figures and its side —
+// so a near-threshold note there would describe the row twice, once redundantly. The report has no
+// such line, so the same silence would delete the fact instead of deferring it. What differs is
+// what surrounds the note, not what either surface believes about the row.
+//
+// They live HERE, not in the two components, for the reason `buildWorkings` does: a component that
+// derives its own display content grows a second copy of the rule and then drifts from it. These
+// are pure, so both are tested directly — a page cannot be, this repo has no DOM harness.
+//
+// Each switch is exhaustive over `Cs3dState` and ends in assertNever, so a FIFTH member breaks the
+// build in both, and neither page can quietly fall through to an else-arm the way both once did.
+// Return type is NARROWER than Cs3dNote — `body` is a plain string, never null. That is what lets
+// the wizard's render site append its full stop unconditionally: this surface either has a sentence
+// or prints nothing, so there is no heading-only case for punctuation to dangle off.
+export const cs3dNoteWizard = (cs3d: Cs3dState): { heading: string; body: string } | null => {
+  switch (cs3d.state) {
+    case 'applies':
+    case 'not-applicable':
+    case 'near-threshold':
+      return null
+    case 'conditional': {
+      // An empty reason suppresses the line outright. A heading with nothing after it is not a
+      // shorter finding, it is a finding that lost its content and still looks authoritative.
+      const body = cs3d.reason.trim()
+      return body ? { heading: CS3D_NOT_ASSESSED_HEADING, body } : null
+    }
+    default:
+      return assertNever(cs3d)
+  }
+}
+
+export const cs3dNoteReport = (cs3d: Cs3dState): Cs3dNote => {
+  switch (cs3d.state) {
+    case 'applies':
+    case 'not-applicable':
+      return null
+    case 'near-threshold': {
+      // Heading ALONE where the engine attached no reason. It states what is true — the target sits
+      // near the limits — and claims nothing about a test that was not run, which is the specific
+      // false sentence this whole change exists to stop. The limbs, the figures and the side are in
+      // the near-threshold section of the same document; inventing a sentence to fill the space here
+      // is what would lose them. Heading text is the TOKEN'S OWN CONSTANT, so the Framework column
+      // and this sentence cannot word one row two ways.
+      const body = cs3d.reason?.trim()
+      return { heading: CS3D_NEAR_THRESHOLD_LABEL, body: body || null }
+    }
+    case 'conditional': {
+      const body = cs3d.reason.trim()
+      return body ? { heading: CS3D_NOT_ASSESSED_HEADING, body } : null
+    }
+    default:
+      return assertNever(cs3d)
+  }
+}
+
+// All four CS3D outcomes and BOTH display strings, from the ROW. `Cs3dState` now carries the same
+// four and can tell an abstention from an evaluated row sitting just below its limbs, so the two
+// no longer disagree — this reads the row directly because it is handed one (`makeMapFramework`
+// closes over `cs3dRow`) and has no `frameworks` list to resolve 'applies' from, not because the
+// state is lossy. THEY MUST AGREE, and the pairing is fixed: 'applies' → plain token,
+// 'near-threshold' → the near-threshold text, 'conditional' → CS3D_NOT_ASSESSED_LABEL,
+// 'not-applicable' → null. Change a branch here and the matching branch there moves with it.
+// The identity is 'CS3D' in every case; only the text and the caveat flag move.
+// null ⇒ emit no token at all, the 'not-applicable' relabel.
 //   applies (incl. a marginal limb ABOVE, which still applies) → plain, no caveat
 //   near-threshold, not applying                               → evaluated, just under its limbs
 //   not-assessed                                              → withheld
@@ -327,7 +437,7 @@ export const cs3dToken = (row: FrameworkApplicability | undefined): RegimeToken 
   if (!row) return { text: CS3D_NOT_ASSESSED_LABEL, framework: 'CS3D', qualified: true }
   if (row.applies) return { text: 'CS3D', framework: 'CS3D' }
   if (row.status === 'not-applicable') return null
-  if (row.status === 'near-threshold') return { text: 'CS3D (near threshold)', framework: 'CS3D', qualified: true }
+  if (row.status === 'near-threshold') return { text: CS3D_NEAR_THRESHOLD_LABEL, framework: 'CS3D', qualified: true }
   return { text: CS3D_NOT_ASSESSED_LABEL, framework: 'CS3D', qualified: true }
 }
 

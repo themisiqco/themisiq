@@ -18,7 +18,7 @@ import {
 // different figures or cite different regimes for one deal.
 import {
   DEAL_TYPES, spellMagnitude, NEAR_PCT, nearSentence,
-  resolveCs3d, makeMapFramework, regimeLabel, themisIqFigure as themisIqFigureOf,
+  resolveCs3d, makeMapFramework, regimeLabel, themisIqFigure as themisIqFigureOf, cs3dNoteWizard,
 } from '../../../lib/deals/reportModel'
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
@@ -377,18 +377,20 @@ function DealsDashboardInner() {
   // which this screen cannot determine (no market multi-select yet), so "not in the resolved list" is
   // NOT the same as "does not apply" and the token is never simply suppressed.
   //
-  // TWO INPUTS, TWO JOBS. `Cs3dState` is consumed here for ONE thing only — `cs3d.reason`, the
-  // sentence printed beneath a finding. The token's display TEXT and its `qualified` flag come from
-  // the CS3D ROW, via makeMapFramework. The split is not tidiness: the ROW carries FOUR statuses
-  // (applies / near-threshold / not-assessed / not-applicable) where `Cs3dState` carries THREE, so
-  // the summary cannot tell an abstention apart from an evaluated row sitting just below its limbs.
-  // Deriving the token from the state is what once printed "not assessed" over a row the
-  // near-threshold panel on this same screen showed with its limbs, its values and "0 of 2 limbs met".
+  // TWO INPUTS, TWO JOBS. `Cs3dState` supplies the SENTENCE printed beneath a finding; the CS3D ROW
+  // supplies the token's display text and `qualified` flag, via makeMapFramework. Both now carry the
+  // same four outcomes — the state gained 'near-threshold' on 11 Aug 2026 — so the split is about
+  // what each is FOR, not about one being lossier than the other. THEY MUST AGREE: reportModel pins
+  // the pairing, and a mismatch is how this screen once printed "not assessed" over a row the
+  // near-threshold panel below showed with its limbs, its values and "0 of 2 limbs met".
   const cs3d = resolveCs3d(frameworks, applicability)
-  // Narrowed HERE, not in the render gate: only the 'conditional' variant carries a reason, and the
-  // gate is now `qualified` on the token. Reading `.reason` at the render site would put the state
-  // check back in the gate and imply it decides whether the line prints, which it does not.
-  const cs3dReason = cs3d.state === 'conditional' ? cs3d.reason : null
+  // RENDERED, not re-derived. The exhaustive switch behind this lives in reportModel beside
+  // `Cs3dState`, so a fifth member breaks the build rather than falling to an else-arm — which is
+  // precisely what the equality narrowing this replaces (`state === 'conditional' ? … : null`) did
+  // when the union grew a fourth, shipping "CS3D not assessed:" with nothing after it.
+  // null ⇒ print nothing. On THIS screen 'near-threshold' is null on purpose: `citedNear` below
+  // already prints that row's limbs and figures, and a second line would describe it twice.
+  const cs3dNote = cs3dNoteWizard(cs3d)
   const cs3dRow = applicability.find(f => f.framework === 'CS3D')
   const mapFramework = makeMapFramework(frameworks, cs3dRow)
   // ESTABLISHED ONLY. The severity tiles are a decision input, and counting a conditioned finding
@@ -785,9 +787,14 @@ function DealsDashboardInner() {
                     {risk.scope === 'conditional' && (
                       <div style={{ fontSize: 11, color: '#ba7517', lineHeight: 1.55, marginTop: 8 }}>{risk.condition}</div>
                     )}
-                    {tokens.some(t => t.framework === 'CS3D' && t.qualified) && (
+                    {/* BOTH conditions, and they answer different questions. The token check asks
+                        whether THIS finding cites CS3D at all — it is per-finding, and dropping it
+                        would print the note under every finding on the page. `cs3dNote` asks whether
+                        the deal's CS3D state has anything to say — it is per-deal, and is what
+                        keeps a near-threshold row from being described twice. */}
+                    {cs3dNote && tokens.some(t => t.framework === 'CS3D' && t.qualified) && (
                       <div style={{ fontSize: 11, color: '#ba7517', lineHeight: 1.55, marginTop: 8 }}>
-                        <strong style={{ fontWeight: 600 }}>CS3D not assessed:</strong> {cs3dReason}.
+                        <strong style={{ fontWeight: 600 }}>{cs3dNote.heading}:</strong> {cs3dNote.body}.
                       </div>
                     )}
                     {citedNear.map(f => (
