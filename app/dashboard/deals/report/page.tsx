@@ -31,7 +31,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabase'
-import { useEntitlement } from '../../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../../lib/useEntitlement'
 import { useReportTitle, reportTitle } from '../../../../lib/useReportTitle'
 import { filenameDate } from '../../../../lib/filename'
 import PaywallCard from '../../../components/PaywallCard'
@@ -101,7 +101,9 @@ export default function DealsReportPage() {
 
 function DealsReportInner() {
   const params = useSearchParams()
-  const isPaid = useEntitlement('deals')
+  // State form, not the bare boolean: `isPaid` starts false, so the paywall below rendered for
+  // every paying customer before the entitlement resolved. Ordering matters too — see the guard.
+  const { isPaid, loading: entLoading } = useEntitlementState('deals')
   const id = params.get('id')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -143,6 +145,10 @@ function DealsReportInner() {
     ? reportTitle(deal.target_name, `ESG Diligence Report - ${filenameDate(generatedAt)}`)
     : null)
 
+  // BEFORE the paywall. An unresolved entitlement is not a refusal, and this page is printed —
+  // a paywall flashing into a print preview is worse than on screen. Reuses the page's own
+  // waiting state so no new one appears.
+  if (entLoading) return <Centered>Loading report…</Centered>
   if (!isPaid) return <PaywallCard />
   if (!id) return <Centered>No deal id provided.</Centered>
   if (loading) return <Centered>Loading report…</Centered>

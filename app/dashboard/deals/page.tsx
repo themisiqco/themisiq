@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Nav from '../../components/Nav'
 import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS } from '../../../lib/sb253'
-import { useEntitlement } from '../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../lib/useEntitlement'
 import { supabase } from '../../../lib/supabase'
 import {
   getObligations, getApplicableFrameworks, getFrameworkApplicability, getComplianceCost,
@@ -57,15 +57,39 @@ const verifyChip: React.CSSProperties = { fontSize: 10, fontWeight: 700, padding
 
 // ─── Page wrapper ─────────────────────────────────────────────────────────────
 
+// The free-tier gate's view of "does this user already have a saved deal", as a DISCRIMINATED
+// UNION rather than a nullable value.
+//
+// The head count carried the distinction as `number | null` — null not-yet-counted, 0 none — and
+// that only worked while nobody had to read the row itself. Now the wall needs the deal's id and
+// name, so a nullable row would carry THREE meanings in two states: not loaded, loaded-and-absent,
+// loaded-and-present. `undefined` vs `null` would technically separate the first two and would be
+// misread by the first person to write `if (!savedDeal)`.
+//
+// On the union there is no id to read on the arms that have none, so "render a link to their deal
+// before we know whether they have one" is not expressible. Same reasoning as ObligationPrice's
+// quote arm in lib/obligations.ts.
+type FreeTierDeal =
+  | { state: 'loading' }                                  // not yet asked, or answer in flight
+  | { state: 'none' }                                     // asked: this user has saved nothing
+  | { state: 'saved'; id: string; name: string }          // asked: their most recent saved deal
+
+// ONE loading shell, used by the Suspense boundary AND by the free-tier gate below. The gate has
+// to render something while it does not yet know whether to wall, and it must not be a different
+// something — a reader who sees two distinct "wait" states cannot tell which one they are in.
+function DealsShell() {
+  return (
+    <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
+      <Nav />
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '3rem 1.5rem', fontSize: 14, color: '#888784' }}>Loading deal…</div>
+    </div>
+  )
+}
+
 export default function DealsDashboard() {
   // useSearchParams must be inside a Suspense boundary for Next.js to prerender this page.
   return (
-    <Suspense fallback={
-      <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
-        <Nav />
-        <div style={{ maxWidth: 900, margin: '0 auto', padding: '3rem 1.5rem', fontSize: 14, color: '#888784' }}>Loading deal…</div>
-      </div>
-    }>
+    <Suspense fallback={<DealsShell />}>
       <DealsDashboardInner />
     </Suspense>
   )
@@ -74,7 +98,13 @@ export default function DealsDashboard() {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 function DealsDashboardInner() {
-  const isPaid = useEntitlement('deals')
+  // Both facts the free-tier gate needs, each with its own "not yet known" state. See the gate
+  // itself, below the derivations, for why neither may be read before it resolves.
+  const { isPaid, loading: entLoading } = useEntitlementState('deals')
+  // Starts on the 'loading' arm, which is NOT 'none'. Reading an unresolved answer as "no saved
+  // deals" opens the wizard to someone who should be walled; reading it as "has one" walls someone
+  // who should not be. The union above is what keeps those three states from collapsing into two.
+  const [savedDeal, setSavedDeal] = useState<FreeTierDeal>({ state: 'loading' })
   const [step, setStep] = useState(0)
   const [deal, setDeal] = useState({
     target_name: '',
@@ -148,8 +178,43 @@ function DealsDashboardInner() {
     let cancelled = false
     ;(async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      if (cancelled || !session) return
+      // NO SESSION MEANS NO SAVED DEALS — a RESOLVED 'none', not an unknown. Without this the
+      // union stays on 'loading' forever for a signed-out visitor and the gate below holds the
+      // loading shell up permanently, replacing a usable wizard with a spinner. Signed out,
+      // handleSave already says 'Please log in to save your deal.'
+      if (cancelled || !session) { setSavedDeal({ state: 'none' }); return }
       setUserId(session.user.id)
+
+      // ── Free-tier lookup ─────────────────────────────────────────────────
+      // BEFORE the `!dealIdParam` return, because the gate applies exactly when there is no id —
+      // putting it after would mean the one case that needs this never runs it.
+      //
+      // SELECTS THE ROW, not a count. The wall has to offer a way back into the deal they already
+      // own, and that link needs the id to point at and the name to show — a `head: true` count
+      // answers "how many" and cannot answer "which", which is why this is a select. Two columns
+      // only, and one row: this is still an existence question, just one whose answer is usable.
+      //
+      // updated_at desc + limit 1: the free tier permits one row, but a user who held an
+      // entitlement, saved several and then lapsed has many. Most recently touched is the one
+      // they were last working on.
+      const { data: recent, error: recentError } = await supabase
+        .from('deals')
+        .select('id, target_name')
+        .eq('user_id', session.user.id)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (cancelled) return
+      // A FAILED LOOKUP MUST NOT WALL. The trigger is the enforcement; this gate only explains it
+      // earlier, so when it cannot tell, it says nothing and lets the DB refuse the second insert
+      // with its own message. Walling on a network error would lock someone out of a deal they own
+      // — and out of the very link that is their only route back to it.
+      if (recentError) { console.error('Saved-deal lookup failed:', recentError); setSavedDeal({ state: 'none' }) }
+      else if (!recent) setSavedDeal({ state: 'none' })
+      // Same naming rule as the deal list, so one deal is not 'Untitled deal' in one place and
+      // blank in another.
+      else setSavedDeal({ state: 'saved', id: recent.id, name: (recent.target_name || '').trim() || 'Untitled deal' })
+
       if (!dealIdParam) return          // no id -> start clean; nothing is loaded and dealId stays null
       const { data, error } = await supabase
         .from('deals')
@@ -956,16 +1021,80 @@ function DealsDashboardInner() {
           </div>
         </div>
       ) : (
-        <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
+        <div>
+          {/* SETS THE EXPECTATION BEFORE THE WALL, not after it. Without this the first a user
+              hears of the cap is being refused, and a limit discovered by hitting it reads as a
+              fault. Sits above the upgrade panel because it is the fact; the panel is the offer.
+              It is true both before and after they save — this deal is the free one either way. */}
+          <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.2)', borderRadius: 10, padding: '0.85rem 1.25rem', marginBottom: 12, fontSize: 12, color: '#0C447C', lineHeight: 1.6 }}>
+            <strong style={{ fontWeight: 600 }}>This is your free deal.</strong> Screening this target and saving it needs no subscription. Once it is saved, starting a second target needs the Deals module.
+          </div>
+          <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', marginBottom: 8 }}>Unlock your full ESG diligence programme</div>
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 20, lineHeight: 1.6 }}>Screen a target&rsquo;s ESG risk, work out which reporting rules apply to it and what compliance would cost, and produce a diligence report for your investment committee.</div>
           <a href="/pricing" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>See pricing & unlock reports →</a>
+          </div>
         </div>
       )}
     </div>
   )
 
   const steps = [renderStep0, renderStep1, renderStep2, renderStep3, renderStep4]
+
+  // ── FREE-TIER GATE — walls before step 0 ────────────────────────────────────
+  //
+  // DECIDE NOTHING UNTIL BOTH FACTS ARE IN. `isPaid` starts false and `savedDeal` starts on its
+  // 'loading' arm, so any render that reads either before it resolves is reading a default, not an
+  // answer. Rendering the wizard first and replacing it with the wall is the worse of the two
+  // failures — they may have started typing into a form that is about to vanish — and rendering
+  // the wall first tells a paying customer they have lost access they have not lost. The shell
+  // says neither. It is the SAME shell as the Suspense fallback, so this is not a new wait state.
+  if (entLoading || savedDeal.state === 'loading') return <DealsShell />
+
+  // `!dealIdParam` IS THE EDIT EXEMPTION, and it is what keeps the client agreeing with the
+  // database. The trigger is BEFORE INSERT only, so an unentitled user's UPDATEs are permitted
+  // server-side; walling the edit path would have the client enforce a stricter rule than the
+  // thing that actually enforces. They saved it while it was allowed — they can still open it.
+  //
+  // Keyed on the URL PARAM, not on the loaded `dealId`, so the decision does not wait on a third
+  // async fact. The cost is that a bogus `?id=` suppresses the wall and lands on a blank NEW
+  // deal — at which point the trigger refuses the insert and handleSave surfaces its message.
+  // That is the intended division: the trigger enforces, this only explains it earlier.
+  // UNCHANGED IN MEANING from the head-count version: entitlement resolved and false, at least one
+  // saved deal, no ?id=. Only the middle term's representation changed — `savedDealCount >= 1`
+  // became the 'saved' arm, which additionally carries the id and name the link below needs.
+  const walled = !isPaid && savedDeal.state === 'saved' && !dealIdParam
+  if (walled) return (
+    <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
+      <Nav />
+      <div style={{ maxWidth: 640, margin: '0 auto', padding: '3rem 1.5rem' }}>
+        <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 10 }}>Deals &amp; Investment</div>
+          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.5rem', fontWeight: 400, color: '#fff', marginBottom: 10 }}>You have used your free deal</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 20, lineHeight: 1.6 }}>
+            Screening one target is free. To screen another — and to keep a pipeline of them, with the
+            diligence report, the Excel export and the shareable assessment — unlock the Deals module.
+          </div>
+          {/* ⚠️ THIS LINK IS THE ONLY ROUTE BACK TO THEIR SAVED DEAL. DO NOT REMOVE IT AS
+              DECORATION. The deal is reachable at exactly one URL — /dashboard/deals?id=<id> —
+              and both surfaces that would otherwise hand over that id, /dashboard/deals/list and
+              /dashboard/deals/report, are FULLY WALLED on this same entitlement. There is no nav
+              entry, no search, and no other page that lists it. If this anchor is deleted, or its
+              href loses the id, an unentitled user's own work becomes unreachable to them while
+              still counting against the cap that put this wall in front of them.
+              It is also why the lookup above selects the row rather than counting rows. */}
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <a href={`/dashboard/deals?id=${savedDeal.id}`} style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: '#fff', color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
+              Open your saved deal — {savedDeal.name} →
+            </a>
+            <a href="/pricing?modules=deals#build-your-stack" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
+              See pricing &amp; unlock →
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>

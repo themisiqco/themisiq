@@ -20,7 +20,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../../../lib/supabase'
 import Nav from '../../../components/Nav'
 import PaywallCard from '../../../components/PaywallCard'
-import { useEntitlement } from '../../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../../lib/useEntitlement'
 import { exportPipelineXlsx, PIPELINE_SELECT, type PipelineDealRow } from '../../../../lib/deals/exportPipelineXlsx'
 
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
@@ -64,7 +64,10 @@ function frameworkSummary(frameworks: string[] | null): { count: number; text: s
 }
 
 export default function DealsListPage() {
-  const isPaid = useEntitlement('deals')
+  // `entLoading` is why this reads the state form: `isPaid` starts false, so rendering the
+  // paywall from the bare boolean showed it to EVERY paying customer on EVERY load and then
+  // removed it. The wall still fires on a resolved false — only the flash is gone.
+  const { isPaid, loading: entLoading } = useEntitlementState('deals')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [rows, setRows] = useState<DealRow[]>([])
@@ -118,6 +121,18 @@ export default function DealsListPage() {
     }
   }
 
+  // Ordered before the paywall: an unresolved entitlement is not a refusal. The page's own
+  // "Loading your deals…" state is already the right shape for waiting, so nothing new appears.
+  if (entLoading) return (
+    <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
+      <Nav />
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '2rem 2.5rem' }}>
+        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '3rem', textAlign: 'center', color: '#888784', fontSize: 13 }}>
+          Loading your deals…
+        </div>
+      </div>
+    </div>
+  )
   if (!isPaid) return (
     <PaywallCard
       title="Unlock the Deals module"
