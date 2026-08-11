@@ -135,7 +135,11 @@ export type AssessmentResult = {
 const HAZARD_LABELS: Record<string, string> = {
   drought: 'Drought', water: 'Water stress', heat: 'Extreme heat',
   flood: 'Inland flooding', coastal: 'Coastal flooding', wildfire: 'Wildfire',
-  cyclone: 'Storms / cyclones', cold: 'Cold / permafrost',
+  // 'Cold / permafrost' RETIRED — see methodology §3.2a. The two readings pull opposite ways under
+  // warming: cold extremes diminish, permafrost degradation increases, and scenario.physical_mult
+  // scales every hazard UPWARD with warming. A diminishing hazard cannot be scored on this scale, so
+  // the category is permafrost and ground instability, and cold extremes are out of scope.
+  cyclone: 'Storms / cyclones', cold: 'Permafrost and ground instability',
 }
 
 const OPPORTUNITY_LABELS: Record<string, string> = {

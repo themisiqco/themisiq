@@ -5,8 +5,14 @@
   or re-render with the build script.
 
   DOCUMENT VERSION + DATE  →  see .cover-version below  ("v1.0 · June 2026")
-  MODEL VERSION (must match mr_model_config.model_version in Supabase)
-                           →  appears twice, each tagged  <span class="modelver">1.0</span>
+
+  MODEL VERSION. This document NO LONGER STATES the version in force. It used to,
+  in 4.4, and it drifted: the doc said 1.0 while mr_model_config.model_version had
+  moved to 1.1. The version is stamped on every report by the engine, which is the
+  copy that cannot go stale, so 4.4 now points at that instead of repeating it.
+  The one remaining <span class="modelver">1.0</span> is in 6.2 and is ILLUSTRATIVE
+  — "a report generated under model version 1.0 will continue to display as such"
+  — so it is an example of the rule, not a claim about the current version. Leave it.
 -->
 <!doctype html>
 <html lang="en">
@@ -120,8 +126,8 @@
   <ul class="contents">
     <li>1. Frameworks and scope — IFRS S2, CSRD ESRS, and what the tool is (and is not)</li>
     <li>2. The risk model — physical risk, transition risk, and scenario inversion</li>
-    <li>3. Data foundations — IPCC AR6 regions, TCFD categories, ESRS topics, scenarios</li>
-    <li>4. Scoring scheme — ordinal inputs, multipliers, banding, calibration</li>
+    <li>3. Data foundations — IPCC AR6 regions, TCFD categories, hazard definitions, ESRS topics, scenarios</li>
+    <li>4. Scoring scheme — ordinal inputs, scoring rubrics, multipliers, banding, calibration</li>
     <li>5. The double-materiality matrix (CSRD mode)</li>
     <li>6. Limitations, governance and next steps</li>
   </ul>
@@ -161,7 +167,7 @@
   <h3>2.1 Physical risk</h3>
   <p>Physical risk = industry sensitivity × geographic hazard exposure × scenario severity × time horizon.</p>
   <ul>
-    <li><strong>Industry sensitivity:</strong> how exposed a sector's operations and assets are to each climate hazard (extreme heat, drought, water stress, inland flooding, coastal flooding, wildfire, storms/cyclones, cold/permafrost).</li>
+    <li><strong>Industry sensitivity:</strong> how exposed a sector's operations and assets are to each climate hazard (extreme heat, drought, water stress, inland flooding, coastal flooding, wildfire, storms/cyclones, permafrost and ground instability).</li>
     <li><strong>Geographic hazard exposure:</strong> the characteristic hazards of the IPCC AR6 reference region(s) in which the entity operates.</li>
     <li><strong>Scenario severity:</strong> a multiplier reflecting the warming pathway selected (higher-warming pathways raise physical risk).</li>
     <li><strong>Time horizon:</strong> a multiplier reflecting whether risk is assessed to ~2030 (short), ~2040 (medium), or ~2050+ (long term).</li>
@@ -191,30 +197,73 @@
   <p class="src">Source: IPCC AR6 WGI Atlas and reference-region dataset (Iturbide et al., 2020). Region hazard profiles trace to the AR6 WGI regional fact sheets and Interactive Atlas.</p>
 
   <h3>3.2 Hazard and risk categories — IPCC climatic impact-drivers and TCFD</h3>
-  <p>Physical hazards use IPCC climatic impact-driver categories (extreme heat, drought, water stress, inland flooding, coastal flooding, wildfire, storms/cyclones, cold/permafrost). Transition risk categories follow the Task Force on Climate-related Financial Disclosures (TCFD) classification: policy and legal, technology, market, and reputation.</p>
+  <p>Physical hazards use IPCC climatic impact-driver categories (extreme heat, drought, water stress, inland flooding, coastal flooding, wildfire, storms/cyclones, permafrost and ground instability). Transition risk categories follow the Task Force on Climate-related Financial Disclosures (TCFD) classification: policy and legal, technology, market, and reputation.</p>
   <div class="pagefoot"><span>ThemisIQ Compliance Inc.</span><span>2–3 · Risk model · Data foundations</span></div>
 </section>
 
-<!-- ===================== PAGE 6 — SECTION 3.3 + 3.4 + 4 ===================== -->
+<!-- ===================== PAGE 6 — SECTION 3.2a + 3.3 + 3.4 ===================== -->
 <section class="page">
+  <h3>3.2a Hazard definitions where the category name is ambiguous</h3>
+  <p>Two of the eight impact-driver categories carry names that admit more than one reading. Both are defined here so that a score can be reproduced.</p>
+  <p><strong>Drought and water stress are distinct, and are scored independently.</strong> Water stress is structural: the standing relationship between supply and demand in a normal year, which constrains where a facility can be sited and whether it can be licensed. Drought is an acute deficit arriving on top of that structural position. A region may carry high water stress with little drought — an arid region on reliable but limited supply — or low water stress with severe episodic drought. Scoring them as one value would lose the distinction between a siting constraint and an operational interruption, which are answered by different management responses.</p>
+  <p><strong>The cold hazard is permafrost and ground instability.</strong> It covers thaw-driven loss of bearing capacity, subsidence, and the shortening of the frozen-ground access season. <em>Cold extremes are out of scope.</em> They diminish under warming, and the model's scenario multipliers scale every hazard upward as warming rises, so a diminishing hazard cannot be represented correctly on this scale: a higher-warming pathway would raise its score when the assessed direction is the reverse. This is recorded as a known limitation rather than corrected, because correcting it would require a per-hazard scenario direction the model does not carry.</p>
+
   <h3>3.3 Topics — ESRS topical standards (CSRD mode)</h3>
   <p>The impact axis uses the ten ESRS topical standards, which are public EU instruments: five environmental (E1 Climate change; E2 Pollution; E3 Water and marine resources; E4 Biodiversity and ecosystems; E5 Resource use and circular economy), four social (S1 Own workforce; S2 Workers in the value chain; S3 Affected communities; S4 Consumers and end-users), and one governance (G1 Business conduct).</p>
 
   <h3>3.4 Scenarios — IPCC SSPs and NGFS</h3>
   <p>Scenario pathways use two public, widely-adopted sets. IPCC Shared Socioeconomic Pathways (SSPs) provide the warming dimension: SSP1-2.6 (~1.8°C), SSP2-4.5 (~2.7°C), and SSP5-8.5 (~4.4°C). NGFS (Network for Greening the Financial System) scenarios provide a finance-oriented transition dimension: Orderly (early policy), Disorderly (late, abrupt), and Hot House (limited action). The tool defaults to SSP2-4.5 medium-term as a reasonable central case for first-pass screening; users are encouraged to test resilience by also running higher- and lower-warming pathways.</p>
 
-  <div class="section-tag" style="margin-top:14pt;">4 · Scoring scheme</div>
+  <div class="pagefoot"><span>ThemisIQ Compliance Inc.</span><span>3 · Data foundations</span></div>
+</section>
+
+<!-- ===================== PAGE 7 — SECTION 4 + 4.1 + 4.1a ===================== -->
+<section class="page">
+  <div class="section-tag">4 · Scoring scheme</div>
   <h2>4. Scoring scheme</h2>
   <p>All factor scores are held on simple ordinal scales and combined multiplicatively, then mapped to a 0–10 materiality score and a high/medium/low band. The scheme is intentionally transparent so that any flagged risk or material topic can be traced to its inputs.</p>
 
   <h3>4.1 Ordinal inputs</h3>
   <ul>
-    <li><strong>Regional hazard intensity:</strong> 0 (absent) to 3 (dominant), per hazard per IPCC reference region.</li>
-    <li><strong>Industry hazard sensitivity:</strong> 0 to 3, per hazard per sector.</li>
+    <li><strong>Regional hazard intensity:</strong> 0 to 3 per hazard per IPCC reference region — see 4.1b for the scoring rubric.</li>
+    <li><strong>Industry hazard sensitivity:</strong> 0 (no meaningful exposure) to 3 (direct and broad) per hazard per sector — see 4.1a for the scoring rubric.</li>
     <li><strong>Industry carbon exposure:</strong> 1 (low) to 3 (high).</li>
     <li><strong>Jurisdiction policy intensity:</strong> 1 (emerging) to 3 (stringent — e.g. EU ETS, EU CBAM).</li>
     <li><strong>Topic baseline relevance per industry (CSRD mode):</strong> low (2) / medium (5) / high (8) on the 0–10 scale, applied independently to financial and impact axes.</li>
   </ul>
+
+  <h3>4.1a Industry hazard sensitivity — scoring rubric</h3>
+  <p>Industry hazard sensitivity asks how a hazard reaches a sector: whether it acts on assets and inputs the business itself operates, or arrives through others. It is a judgement about channel and reach. The severity of the hazard event is carried separately by regional intensity.</p>
+  <ul>
+    <li><strong>3 —</strong> acts on assets or inputs the business cannot operate without, <strong>and</strong> is broad across the sector's asset base. A hazard that is partial in extent reaches 3 only where the sector routinely prices it into siting or scheduling decisions.</li>
+    <li><strong>2 —</strong> acts directly, but on part of the asset base or episodically. Or reaches the business severely through its immediate supply chain.</li>
+    <li><strong>1 —</strong> indirect only.</li>
+    <li><strong>0 —</strong> no meaningful exposure.</li>
+  </ul>
+  <p><strong>Worked reading.</strong> Extreme heat scores 3 for construction, where it halts outdoor labour across every site and is priced into scheduling; 2 for real estate, where it raises cooling load across the whole portfolio without preventing the asset from operating; and 1 for professional services, where it reaches the business only through the comfort and running cost of substitutable premises.</p>
+  <p>Sector-level sensitivity is assigned by expert judgement. No public, non-proprietary sector-by-hazard matrix exists; the sets that do are commercial products. Sector is itself an established proxy for hazard sensitivity in supervisory analysis: the ECB/ESRB Project Team on climate risk monitoring, in <em>Climate-related risk and financial stability</em> (July 2021), derives firm-level heat and water stress sensitivity from dependence on water, energy and labour, proxied by the firm's country and industrial sector. The control is therefore disclosure rather than sourcing: every cell records the rubric level applied and the asset or input it turns on. Values on this scale are recorded with provenance <em>expert judgment</em> and are never presented as primary-sourced.</p>
+  <p><strong>Known limitation — a considered finding of no exposure cannot be shown to a reader.</strong> The engine suppresses any hazard scored zero, and suppresses an unfilled cell identically. A deliberate assessment that a hazard does not meaningfully reach a sector therefore produces the same output as a cell nobody has examined: in both cases the hazard is simply absent from the register. The distinction survives in the reference data, where a zero carries its rubric level and note, but it does not reach the report. This is the reverse of the treatment on the regional scale, where a missing value is surfaced as <em>not assessed</em> precisely so that a gap is visible.</p>
+  <div class="pagefoot"><span>ThemisIQ Compliance Inc.</span><span>4 · Scoring — ordinal inputs and sensitivity rubric</span></div>
+</section>
+
+<!-- ===================== PAGE 8 — SECTION 4.1b + 4.2 ===================== -->
+<section class="page">
+  <h3>4.1b Regional hazard intensity — scoring rubric</h3>
+  <p>Regional hazard intensity is assessed against two anchors, both drawn from IPCC AR6 Working Group I.</p>
+  <ul>
+    <li><strong>Level —</strong> how characteristic the hazard is of the region, read from the AR6 WGI Interactive Atlas and the regional fact sheets.</li>
+    <li><strong>Trend —</strong> the assessed direction of change and its confidence, from AR6 WGI Chapter 12.</li>
+  </ul>
+  <p>The two combine as:</p>
+  <ul>
+    <li>Both high &rarr; <strong>3</strong></li>
+    <li>Both moderate, or one high and one moderate &rarr; <strong>2</strong></li>
+    <li>Both low &rarr; <strong>1</strong></li>
+    <li>Neither present &rarr; <strong>0</strong></li>
+    <li>Divergent &rarr; <strong>2</strong>, with the cell note naming which anchor drove it</li>
+  </ul>
+  <p><strong>Confidence does not set the value.</strong> It is recorded alongside the score so a reader can see where the judgement is firmest, but it never raises or lowers the number. AR6 confidence tracks observational density and model agreement, so allowing it to set the score would systematically under-score the regions with the sparsest records — frequently the most exposed. A hazard assessed as increasing with medium confidence is not a smaller hazard than one assessed as increasing with high confidence. It is the same hazard, less well observed.</p>
+  <p><strong>Intensity is a level, not a delta.</strong> The model computes risk, which depends on how severe a hazard is and not only on how much it is changing. A region where a hazard is already dominant and stable scores above one where a slight hazard is rising quickly, and the scenario multipliers below carry the forward-looking component separately. The trend anchor exists so that a hazard which is not yet characteristic but is assessed to become so is not scored as absent — not to convert the scale into a rate of change.</p>
 
   <h3>4.2 Multipliers</h3>
   <ul>
@@ -222,16 +271,16 @@
     <li><strong>Scenario transition-severity (policy-speed) multiplier:</strong> ranges from 0.5 (limited-action pathway) to 1.5 (rapid-/abrupt-policy pathway). The inverse relationship to the physical multiplier is the engine's representation of the physical-transition inversion described in Section 2.3.</li>
     <li><strong>Time horizon multiplier:</strong> 0.85 (short term) / 1.0 (medium term) / 1.2 (long term).</li>
   </ul>
-  <div class="pagefoot"><span>ThemisIQ Compliance Inc.</span><span>3–4 · Data foundations · Scoring</span></div>
+  <div class="pagefoot"><span>ThemisIQ Compliance Inc.</span><span>4 · Scoring — regional intensity rubric and multipliers</span></div>
 </section>
 
-<!-- ===================== PAGE 7 — SECTION 4.3 + 4.4 + 5 ===================== -->
+<!-- ===================== PAGE 9 — SECTION 4.3 + 4.4 + 5 ===================== -->
 <section class="page">
   <h3>4.3 Banding</h3>
   <p>Combined physical scores band as: high ≥ 5.5, medium ≥ 3.0, otherwise low (on the raw ordinal-product scale). Topic scores on the 0–10 scale band as: high ≥ 8, medium ≥ 5, otherwise low. Bands appear alongside the underlying numeric score in every output, so users can see both the qualitative judgment and the score behind it.</p>
 
   <h3>4.4 Calibration note</h3>
-  <p>Scoring values — industry sensitivities, regional hazard intensities, jurisdictional policy intensities, topic baselines, and threshold bands — are starter values, independently derived from the public frameworks listed above and pending entity-specific calibration. Each weighting is independently sourced, but starter values are the same engineering reality as the GHG-emission-factor sets in industry GHG accounting tools at first commercial release: a defensible foundation that improves with calibration against worked examples and sector-specific validation. Calibration is an ongoing process documented in each model version. The model version (currently <span class="modelver">1.0</span>) is stamped on every report so users can trace outputs to the specific version that produced them.</p>
+  <p>Scoring values — industry sensitivities, regional hazard intensities, jurisdictional policy intensities, topic baselines, and threshold bands — are starter values, independently derived from the public frameworks listed above and pending entity-specific calibration. Each weighting is either transcribed from a named public source or set by disclosed expert judgement, and every value records which. Starter values are the same engineering reality as the GHG-emission-factor sets in industry GHG accounting tools at first commercial release: a defensible foundation that improves with calibration against worked examples and sector-specific validation. Calibration is an ongoing process documented in each model version. The model version in force is stamped on every report, so users can trace outputs to the specific version that produced them.</p>
 
   <div class="section-tag" style="margin-top:14pt;">5 · The double-materiality matrix</div>
   <h2>5. The double-materiality matrix (CSRD mode)</h2>
@@ -241,7 +290,7 @@
   <div class="pagefoot"><span>ThemisIQ Compliance Inc.</span><span>4–5 · Scoring · Double-materiality matrix</span></div>
 </section>
 
-<!-- ===================== PAGE 8 — SECTION 6 ===================== -->
+<!-- ===================== PAGE 10 — SECTION 6 ===================== -->
 <section class="page tight6">
   <div class="section-tag">6 · Limitations, governance and next steps</div>
   <h2>6. Limitations, governance and next steps</h2>
@@ -271,7 +320,7 @@
   
 </section>
 
-<!-- ===================== PAGE 9 — COLOPHON ===================== -->
+<!-- ===================== PAGE 11 — COLOPHON ===================== -->
 <section class="page">
   <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:230mm; text-align:center;">
     <div class="wordmark" style="font-size:18pt;">Themis<span class="iq">IQ</span></div>
