@@ -71,6 +71,13 @@ export async function resolveOrCreateUser(email: string): Promise<string> {
 
 // ── Server-side price recompute (never trust a client-supplied amount) ────────
 
+// ⚠️ NO LICENCE TERM IS SET HERE, AND NONE SHOULD BE. This module prices an order and produces
+// the metadata string; it never touches the `entitlements` table. The invoice path grants through
+// Stripe's invoice.paid → grantFromMetadata in app/api/webhooks/stripe/route.ts, which is the same
+// and only writer the card path uses, so both get term_start/term_end from ONE call to
+// lib/entitlementTerm.ts. Adding a term here would create the second +365 this codebase keeps
+// getting bitten by, and it would be the one that silently disagrees — invoice customers are the
+// path nobody exercises by accident.
 export interface PricedOrder {
   keys: ModuleKey[]         // canonical module keys (pricing-page ids resolved)
   totalUSD: number          // recomputed via cartQuote; 0 when requiresQuote

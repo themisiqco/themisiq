@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import type Stripe from 'stripe'
 import { getStripe } from '../../../../lib/stripe'
 import { getSupabaseAdmin } from '../../../../lib/supabaseAdmin'
+import { entitlementTerm } from '../../../../lib/entitlementTerm'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -154,6 +155,19 @@ export async function POST(req: NextRequest) {
 // Write the purchased entitlement keys for a user. Idempotent: re-delivery of the
 // same event just re-upserts the same rows (the unique user_id+module_key
 // constraint makes this safe).
+//
+// STILL IDEMPOTENT AFTER THE TERM COLUMNS, and that constraint is what shaped them. Stripe
+// delivers at least once, so this function must be safe to run twice on one payment. The term
+// rules are max()-shaped for exactly that reason: re-running yields the same term_start (the
+// earlier of prior and now — prior now exists and wins) and a term_end that moves only by the
+// redelivery interval. ADDING a year per delivery would give a redelivered event two years for
+// one payment, which is why a repurchase does not add to the remaining term. See the ⚠️ in
+// lib/entitlementTerm.ts for what would have to exist first.
+//
+// BOTH PROVISIONING PATHS ARRIVE HERE. Card is checkout.session.completed; invoice is
+// invoice.paid, and lib/order/provision.ts only prices the order and builds the metadata string
+// that this function then reads. There is no second entitlement writer in the repo, so card and
+// invoice cannot disagree about the term — not by convention, but because there is one writer.
 async function grantFromMetadata(
   metadata: Stripe.Metadata | null | undefined,
   source: string,
@@ -176,14 +190,44 @@ async function grantFromMetadata(
 
   if (keys.length === 0) return
 
+  const supabaseAdmin = getSupabaseAdmin()
+
+  // Prior terms, so a term the customer has already paid for is never shortened by a repurchase.
+  // THIS READ IS LOAD-BEARING AND ITS FAILURE THROWS. Without it we cannot tell a new grant from a
+  // repurchase, and writing a fresh term blind would silently move an existing term_end backwards.
+  // Throwing returns 500, which is Stripe's retry signal — the same contract the write below has
+  // relied on since this route was written. A grant delayed by a retry is recoverable; a term
+  // quietly cut short is not, and nothing downstream would ever report it.
+  const { data: priorRows, error: readErr } = await supabaseAdmin
+    .from('entitlements')
+    .select('module_key, term_start, term_end')
+    .eq('user_id', userId)
+    .in('module_key', keys)
+
+  if (readErr) {
+    console.error('[webhook] failed to read prior entitlement terms:', readErr)
+    throw readErr
+  }
+
+  const priorByKey = new Map(
+    (priorRows ?? []).map((r) => [r.module_key as string, r as { term_start: string | null; term_end: string | null }]),
+  )
+
+  // ONE clock for the whole grant. Calling entitlementTerm with a per-row `new Date()` would give
+  // the modules in a single cart term_ends seconds apart — a difference no customer could account
+  // for and a support question with no good answer.
+  const now = new Date()
+
   const rows = keys.map((module_key) => ({
     user_id: userId,
     module_key,
     source,
     location_allowance: module_key === 'ghg' ? ghgAllowance : null,
+    // ONE definition of the term, shared by BOTH provisioning paths — see this function's header
+    // for why that is already true. lib/entitlementTerm.ts is the only place +365 is written.
+    ...entitlementTerm(now, priorByKey.get(module_key)),
   }))
 
-  const supabaseAdmin = getSupabaseAdmin()
   const { error } = await supabaseAdmin
     .from('entitlements')
     .upsert(rows, { onConflict: 'user_id,module_key' })
