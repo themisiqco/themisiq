@@ -8,7 +8,7 @@ import { useEntitlementState } from '../../../lib/useEntitlement'
 import { supabase } from '../../../lib/supabase'
 import {
   getObligations, getApplicableFrameworks, getFrameworkApplicability, getComplianceCost,
-  SECTOR_RISKS, DEFAULT_PIPELINE_TARGETS, DEAL_CURRENCIES,
+  sectorRisks, DEFAULT_PIPELINE_TARGETS, DEAL_CURRENCIES,
   assessmentView, partiallyAssessedNote, routeNotMetNote, partialHeadingPhrase,
   obligationPriceLabel, resolveFieldsPrompt,
   type FrameworkApplicability,
@@ -339,7 +339,13 @@ function DealsDashboardInner() {
     } finally { setSaving(false) }
   }
 
-  const risks = SECTOR_RISKS[deal.sector] || []
+  // Resolved against the deal's jurisdiction, not indexed raw. A finding whose instrument is not
+  // established here comes back on the 'conditional' arm carrying the nexus that would bring this
+  // target into scope — it is still shown, because dropping it would trade a false positive for the
+  // false negative that stops a buyer looking.
+  const risks = sectorRisks(deal.sector, deal.jurisdiction)
+  const establishedRisks = risks.filter(r => r.scope === 'established')
+  const conditionalRisks = risks.filter(r => r.scope === 'conditional')
   // Rich applicability, computed from the SAME guard as the `frameworks` effect above so the two
   // views of the same deal cannot disagree. `frameworks` stays the persisted legal in/out; this adds
   // the near-threshold detail the flat string[] deliberately does not carry.
@@ -385,9 +391,17 @@ function DealsDashboardInner() {
   const cs3dReason = cs3d.state === 'conditional' ? cs3d.reason : null
   const cs3dRow = applicability.find(f => f.framework === 'CS3D')
   const mapFramework = makeMapFramework(frameworks, cs3dRow)
-  const criticalRisks = risks.filter(r => r.severity === 'critical')
-  const highRisks = risks.filter(r => r.severity === 'high')
-  const mediumRisks = risks.filter(r => r.severity === 'medium')
+  // ESTABLISHED ONLY. The severity tiles are a decision input, and counting a conditioned finding
+  // in them inflates the number a reader acts on — a US Industrials target's "high risks" would
+  // include a CBAM exposure conditioned on an import route nobody has confirmed. Conditional
+  // findings are counted separately and shown in their own block, exactly as near-threshold
+  // frameworks are surfaced without being promoted into the applicable list.
+  //
+  // Severity itself is NOT downgraded on a conditioned finding: severity says how material it is IF
+  // it applies, scope says whether it applies. Collapsing them would lose one of the two facts.
+  const criticalRisks = establishedRisks.filter(r => r.severity === 'critical')
+  const highRisks = establishedRisks.filter(r => r.severity === 'high')
+  const mediumRisks = establishedRisks.filter(r => r.severity === 'medium')
   const complianceCost = deal.deal_value > 0 ? getComplianceCost(deal.deal_value, deal.sector, frameworks) : null
   const obligations = getObligations(deal.location_count, frameworks, deal.sector)
   // Compact ThemisIQ summed figure (included tier only) — shared by the Cost Estimate card,
@@ -718,11 +732,17 @@ function DealsDashboardInner() {
               <strong style={{ fontWeight: 600, color: '#ba7517' }}>Framework column partially resolved.</strong> The {view.unevaluated.join(' / ')} size test could not be completed, so {view.unevaluated.length === 1 ? 'it does' : 'they do'} not appear in any label below. Labels reflect only the regimes determinable from the figures provided. {resolveFieldsPrompt(view.fieldsToResolve, view.unevaluated)}
             </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
+          {/* A FOURTH TILE, not a fourth severity. 'Conditional' answers a different question from
+              the three beside it — whether the finding reaches this target at all, rather than how
+              material it is — which is why it is counted apart rather than folded in. */}
+          <div style={{ display: 'grid', gridTemplateColumns: conditionalRisks.length > 0 ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
             {[
               { label: 'Critical risks', count: criticalRisks.length, color: '#B91C1C', bg: '#FCEBEB' },
               { label: 'High risks', count: highRisks.length, color: '#ba7517', bg: '#FEF3E2' },
               { label: 'Medium risks', count: mediumRisks.length, color: '#0C447C', bg: '#E6F1FB' },
+              ...(conditionalRisks.length > 0
+                ? [{ label: 'Conditional', count: conditionalRisks.length, color: '#ba7517', bg: '#FEF3E2' }]
+                : []),
             ].map(({ label, count, color, bg }) => (
               <div key={label} style={{ background: bg, borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', fontWeight: 400, color }}>{count}</div>
@@ -752,12 +772,19 @@ function DealsDashboardInner() {
                     <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{risk.risk}</div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
                       <span style={{ fontSize: 10, color: '#888784' }}>{regimeLabel(tokens)}</span>
+                      {risk.scope === 'conditional' && <span style={verifyChip}>CONDITIONAL</span>}
                       {citedNear.length > 0 && <span style={verifyChip}>VERIFY</span>}
                       <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: cfg.bg, color: cfg.color, border: `0.5px solid ${cfg.border}` }}>{cfg.label}</span>
                     </div>
                   </div>
                   <div style={{ padding: '10px 16px', background: '#fff' }}>
                     <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{risk.detail}</div>
+                    {/* Same amber note the CS3D and near-threshold qualifications already use — a
+                        conditioned finding is the same kind of statement, so it should not arrive
+                        in a new visual language the reader has to learn. */}
+                    {risk.scope === 'conditional' && (
+                      <div style={{ fontSize: 11, color: '#ba7517', lineHeight: 1.55, marginTop: 8 }}>{risk.condition}</div>
+                    )}
                     {tokens.some(t => t.framework === 'CS3D' && t.qualified) && (
                       <div style={{ fontSize: 11, color: '#ba7517', lineHeight: 1.55, marginTop: 8 }}>
                         <strong style={{ fontWeight: 600 }}>CS3D not assessed:</strong> {cs3dReason}.

@@ -37,12 +37,12 @@ import { filenameDate } from '../../../../lib/filename'
 import PaywallCard from '../../../components/PaywallCard'
 import { DISCLAIMER_PARAS } from '../../../../lib/disclaimer'
 import {
-  getFrameworkApplicability, getObligations, getComplianceCost, SECTOR_RISKS,
+  getFrameworkApplicability, getObligations, getComplianceCost, sectorRisks,
   assessmentView, isRevenueDeclared, notAssessedNote as notAssessedNoteOf, partiallyAssessedNote,
   routeNotMetNote, partialHeadingPhrase,
   nearThresholdNoneNote, obligationPriceLabel, resolveFieldsPrompt,
   FX_SOURCE, FX_AS_OF, THRESHOLD_TESTS, isTestActive,
-  type FrameworkApplicability, type SectorRisk,
+  type FrameworkApplicability, type ResolvedRisk,
 } from '../../../../lib/deals/assessment'
 import {
   dealTypeLabel, spellMagnitude, NEAR_PCT, nearSentence,
@@ -326,7 +326,9 @@ function DealReport({ deal, reportDate, reference }: { deal: DealRow; reportDate
   const cs3dRow = applicability.find(f => f.framework === 'CS3D')
   const mapFramework = makeMapFramework(frameworks, cs3dRow)
 
-  const risks: SectorRisk[] = SECTOR_RISKS[sector] || []
+  // Resolved against the deal's jurisdiction — a finding whose instrument is not established for
+  // this target carries the nexus that would bring it into scope, rather than asserting it.
+  const risks: ResolvedRisk[] = sectorRisks(sector, jurisdiction)
   const obligations = getObligations(locationCount, frameworks, sector)
   const complianceCost = dealValue > 0 ? getComplianceCost(dealValue, sector, frameworks) : null
   // In a printed document "Enter locations →" would instruct a reader who has nothing to click.
@@ -574,6 +576,12 @@ function DealReport({ deal, reportDate, reference }: { deal: DealRow; reportDate
                         <td style={td}>
                           <div style={{ fontWeight: 500 }}>{r.risk}</div>
                           <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, marginTop: 3 }}>{r.detail}</div>
+                          {/* Printed in the same amber-cite style as the CS3D qualification below,
+                              so a conditioned finding survives a greyscale print as text rather
+                              than as a colour a reader has to interpret. */}
+                          {r.scope === 'conditional' && (
+                            <p style={{ ...cite, fontStyle: 'normal', color: '#ba7517' }}>{r.condition}</p>
+                          )}
                           {tokens.some(t => t.framework === 'CS3D' && t.qualified) && (
                             <p style={{ ...cite, fontStyle: 'normal', color: '#ba7517' }}><strong style={{ fontWeight: 600 }}>CS3D not assessed:</strong> {cs3dReason}.</p>
                           )}

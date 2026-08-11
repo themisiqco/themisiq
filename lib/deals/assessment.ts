@@ -22,7 +22,49 @@ export type DealInput = {
   currency: DealCurrency
 }
 
-export type SectorRisk = { risk: string; severity: 'critical' | 'high' | 'medium'; framework: string; detail: string }
+// ─── Sector risk findings ───────────────────────────────────────────────────────
+//
+// A finding's `detail` used to weld two claims into one paragraph: a MECHANISM true of the sector
+// anywhere, and an INSTRUMENT ASSERTION true only given a nexus. So a US-only Technology target was
+// told "Conformity assessment applies from {date}" under the EU AI Act, and a Canadian retailer that
+// its goods "fall under the EU Deforestation Regulation". Neither had been established.
+//
+// A HARD JURISDICTION GATE WAS THE WRONG FIX. These instruments genuinely reach beyond their home
+// jurisdiction — CBAM catches importers into the EU, EUDR catches operators placing goods on the EU
+// market, the AI Act reaches systems affecting EU persons — so dropping the finding trades a false
+// positive for a false negative, and in diligence the false negative is the worse of the two because
+// a buyer told a statute does not apply stops looking. Same reasoning as csrdNonEuAbstention().
+//
+// So the assertion is CONDITIONED, not deleted. `detail` keeps only the mechanism; the assertion
+// moves to `conditional.consequence` and is appended when the deal's jurisdiction is one where the
+// instrument is established. Out of jurisdiction, the reader gets the nexus test instead.
+// GATING THE TOKEN ALONE WOULD NOT HAVE WORKED: the false sentence lives in the body, and a corrected
+// label above an uncorrected paragraph is harder to catch in review than an obviously wrong badge.
+//
+// Where the instrument was the SUBJECT of the mechanism sentence a clean split was impossible and
+// the sentence was rewritten — lib/deals/sectorRisks.test.ts lists those ten by name and holds their
+// legal references instead of their wording.
+export type SectorRiskCondition = {
+  /** Jurisdictions — spelled as the deal form spells them — where this is ESTABLISHED, not conditioned. */
+  establishedIn: string[]
+  /** Heading for the conditioned note, e.g. 'Conditioned on EU market access.' */
+  label: string
+  /** The nexus test: what brings a target established elsewhere into scope. */
+  nexus: string
+  /** What this screen has not established, e.g. 'whether your goods reach the EU market'. */
+  unresolved: string
+  /** The instrument assertion, moved out of `detail`. Appended when established. Absent where the
+   *  finding never asserted one and only its framework token was out of jurisdiction. */
+  consequence?: string
+}
+export type SectorRisk = {
+  risk: string
+  severity: 'critical' | 'high' | 'medium'
+  framework: string
+  /** MECHANISM ONLY. Must assert no instrument — anything conditional belongs in `conditional`. */
+  detail: string
+  conditional?: SectorRiskCondition
+}
 
 export const SECTOR_RISKS: Record<string, SectorRisk[]> = {
   'Energy & Utilities': [
@@ -32,58 +74,136 @@ export const SECTOR_RISKS: Record<string, SectorRisk[]> = {
   ],
   'Financial Services': [
     { risk: 'Financed emissions (Scope 3 Cat.15)', severity: 'critical', framework: 'PCAF / CSRD', detail: 'Financed emissions typically represent 95%+ of a financial institution\'s carbon footprint. PCAF methodology required.' },
-    { risk: 'SFDR portfolio alignment', severity: 'high', framework: 'SFDR / EU Taxonomy', detail: 'EU financial products must disclose sustainability characteristics. Article 8/9 classification impacts fund marketability.' },
-    { risk: 'Physical risk in loan book', severity: 'high', framework: 'ECB / TCFD', detail: 'Mortgage and commercial real estate portfolios face material physical climate risk under ECB guidelines.' },
+    { risk: 'SFDR portfolio alignment', severity: 'high', framework: 'SFDR / EU Taxonomy', detail: 'Portfolio sustainability characteristics affect fund marketability and investor selection.',
+      conditional: { establishedIn: ['European Union'], label: 'Conditioned on marketing financial products in the EU.', nexus: 'SFDR attaches to the product and to the manager marketing it in the EU, not to where the manager is established.', unresolved: 'whether you market products in the EU', consequence: 'EU financial products must disclose sustainability characteristics. Article 8/9 classification impacts fund marketability.' } },
+    { risk: 'Physical risk in loan book', severity: 'high', framework: 'ECB / TCFD', detail: 'Mortgage and commercial real estate portfolios face material physical climate risk.',
+      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU banking supervision.', nexus: 'The ECB guidelines bind significant institutions under EU banking supervision; an institution supervised elsewhere carries the same portfolio risk under its own regulator.', unresolved: 'whether you fall under EU banking supervision', consequence: 'ECB guidelines on climate and environmental risk apply to supervised institutions.' } },
   ],
   'Real Estate': [
-    { risk: 'Embodied carbon in portfolio', severity: 'high', framework: 'CSRD / CRREM', detail: 'Building portfolios face stranding risk under EU carbon reduction pathways. CRREM analysis required.' },
-    { risk: 'Energy efficiency compliance', severity: 'high', framework: 'EU EPC / MEES', detail: 'EU Energy Performance of Buildings Directive and UK MEES require minimum EPC ratings. Non-compliant assets face rental prohibition.' },
+    { risk: 'Embodied carbon in portfolio', severity: 'high', framework: 'CSRD / CRREM', detail: 'Building portfolios face stranding risk against decarbonisation pathways. CRREM analysis is the standard way to test it.',
+      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU property holdings.', nexus: 'CRREM’s EU pathways apply to assets held in EU markets; assets elsewhere are tested against the pathway for their own market.', unresolved: 'whether you hold EU property', consequence: 'EU carbon reduction pathways apply to the EU-held portion of the portfolio.' } },
+    { risk: 'Energy efficiency compliance', severity: 'high', framework: 'EU EPC / MEES', detail: 'Building portfolios carry regulatory exposure where minimum energy-performance ratings apply, and non-compliant assets can become unlettable.',
+      conditional: { establishedIn: ['European Union', 'UK'], label: 'Conditioned on EU or UK property holdings.', nexus: 'Both regimes attach to the property, not to the owner — a company established elsewhere is reached through the assets it holds in those markets.', unresolved: 'whether you hold EU or UK property', consequence: 'The EU Energy Performance of Buildings Directive and UK MEES require minimum EPC ratings. Non-compliant assets face rental prohibition.' } },
     { risk: 'Physical flood and heat risk', severity: 'critical', framework: 'TCFD / IFRS S2', detail: 'Real estate assets face material physical climate risk. Asset-level flood mapping and heat stress analysis required.' },
   ],
   'Technology': [
     { risk: 'Data centre energy intensity', severity: 'medium', framework: 'SB 253 / CSRD', detail: 'Data centre operations carry significant Scope 2 exposure. PPA and renewable energy coverage assessment needed.' },
-    { risk: 'AI governance exposure', severity: 'medium', framework: 'EU AI Act', detail: `Technology products may contain high-risk AI systems. Conformity assessment applies from ${AI_ACT_HIGH_RISK_STANDALONE} for stand-alone systems, and from ${AI_ACT_HIGH_RISK_EMBEDDED} where the AI is built into a product already covered by EU product-safety law (${AI_ACT_CITATION}).` },
-    { risk: 'Supply chain minerals risk', severity: 'high', framework: 'CS3D / ESRS S2', detail: `Hardware products may rely on conflict minerals. CS3D due diligence obligations apply to in-scope companies from ${CS3D_APPLIES_FROM} (${CS3D_CITATION}).` },
+    { risk: 'AI governance exposure', severity: 'medium', framework: 'EU AI Act', detail: 'Technology products may contain high-risk AI systems.',
+      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'The AI Act reaches providers and deployers placing a system on the EU market, and systems whose output is used in the EU, wherever the company is established.', unresolved: 'EU availability of your systems', consequence: `Conformity assessment applies from ${AI_ACT_HIGH_RISK_STANDALONE} for stand-alone systems, and from ${AI_ACT_HIGH_RISK_EMBEDDED} where the AI is built into a product already covered by EU product-safety law (${AI_ACT_CITATION}).` } },
+    // `detail` keeps its CS3D sentence: "in-scope companies" is self-limiting, so it asserts nothing
+    // about THIS target. The conditional here covers the ESRS S2 token beside it, which is not.
+    { risk: 'Supply chain minerals risk', severity: 'high', framework: 'CS3D / ESRS S2', detail: `Hardware products may rely on conflict minerals. CS3D due diligence obligations apply to in-scope companies from ${CS3D_APPLIES_FROM} (${CS3D_CITATION}).`,
+      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU reporting scope.', nexus: 'ESRS S2 is a CSRD reporting standard, so it reaches a company through its own or its parent’s CSRD obligation rather than directly.', unresolved: 'whether CSRD reaches you' } },
   ],
   'Healthcare & Pharma': [
     { risk: 'Cold chain emissions', severity: 'medium', framework: 'SB 253 / GHG Protocol', detail: 'Pharmaceutical cold chain carries significant Scope 3 Cat.4 emissions from refrigerant leakage and transport.' },
     { risk: 'Pharmaceutical waste', severity: 'medium', framework: 'CSRD / GRI', detail: 'Pharmaceutical manufacturing generates hazardous waste requiring environmental liability assessment.' },
-    { risk: 'Clinical trial supply chain', severity: 'medium', framework: 'CS3D / ESRS S2', detail: 'Clinical trial operations in emerging markets carry human rights and labour standards risk.' },
+    { risk: 'Clinical trial supply chain', severity: 'medium', framework: 'CS3D / ESRS S2', detail: 'Clinical trial operations in emerging markets carry human rights and labour standards risk.',
+      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU reporting scope.', nexus: 'ESRS S2 is a CSRD reporting standard, so it reaches a company through its own or its parent’s CSRD obligation rather than directly.', unresolved: 'whether CSRD reaches you' } },
   ],
   'Industrials & Manufacturing': [
     { risk: 'Scope 1 process emissions', severity: 'critical', framework: 'SB 253 / CSRD', detail: 'Industrial manufacturing typically carries significant Scope 1 process emissions requiring full GHG inventory.' },
-    { risk: 'Carbon border adjustment exposure', severity: 'high', framework: 'EU CBAM', detail: 'EU Carbon Border Adjustment Mechanism covers iron and steel, cement, aluminium, fertilisers, hydrogen and electricity. The definitive period began 1 January 2026, with a 50-tonne annual net-mass exemption for all but electricity and hydrogen (Regulation (EU) 2023/956 as amended by (EU) 2025/2083).' },
-    { risk: 'Chemical and hazardous materials', severity: 'high', framework: 'REACH / CSRD', detail: 'Industrial operations may carry significant environmental liability from chemical usage and historical contamination.' },
+    { risk: 'Carbon border adjustment exposure', severity: 'high', framework: 'EU CBAM', detail: 'Iron and steel, cement, aluminium, fertilisers, hydrogen and electricity carry a carbon-border cost when they enter the EU.',
+      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'CBAM applies to the declarant importing covered goods into the EU — it reaches a producer established elsewhere through that import route, not through where it operates.', unresolved: 'whether goods you produce enter the EU', consequence: 'The definitive period began 1 January 2026, with a 50-tonne annual net-mass exemption for all but electricity and hydrogen (Regulation (EU) 2023/956 as amended by (EU) 2025/2083).' } },
+    { risk: 'Chemical and hazardous materials', severity: 'high', framework: 'REACH / CSRD', detail: 'Industrial operations may carry significant environmental liability from chemical usage and historical contamination.',
+      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'REACH attaches to substances manufactured in or imported into the EU, so a manufacturer established elsewhere is reached through what it ships there.', unresolved: 'whether your substances or articles enter the EU' } },
   ],
   'Consumer & Retail': [
     { risk: 'Scope 3 Cat.1 supplier emissions', severity: 'high', framework: 'SB 253 / CSRD', detail: 'Consumer goods companies typically carry 70-90% of emissions in Scope 3 Cat.1. Supplier engagement programme needed.' },
-    { risk: 'Deforestation exposure', severity: 'high', framework: 'EU EUDR', detail: 'Consumer goods with exposure to cattle, soy, palm oil, cocoa, coffee, wood or rubber fall under the EU Deforestation Regulation, applying to large and medium operators from 30 December 2026 and to micro and small enterprises from 30 June 2027 (Regulation (EU) 2023/1115 as amended by (EU) 2025/2650).' },
-    { risk: 'Labour rights in supply chain', severity: 'high', framework: 'CS3D / Modern Slavery', detail: 'Consumer goods supply chains carry significant forced labour and child labour risk in sourcing countries.' },
+    { risk: 'Deforestation exposure', severity: 'high', framework: 'EU EUDR', detail: 'Consumer goods with exposure to cattle, soy, palm oil, cocoa, coffee, wood or rubber carry deforestation risk in their sourcing.',
+      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'EUDR applies to operators and traders placing the listed commodities on the EU market, or exporting them from it — a company incorporated elsewhere is reached through that placement.', unresolved: 'whether your goods reach the EU market', consequence: 'The EU Deforestation Regulation applies to large and medium operators from 30 December 2026 and to micro and small enterprises from 30 June 2027 (Regulation (EU) 2023/1115 as amended by (EU) 2025/2650).' } },
+    { risk: 'Labour rights in supply chain', severity: 'high', framework: 'CS3D / Modern Slavery', detail: 'Consumer goods supply chains carry significant forced labour and child labour risk in sourcing countries.',
+      conditional: { establishedIn: ['UK', 'Australia'], label: 'Conditioned on UK or Australian turnover.', nexus: 'The UK and Australian Modern Slavery Acts attach to carrying on business in those markets above a turnover threshold, wherever the company is incorporated.', unresolved: 'whether you carry on business there above the threshold' } },
   ],
   'Agriculture & Food': [
     { risk: 'Land use change emissions', severity: 'critical', framework: 'GHG Protocol / SB 253', detail: 'Agricultural operations may carry significant land use change (LUC) emissions requiring scope 3 Cat.11 assessment.' },
-    { risk: 'Deforestation and biodiversity', severity: 'critical', framework: 'EU EUDR / TNFD', detail: 'Agricultural supply chains face EU Deforestation Regulation and emerging TNFD nature-related disclosure requirements.' },
+    { risk: 'Deforestation and biodiversity', severity: 'critical', framework: 'EU EUDR / TNFD', detail: 'Agricultural supply chains carry deforestation and nature-related risk, and TNFD nature disclosure expectations are emerging across markets.',
+      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'EUDR applies to operators and traders placing the listed commodities on the EU market, or exporting them from it — a company incorporated elsewhere is reached through that placement.', unresolved: 'whether your commodities reach the EU market', consequence: 'The EU Deforestation Regulation applies to the listed commodities placed on the EU market.' } },
     { risk: 'Water risk', severity: 'high', framework: 'CSRD / CDP Water', detail: 'Agricultural operations in water-stressed regions face material operational and regulatory risk.' },
   ],
   'Transport & Logistics': [
-    { risk: 'Fleet decarbonisation liability', severity: 'high', framework: 'SB 253 / CSRD', detail: 'Transport fleet carries significant Scope 1 emissions. EU FuelEU Maritime and ETS expansion add compliance cost.' },
-    { risk: 'Aviation and shipping ETS exposure', severity: 'high', framework: 'EU ETS', detail: 'EU ETS now covers aviation and maritime. Carbon cost exposure requires detailed fleet assessment.' },
+    { risk: 'Fleet decarbonisation liability', severity: 'high', framework: 'SB 253 / CSRD', detail: 'Transport fleet carries significant Scope 1 emissions.',
+      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU routes.', nexus: 'FuelEU Maritime and the ETS extension attach to voyages into, out of and within the EU, whichever state the operator is established in.', unresolved: 'whether your routes touch the EU', consequence: 'EU FuelEU Maritime and ETS expansion add compliance cost.' } },
+    { risk: 'Aviation and shipping ETS exposure', severity: 'high', framework: 'EU ETS', detail: 'Aviation and maritime fleets carry carbon-cost exposure that requires detailed fleet assessment.',
+      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EEA routes.', nexus: 'EU ETS reaches flights and voyages into, out of and within the EEA, whichever flag or state the operator sits under.', unresolved: 'whether your routes touch the EEA', consequence: 'EU ETS now covers aviation and maritime.' } },
     { risk: 'Infrastructure physical risk', severity: 'medium', framework: 'TCFD / IFRS S2', detail: 'Transport infrastructure faces physical climate risk from flooding, extreme heat and storm events.' },
   ],
   'Mining & Metals': [
     { risk: 'Scope 1 extraction emissions', severity: 'critical', framework: 'SB 253 / CSRD', detail: 'Mining operations carry significant Scope 1 methane and process emissions requiring full GHG inventory.' },
     { risk: 'Tailings and environmental liability', severity: 'critical', framework: 'CSRD / GRI', detail: 'Mining operations carry material environmental liability from tailings management and historical contamination.' },
-    { risk: 'Conflict minerals and HRDD', severity: 'high', framework: 'CS3D / OECD DDG', detail: 'Mining operations in conflict-affected areas require OECD Due Diligence Guidance compliance.' },
+    // OECD DDG IS VOLUNTARY GUIDANCE, NOT LAW. This read "require OECD Due Diligence Guidance
+    // compliance", which states an instrument that binds nobody as a legal obligation. That is a
+    // different defect from the jurisdictional ones around it — no nexus would have made it true —
+    // so it is corrected in the text rather than conditioned.
+    { risk: 'Conflict minerals and HRDD', severity: 'high', framework: 'CS3D / OECD DDG', detail: 'Mining operations in conflict-affected and high-risk areas carry sourcing risk that buyers and downstream customers expect to see addressed. The OECD Due Diligence Guidance is the reference framework for that work — it is voluntary guidance rather than a legal obligation in itself, though a binding due-diligence duty such as CS3D may require equivalent steps.' },
   ],
   'Construction & Materials': [
-    { risk: 'Embodied carbon in products', severity: 'high', framework: 'CSRD / EU Taxonomy', detail: 'Cement and steel production carry significant process emissions. EU Taxonomy alignment assessment required.' },
-    { risk: 'EU CBAM exposure', severity: 'high', framework: 'EU CBAM', detail: 'Construction materials (cement, steel, aluminium) face EU Carbon Border Adjustment Mechanism from 2026.' },
-    { risk: 'Site biodiversity and land use', severity: 'medium', framework: 'CSRD / TNFD', detail: 'Construction projects face emerging biodiversity disclosure requirements under TNFD and CSRD ESRS E4.' },
+    { risk: 'Embodied carbon in products', severity: 'high', framework: 'CSRD / EU Taxonomy', detail: 'Cement and steel production carry significant process emissions.',
+      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU reporting scope.', nexus: 'The EU Taxonomy is reported by entities already inside CSRD or SFDR scope, so it reaches a company through one of those obligations rather than directly.', unresolved: 'whether an EU reporting obligation reaches you', consequence: 'EU Taxonomy alignment assessment required.' } },
+    { risk: 'EU CBAM exposure', severity: 'high', framework: 'EU CBAM', detail: 'Cement, steel and aluminium carry a carbon-border cost when they enter the EU.',
+      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'CBAM applies to the declarant importing covered goods into the EU — it reaches a producer established elsewhere through that import route, not through where it operates.', unresolved: 'whether materials you produce enter the EU', consequence: 'The EU Carbon Border Adjustment Mechanism definitive period began in 2026.' } },
+    { risk: 'Site biodiversity and land use', severity: 'medium', framework: 'CSRD / TNFD', detail: 'Construction projects face emerging biodiversity disclosure requirements under TNFD.',
+      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU reporting scope.', nexus: 'ESRS E4 is a CSRD standard, so it reaches a company through its own or its parent’s CSRD obligation rather than directly.', unresolved: 'whether CSRD reaches you', consequence: 'CSRD ESRS E4 adds a biodiversity disclosure requirement for companies in CSRD scope.' } },
   ],
   'Professional Services': [
     { risk: 'Scope 2 and business travel emissions', severity: 'medium', framework: 'SB 253 / CSRD', detail: 'Professional services firms carry Scope 2 and Scope 3 Cat.6 business travel emissions.' },
-    { risk: 'Client portfolio ESG exposure', severity: 'medium', framework: 'CSRD / SFDR', detail: 'Advisory and consulting firms may carry reputational and legal exposure from ESG advice provided to clients.' },
+    { risk: 'Client portfolio ESG exposure', severity: 'medium', framework: 'CSRD / SFDR', detail: 'Advisory and consulting firms may carry reputational and legal exposure from ESG advice provided to clients.',
+      conditional: { establishedIn: ['European Union'], label: 'Conditioned on marketing financial products in the EU.', nexus: 'SFDR attaches to the product and to the manager marketing it in the EU, not to where the adviser is established.', unresolved: 'whether your clients market products in the EU' } },
   ],
+}
+
+// ─── Resolving a sector risk against the deal's jurisdiction ────────────────────
+//
+// THE ONE CHOKE POINT. Four surfaces consume sector risks — the wizard, the printed report, the
+// target-facing share page and the XLSX pipeline export — and all four used to index SECTOR_RISKS
+// directly. Conditioning at the render sites would have to be written four times, and the XLSX has
+// NO render site at all: it only counts by severity, so it would have gone on counting findings the
+// other three had marked conditional. Resolving here means a fifth consumer inherits it by having
+// no other route to a finding.
+//
+// A resolved finding is a DISCRIMINATED UNION, so `condition` cannot be read on a finding that has
+// none, and an established finding cannot accidentally render a nexus note. Same shape and the same
+// reason as ObligationPrice: make the wrong read unrepresentable rather than discouraged.
+export type ResolvedRisk =
+  | { risk: string; severity: SectorRisk['severity']; framework: string; detail: string; scope: 'established' }
+  | { risk: string; severity: SectorRisk['severity']; framework: string; detail: string; scope: 'conditional'; condition: string }
+
+// One sentence, composed ONCE. The four surfaces render it; none of them writes it. Three separate
+// literals is how CS3D's "not assessed" wording drifted before CS3D_NOT_ASSESSED_LABEL existed.
+export const CONDITION_SCREEN_NOTE = 'This screen records a primary jurisdiction only, so '
+export const conditionSentence = (c: SectorRiskCondition): string =>
+  `${c.label} ${c.nexus} ${CONDITION_SCREEN_NOTE}${c.unresolved} is not established here. Confirm before ruling it out.`
+
+// ⚠️ KNOWN ISSUE — SECTOR RISKS AND FRAMEWORKS DISAGREE ABOUT 'Global'. NOT FIXED HERE.
+//
+// Here, 'Global' resolves CONDITIONAL: "Global / multiple regions" is not confirmation of EU
+// establishment, and treating it as one would reinstate the assertion for exactly the targets least
+// likely to be checked. That matches csrdNonEuAbstention() and cs3dNonEuAbstention(), which both
+// abstain on 'Global' for the same reason — the EU footprint is not captured.
+//
+// But getFrameworkApplicability does NOT treat 'Global' consistently. Two EU instruments resolve
+// 'applies' outright there — EU Taxonomy and EU ETS both test
+// `['European Union','Global'].includes(jurisdiction)` — while CSRD and CS3D abstain on the same
+// jurisdiction. So on one Global deal the frameworks section can assert EU ETS applies while a
+// sector finding citing EU ETS is conditioned on whether the target's routes touch the EEA.
+//
+// The argument that makes CSRD abstain applies equally to EU ETS, which turns on operating an
+// installation or a route inside the EEA. Resolving that means deciding whether 'Global' asserts or
+// abstains for those two, and that changes the applicable-frameworks list a customer may already
+// have exported — out of scope for this change, recorded so the next reader is not surprised.
+export function sectorRisks(sector: string | null | undefined, jurisdiction: string | null | undefined): ResolvedRisk[] {
+  const template = (sector && SECTOR_RISKS[sector]) || []
+  return template.map((r): ResolvedRisk => {
+    const base = { risk: r.risk, severity: r.severity, framework: r.framework }
+    if (!r.conditional) return { ...base, detail: r.detail, scope: 'established' }
+    // A missing jurisdiction is not a match. Nothing was established, so nothing is asserted.
+    const established = !!jurisdiction && r.conditional.establishedIn.includes(jurisdiction)
+    if (established) {
+      const detail = r.conditional.consequence ? `${r.detail} ${r.conditional.consequence}` : r.detail
+      return { ...base, detail, scope: 'established' }
+    }
+    return { ...base, detail: r.detail, scope: 'conditional', condition: conditionSentence(r.conditional) }
+  })
 }
 
 // Compliance cost estimates by deal size and sector complexity

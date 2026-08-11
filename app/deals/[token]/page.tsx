@@ -11,7 +11,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase' // anon public client (NEXT_PUBLIC_SUPABASE_ANON_KEY)
-import { getObligations, SECTOR_RISKS, type SectorRisk } from '../../../lib/deals/assessment'
+import { getObligations, sectorRisks, type ResolvedRisk } from '../../../lib/deals/assessment'
 import { GHG_TIERS, type Tier } from '../../../lib/pricing'
 
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
@@ -103,7 +103,9 @@ export default function DealAssessmentPage() {
   // judge whether to rely on it. The wizard's share gate is what stops an empty snapshot being
   // shared in the first place.
   const frameworks = Array.isArray(data.frameworks) ? data.frameworks : []
-  const risks: SectorRisk[] = (data.sector && SECTOR_RISKS[data.sector]) || []
+  // Resolved against the target's own jurisdiction — this page is read BY the target, so an
+  // instrument asserted against a company it does not reach is the worst place for it to appear.
+  const risks: ResolvedRisk[] = sectorRisks(data.sector, data.jurisdiction)
   const obligations = getObligations(data.location_count ?? 0, frameworks, data.sector ?? undefined)
 
   const fmt = (n: number) => `USD ${n.toLocaleString()}`
@@ -170,7 +172,8 @@ export default function DealAssessmentPage() {
         </section>
       )}
 
-      {/* ESG risk findings — computed from SECTOR_RISKS (shared lib) */}
+      {/* ESG risk findings — resolved through sectorRisks() (shared lib), so this page and the
+          owner's report condition the same findings the same way. */}
       {risks.length > 0 && (
         <section style={{ marginBottom: 28 }}>
           <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, marginBottom: 4 }}>Material ESG findings</h2>
@@ -184,11 +187,15 @@ export default function DealAssessmentPage() {
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{risk.risk}</div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
                       <span style={{ fontSize: 10, color: '#888784' }}>{risk.framework}</span>
+                      {risk.scope === 'conditional' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#FEF3E2', color: '#ba7517', border: '0.5px solid rgba(186,117,23,0.35)' }}>CONDITIONAL</span>}
                       <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: cfg.bg, color: cfg.color, border: `0.5px solid ${cfg.border}` }}>{cfg.label}</span>
                     </div>
                   </div>
                   <div style={{ padding: '10px 16px' }}>
                     <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{risk.detail}</div>
+                    {risk.scope === 'conditional' && (
+                      <div style={{ fontSize: 11, color: '#ba7517', lineHeight: 1.55, marginTop: 8 }}>{risk.condition}</div>
+                    )}
                   </div>
                 </div>
               )

@@ -21,7 +21,7 @@
 
 import {
   getFrameworkApplicability, assessmentView, getApplicableFrameworks,
-  getComplianceCost, getObligations, SECTOR_RISKS, FIELD_LABELS,
+  getComplianceCost, getObligations, sectorRisks, FIELD_LABELS,
 } from './assessment'
 import { filenameDate, filenameSafe } from '../filename'
 
@@ -116,6 +116,8 @@ export async function exportPipelineXlsx(input: PipelineExportInput): Promise<vo
     // Risk findings — counts only. The findings themselves are 1-2 sentence paragraphs and do not
     // belong in a row meant for pivoting; they are in the per-deal report.
     'Critical risks', 'High risks', 'Medium risks',
+    // Counted and named apart from the three above — see the countBy comment in the row builder.
+    'Conditional risks', 'Conditional risks — regimes',
     // Data room
     'GHG data available', 'ESG report available',
   ]
@@ -194,9 +196,25 @@ export async function exportPipelineXlsx(input: PipelineExportInput): Promise<vo
 
     // No sector means no risk template was ever applied. Reporting 0 critical risks for a target
     // nobody screened would read as a clean bill of health.
-    const risks = sector ? (SECTOR_RISKS[sector] ?? []) : null
+    //
+    // Resolved through sectorRisks(), not indexed raw. THIS FILE HAS NO RENDER SITE — it only
+    // counts — so a gate written at the other three surfaces would have left these columns counting
+    // findings the wizard and the report had marked conditional, and the spreadsheet is the one
+    // artefact a reader sorts and filters without seeing the finding text.
+    const risks = sector ? sectorRisks(sector, jurisdiction) : null
+    const established = risks?.filter((r) => r.scope === 'established') ?? null
+    const conditional = risks?.filter((r) => r.scope === 'conditional') ?? null
+    // Severity counts are ESTABLISHED ONLY: a conditioned finding has not been shown to reach this
+    // target, and folding it into "High risks" inflates the number a reader pivots on.
     const countBy = (sev: 'critical' | 'high' | 'medium'): Cell =>
-      risks == null ? 'SECTOR NOT SET' : risks.filter((r) => r.severity === sev).length
+      established == null ? 'SECTOR NOT SET' : established.filter((r) => r.severity === sev).length
+    const conditionalCount: Cell = conditional == null ? 'SECTOR NOT SET' : conditional.length
+    // Named, not just counted: a bare number cannot answer "which targets have unresolved CBAM
+    // exposure", and naming them is the shape this file already uses for 'Other rules'.
+    const conditionalRegimes: Cell =
+      conditional == null ? 'SECTOR NOT SET'
+      : conditional.length === 0 ? 'None'
+      : [...new Set(conditional.map((r) => r.framework))].join(', ')
 
     return [
       (d.target_name ?? '').trim() || 'Untitled deal',
@@ -217,6 +235,7 @@ export async function exportPipelineXlsx(input: PipelineExportInput): Promise<vo
       cantAssess, figuresNeeded,
       costLow, costHigh, pctLow, pctHigh, themisIq,
       countBy('critical'), countBy('high'), countBy('medium'),
+      conditionalCount, conditionalRegimes,
       d.has_ghg_data ? 'Yes' : 'No',
       d.has_esg_report ? 'Yes' : 'No',
     ]
