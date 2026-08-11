@@ -219,7 +219,7 @@ export default function Home() {
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>Not sure where to start?</div>
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Built for who's asking.</h2>
-            <p style={{ fontSize: 15, color: '#555553', maxWidth: 520, margin: '0 auto', fontWeight: 300 }}>Whether it's a customer, your bank, your board or your investor — we've bundled exactly what you need.</p>
+            <p style={{ fontSize: 15, color: '#555553', maxWidth: 520, margin: '0 auto', fontWeight: 300 }}>Whether it's a customer, your bank, your board or your investor — here's where to start for each.</p>
           </div>
           {/* Use-case pack cards (OLD model) */}
           {!NEW_PRICING_ACTIVE && (

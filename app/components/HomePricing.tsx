@@ -308,7 +308,7 @@ export default function HomePricing() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                   <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{count} module{count !== 1 ? 's' : ''} selected</div>
                   {volumeDiscount(count) > 0 && !quote.requiresQuote && (
-                    <div style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(100,254,62,0.15)', color: '#64fe3e', border: '1px solid rgba(100,254,62,0.3)' }}>{volumeDiscount(count) * 100}% bundle discount applied</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(100,254,62,0.15)', color: '#64fe3e', border: '1px solid rgba(100,254,62,0.3)' }}>{volumeDiscount(count) * 100}% multi-module discount applied</div>
                   )}
                 </div>
               </div>
@@ -326,12 +326,14 @@ export default function HomePricing() {
           </div>
         )}
 
-        {/* Bundle hints */}
+        {/* Discount bands — same cards, same wording, as /pricing. Not products: Core / Growth /
+            Platform named three tiers nobody can buy, and "Platform" read as the Full Platform
+            bundle removed on 23 Jul 2026. Figures use the same − (U+2212) as the hero above. */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
           {[
-            { label: 'Core', sub: '1 module · full price', active: count === 1 },
-            { label: 'Growth', sub: '2 modules · 10% off', active: count === 2 },
-            { label: 'Platform', sub: '3+ modules · 20% off', active: count >= 3 },
+            { label: 'Full price', sub: '1 module', active: count === 1 },
+            { label: '−10%', sub: '2 modules', active: count === 2 },
+            { label: '−20%', sub: '3 or more modules', active: count >= 3 },
           ].map(h => (
             <div key={h.label} style={{ background: h.active ? '#fff' : '#f8f7f5', border: h.active ? '1.5px solid #0d0d0d' : '1px solid #e8e7e4', borderRadius: 10, padding: 10, textAlign: 'center', transition: 'all 0.2s' }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: h.active ? '#0d0d0d' : '#888784' }}>{h.label}</div>

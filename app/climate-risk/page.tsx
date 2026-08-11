@@ -197,7 +197,11 @@ export default function Page() {
         <div style={{ maxWidth: 800, margin: '0 auto', textAlign: 'center' }}>
           <div style={eyebrow}>Pricing</div>
           <h2 style={sectionTitle}>Start with Climate Risk.</h2>
-          <p style={sectionSub}>A complete TCFD-aligned climate risk assessment — one flat annual price. Add modules and bundle to save: 10% off two, 20% off three or more.</p>
+          {/* The multi-module discount is named here exactly as the checkout names it, and the
+              figures are worded exactly as the pricing and homepage heroes word them. This page is
+              the only module marketing page that quotes the discount at all, so it had drifted
+              furthest: "bundle to save" described a bundle the product removed on 23 Jul 2026. */}
+          <p style={sectionSub}>A complete TCFD-aligned climate risk assessment — one flat annual price. Add modules and the multi-module discount applies automatically: two modules −10%, three or more −20%.</p>
           <div style={{ maxWidth: 400, margin: '2.5rem auto 0', textAlign: 'left' }}>
             {[
               { plan: 'Climate Risk', price: '$' + FLAT_MODULE_PRICES['climate-risk'].toLocaleString(), cadence: '/ reporting year', features: ['Physical & transition risk assessment', 'Single + double materiality (IFRS S2 · CSRD/ESRS)', '3 IPCC scenario pathways', 'TCFD-aligned report structure', 'IFRS S2 · CSRD ESRS E1 · SB 261 mapping'], featured: true },

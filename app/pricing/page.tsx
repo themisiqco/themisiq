@@ -373,11 +373,12 @@ function PricingPageInner() {
     marginTop: 2,
   })
 
-  const hintCard = (activeBundle: string, label: string): React.CSSProperties => {
-    const isActive =
-      (label === 'Core' && activeBundle === 'core') ||
-      (label === 'Growth' && activeBundle === 'growth') ||
-      (label === 'Platform' && activeBundle === 'platform')
+  // Matches on the BAND, not on the rendered label. It used to compare the label against 'Core' /
+  // 'Growth' / 'Platform', which welded the active-state highlight to customer-facing copy: editing
+  // the wording silently stopped the current band lighting up, with nothing to catch it. The band
+  // values are internal and unchanged, so the copy above is now free to say whatever is true.
+  const hintCard = (activeBundle: string, band: string): React.CSSProperties => {
+    const isActive = band === activeBundle
     return {
       background: isActive ? '#fff' : '#f8f7f5',
       border: isActive ? '1.5px solid #0d0d0d' : '1px solid #e8e7e4',
@@ -450,13 +451,28 @@ function PricingPageInner() {
           </p>
         </div>
 
-        {/* Interactive prompt */}
+        {/* Interactive prompt — the page's first instruction, so it must describe the first action
+            that EXISTS. It used to open "explore the tiers below", pointing at the tier cards under
+            !NEW_PRICING_ACTIVE further down; those have not rendered since the June 2026 rescope,
+            so a visitor was told to begin with a step that was not on the page and then to select
+            modules second — the one thing they can actually do first.
+            Tiers are not mentioned at all now, deliberately. GHG is the only tiered module and its
+            picker appears INSIDE the module row once GHG is selected, so any mention here would
+            either name a step that comes second or imply tiering applies to modules priced flat.
+            "Bundle discounts" went the same way: the Full Platform bundle was removed on 23 Jul
+            2026 and what the cart applies is the multi-module discount. The figures are stated in
+            the hero's own words a few elements below (see the pick-and-pace panel), so the two
+            agree rather than describing the same discount two ways.
+            ONE NAME EVERYWHERE, and it is the checkout's: order/page.tsx calls this line item the
+            multi-module discount, so every other surface says that too. It had five names — volume
+            discount, bundle discount, bundle to save, multi-module discount, and unnamed — for one
+            mechanism a buyer meets once, at the moment they pay. */}
         <div style={s.promptWrap}>
           <div style={s.promptInner}>
             <div style={{ ...s.promptDot, animation: 'pulse 2s ease-in-out infinite' }} />
             <div style={{ flex: 1 }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d' }}>This pricing tool is interactive — </span>
-              <span style={{ fontSize: 12, color: '#555553', fontWeight: 300 }}>explore the tiers below, then select the compliance modules your business needs. Your total updates instantly with bundle discounts applied automatically.</span>
+              <span style={{ fontSize: 12, color: '#555553', fontWeight: 300 }}>select the compliance modules your business needs. Your total updates instantly, with the multi-module discount applied automatically — two modules −10%, three or more −20%.</span>
             </div>
           </div>
         </div>
@@ -778,7 +794,7 @@ function PricingPageInner() {
                   <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{count} module{count !== 1 ? 's' : ''} selected</div>
                   {volumeDiscount(count) > 0 && !quote.requiresQuote && (
                     <div style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(100,254,62,0.15)', color: '#64fe3e', border: '1px solid rgba(100,254,62,0.3)' }}>
-                      {volumeDiscount(count) * 100}% bundle discount applied
+                      {volumeDiscount(count) * 100}% multi-module discount applied
                     </div>
                   )}
                   {quote.requiresInvoice && (
@@ -802,19 +818,20 @@ function PricingPageInner() {
           </div>
         )}
 
-        {/* Bundle hints */}
+        {/* Discount bands. These are BANDS, not products: the cards used to read Core / Growth /
+            Platform, which named three tiers a buyer cannot purchase — and "Platform" in particular
+            read as the Full Platform bundle removed on 23 Jul 2026. The discount now leads each
+            card and the condition sits under it, so the card states the rule rather than christening
+            a package. Figures use the same − (U+2212) as both heroes. */}
         <div style={s.hintGrid}>
           {[
-            { label: 'Core', sub: '1 module · full price' },
-            { label: 'Growth', sub: '2 modules · 10% off' },
-            { label: 'Platform', sub: '3+ modules · 20% off' },
+            { band: 'core', label: 'Full price', sub: '1 module' },
+            { band: 'growth', label: '−10%', sub: '2 modules' },
+            { band: 'platform', label: '−20%', sub: '3 or more modules' },
           ].map(h => {
-            const isActive =
-              (h.label === 'Core' && activeBundle === 'core') ||
-              (h.label === 'Growth' && activeBundle === 'growth') ||
-              (h.label === 'Platform' && activeBundle === 'platform')
+            const isActive = h.band === activeBundle
             return (
-              <div key={h.label} style={hintCard(activeBundle, h.label)}>
+              <div key={h.band} style={hintCard(activeBundle, h.band)}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: isActive ? '#0d0d0d' : '#888784' }}>{h.label}</div>
                 <div style={{ fontSize: 10, color: '#888784', marginTop: 2 }}>{h.sub}</div>
               </div>

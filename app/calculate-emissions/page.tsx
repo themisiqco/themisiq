@@ -132,7 +132,7 @@ const FAQ_LD = {
       name: "Is this a subscription? Will I be charged again?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "No. ThemisIQ is a one-time purchase - you select and pay for the modules you need, once, and your credit card will not be charged again. Special pricing is available for multi-module and bundled purchases, and every payment is handled securely by Stripe.",
+        text: "No. ThemisIQ is a one-time purchase - you select and pay for the modules you need, once, and your credit card will not be charged again. Choose more than one module and the multi-module discount is applied automatically at checkout, and every payment is handled securely by Stripe.",
       },
     },
     {
@@ -677,7 +677,7 @@ export default function CalculateEmissionsPage() {
               <details className="qa">
                 <summary>Is this a subscription? Will I be charged again?</summary>
                 <div className="qa-body">
-                  No &mdash; this is not a subscription, and your credit card will not be charged again. ThemisIQ is a one-time purchase: you select and pay for the modules you need, once. Buying more than one module? Ask about our <Link href={CONFIG.PRICING_URL}>special pricing for multi-module and bundled purchases</Link>. We always show you exactly what you&rsquo;re paying for before you confirm, and every payment is handled securely by <strong>Stripe</strong>.
+                  No &mdash; this is not a subscription, and your credit card will not be charged again. ThemisIQ is a one-time purchase: you select and pay for the modules you need, once. Buying more than one module? The <Link href={CONFIG.PRICING_URL}>multi-module discount</Link> is applied automatically at checkout — nothing to ask for. We always show you exactly what you&rsquo;re paying for before you confirm, and every payment is handled securely by <strong>Stripe</strong>.
                 </div>
               </details>
 
