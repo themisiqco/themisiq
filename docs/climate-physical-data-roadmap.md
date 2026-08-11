@@ -367,6 +367,97 @@ expected fire has been misled by an omission we could have prevented at the cell
 
 ---
 
+## Tropical cyclone — CHAZ coastal wind hazard maps
+
+Recorded as **sourced**. This supersedes the earlier candidate, CLIMADA — which turns out to be
+the toolchain CHAZ tracks are processed *through*, not a hazard dataset in itself.
+
+### Source
+
+Meiler, S., Lee, C.Y., Camargo, S.J., Sobel, A.H. *"Global coastal wind hazard maps from the
+CHAZ tropical cyclone model."* **Scientific Data 13, 136 (2026).**
+<https://doi.org/10.1038/s41597-025-06452-0>
+
+**Data:** Columbia University Dryad repository — <https://doi.org/10.5061/dryad.qfttdz0vz>
+
+**Licence: CC BY 4.0** — commercial use permitted with attribution.
+
+### What it provides
+
+Columbia HAZard model tracks processed through **CLIMADA** into gridded wind fields.
+
+- **Historical baseline** 1995–2014 (GCM), plus an **ERA5 reference** 1981–2019
+- **Future windows** 2041–2060 and 2081–2100
+- **Six CMIP6 GCMs** — CESM2, CNRM-CM6-1, EC-Earth3, IPSL-CM6A-LR, MIROC6, UKESM1-0-LL —
+  with **80 ensemble members per configuration**
+- **Resolution** 300 arcseconds over land (~9.3 km), 3600 over ocean
+
+**Two metrics:**
+
+| Metric | Content |
+|---|---|
+| **Exceedance intensity** | Wind speed (m/s) at return periods of 10, 25, 50, 100, 250 and 1000 years |
+| **Return period** | Years between exceeding **33 m/s** (Category 1) or **50 m/s** (Category 3+) |
+
+**Formats: CSV, point NetCDF, gridded NetCDF raster.** The CSV means **no raster processing is
+required** — unlike Aqueduct Floods coastal, which is the reason coastal remains a gap while
+this does not.
+
+### Three constraints, all stated by the authors
+
+**1 · No SSP1-2.6.** Scenarios are **SSP2-4.5, SSP3-7.0 and SSP5-8.5**. The ThemisIQ trio
+cannot be completed for this hazard — **the optimistic pathway has no cyclone data.**
+
+Two options, and this is a decision to take:
+
+- **Cyclone runs on two scenarios** rather than three, or
+- **SSP2-4.5 substitutes for the optimistic case**, and that substitution is disclosed.
+
+**This is the mirror of the Aqueduct problem.** There the ends aligned and the middle did not;
+here the middle and the high end align and the optimistic end is absent entirely.
+
+**2 · The two moisture formulations must not be averaged.** CHAZ runs both **column-integrated
+relative humidity (CRH)** and **saturation deficit (SD)** in its genesis index. Under warming
+**CRH projects increasing cyclone frequency and SD projects decreasing.**
+
+The authors state there is **no theoretical or empirical consensus on the direction of global TC
+frequency change**, and that the two should be analysed as **bounding cases rather than
+averaged**. CCKP's country pages use CRH without presenting the bound.
+
+**A ThemisIQ score built on frequency would inherit a sign that reverses by configuration.**
+That is the direct reason this hazard is scored on **intensity**.
+
+**3 · Coastal only.** The authors advise strongly against using ocean values, and state that
+far-inland points reflect **very sparse event sampling** and should not be taken at face value.
+
+This suits the hazard — cyclone *is* coastal — but it has a consequence for scoring: **an inland
+province cannot be scored from this source and must read as not assessed, never as low.** That
+is the same distinction the 14 July fix draws on the region axis, arriving here from the data
+rather than from the schema.
+
+### Why intensity and not frequency
+
+AR6 assesses that **once storms form, intensities are likely to increase**, particularly for
+major cyclones, while **the drivers of formation and landfall remain poorly understood**.
+
+Intensity carries a signal AR6 has confidence in. Frequency does not — and CHAZ's own two
+configurations demonstrate that directly, by disagreeing on the sign.
+
+### Alternative considered and not taken — STORM
+
+Bloemendaal et al. 2020, *Scientific Data* 7:377. CC BY 4.0, 10 km, **10,000 synthetic years**
+generated from IBTrACS. Gives wind-speed return periods including pre-aggregated Excel files
+for **18 coastal cities and 63 islands**.
+
+**Not taken as the primary source** because the authors state it is based on **present-day
+climate conditions 1980–2017 and cannot be used to assess climate trends.**
+
+**It remains a candidate for a present-day LEVEL anchor alongside CHAZ for TREND** — which
+would mirror the LEVEL/TREND structure of methodology §4.1b exactly, rather than inventing a
+second pattern for one hazard.
+
+---
+
 ## Reference archives — storage
 
 **Held outside the repo.**
@@ -396,13 +487,13 @@ read. A hazard can be sourced and still be weeks of work away.
 | **drought** | CCKP `spei12` (median of ensemble) + Aqueduct `drr` (3.0, baseline only) | **RETRIEVED** |
 | **water** | Aqueduct `bws` (4.0, full futures) | **sourced** |
 | **wildfire** | ETH Zurich `fwixd` (CMIP6, 36 models, full trio) | **sourced, not yet usable** |
+| **cyclone** | CHAZ coastal wind hazard maps (intensity; no SSP1-2.6) | **sourced** |
 | **flood** | Aqueduct `rfr` (3.0, baseline only) | **partial** |
 | **coastal** | — | **GAP** — raster only |
-| **cyclone** | — | **GAP** — candidate: CLIMADA (ETH Zurich, open source) |
 | **permafrost** | — | **GAP** — candidate: ESA Permafrost CCI |
 
-**Two retrieved, two sourced, one partial, three gaps** — against two sourced, one proxy and
-five gaps at the start of this work.
+**Four sourced — of which two retrieved — one partial, two gaps** (coastal and permafrost),
+against two sourced, one proxy and five gaps at the start of this work.
 
 **Wildfire is sourced but not retrieved in usable form.** The ETH archive is raw per-model
 CMIP6 — 36 models, up to 5 members each — and needs the ensemble reduction doing before it can
@@ -410,9 +501,14 @@ be banded. CCKP has already done that reduction and ships the 50th percentile. T
 single largest difference in effort between the sources, and it is invisible from the licence
 or the variable name.
 
-**Three licences, all CC BY 4.0**, all permitting commercial use with attribution: World Bank
-CCKP, WRI Aqueduct, ETH Zurich. Attribution copy must name each and, for CCKP, must not imply
-World Bank endorsement.
+**Five sources, all CC BY 4.0**, all permitting commercial use with attribution: World Bank
+CCKP, WRI Aqueduct, ETH Zurich (FWI), Columbia/Dryad (CHAZ), and STORM if it is taken as a
+level anchor. Attribution copy must name each and, for CCKP, must not imply World Bank
+endorsement.
+
+**No source in this roadmap carries a licence that restricts commercial use.** That is worth
+stating once: the hazard layer can be built entirely on data ThemisIQ may sell against,
+provided every attribution is carried.
 
 ---
 
@@ -455,11 +551,11 @@ are two different questions that happen to share a word.
 ## What remains open
 
 1. **Site input mechanism** — whether a map picker or coordinate entry.
-2. **Sources for the three remaining gap hazards** — coastal, cyclone, permafrost. Candidates
-   named but not decided: CLIMADA (cyclone), ESA Permafrost CCI (permafrost). Coastal has no
-   candidate short of aggregating the Aqueduct Floods rasters and deciding what a depth map
-   means for a province. *Water closed under Aqueduct 4.0; flood partially closed; wildfire
-   closed under the ETH Zurich FWI set.*
+2. **Sources for the two remaining gap hazards** — coastal and permafrost. ESA Permafrost CCI
+   is named as a candidate but not decided. **Coastal has no candidate** short of aggregating
+   the Aqueduct Floods rasters and deciding what a depth map means for a province — and it is
+   now the only hazard with no path at all. *Water closed under Aqueduct 4.0; flood partially
+   closed; wildfire closed under the ETH Zurich FWI set; cyclone closed under CHAZ.*
 3. **Ensemble reduction for wildfire** — 36 models with up to 5 members each are shipped
    unreduced. Which statistic (median, mean, a percentile) and across which members is a
    methodology decision the other two sources made for us before delivery. CCKP's choice — the
@@ -471,20 +567,30 @@ are two different questions that happen to share a word.
 6. **Mapping three different period windows onto `mr_horizons`** — CCKP's 20-year spans,
    Aqueduct's 30-year spans centred differently, and the ETH set's annual values. Only the
    annual data can be re-averaged to fit; the other two are as published.
-7. **Which Aqueduct scenario stands in for the ThemisIQ middle case** — SSP3-7.0 substituted
-   and disclosed (recommended), interpolated, or water stress run on two scenarios only.
-   *Note the ETH Zurich set ships `ssp370` as well, so a future decision to align the middle
-   case across sources has data on both sides.*
-8. **Whether ThemisIQ sectors map onto Aqueduct's `ind` / `irr` / `dom` weightings**, making
+7. **Scenario alignment, now a question across two hazards rather than one.**
+   *Water stress:* the ends align and the middle does not — SSP3-7.0 substituted and disclosed
+   (recommended), interpolated, or run on two scenarios only. The ETH Zurich wildfire set ships
+   `ssp370` as well, so aligning the middle across sources has data on both sides.
+   *Cyclone:* the mirror image — SSP2-4.5 and SSP5-8.5 are present, **SSP1-2.6 is absent
+   entirely**. Either cyclone runs on two scenarios, or SSP2-4.5 stands in for the optimistic
+   case and is disclosed as doing so.
+   A single rule covering both would be better than two per-hazard exceptions.
+8. **Whether STORM is added as a present-day LEVEL anchor for cyclone**, with CHAZ carrying
+   TREND — mirroring methodology §4.1b rather than scoring cyclone on a different structure
+   from every other hazard.
+9. **How an inland province reads for cyclone.** CHAZ is coastal-only by the authors'
+   instruction, so inland must resolve to *not assessed* rather than *low* — which is a scoring
+   rule, not just a note, and needs the same treatment as a missing region row.
+10. **Whether ThemisIQ sectors map onto Aqueduct's `ind` / `irr` / `dom` weightings**, making
    the geography sector-specific.
-9. **Calibration of the 0–3 ordinal from a continuous index.** *Partly settled for water
+11. **Calibration of the 0–3 ordinal from a continuous index.** *Partly settled for water
    stress:* Aqueduct's band edges are absolute percentage thresholds, and the decision above
    keeps the 0–3 scale with the Aqueduct label carried in `source_note`. Still open for the
    CCKP-sourced hazards, and still open in general as to whether band edges should be
    **absolute** or **relative to the global distribution** — an absolute threshold and a
    percentile threshold answer different questions and will disagree most in the regions where
    the data is thinnest.
-10. **Whether subnational units replace AR6 regions or sit alongside them.**
+12. **Whether subnational units replace AR6 regions or sit alongside them.**
 
 ---
 
