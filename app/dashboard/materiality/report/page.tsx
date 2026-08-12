@@ -206,7 +206,18 @@ function ReportInner() {
       )
     : null)
 
-  if (!isPaid) return <PaywallCard />
+  // WRITTEN OUT RATHER THAN INHERITED. This is the one page the old PaywallCard default actually
+  // described correctly — it is the double-materiality report — so the copy below is that default
+  // word for word. Spelling it out changes nothing a customer sees; it makes the wording a choice
+  // this page made rather than one it happened to receive, which is the whole point of removing
+  // the default. `risk` is the shorthand slug for climate-risk on /pricing (LEGACY_PRICING_PAGE_ID).
+  if (!isPaid) return (
+    <PaywallCard
+      title="Unlock the Climate Risk module"
+      body="This report is part of the Climate Risk module. Unlock it to view the full double-materiality assessment, generate the CSRD / IFRS S2 report, and download it as a PDF."
+      href="/pricing?modules=risk"
+    />
+  )
   if (loading) return <Centered>Loading report…</Centered>
   if (error) return <Centered>{error}</Centered>
   if (!a) return <Centered>No assessment data.</Centered>

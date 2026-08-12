@@ -115,7 +115,7 @@ export default function SupplierResponseViewer() {
     </div>
   )
 
-  if (!isPaid) return <PaywallCard title="Unlock the Supply Chain module" body="The Supplier Portal is part of the Supply Chain module. Unlock it to create campaigns, invite suppliers, and review responses." />
+  if (!isPaid) return <PaywallCard title="Unlock the Supply Chain module" body="The Supplier Portal is part of the Supply Chain module. Unlock it to create campaigns, invite suppliers, and review responses." href="/pricing?modules=supply" />
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />

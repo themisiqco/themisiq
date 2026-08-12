@@ -709,6 +709,7 @@ export default function SbtiDashboard() {
       <PaywallCard
         title="Unlock SBTi target-setting"
         body="SBTi target-setting and monitoring is part of the GHG module. Unlock GHG to set science-based targets under the Corporate Net-Zero Standard V2.0, track your trajectory, and monitor progress."
+        href="/pricing?modules=ghg"
       />
     )
   }

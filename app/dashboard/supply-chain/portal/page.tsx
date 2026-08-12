@@ -99,7 +99,7 @@ export default function SupplierPortalDashboard() {
   const statusColor = (s: string) => s === 'active' ? '#0F6E56' : s === 'closed' ? '#888784' : '#ba7517'
   const statusBg = (s: string) => s === 'active' ? '#E1F5EE' : s === 'closed' ? '#f8f7f5' : '#FEF3E2'
 
-  if (!isPaid) return <PaywallCard title="Unlock the Supply Chain module" body="The Supplier Portal is part of the Supply Chain module. Unlock it to create campaigns, invite suppliers, and review responses." />
+  if (!isPaid) return <PaywallCard title="Unlock the Supply Chain module" body="The Supplier Portal is part of the Supply Chain module. Unlock it to create campaigns, invite suppliers, and review responses." href="/pricing?modules=supply" />
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />

@@ -137,6 +137,7 @@ export default function DealsListPage() {
     <PaywallCard
       title="Unlock the Deals module"
       body="Screen a target's ESG risk, work out which reporting rules apply to it, and produce a diligence report for your investment committee."
+      href="/pricing?modules=deals"
     />
   )
 

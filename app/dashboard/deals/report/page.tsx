@@ -222,7 +222,20 @@ function DealsReportInner() {
   // owner filter AND under RLS, so a foreign id can never equal it — the unentitled reader gets the
   // paywall, and the row itself was never readable in the first place.
   const freeDealAllowed = freeTier.state === 'resolved' && freeTier.newestOwnDealId !== null && freeTier.newestOwnDealId === id
-  if (!isPaid && !freeDealAllowed) return <PaywallCard />
+  // ONLY REACHABLE BY SOMEONE WHO HAS OPENED A REPORT BEFORE. `freeDealAllowed` lets the newest
+  // own deal through, so this wall fires on the SECOND one — the reader is demonstrably in the
+  // Deals module, and the question they actually have is why this report is locked when the last
+  // one was not. The first sentence answers that; a generic "unlock this module" does not.
+  //
+  // Wording is the neighbouring Deals surfaces', not a new register: the title is deals/list's
+  // verbatim, and the deliverables are the free-deal wall's own list in deals/page.tsx.
+  if (!isPaid && !freeDealAllowed) return (
+    <PaywallCard
+      title="Unlock the Deals module"
+      body="Screening one target is free. This report belongs to another one — unlock Deals to open it, keep a pipeline of targets, and take away the diligence report, the Excel export and the shareable assessment."
+      href="/pricing?modules=deals"
+    />
+  )
 
   if (loading) return <Centered>Loading report…</Centered>
   if (error) return <Centered>{error}</Centered>

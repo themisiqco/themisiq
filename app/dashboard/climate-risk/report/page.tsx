@@ -97,7 +97,23 @@ function ResilienceReportInner() {
     ? reportTitle(a.workings?.disclosure?.legalEntity || a.company_name, 'Climate Resilience Report')
     : null)
 
-  if (!isPaid) return <PaywallCard />
+  // THE OLD DEFAULT DESCRIBED A DIFFERENT REPORT. It promised "the full double-materiality
+  // assessment… the CSRD / IFRS S2 report" — which is the materiality report, not this one. This
+  // route renders resilience analyses only (see the guard a few lines below) and titles itself
+  // "Climate Resilience Report".
+  //
+  // VOCABULARY IS THE REPORT'S OWN, not a new register invented for a wall. Every term below is a
+  // section heading in the document this unlocks: "Resilience conclusion", "Physical risks across
+  // scenarios", "Transition risks across scenarios", "Opportunities across scenarios", and
+  // "Scenario selection and rationale". A reader who unlocks it should meet the words they were
+  // sold, in the order they were sold them.
+  if (!isPaid) return (
+    <PaywallCard
+      title="Unlock the Climate Risk module"
+      body="This resilience report is part of the Climate Risk module. Unlock it to read your resilience conclusion, see how physical risks, transition risks and opportunities play out across each scenario, and download the report with its methodology and sources."
+      href="/pricing?modules=risk"
+    />
+  )
   if (loading) return <Centered>Loading report…</Centered>
   if (error) return <Centered>{error}</Centered>
   if (!a) return <Centered>No assessment data.</Centered>
