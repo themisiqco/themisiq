@@ -73,7 +73,7 @@ interface Obligation {
 const REVENUE_LABELS = ['Under $50M','$50M','$100M','$250M','$500M','$750M','$1B','$2B','$5B','$10B','$10B+']
 const REVENUE_VALUES = [25, 50, 100, 250, 500, 750, 1000, 2000, 5000, 10000, 15000]
 
-function computeObligations(a: Answers): Obligation[] {
+export function computeObligations(a: Answers): Obligation[] {
   const rev = a.revenue !== undefined ? REVENUE_VALUES[a.revenue] : 0
   const emp = a.employees || ''
   const jur = a.jurisdictions || []
