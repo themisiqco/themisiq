@@ -5,7 +5,7 @@ import {
   AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED, AI_ACT_HIGH_RISK_SENTENCE,
 } from '../../lib/aiAct'
 import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_STATUS_SENTENCE, SB253_SCOPE3_FROM } from '../../lib/sb253'
-import { SB261_CITATION, SB261_STATUS_SENTENCE } from '../../lib/sb261'
+import { SB261_CITATION, SB261_STATUS_SENTENCE, SB261_TABLE_STATUS } from '../../lib/sb261'
 import { IFRS_S2_CITATION, IFRS_S2_STATUS_SENTENCE } from '../../lib/ifrsS2'
 import { NIS2_CITATION, NIS2_TIMING, NIS2_SIZE_TEST, NIS2_CORE_DUTIES, NIS2_DORA_CARVE_OUT, NIS2_SURVIVING_DUTY } from '../../lib/nis2'
 // lib/cs3d.ts: "ANY SURFACE NAMING A CS3D DATE OR THRESHOLD IMPORTS FROM HERE. A literal in copy is
@@ -235,7 +235,7 @@ export function computeObligations(a: Answers): Obligation[] {
   // SB 261 posture verified against primary sources 12 August 2026: Ninth Circuit order of
   // 18 November 2025 in Chamber of Commerce v. Sanchez, No. 25-5327, and CARB's SB 261 docket
   // page. No merits ruling as of this date — re-check before relying on "has not ruled".
-  if (hasCA && revUSD >= 500_000_000) regs.push({ name: 'SB 261 — California Climate-Related Financial Risk Act', obligationId: 'sb261', jurisdiction: 'California, USA', group: 'regulatory', urgency: 'monitor', urgency_label: 'MONITOR', timing: 'Enforcement paused — no new date set', module: 'Climate · Risk', what: `You meet the $500m revenue threshold. ${SB261_CITATION}. ${SB261_STATUS_SENTENCE}`, action: 'Prepare the TCFD-aligned report now; it is the same deliverable whenever a date is set.' })
+  if (hasCA && revUSD >= 500_000_000) regs.push({ name: 'SB 261 — California Climate-Related Financial Risk Act', obligationId: 'sb261', jurisdiction: 'California, USA', group: 'regulatory', urgency: 'monitor', urgency_label: 'MONITOR', timing: SB261_TABLE_STATUS, module: 'Climate · Risk', what: `You meet the $500m revenue threshold. ${SB261_CITATION}. ${SB261_STATUS_SENTENCE}`, action: 'Prepare the TCFD-aligned report now; it is the same deliverable whenever a date is set.' })
 
   // ── CSRD ────────────────────────────────────────────────────────────────────
   // ONE entry, not two. The 250-employee tier DOES NOT EXIST post-Omnibus: Directive (EU) 2026/470
