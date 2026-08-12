@@ -63,10 +63,12 @@ const MODULES: Module[] = [
     id: 'risk',
     name: 'Climate Risk',
     description: 'SB 261 · TCFD · IFRS S2 · ESRS E1 · CDP (P-series) · SASB · scenario analysis · physical & transition risk',
-    // NOT 'SB 261 · Jan 2026'. The Ninth Circuit issued a preliminary injunction applying only to
-    // SB 261, and CARB's 1 December 2025 enforcement advisory confirmed it will not enforce the
-    // 1 January 2026 deadline and will set an alternate date once the appeal resolves. Naming that
-    // date on the page where a customer decides to buy asserts a deadline nobody is enforcing.
+    // NOT 'SB 261 · Jan 2026' — naming a date nobody is enforcing on the page where a customer
+    // decides to buy asserts a deadline that does not exist.
+    // Ninth Circuit injunction pending appeal, 18 November 2025 — Chamber of Commerce v. Sanchez,
+    // No. 25-5327. Not a preliminary injunction; the district court denied that. SB 261 enforcement
+    // is barred, SB 253 is not. Argued 9 January 2026, no ruling as of 12 August 2026.
+    // Canonical account lives at the SB 261 entry in app/assess/page.tsx.
     tags: [{ label: 'SB 261 · enforcement paused', color: 'orange' }],
     cta: {
       headline: 'Ready to assess your climate risk?',
