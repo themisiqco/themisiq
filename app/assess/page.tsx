@@ -298,7 +298,15 @@ export function computeObligations(a: Answers): Obligation[] {
   // told it had to file. Converted via lib/deals/assessment.ts's convertCurrency — one rate table.
   const msUK = hasUK && revIn('GBP') > 36_000_000
   const msAU = hasAU && revIn('AUD') >= 100_000_000
-  if (msUK || msAU) regs.push({ name: 'Modern Slavery Act — UK / Australia', obligationId: 'modern-slavery', jurisdiction: msUK && msAU ? 'UK + Australia' : msUK ? 'United Kingdom' : 'Australia', group: 'regulatory', urgency: 'medium', urgency_label: 'ANNUAL', timing: 'Annual · 6 months after financial year end', module: 'Supply Chain', what: `${msUK ? 'UK Modern Slavery Act 2015 s.54: GBP 36,000,000 total GLOBAL turnover including subsidiaries, for any body corporate carrying on business in any part of the UK. ' : ''}${msAU ? 'Australian Modern Slavery Act 2018: AUD 100,000,000 consolidated revenue — the threshold is UNDER REVIEW, with a reduction to AUD 50,000,000 proposed. ' : ''}An annual transparency statement is required covering the steps taken to ensure no modern slavery in your operations and supply chains. ${fxNote}`, action: 'Conduct supply chain human rights assessment and draft the Modern Slavery statement.' })
+  // AU THRESHOLD VERIFIED AGAINST THE GOVERNMENT'S OWN RESPONSE, 12 August 2026. The previous copy
+  // said the threshold was "UNDER REVIEW, with a reduction to AUD 50,000,000 proposed" — undated and
+  // unsourced, and it read as a live proposal heading for adoption. It is not: the McMillan statutory
+  // review recommended AUD 50m in 2023, and the Government's December 2024 response NOTED that
+  // recommendation rather than agreeing to it, retaining AUD 100m and deferring the question until
+  // other reforms are scoped. An Australian company between the two figures could have read the old
+  // copy as a reason to prepare for a duty it does not have. THE PERISHABLE CLAIM is "declined and
+  // deferred" — the Government said it would revisit, so re-check before relying on this.
+  if (msUK || msAU) regs.push({ name: 'Modern Slavery Act — UK / Australia', obligationId: 'modern-slavery', jurisdiction: msUK && msAU ? 'UK + Australia' : msUK ? 'United Kingdom' : 'Australia', group: 'regulatory', urgency: 'medium', urgency_label: 'ANNUAL', timing: 'Annual · 6 months after financial year end', module: 'Supply Chain', what: `${msUK ? 'UK Modern Slavery Act 2015 s.54: GBP 36,000,000 total GLOBAL turnover including subsidiaries, for any body corporate carrying on business in any part of the UK. ' : ''}${msAU ? 'Australian Modern Slavery Act 2018: AUD 100,000,000 consolidated revenue. The 2023 statutory review recommended lowering this to AUD 50,000,000, but the Government declined to adopt that recommendation in its December 2024 response and retained AUD 100,000,000, saying it would revisit the threshold once other reforms are scoped. The current bar is AUD 100,000,000. ' : ''}An annual transparency statement is required covering the steps taken to ensure no modern slavery in your operations and supply chains. ${fxNote}`, action: 'Conduct supply chain human rights assessment and draft the Modern Slavery statement.' })
 
   // ── MARKET-DRIVEN ───────────────────────────────────────────────────────────
   // Nothing below carries a statutory penalty. These fire on who is ASKING — the ownership answer
