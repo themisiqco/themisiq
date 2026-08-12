@@ -228,6 +228,27 @@ export type PackId =
   | 'ifrs-s2-compliance'
   | 'csrd-compliance'
 
+// ⚠️ PACKS IS RETIRED. Nothing sells it, and nothing may. Every price below is between 43% and 78%
+// BELOW what the same modules cost through cartQuote today — investor-esg is $3,999 against $14,080
+// of modules — so this is not a stale export, it is a live financial exposure if anything ever reads
+// it to charge. All THREE remaining consumers are hard rejections or unreachable code: /api/checkout
+// and /api/admin/create-invoice both 400 on packId, and PackFlow.tsx is unreachable behind four
+// redirects with a checkout that was never wired. The homepage cards were deleted outright on
+// 12 Aug 2026 and no longer read PACKS at all. No UI path can construct a packId.
+//
+// THE HAZARD IS THAT THIS LOOKS MAINTAINED. Plausible prices, real module lists, no warning — a
+// reader meeting it cold would reasonably wire something to it. Do not. Reverting NEW_PRICING_ACTIVE
+// would restore a homepage selling $14,080 of modules for $3,999, which is a second reason the
+// rollback path CLAUDE.md describes as gone is genuinely gone.
+//
+// The spread, computed against cartQuote on 12 Aug 2026 — recompute rather than trusting these if
+// FLAT_MODULE_PRICES or the volume discount moves, since the gap only ever widens:
+//   supplier-readiness  $1,999  vs  $7,020   71.5% below
+//   climate-readiness   $1,999  vs  $8,820   77.3% below
+//   esg-foundation      $2,999  vs  $9,039   66.8% below
+//   investor-esg        $3,999  vs $14,080   71.6% below
+//   ifrs-s2-compliance  $4,999  vs  $8,820   43.3% below
+//   csrd-compliance     $5,999  vs $11,359   47.2% below
 export const PACKS: Record<
   PackId,
   { label: string; price: number; modules: ModuleKey[] }

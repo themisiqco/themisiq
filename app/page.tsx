@@ -1,7 +1,9 @@
 'use client'
 import HomePricing from './components/HomePricing'
 import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS } from '../lib/sb253'
-import { PACKS, NEW_PRICING_ACTIVE } from '../lib/pricing'
+// PACKS dropped from this import with the old-model cards below — it is retired (see the note above
+// its declaration in lib/pricing.ts). NEW_PRICING_ACTIVE STAYS: the live cards still gate on it.
+import { NEW_PRICING_ACTIVE } from '../lib/pricing'
 import { PACK_SLUG_MODULES } from '../lib/packEntryPoints'
 import Nav from './components/Nav'
 import Footer from './components/Footer'
@@ -221,32 +223,14 @@ export default function Home() {
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Built for who's asking.</h2>
             <p style={{ fontSize: 15, color: '#555553', maxWidth: 520, margin: '0 auto', fontWeight: 300 }}>Whether it's a customer, your bank, your board or your investor — here's where to start for each.</p>
           </div>
-          {/* Use-case pack cards (OLD model) */}
-          {!NEW_PRICING_ACTIVE && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-            {[
-              { name: 'Supplier Readiness', driver: 'A customer is asking', price: '$' + PACKS['supplier-readiness'].price.toLocaleString(), color: '#0F6E56', bg: '#E1F5EE', href: '/get-started/supplier', items: ['GHG Inventory', 'Supply Chain risk register', 'Supplier questionnaire'] },
-              { name: 'Climate Readiness', driver: 'Your bank is asking', price: '$' + PACKS['climate-readiness'].price.toLocaleString(), color: '#0C447C', bg: '#E6F1FB', href: '/get-started/climate', items: ['GHG Inventory', 'Climate Risk assessment', 'TCFD / IFRS S2 output'] },
-              { name: 'ESG Foundation', driver: 'Your board wants it', price: '$' + PACKS['esg-foundation'].price.toLocaleString(), color: '#7425e3', bg: '#EDE9FE', href: '/get-started/foundation', items: ['GHG Inventory', 'People & Workforce', 'Climate Risk'] },
-              { name: 'Investor ESG', driver: 'Your investor requires it', price: '$' + PACKS['investor-esg'].price.toLocaleString(), color: '#B91C1C', bg: '#FCEBEB', href: '/get-started/investor', items: ['GHG Inventory', 'Climate Risk', 'Supply Chain', 'Deals & Investment'] },
-            ].map(pack => (
-              <a key={pack.name} href={pack.href} style={{ background: '#fff', border: `1.5px solid ${pack.color}25`, borderRadius: 14, padding: '1.5rem', textDecoration: 'none', display: 'block', transition: 'all 0.15s' }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = pack.color}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = pack.color + '25'}>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: pack.color, marginBottom: 6 }}>{pack.driver}</div>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{pack.name}</div>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, color: pack.color, marginBottom: 12 }}>{pack.price}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'inherit' }}>/yr</span></div>
-                {pack.items.map(item => (
-                  <div key={item} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-                    <span style={{ color: pack.color, flexShrink: 0, fontSize: 12 }}>✓</span>
-                    <span style={{ fontSize: 12, color: '#555553' }}>{item}</span>
-                  </div>
-                ))}
-                <div style={{ marginTop: 16, fontSize: 12, fontWeight: 600, color: pack.color }}>See details →</div>
-              </a>
-            ))}
-          </div>
-          )}
+          {/* The OLD-model cards stood here — four priced pack tiles reading PACKS and routing to
+              /get-started/*. Deleted, not left behind a flag: NEW_PRICING_ACTIVE has been true since
+              the June 2026 rescope so they could not render, and every price they carried is 43-78%
+              under what cartQuote charges for the same modules (see the retirement note on PACKS in
+              lib/pricing.ts). A dead branch holding under-priced money is worth less than nothing —
+              it reads as a rollback that is still available, and it is not.
+              The cards below are the live ones: same four use cases, no price, straight into the
+              configurator. */}
 
           {/* Use-case pack cards (NEW model) — configurator entry points, no price */}
           {NEW_PRICING_ACTIVE && (
