@@ -152,9 +152,18 @@ export function computeObligations(a: Answers): Obligation[] {
       urgency: staffIndeterminate ? 'high' : 'critical',
       urgency_label: staffIndeterminate ? 'CONFIRM HEADCOUNT' : 'ACTIVE NOW',
       // The collapsed row is the only line most readers see, so it must say WHAT TO CHECK, not that a
-      // check exists. empAtLeast(1_001) returns null for exactly one band — 1,000–4,999 — so naming
-      // that band here is safe: it is the only band that can reach this arm.
-      timing: staffIndeterminate ? 'Applies above 1,000 employees — your 1,000–4,999 band spans that line' : 'Active — first report on the amended thresholds',
+      // check exists.
+      //
+      // IT NAMED THE BAND, AND THE BAND NAME WENT. It read 'your 1,000–4,999 band spans that line',
+      // justified on the ground that empAtLeast(1_001) returns null for exactly one SELECTABLE band.
+      // True as far as it goes — and false for the case the justification did not consider: an
+      // UNSET employees answer also returns null, and reaches this same arm. A visitor who answered
+      // nothing would be told they are in a band they never chose. It is unreachable only because
+      // canAdvance blocks an unanswered options question, which is ONE EDIT away — a skip button, an
+      // optional question, a URL prefill — and this is copy, so it would fail silently rather than
+      // loudly. Naming the boundary keeps the whole point (the limb cannot be settled from what you
+      // gave) without asserting where the reader sits.
+      timing: staffIndeterminate ? 'Applies above 1,000 employees — your headcount spans that line' : 'Active — first report on the amended thresholds',
       module: 'Climate · GHG + Risk + People + Supply Chain',
       what: staffIndeterminate
         ? `Post-Omnibus CSRD is a TWO-LIMB AND: more than 1,000 employees AND more than EUR 450,000,000 net turnover (Directive (EU) 2026/470 amending the Accounting Directive, arts. 19a/29a). Your turnover limb is met. YOUR HEADCOUNT BAND CANNOT SETTLE THE OTHER LIMB — it spans the 1,000 boundary, so a figure at or below 1,000 is out of scope. Confirm the exact average headcount for the financial year. ${fxNote}`
@@ -329,13 +338,26 @@ export function computeObligations(a: Answers): Obligation[] {
   const pt250 = empAtLeast(250)
   const pt100 = empAtLeast(100)
   if (hasEU && pt250 === true) regs.push({ name: 'EU Pay Transparency (2023/970) — gender pay gap reporting', obligationId: 'eu-pay-transparency', jurisdiction: 'European Union', group: 'regulatory', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: '7 June 2027, then annually', module: 'People & Workforce', what: 'At 250 or more workers you report the gender pay gap by 7 June 2027 and ANNUALLY thereafter. A reported gap above 5% is NOT automatically unlawful: the trigger is an unjustified gap that is not remedied within six months, at which point a JOINT PAY ASSESSMENT with worker representatives follows.', action: 'Calculate the gap by category of worker performing equal work, and prepare the objective justification for any gap you find.' })
-  if (hasEU && pt250 !== true && pt100 !== false) regs.push({ name: 'EU Pay Transparency (2023/970) — reporting band undetermined', obligationId: 'eu-pay-transparency', jurisdiction: 'European Union', group: 'regulatory', urgency: 'monitor', urgency_label: 'CONFIRM HEADCOUNT', timing: 'Depends on exact headcount', module: 'People & Workforce', what: 'Your headcount band (50–249) SPANS THREE DIFFERENT DUTIES under Directive (EU) 2023/970 and cannot determine which applies: 150–249 workers report by 7 June 2027 every three years; 100–149 report by 7 June 2031 every three years; under 100 are not required to report at all. Confirm your exact worker count. The day-one obligations above apply to you either way.', action: 'Establish your exact worker count for the reference period, then set the reporting cycle from it.' })
+  // THE BAND NAME WENT FROM THE COPY. It opened 'Your headcount band (50–249) SPANS THREE DIFFERENT
+  // DUTIES', which is true of the only SELECTABLE band reaching this arm and false of the other case
+  // that reaches it: an UNSET employees answer, where both probes return null. That reader chose no
+  // band and would be told they are in one. Unreachable only because canAdvance blocks an unanswered
+  // options question — one edit away, and a copy defect fails silently. The three duties are still
+  // enumerated below, so nothing is lost but the assertion about where the reader sits.
+  if (hasEU && pt250 !== true && pt100 !== false) regs.push({ name: 'EU Pay Transparency (2023/970) — reporting band undetermined', obligationId: 'eu-pay-transparency', jurisdiction: 'European Union', group: 'regulatory', urgency: 'monitor', urgency_label: 'CONFIRM HEADCOUNT', timing: 'Depends on exact headcount', module: 'People & Workforce', what: 'YOUR HEADCOUNT SPANS THREE DIFFERENT DUTIES under Directive (EU) 2023/970 and cannot determine which applies: 150–249 workers report by 7 June 2027 every three years; 100–149 report by 7 June 2031 every three years; under 100 are not required to report at all. Confirm your exact worker count. The day-one obligations above apply to you either way.', action: 'Establish your exact worker count for the reference period, then set the reporting cycle from it.' })
 
   // ── California pay data (Gov Code §12999, as amended by SB 1162 and SB 464) ──
   // The test is 100+ PAYROLL EMPLOYEES ANYWHERE IN THE US with AT LEAST ONE working in California —
   // TOTAL headcount, not California headcount. The old gate fired on `hasCA` alone with no size test
   // while its own copy asserted a 100+ threshold. NOTE the form collects GLOBAL headcount, which is
   // not the same population as US payroll headcount — stated in the copy rather than assumed away.
+  //
+  // THE BAND NAME WENT FROM THE null ARM. It read 'Your band (50–249) cannot settle whether you cross
+  // 100' — true of the one SELECTABLE band that reaches it, false for an UNSET employees answer,
+  // which empAtLeast also returns null for and which reaches the same arm. Telling a reader who chose
+  // nothing that they are in the 50–249 band is a fabricated fact about them, not a caveat. It is
+  // unreachable only because canAdvance blocks an unanswered options question, which is one edit from
+  // not being true — and unlike a gate defect, this one would ship silently.
   const caStaff = empAtLeast(100)
   if (hasCA && caStaff !== false) regs.push({
     name: 'California Pay Data Reporting (Gov. Code §12999)', obligationId: 'ca-pay-data',
@@ -346,7 +368,7 @@ export function computeObligations(a: Answers): Obligation[] {
     timing: 'Second Wednesday of May, annually',
     module: 'People & Workforce',
     what: caStaff === null
-      ? 'Government Code §12999, as amended by SB 1162 and SB 464, applies to employers with 100 or more PAYROLL EMPLOYEES ANYWHERE IN THE UNITED STATES where at least one works in California — it is total US headcount that counts, not California headcount. Your band (50–249) cannot settle whether you cross 100. Confirm your US payroll count. Filing is due the second Wednesday of May each year, and penalties are now MANDATORY under SB 464 rather than discretionary.'
+      ? 'Government Code §12999, as amended by SB 1162 and SB 464, applies to employers with 100 or more PAYROLL EMPLOYEES ANYWHERE IN THE UNITED STATES where at least one works in California — it is total US headcount that counts, not California headcount. What you gave cannot settle whether you cross 100. Confirm your US payroll count. Filing is due the second Wednesday of May each year, and penalties are now MANDATORY under SB 464 rather than discretionary.'
       : 'Government Code §12999, as amended by SB 1162 and SB 464, applies to employers with 100 or more PAYROLL EMPLOYEES ANYWHERE IN THE UNITED STATES where at least one works in California — total US headcount, not California headcount. Note this form collects GLOBAL headcount, so confirm the US figure. Pay data by race, ethnicity, sex and job category is due the second Wednesday of May each year, and penalties are now MANDATORY under SB 464 rather than discretionary.',
     action: 'Assemble pay and hours-worked data by establishment, job category and demographic group for the US payroll population.',
   })

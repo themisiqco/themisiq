@@ -55,6 +55,11 @@ describe('computeObligations — CSRD headcount band, the empAtLeast tri-state',
     expect(csrd!.urgency_label).toBe('CONFIRM HEADCOUNT')
     // The third state must not be silently upgraded to a firm answer.
     expect(csrd!.urgency_label).not.toBe('ACTIVE NOW')
+    // AND THE TIMING NAMES NO BAND. It read 'your 1,000–4,999 band spans that line' — true of the
+    // only selectable band reaching this arm, false for an UNSET answer, which returns null too.
+    expect(csrd!.timing).not.toContain('1,000–4,999')
+    // The boundary still has to be named, or the row says a check exists without saying what to check.
+    expect(csrd!.timing).toContain('1,000 employees')
   })
 
   it('(b) a band ENTIRELY ABOVE 1,000 settles it, and the entry is unqualified', () => {
@@ -315,9 +320,21 @@ describe('computeObligations — EU Pay Transparency, three arms', () => {
     expect(undetermined).toBeDefined()
     expect(undetermined!.urgency_label).toBe('CONFIRM HEADCOUNT')
     expect(undetermined!.timing).toBe('Depends on exact headcount')
-    // The copy names this band, and under the two-probe gate it is the only selectable band that can
-    // reach the arm — the same justification the CSRD entry gives for naming '1,000–4,999'.
-    expect(undetermined!.what).toContain('Your headcount band (50–249)')
+    // THE COPY MUST NAME NO BAND. It used to open 'Your headcount band (50–249) SPANS THREE
+    // DIFFERENT DUTIES', justified as the only SELECTABLE band reaching this arm — true, and false
+    // for the other case that reaches it: an UNSET employees answer, where both probes return null
+    // and the reader has chosen no band at all. Asserted as an ABSENCE so that re-adding any band
+    // name fails here, and paired with the positive assertion below so the arm still has to make its
+    // point.
+    // Asserted on the POSSESSIVE PHRASE, not on the digits: the copy legitimately contains '150–249'
+    // and '100–149' as statutory bands in the enumeration below. What must not appear is a claim
+    // about which one the reader is in.
+    expect(undetermined!.what).not.toContain('Your headcount band')
+    expect(undetermined!.what).not.toContain('Your band')
+    expect(undetermined!.what).toContain('SPANS THREE DIFFERENT DUTIES')
+    // The three duties are still enumerated — the uncertainty is described, not just announced.
+    expect(undetermined!.what).toContain('7 June 2027')
+    expect(undetermined!.what).toContain('7 June 2031')
     // A 50-249 employer now gets BOTH Pay Transparency entries: day-one, plus the abstention. Under
     // the dead gate it got only the first, which is the regression this length assertion catches.
     expect(eu('50_249').filter(o => o.name.includes('Pay Transparency'))).toHaveLength(2)
@@ -378,6 +395,13 @@ describe('computeObligations — California pay data size gate (NOT the populati
     expect(entry!.urgency).toBe('monitor')
     // The copy must name the US-payroll population even though the form cannot measure it.
     expect(entry!.what).toContain('ANYWHERE IN THE UNITED STATES')
+    // AND IT MUST NAME NO BAND. It read 'Your band (50–249) cannot settle whether you cross 100' —
+    // true of the one selectable band reaching this arm, a fabricated fact for an UNSET answer.
+    // Possessive phrase, not digits — same reasoning as the Pay Transparency arm.
+    expect(entry!.what).not.toContain('Your band')
+    expect(entry!.what).not.toContain('Your headcount band')
+    // The unsettled limb still has to be stated, or the abstention says nothing.
+    expect(entry!.what).toContain('cannot settle whether you cross 100')
   })
 })
 
