@@ -223,9 +223,24 @@ export function computeObligations(a: Answers): Obligation[] {
   // Reporting bands. 250+ annual from 7 June 2027; 150–249 triennial from 7 June 2027; 100–149
   // triennial from 7 June 2031; under 100 not required by the Directive. The '50_249' band spans BOTH
   // the 100 and 150 boundaries, so it determines nothing — that entry says so.
+  //
+  // TWO PROBES, NOT ONE, because the duty has TWO decisive boundaries and a single probe can only
+  // settle one of them. `pt250 === null` was the whole abstention gate and fired for NO SELECTABLE
+  // BAND: empAtLeast(250) returns false for '50_249' — the band tops out at 249, so it answers
+  // "at least 250?" definitively — and null only for an unanswered question, which canProceed
+  // (page :582) makes unreachable. So the arm was dead code, and a 50-249 EU employer silently
+  // received no reporting entry at all. Modelled now on the CSRD and CA pay data gates, which probe
+  // a boundary their target band ACTUALLY STRADDLES: `empAtLeast(100)` returns null for exactly
+  // '50_249'.
+  //   pt250 !== true  ⇒ the band cannot establish the 250+ annual duty
+  //   pt100 !== false ⇒ nor can it establish that the Directive imposes no reporting at all
+  // Both together mean the band settles NEITHER end, which is what "cannot determine which applies"
+  // means. Written as two !== rather than `pt100 === null` so that a future band straddling only the
+  // 250 line (say '100_299') also abstains instead of falling through to silence.
   const pt250 = empAtLeast(250)
+  const pt100 = empAtLeast(100)
   if (hasEU && pt250 === true) regs.push({ name: 'EU Pay Transparency (2023/970) — gender pay gap reporting', obligationId: 'eu-pay-transparency', jurisdiction: 'European Union', group: 'regulatory', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: '7 June 2027, then annually', module: 'People & Workforce', what: 'At 250 or more workers you report the gender pay gap by 7 June 2027 and ANNUALLY thereafter. A reported gap above 5% is NOT automatically unlawful: the trigger is an unjustified gap that is not remedied within six months, at which point a JOINT PAY ASSESSMENT with worker representatives follows.', action: 'Calculate the gap by category of worker performing equal work, and prepare the objective justification for any gap you find.' })
-  if (hasEU && pt250 === null) regs.push({ name: 'EU Pay Transparency (2023/970) — reporting band undetermined', obligationId: 'eu-pay-transparency', jurisdiction: 'European Union', group: 'regulatory', urgency: 'monitor', urgency_label: 'CONFIRM HEADCOUNT', timing: 'Depends on exact headcount', module: 'People & Workforce', what: 'Your headcount band (50–249) SPANS THREE DIFFERENT DUTIES under Directive (EU) 2023/970 and cannot determine which applies: 150–249 workers report by 7 June 2027 every three years; 100–149 report by 7 June 2031 every three years; under 100 are not required to report at all. Confirm your exact worker count. The day-one obligations above apply to you either way.', action: 'Establish your exact worker count for the reference period, then set the reporting cycle from it.' })
+  if (hasEU && pt250 !== true && pt100 !== false) regs.push({ name: 'EU Pay Transparency (2023/970) — reporting band undetermined', obligationId: 'eu-pay-transparency', jurisdiction: 'European Union', group: 'regulatory', urgency: 'monitor', urgency_label: 'CONFIRM HEADCOUNT', timing: 'Depends on exact headcount', module: 'People & Workforce', what: 'Your headcount band (50–249) SPANS THREE DIFFERENT DUTIES under Directive (EU) 2023/970 and cannot determine which applies: 150–249 workers report by 7 June 2027 every three years; 100–149 report by 7 June 2031 every three years; under 100 are not required to report at all. Confirm your exact worker count. The day-one obligations above apply to you either way.', action: 'Establish your exact worker count for the reference period, then set the reporting cycle from it.' })
 
   // ── California pay data (Gov Code §12999, as amended by SB 1162 and SB 464) ──
   // The test is 100+ PAYROLL EMPLOYEES ANYWHERE IN THE US with AT LEAST ONE working in California —

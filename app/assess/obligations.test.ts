@@ -177,21 +177,25 @@ describe('computeObligations — DORA is lex specialis over NIS2', () => {
 // ANY size. It is now three gates: day-one on `hasEU` alone, the 250+ annual duty on
 // `pt250 === true`, and an abstention arm on `pt250 === null`.
 //
-// ⚠️ THE THIRD ARM DOES NOT FIRE FOR THE BAND ITS OWN COPY NAMES. This is a live defect, found while
-// writing these tests, and the tests below pin CURRENT behaviour rather than intended behaviour so
-// that a fix visibly changes them. The gate is `pt250 === null` where `pt250 = empAtLeast(250)`, and
-// for the '50_249' band empAtLeast(250) returns FALSE, not null — the band tops out at 249, so it can
-// answer "at least 250?" definitively. null is returned only for an UNANSWERED employees question.
-// Consequences, both wrong:
-//   - a 50-249 EU employer gets the day-one entry and NO reporting-band entry at all, though its
-//     band spans the 100 and 150 boundaries and genuinely cannot settle which of three duties applies
-//   - a visitor who SKIPPED the employees question gets an entry reading "Your headcount band
-//     (50–249) SPANS THREE DIFFERENT DUTIES", asserting a band they never selected
-// The fix is a gate that asks whether the band straddles 100/150 — not one that asks about 250.
+// THE ABSTENTION ARM WAS DEAD CODE, and these guard the repair. It was gated on `pt250 === null`,
+// and empAtLeast(250) returns FALSE for '50_249' — the band tops out at 249, so it answers "at least
+// 250?" definitively — leaving null reachable only from an UNANSWERED employees question. A 50-249
+// EU employer therefore received the day-one entry and NO reporting-band entry at all, silently,
+// which is the exact abstention 41eb198 set out to add. The gate now takes TWO probes,
+// `pt250 !== true && pt100 !== false`, so it fires where the band settles neither boundary.
+//
+// ⚠️ ON PARTIAL ANSWERS. computeObligations is a pure function and these tests call it directly, so a
+// fixture may omit fields a real visitor could never omit. THE UNANSWERED-EMPLOYEES PATH IS
+// UNREACHABLE THROUGH THE WIZARD: `canProceed` at page.tsx:582 is `!!val` for an options question and
+// the Continue button is `disabled={!canProceed}` at :641, so the employees step cannot be advanced
+// past unanswered — and there is no deep link, no progress-bar click, no skip affordance and no
+// setStep write that jumps it (the only writes are goNext/goBack, 'Start over' → 0, and the email
+// submit → RESULTS_STEP). So a test driving a partial `answers` is UNIT-TESTING THE FUNCTION, not
+// describing a user journey, and nothing here should be read as a claim about what a customer sees.
+// Every fixture below supplies a band for that reason.
 describe('computeObligations — EU Pay Transparency, three arms', () => {
-  const eu = (employees?: string) =>
-    computeObligations(employees === undefined ? { jurisdictions: ['eu'] } : { jurisdictions: ['eu'], employees })
-  const named = (employees: string | undefined, fragment: string) =>
+  const eu = (employees: string) => computeObligations({ jurisdictions: ['eu'], employees })
+  const named = (employees: string, fragment: string) =>
     eu(employees).find(o => o.name.includes(fragment))
 
   it('day-one obligations bind at ANY size — the 40-person employer the old gate silenced', () => {
@@ -212,17 +216,29 @@ describe('computeObligations — EU Pay Transparency, three arms', () => {
     expect(named('50_249', 'day-one obligations')).toBeDefined()
   })
 
-  it('DEFECT PINNED: the 50-249 band gets NO reporting-band entry, and the abstention arm fires on an unanswered question instead', () => {
-    // What the band SHOULD get, per the entry's own copy, and does not.
-    expect(named('50_249', 'reporting band undetermined')).toBeUndefined()
-    expect(eu('50_249').filter(o => o.name.includes('Pay Transparency'))).toHaveLength(1)
-
-    // What actually reaches the abstention arm: no answer at all.
-    const undetermined = named(undefined, 'reporting band undetermined')
+  it('the 50-249 band gets the abstention arm — it settles neither the 100 nor the 250 boundary', () => {
+    const undetermined = named('50_249', 'reporting band undetermined')
     expect(undetermined).toBeDefined()
     expect(undetermined!.urgency_label).toBe('CONFIRM HEADCOUNT')
-    // And it tells that visitor they are in a band they never selected.
+    expect(undetermined!.timing).toBe('Depends on exact headcount')
+    // The copy names this band, and under the two-probe gate it is the only selectable band that can
+    // reach the arm — the same justification the CSRD entry gives for naming '1,000–4,999'.
     expect(undetermined!.what).toContain('Your headcount band (50–249)')
+    // A 50-249 employer now gets BOTH Pay Transparency entries: day-one, plus the abstention. Under
+    // the dead gate it got only the first, which is the regression this length assertion catches.
+    expect(eu('50_249').filter(o => o.name.includes('Pay Transparency'))).toHaveLength(2)
+  })
+
+  it('the arms are mutually exclusive — no band gets both the 250+ duty and the abstention', () => {
+    for (const band of ['under50', '50_249', '250_499', '500_999', '1000_4999', '5000plus']) {
+      const reporting = named(band, 'gender pay gap reporting')
+      const undetermined = named(band, 'reporting band undetermined')
+      expect(reporting && undetermined).toBeFalsy()
+      // And a band definitively under 100 gets neither: the Directive imposes no reporting there.
+      if (band === 'under50') expect(reporting || undetermined).toBeFalsy()
+      // Not vacuous — day-one is present for every band, so an empty result cannot pass this.
+      expect(named(band, 'day-one obligations')).toBeDefined()
+    }
   })
 })
 
