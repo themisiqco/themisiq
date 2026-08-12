@@ -9,7 +9,7 @@ import { buildComparabilityDisclosure, buildComparabilityRecord, observationLine
 import type { PriorYearState, InventorySummary, ComparabilityCapture, ComparabilityAnswer, ComparabilityRecord } from '../../../lib/ghg/comparability'
 import { assessCompleteness } from '../../../lib/ghg/loadSeries'
 import type { YearDataStatus } from '../../../lib/ghg/series'
-import { useEntitlement, useHasConcierge, useGhgLocationAllowance } from '../../../lib/useEntitlement'
+import { useEntitlementAccess, useHasConcierge, useGhgLocationAllowance, type EntitlementAccess } from '../../../lib/useEntitlement'
 import { generateAssurancePDF } from '../../../lib/assurancePdf'
 import { SB253_SCOPE3_FROM } from '../../../lib/sb253'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -253,6 +253,75 @@ function GHGBot({ currentStep }: { currentStep: number }) {
   )
 }
 
+// ENTRY WALL — shown INSTEAD OF a new wizard, never over a partly-filled one.
+//
+// WHY IT EXISTS. Since 11 Aug 2026 enforce_ghg_location_allowance() refuses every
+// ghg_inventories write without an active pass, and nothing on this page asked the question
+// before the customer typed. The whole wizard — locations, fuels, factors, frameworks — could be
+// filled in, and the first notice was `alert('Save failed: …')` at the end. This is the same
+// refusal, moved to before the effort.
+//
+// IT REPLACES, IT DOES NOT OVERLAY. The mid-wizard PaywallOverlay blurs and sets
+// pointerEvents:'none', which is survivable over a results panel the customer cannot edit anyway
+// and is NOT survivable over inputs — it strands whatever they typed behind a sheet of glass.
+// Rendering this in place of a fresh wizard means there is never any typed work to strand.
+//
+// THE COPY PROMISES NOTHING THE PRODUCT CANNOT HONOUR. It does not say work is preserved: on the
+// 'none' path there is nothing saved yet and nothing to preserve, and on the 'expired' path the
+// saved inventories are still readable, which is what it says instead. 'unknown' is not
+// merged into either — a read that failed is reported as a read that failed, with a retry,
+// rather than as a purchase the customer has not made.
+function GhgEntryWall({ access }: { access: Extract<EntitlementAccess, 'expired' | 'none' | 'unknown'> }) {
+  const copy = {
+    expired: {
+      title: 'Your GHG access has expired.',
+      body: 'Renewing turns saving back on. Your existing inventories are still here and still readable — open any of them from your inventory list.',
+      cta: 'Renew GHG →',
+      href: '/pricing?modules=ghg',
+      secondary: { label: 'View your inventories', href: '/dashboard/ghg?view=list' },
+    },
+    none: {
+      title: 'Saving an inventory needs the GHG module.',
+      body: 'You can price it up in a couple of minutes. Once it is on your account, everything you enter here saves as you go — and stays available for the whole of your reporting year.',
+      cta: 'See GHG pricing →',
+      href: '/pricing?modules=ghg',
+      secondary: { label: 'Back to dashboard', href: '/dashboard' },
+    },
+    unknown: {
+      title: 'We could not check your GHG access.',
+      // States what was observed, not a guess at why. The read failed; that is all that is known,
+      // and naming a cause we cannot verify is how a wrong one ends up on screen for months.
+      body: 'The check did not come back, so we have not started a new inventory rather than start one you might not be able to save. This is usually temporary.',
+      cta: 'Try again',
+      href: '',
+      secondary: { label: 'Back to dashboard', href: '/dashboard' },
+    },
+  }[access]
+
+  return (
+    <div style={{ background: '#fff', minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+      <nav style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2rem', height: 56, display: 'flex', alignItems: 'center', gap: '1rem', position: 'sticky', top: 0, zIndex: 100 }}>
+        <a href="/dashboard" style={{ textDecoration: 'none' }}><img src="/logo.png" alt="ThemisIQ" style={{ height: 24, width: 'auto', display: 'block' }} /></a>
+        <span style={{ fontSize: 12, color: '#888784' }}>/ GHG Inventory</span>
+      </nav>
+      <div style={{ maxWidth: 560, margin: '0 auto', padding: '4rem 1.5rem' }}>
+        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '2.5rem', textAlign: 'center' as const, boxShadow: '0 2px 20px rgba(0,0,0,0.04)' }}>
+          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 10 }}>{copy.title}</div>
+          <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.75rem', fontWeight: 300 }}>{copy.body}</div>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' as const }}>
+            {copy.href ? (
+              <a href={copy.href} style={{ fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none' }}>{copy.cta}</a>
+            ) : (
+              <button onClick={() => window.location.reload()} style={{ fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>{copy.cta}</button>
+            )}
+            <a href={copy.secondary.href} style={{ fontSize: 13, fontWeight: 500, padding: '11px 24px', borderRadius: 8, background: 'none', border: '0.5px solid #e8e7e4', color: '#555553', textDecoration: 'none' }}>{copy.secondary.label}</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function PaywallOverlay({ frameworks }: { frameworks: string[] }) {
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 10, backdropFilter: 'blur(8px)', background: 'rgba(248,247,245,0.85)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -406,7 +475,15 @@ const searchParams = useSearchParams()
   const [priorYearLookup, setPriorYearLookup] = useState<{ key: string; result: PriorYearLookup } | null>(null)
   const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([])
   const [addingNewCompany, setAddingNewCompany] = useState(false)
-  const isPaid = useEntitlement('ghg')
+  // FOUR-WAY, because the trigger it explains is. enforce_ghg_location_allowance() refuses EVERY
+  // ghg_inventories write without an ACTIVE pass since 11 Aug 2026, and it says something
+  // different to a lapsed customer than to someone who never bought. This hook is what lets the
+  // screen say the same thing BEFORE the work is done rather than after.
+  const ghgAccess = useEntitlementAccess('ghg')
+  // Steps 4-5 keep the meaning they were written with — "a row exists" — so the existing
+  // PaywallOverlay behaviour is unchanged for both active and expired customers. Deliberate: this
+  // change adds a gate at entry, it does not re-gate the report and export surfaces.
+  const isPaid = ghgAccess === 'active' || ghgAccess === 'expired'
   const CONCIERGE_DEV = useHasConcierge()   // concierge gate: true when the customer holds any concierge tier entitlement
   const { allowance: locationAllowance, loading: allowanceLoading } = useGhgLocationAllowance()
   const [showLocationWall, setShowLocationWall] = useState(false)
@@ -2307,6 +2384,29 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
     )
   }
 
+  // ── ENTRY GATE ────────────────────────────────────────────────────────────────────────────
+  // A NEW inventory (no id yet) requires an ACTIVE pass, because nothing entered into it can be
+  // saved without one — the trigger refuses the insert outright. Better to say so on an empty
+  // screen than after six steps of data entry.
+  //
+  // AN EXISTING INVENTORY IS DELIBERATELY NOT GATED HERE. Reading is untouched by the trigger,
+  // which fires only on INSERT/UPDATE, so a lapsed customer keeps full sight of the numbers they
+  // filed — and of the workings a verifier may still be reading. Expiry withdraws the right to
+  // write, not the record. The banner further down tells them saving is off; nothing is hidden.
+  //
+  // The loading arm renders the same "Loading…" this page already shows for `mode`, rather than
+  // the wizard: showing the form and then replacing it with a wall is the flash useEntitlement.ts
+  // documents, and it reads as access being taken away mid-session.
+  // Nested rather than two sibling ifs so the narrowing survives: after the outer test rules out
+  // 'active' and the inner one rules out 'loading', `ghgAccess` is exactly the three states the
+  // wall accepts, and a sixth state added later fails to compile here instead of rendering blank.
+  if (mode === 'wizard' && !inventoryId && ghgAccess !== 'active') {
+    if (ghgAccess === 'loading') {
+      return <div style={{ background: '#fff', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888784', fontSize: 14 }}>Loading…</div>
+    }
+    return <GhgEntryWall access={ghgAccess} />
+  }
+
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <nav style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2rem', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
@@ -2334,6 +2434,25 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
       </div>
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '2.5rem 2rem 120px' }}>
+        {/* READ-ON, SAVE-OFF. Only reachable with an existing inventory open — a new one hits the
+            entry wall above. It is a NOTICE, not a gate: nothing below is blurred or disabled,
+            because the customer can legitimately read, navigate and export from here, and the one
+            thing they cannot do is already refused by the trigger with its own message. Saying it
+            up front is the difference between a known limit and a lost afternoon. */}
+        {ghgAccess !== 'active' && ghgAccess !== 'loading' && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' as const, background: '#FEF3E2', border: '0.5px solid #ba751733', borderRadius: 10, padding: '12px 16px', marginBottom: '1.5rem' }}>
+            <span style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.6 }}>
+              {ghgAccess === 'expired'
+                ? <><strong style={{ fontWeight: 600 }}>Your GHG access has expired.</strong> You can read this inventory and everything in it. Saving changes is off until you renew.</>
+                : ghgAccess === 'unknown'
+                ? <><strong style={{ fontWeight: 600 }}>We could not check your GHG access.</strong> Reading is unaffected. Saving may not work until this clears.</>
+                : <><strong style={{ fontWeight: 600 }}>Saving needs the GHG module.</strong> You can read this inventory, but changes will not be kept.</>}
+            </span>
+            {ghgAccess !== 'unknown' && (
+              <a href="/pricing?modules=ghg" style={{ fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>{ghgAccess === 'expired' ? 'Renew GHG →' : 'See pricing →'}</a>
+            )}
+          </div>
+        )}
         {step === 0 && renderStep0()}
         {step === 1 && renderStep1()}
         {step === 2 && renderStep2()}
