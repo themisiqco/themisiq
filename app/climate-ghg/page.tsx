@@ -197,7 +197,7 @@ export default function Page() {
               ['SB 253 · CARB template', 'California, USA', '$1B+ global revenue', `${sbShortDate} (${SB253_DATE_STATUS})`, '✓ Full — pre-filled export'],
               ['CDP Climate (C6, C7, C11)', 'Global', 'Investor-requested', 'Annual · July', '✓ Full — direct mapping'],
               ['ESRS E1 · CSRD', 'European Union', '500+ employees (large)', 'FY2024 reporting', '✓ Full — ESRS E1-6'],
-              ['IFRS S2', '30+ jurisdictions', 'Adopted by jurisdiction', 'Jurisdiction-dependent', '✓ Full — scenario analysis'],
+              ['IFRS S2', 'Multiple', 'Adopted by jurisdiction', 'Jurisdiction-dependent', '✓ Full — scenario analysis'],
               ['GHG Protocol Corporate', 'Global', 'Voluntary + mandatory base', 'Ongoing', '✓ Full — methodology base'],
               ['EcoVadis', 'Global', 'Customer-requested', 'Annual', '✓ Full — E1 module maps directly'],
               ['GRI 305', 'Global', 'Voluntary', 'Annual', '✓ Full — GRI 305-1, 305-2, 305-3'],

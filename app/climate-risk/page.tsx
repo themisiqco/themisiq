@@ -160,8 +160,22 @@ export default function Page() {
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={eyebrow}>Global regulatory coverage</div>
           <h2 style={sectionTitle}>One assessment. Every regime.</h2>
-          <p style={sectionSub}>Climate risk disclosure is going mandatory across dozens of jurisdictions — most building on the same TCFD foundation. ThemisIQ maps your single assessment to all of them.</p>
+          {/* DEFERS TO THE STATUS COLUMN, DOES NOT RESTATE IT — a lede summarising those positions
+              would be a second copy to keep in step, and this one points at them instead, so the two
+              cannot drift. It carries NO COUNT and NO DIRECTION OF TRAVEL; the previous version had
+              both, reading 'going mandatory across dozens of jurisdictions' — a trend no source here
+              establishes, and a third spelling of a figure the repo states as 28 and as 36. The
+              qualified count lives in lib/ifrsS2.ts, in a slot able to carry its as-of date. */}
+          <p style={sectionSub}>These regimes differ in kind, not only in timing — the table below states where each one stands. Most build on the same TCFD foundation, so ThemisIQ maps a single assessment across all of them.</p>
         </div>
+        {/* THE STATUS COLUMN STATES A POSITION, NEVER A TREND. IFRS S2 read 'Live & expanding',
+            which asserted a DIRECTION OF TRAVEL no source here establishes — the verified figure is
+            a snapshot (28 adopted, a further 12 planning to, April 2026), and a plan to adopt is not
+            a demonstrated trajectory. Worse, it sat directly beside that dated count, so a reader
+            meeting the row today was invited to assume the number had grown since. Every other cell
+            in this column names a position and nothing more — 'In force (scope simplified by
+            Omnibus)', 'Rules expected from FY2027', 'Enforcement paused — appeal pending, no new
+            date'. A trend claim among them reads as the same kind of fact when it is not. */}
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr>
@@ -173,7 +187,7 @@ export default function Page() {
           <tbody>
             {[
               ['CSRD · ESRS E1', 'European Union', 'Large EU & EU-active companies', 'In force (scope simplified by Omnibus)', '✓ Full — ESRS E1 climate risk'],
-              ['IFRS S2 (ISSB)', '36+ jurisdictions', 'Adopted jurisdiction by jurisdiction', 'Live & expanding', '✓ Full — TCFD + scenario analysis'],
+              ['IFRS S2 (ISSB)', 'Multiple', 'Adopted jurisdiction by jurisdiction', 'Live where adopted — voluntary or mandatory', '✓ Full — TCFD + scenario analysis'],
               ['UK SRS (S1 & S2)', 'United Kingdom', 'Listed & large companies', 'Rules expected from FY2027', '✓ Full — ISSB-aligned'],
               ['Australia · AASB S2', 'Australia', 'Large entities, phased', 'Phasing in from Jan 2025', '✓ Full — IFRS S2 basis'],
               ['Canada · CSDS', 'Canada', 'ISSB-aligned, voluntary→mandatory', 'Adoption underway', '✓ Full — IFRS S2 basis'],

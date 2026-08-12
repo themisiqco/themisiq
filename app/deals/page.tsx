@@ -2,6 +2,7 @@
 import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
 import { FLAT_MODULE_PRICES } from '../../lib/pricing'
+import { IFRS_S2_ADOPTION_COUNT } from '../../lib/ifrsS2'
 
 export default function Page() {
   // Price from the single source of truth, formatted as app/cbam/page.tsx does.
@@ -38,7 +39,7 @@ export default function Page() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {[
               { val: '$M+', unit: 'liability', label: 'SB 253 compliance costs can be inherited in M&A transactions', color: '#B91C1C', bg: '#FCEBEB' },
-              { val: 'IFRS S2', unit: 'mandatory', label: 'climate risk disclosure now required in 30+ jurisdictions', color: '#7425e3', bg: '#EDE9FE' },
+              { val: 'IFRS S2', unit: 'per jurisdiction', label: IFRS_S2_ADOPTION_COUNT, color: '#7425e3', bg: '#EDE9FE' },
               { val: '72%', unit: 'of LPs', label: 'now require ESG data from portfolio companies at investment', color: '#0F6E56', bg: '#E1F5EE' },
               { val: 'Days', unit: 'not weeks', label: 'ThemisIQ climate diligence turnaround vs traditional advisors', color: '#0C447C', bg: '#E6F1FB' },
             ].map(({ val, unit, label, color, bg }) => (

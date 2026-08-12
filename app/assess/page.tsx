@@ -6,6 +6,7 @@ import {
 } from '../../lib/aiAct'
 import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_STATUS_SENTENCE, SB253_SCOPE3_FROM } from '../../lib/sb253'
 import { SB261_CITATION, SB261_STATUS_SENTENCE } from '../../lib/sb261'
+import { IFRS_S2_CITATION, IFRS_S2_STATUS_SENTENCE } from '../../lib/ifrsS2'
 // lib/cs3d.ts: "ANY SURFACE NAMING A CS3D DATE OR THRESHOLD IMPORTS FROM HERE. A literal in copy is
 // the defect." The group-parentage entry below names both thresholds and the application date.
 import { CS3D_APPLIES_FROM, CS3D_CITATION, CS3D_EMPLOYEE_THRESHOLD, CS3D_TURNOVER_THRESHOLD } from '../../lib/cs3d'
@@ -190,7 +191,7 @@ export function computeObligations(a: Answers): Obligation[] {
     action: 'Ask your parent whether the group is in CS3D scope on its consolidated figures, and whether your operations and suppliers fall inside a group due-diligence programme.',
   })
 
-  if (hasEU || hasUK || hasAU || jur.includes('canada') || jur.includes('apac')) regs.push({ name: 'IFRS S2 — Climate-related Disclosures', obligationId: 'ifrs-s2', jurisdiction: '30+ jurisdictions globally', group: 'regulatory', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: 'Active — jurisdiction dependent', module: 'Climate · Risk', what: 'IFRS S2 has been adopted by 30+ jurisdictions including the EU, UK, Australia, Canada, Singapore, and Japan.', action: 'Run IFRS S2 physical and transition risk assessment.' })
+  if (hasEU || hasUK || hasAU || jur.includes('canada') || jur.includes('apac')) regs.push({ name: 'IFRS S2 — Climate-related Disclosures', obligationId: 'ifrs-s2', jurisdiction: 'Multiple jurisdictions', group: 'regulatory', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: 'Adoption is jurisdiction by jurisdiction — voluntary in some, mandatory in others', module: 'Climate · Risk', what: `${IFRS_S2_CITATION}. ${IFRS_S2_STATUS_SENTENCE}`, action: 'Run IFRS S2 physical and transition risk assessment.' })
   // Both timing arms named 2 August 2026, and the critical arm appended a HARDCODED '— 77 days',
   // which was an interval to a date that has since both passed and moved. The two dates are printed
   // together because this screen never learns whether a system is stand-alone or embedded in a
