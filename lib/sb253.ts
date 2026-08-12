@@ -2,16 +2,21 @@
 // SINGLE SOURCE for the California SB 253 first-report date — and, as importantly, for the fact that
 // THE DATE IS NOT SETTLED.
 //
-// IT HAS BEEN SET THREE TIMES. CARB staff first floated 30 June 2026; the Board adopted 10 August 2026
-// in the initial regulation on 26 February 2026; the modified regulation of 27 July 2026 proposes
-// 10 November 2026. Public comment on that modification closed 11 August 2026 and it still requires
-// Office of Administrative Law approval. Until CARB finalises and OAL approves, 10 November 2026 is a
-// PROPOSAL, not law — which is why SB253_DATE_STATUS exists and why every surface must carry it.
+// IT HAS BEEN SET MORE THAN ONCE, AND NOTHING IS IN FORCE. The Board approved the initial regulation
+// on 26 February 2026 — Title 17 CCR, Article 6, sections 96070-96077 — carrying a 10 August 2026
+// first-report date, subject to Office of Administrative Law approval. CARB submitted it to OAL on
+// 20 May 2026 and then WITHDREW it, to clarify certain requirements and to defer the date from
+// 10 August to 10 November 2026. Modified text was published 27 July 2026 with public comment closing
+// 11 August 2026; as of 12 August 2026 the package has not returned to OAL. So 10 August was never in
+// force either — it died with the withdrawal — and 10 November 2026 is a PROPOSAL, not law. That is
+// why SB253_DATE_STATUS exists and why every surface must carry it.
 //
-// ⚠️ VERIFIED AGAINST SECONDARY SOURCES ONLY, 10 August 2026. PRIMARY SOURCE NOT YET CHECKED —
-// confirm against CARB's own rulemaking page before relying on this, and before any customer-facing
-// claim is treated as final. This is the one constant in the repo whose provenance is weaker than the
-// surfaces that consume it, and it should not be promoted to "settled" without that check.
+// ✅ VERIFIED AGAINST PRIMARY SOURCES, 12 August 2026 — CARB's Notice of Public Availability of
+// Modified Text (15-Day Notice), published 27 July 2026, and CARB's rulemaking page for the California
+// Corporate Greenhouse Gas Reporting and Climate-Related Financial Risk Disclosure Initial Regulation.
+// Note the rulemaking page was itself stale when checked (last reviewed 29 December 2025) and still
+// showed the Final Package pending at OAL, which the withdrawal had already overtaken — the 15-Day
+// Notice is the governing record. Re-check before promoting any date here to final.
 //
 // WHY THIS FILE EXISTS. The date lived as eight prose literals in five spellings — 'November 10, 2026',
 // 'Nov 10, 2026', 'Nov 10', 'November 10', '2026' — and as FIVE independent countdown blocks with
@@ -28,19 +33,20 @@
 export const SB253_FIRST_REPORT_DATE = '10 November 2026'
 
 // 'proposed', never 'final', until CARB finalises and OAL approves. A surface that prints the date
-// without this word states as settled something that has already moved twice.
+// without this word states as settled a date that has already moved once, and an earlier date
+// that was approved and then withdrawn before it ever took effect.
 export const SB253_DATE_STATUS = 'proposed'
 
 export const SB253_SCOPE3_FROM = '2027'
 
 export const SB253_CITATION =
-  'California Health & Safety Code §38532; CARB initial regulation adopted 26 February 2026, modified 27 July 2026'
+  'California Health & Safety Code §38532; CARB initial regulation (Title 17 CCR §§96070-96077) approved by the Board 26 February 2026, withdrawn from OAL review, modified text published 27 July 2026 — not yet approved'
 
 // The full posture, for any surface with room for a sentence. States what is proposed, what it covers,
 // that it is not final, what remains outstanding, and that it has moved — so a reader can judge how
 // much to rely on it rather than being handed a countdown.
 export const SB253_STATUS_SENTENCE =
-  'CARB has proposed 10 November 2026 for the first SB 253 report — Scope 1 and 2 for the prior fiscal year. The date is not final: the modified regulation closed public comment on 11 August 2026 and still requires OAL approval. It has moved twice already.'
+  'CARB has proposed 10 November 2026 for the first SB 253 report — Scope 1 and 2 for the prior fiscal year. The date is not final: the modified regulation closed public comment on 11 August 2026 and still requires OAL approval. An earlier date of 10 August 2026 was approved and then withdrawn before it took effect.'
 
 // For a chip, tag or nav-width slot where the sentence will not fit. Carries the posture in the
 // shortest honest form; if even this does not fit, the surface should name no date.
