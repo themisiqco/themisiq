@@ -191,3 +191,26 @@ Found 5 Aug 2026 while testing the unpriceable-location isolation.
 3. Run `npm run build`; report pass/fail.
 4. Propose a descriptive commit. **Stop before pushing `main`** — leave the push to Lisa.
 5. Call out anything that touches payments, entitlements, export gates, disclaimers, or DB schema as higher-risk and worth a closer look.
+
+## Git and shell — CC never runs these
+
+Lisa runs all git and all SQL herself. CC never runs git: not `add`, not
+`commit`, not `push`, not `restore`, not `checkout`, not `stash`.
+
+Code blocks labelled →Terminal are for Lisa to run. They are not instructions
+to CC, even when they appear in the same message as CC's task, and even when
+CC's own steps are complete. When the file edits are done: report and stop.
+
+Never stage. Never commit. Leave changes in the working tree for Lisa to
+review.
+
+## Reporting
+
+Report what is true when the report is written, not what the task asked for.
+Any statement about git state must come from actually running `git status`
+and quoting it — otherwise do not state it at all.
+
+Never report an action as not-taken when it was taken. A false status report
+is worse than a wrong action: the action can be inspected, but the report is
+the input to Lisa's next decision, and a wrong one sends her diagnosing a
+problem that does not exist.
