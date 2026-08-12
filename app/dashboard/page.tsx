@@ -124,7 +124,7 @@ const MODULES: DashboardModule[] = [
     href: '/dashboard/supply-chain/portal',
     color: '#7425e3',
     bg: '#EDE9FE',
-    frameworks: ['EcoVadis', 'CS3D', 'Modern Slavery', 'CDP C12'],
+    frameworks: ['EcoVadis', 'CS3D', 'Modern Slavery', 'CDP supplier engagement'],
     urgency: null,
     previewable: false,
   },

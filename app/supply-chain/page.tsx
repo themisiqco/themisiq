@@ -29,7 +29,7 @@ export default function Page() {
               <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
-              {['Scope 3 Cat.1', 'ESRS S2', 'CS3D', 'EcoVadis', 'CDP C12', 'Modern Slavery', 'UNGP', 'GRI 414'].map(tag => (
+              {['Scope 3 Cat.1', 'ESRS S2', 'CS3D', 'EcoVadis', 'CDP supplier engagement', 'Modern Slavery', 'UNGP', 'GRI 414'].map(tag => (
                 <span key={tag} style={{ fontSize: 11, padding: '4px 12px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#555553' }}>{tag}</span>
               ))}
             </div>
@@ -40,7 +40,7 @@ export default function Page() {
             {[
               { val: '70%', unit: 'of emissions', label: 'typically in Scope 3 Cat.1 for manufacturers', color: '#7425e3', bg: '#EDE9FE' },
               { val: 'CS3D', unit: CS3D_APPLIES_FROM, label: 'EU supply chain due diligence — civil liability for failures', color: '#B91C1C', bg: '#FCEBEB' },
-              { val: '5+', unit: 'frameworks', label: 'CS3D · EcoVadis · Modern Slavery · CDP C12 · ESRS S2 — one platform', color: '#0F6E56', bg: '#E1F5EE' },
+              { val: '5+', unit: 'frameworks', label: 'CS3D · EcoVadis · Modern Slavery · CDP supplier engagement · ESRS S2 — one platform', color: '#0F6E56', bg: '#E1F5EE' },
               { val: '$2,900', unit: 'portal/yr', label: 'vs $15,000–$50,000 for EcoVadis supplier outreach — same outcome', color: '#0C447C', bg: '#E6F1FB' },
             ].map(({ val, unit, label, color, bg }) => (
               <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid ${color}22` }}>
@@ -80,7 +80,7 @@ export default function Page() {
               { fw: 'EU CS3D', scope: 'Human rights + environmental HRDD', deadline: `${CS3D_APPLIES_FROM} (large companies)`, urgency: 'critical' },
               { fw: 'ESRS S2 + G1', scope: 'Value chain workers + business conduct', deadline: 'FY2024 (large EU)', urgency: 'critical' },
               { fw: 'SB 253 Scope 3', scope: 'Category 1 purchased goods', deadline: '2027 (California)', urgency: 'high' },
-              { fw: 'CDP C12', scope: 'Supplier engagement programme', deadline: 'Annual · July', urgency: 'medium' },
+              { fw: 'CDP supplier engagement', scope: 'Supplier engagement programme', deadline: 'Annual · July', urgency: 'medium' },
               { fw: 'Modern Slavery Act', scope: 'UK + Australia transparency statement', deadline: 'Annual', urgency: 'medium' },
               { fw: 'EcoVadis', scope: 'Supplier sustainability ratings', deadline: 'Customer-requested', urgency: 'medium' },
             ].map(({ fw, scope, deadline, urgency }) => {
@@ -111,7 +111,7 @@ export default function Page() {
             { icon: '', title: 'Supplier portal', desc: 'Branded supplier sustainability data collection portal. Suppliers complete structured questionnaires on emissions, labour practices, and environmental performance — no spreadsheets.' },
             { icon: '', title: 'Scope 3 Cat.1 primary data', desc: 'Collect spend data, activity data, and supplier-specific emission factors directly from your supply base — the primary supplier data that feeds your Scope 3 Category 1 calculation in the GHG module, across all GHG Protocol methods.' },
             { icon: '', title: 'Human rights risk mapping', desc: 'Risk-based HRDD across your value chain. Country and sector risk scoring. Supplier prioritisation for deeper assessment. Grievance mechanism management.' },
-            { icon: '', title: 'EcoVadis integration', desc: 'EcoVadis scorecard tracking, improvement plan management, and CDP C12 supplier engagement programme documentation — all in one platform.' },
+            { icon: '', title: 'EcoVadis integration', desc: 'EcoVadis scorecard tracking, improvement plan management, and CDP supplier engagement programme documentation — all in one platform.' },
             { icon: '', title: 'Modern Slavery Act', desc: 'UK and Australia Modern Slavery Act statement preparation. Supply chain mapping, risk identification, and director sign-off workflow. Published to government registry.' },
             { icon: '', title: 'ESRS S2 + G1 disclosure', desc: 'ESRS S2 (value chain workers) and G1 (business conduct) disclosure preparation. Supplier due diligence policy documentation and outcomes reporting.' },
           ].map(({ icon, title, desc }) => (
@@ -136,7 +136,7 @@ export default function Page() {
               ['01', 'Map your supply base', 'Upload your supplier list. ThemisIQ risk-scores each supplier by country, sector, and spend — prioritising who needs deep assessment first.'],
               ['02', 'Collect supplier data', 'Send branded data collection requests via the ThemisIQ supplier portal. Track completion status and chase non-responders automatically.'],
               ['03', 'Feed Scope 3 Cat.1', 'Primary supplier data flows into the GHG module, where your Scope 3 Category 1 calculation runs. Spend-based estimates for non-respondents fill the gaps.'],
-              ['04', 'Generate disclosures', 'ESRS S2, CDP C12, Modern Slavery Act statement, and CS3D due diligence documentation — all generated from your supplier programme data.'],
+              ['04', 'Generate disclosures', 'ESRS S2, CDP supplier engagement, Modern Slavery Act statement, and CS3D due diligence documentation — all generated from your supplier programme data.'],
             ].map(([num, title, desc]) => (
               <div key={num}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '2.5rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', opacity: 0.5, marginBottom: '0.75rem' }}>{num}</div>

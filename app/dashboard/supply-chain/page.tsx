@@ -147,7 +147,7 @@ const FRAMEWORK_CONFIG: Record<Framework, { label: string; desc: string }> = {
   cs3d:          { label: 'EU CS3D', desc: `Human rights & environmental due diligence · ${CS3D_APPLIES_FROM}` },
   ecovadis:      { label: 'EcoVadis', desc: 'Supplier sustainability ratings · customer-requested' },
   modern_slavery:{ label: 'Modern Slavery Act', desc: 'UK & Australia transparency statement · annual' },
-  cdp_c12:       { label: 'CDP C12', desc: 'Supplier engagement programme · annual · July' },
+  cdp_c12:       { label: 'CDP supplier engagement', desc: 'Supplier engagement programme · annual · July' },
   esrs_s2:       { label: 'ESRS S2', desc: 'Value chain workers disclosure · FY2024 active' },
   scope3:        { label: 'Scope 3 Cat.1', desc: 'GHG Protocol purchased goods & services' },
 }
@@ -548,7 +548,7 @@ export default function SupplyChainDashboard() {
 
           <div style={{ marginTop: 16, background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.2)', borderRadius: 10, padding: '1rem' }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#0C447C', marginBottom: 4 }}>Next step: primary data collection</div>
-            <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>For high-emission suppliers, switch from spend-based to primary data — request actual activity data via the ThemisIQ supplier portal. This improves accuracy and satisfies SB 253, CDP C12 and ESRS E1-6 requirements.</div>
+            <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>For high-emission suppliers, switch from spend-based to primary data — request actual activity data via the ThemisIQ supplier portal. This improves accuracy and satisfies SB 253, CDP supplier engagement and ESRS E1-6 requirements.</div>
           </div>
         </>
       )}
