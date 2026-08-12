@@ -59,8 +59,19 @@ export const NIS2_TIMING = 'Applies through national law — transposition deadl
 // sector without size catches a two-person consultancy, size without sector catches a large retailer
 // in no Annex at all. That pair was the /assess gate's original defect, and stating them apart here
 // would invite it back at the next call site.
+//
+// OPENS WITH AN ANAPHOR, NOT WITH THE REGIME'S NAME. It read 'NIS2 reaches entities…', which
+// composed after NIS2_CITATION as 'Directive (EU) 2022/2555 (NIS2). NIS2 reaches entities…' — the
+// name twice in eleven words. Two rewrites were rejected on the way here, both caught by rendering
+// the composed string rather than reading the constant: deleting the leading 'NIS2' leaves
+// 'Reaches entities…', a subjectless fragment that reads worse alone than the repetition read
+// composed; and '…— are in scope.' collided with the per-visitor sentence that follows it at the
+// call site, 'Your sector and size place you in scope.' 'The Directive' is generic enough to follow
+// any citation, specific enough to stand alone, and leaves 'in scope' free for the sentence that
+// applies it to the reader. EVERY CONSTANT HERE HAS TO READ BOTH WAYS, since none controls where it
+// is rendered — check the composed output, not the literal.
 export const NIS2_SIZE_TEST =
-  'NIS2 reaches entities in an Annex I or Annex II sector that exceed the medium-enterprise thresholds — 50 or more staff, or EUR 10,000,000 or more turnover.'
+  'The Directive applies to entities in an Annex I or Annex II sector that exceed the medium-enterprise thresholds — 50 or more staff, or EUR 10,000,000 or more turnover.'
 
 // WHAT DORA ACTUALLY DISPLACES, and — the load-bearing half — what it does not. Art. 4(1) disapplies
 // the RELEVANT PROVISIONS of the Directive to entities covered by a sector-specific Union act
@@ -74,6 +85,21 @@ export const NIS2_SIZE_TEST =
 // replace still live. See NIS2_SURVIVING_DUTY for the concrete one.
 export const NIS2_DORA_CARVE_OUT =
   'Where a sector-specific Union act imposes at least equivalent requirements, art. 4(1) disapplies the relevant provisions of NIS2 to the entities it covers, including the supervision and enforcement provisions in Chapter VII. Art. 4(2) sets the equivalence test by reference to art. 21(1) and (2) for cybersecurity risk-management measures and art. 23(1) to (6) for incident notification. NIS2 does not cease to apply: what is displaced is the provisions the sector-specific act replaces, not the Directive.'
+
+// THE PROVISIONS THEMSELVES, for an entity NIS2 reaches in full. Named with their articles because
+// this repo was describing them in prose on one surface while citing them by number on another, with
+// nothing connecting the two — and a description that drifts from its citation is the defect the
+// secondary-source warning at the head of this file is about, one step removed.
+//
+// ⚠️ THESE ARE EXACTLY WHAT ART. 4 DISPLACES FOR A DORA FINANCIAL ENTITY. NIS2_CORE_DUTIES and
+// NIS2_DORA_CARVE_OUT describe the same provisions from opposite sides — one says what is owed, the
+// other says what is lifted — so THEY MUST STAY IN STEP. If you edit one and not the other, the
+// other is probably now wrong, and the page will tell a bank that something is displaced while
+// telling everyone else it is owed under a different article. Board-level accountability carries NO
+// article number here on purpose: art. 21 and art. 23 are the two this file has verified, and
+// guessing a third is the exact move the header forbids.
+export const NIS2_CORE_DUTIES =
+  'Board-level accountability, cybersecurity risk-management measures under art. 21, and incident notification under art. 23 — a 24-hour early warning followed by a 72-hour notification.'
 
 // THE DUTY THAT SURVIVES FOR A DORA FINANCIAL ENTITY. Art. 3(4), not art. 27 — see the secondary-
 // source warning at the head of this file, which exists because this is exactly the constant that

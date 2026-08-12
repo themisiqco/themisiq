@@ -7,7 +7,7 @@ import {
 import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_STATUS_SENTENCE, SB253_SCOPE3_FROM } from '../../lib/sb253'
 import { SB261_CITATION, SB261_STATUS_SENTENCE } from '../../lib/sb261'
 import { IFRS_S2_CITATION, IFRS_S2_STATUS_SENTENCE } from '../../lib/ifrsS2'
-import { NIS2_CITATION, NIS2_TIMING, NIS2_SIZE_TEST, NIS2_DORA_CARVE_OUT, NIS2_SURVIVING_DUTY } from '../../lib/nis2'
+import { NIS2_CITATION, NIS2_TIMING, NIS2_SIZE_TEST, NIS2_CORE_DUTIES, NIS2_DORA_CARVE_OUT, NIS2_SURVIVING_DUTY } from '../../lib/nis2'
 // lib/cs3d.ts: "ANY SURFACE NAMING A CS3D DATE OR THRESHOLD IMPORTS FROM HERE. A literal in copy is
 // the defect." The group-parentage entry below names both thresholds and the application date.
 import { CS3D_APPLIES_FROM, CS3D_CITATION, CS3D_EMPLOYEE_THRESHOLD, CS3D_TURNOVER_THRESHOLD } from '../../lib/cs3d'
@@ -252,7 +252,7 @@ export function computeObligations(a: Answers): Obligation[] {
   // shape as Modern Slavery's undated "the threshold is UNDER REVIEW". If it is ever wanted it
   // belongs in a lib/nis2.ts with a dated provenance header, alongside the directive number and the
   // Annex thresholds, which are also call-site literals today.
-  if (hasEU && nis2Sectors && nis2Size && !doraDisplacesNis2) regs.push({ name: 'EU NIS2 Directive — Network and Information Security', obligationId: 'nis2', jurisdiction: 'European Union · 18 sectors', group: 'regulatory', urgency: 'critical', urgency_label: 'ACTIVE NOW', timing: NIS2_TIMING, module: 'Cyber Governance', what: `${NIS2_CITATION}. ${NIS2_SIZE_TEST} Your sector and size place you in scope. Board-level accountability, mandatory security measures and 24-hour / 72-hour incident notification apply. ${fxNote}`, action: 'Conduct NIS2 gap assessment and document board cyber governance immediately.' })
+  if (hasEU && nis2Sectors && nis2Size && !doraDisplacesNis2) regs.push({ name: 'EU NIS2 Directive — Network and Information Security', obligationId: 'nis2', jurisdiction: 'European Union · Annex I and II sectors', group: 'regulatory', urgency: 'critical', urgency_label: 'ACTIVE NOW', timing: NIS2_TIMING, module: 'Cyber Governance', what: `${NIS2_CITATION}. ${NIS2_SIZE_TEST} Your sector and size place you in scope. ${NIS2_CORE_DUTIES} ${fxNote}`, action: 'Conduct NIS2 gap assessment and document board cyber governance immediately.' })
   // THE EXACT COMPLEMENT OF THE ENTRY ABOVE — same three conjuncts, the last one negated — so the
   // two are mutually exclusive BY CONSTRUCTION rather than by two conditions that happen to agree.
   // A financial entity used to get neither: the DORA entry told it the risk-management and incident
