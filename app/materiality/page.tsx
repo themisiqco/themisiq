@@ -11,7 +11,11 @@
 // has a dedicated sustainability lead.
 
 import Link from 'next/link'
-import { PACKS, NEW_PRICING_ACTIVE, cartQuote, type ModuleKey } from '@/lib/pricing'
+// PACKS and NEW_PRICING_ACTIVE were imported for a dead branch and are gone from this file only.
+// PACKS remains LIVE in app/api/checkout, app/api/admin/create-invoice, app/page.tsx and
+// app/get-started/_pack/PackFlow.tsx — do not read its removal here as a signal it is retired.
+import { cartQuote, FLAT_MODULE_PRICES, type ModuleKey } from '@/lib/pricing'
+import { IFRS_S2_STATUS_SENTENCE, IFRS_S2_SHORT } from '@/lib/ifrsS2'
 
 const GRAD = 'linear-gradient(135deg, #7425e3, #1fb1ff, #64fe3e)'
 
@@ -45,6 +49,14 @@ const ghostBtn: React.CSSProperties = {
 }
 
 export default function MaterialityMarketingPage() {
+  // THERE IS NO MATERIALITY MODULE TO BUY, and the buy path has to say so. Materiality is delivered
+  // by the Climate Risk module — lib/pricing.ts states it on the ModuleKey itself ('climate-risk' //
+  // includes the materiality wizard + report), /dashboard/materiality is a redirect to
+  // /dashboard/climate-risk, and the gate there reads useEntitlement('climate-risk'). So the price
+  // is Climate Risk's, the order shorthand is 'risk', and the line beside each button tells the
+  // customer what they are actually buying. Same shape as app/supply-chain/page.tsx:9 — a bare
+  // FLAT_MODULE_PRICES lookup, a plain <a> to /order, and the price as the label.
+  const riskPrice = FLAT_MODULE_PRICES['climate-risk'].toLocaleString('en-US')
   return (
     <div style={s.page}>
 
@@ -74,27 +86,31 @@ export default function MaterialityMarketingPage() {
             <span style={gradText}>Knowing what matters for your organization.</span>
           </h1>
           <p style={{ fontSize: 15, color: '#555553', fontWeight: 300, lineHeight: 1.8, maxWidth: 620, margin: '0 auto 28px' }}>
-            Materiality determination is now a mandatory part of sustainability disclosure under both IFRS S2 and CSRD ESRS. ThemisIQ's Materiality Assessment delivers single materiality for IFRS S2 and double materiality for CSRD — through one engine, with the methodology your auditor expects.
+            Both IFRS S2 and CSRD ESRS require you to determine which sustainability topics are material, and to document how you reached that judgment. What differs is what obliges you: CSRD applies as EU law, while IFRS S2 binds only where a jurisdiction has adopted it. ThemisIQ&apos;s Materiality Assessment delivers single materiality for IFRS S2 and double materiality for CSRD — through one engine, with the methodology your auditor expects.
           </p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
             <a href="#samples" style={primaryBtn}>See a sample report ↓</a>
+            <a href="/order?modules=risk" style={ghostBtn}>${riskPrice}/yr</a>
             <Link href="/advisory" style={ghostBtn}>Talk to a specialist</Link>
           </div>
+          <p style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 14 }}>
+            Materiality comes with Climate Risk — there is no separate module to buy.
+          </p>
         </section>
 
         {/* ── REGULATORY URGENCY ─────────────────────────────────────────── */}
         <section style={s.section}>
           <div style={s.eyebrow}>Why now</div>
-          <h2 style={s.sectionTitle}>Materiality determination is no longer optional.</h2>
+          <h2 style={s.sectionTitle}>Both frameworks make you determine it — and show your working.</h2>
           <p style={s.sectionLead}>
             Both major global frameworks now require entities to formally determine which sustainability topics are material — and to document the methodology behind that judgment. Auditors and assurance providers expect to see this work, not just its conclusions.
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginTop: 8 }}>
             <div style={{ background: '#E6F1FB', border: '1px solid rgba(12,68,124,0.15)', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0C447C', marginBottom: 6 }}>IFRS S2 / ISSB</div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>Active globally</div>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>{IFRS_S2_SHORT}</div>
               <p style={{ fontSize: 13, color: '#374151', lineHeight: 1.7, margin: 0 }}>
-                Effective FY2024+ in Canada (CSDS), the UK, Australia, New Zealand, Brazil, Japan and across 30+ ISSB-adopting jurisdictions. S2 requires identifying climate-related risks and opportunities that could reasonably be expected to affect enterprise value — a single (financial) materiality judgment.
+                {IFRS_S2_STATUS_SENTENCE} S2 requires identifying climate-related risks and opportunities that could reasonably be expected to affect enterprise value — a single (financial) materiality judgment.
               </p>
             </div>
             <div style={{ background: '#FEF3E2', border: '1px solid rgba(186,117,23,0.15)', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
@@ -289,39 +305,44 @@ export default function MaterialityMarketingPage() {
 
         {/* ── PRICING TEASER ──────────────────────────────────────────────── */}
         <section style={s.section}>
-          <div style={s.eyebrow}>Two paths to the deliverable</div>
-          <h2 style={s.sectionTitle}>Choose by reporting obligation — or by who's asking.</h2>
+          {/* THIS SECTION USED TO BE THE ONLY BUY PATH ON THE PAGE, AND IT SOLD SOMETHING THAT DOES
+              NOT EXIST. The eyebrow read 'Two paths to the deliverable' and the lede said materiality
+              was 'included in our reporting-obligation packs and in three of our driver-based starter
+              packs' — naming two pack products, 'IFRS S2 Compliance Pack' and 'CSRD Compliance Pack',
+              that the cart cannot sell. Meanwhile the ACTUAL path was absent from the page entirely:
+              materiality is delivered by the Climate Risk module, and nothing said so or priced it.
+              A visitor wanting to buy had two dead product names and no live one.
+              WHAT CHANGED. The hero and final CTA now carry Climate Risk at its own price, so this
+              section stops being a 'path' and becomes what it always described — the combinations
+              people buy for a given obligation. The FIGURES ARE UNCHANGED and were never wrong: both
+              come from cartQuote, the same function /api/checkout charges from, so a price shown here
+              and a price charged cannot disagree. Only the framing was false.
+              The dead `!NEW_PRICING_ACTIVE` arms are deleted rather than left: NEW_PRICING_ACTIVE has
+              been true since the June 2026 rescope, so they could not render, and a branch that
+              cannot run is a second price nobody is checking. */}
+          <div style={s.eyebrow}>What people usually buy alongside it</div>
+          <h2 style={s.sectionTitle}>Two combinations — chosen by what you have to report.</h2>
           <p style={s.sectionLead}>
-            Materiality assessment is included in our reporting-obligation packs and in three of our driver-based starter packs.
+            Climate Risk covers the materiality assessment on its own. Most buyers add the modules their reporting obligation also asks for — these are the two most common combinations, priced as they would be at checkout.
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginTop: 8 }}>
             <div style={{ background: '#E6F1FB', border: '1.5px solid #0C447C', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0C447C', marginBottom: 4 }}>IFRS S2 / ISSB</div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 4 }}>IFRS S2 Compliance Pack</div>
-              {!NEW_PRICING_ACTIVE && (
-                <div style={{ fontSize: 13, color: '#555553', marginBottom: 12 }}>From <strong>${PACKS['ifrs-s2-compliance'].price.toLocaleString()}</strong> /year</div>
-              )}
-              {NEW_PRICING_ACTIVE && (
-                <div style={{ fontSize: 13, color: '#555553', marginBottom: 12 }}>From <strong>${cartQuote({ modules: ['ghg', 'climate-risk'] as ModuleKey[], ghgTier: 'starter' }).totalUSD.toLocaleString()}</strong> /year</div>
-              )}
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 4 }}>For an IFRS S2 disclosure</div>
+              <div style={{ fontSize: 13, color: '#555553', marginBottom: 12 }}>From <strong>${cartQuote({ modules: ['ghg', 'climate-risk'] as ModuleKey[], ghgTier: 'starter' }).totalUSD.toLocaleString()}</strong> /year</div>
               <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.7, marginBottom: 12 }}>
                 IFRS S2 single materiality · climate risk · scenario analysis · GHG inventory · TCFD-aligned narrative.
               </div>
-              <Link href="/pricing?modules=risk,ghg" style={{ ...ghostBtn, padding: '8px 16px', fontSize: 12 }}>See full pricing →</Link>
+              <a href="/order?modules=risk,ghg" style={{ ...ghostBtn, padding: '8px 16px', fontSize: 12 }}>Add GHG and continue →</a>
             </div>
             <div style={{ background: '#eef2ff', border: '1.5px solid #1e1b4b', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1e1b4b', marginBottom: 4 }}>CSRD / ESRS</div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 4 }}>CSRD Compliance Pack</div>
-              {!NEW_PRICING_ACTIVE && (
-                <div style={{ fontSize: 13, color: '#555553', marginBottom: 12 }}>From <strong>${PACKS['csrd-compliance'].price.toLocaleString()}</strong> /year</div>
-              )}
-              {NEW_PRICING_ACTIVE && (
-                <div style={{ fontSize: 13, color: '#555553', marginBottom: 12 }}>From <strong>${cartQuote({ modules: ['ghg', 'climate-risk', 'supply-chain', 'people'] as ModuleKey[], ghgTier: 'starter' }).totalUSD.toLocaleString()}</strong> /year</div>
-              )}
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 4 }}>For CSRD reporting</div>
+              <div style={{ fontSize: 13, color: '#555553', marginBottom: 12 }}>From <strong>${cartQuote({ modules: ['ghg', 'climate-risk', 'supply-chain', 'people'] as ModuleKey[], ghgTier: 'starter' }).totalUSD.toLocaleString()}</strong> /year</div>
               <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.7, marginBottom: 12 }}>
                 CSRD double materiality · climate risk · supply chain · people &amp; workforce · governance · GHG.
               </div>
-              <Link href="/pricing?modules=risk,ghg,supply,people" style={{ ...ghostBtn, padding: '8px 16px', fontSize: 12 }}>See full pricing →</Link>
+              <a href="/order?modules=risk,ghg,supply,people" style={{ ...ghostBtn, padding: '8px 16px', fontSize: 12 }}>Add all four and continue →</a>
             </div>
           </div>
         </section>
@@ -337,8 +358,12 @@ export default function MaterialityMarketingPage() {
             </p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
               <Link href="/advisory" style={primaryBtn}>Talk to a specialist →</Link>
+              <a href="/order?modules=risk" style={ghostBtn}>${riskPrice}/yr</a>
               <Link href="/pricing" style={ghostBtn}>See pricing</Link>
             </div>
+            <p style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 14 }}>
+              Materiality comes with Climate Risk — there is no separate module to buy.
+            </p>
           </div>
         </section>
 
