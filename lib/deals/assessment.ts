@@ -1188,6 +1188,20 @@ export const getFrameworkApplicability = (
 // same order, still string[]. `currency` defaults to USD so the old 4-arg call site still compiles.
 // Near-threshold frameworks are NOT silently promoted into this list — it stays the legal in/out.
 // Read getFrameworkApplicability when you need the marker.
+// ── THE CANONICAL JURISDICTION LIST ──────────────────────────────────────────────────────────────
+//
+// LIVES HERE, WITH THE ENGINE THAT MATCHES ON IT. It was declared in app/dashboard/deals/page.tsx —
+// the dropdown that produces the values — which put the list in one consumer and the interpretation
+// in another, with nothing holding them together. The engine matches by EXACT EQUALITY
+// (`jurisdiction === 'UK'` and eight siblings), and a value hitting no branch does not error: it
+// falls through to the universal baseline and renders as REGIME_FALLBACK — 'GHG Protocol / IFRS S2'
+// — on the target-facing /deals/[token] page, reading exactly like a real answer.
+//
+// So the list and the branches must agree, and agreement is now testable: see the jurisdiction
+// coverage block in assessment.test.ts, which fails if a member is added without the engine learning
+// it, or if an existing one stops resolving. The wizard imports this rather than declaring its own.
+export const JURISDICTIONS = ['USA', 'European Union', 'UK', 'Canada', 'Australia', 'Global', 'Other']
+
 export const getApplicableFrameworks = (
   jurisdiction: string, revenue: number, sector: string, dealType: string, currency: string = 'USD',
   size: { total_assets?: number | null; employee_count?: number | null } = {},

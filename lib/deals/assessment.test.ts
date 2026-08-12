@@ -9,7 +9,7 @@ import {
   isRevenueDeclared, assessmentView, notAssessedNote, partiallyAssessedNote, routeNotMetNote,
   partialHeadingPhrase,
   nearThresholdNoneNote, resolveFieldsPrompt, FIELD_LABELS, FIELD_FORM_LABELS,
-  getObligations, obligationPriceLabel, SECTOR_RISKS,
+  getObligations, obligationPriceLabel, SECTOR_RISKS, JURISDICTIONS,
   type DealCurrency, type FrameworkApplicability, type DealSize, type ThresholdLimb,
 } from './assessment'
 import { REGIME_COLUMNS } from './exportPipelineXlsx'
@@ -1080,5 +1080,103 @@ describe('pipeline export: every rule the engine can emit needs its own spreadsh
       `against getFrameworkApplicability in lib/deals/assessment.ts first. Remove the column only if\n` +
       `the framework itself is genuinely gone.\n`,
     ).toEqual([])
+  })
+})
+
+// ── JURISDICTION COVERAGE: the wizard's list and the engine must agree ───────────────────────────
+//
+// THE HAZARD. The engine matches jurisdiction by EXACT EQUALITY — `jurisdiction === 'UK'` and eight
+// siblings. A value that hits no branch does not error and does not return empty: it falls through
+// to the universal baseline (IFRS S2, TCFD), and makeMapFramework then has no REGIME_CANDIDATE to
+// license, so it renders REGIME_FALLBACK — 'GHG Protocol / IFRS S2'. On app/deals/[token]/page.tsx
+// that is shown TO THE TARGET COMPANY as its regulatory position. A methodology and a standard, in
+// place of the statutes that actually reach it, reading exactly like a real answer.
+//   'United Kingdom' does this. So does free text, and so would a jurisdiction added to the wizard's
+// dropdown without the engine learning it. Production data is clean today (7 European Union, 5 USA,
+// 2 UK), which is precisely when a guard is cheap to add.
+//
+// WHY THIS IS NOT "every jurisdiction maps to a regime". FOUR OF THE SEVEN LEGITIMATELY FALL BACK:
+// only SB 253, CSRD, UK SRS (S1/S2) and SECR are REGIME_CANDIDATES, so Canada, Australia, Global and
+// Other have no disclosure regime to map to at any size — that is a modelling fact, not a defect.
+// Asserting a non-fallback mapping for all seven would be asserting something false.
+//   What CAN be asserted is RECOGNITION: does the engine emit anything jurisdiction-specific, beyond
+// the baseline it emits for every input including a typo? Five of the seven do. Australia and Other
+// do not, and are recorded below as such — deliberately, so that if either ever gains a regime the
+// table is where it gets noticed.
+const UNIVERSAL_BASELINE = ['IFRS S2', 'TCFD']
+
+// Every canonical jurisdiction → the frameworks the engine must emit BEYOND the baseline, at inputs
+// clearing every size limb. An empty array is a claim, not an omission: it says this jurisdiction has
+// no modelled regime and the fallback is the correct answer for it.
+const JURISDICTION_COVERAGE: Record<string, string[]> = {
+  'USA':            ['SB 253'],
+  'European Union': ['CSRD', 'EU Taxonomy', 'CS3D'],
+  'UK':             ['SECR', 'UK SRS (S1/S2)'],
+  'Canada':         ['Canada S-211'],
+  'Global':         ['EU Taxonomy'],
+  'Australia':      [],
+  'Other':          [],
+}
+
+// Large enough to clear every threshold in THRESHOLD_TESTS, so a missing framework is a missing
+// BRANCH rather than an unmet limb.
+const bigDeal = (jurisdiction: string) =>
+  getApplicableFrameworks(jurisdiction, 5_000_000_000, 'Technology', 'ma', 'USD',
+    { total_assets: 3_000_000_000, employee_count: 6_000 })
+
+describe('every jurisdiction the wizard offers is one the engine knows', () => {
+  it('the coverage table and the wizard dropdown describe the same set', () => {
+    // THE ADD-WITHOUT-TEACHING GUARD. Adding 'Japan' to JURISDICTIONS fails here until someone
+    // decides what the engine emits for it — including deciding that the answer is "nothing", which
+    // has to be written down rather than defaulted into.
+    expect([...JURISDICTIONS].sort()).toEqual(Object.keys(JURISDICTION_COVERAGE).sort())
+  })
+
+  it('each jurisdiction still emits its own frameworks', () => {
+    for (const [jurisdiction, expected] of Object.entries(JURISDICTION_COVERAGE)) {
+      const fw = bigDeal(jurisdiction)
+      // The baseline is emitted regardless of jurisdiction, so its presence proves nothing — but its
+      // ABSENCE would mean the engine broke entirely, which would make the assertions below vacuous.
+      expect(fw, `${jurisdiction} lost the universal baseline`).toEqual(expect.arrayContaining(UNIVERSAL_BASELINE))
+      for (const f of expected) {
+        expect(fw, `${jurisdiction} stopped resolving ${f}`).toContain(f)
+      }
+    }
+  })
+
+  it('the five recognised jurisdictions are DISTINGUISHABLE from an unrecognised value', () => {
+    // This is the assertion that actually catches a silent degrade: a jurisdiction the engine knows
+    // must produce something an unknown string does not.
+    for (const [jurisdiction, expected] of Object.entries(JURISDICTION_COVERAGE)) {
+      const beyondBaseline = bigDeal(jurisdiction).filter(f => !UNIVERSAL_BASELINE.includes(f))
+      if (expected.length > 0) {
+        expect(beyondBaseline, `${jurisdiction} is indistinguishable from a typo`).not.toEqual([])
+      } else {
+        // Australia and Other: recorded as producing nothing jurisdiction-specific. If that changes,
+        // this fails and the table above has to say so.
+        expect(beyondBaseline, `${jurisdiction} gained a framework the table does not record`).toEqual([])
+      }
+    }
+  })
+
+  // ── ANTI-VACUITY: the fallback has to be reachable, or the tests above prove nothing ────────────
+  //
+  // If every input resolved, "each jurisdiction resolves" would be green for the wrong reason. These
+  // pin that a non-canonical value really does degrade — and that the degrade is silent, which is
+  // why the guard above exists at all.
+  it('a NON-canonical jurisdiction degrades to the baseline alone, silently', () => {
+    for (const wrong of ['United Kingdom', 'Japan', 'uk', 'EU', '']) {
+      const fw = bigDeal(wrong)
+      expect(fw, `${wrong || '(empty string)'} should not resolve`).toEqual(UNIVERSAL_BASELINE)
+      // No throw, no empty array, no flag — the failure mode is indistinguishable from a small
+      // company in a jurisdiction with no modelled regime. That is the whole problem.
+    }
+  })
+
+  it("'United Kingdom' and 'UK' are not the same to this engine", () => {
+    // The specific near-miss a human would type. Named separately from the loop above because it is
+    // the one most likely to reach production data.
+    expect(bigDeal('UK')).toContain('SECR')
+    expect(bigDeal('United Kingdom')).not.toContain('SECR')
   })
 })

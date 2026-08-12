@@ -8,7 +8,7 @@ import { useEntitlementState } from '../../../lib/useEntitlement'
 import { supabase } from '../../../lib/supabase'
 import {
   getObligations, getApplicableFrameworks, getFrameworkApplicability, getComplianceCost,
-  sectorRisks, DEFAULT_PIPELINE_TARGETS, DEAL_CURRENCIES,
+  sectorRisks, DEFAULT_PIPELINE_TARGETS, DEAL_CURRENCIES, JURISDICTIONS,
   assessmentView, partiallyAssessedNote, routeNotMetNote, partialHeadingPhrase,
   obligationPriceLabel, resolveFieldsPrompt,
   type FrameworkApplicability,
@@ -30,7 +30,11 @@ const SECTORS = [
   'Construction & Materials', 'Professional Services', 'Other',
 ]
 
-const JURISDICTIONS = ['USA', 'European Union', 'UK', 'Canada', 'Australia', 'Global', 'Other']
+// JURISDICTIONS MOVED TO lib/deals/assessment.ts — it is imported below with the rest of the engine.
+// The list belongs beside the branches that match on it: declaring it here put the vocabulary in the
+// dropdown and its interpretation in the engine, with nothing able to check that the two agreed. A
+// value the engine does not know degrades silently to 'GHG Protocol / IFRS S2' on the target-facing
+// share page rather than erroring.
 
 // Sector-based ESG risk flags
 // Assessment logic (SECTOR_RISKS, getComplianceCost, getObligations, getApplicableFrameworks)
