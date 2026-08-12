@@ -403,6 +403,30 @@ type Question = {
   options?: { value: string; label: string; sub: string }[]
 }
 
+// THE ONLY THING STOPPING AN UNSET ANSWER REACHING computeObligations. Extracted from the render —
+// a PURE MOVE, the expression is unchanged — so it can be tested, because it could not be where it
+// was and it is the single load-bearing guarantee on this page.
+//
+// WHY IT MATTERS MORE THAN IT LOOKS. Five gates in computeObligations read an unset answer as an
+// AFFIRMATIVE one, because `Answers` fields are optional and the normalisation collapses undefined
+// into '' / 0 / []. None is reachable today, and this expression is the whole reason:
+//   :146  csrdStaff !== false        → unset employees fires CSRD, timing reads
+//                                      "your 1,000–4,999 band spans that line" — a band never chosen
+//   :340  caStaff !== false          → unset employees fires CA pay data, "Your band (50–249)"
+//   :332  pt250 !== true && pt100 !== false → unset employees fires the abstention arm, same band
+//   :209  hasEU && ai !== 'no'       → unset ai_use fires the AI Act at 'high', as if answered yes
+//   :79   revenue defaults to 0      → benign today, but silently rather than by check
+// Three of those five put a headcount band in front of a reader who never selected one. Loosen this
+// expression — a skip button, an optional question, a URL prefill — and all five go live together.
+//
+// The `val ?? []` in the multiselect arm is what `multiVal` computes at the call site; keeping the
+// derivation here rather than passing a second argument is what makes the function testable from a
+// value alone.
+export const canAdvance = (type: Question['type'], val: unknown): boolean =>
+  type === 'slider' ? val !== undefined
+  : type === 'options' ? !!val
+  : ((val as string[] | undefined) || []).length > 0
+
 // ── Module cell, for entries that map to an ObligationId ─────────────────────
 //
 // THE LABEL IS DERIVED FROM THE OBLIGATION, NOT FROM THE ENTRY'S OWN `module` STRING. The two
@@ -691,7 +715,7 @@ export default function AssessPage() {
     const q = questions[step]
     const val = answers[q.id]
     const multiVal = (answers[q.id] as string[] | undefined) || []
-    const canProceed = q.type === 'slider' ? val !== undefined : q.type === 'options' ? !!val : multiVal.length > 0
+    const canProceed = canAdvance(q.type, val)
 
     return (
       <div>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeObligations } from './page'
+import { computeObligations, canAdvance } from './page'
 
 // THE FIRST TEST OVER app/assess/. This page determines a visitor's regulatory obligations from its
 // own literals and EMAILS THE RESULT TO A NAMED LEAD, and until now nothing guarded it: the comment
@@ -378,5 +378,98 @@ describe('computeObligations — California pay data size gate (NOT the populati
     expect(entry!.urgency).toBe('monitor')
     // The copy must name the US-payroll population even though the form cannot measure it.
     expect(entry!.what).toContain('ANYWHERE IN THE UNITED STATES')
+  })
+})
+
+// ── canAdvance: the one guarantee that no unset answer reaches computeObligations ────────────────
+//
+// WHAT THIS PROTECTS, and why it is the most load-bearing expression on the page. FIVE GATES IN
+// computeObligations READ AN UNSET ANSWER AS AN AFFIRMATIVE ONE. `Answers` declares every field
+// optional, and the normalisation at page.tsx:79-86 collapses undefined into '' / 0 / [] — legal
+// values that nothing downstream can distinguish from a real answer. The five:
+//
+//   page.tsx:146  `csrdStaff !== false`                  unset employees → CSRD fires, and its
+//                                                        timing reads "your 1,000–4,999 band spans
+//                                                        that line" — a band never selected
+//   page.tsx:340  `caStaff !== false`                    unset employees → CA pay data fires,
+//                                                        "Your band (50–249) cannot settle…"
+//   page.tsx:332  `pt250 !== true && pt100 !== false`    unset employees → the abstention arm fires,
+//                                                        "Your headcount band (50–249)…"
+//   page.tsx:209  `hasEU && ai !== 'no'`                 unset ai_use → the AI Act fires at 'high',
+//                                                        the same branch as an affirmative answer
+//   page.tsx:79   `revenue` defaults to 0                benign today — 0 fails every threshold —
+//                                                        but silently rather than by check
+//
+// THREE OF THE FIVE PUT A HEADCOUNT BAND IN FRONT OF A READER WHO NEVER SELECTED ONE, on a page that
+// emails its determination to a named lead. None is reachable today, and THIS EXPRESSION IS THE
+// ENTIRE REASON: the Continue button is `disabled={!canProceed}`, and there is no skip affordance,
+// no optional question, no deep link and no setStep write that jumps a step.
+//
+// So the risk is not that canAdvance is wrong. It is that someone loosens it — a skip button, an
+// optional question, a URL prefill — and all five go live at once, silently, in copy rather than in
+// a crash. That is the same shape as the setStep(8) defect recorded at page.tsx:399, which type-
+// checked, passed every test and passed the build, and was found by a person completing the form.
+describe('canAdvance — no unset answer may reach computeObligations', () => {
+  describe('slider', () => {
+    it('undefined blocks — the revenue slider DISPLAYS $750M before it is touched, but holds nothing', () => {
+      // page.tsx renders `val ?? 5` for display while `answers.revenue` stays undefined. If this
+      // arm ever softened to a truthiness test, index 0 ("Under $50M") would also block.
+      expect(canAdvance('slider', undefined)).toBe(false)
+    })
+
+    it('any set index proceeds, INCLUDING 0', () => {
+      expect(canAdvance('slider', 0)).toBe(true)
+      expect(canAdvance('slider', 5)).toBe(true)
+      expect(canAdvance('slider', 10)).toBe(true)
+    })
+  })
+
+  describe('options', () => {
+    it('undefined and empty string both block', () => {
+      expect(canAdvance('options', undefined)).toBe(false)
+      // '' is what the normalisation produces for an unset answer, so it must block too — this is
+      // the value the five gates above would actually receive.
+      expect(canAdvance('options', '')).toBe(false)
+    })
+
+    it('a chosen value proceeds', () => {
+      for (const v of ['under50', '5000plus', 'no', 'yes_hr', 'us_listed', 'pe_vc', 'regulatory']) {
+        expect(canAdvance('options', v), `${v} should proceed`).toBe(true)
+      }
+    })
+  })
+
+  describe('multiselect', () => {
+    it('an empty array blocks, and so does undefined', () => {
+      expect(canAdvance('multiselect', [])).toBe(false)
+      // undefined reaches the `|| []` default at the call site; assert the function agrees.
+      expect(canAdvance('multiselect', undefined)).toBe(false)
+    })
+
+    it('one or more entries proceed', () => {
+      expect(canAdvance('multiselect', ['eu'])).toBe(true)
+      expect(canAdvance('multiselect', ['eu', 'uk', 'california'])).toBe(true)
+    })
+  })
+
+  // The end-to-end statement, asserted rather than described: every question type refuses the value
+  // its own unset state produces. If a future edit makes any of these pass, the five gates above are
+  // live and three of them will name a band at a reader who chose none.
+  it('EVERY question type refuses its own unset value', () => {
+    const unsetByType: [Parameters<typeof canAdvance>[0], unknown][] = [
+      ['slider', undefined],
+      ['options', undefined],
+      ['options', ''],
+      ['multiselect', undefined],
+      ['multiselect', []],
+    ]
+    for (const [type, val] of unsetByType) {
+      expect(canAdvance(type, val), `${type} must block ${JSON.stringify(val)}`).toBe(false)
+    }
+    // Not vacuous — each type has at least one value that DOES proceed, so a canAdvance that always
+    // returned false could not pass this block.
+    expect(canAdvance('slider', 0)).toBe(true)
+    expect(canAdvance('options', 'no')).toBe(true)
+    expect(canAdvance('multiselect', ['eu'])).toBe(true)
   })
 })
