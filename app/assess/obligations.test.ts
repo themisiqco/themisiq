@@ -155,16 +155,23 @@ describe('computeObligations — DORA is lex specialis over NIS2', () => {
   const eu = (sectors: string[]) =>
     computeObligations({ jurisdictions: ['eu'], sectors, revenue: REVENUE_INDEX_750M, employees: '1000_4999' })
   const ids = (sectors: string[]) => eu(sectors).map(o => o.obligationId)
+  // ⚠️ MATCH NIS2 ON NAME, NEVER ON obligationId. BOTH NIS2 entries carry `obligationId: 'nis2'` —
+  // correctly, since both route to Cyber Governance at the same price — so `ids()` cannot tell them
+  // apart, and an `ids(...).toContain('nis2')` assertion passes for either. The two entries differ by
+  // NAME, which is also what the results list keys its React children and its expand state on.
+  const NIS2_MAIN = 'EU NIS2 Directive — Network and Information Security'
+  const NIS2_SURVIVING = 'EU NIS2 Directive — duties surviving DORA'
+  const names = (sectors: string[]) => eu(sectors).map(o => o.name)
 
-  it('an EU FINANCIAL entity gets DORA and NOT NIS2', () => {
+  it('an EU FINANCIAL entity gets DORA and NOT the main NIS2 entry', () => {
     expect(ids(['financial'])).toContain('dora')
-    expect(ids(['financial'])).not.toContain('nis2')
+    expect(names(['financial'])).not.toContain(NIS2_MAIN)
     // Not vacuous: DORA's presence is itself the companion, but assert the array is real.
     expect(eu(['financial']).length).toBeGreaterThan(0)
   })
 
   it('an EU entity in an Annex I/II sector that is NOT financial gets NIS2 and not DORA', () => {
-    expect(ids(['energy'])).toContain('nis2')
+    expect(names(['energy'])).toContain(NIS2_MAIN)
     expect(ids(['energy'])).not.toContain('dora')
     // Not vacuous — the same fixture produces other obligations, so an empty result cannot pass the
     // DORA-absence half.
@@ -184,23 +191,75 @@ describe('computeObligations — DORA is lex specialis over NIS2', () => {
   // the fix must not stop suppressing for a pure financial entity, and must stop suppressing the
   // moment a non-financial Annex sector is present.
   it('financial AND energy gets BOTH — DORA for the financial half, NIS2 for the rest', () => {
-    const both = ids(['financial', 'energy'])
-    expect(both).toContain('dora')
-    expect(both).toContain('nis2')
+    expect(ids(['financial', 'energy'])).toContain('dora')
+    expect(names(['financial', 'energy'])).toContain(NIS2_MAIN)
   })
 
-  it('adding ANY non-financial Annex sector to financial restores NIS2', () => {
+  it('adding ANY non-financial Annex sector to financial restores the main NIS2 entry', () => {
     // Every non-financial sector the form can detect as NIS2-relevant, so a future edit that drops
     // one from nis2NonFinancialSectors fails here rather than silently suppressing again.
     for (const s of ['energy', 'health', 'transport', 'tech']) {
-      const both = ids(['financial', s])
-      expect(both, `financial + ${s} should keep NIS2`).toContain('nis2')
-      expect(both, `financial + ${s} should keep DORA`).toContain('dora')
+      expect(names(['financial', s]), `financial + ${s} should keep NIS2`).toContain(NIS2_MAIN)
+      expect(ids(['financial', s]), `financial + ${s} should keep DORA`).toContain('dora')
     }
     // And a NON-Annex sector must NOT restore it — otherwise the test above would pass for the wrong
     // reason and the suppression would be effectively dead.
-    expect(ids(['financial', 'retail'])).not.toContain('nis2')
+    expect(names(['financial', 'retail'])).not.toContain(NIS2_MAIN)
     expect(ids(['financial', 'retail'])).toContain('dora')
+  })
+
+  // ── THE SURVIVING-DUTIES ENTRY ─────────────────────────────────────────────────────────────────
+  //
+  // The two gates are exact complements (`… && !doraDisplacesNis2` / `… && doraDisplacesNis2`), so
+  // exactly one may ever appear; the last test below pins that they can never both.
+  it('financial only: the surviving-duties entry appears, the main NIS2 entry does not', () => {
+    const n = names(['financial'])
+    expect(n).toContain(NIS2_SURVIVING)
+    expect(n).not.toContain(NIS2_MAIN)
+    // And it does not arrive alone or unqualified.
+    expect(ids(['financial'])).toContain('dora')
+    const surviving = eu(['financial']).find(o => o.name === NIS2_SURVIVING)!
+    expect(surviving.urgency).toBe('medium')
+    expect(surviving.urgency_label).toBe('STILL APPLIES')
+    // The three things it must land, asserted on the customer-visible string rather than described.
+    expect(surviving.what).toContain('you remain in scope')
+    expect(surviving.what).toContain('does not cease to apply')
+    expect(surviving.what).toContain('art. 3(4)')
+    // NOT art. 27 — the mislabelled article lib/nis2.ts was written to keep out of this entry.
+    expect(surviving.what).not.toContain('art. 27')
+    // The displaced work must not be handed back to the reader as an action.
+    expect(surviving.action).not.toMatch(/gap assessment/i)
+  })
+
+  it('financial + energy: the MAIN entry returns and the surviving-duties entry steps aside', () => {
+    const n = names(['financial', 'energy'])
+    expect(n).toContain(NIS2_MAIN)
+    expect(n).not.toContain(NIS2_SURVIVING)
+    // Not vacuous — DORA is still there, so this is a swap and not an empty result.
+    expect(ids(['financial', 'energy'])).toContain('dora')
+  })
+
+  it('energy only: the main entry, and neither DORA nor the surviving-duties entry', () => {
+    const n = names(['energy'])
+    expect(n).toContain(NIS2_MAIN)
+    expect(n).not.toContain(NIS2_SURVIVING)
+    expect(ids(['energy'])).not.toContain('dora')
+    expect(eu(['energy']).length).toBeGreaterThan(0)
+  })
+
+  it('the two NIS2 entries are mutually exclusive across every sector combination', () => {
+    const sectors = ['financial', 'energy', 'health', 'transport', 'tech', 'retail']
+    // Every single and every pair — the gates differ only in the sign of one conjunct, so a pair is
+    // enough to expose any combination where both or neither could fire while NIS2 is in scope.
+    const combos = [...sectors.map(s => [s]), ...sectors.flatMap((a, i) => sectors.slice(i + 1).map(b => [a, b]))]
+    for (const c of combos) {
+      const n = names(c)
+      const both = n.includes(NIS2_MAIN) && n.includes(NIS2_SURVIVING)
+      expect(both, `${c.join(' + ')} produced BOTH NIS2 entries`).toBe(false)
+    }
+    // Not vacuous: at least one combination produces each entry, so the loop is testing something.
+    expect(names(['financial'])).toContain(NIS2_SURVIVING)
+    expect(names(['energy'])).toContain(NIS2_MAIN)
   })
 })
 

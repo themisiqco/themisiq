@@ -7,6 +7,7 @@ import {
 import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_STATUS_SENTENCE, SB253_SCOPE3_FROM } from '../../lib/sb253'
 import { SB261_CITATION, SB261_STATUS_SENTENCE } from '../../lib/sb261'
 import { IFRS_S2_CITATION, IFRS_S2_STATUS_SENTENCE } from '../../lib/ifrsS2'
+import { NIS2_CITATION, NIS2_TIMING, NIS2_SIZE_TEST, NIS2_DORA_CARVE_OUT, NIS2_SURVIVING_DUTY } from '../../lib/nis2'
 // lib/cs3d.ts: "ANY SURFACE NAMING A CS3D DATE OR THRESHOLD IMPORTS FROM HERE. A literal in copy is
 // the defect." The group-parentage entry below names both thresholds and the application date.
 import { CS3D_APPLIES_FROM, CS3D_CITATION, CS3D_EMPLOYEE_THRESHOLD, CS3D_TURNOVER_THRESHOLD } from '../../lib/cs3d'
@@ -251,7 +252,47 @@ export function computeObligations(a: Answers): Obligation[] {
   // shape as Modern Slavery's undated "the threshold is UNDER REVIEW". If it is ever wanted it
   // belongs in a lib/nis2.ts with a dated provenance header, alongside the directive number and the
   // Annex thresholds, which are also call-site literals today.
-  if (hasEU && nis2Sectors && nis2Size && !doraDisplacesNis2) regs.push({ name: 'EU NIS2 Directive — Network and Information Security', obligationId: 'nis2', jurisdiction: 'European Union · 18 sectors', group: 'regulatory', urgency: 'critical', urgency_label: 'ACTIVE NOW', timing: 'Applies through national law — transposition deadline was 17 October 2024', module: 'Cyber Governance', what: `Directive (EU) 2022/2555 reaches entities in an Annex I or Annex II sector that exceed the medium-enterprise thresholds — 50 or more staff, or EUR 10,000,000 or more turnover. Your sector and size place you in scope. Board-level accountability, mandatory security measures and 24-hour / 72-hour incident notification apply. ${fxNote}`, action: 'Conduct NIS2 gap assessment and document board cyber governance immediately.' })
+  if (hasEU && nis2Sectors && nis2Size && !doraDisplacesNis2) regs.push({ name: 'EU NIS2 Directive — Network and Information Security', obligationId: 'nis2', jurisdiction: 'European Union · 18 sectors', group: 'regulatory', urgency: 'critical', urgency_label: 'ACTIVE NOW', timing: NIS2_TIMING, module: 'Cyber Governance', what: `${NIS2_CITATION}. ${NIS2_SIZE_TEST} Your sector and size place you in scope. Board-level accountability, mandatory security measures and 24-hour / 72-hour incident notification apply. ${fxNote}`, action: 'Conduct NIS2 gap assessment and document board cyber governance immediately.' })
+  // THE EXACT COMPLEMENT OF THE ENTRY ABOVE — same three conjuncts, the last one negated — so the
+  // two are mutually exclusive BY CONSTRUCTION rather than by two conditions that happen to agree.
+  // A financial entity used to get neither: the DORA entry told it the risk-management and incident
+  // provisions do not additionally apply, and nothing told it what does. That sentence is correct and
+  // it is the whole problem — a reader finishing it concludes NIS2 is handled, and no surface on the
+  // page corrected them.
+  //   WHAT SURVIVES IS NOT ART. 27. See the secondary-source warning at the head of lib/nis2.ts: the
+  //   registration duty in art. 27 reaches a closed list of digital-infrastructure providers and no
+  //   credit institution is on it. The duty that reaches a bank is art. 3(4), and we nearly shipped
+  //   the right substance under the wrong article number because a secondary source had mislabelled
+  //   it. Every claim in this entry comes from lib/nis2.ts, which was verified against the article
+  //   text rather than a summary of it.
+  // Urgency is deliberately NOT critical — see the note beside it below.
+  if (hasEU && nis2Sectors && nis2Size && doraDisplacesNis2) regs.push({
+    // Distinct NAME, not just a distinct id. The results list keys its React children and its
+    // expand/collapse state on `ob.name`, so two entries sharing a name would collide into one row
+    // that opens both. The shared obligationId is fine and correct — both route to Cyber Governance.
+    name: 'EU NIS2 Directive — duties surviving DORA',
+    obligationId: 'nis2',
+    jurisdiction: 'European Union · financial entities',
+    group: 'regulatory',
+    // NOT 'critical'. The provisions art. 4 displaces — risk management and incident notification —
+    // were the urgent ones, and the DORA entry immediately below carries them at 'critical'. What is
+    // left is an identification-and-notification duty with a two-week change window: real, dated, and
+    // owed, but not the thing to do first. 'medium' sorts it beneath DORA so the reader meets the
+    // substantive regime before the administrative one, and above 'monitor', which would read as a
+    // watching brief for something already owed.
+    urgency: 'medium',
+    // The label carries the entire point of the entry. The risk this exists to address is a reader
+    // who has just been told NIS2's main provisions do not apply and concludes NIS2 is done with.
+    urgency_label: 'STILL APPLIES',
+    timing: NIS2_TIMING,
+    module: 'Cyber Governance',
+    what: `${NIS2_CITATION} — you remain in scope. ${NIS2_DORA_CARVE_OUT} WHAT IS NOT DISPLACED: ${NIS2_SURVIVING_DUTY}`,
+    // Cannot be 'Conduct NIS2 gap assessment' — that is what DORA now covers, and sending a bank to
+    // do it twice is the overlap the lex specialis rule exists to prevent. The action for a duty that
+    // is administrative is administrative.
+    action: 'Confirm your entry on the national register of essential and important entities, and keep the submitted details current — changes are notified within two weeks.',
+  })
+
   if (doraApplies) regs.push({ name: 'DORA — Digital Operational Resilience Act', obligationId: 'dora', jurisdiction: 'EU financial services', group: 'regulatory', urgency: 'critical', urgency_label: 'ACTIVE NOW', timing: 'Active since 17 January 2025', module: 'Cyber Governance', what: 'As a financial services entity with EU operations, DORA applies in full: ICT risk-management framework, incident classification and reporting, resilience testing, and a critical third-party provider register. Regulation (EU) 2022/2554 states in its own text that it constitutes lex specialis with regard to Directive (EU) 2022/2555, and NIS2 art. 4(2) is the mechanism that gives way to it, so NIS2\u2019s risk-management and incident provisions do not additionally apply to you.', action: 'ICT risk framework and Critical Third-Party Provider register required immediately.' })
 
   // THE FOUR-DAY CLOCK STARTS AT THE DETERMINATION, NOT THE INCIDENT, and the copy read 'Material
