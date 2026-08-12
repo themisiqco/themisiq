@@ -1,7 +1,7 @@
 'use client'
 import Nav from '@/app/components/Nav'
 import Footer from '@/app/components/Footer'
-import { SB253_PROGRAMME_URL } from '@/lib/sb253'
+import { SB253_POSTURE, SB253_PROGRAMME_URL, SB253_STATUTE } from '@/lib/sb253'
 import { SB261_CITATION, SB261_DOCKET_URL, SB261_TABLE_STATUS } from '@/lib/sb261'
 
 // ── DATA ──────────────────────────────────────────────────────────
@@ -14,7 +14,7 @@ const groups = [
     intro: 'Built on the GHG Protocol and structured for the major climate-disclosure regimes.',
     items: [
       { name: 'GHG Protocol', body: 'The global accounting standard for corporate greenhouse-gas inventories.', maps: 'Your Scope 1, 2 and 3 inventory is built on the GHG Protocol Corporate Standard, audit-trail first.', href: 'https://ghgprotocol.org', module: '/climate-ghg' },
-      { name: 'California SB 253', body: 'Climate Corporate Data Accountability Act — mandatory Scope 1–3 disclosure for large companies doing business in California.', maps: 'One-click, pre-filled SB 253 emissions export from your verified inventory.', href: SB253_PROGRAMME_URL, module: '/climate-ghg' },
+      { name: 'California SB 253', body: `Climate Corporate Data Accountability Act — mandatory Scope 1–3 disclosure. ${SB253_STATUTE}. Reporting has not begun: ${SB253_POSTURE}.`, maps: 'One-click, pre-filled SB 253 emissions export from your GHG inventory.', href: SB253_PROGRAMME_URL, module: '/climate-ghg' },
       { name: 'California SB 261', body: `Climate-Related Financial Risk Act — biennial climate risk reporting aligned to TCFD. ${SB261_CITATION}. ${SB261_TABLE_STATUS}.`, maps: 'TCFD-aligned climate financial-risk report ready for SB 261 filers.', href: SB261_DOCKET_URL, module: '/climate-risk' },
       { name: 'IFRS S2', body: 'The ISSB global baseline for climate-related financial disclosures.', maps: 'Climate disclosures structured to the IFRS S2 / ISSB requirements.', href: 'https://www.ifrs.org/issued-standards/ifrs-sustainability-standards-navigator/ifrs-s2-climate-related-disclosures/', module: '/climate-risk' },
       { name: 'ESRS E1', body: 'The climate-change standard within the EU’s CSRD reporting framework.', maps: 'ESRS E1 climate datapoints mapped directly from your GHG inventory.', href: 'https://www.efrag.org', module: '/climate-ghg' },
@@ -94,8 +94,8 @@ export default function Frameworks() {
         <div style={eyebrow}>Frameworks</div>
         <h1 style={h1}>The frameworks we <span style={grad}>support</span></h1>
         <p style={lede}>
-          ThemisIQ is built on one principle: collect your data once, comply everywhere. The same verified
-          inputs map across the frameworks below — from California’s SB 253 to the EU’s CSRD, from IFRS S2
+          ThemisIQ is built on one principle: collect your data once, comply everywhere. The same source
+          data maps across the frameworks below — from California’s SB 253 to the EU’s CSRD, from IFRS S2
           to the AI and cyber regimes — so you report under each without re-entering anything.
         </p>
       </section>

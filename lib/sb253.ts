@@ -42,6 +42,10 @@ export const SB253_SCOPE3_FROM = '2027'
 export const SB253_CITATION =
   'California Health & Safety Code §38532; CARB initial regulation (Title 17 CCR §§96070-96077) approved by the Board 26 February 2026, withdrawn from OAL review, modified text published 27 July 2026 — not yet approved'
 
+// The statute alone, for a slot that needs the instrument but not its history — a directory card,
+// a chip, a table cell. SB261_CITATION is the sibling and is deliberately the same shape.
+export const SB253_STATUTE = 'California Health & Safety Code §38532 (SB 253)'
+
 // The programme page. Verified live 12 August 2026. Note this is the PROGRAMME page, not the
 // rulemaking page — the rulemaking page was stale when checked (last reviewed 29 December 2025)
 // and still showed the Final Package pending at OAL, which the withdrawal had overtaken. The
@@ -58,6 +62,11 @@ export const SB253_STATUS_SENTENCE =
 // For a chip, tag or nav-width slot where the sentence will not fit. Carries the posture in the
 // shortest honest form; if even this does not fit, the surface should name no date.
 export const SB253_SHORT = 'SB 253 · 10 Nov 2026 proposed'
+
+// Name-free posture, for a slot whose surrounding prose already names the regime — a directory
+// card, a sentence, a table cell. SB253_SHORT carries the name and suits a chip standing alone;
+// this one does not, and the two are not interchangeable. SB261_TABLE_STATUS is the sibling.
+export const SB253_POSTURE = 'first report proposed for 10 November 2026, not yet final'
 
 // For a slot whose siblings read 'Annual — July' / 'FY2024 (large EU companies)' / 'Jurisdiction
 // dependent' — i.e. FRAMEWORKS.deadline in lib/ghg/engine.ts, rendered in the GHG export summary
