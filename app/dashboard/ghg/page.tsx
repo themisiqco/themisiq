@@ -12,6 +12,7 @@ import type { YearDataStatus } from '../../../lib/ghg/series'
 import { useEntitlementAccess, useHasConcierge, useGhgLocationAllowance, type EntitlementAccess } from '../../../lib/useEntitlement'
 import { generateAssurancePDF } from '../../../lib/assurancePdf'
 import { SB253_SCOPE3_FROM } from '../../../lib/sb253'
+import { EPA_EGRID_POWER_PROFILER_URL } from '../../../lib/sources'
 import { useSearchParams, useRouter } from 'next/navigation'
 
 import {
@@ -1728,7 +1729,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                         {US_SUBREGIONS.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
                       </select>
                     </Field>
-                    <a href="https://www.epa.gov/egrid/power-profiler" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#0C447C', textDecoration: 'none', display: 'inline-block', marginTop: 6 }}>🔎 Find your subregion with EPA Power Profiler (enter your ZIP) →</a>
+                    <a href={EPA_EGRID_POWER_PROFILER_URL} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#0C447C', textDecoration: 'none', display: 'inline-block', marginTop: 6 }}>🔎 Find your subregion with EPA Power Profiler (enter your ZIP) →</a>
                   </div>
                 )}
                 {isPaid ? <DocUpload label="Upload electricity bills" locIdx={activeLocation} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:utility_electricity`]} /> : <LockedDocUpload label="Upload electricity bills" />}
