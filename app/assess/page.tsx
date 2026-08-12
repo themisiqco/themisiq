@@ -209,11 +209,28 @@ export function computeObligations(a: Answers): Obligation[] {
 
   // ── NIS2 / DORA ─────────────────────────────────────────────────────────────
   // DORA IS LEX SPECIALIS. NIS2 art. 4(2) disapplies its risk-management and incident provisions
-  // where a sector-specific act imposes at least equivalent requirements, and the ESAs and the
-  // Commission have confirmed DORA meets that test. An EU financial entity therefore gets DORA, NOT
-  // both — the old logic fired both and told a bank it had two overlapping regimes.
-  const nis2Sectors = isEnergy || isFinancial || isHealth || isTransport || sec.includes('tech')
+  // where a sector-specific act imposes at least equivalent requirements. An EU financial entity
+  // therefore gets DORA, NOT both — the old logic fired both and told a bank it had two overlapping
+  // regimes.
+  //
+  // BUT THE CARVE-OUT IS PER SECTOR, NOT PER COMPANY, AND THE GATE READ IT AS PER COMPANY. Sectors
+  // here are a MULTI-SELECT. A company ticking Financial AND Energy is `isFinancial`, so a bare
+  // `!doraApplies` suppressed its NIS2 entry outright — including the ENERGY-side scoping, which
+  // DORA does not touch and art. 4(2) never reached. It was told nothing about a regime that plainly
+  // covers half its operations.
+  //   NIS2 art. 4(1) is express on this: where sector-specific Union legal acts do not cover all
+  //   entities in a specific sector falling within the Directive's scope, the relevant provisions
+  //   continue to apply to the entities not covered. DORA covers a company's FINANCIAL activities,
+  //   not the company entire.
+  // So the suppression is now conditioned on financial being the ONLY NIS2-relevant sector ticked.
+  // Split rather than inlined: `nis2NonFinancialSectors` is the thing art. 4(2) cannot reach, and
+  // naming it is what stops the next reader collapsing the two back into one boolean.
+  const nis2NonFinancialSectors = isEnergy || isHealth || isTransport || sec.includes('tech')
+  const nis2Sectors = isFinancial || nis2NonFinancialSectors
   const doraApplies = isFinancial && hasEU
+  // Displacement, not applicability: DORA applying is NOT the same fact as NIS2 being displaced, and
+  // conflating them is the defect above. This is the narrower one.
+  const doraDisplacesNis2 = doraApplies && !nis2NonFinancialSectors
   // NIS2's real scope test: an Annex I or II sector AND exceeding the medium-enterprise ceiling —
   // 50+ headcount OR EUR 10m+ turnover. The old gate used "sector OR 500+ employees", which both
   // over-called (a 600-person EU retailer in no Annex sector) and under-called (a 60-person energy
@@ -234,7 +251,7 @@ export function computeObligations(a: Answers): Obligation[] {
   // shape as Modern Slavery's undated "the threshold is UNDER REVIEW". If it is ever wanted it
   // belongs in a lib/nis2.ts with a dated provenance header, alongside the directive number and the
   // Annex thresholds, which are also call-site literals today.
-  if (hasEU && nis2Sectors && nis2Size && !doraApplies) regs.push({ name: 'EU NIS2 Directive — Network and Information Security', obligationId: 'nis2', jurisdiction: 'European Union · 18 sectors', group: 'regulatory', urgency: 'critical', urgency_label: 'ACTIVE NOW', timing: 'Applies through national law — transposition deadline was 17 October 2024', module: 'Cyber Governance', what: `Directive (EU) 2022/2555 reaches entities in an Annex I or Annex II sector that exceed the medium-enterprise thresholds — 50 or more staff, or EUR 10,000,000 or more turnover. Your sector and size place you in scope. Board-level accountability, mandatory security measures and 24-hour / 72-hour incident notification apply. ${fxNote}`, action: 'Conduct NIS2 gap assessment and document board cyber governance immediately.' })
+  if (hasEU && nis2Sectors && nis2Size && !doraDisplacesNis2) regs.push({ name: 'EU NIS2 Directive — Network and Information Security', obligationId: 'nis2', jurisdiction: 'European Union · 18 sectors', group: 'regulatory', urgency: 'critical', urgency_label: 'ACTIVE NOW', timing: 'Applies through national law — transposition deadline was 17 October 2024', module: 'Cyber Governance', what: `Directive (EU) 2022/2555 reaches entities in an Annex I or Annex II sector that exceed the medium-enterprise thresholds — 50 or more staff, or EUR 10,000,000 or more turnover. Your sector and size place you in scope. Board-level accountability, mandatory security measures and 24-hour / 72-hour incident notification apply. ${fxNote}`, action: 'Conduct NIS2 gap assessment and document board cyber governance immediately.' })
   if (doraApplies) regs.push({ name: 'DORA — Digital Operational Resilience Act', obligationId: 'dora', jurisdiction: 'EU financial services', group: 'regulatory', urgency: 'critical', urgency_label: 'ACTIVE NOW', timing: 'Active since 17 January 2025', module: 'Cyber Governance', what: 'As a financial services entity with EU operations, DORA applies in full: ICT risk-management framework, incident classification and reporting, resilience testing, and a critical third-party provider register. Regulation (EU) 2022/2554 states in its own text that it constitutes lex specialis with regard to Directive (EU) 2022/2555, and NIS2 art. 4(2) is the mechanism that gives way to it, so NIS2\u2019s risk-management and incident provisions do not additionally apply to you.', action: 'ICT risk framework and Critical Third-Party Provider register required immediately.' })
 
   // THE FOUR-DAY CLOCK STARTS AT THE DETERMINATION, NOT THE INCIDENT, and the copy read 'Material

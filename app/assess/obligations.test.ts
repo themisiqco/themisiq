@@ -166,6 +166,41 @@ describe('computeObligations — DORA is lex specialis over NIS2', () => {
   it('an EU entity in an Annex I/II sector that is NOT financial gets NIS2 and not DORA', () => {
     expect(ids(['energy'])).toContain('nis2')
     expect(ids(['energy'])).not.toContain('dora')
+    // Not vacuous — the same fixture produces other obligations, so an empty result cannot pass the
+    // DORA-absence half.
+    expect(eu(['energy']).length).toBeGreaterThan(0)
+  })
+
+  // ── THE CARVE-OUT IS PER SECTOR, NOT PER COMPANY ───────────────────────────────────────────────
+  //
+  // Sectors are a MULTI-SELECT, and the gate read `!doraApplies` — so a company ticking Financial AND
+  // Energy was `isFinancial` and lost its NIS2 entry outright, including the ENERGY-side scoping that
+  // DORA does not touch. NIS2 art. 4(1) is express: where sector-specific Union acts do not cover all
+  // entities in a sector within scope, the relevant provisions continue to apply to those not
+  // covered. DORA covers a company's FINANCIAL activities, not the company entire.
+  //
+  // The gate now suppresses only where financial is the ONLY NIS2-relevant sector ticked
+  // (`doraDisplacesNis2 = doraApplies && !nis2NonFinancialSectors`). These three pin both directions:
+  // the fix must not stop suppressing for a pure financial entity, and must stop suppressing the
+  // moment a non-financial Annex sector is present.
+  it('financial AND energy gets BOTH — DORA for the financial half, NIS2 for the rest', () => {
+    const both = ids(['financial', 'energy'])
+    expect(both).toContain('dora')
+    expect(both).toContain('nis2')
+  })
+
+  it('adding ANY non-financial Annex sector to financial restores NIS2', () => {
+    // Every non-financial sector the form can detect as NIS2-relevant, so a future edit that drops
+    // one from nis2NonFinancialSectors fails here rather than silently suppressing again.
+    for (const s of ['energy', 'health', 'transport', 'tech']) {
+      const both = ids(['financial', s])
+      expect(both, `financial + ${s} should keep NIS2`).toContain('nis2')
+      expect(both, `financial + ${s} should keep DORA`).toContain('dora')
+    }
+    // And a NON-Annex sector must NOT restore it — otherwise the test above would pass for the wrong
+    // reason and the suppression would be effectively dead.
+    expect(ids(['financial', 'retail'])).not.toContain('nis2')
+    expect(ids(['financial', 'retail'])).toContain('dora')
   })
 })
 
