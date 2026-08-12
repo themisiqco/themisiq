@@ -1,5 +1,25 @@
 import { describe, it, expect } from 'vitest'
-import { computeObligations, canAdvance } from './page'
+import {
+  computeObligations, canAdvance, asRevenueIndex, answered, UNANSWERED, REVENUE_INDICES,
+  type EmployeesAnswer, type RevenueAnswer, type AiUseAnswer,
+} from './page'
+
+// ── WHY EVERY FIXTURE BELOW SPELLS OUT ITS UNANSWERED FIELDS ─────────────────────────────────────
+//
+// `Answers` has no optional single-selects any more: each is `<Union> | UNANSWERED`, so omitting one
+// does not compile. THAT IS THE POINT — a fixture can no longer leave a field out and let the reader
+// guess whether the omission was meaningful. Spread from this named constant rather than from
+// EMPTY_ANSWERS so the name states the claim at every call site: everything not overridden below is
+// UNANSWERED ON PURPOSE, not forgotten.
+const UNANSWERED_ALL = {
+  driver: UNANSWERED,
+  revenue: UNANSWERED,
+  employees: UNANSWERED,
+  listing: UNANSWERED,
+  ownership: UNANSWERED,
+  ai_use: UNANSWERED,
+  supply_chain: UNANSWERED,
+}
 
 // THE FIRST TEST OVER app/assess/. This page determines a visitor's regulatory obligations from its
 // own literals and EMAILS THE RESULT TO A NAMED LEAD, and until now nothing guarded it: the comment
@@ -30,11 +50,12 @@ import { computeObligations, canAdvance } from './page'
 // Index 4 ($500M => EUR 439,251,515) does NOT clear it, so 5 is the lowest band that satisfies the
 // turnover limb — chosen over a larger one so the fixture sits near the real boundary rather than far
 // above it, and chosen over index 6 ($1bn) so it does not also sit exactly on the SB 253 line.
-const REVENUE_INDEX_750M = 5
+const REVENUE_INDEX_750M: RevenueAnswer = 5
 
 // Only the headcount band varies across the three. Jurisdiction is EU alone: no California, so no
 // SB 253 or SB 261 entry can appear, and no sector, so nothing size-gated in the cyber regimes fires.
-const answers = (employees: string) => ({
+const answers = (employees: EmployeesAnswer) => ({
+  ...UNANSWERED_ALL,
   jurisdictions: ['eu'],
   revenue: REVENUE_INDEX_750M,
   employees,
@@ -44,7 +65,7 @@ const answers = (employees: string) => ({
 // comment on Obligation.obligationId in page.tsx, and the CSRD absence note in lib/obligations.ts).
 // So it is identified by name, which is the only stable handle it has.
 const CSRD_NAME = 'CSRD / ESRS — Corporate Sustainability Reporting Directive'
-const findCsrd = (employees: string) =>
+const findCsrd = (employees: EmployeesAnswer) =>
   computeObligations(answers(employees)).find(o => o.name === CSRD_NAME)
 
 describe('computeObligations — CSRD headcount band, the empAtLeast tri-state', () => {
@@ -92,8 +113,8 @@ describe('computeObligations — CSRD headcount band, the empAtLeast tri-state',
 //
 // Index 6 is exactly $1bn, which is the boundary case; index 7 is the next band up.
 describe('computeObligations — SB 253 fires on strict >, matching THRESHOLD_TESTS gt', () => {
-  const ca = (revenue: number) => computeObligations({ jurisdictions: ['california'], revenue })
-  const sb253 = (revenue: number) => ca(revenue).find(o => o.obligationId === 'sb253')
+  const ca = (revenue: RevenueAnswer) => computeObligations({ ...UNANSWERED_ALL, jurisdictions: ['california'], revenue })
+  const sb253 = (revenue: RevenueAnswer) => ca(revenue).find(o => o.obligationId === 'sb253')
 
   it('EXACTLY $1,000,000,000 does NOT produce an SB 253 entry', () => {
     expect(sb253(6)).toBeUndefined()
@@ -131,8 +152,8 @@ describe('computeObligations — SB 253 fires on strict >, matching THRESHOLD_TE
 // What IS assertable is the gate itself: the jurisdiction wiring and the threshold direction. That is
 // what these two pin. THEY DO NOT PIN THE CONVERSION. Do not read a green run here as covering it.
 describe('computeObligations — UK Modern Slavery gate (NOT the conversion — see comment)', () => {
-  const uk = (revenue: number) => computeObligations({ jurisdictions: ['uk'], revenue })
-  const ms = (revenue: number) => uk(revenue).find(o => o.obligationId === 'modern-slavery')
+  const uk = (revenue: RevenueAnswer) => computeObligations({ ...UNANSWERED_ALL, jurisdictions: ['uk'], revenue })
+  const ms = (revenue: RevenueAnswer) => uk(revenue).find(o => o.obligationId === 'modern-slavery')
 
   it('$25M — below the bar in either currency — produces no entry', () => {
     expect(ms(0)).toBeUndefined()
@@ -158,7 +179,7 @@ describe('computeObligations — UK Modern Slavery gate (NOT the conversion — 
 // non-financial Annex I/II sectors it correctly reaches. Energy is Annex I.
 describe('computeObligations — DORA is lex specialis over NIS2', () => {
   const eu = (sectors: string[]) =>
-    computeObligations({ jurisdictions: ['eu'], sectors, revenue: REVENUE_INDEX_750M, employees: '1000_4999' })
+    computeObligations({ ...UNANSWERED_ALL, jurisdictions: ['eu'], sectors, revenue: REVENUE_INDEX_750M, employees: '1000_4999' })
   const ids = (sectors: string[]) => eu(sectors).map(o => o.obligationId)
   // ⚠️ MATCH NIS2 ON NAME, NEVER ON obligationId. BOTH NIS2 entries carry `obligationId: 'nis2'` —
   // correctly, since both route to Cyber Governance at the same price — so `ids()` cannot tell them
@@ -293,8 +314,8 @@ describe('computeObligations — DORA is lex specialis over NIS2', () => {
 // describing a user journey, and nothing here should be read as a claim about what a customer sees.
 // Every fixture below supplies a band for that reason.
 describe('computeObligations — EU Pay Transparency, three arms', () => {
-  const eu = (employees: string) => computeObligations({ jurisdictions: ['eu'], employees })
-  const named = (employees: string, fragment: string) =>
+  const eu = (employees: EmployeesAnswer) => computeObligations({ ...UNANSWERED_ALL, jurisdictions: ['eu'], employees })
+  const named = (employees: EmployeesAnswer, fragment: string) =>
     eu(employees).find(o => o.name.includes(fragment))
 
   it('day-one obligations bind at ANY size — the 40-person employer the old gate silenced', () => {
@@ -341,7 +362,10 @@ describe('computeObligations — EU Pay Transparency, three arms', () => {
   })
 
   it('the arms are mutually exclusive — no band gets both the 250+ duty and the abstention', () => {
-    for (const band of ['under50', '50_249', '250_499', '500_999', '1000_4999', '5000plus']) {
+    // Typed as EmployeesAnswer[] rather than string[]: the narrowed helper now rejects a typo'd
+    // band at compile time, which is the second thing this type change buys a test author.
+    const BANDS: EmployeesAnswer[] = ['under50', '50_249', '250_499', '500_999', '1000_4999', '5000plus']
+    for (const band of BANDS) {
       const reporting = named(band, 'gender pay gap reporting')
       const undetermined = named(band, 'reporting band undetermined')
       expect(reporting && undetermined).toBeFalsy()
@@ -371,9 +395,9 @@ describe('computeObligations — EU Pay Transparency, three arms', () => {
 // half that is mechanised. Treat the population definition as untested.
 describe('computeObligations — California pay data size gate (NOT the population — see comment)', () => {
   // $500M so SB 261 fires alongside, giving every absence assertion a live companion.
-  const ca = (employees: string) =>
-    computeObligations({ jurisdictions: ['california'], revenue: 4, employees })
-  const payData = (employees: string) => ca(employees).find(o => o.obligationId === 'ca-pay-data')
+  const ca = (employees: EmployeesAnswer) =>
+    computeObligations({ ...UNANSWERED_ALL, jurisdictions: ['california'], revenue: 4 as RevenueAnswer, employees })
+  const payData = (employees: EmployeesAnswer) => ca(employees).find(o => o.obligationId === 'ca-pay-data')
 
   it('a band entirely BELOW 100 produces no entry — the old hasCA-alone gate is gone', () => {
     expect(payData('under50')).toBeUndefined()
@@ -495,5 +519,79 @@ describe('canAdvance — no unset answer may reach computeObligations', () => {
     expect(canAdvance('slider', 0)).toBe(true)
     expect(canAdvance('options', 'no')).toBe(true)
     expect(canAdvance('multiselect', ['eu'])).toBe(true)
+  })
+})
+
+// ── WHAT THE TYPE CHANGE BOUGHT, AND WHAT IT DID NOT ─────────────────────────────────────────────
+//
+// BOUGHT — OMISSION IS UNCOMPILABLE, for every single-select. `Answers` has no optional
+// single-selects: each is `<Union> | UNANSWERED`, so a fixture, a `useState({})` or a `setAnswers({})`
+// that leaves one out is a type error rather than a silent `undefined`. That is what forced every
+// factory above to say what it means. It also killed the normalisation block that laundered
+// `undefined` into '' / 0 at the top of computeObligations, which was the source of the whole class.
+//
+// BOUGHT — NEGATIVE COMPARISON IS UNCOMPILABLE FOR ai_use, and only for ai_use. A literal union plus
+// a sentinel does NOT stop `x !== 'no'` compiling: TypeScript rejects a comparison only where the
+// types have no overlap, and `AiUseAnswer | 'unanswered'` contains 'no'. Wrapping the answer removes
+// the overlap, so `a.ai_use !== 'no'` is now an error and the read must narrow first.
+//
+// NOT BOUGHT — the other five fields can still be compared negatively without a type error. They are
+// not wrapped because THEY ARE NOT READ NEGATIVELY: listing === 'us_listed', ownership === 'pe_vc',
+// the six driver === tests. AN AFFIRMATIVE COMPARISON IS ALREADY SAFE — an unanswered value fails it,
+// which is the correct direction. The defect only exists where the code asks "is it NOT this",
+// because there the unanswered value passes.
+//
+// THE RULE: A NEGATIVE READ NEEDS THE WRAPPER. If you write `!==` against driver, listing, ownership,
+// employees or supply_chain, wrap that field rather than reasoning about whether it is safe this
+// time. That reasoning produced four instances of this defect in a single day.
+//
+// STILL A SENTINEL: revUSD. An unanswered revenue becomes 0, which is safe ONLY because every revenue
+// comparison in computeObligations is a lower bound. page.tsx says so at the line that does it.
+describe('the unanswered state cannot be mistaken for an answer', () => {
+  const euVisitor = { ...UNANSWERED_ALL, jurisdictions: ['eu'] }
+  const aiEntry = (a: Parameters<typeof computeObligations>[0]) =>
+    computeObligations(a).find(o => o.obligationId === 'eu-ai-act')
+
+  it('(a) an UNANSWERED ai_use produces NO AI Act entry — the defect that started the sweep', () => {
+    // This visitor qualifies on jurisdiction; only the AI answer is missing. The old gate was
+    // `hasEU && ai !== 'no'`, and an unset ai_use normalised to '' — which is !== 'no' — so it took
+    // the same branch as an affirmative answer and told a company with no declared AI systems that
+    // its systems required classification.
+    expect(aiEntry(euVisitor)).toBeUndefined()
+    // Not vacuous: the same visitor DOES produce other EU obligations, so an empty result cannot
+    // pass this.
+    expect(computeObligations(euVisitor).length).toBeGreaterThan(0)
+  })
+
+  it('(b) no over-correction — "no" stays silent, "no_planned" still fires', () => {
+    expect(aiEntry({ ...euVisitor, ai_use: answered('no') })).toBeUndefined()
+    const planned = aiEntry({ ...euVisitor, ai_use: answered('no_planned') })
+    expect(planned).toBeDefined()
+    // 'no_planned' is not high-risk-by-answer, so it takes the non-critical arm.
+    expect(planned!.urgency).toBe('high')
+    // Every affirmative answer must still produce the entry — a wrapper that swallowed one would
+    // pass test (a) for the wrong reason.
+    for (const v of ['yes_hr', 'yes_credit', 'yes_other', 'no_planned'] as AiUseAnswer[]) {
+      expect(aiEntry({ ...euVisitor, ai_use: answered(v) }), `${v} should fire`).toBeDefined()
+    }
+  })
+
+  it('(c) asRevenueIndex accepts every valid index and refuses everything else', () => {
+    for (const i of REVENUE_INDICES) {
+      expect(asRevenueIndex(i), `index ${i} is valid`).toBe(i)
+    }
+    // Out of range, non-integer, and the values a broken upstream would actually send. A cast would
+    // have accepted all of these and handed REVENUE_VALUES[n] === undefined to the thresholds.
+    for (const bad of [-1, REVENUE_INDICES.length, 99, 1.5, NaN, Infinity]) {
+      expect(asRevenueIndex(bad), `${bad} must be refused`).toBeNull()
+    }
+  })
+
+  it('(d) an ALL-UNANSWERED Answers produces zero obligations and does not throw', () => {
+    expect(() => computeObligations({ ...UNANSWERED_ALL })).not.toThrow()
+    expect(computeObligations({ ...UNANSWERED_ALL })).toEqual([])
+    // The floor and the ceiling of the same guarantee: nothing answered means nothing asserted, and
+    // one answer is enough to produce something. An empty result must be a decision, not a crash.
+    expect(computeObligations({ ...UNANSWERED_ALL, jurisdictions: ['eu'] }).length).toBeGreaterThan(0)
   })
 })

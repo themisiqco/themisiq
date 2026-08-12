@@ -26,19 +26,109 @@ import {
   priceLabel, driverModules, isDriverId, type ObligationId,
 } from '../../lib/obligations'
 
+// ── UNANSWERED ───────────────────────────────────────────────────────────────────────────────────
+//
+// A STRING LITERAL, NOT A SYMBOL, and the choice is about how each one FAILS.
+//   · Collision. A symbol cannot collide with any answer value, ever. 'unanswered' collides only if
+//     someone adds an option with that exact value — checked against all 27 option values in the
+//     questions array below, currently zero, and visible in that array if it ever changes.
+//   · Serialisation. THIS IS WHY THE STRING WINS. JSON.stringify DROPS symbol-valued properties. The
+//     answers object is not posted today — answerProfile() flattens to label pairs first — but the
+//     submit path is a few lines away, and a symbol crossing it would silently become `undefined`,
+//     reintroducing exactly the ambiguity this type exists to remove, invisibly. A string round-trips.
+// One failure is unlikely and visible; the other is plausible and silent. Take the visible one.
+export const UNANSWERED = 'unanswered' as const
+
+// The answer vocabularies, DERIVED FROM THE OPTION VALUES in the questions array — not invented.
+// Every member below appears as a `value:` on its question. If a question gains an option, its union
+// gains a member here or the option cannot be selected into state.
+export type DriverAnswer      = 'regulatory' | 'customer' | 'investor' | 'bank' | 'board' | 'ahead'
+export type EmployeesAnswer   = 'under50' | '50_249' | '250_499' | '500_999' | '1000_4999' | '5000plus'
+export type ListingAnswer     = 'not_listed' | 'us_listed' | 'eu_listed' | 'uk_listed' | 'listed_other'
+export type OwnershipAnswer   = 'founder_family' | 'pe_vc' | 'group' | 'other'
+export type AiUseAnswer       = 'yes_hr' | 'yes_credit' | 'yes_other' | 'no_planned' | 'no'
+export type SupplyChainAnswer = 'simple' | 'moderate' | 'complex' | 'deep'
+// The slider is an INDEX into REVENUE_VALUES, not a figure. 0 is a real answer ('Under $50M'), which
+// is why the old `a.revenue !== undefined ? … : 0` default was wrong twice over: it produced a
+// FIGURE of 0 for an unset answer, and 0 is also a legal index meaning $25M.
+//
+// ONE SOURCE for the indices: the tuple below drives the TYPE, the slider's `max`, and the runtime
+// guard that validates a written index. Writing `0 | 1 | … | 10` by hand would be a fourth place the
+// range is stated, and the guard would then need a cast to bridge them.
+export const REVENUE_INDICES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const
+export type RevenueAnswer = typeof REVENUE_INDICES[number]
+
+// ── THE WRAPPER, AND WHY ONLY ai_use GETS IT ─────────────────────────────────────────────────────
+//
+// A LITERAL UNION PLUS A SENTINEL DOES NOT STOP `ai !== 'no'` COMPILING. TypeScript rejects a
+// comparison only where the types have NO OVERLAP, and `AiUseAnswer | 'unanswered'` contains 'no',
+// so the comparison is legal — it just does not mean what its author thinks. Wrapping the answer
+// removes the overlap: `Answered<AiUseAnswer> | 'unanswered'` cannot be compared to a bare string at
+// all, so the read has to narrow first.
+//
+// ai_use IS THE ONLY FIELD READ NEGATIVELY. Every other single-select is compared affirmatively —
+// `listing === 'us_listed'`, `ownership === 'pe_vc'`, the six `driver === …` tests — and AN
+// AFFIRMATIVE COMPARISON IS ALREADY SAFE: an unanswered value fails it, which is the correct
+// direction. The defect exists only where the code asks "is it NOT this", because there the
+// unanswered value passes. So the wrapper goes where the hazard is and nowhere else; wrapping the
+// other five would be five sets of narrowing bought for no defect.
+//
+// THE RULE, for whoever comes next: A NEGATIVE READ NEEDS THE WRAPPER; AN AFFIRMATIVE ONE DOES NOT.
+// If you find yourself writing `!==` against any other field, WRAP THAT FIELD rather than reasoning
+// about whether it happens to be safe this time. That reasoning is what produced four instances of
+// this defect in one day.
+//
+// Shape: a one-property object, not a class or a symbol-keyed brand, so it SURVIVES JSON — the same
+// argument that chose a string sentinel over a symbol in stage 1. `{"answer":"no"}` round-trips, and
+// it is a plain value React state holds without ceremony.
+export type Answered<T> = { readonly answer: T }
+export const answered = <T,>(answer: T): Answered<T> => ({ answer })
+export const isAnswered = <T,>(f: Answered<T> | typeof UNANSWERED): f is Answered<T> => f !== UNANSWERED
+
+// The slider hands back a string; Number() turns it into a `number`, which is not a RevenueAnswer.
+// VALIDATED, NOT CAST. `.find` over the index tuple returns RevenueAnswer | undefined without any
+// assertion, so the narrowing is earned at runtime rather than promised to the compiler — a cast
+// here would accept a fourteenth index and hand REVENUE_VALUES[14] === undefined to the thresholds,
+// producing NaN revenue and silently failing every comparison. That is the shape of defect this
+// whole type change exists to remove, so it must not be reintroduced by the writer.
+export const asRevenueIndex = (n: number): RevenueAnswer | null =>
+  REVENUE_INDICES.find(i => i === n) ?? null
+
 interface Answers {
-  driver?: string
-  revenue?: number
-  employees?: string
+  driver: DriverAnswer | typeof UNANSWERED
+  revenue: RevenueAnswer | typeof UNANSWERED
+  employees: EmployeesAnswer | typeof UNANSWERED
+  // MULTISELECTS STAY `string[]?`, deliberately. Every read is `.includes(…)`, which returns false on
+  // an empty array, so `[]` is already an honest "nothing selected" — there is no read anywhere in
+  // computeObligations where an empty array produces an affirmative result. They do not have the
+  // defect, so they do not get the cure.
   jurisdictions?: string[]
   sectors?: string[]
   // `listed` was ONE question doing two jobs. Split, because listing status and ownership are
   // independent facts and the combined question forced a choice between them: a US-listed
   // PE-backed company could only declare one, and lost the other's entry.
-  listing?: string
-  ownership?: string
-  ai_use?: string
-  supply_chain?: string
+  listing: ListingAnswer | typeof UNANSWERED
+  ownership: OwnershipAnswer | typeof UNANSWERED
+  // WRAPPED — the only field read negatively, and the only one that needs it. See the rule above.
+  ai_use: Answered<AiUseAnswer> | typeof UNANSWERED
+  // COLLECTED AND NEVER READ — no gate fires on it, by design (see its question's sub-copy). It is
+  // typed like its siblings anyway rather than left optional: a second class of field would be a
+  // second rule to remember, and if anyone ever does read it they now have to handle the unanswered
+  // arm. Typing it costs nothing today because nothing reads it.
+  supply_chain: SupplyChainAnswer | typeof UNANSWERED
+}
+
+// The starting state, and what 'Start over' restores. Replaces `{}`, which a non-optional Answers
+// no longer accepts — the point being that "no answers yet" is now a value you have to state rather
+// than an absence you can pass by accident.
+export const EMPTY_ANSWERS: Answers = {
+  driver: UNANSWERED,
+  revenue: UNANSWERED,
+  employees: UNANSWERED,
+  listing: UNANSWERED,
+  ownership: UNANSWERED,
+  ai_use: UNANSWERED,
+  supply_chain: UNANSWERED,
 }
 
 interface Obligation {
@@ -76,14 +166,16 @@ const REVENUE_LABELS = ['Under $50M','$50M','$100M','$250M','$500M','$750M','$1B
 const REVENUE_VALUES = [25, 50, 100, 250, 500, 750, 1000, 2000, 5000, 10000, 15000]
 
 export function computeObligations(a: Answers): Obligation[] {
-  const rev = a.revenue !== undefined ? REVENUE_VALUES[a.revenue] : 0
-  const emp = a.employees || ''
+  // THE NORMALISATION BLOCK IS GONE, and it was the defect rather than a convenience. It read
+  //     const emp = a.employees || ''      const ai = a.ai_use || ''      … and four more
+  // laundering `undefined` into a legal-looking `string` at the top of the function, so every
+  // downstream site inherited an ambiguity it could not see. `a.ai_use` is now already the right
+  // type; there is nothing left to normalise and no local to hide the third state behind.
+  //
+  // jur/sec KEEP their `|| []`: an empty array is an honest "nothing selected" because every read is
+  // `.includes(…)`, which returns false on it. They never had the defect.
   const jur = a.jurisdictions || []
   const sec = a.sectors || []
-  const listing = a.listing || ''
-  const ownership = a.ownership || ''
-  const driver = a.driver || ''
-  const ai  = a.ai_use || ''
   const hasEU   = jur.includes('eu')
   const hasUK   = jur.includes('uk')
   const hasCA   = jur.includes('california')
@@ -98,7 +190,10 @@ export function computeObligations(a: Answers): Obligation[] {
   // CSRD >1,000 test at its lower edge. Where a band cannot determine an obligation, the entry SAYS
   // SO rather than guessing — the same rule the Deals engine applies with `not-assessed`.
   const empAtLeast = (n: number): boolean | null => {
-    switch (emp) {
+    // Reads a.employees DIRECTLY — the `emp` local is gone with the normalisation block. The
+    // `default:` arm already returned null for an unrecognised value, and UNANSWERED lands there, so
+    // the third state is handled by the shape this switch already had rather than by a new branch.
+    switch (a.employees) {
       case 'under50':    return n <= 0 ? true : false
       case '50_249':     return n <= 50 ? true : n > 249 ? false : null   // straddles 100 and 150
       case '250_499':    return n <= 250 ? true : n > 499 ? false : null
@@ -111,14 +206,20 @@ export function computeObligations(a: Answers): Obligation[] {
   // Revenue arrives as a USD-millions slider index. Statutory limbs are in their own currency, so the
   // COMPANY figure converts to the limb's currency — GBP 36m, EUR 450m, EUR 10m, AUD 100m are never
   // restated in dollars. Same direction as lib/deals/assessment.ts's evaluateLimb.
-  const revUSD = rev * 1_000_000
+  // UNANSWERED → 0, stated rather than defaulted. Behaviour is unchanged from the old
+  // `a.revenue !== undefined ? … : 0`, and it is SAFE ONLY BECAUSE EVERY REVENUE COMPARISON IN THIS
+  // FUNCTION IS A LOWER BOUND — `> 1bn`, `>= 500m`, `>= 10m`, `> 36m` — so 0 fails all of them, which
+  // is the correct answer for a figure nobody gave. THE MOMENT SOMEONE WRITES A `<` COMPARISON
+  // AGAINST revUSD, 0 becomes an affirmative answer and this line is the defect. Then it has to
+  // become `number | null` and every site has to narrow.
+  const revUSD = (a.revenue === UNANSWERED ? 0 : REVENUE_VALUES[a.revenue]) * 1_000_000
   const revIn = (c: 'EUR' | 'GBP' | 'AUD'): number => convertCurrency(revUSD, 'USD', c)
   const fxNote = `Converted from your USD figure at the ECB reference rate of ${FX_AS_OF}; confirm against your reported figure in the statutory currency.`
 
   // Listing status drives the SEC entries; ownership drives the LP & lender entry. These were one
   // field, so the two could not both be true — a US-listed, PE-backed company had to pick.
-  const isPublicUS = listing === 'us_listed'
-  const isPE       = ownership === 'pe_vc'
+  const isPublicUS = a.listing === 'us_listed'
+  const isPE       = a.ownership === 'pe_vc'
   // 'group' — a subsidiary of a larger parent — is COLLECTED BUT NOT YET SCORED. CSRD and CS3D can
   // both reach a company through its parent, and no determination here is safe without knowing where
   // the parent is established and whether it consolidates you. Deliberately no entry fires on it.
@@ -188,7 +289,7 @@ export function computeObligations(a: Answers): Obligation[] {
   // CS3D route (b). lib/cs3d.ts is explicit that group parentage and franchising "are NOT expressed
   // here or there" — no threshold constant models them — so this entry names the route and abstains
   // rather than testing the art. 2(1)(a) limbs against a figure they were not written for.
-  const isGroup = ownership === 'group'
+  const isGroup = a.ownership === 'group'
   if (isGroup && hasEU) regs.push({
     name: 'CS3D — due diligence through group parentage',
     jurisdiction: 'European Union · group level',
@@ -215,7 +316,11 @@ export function computeObligations(a: Answers): Obligation[] {
   // both application dates and the citation with it. Classification is described as the thing that
   // SETTLES whether anything applies, not as a duty owed today, because for the planning case that
   // is the honest shape: the tier is what to establish before a system goes live.
-  if (hasEU && ai !== 'no') { const urgency = (ai === 'yes_hr' || ai === 'yes_credit') ? 'critical' : 'high'; regs.push({ name: 'EU AI Act — Artificial Intelligence Regulation', obligationId: 'eu-ai-act', jurisdiction: 'European Union (global scope)', group: 'regulatory', urgency, urgency_label: urgency === 'critical' ? 'IMMEDIATE ACTION' : 'HIGH PRIORITY', timing: `${AI_ACT_HIGH_RISK_STANDALONE} (stand-alone) · ${AI_ACT_HIGH_RISK_EMBEDDED} (in a regulated product)`, module: 'AI Governance', what: ai === 'yes_hr' ? `CV screening and hiring AI are Annex III high-risk. ${AI_ACT_HIGH_RISK_SENTENCE}` : `The EU AI Act's obligations follow the RISK TIER of each system rather than the fact of deploying AI, so what applies to you is settled by classifying your systems — for one you plan to deploy as much as one already running. ${AI_ACT_HIGH_RISK_SENTENCE}`, action: 'Inventory all AI systems and begin Article 11 technical documentation.' }) }
+  // THREE ARMS, NARROWED EXPLICITLY. `a.ai_use !== 'no'` no longer compiles — the wrapper removed the
+  // overlap — so the unanswered case has to be dealt with by name instead of falling through with the
+  // affirmatives. UNANSWERED and 'no' both produce NO ENTRY; only a real deployment answer does.
+  const aiField = a.ai_use
+  if (hasEU && isAnswered(aiField) && aiField.answer !== 'no') { const ai = aiField.answer; const urgency = (ai === 'yes_hr' || ai === 'yes_credit') ? 'critical' : 'high'; regs.push({ name: 'EU AI Act — Artificial Intelligence Regulation', obligationId: 'eu-ai-act', jurisdiction: 'European Union (global scope)', group: 'regulatory', urgency, urgency_label: urgency === 'critical' ? 'IMMEDIATE ACTION' : 'HIGH PRIORITY', timing: `${AI_ACT_HIGH_RISK_STANDALONE} (stand-alone) · ${AI_ACT_HIGH_RISK_EMBEDDED} (in a regulated product)`, module: 'AI Governance', what: ai === 'yes_hr' ? `CV screening and hiring AI are Annex III high-risk. ${AI_ACT_HIGH_RISK_SENTENCE}` : `The EU AI Act's obligations follow the RISK TIER of each system rather than the fact of deploying AI, so what applies to you is settled by classifying your systems — for one you plan to deploy as much as one already running. ${AI_ACT_HIGH_RISK_SENTENCE}`, action: 'Inventory all AI systems and begin Article 11 technical documentation.' }) }
 
   // ── NIS2 / DORA ─────────────────────────────────────────────────────────────
   // DORA IS LEX SPECIALIS. NIS2 art. 4(2) disapplies its risk-management and incident provisions
@@ -393,19 +498,19 @@ export function computeObligations(a: Answers): Obligation[] {
   // Nothing below carries a statutory penalty. These fire on who is ASKING — the ownership answer
   // and the driver answer — not on a jurisdiction, a size limb or a sector.
   if (isPE) regs.push({ name: 'LP & Lender ESG Requirements', obligationId: 'lp-lender-esg', jurisdiction: 'Global · capital markets', group: 'market', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: 'Varies by LP agreement', module: 'Deals & Investment', what: 'Institutional LPs and lenders are requiring documented ESG diligence as a condition of capital deployment.', action: 'Establish portfolio climate monitoring and LP ESG reporting framework.' })
-  if (driver === 'customer') regs.push({ name: 'Customer Supplier Questionnaire', jurisdiction: 'Global · your customers', group: 'market', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: 'As requested by your customer', module: 'Supply Chain', what: 'Your customer is asking you to complete a sustainability questionnaire covering GHG emissions, labour practices, ethics and environmental management.', action: 'Complete a sustainability self-assessment using the ThemisIQ Supplier Portal questionnaire.' })
-  if (driver === 'customer') regs.push({ name: 'GHG Inventory — Scope 1 & 2', jurisdiction: 'Global · customer requirement', group: 'market', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: 'As requested by your customer', module: 'Climate · GHG', what: 'Most customer sustainability questionnaires require your Scope 1 and Scope 2 GHG emissions — the baseline metric every sustainability programme starts with.', action: 'Complete your GHG inventory using the ThemisIQ Climate module.' })
-  if (driver === 'bank') regs.push({ name: 'Bank / Insurer ESG Questionnaire', jurisdiction: 'Global · your lender', group: 'market', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: 'As requested by your bank or insurer', module: 'Climate · GHG + Risk', what: 'Banks and insurers are requiring ESG data for loan renewals and sustainability-linked financing. Climate risk and GHG emissions are the most commonly requested data points.', action: 'Complete your GHG inventory and climate risk assessment.' })
-  if (driver === 'board') regs.push({ name: 'Board ESG Governance Programme', jurisdiction: 'Global · internal governance', group: 'market', urgency: 'medium', urgency_label: 'RECOMMENDED', timing: 'As directed by your board', module: 'Climate · GHG', what: 'Boards are requesting ESG performance data for governance, talent attraction and reputational risk management — even without a regulatory mandate.', action: 'Start with a GHG inventory and supply chain risk assessment as the foundation of your ESG programme.' })
-  if (driver === 'ahead') regs.push({ name: 'Proactive ESG Programme', jurisdiction: 'Global · best practice', group: 'market', urgency: 'medium', urgency_label: 'RECOMMENDED', timing: 'At your own pace', module: 'Climate · GHG', what: 'Getting ahead of regulations now means less disruption when they become mandatory.', action: 'Start with a GHG inventory and compliance gap assessment.' })
-  if (driver === 'investor') regs.push({ name: 'Investor / PE ESG Requirements', jurisdiction: 'Global · your investors', group: 'market', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: 'As required by your investor', module: 'Deals & Investment', what: 'Investors and PE firms are requiring portfolio companies to measure and report ESG performance as a condition of ongoing investment.', action: 'Establish a GHG inventory, supply chain risk register and governance framework.' })
+  if (a.driver === 'customer') regs.push({ name: 'Customer Supplier Questionnaire', jurisdiction: 'Global · your customers', group: 'market', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: 'As requested by your customer', module: 'Supply Chain', what: 'Your customer is asking you to complete a sustainability questionnaire covering GHG emissions, labour practices, ethics and environmental management.', action: 'Complete a sustainability self-assessment using the ThemisIQ Supplier Portal questionnaire.' })
+  if (a.driver === 'customer') regs.push({ name: 'GHG Inventory — Scope 1 & 2', jurisdiction: 'Global · customer requirement', group: 'market', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: 'As requested by your customer', module: 'Climate · GHG', what: 'Most customer sustainability questionnaires require your Scope 1 and Scope 2 GHG emissions — the baseline metric every sustainability programme starts with.', action: 'Complete your GHG inventory using the ThemisIQ Climate module.' })
+  if (a.driver === 'bank') regs.push({ name: 'Bank / Insurer ESG Questionnaire', jurisdiction: 'Global · your lender', group: 'market', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: 'As requested by your bank or insurer', module: 'Climate · GHG + Risk', what: 'Banks and insurers are requiring ESG data for loan renewals and sustainability-linked financing. Climate risk and GHG emissions are the most commonly requested data points.', action: 'Complete your GHG inventory and climate risk assessment.' })
+  if (a.driver === 'board') regs.push({ name: 'Board ESG Governance Programme', jurisdiction: 'Global · internal governance', group: 'market', urgency: 'medium', urgency_label: 'RECOMMENDED', timing: 'As directed by your board', module: 'Climate · GHG', what: 'Boards are requesting ESG performance data for governance, talent attraction and reputational risk management — even without a regulatory mandate.', action: 'Start with a GHG inventory and supply chain risk assessment as the foundation of your ESG programme.' })
+  if (a.driver === 'ahead') regs.push({ name: 'Proactive ESG Programme', jurisdiction: 'Global · best practice', group: 'market', urgency: 'medium', urgency_label: 'RECOMMENDED', timing: 'At your own pace', module: 'Climate · GHG', what: 'Getting ahead of regulations now means less disruption when they become mandatory.', action: 'Start with a GHG inventory and compliance gap assessment.' })
+  if (a.driver === 'investor') regs.push({ name: 'Investor / PE ESG Requirements', jurisdiction: 'Global · your investors', group: 'market', urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: 'As required by your investor', module: 'Deals & Investment', what: 'Investors and PE firms are requiring portfolio companies to measure and report ESG performance as a condition of ongoing investment.', action: 'Establish a GHG inventory, supply chain risk register and governance framework.' })
 
   // CDP and EcoVadis are BOTH REQUEST-DRIVEN: nobody is obliged to file either one, and neither has
   // a size test of its own. CDP previously fired on `rev >= 500 || hasGlobal` — a $500m gate lifted
   // wholesale from SB 261, which has nothing to do with CDP and produced the same false confidence
   // in the other direction: a $60m manufacturer whose largest customer had just sent a CDP supply
   // chain request was told CDP did not concern it. Both now fire on the ASK.
-  const requested = driver === 'customer' || driver === 'investor'
+  const requested = a.driver === 'customer' || a.driver === 'investor'
   if (requested) regs.push({ name: 'CDP Climate — Annual Disclosure', obligationId: 'cdp', jurisdiction: 'Global · customer & investor requests', group: 'market', urgency: 'medium', urgency_label: 'ON REQUEST', timing: 'On request · annual July submission window', module: 'Climate · GHG + Risk', what: 'CDP is a disclosure REQUEST, not a filing obligation: investors representing over $130 trillion AUM, and large buyers running CDP Supply Chain programmes, ask companies to respond. There is no revenue or headcount threshold — a request from one customer or one investor is what puts you in scope. CDP C6, C7, C11 and Section P all flow from your GHG inventory.', action: 'Complete GHG inventory to feed CDP C6 and run scenario analysis for CDP Section P.' })
   if (requested) regs.push({ name: 'EcoVadis Sustainability Rating', obligationId: 'ecovadis', jurisdiction: 'Global · customer & investor requests', group: 'market', urgency: 'medium', urgency_label: 'ON REQUEST', timing: 'On request · rating valid 12 months', module: 'Supply Chain', what: 'EcoVadis is a request-driven supplier sustainability rating: a customer or investor asks you to be scored across Environment, Labour & Human Rights, Ethics and Sustainable Procurement, and the scorecard is then visible to everyone who requests it. The evidence it wants — a GHG inventory, published policies, and supplier due diligence — is the same evidence behind the questionnaires above, so it is assembled once and reused.', action: 'Assemble the evidence set once — GHG inventory, policy documents, supplier due diligence — and reuse it across EcoVadis and your customers’ own questionnaires.' })
 
@@ -473,7 +578,7 @@ const URGENCY_TEXT: Record<string, string> = { critical: '#501313', high: '#6338
 
 export default function AssessPage() {
   const [step, setStep] = useState(0)
-  const [answers, setAnswers] = useState<Answers>({})
+  const [answers, setAnswers] = useState<Answers>(EMPTY_ANSWERS)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [email, setEmail] = useState({ first: '', last: '', emailAddr: '', company: '', role: '' })
 
@@ -695,7 +800,7 @@ export default function AssessPage() {
           </div>
         </div>
         <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-          <button onClick={() => { setStep(0); setAnswers({}) }} style={{ fontSize: 12, color: '#888784', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Start over</button>
+          <button onClick={() => { setStep(0); setAnswers(EMPTY_ANSWERS) }} style={{ fontSize: 12, color: '#888784', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Start over</button>
         </div>
       </div>
     )
@@ -754,7 +859,15 @@ export default function AssessPage() {
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', textAlign: 'center' as const, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 10 }}>
                 {REVENUE_LABELS[val as number ?? 5]}
               </div>
-              <input type="range" min={0} max={10} value={val as number ?? 5} onChange={e => setAnswers(a => ({ ...a, revenue: Number(e.target.value) }))} style={{ width: '100%', accentColor: '#7425e3' }} />
+              {/* `max` derives from REVENUE_INDICES, so the slider's range and the RevenueAnswer type
+                  cannot drift — a hardcoded 10 would be a third place the range is stated.
+                  THE GUARD REFUSES an out-of-range index rather than writing it: state keeps whatever
+                  it held, so an unanswered question stays unanswered and canAdvance keeps blocking,
+                  and an answered one keeps its last good value. It cannot happen through this input,
+                  which is why refusing is right — if it ever does, something upstream is wrong, and
+                  the honest response is to record nothing rather than to invent an index whose
+                  REVENUE_VALUES lookup is undefined. */}
+              <input type="range" min={0} max={REVENUE_INDICES.length - 1} value={val as number ?? 5} onChange={e => { const i = asRevenueIndex(Number(e.target.value)); if (i === null) return; setAnswers(a => ({ ...a, revenue: i })) }} style={{ width: '100%', accentColor: '#7425e3' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#888784', marginTop: 4 }}>
                 <span>Under $50M</span><span>$10B+</span>
               </div>
