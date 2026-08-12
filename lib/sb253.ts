@@ -42,6 +42,13 @@ export const SB253_SCOPE3_FROM = '2027'
 export const SB253_CITATION =
   'California Health & Safety Code §38532; CARB initial regulation (Title 17 CCR §§96070-96077) approved by the Board 26 February 2026, withdrawn from OAL review, modified text published 27 July 2026 — not yet approved'
 
+// The programme page. Verified live 12 August 2026. Note this is the PROGRAMME page, not the
+// rulemaking page — the rulemaking page was stale when checked (last reviewed 29 December 2025)
+// and still showed the Final Package pending at OAL, which the withdrawal had overtaken. The
+// previous link on the framework directory card had rotted to a 404, which is why this is a
+// constant and not a literal at the call site.
+export const SB253_PROGRAMME_URL = 'https://ww2.arb.ca.gov/our-work/programs/california-corporate-greenhouse-gas-reporting-and-climate-related-financial-risk'
+
 // The full posture, for any surface with room for a sentence. States what is proposed, what it covers,
 // that it is not final, what remains outstanding, and that it has moved — so a reader can judge how
 // much to rely on it rather than being handed a countdown.

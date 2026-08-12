@@ -5,6 +5,7 @@ import {
   AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED, AI_ACT_HIGH_RISK_SENTENCE,
 } from '../../lib/aiAct'
 import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_STATUS_SENTENCE, SB253_SCOPE3_FROM } from '../../lib/sb253'
+import { SB261_CITATION, SB261_STATUS_SENTENCE } from '../../lib/sb261'
 // lib/cs3d.ts: "ANY SURFACE NAMING A CS3D DATE OR THRESHOLD IMPORTS FROM HERE. A literal in copy is
 // the defect." The group-parentage entry below names both thresholds and the application date.
 import { CS3D_APPLIES_FROM, CS3D_CITATION, CS3D_EMPLOYEE_THRESHOLD, CS3D_TURNOVER_THRESHOLD } from '../../lib/cs3d'
@@ -131,7 +132,7 @@ function computeObligations(a: Answers): Obligation[] {
   // SB 261 posture verified against primary sources 12 August 2026: Ninth Circuit order of
   // 18 November 2025 in Chamber of Commerce v. Sanchez, No. 25-5327, and CARB's SB 261 docket
   // page. No merits ruling as of this date — re-check before relying on "has not ruled".
-  if (hasCA && revUSD >= 500_000_000) regs.push({ name: 'SB 261 — California Climate-Related Financial Risk Act', obligationId: 'sb261', jurisdiction: 'California, USA', group: 'regulatory', urgency: 'monitor', urgency_label: 'MONITOR', timing: 'Enforcement paused — no new date set', module: 'Climate · Risk', what: 'You meet the $500m revenue threshold. California Health & Safety Code \u00a738533 (SB 261). On 18 November 2025 the Ninth Circuit granted an injunction pending appeal barring enforcement of SB 261 \u2014 Chamber of Commerce v. Sanchez, No. 25-5327 \u2014 and declined to extend it to SB 253. The 1 January 2026 deadline is not in effect. The court heard argument on 9 January 2026 and has not ruled. If SB 261 is upheld, CARB has not said when a new deadline would fall. CARB keeps a public docket for companies that choose to file in the meantime.', action: 'Prepare the TCFD-aligned report now; it is the same deliverable whenever a date is set.' })
+  if (hasCA && revUSD >= 500_000_000) regs.push({ name: 'SB 261 — California Climate-Related Financial Risk Act', obligationId: 'sb261', jurisdiction: 'California, USA', group: 'regulatory', urgency: 'monitor', urgency_label: 'MONITOR', timing: 'Enforcement paused — no new date set', module: 'Climate · Risk', what: `You meet the $500m revenue threshold. ${SB261_CITATION}. ${SB261_STATUS_SENTENCE}`, action: 'Prepare the TCFD-aligned report now; it is the same deliverable whenever a date is set.' })
 
   // ── CSRD ────────────────────────────────────────────────────────────────────
   // ONE entry, not two. The 250-employee tier DOES NOT EXIST post-Omnibus: Directive (EU) 2026/470

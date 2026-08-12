@@ -1,6 +1,8 @@
 'use client'
 import Nav from '@/app/components/Nav'
 import Footer from '@/app/components/Footer'
+import { SB253_PROGRAMME_URL } from '@/lib/sb253'
+import { SB261_CITATION, SB261_DOCKET_URL, SB261_TABLE_STATUS } from '@/lib/sb261'
 
 // ── DATA ──────────────────────────────────────────────────────────
 // NOTE: The "maps" lines below describe how ThemisIQ reports relate to each
@@ -12,8 +14,8 @@ const groups = [
     intro: 'Built on the GHG Protocol and structured for the major climate-disclosure regimes.',
     items: [
       { name: 'GHG Protocol', body: 'The global accounting standard for corporate greenhouse-gas inventories.', maps: 'Your Scope 1, 2 and 3 inventory is built on the GHG Protocol Corporate Standard, audit-trail first.', href: 'https://ghgprotocol.org', module: '/climate-ghg' },
-      { name: 'California SB 253', body: 'Climate Corporate Data Accountability Act — mandatory Scope 1–3 disclosure for large companies doing business in California.', maps: 'One-click, pre-filled SB 253 emissions export from your verified inventory.', href: 'https://ww2.arb.ca.gov/our-work/programs/climate-disclosure', module: '/climate-ghg' },
-      { name: 'California SB 261', body: 'Climate-Related Financial Risk Act — biennial climate risk reporting aligned to TCFD.', maps: 'TCFD-aligned climate financial-risk report ready for SB 261 filers.', href: 'https://ww2.arb.ca.gov/our-work/programs/climate-disclosure', module: '/climate-risk' },
+      { name: 'California SB 253', body: 'Climate Corporate Data Accountability Act — mandatory Scope 1–3 disclosure for large companies doing business in California.', maps: 'One-click, pre-filled SB 253 emissions export from your verified inventory.', href: SB253_PROGRAMME_URL, module: '/climate-ghg' },
+      { name: 'California SB 261', body: `Climate-Related Financial Risk Act — biennial climate risk reporting aligned to TCFD. ${SB261_CITATION}. ${SB261_TABLE_STATUS}.`, maps: 'TCFD-aligned climate financial-risk report ready for SB 261 filers.', href: SB261_DOCKET_URL, module: '/climate-risk' },
       { name: 'IFRS S2', body: 'The ISSB global baseline for climate-related financial disclosures.', maps: 'Climate disclosures structured to the IFRS S2 / ISSB requirements.', href: 'https://www.ifrs.org/issued-standards/ifrs-sustainability-standards-navigator/ifrs-s2-climate-related-disclosures/', module: '/climate-risk' },
       { name: 'ESRS E1', body: 'The climate-change standard within the EU’s CSRD reporting framework.', maps: 'ESRS E1 climate datapoints mapped directly from your GHG inventory.', href: 'https://www.efrag.org', module: '/climate-ghg' },
       { name: 'CDP', body: 'The global environmental disclosure system used by investors and buyers.', maps: 'Export-ready answers for CDP Climate, including the C6 emissions module.', href: 'https://www.cdp.net', module: '/climate-ghg' },

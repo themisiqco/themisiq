@@ -10,6 +10,7 @@ import { LEGACY_PRICING_PAGE_ID, tierPrice, tierStrikethrough, volumeDiscount, A
 import { AI_ACT_HIGH_RISK_STANDALONE } from '../../lib/aiAct'
 import { CS3D_APPLIES_FROM } from '../../lib/cs3d'
 import { SB253_SHORT } from '../../lib/sb253'
+import { SB261_SHORT } from '../../lib/sb261'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,7 +70,7 @@ const MODULES: Module[] = [
     // No. 25-5327. Not a preliminary injunction; the district court denied that. SB 261 enforcement
     // is barred, SB 253 is not. Argued 9 January 2026, no ruling as of 12 August 2026.
     // Canonical account lives at the SB 261 entry in app/assess/page.tsx.
-    tags: [{ label: 'SB 261 · enforcement paused', color: 'orange' }],
+    tags: [{ label: SB261_SHORT, color: 'orange' }],
     cta: {
       headline: 'Ready to assess your climate risk?',
       sub: 'Physical and transition risk quantified. TCFD and SB 261 ready.',

@@ -1,6 +1,7 @@
 'use client'
 import Nav from '../components/Nav'
 import { FLAT_MODULE_PRICES } from '@/lib/pricing'
+import { SB261_TABLE_STATUS } from '@/lib/sb261'
 import Footer from '@/app/components/Footer'
 export default function Page() {
   return (
@@ -176,7 +177,7 @@ export default function Page() {
               ['UK SRS (S1 & S2)', 'United Kingdom', 'Listed & large companies', 'Rules expected from FY2027', '✓ Full — ISSB-aligned'],
               ['Australia · AASB S2', 'Australia', 'Large entities, phased', 'Phasing in from Jan 2025', '✓ Full — IFRS S2 basis'],
               ['Canada · CSDS', 'Canada', 'ISSB-aligned, voluntary→mandatory', 'Adoption underway', '✓ Full — IFRS S2 basis'],
-              ['SB 261', 'California, USA', '$500M+ revenue, doing business in CA', 'Enforcement paused (appeal pending)', '✓ Full — TCFD-aligned report'],
+              ['SB 261', 'California, USA', '$500M+ revenue, doing business in CA', SB261_TABLE_STATUS, '✓ Full — TCFD-aligned report'],
               ['TCFD', 'Global', 'Investor / lender / board requested', 'De facto standard', '✓ Full — all four pillars'],
             ].map((row, i) => (
               <tr key={i}>
@@ -188,7 +189,7 @@ export default function Page() {
           </tbody>
         </table>
         <div style={{ fontSize: 11, color: '#888784', marginTop: 14, lineHeight: 1.6, fontWeight: 300 }}>
-          Regulatory timing and scope are evolving — the EU Omnibus reform, UK SRS rules, and California&apos;s SB 261 appeal are all in motion. Confirm your specific obligations with qualified counsel. ThemisIQ keeps framework mappings current as rules are finalised.
+          Regulatory timing and scope are evolving: the EU Omnibus reform is in force with its scope simplified, UK SRS rules are expected, and enforcement of California&apos;s SB 261 is barred pending appeal. Confirm your specific obligations with qualified counsel. ThemisIQ keeps framework mappings current as rules are finalised.
         </div>
       </section>
 
