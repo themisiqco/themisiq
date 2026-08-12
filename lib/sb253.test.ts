@@ -31,12 +31,27 @@ const SCAN_DIRS = ['app', 'lib']
 //   - The AMBIGUOUS forms ('Nov 10', 'November 10') are qualified, because a bare day-and-month with
 //     no year is exactly what a future unrelated deadline might use — and is also how this date
 //     evaded a whole-string guard once already, split across `val: 'Nov 10'` / `unit: '2026'`.
+//
+// ⚠️ THE GUARD FORBADE THE OLD SPELLINGS AND NOT THE HOUSE ONE. Every pattern above is MONTH-FIRST —
+// 'November 10, 2026' — because that is how the eight original literals were written. But the
+// constants read DAY-FIRST: SB253_FIRST_REPORT_DATE is '10 November 2026' and SB253_SHORT carries
+// '10 Nov 2026'. None of the month-first patterns is a substring of either. So a developer copying
+// the house style onto a new surface — the most likely way this recurs, because it is what the file
+// they are reading looks like — walked straight through the guard.
+//   The day-first forms are added below. They are as specific as their month-first siblings: nothing
+// else in this repo falls on 10 November, so they need no SB 253 qualifier. The bare '10 Nov' and
+// '10 November' are NOT added unqualified, for the crying-wolf reason above — a day-and-month with no
+// year could belong to a future unrelated deadline — so they are qualified the same way.
 const FORBIDDEN = [
-  // Full and unambiguous.
+  // Full and unambiguous — MONTH-FIRST (the retired spellings).
   'November 10, 2026', 'Nov 10, 2026', '2026-11-10', '2026-11-10T00:00:00',
+  // Full and unambiguous — DAY-FIRST (the house style, and the way this will recur).
+  '10 November 2026', '10 Nov 2026',
   // Ambiguous alone — qualified.
   "val: 'Nov 10'", "'SB 253 · Nov 10'", 'SB 253 · Nov 10', 'the November 10 deadline',
   'miss the November 10', 'November 10 is',
+  "val: '10 Nov'", "'SB 253 · 10 Nov'", 'SB 253 · 10 Nov', 'the 10 November deadline',
+  'miss the 10 November', '10 November is',
 ]
 
 const EXCLUDED_FILES = new Set([
