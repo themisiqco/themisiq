@@ -73,3 +73,98 @@ describe('computeObligations — CSRD headcount band, the empAtLeast tri-state',
     expect(computeObligations(answers('500_999')).length).toBeGreaterThan(0)
   })
 })
+
+// ── SB 253: the strict > boundary ────────────────────────────────────────────────────────────────
+//
+// PINS: page.tsx:129, `hasCA && revUSD > 1_000_000_000`. The statute is "in excess of" $1bn, so the
+// comparison is STRICT — a company at exactly $1,000,000,000 is out of scope. THRESHOLD_TESTS['SB
+// 253'] in lib/deals/assessment.ts encodes the same limb with `comparison: 'gt'`, and
+// lib/deals/assessment.test.ts already pins that side ('SB 253 is strict — exactly at the figure does
+// NOT apply'). This asserts /assess AGREES WITH THE ENGINE. The two evaluate the same statute from
+// different code, and a page that emails a prospect "SB 253 applies to you" while the Deals engine
+// says it does not is the disagreement worth catching — neither file imports the figure from the
+// other, so nothing but a test holds them together.
+//
+// Index 6 is exactly $1bn, which is the boundary case; index 7 is the next band up.
+describe('computeObligations — SB 253 fires on strict >, matching THRESHOLD_TESTS gt', () => {
+  const ca = (revenue: number) => computeObligations({ jurisdictions: ['california'], revenue })
+  const sb253 = (revenue: number) => ca(revenue).find(o => o.obligationId === 'sb253')
+
+  it('EXACTLY $1,000,000,000 does NOT produce an SB 253 entry', () => {
+    expect(sb253(6)).toBeUndefined()
+    // Not vacuous: a Californian company at $1bn still clears the SB 261 $500m limb, so the fixture
+    // demonstrably produces obligations — the SB 253 absence is a decision, not an empty result.
+    expect(ca(6).length).toBeGreaterThan(0)
+  })
+
+  it('the next band up ($2bn) does', () => {
+    expect(sb253(7)).toBeDefined()
+    expect(sb253(7)!.urgency).toBe('critical')
+  })
+})
+
+// ── Modern Slavery: the currency conversion ──────────────────────────────────────────────────────
+//
+// PINS: page.tsx:254-255. Before 41eb198 both limbs compared the RAW USD slider figure against
+// thresholds denominated in GBP and AUD — "firing from $36m where the real bar is £36m". They now
+// convert through revIn(), which routes to lib/deals/assessment.ts's convertCurrency, so there is one
+// dated rate table rather than two.
+//
+// ⚠️ COVERAGE LIMIT, STATED RATHER THAN PAPERED OVER. The requested assertion — a USD figure that
+// clears $36m but NOT £36m — CANNOT BE WRITTEN, because no REVENUE_VALUES band lands in that window.
+// At the ECB rate in lib/deals/assessment.ts the over-call windows are:
+//
+//   UK:  $36,000,001 – $47,664,732   (£36m breakeven is $47,664,732)
+//   AU:  $68,912,701 – $99,999,999   (AUD 100m breakeven is $68,912,701)
+//
+// and the slider steps $25M → $50M → $100M, skipping both. Every one of the eleven bands produces
+// the SAME answer converted or unconverted, for both limbs. SO THE CONVERSION FIX IS CORRECT BUT
+// CURRENTLY UNOBSERVABLE THROUGH THIS FORM, and no test driving computeObligations can distinguish
+// it. It would become observable the moment the slider gains a finer band or revenue is collected as
+// a free figure — which is exactly when a regression would ship unnoticed.
+//
+// What IS assertable is the gate itself: the jurisdiction wiring and the threshold direction. That is
+// what these two pin. THEY DO NOT PIN THE CONVERSION. Do not read a green run here as covering it.
+describe('computeObligations — UK Modern Slavery gate (NOT the conversion — see comment)', () => {
+  const uk = (revenue: number) => computeObligations({ jurisdictions: ['uk'], revenue })
+  const ms = (revenue: number) => uk(revenue).find(o => o.obligationId === 'modern-slavery')
+
+  it('$25M — below the bar in either currency — produces no entry', () => {
+    expect(ms(0)).toBeUndefined()
+    // Not vacuous: a UK company still picks up IFRS S2 at any size.
+    expect(uk(0).length).toBeGreaterThan(0)
+  })
+
+  it('$50M — GBP 37,763,771, above the GBP 36m bar — produces one', () => {
+    expect(ms(1)).toBeDefined()
+    expect(ms(1)!.jurisdiction).toBe('United Kingdom')
+  })
+})
+
+// ── NIS2 / DORA: lex specialis, mutually exclusive ───────────────────────────────────────────────
+//
+// PINS: page.tsx:206 and :213-214. Before 41eb198 both fired for an EU financial entity, telling a
+// bank it had two overlapping cyber regimes. NIS2 art. 4(2) disapplies its risk-management and
+// incident provisions where a sector-specific act imposes at least equivalent requirements, and the
+// ESAs and the Commission have confirmed DORA meets that test — so a financial entity gets DORA
+// ALONE. The exclusion is the `!doraApplies` conjunct on the NIS2 gate; delete it and both return.
+//
+// The second test guards the other direction: the exclusion must not swallow NIS2 for the
+// non-financial Annex I/II sectors it correctly reaches. Energy is Annex I.
+describe('computeObligations — DORA is lex specialis over NIS2', () => {
+  const eu = (sectors: string[]) =>
+    computeObligations({ jurisdictions: ['eu'], sectors, revenue: REVENUE_INDEX_750M, employees: '1000_4999' })
+  const ids = (sectors: string[]) => eu(sectors).map(o => o.obligationId)
+
+  it('an EU FINANCIAL entity gets DORA and NOT NIS2', () => {
+    expect(ids(['financial'])).toContain('dora')
+    expect(ids(['financial'])).not.toContain('nis2')
+    // Not vacuous: DORA's presence is itself the companion, but assert the array is real.
+    expect(eu(['financial']).length).toBeGreaterThan(0)
+  })
+
+  it('an EU entity in an Annex I/II sector that is NOT financial gets NIS2 and not DORA', () => {
+    expect(ids(['energy'])).toContain('nis2')
+    expect(ids(['energy'])).not.toContain('dora')
+  })
+})
