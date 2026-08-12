@@ -168,3 +168,105 @@ describe('computeObligations — DORA is lex specialis over NIS2', () => {
     expect(ids(['energy'])).not.toContain('dora')
   })
 })
+
+// ── EU Pay Transparency: one entry became three ──────────────────────────────────────────────────
+//
+// PINS: page.tsx:222, :227 and :228. Before 41eb198 this was ONE entry gated at 250+, so a 40-person
+// EU employer was told nothing applied — when the Directive's day-one obligations (salary ranges in
+// postings, no salary-history questions, a pay-information request route) bind EVERY EU employer at
+// ANY size. It is now three gates: day-one on `hasEU` alone, the 250+ annual duty on
+// `pt250 === true`, and an abstention arm on `pt250 === null`.
+//
+// ⚠️ THE THIRD ARM DOES NOT FIRE FOR THE BAND ITS OWN COPY NAMES. This is a live defect, found while
+// writing these tests, and the tests below pin CURRENT behaviour rather than intended behaviour so
+// that a fix visibly changes them. The gate is `pt250 === null` where `pt250 = empAtLeast(250)`, and
+// for the '50_249' band empAtLeast(250) returns FALSE, not null — the band tops out at 249, so it can
+// answer "at least 250?" definitively. null is returned only for an UNANSWERED employees question.
+// Consequences, both wrong:
+//   - a 50-249 EU employer gets the day-one entry and NO reporting-band entry at all, though its
+//     band spans the 100 and 150 boundaries and genuinely cannot settle which of three duties applies
+//   - a visitor who SKIPPED the employees question gets an entry reading "Your headcount band
+//     (50–249) SPANS THREE DIFFERENT DUTIES", asserting a band they never selected
+// The fix is a gate that asks whether the band straddles 100/150 — not one that asks about 250.
+describe('computeObligations — EU Pay Transparency, three arms', () => {
+  const eu = (employees?: string) =>
+    computeObligations(employees === undefined ? { jurisdictions: ['eu'] } : { jurisdictions: ['eu'], employees })
+  const named = (employees: string | undefined, fragment: string) =>
+    eu(employees).find(o => o.name.includes(fragment))
+
+  it('day-one obligations bind at ANY size — the 40-person employer the old gate silenced', () => {
+    const dayOne = named('under50', 'day-one obligations')
+    expect(dayOne).toBeDefined()
+    expect(dayOne!.urgency_label).toBe('ALL EMPLOYERS')
+    // And they are not size-gated at the top either.
+    expect(named('5000plus', 'day-one obligations')).toBeDefined()
+  })
+
+  it('the 250+ annual reporting duty fires only where the band clears 250', () => {
+    const reporting = named('250_499', 'gender pay gap reporting')
+    expect(reporting).toBeDefined()
+    expect(reporting!.timing).toBe('7 June 2027, then annually')
+    // Below 250 it must not: the band tops out at 249.
+    expect(named('50_249', 'gender pay gap reporting')).toBeUndefined()
+    // Not vacuous — the day-one entry is still there for that same 50-249 employer.
+    expect(named('50_249', 'day-one obligations')).toBeDefined()
+  })
+
+  it('DEFECT PINNED: the 50-249 band gets NO reporting-band entry, and the abstention arm fires on an unanswered question instead', () => {
+    // What the band SHOULD get, per the entry's own copy, and does not.
+    expect(named('50_249', 'reporting band undetermined')).toBeUndefined()
+    expect(eu('50_249').filter(o => o.name.includes('Pay Transparency'))).toHaveLength(1)
+
+    // What actually reaches the abstention arm: no answer at all.
+    const undetermined = named(undefined, 'reporting band undetermined')
+    expect(undetermined).toBeDefined()
+    expect(undetermined!.urgency_label).toBe('CONFIRM HEADCOUNT')
+    // And it tells that visitor they are in a band they never selected.
+    expect(undetermined!.what).toContain('Your headcount band (50–249)')
+  })
+})
+
+// ── California pay data: a size test where there was none ────────────────────────────────────────
+//
+// PINS: page.tsx:235-236. Before 41eb198 this fired on `hasCA` ALONE — any Californian company, at
+// any size — while its own copy asserted a 100+ threshold. It now carries `caStaff = empAtLeast(100)`
+// and gates on `caStaff !== false`, so the tri-state reaches it: a definite no suppresses the entry,
+// a definite yes gives HIGH PRIORITY, and a straddling band gives CONFIRM HEADCOUNT.
+//
+// ⚠️ WHAT THESE TESTS DO NOT COVER, stated rather than implied. The substantive correction in 41eb198
+// was the POPULATION: Gov. Code §12999 counts 100+ payroll employees ANYWHERE IN THE UNITED STATES
+// with at least one working in California — not 100 Californian employees. THAT DISTINCTION IS NOT
+// OBSERVABLE THROUGH THIS FORM AND NO TEST HERE CAN PIN IT: the form collects a single GLOBAL
+// headcount band and a jurisdiction multi-select, and holds neither a US-payroll figure nor a
+// Californian one. The gate uses global headcount as a proxy and the entry's copy says so outright
+// ("Note this form collects GLOBAL headcount, so confirm the US figure"). So the correction survives
+// as COPY, guarded by nothing. What follows pins the size gate and the tri-state branching — the
+// half that is mechanised. Treat the population definition as untested.
+describe('computeObligations — California pay data size gate (NOT the population — see comment)', () => {
+  // $500M so SB 261 fires alongside, giving every absence assertion a live companion.
+  const ca = (employees: string) =>
+    computeObligations({ jurisdictions: ['california'], revenue: 4, employees })
+  const payData = (employees: string) => ca(employees).find(o => o.obligationId === 'ca-pay-data')
+
+  it('a band entirely BELOW 100 produces no entry — the old hasCA-alone gate is gone', () => {
+    expect(payData('under50')).toBeUndefined()
+    // Not vacuous: the same Californian company at $500M still picks up SB 261.
+    expect(ca('under50').length).toBeGreaterThan(0)
+  })
+
+  it('a band entirely ABOVE 100 produces an unqualified entry', () => {
+    const entry = payData('250_499')
+    expect(entry).toBeDefined()
+    expect(entry!.urgency_label).toBe('HIGH PRIORITY')
+    expect(entry!.urgency).toBe('high')
+  })
+
+  it('a band STRADDLING 100 produces the abstention arm, not a guess in either direction', () => {
+    const entry = payData('50_249')
+    expect(entry).toBeDefined()
+    expect(entry!.urgency_label).toBe('CONFIRM HEADCOUNT')
+    expect(entry!.urgency).toBe('monitor')
+    // The copy must name the US-payroll population even though the form cannot measure it.
+    expect(entry!.what).toContain('ANYWHERE IN THE UNITED STATES')
+  })
+})
