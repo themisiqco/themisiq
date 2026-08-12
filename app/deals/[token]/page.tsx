@@ -12,6 +12,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase' // anon public client (NEXT_PUBLIC_SUPABASE_ANON_KEY)
 import { getObligations, sectorRisks, type ResolvedRisk } from '../../../lib/deals/assessment'
+import { makeMapFramework, regimeLabel } from '../../../lib/deals/reportModel'
 import { GHG_TIERS, type Tier } from '../../../lib/pricing'
 
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
@@ -106,6 +107,19 @@ export default function DealAssessmentPage() {
   // Resolved against the target's own jurisdiction — this page is read BY the target, so an
   // instrument asserted against a company it does not reach is the worst place for it to appear.
   const risks: ResolvedRisk[] = sectorRisks(data.sector, data.jurisdiction)
+  // The SAME label mapping the buyer's report and the wizard apply — a static SECTOR_RISKS template
+  // carries generic regime names ('SB 253 / CSRD'), and rendering them raw cited a Californian
+  // statute at a UK target on the page that target reads. Resolved against the stored `frameworks`
+  // snapshot, which is exactly makeMapFramework's first argument, so nothing new is fetched.
+  //
+  // cs3dRow IS undefined ON PURPOSE, and it is the one thing this page cannot supply.
+  // getFrameworkApplicability needs revenue, currency, total_assets and employee_count, and the RPC
+  // whitelist excludes all four on privacy grounds — they are the BUYER'S FINANCIAL VIEW OF THE
+  // TARGET, and this is the page the target reads. Adding them to the whitelist to improve a label
+  // would be the wrong trade by a wide margin. So CS3D resolves through cs3dToken(undefined) and
+  // renders as 'CS3D (not assessed)', which is TRUE — this page has not evaluated it — rather than
+  // the flat 'CS3D' the raw template asserts. An honest abstention, not a degraded answer.
+  const mapFramework = makeMapFramework(frameworks, undefined)
   const obligations = getObligations(data.location_count ?? 0, frameworks, data.sector ?? undefined)
 
   const fmt = (n: number) => `USD ${n.toLocaleString()}`
@@ -186,7 +200,7 @@ export default function DealAssessmentPage() {
                   <div style={{ background: risk.severity === 'critical' ? cfg.bg : '#fff', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderBottom: `0.5px solid ${cfg.border}20`, flexWrap: 'wrap' }}>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{risk.risk}</div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                      <span style={{ fontSize: 10, color: '#888784' }}>{risk.framework}</span>
+                      <span style={{ fontSize: 10, color: '#888784' }}>{regimeLabel(mapFramework(risk.framework))}</span>
                       {risk.scope === 'conditional' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#FEF3E2', color: '#ba7517', border: '0.5px solid rgba(186,117,23,0.35)' }}>CONDITIONAL</span>}
                       <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: cfg.bg, color: cfg.color, border: `0.5px solid ${cfg.border}` }}>{cfg.label}</span>
                     </div>
