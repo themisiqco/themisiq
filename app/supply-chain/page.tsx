@@ -24,7 +24,7 @@ export default function Page() {
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
               <a href="/dashboard/supply-chain" style={{ ...btnPrimary, textDecoration: 'none' }}>Map your supply chain →</a>
-              <a href="/dashboard/supply-chain" style={{ ...btnSecondary, textDecoration: 'none' }}>See how supplier data feeds Scope 3 →</a>
+              <a href="/dashboard/supply-chain" style={{ ...btnSecondary, textDecoration: 'none' }}>See how supplier data reaches Scope 3 →</a>
               <a href="/order?modules=supply" style={{ ...btnSecondary, textDecoration: 'none' }}>${supplyPrice}/yr</a>
               <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
             </div>
@@ -78,7 +78,7 @@ export default function Page() {
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 16 }}>Key supply chain frameworks</div>
             {[
               { fw: 'EU CS3D', scope: 'Human rights + environmental HRDD', deadline: `${CS3D_APPLIES_FROM} (large companies)`, urgency: 'critical' },
-              { fw: 'ESRS S2 + G1', scope: 'Value chain workers + business conduct', deadline: 'FY2024 (large EU)', urgency: 'critical' },
+              { fw: 'ESRS S2', scope: 'Value chain workers', deadline: 'FY2024 (large EU)', urgency: 'critical' },
               { fw: 'SB 253 Scope 3', scope: 'Category 1 purchased goods', deadline: '2027 (California)', urgency: 'high' },
               { fw: 'CDP supplier engagement', scope: 'Supplier engagement programme', deadline: 'Annual · July', urgency: 'medium' },
               { fw: 'Modern Slavery Act', scope: 'UK + Australia transparency statement', deadline: 'Annual', urgency: 'medium' },
@@ -108,15 +108,14 @@ export default function Page() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
           {[
-            { icon: '', title: 'Supplier portal', desc: 'Branded supplier sustainability data collection portal. Suppliers complete structured questionnaires on emissions, labour practices, and environmental performance — no spreadsheets.' },
-            { icon: '', title: 'Scope 3 Cat.1 primary data', desc: 'Collect spend data, activity data, and supplier-specific emission factors directly from your supply base — the primary supplier data that feeds your Scope 3 Category 1 calculation in the GHG module, across all GHG Protocol methods.' },
-            { icon: '', title: 'Human rights risk mapping', desc: 'Risk-based HRDD across your value chain. Country and sector risk scoring. Supplier prioritisation for deeper assessment. Grievance mechanism management.' },
-            { icon: '', title: 'EcoVadis integration', desc: 'EcoVadis scorecard tracking, improvement plan management, and CDP supplier engagement programme documentation — all in one platform.' },
-            { icon: '', title: 'Modern Slavery Act', desc: 'UK and Australia Modern Slavery Act statement preparation. Supply chain mapping, risk identification, and director sign-off workflow. Published to government registry.' },
-            { icon: '', title: 'ESRS S2 + G1 disclosure', desc: 'ESRS S2 (value chain workers) and G1 (business conduct) disclosure preparation. Supplier due diligence policy documentation and outcomes reporting.' },
-          ].map(({ icon, title, desc }) => (
+            { title: 'Supplier portal', desc: 'Branded supplier sustainability data collection portal. Suppliers complete structured questionnaires on emissions, labour practices, and environmental performance — no spreadsheets.' },
+            { title: 'Scope 3 Cat.1 primary data', desc: 'Collect spend data, activity data, and supplier-specific emission factors directly from your supply base — the primary supplier data that feeds your Scope 3 Category 1 calculation in the GHG module, across all GHG Protocol methods.' },
+            { title: 'Human rights risk mapping', desc: 'Risk-based HRDD across your value chain. Country and sector risk scoring. Supplier prioritisation for deeper assessment. Questionnaires cover grievance mechanisms and remediation.' },
+            { title: 'EcoVadis-themed questionnaires', desc: 'Supplier questionnaires structured to the four EcoVadis themes — Environment, Labour & Human Rights, Ethics, and Sustainable Procurement — so the evidence you collect maps to the scorecard you\'re rated against.' },
+            { title: 'Modern Slavery Act', desc: 'UK and Australia Modern Slavery Act. Structured supplier questionnaires across forced and compulsory labour, child labour, and due diligence and remediation — with supply chain mapping and risk identification.' },
+            { title: 'ESRS S2 supplier data', desc: 'Supplier questionnaires aligned to ESRS S2 (value chain workers) — the value chain worker data your disclosure needs, collected and evidenced.' },
+          ].map(({ title, desc }) => (
             <div key={title} style={{ background: '#fff', padding: '2rem' }}>
-              <div style={{ fontSize: 24, marginBottom: 12 }}>{icon}</div>
               <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
               <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 300 }}>{desc}</div>
             </div>
@@ -129,14 +128,14 @@ export default function Page() {
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
             <div style={eyebrow}>How it works</div>
-            <h2 style={sectionTitle}>From supplier list to disclosure.</h2>
+            <h2 style={sectionTitle}>From supplier list to Scope 3 data.</h2>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '1rem' }}>
             {[
               ['01', 'Map your supply base', 'Upload your supplier list. ThemisIQ risk-scores each supplier by country, sector, and spend — prioritising who needs deep assessment first.'],
-              ['02', 'Collect supplier data', 'Send branded data collection requests via the ThemisIQ supplier portal. Track completion status and chase non-responders automatically.'],
-              ['03', 'Feed Scope 3 Cat.1', 'Primary supplier data flows into the GHG module, where your Scope 3 Category 1 calculation runs. Spend-based estimates for non-respondents fill the gaps.'],
-              ['04', 'Generate disclosures', 'ESRS S2, CDP supplier engagement, Modern Slavery Act statement, and CS3D due diligence documentation — all generated from your supplier programme data.'],
+              ['02', 'Collect supplier data', 'Send branded data collection requests via the ThemisIQ supplier portal. Track completion status and send reminders to non-responders.'],
+              ['03', 'Collect Category 1 data', 'Suppliers report their Category 1 emissions through the portal. Where a supplier hasn\'t responded, spend-based estimates fill the gap.'],
+              ['04', 'Feed your Scope 3', 'Pull supplier-reported Category 1 emissions into your GHG inventory, with spend-based gap-fill for non-responders. You review the full breakdown before it\'s applied.'],
             ].map(([num, title, desc]) => (
               <div key={num}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '2.5rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', opacity: 0.5, marginBottom: '0.75rem' }}>{num}</div>

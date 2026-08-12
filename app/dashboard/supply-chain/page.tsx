@@ -558,7 +558,7 @@ export default function SupplyChainDashboard() {
   const renderStep4 = () => (
     <div>
       <h2 style={sectionHead}>Export your assessment</h2>
-      <p style={sectionSub}>Download your supplier risk register and Scope 3 estimate. Unlock the full programme to generate CS3D, EcoVadis and Modern Slavery reports.</p>
+      <p style={sectionSub}>Download your supplier risk register and spend-based Scope 3 Category 1 estimate.</p>
 
       <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.5rem', marginBottom: 20 }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Programme summary — {inventory.company || 'Your company'}</div>
@@ -592,8 +592,8 @@ export default function SupplyChainDashboard() {
       ) : (
         <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', marginBottom: 8 }}>Unlock your full supply chain programme</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 20, lineHeight: 1.6 }}>Download your supplier risk register, generate CS3D due diligence documentation, EcoVadis gap analysis, and Modern Slavery Act statement — all from your supplier data.</div>
-          <a href="/pricing" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>See pricing & unlock reports →</a>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 20, lineHeight: 1.6 }}>Download your full supplier risk register — every supplier scored by country, sector and spend — and pull supplier-reported data into your Scope 3 Category 1 calculation.</div>
+          <a href="/pricing" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>See pricing →</a>
         </div>
       )}
     </div>

@@ -78,7 +78,7 @@ const MODULES: Module[] = [
   {
     id: 'supply',
     name: 'Supply Chain',
-    description: 'Supplier portal · EcoVadis (Environment, Labour & Human Rights, Ethics, Sustainable Procurement) · CDP supplier engagement · EU CS3D · ESRS S2+G1 · Modern Slavery Act · GRI 308/414 · UN Guiding Principles · feeds Scope 3 Cat.1 in the GHG module',
+    description: 'Supplier portal · EcoVadis (Environment, Labour & Human Rights, Ethics, Sustainable Procurement) · CDP supplier engagement · EU CS3D · ESRS S2+G1 · Modern Slavery Act · GRI 308/414 · UN Guiding Principles · pulls supplier data into Scope 3 Cat.1',
     tags: [
       { label: 'Supplier Portal', color: 'purple' },
       { label: `CS3D · ${CS3D_APPLIES_FROM}`, color: 'orange' },
