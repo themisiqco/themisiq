@@ -6,7 +6,12 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { startCheckout } from '../../lib/checkout'
 import ConsentForm, { type ConsentPayload } from '../components/ConsentForm'
-import { LEGACY_PRICING_PAGE_ID, tierPrice, tierStrikethrough, volumeDiscount, ADDONS, conciergeTierForLocations, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, FLAT_MODULE_PRICES, type Tier, type GhgTier, type ModuleKey, type AddOnKey } from '../../lib/pricing'
+// tierPrice and tierStrikethrough dropped with the old-model blocks — both priced the retired
+// per-module-per-tier model and had no reader left. `Tier` STAYS — see the note on the tier state
+// below. NEW_PRICING_ACTIVE STAYS TOO, but only just: every `!NEW_PRICING_ACTIVE` branch is gone, and
+// the four that remain are `NEW_PRICING_ACTIVE && (…)` wrappers around live content — always-true
+// no-ops. They can be unwrapped whenever someone is in here; the flag is not doing work.
+import { LEGACY_PRICING_PAGE_ID, volumeDiscount, ADDONS, conciergeTierForLocations, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, FLAT_MODULE_PRICES, type Tier, type GhgTier, type ModuleKey, type AddOnKey } from '../../lib/pricing'
 import { AI_ACT_HIGH_RISK_STANDALONE } from '../../lib/aiAct'
 import { CS3D_APPLIES_FROM } from '../../lib/cs3d'
 import { SB253_SHORT } from '../../lib/sb253'
@@ -181,6 +186,15 @@ function PricingPageInner() {
     const ids = param.split(',').map(s => s.trim()).filter((s): s is ModuleId => (VALID_MODULE_IDS as string[]).includes(s))
     return ids.length > 0 ? new Set<ModuleId>(ids) : new Set<ModuleId>(['ghg'])
   })()
+  // ⚠️ NAMED FOR A MODEL THAT NO LONGER EXISTS, AND NOT DELETABLE. `tier` was the per-module-per-tier
+  // selector — Starter / Professional / Advisory applied to every module — and those cards are gone.
+  // What it is NOW is the GHG TIER AND NOTHING ELSE: GHG is the only tiered module, and the picker
+  // that writes it lives inside the GHG module row, appearing only when GHG is selected.
+  //
+  // It feeds BOTH the figure shown and the figure charged — cartQuote({ ghgTier: tier }) for the
+  // panel, startCheckout({ tier, … }) in submitConsentAndPay for the payment, plus newModulePrice's
+  // GHG branch and advisoryHref. So a reader clearing out "old tier stuff" would break the price and
+  // the checkout together. Rename it ghgTier if you want the name to match the job; do not remove it.
   const [tier, setTier] = useState<Tier>('starter')
   const [selected, setSelected] = useState<Set<ModuleId>>(initialModules)
   // Add-on selection state
@@ -188,12 +202,11 @@ function PricingPageInner() {
   const [conciergeLocations, setConciergeLocations] = useState(1)
 
 
-  // Pricing logic
-  const unitPrice = tierPrice(tier)
+  // Pricing logic. unitPrice / gross / discount / net / totalNet were deleted with the old-model
+  // blocks: they computed `count × tierPrice(tier)`, the retired per-module-per-tier price, and had
+  // no reader left once those blocks went. Everything shown or charged now derives from cartQuote
+  // below. `count` survives because the live panel reads it for volumeDiscount().
   const count = selected.size
-  const gross = count * unitPrice
-  const discount = volumeDiscount(count)
-  const net = Math.round(gross * (1 - discount))
   // Add-on logic. Concierge tier is resolved from the location count. Verification Readiness was
   // retired 10 Aug 2026 — see docs/ghg-verifier-grade-roadmap.md.
   // is only available once Concierge is added (mirrors the server dependency rule).
@@ -205,17 +218,11 @@ function PricingPageInner() {
   ]
   const addOnsTotal =
     (conciergeActive && !conciergeResolved.isCustomQuote ? ADDONS[conciergeResolved.key].price : 0)
-  // Grand total shown in the panel/CTA = modules + add-ons (matches Stripe).
-  const totalNet = net + addOnsTotal
-  const handleBuy = () => {
-    const moduleKeys = Array.from(selected).map((id) => LEGACY_PRICING_PAGE_ID[id]).filter(Boolean)
-    if (moduleKeys.length === 0) return
-    startCheckout({ tier, moduleKeys, ...(selectedAddOns.length > 0 ? { addOns: selectedAddOns } : {}) })
-  }
-
-  // ── NEW-MODEL pricing (behind NEW_PRICING_ACTIVE) — DISPLAY ONLY. The module
-  // total comes solely from the shared cartQuote(), so the preview equals exactly
-  // what the server charges. handleBuy still sends { tier, moduleKeys, addOns }.
+  // ── PRICING — DISPLAY ONLY. The module total comes solely from the shared cartQuote(), so the
+  // preview equals exactly what the server charges. submitConsentAndPay sends
+  // { tier, moduleKeys, addOns } through startCheckout, which prices from the same function.
+  // (Was "NEW-MODEL pricing (behind NEW_PRICING_ACTIVE)" — there is no other model left to be
+  // behind a flag, and handleBuy, which the old note named, is gone with the old-model CTA arm.)
   const canonicalKeys = Array.from(selected).map((id) => LEGACY_PRICING_PAGE_ID[id]).filter(Boolean) as ModuleKey[]
   // TODO(checkout-consent sub-step): quote.requiresInvoice gates on the MODULE total
   // only (cartQuote), NOT module + add-ons. Add a grand-total card-threshold guard there.
@@ -312,8 +319,6 @@ function PricingPageInner() {
     credItem: { textAlign: 'center' as const },
     credLabel: { fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 4 },
     credVal: { fontSize: 10, color: '#374151', lineHeight: 1.6 },
-    // Tier cards
-    tierGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 12, marginBottom: 24 },
     // Module rows
     moduleWrap: { border: '1px solid #e8e7e4', borderRadius: 16, overflow: 'hidden', marginBottom: 16 },
     moduleHeader: { display: 'grid', gridTemplateColumns: '1fr auto', background: '#f8f7f5', padding: '10px 16px', borderBottom: '1px solid #e8e7e4', alignItems: 'center' },
@@ -336,19 +341,6 @@ function PricingPageInner() {
     WebkitTextFillColor: 'transparent',
     backgroundClip: 'text',
   }
-
-  const tierCard = (t: Tier, active: boolean): React.CSSProperties => ({
-    border: active ? '2px solid #7425e3' : '1px solid #e8e7e4',
-    borderRadius: 12,
-    padding: '1rem',
-    textAlign: 'center',
-    cursor: 'pointer',
-    background: active ? '#fff' : '#f8f7f5',
-    transition: 'all 0.15s',
-    position: 'relative',
-    display: 'flex',
-    flexDirection: 'column',
-  })
 
   const moduleRow = (active: boolean): React.CSSProperties => ({
     display: 'grid',
@@ -517,114 +509,23 @@ function PricingPageInner() {
           </div>
         )}
 
-        {/* Tier cards (OLD model) */}
-        {!NEW_PRICING_ACTIVE && (
-        <div style={s.tierGrid}>
-
-          {/* Starter */}
-          <div style={tierCard('starter', tier === 'starter')} onClick={() => setTier('starter')}>
-            {tier === 'starter' && (
-              <div style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)' }}>
-                <span style={{ background: GRAD, fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#0d0d0d', padding: '2px 10px', borderRadius: 99, whiteSpace: 'nowrap' }}>Selected</span>
-              </div>
-            )}
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784', marginBottom: 6 }}>Starter</div>
-            <div style={{ fontSize: 10, color: '#888784', textDecoration: 'line-through' }}>${tierStrikethrough('starter')?.toLocaleString()}</div>
-            <div style={{ fontSize: 22, fontWeight: 600, color: '#0d0d0d' }}>${tierPrice('starter').toLocaleString()}<span style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
-            <div style={{ fontSize: 9, color: '#92400e', background: '#FEF3E2', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginTop: 4 }}>Early access</div>
-            <div style={{ borderTop: `1px solid ${'#f3f4f6'}`, paddingTop: 12, marginTop: 12, textAlign: 'left', flex: 1 }}>
-              <div style={{ fontSize: 11, color: '#888784', marginBottom: 8 }}>Core reports for each module you select</div>
-              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: '#374151', marginBottom: 5 }}><span style={{ color: '#0F6E56', flexShrink: 0 }}>✓</span>Core reporting frameworks</div>
-              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: '#374151', marginBottom: 5 }}><span style={{ color: '#0F6E56', flexShrink: 0 }}>✓</span>Assurance-ready workings</div>
-              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: '#374151', marginBottom: 5 }}><span style={{ color: '#0F6E56', flexShrink: 0 }}>✓</span>Audit trail — every entry logged</div>
-              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: '#374151', marginBottom: 5 }}><span style={{ color: '#0F6E56', flexShrink: 0 }}>✓</span>ThemisIQ Wizard — always on</div>
-            </div>
-          </div>
-
-          {/* Professional */}
-          <div style={{ ...tierCard('professional', tier === 'professional'), background: tier === 'professional' ? '#0d0d0d' : '#f8f7f5' }} onClick={() => setTier('professional')}>
-            {tier === 'professional' && (
-              <div style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)' }}>
-                <span style={{ background: GRAD, fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#0d0d0d', padding: '2px 10px', borderRadius: 99, whiteSpace: 'nowrap' }}>Selected</span>
-              </div>
-            )}
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: tier === 'professional' ? '#7425e3' : '#7425e3', marginBottom: 6 }}>Professional</div>
-            <div style={{ fontSize: 22, fontWeight: 600, color: tier === 'professional' ? '#fff' : '#0d0d0d' }}>${tierPrice('professional').toLocaleString()}<span style={{ fontSize: 10, color: tier === 'professional' ? 'rgba(255,255,255,0.4)' : '#888784', fontWeight: 400 }}> /module/yr</span></div>
-            <div style={{ fontSize: 9, color: '#a78bfa', background: 'rgba(116,37,227,0.15)', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginTop: 4 }}>All frameworks</div>
-            <div style={{ borderTop: `1px solid ${tier === 'professional' ? 'rgba(255,255,255,0.08)' : '#f3f4f6'}`, paddingTop: 12, marginTop: 12, textAlign: 'left', flex: 1 }}>
-              <div style={{ fontSize: 11, color: tier === 'professional' ? 'rgba(255,255,255,0.45)' : '#888784', marginBottom: 8 }}>All frameworks for your selected modules</div>
-              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: tier === 'professional' ? '#fff' : '#374151', marginBottom: 5 }}><span style={{ color: '#64fe3e', flexShrink: 0 }}>✓</span>Everything in Starter</div>
-              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: tier === 'professional' ? '#fff' : '#374151', marginBottom: 5 }}><span style={{ color: '#64fe3e', flexShrink: 0 }}>✓</span>All reporting frameworks</div>
-              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: tier === 'professional' ? '#fff' : '#374151', marginBottom: 5 }}><span style={{ color: '#64fe3e', flexShrink: 0 }}>✓</span>Multi-organization — up to 5 organizations</div>
-              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: tier === 'professional' ? '#fff' : '#374151', marginBottom: 5 }}><span style={{ color: '#64fe3e', flexShrink: 0 }}>✓</span>Verifier & third-party access role</div>
-              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: tier === 'professional' ? '#fff' : '#374151', marginBottom: 5 }}><span style={{ color: '#64fe3e', flexShrink: 0 }}>✓</span>Regulatory monitor — weekly alerts</div>
-            </div>
-          </div>
-
-          {/* Advisory */}
-          <div style={{ ...tierCard('advisory', tier === 'advisory'), border: tier === 'advisory' ? '2px solid #1fb1ff' : '1px solid #e8e7e4' }} onClick={() => setTier('advisory')}>
-            {tier === 'advisory' && (
-              <div style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)' }}>
-                <span style={{ background: GRAD, fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#0d0d0d', padding: '2px 10px', borderRadius: 99, whiteSpace: 'nowrap' }}>Selected</span>
-              </div>
-            )}
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1fb1ff', marginBottom: 6 }}>Advisory</div>
-            <div style={{ fontSize: 22, fontWeight: 600, color: '#0d0d0d' }}>${tierPrice('advisory').toLocaleString()}<span style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
-            <div style={{ fontSize: 9, color: '#0C447C', background: '#E6F1FB', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginTop: 4 }}>+ Expert guidance</div>
-            <div style={{ borderTop: `1px solid ${'#f3f4f6'}`, paddingTop: 12, marginTop: 12, textAlign: 'left', flex: 1 }}>
-              <div style={{ fontSize: 11, color: '#888784', marginBottom: 8 }}>Platform + dedicated expert guidance</div>
-              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: '#374151', marginBottom: 5 }}><span style={{ color: '#1fb1ff', flexShrink: 0 }}>✓</span>Everything in Professional</div>
-              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: '#374151', marginBottom: 5 }}><span style={{ color: '#1fb1ff', flexShrink: 0 }}>✓</span>Up to 10 organizations</div>
-              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: '#374151', marginBottom: 5 }}><span style={{ color: '#1fb1ff', flexShrink: 0 }}>✓</span>Onboarding session</div>
-              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: '#374151', marginBottom: 5 }}><span style={{ color: '#1fb1ff', flexShrink: 0 }}>✓</span>Guided inventory review</div>
-              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: '#374151', marginBottom: 5 }}><span style={{ color: '#1fb1ff', flexShrink: 0 }}>✓</span>Sector-specific guidance</div>
-              <div style={{ display: 'flex', gap: 7, fontSize: 11, color: '#374151', marginBottom: 5 }}><span style={{ color: '#1fb1ff', flexShrink: 0 }}>✓</span>Board-ready narrative</div>
-            </div>
-          </div>
-
-        </div>
-        )}
-
-        {/* Module selector (OLD model) */}
-        {!NEW_PRICING_ACTIVE && (
-        <div style={s.moduleWrap}>
-          <div style={s.moduleHeader}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784' }}>Select your compliance modules</div>
-            <div style={{ fontSize: 10, color: '#888784', fontWeight: 300 }}>Click any row to add or remove</div>
-          </div>
-
-          {MODULES.map((mod, i) => {
-            const isSelected = selected.has(mod.id)
-            const isLast = i === MODULES.length - 1
-            return (
-              <div
-                key={mod.id}
-                style={{ ...moduleRow(isSelected), ...(isLast ? { borderBottom: 'none' } : {}) }}
-                onClick={() => toggleModule(mod.id)}
-              >
-                <div style={checkbox(isSelected)}>
-                  {isSelected && <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>✓</span>}
-                </div>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{mod.name}</span>
-                    {mod.tags.map(t => (
-                      <span key={t.label} style={tag(t.label, t.color)}>{t.label}</span>
-                    ))}
-                  </div>
-                  <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.6 }}>{mod.description}</div>
-                </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: isSelected ? '#0d0d0d' : '#888784' }}>
-                    ${tierPrice(tier).toLocaleString()}
-                  </div>
-                  <div style={{ fontSize: 10, color: '#888784' }}>/yr</div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-        )}
+        {/* THREE OLD-MODEL BLOCKS STOOD BETWEEN HERE AND THE PRICE PANEL BELOW, ~155 lines, all
+            behind !NEW_PRICING_ACTIVE and none of them renderable since the June 2026 rescope:
+              · the TIER CARDS — Starter / Professional / Advisory, priced per module per year, with
+                feature claims (5 organizations, 10 organizations, weekly regulatory alerts) that no
+                surface makes today;
+              · the OLD MODULE SELECTOR, pricing every row at tierPrice(tier);
+              · the OLD PRICE PANEL, showing gross/net and labelling the discount "bundle discount" —
+                a name retired on 23 Jul 2026 with the Full Platform bundle itself.
+            Deleted rather than left behind the flag, for the reason the homepage cards were: a dead
+            branch holding an obsolete price model reads as a rollback that is still available, and
+            reverting NEW_PRICING_ACTIVE would not restore a working page — it would restore three
+            different prices for one cart.
+            THE LIVE EQUIVALENTS, in order: the Pick-and-pace panel above (which states the
+            multi-module discount), the #build-your-stack module selector below (per-module prices
+            from FLAT_MODULE_PRICES, with the GHG tier picker inline), and the cartQuote price panel
+            after it. Nothing pointed into the deleted blocks — the prompt at the top of the page had
+            already stopped naming tiers. */}
 
         {/* Module selector (NEW model) — per-module pricing, GHG inline tier picker */}
         {NEW_PRICING_ACTIVE && (
@@ -725,54 +626,6 @@ function PricingPageInner() {
             </div>
           </div>
         )}
-        {/* Live price panel (OLD model) */}
-        {!NEW_PRICING_ACTIVE && (
-        <div style={s.pricePanel}>
-          <div style={s.pricePanelInner}>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>
-                Your platform — live estimate
-              </div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8, marginBottom: 8 }}>
-                {MODULES.filter(m => selected.has(m.id)).map(m => m.name).join('\n').split('\n').map((line, i) => (
-                  <div key={i}>{line}</div>
-                ))}
-              </div>
-              {selectedAddOns.length > 0 && (
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8, marginBottom: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                  {selectedAddOns.map(k => (
-                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                      <span>{ADDONS[k].label}</span>
-                      <span style={{ color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap' }}>+${ADDONS[k].price.toLocaleString()}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
-                  {count} module{count !== 1 ? 's' : ''} selected
-                </div>
-                {discount > 0 && (
-                  <div style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(100,254,62,0.15)', color: '#64fe3e', border: '1px solid rgba(100,254,62,0.3)' }}>
-                    {discount * 100}% bundle discount applied
-                  </div>
-                )}
-              </div>
-            </div>
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              {discount > 0 && (
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', textDecoration: 'line-through' }}>
-                  ${(gross + addOnsTotal).toLocaleString()}
-                </div>
-              )}
-              <div style={{ ...gradText, fontSize: 36, fontWeight: 700, lineHeight: 1 }}>
-                ${totalNet.toLocaleString()}
-              </div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>/year</div>
-            </div>
-          </div>
-        </div>
-        )}
 
         {/* Live price panel (NEW model) */}
         {NEW_PRICING_ACTIVE && (
@@ -850,20 +703,17 @@ function PricingPageInner() {
           <div style={s.ctaHeadline}>{cta.headline}</div>
           <div style={s.ctaSub}>{cta.sub}</div>
           <div style={s.ctaBtns}>
-            {NEW_PRICING_ACTIVE ? (
-              quote.requiresQuote ? (
-                <Link href={advisoryHref} style={primaryBtn}>Talk to a specialist →</Link>
-              ) : quote.requiresInvoice ? (
-                <Link href={advisoryHref} style={primaryBtn}>Request an invoice →</Link>
-              ) : (
-                <button onClick={() => setConsentOpen(true)} style={primaryBtn}>Buy now — ${newGrandTotal.toLocaleString()}/yr →</button>
-              )
+            {/* The old-model arm — `tier !== 'advisory' && <button onClick={handleBuy}>` priced from
+                totalNet — went with the three dead blocks above. It was the last reader of handleBuy
+                and of the net/gross figures, both of which computed the retired per-module-per-tier
+                price. The live path is quote-driven: requiresQuote → specialist, requiresInvoice →
+                invoice, otherwise the consent modal and startCheckout. */}
+            {quote.requiresQuote ? (
+              <Link href={advisoryHref} style={primaryBtn}>Talk to a specialist →</Link>
+            ) : quote.requiresInvoice ? (
+              <Link href={advisoryHref} style={primaryBtn}>Request an invoice →</Link>
             ) : (
-              tier !== 'advisory' && (
-              <button onClick={handleBuy} style={primaryBtn}>
-                Buy now — ${totalNet.toLocaleString()}/yr →
-              </button>
-            )
+              <button onClick={() => setConsentOpen(true)} style={primaryBtn}>Buy now — ${newGrandTotal.toLocaleString()}/yr →</button>
             )}
             {cta.buttons.map((btn, i) => (
               <Link key={i} href={btn.href} style={btn.primary ? primaryBtn : ghostBtn}>
