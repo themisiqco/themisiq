@@ -52,6 +52,16 @@ const GWP = {
   diesel_gallon: { co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 },
   diesel_litre: { co2: 2.69627, ch4: 0.0001094, n2o: 0.0000219 },
   fuel_oil_gallon: { co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 },
+  // GRADE-EXPLICIT KEYS. fuel_oil_gallon above is UNCHANGED and still the only one read.
+  // Distillate No. 2 is byte-identical to diesel_gallon, and to the legacy fuel_oil_gallon — EPA lists
+  // diesel and Distillate Fuel Oil No. 2 as the same fuel, which is what makes the legacy key
+  // identifiable as the distillate row rather than a guess.
+  fuel_oil_distillate_gallon: { co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 },
+  // ⚠️ RESIDUAL FUEL OIL No. 6 IS NOT SEEDED. EPA publishes it in the same table as the distillate row
+  // above, but I could not open that document to transcribe it, and a factor typed from memory with a
+  // primary citation attached is worse than an absent one — it looks sourced. Seed it from EPA
+  // "Emission Factors for Greenhouse Gas Inventories" Table 1 before commit 2 makes the key reachable;
+  // until then a US location asking for it gets MissingEmissionFactorError, which is loud by design.
   gasoline_gallon: { co2: 8.7775, ch4: 0.000375, n2o: 0.000075 },
   gasoline_litre: { co2: 2.31877, ch4: 0.0000991, n2o: 0.0000198 },
   diesel_mobile_gallon: { co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 },
@@ -95,6 +105,13 @@ const EF_CA = {
   diesel_gallon: { co2: 10.148684, ch4: 0.000295, n2o: 0.000083 },
   // Light fuel oil "Industrial" (Table 4.x): 2753 / 0.006 / 0.031 g/L.
   fuel_oil_gallon: { co2: 10.421234, ch4: 0.000023, n2o: 0.000117 },
+  // GRADE-EXPLICIT KEYS — ECCC v3.0 Table 4.3 (2026 set), Industrial rows, g/L x 3.785411784.
+  // The legacy key above is CONFIRMED to be the Light/Industrial row: 2753 g/L -> 10.421239 kg/gal
+  // against its stored 10.421234, a 4.6e-6 rounding difference matching every other key in this table.
+  // Light Fuel Oil - Industrial:  2753 / 0.006 / 0.031 g/L.
+  fuel_oil_distillate_gallon: { co2: 10.421239, ch4: 0.000023, n2o: 0.000117 },
+  // Heavy Fuel Oil - Industrial: 3156 / 0.12 / 0.064 g/L.
+  fuel_oil_residual_gallon: { co2: 11.946760, ch4: 0.000454, n2o: 0.000242 },
   // Motor gasoline (Table 4.x): 2307 / 0.100 / 0.02 g/L.
   gasoline_litre: { co2: 2.307, ch4: 0.0001, n2o: 0.00002 },
   gasoline_gallon: { co2: 8.732941, ch4: 0.000379, n2o: 0.000076 },
@@ -123,6 +140,24 @@ const M3_PER_MCF = 1000 / 35.3147 // 28.3168
 // Per DEFRA guidance: natural gas uses the "Natural gas" row (kWh, gross CV — billing basis);
 // diesel/petrol use the "average biofuel blend" rows (forecourt fuel). gallon values are a
 // non-breaking fallback only (US gallon × litre value); UK wizard defaults to kWh/litres.
+//
+// ── EDITION VERIFIED: THIS TABLE IS GENUINELY DEFRA 2025 ────────────────────────────────────────
+// Checked against the DEFRA/DESNZ 2026 workbook — LF, 13 Aug 2026. Three keys differ between the
+// editions, so the 2025 citation above is CORRECT and not a stale header:
+//   natural_gas_kwh   0.18296   (2026: 0.18231)
+//   diesel_litre      2.57082   (2026: 2.58354)
+//   gasoline_litre    2.06916   (2026: 2.07500)
+//
+// ⚠️ THE FUEL-OIL ROW IS THE ONE THAT MISLEADS, WHICH IS WHY THIS NOTE EXISTS.
+// fuel_oil_gallon 12.018374 is 3.17492 kg/L, and 3.17492 is ALSO the 2026 workbook's "Processed fuel
+// oils - residual oil" value — the factor did not move between editions. A single matching row is not
+// evidence of which edition a table came from; the three differing rows above are. Anyone re-deriving
+// this from the fuel-oil row alone will reach the wrong conclusion, as very nearly happened here.
+//
+// CONSEQUENCE: NO FUEL-OIL GRADE KEYS ARE SEEDED IN THIS TABLE, while US/CA/EU/AU/NZ have them.
+// The published grade values are DEFRA 2026, so adding them here would put two editions in one table.
+// Refresh the WHOLE table to 2026 and move the header citation with it, then seed the grades in the
+// same commit. Pinned by engine.test.ts Z9.
 const EF_UK = {
   // Natural gas, kWh (Gross CV): 0.18296 kgCO2e/kWh (DEFRA Fuels row "Natural gas").
   natural_gas_kwh: { co2: 0.18296, ch4: 0, n2o: 0 },
@@ -162,6 +197,20 @@ const EF_EU = {
   diesel_mobile_gallon: { co2: 10.179876, ch4: 0.000412231, n2o: 0.000082522 },
   // Residual fuel oil (CO2 77400 kg/TJ, NCV 40.4, dens 0.990): 3.09569 kg CO2/L → per US-gallon fallback.
   fuel_oil_gallon: { co2: 11.718456, ch4: 0.000454249, n2o: 0.00009085 },
+  // GRADE-EXPLICIT KEYS, derived by the method in this table's header (IPCC 2006 Vol.2: CO2 from
+  // Ch.1 Table 1.4, CH4/N2O stationary defaults from Ch.2, converted via NCV and density).
+  //
+  // RESIDUAL reuses the derivation already recorded above, unchanged: CO2 77400 kg/TJ, NCV 40.4,
+  // dens 0.990 -> 3.09569 kg CO2/L.
+  fuel_oil_residual_gallon: { co2: 11.718456, ch4: 0.000454249, n2o: 0.00009085 },
+  // DISTILLATE uses the GAS/DIESEL OIL row: CO2 74100 kg/TJ, NCV 43.0, dens 0.844 -> 2.68924 kg CO2/L
+  // — the same three inputs this table already records for diesel_litre, so the values below are
+  // byte-identical to diesel_gallon.
+  // ⚠️ THE CATEGORY MAPPING IS A JUDGEMENT, NOT A TRANSCRIPTION. IPCC 2006 has no row headed
+  // "distillate fuel oil"; Gas/Diesel Oil is the category distillate heating oil falls under. That
+  // reading is mine and is not written in the Guidelines in those words — confirm it against Table 1.4
+  // before commit 2 makes this key reachable.
+  fuel_oil_distillate_gallon: { co2: 10.179876, ch4: 0.000412231, n2o: 0.000082522 },
   // Motor gasoline (CO2 69300 kg/TJ, NCV 44.3, dens 0.745): 2.28714 kg CO2/L.
   gasoline_litre: { co2: 2.28714, ch4: 0.000099, n2o: 0.0000198 },
   gasoline_gallon: { co2: 8.657763, ch4: 0.000374756, n2o: 0.000074951 },
@@ -182,6 +231,15 @@ const EF_AU = {
   gasoline_litre: { co2: 2.319, ch4: 0, n2o: 0 },
   // LPG (NGA Table 4): 25.7 GJ/kL × 60.6 kgCO2e/GJ ÷ 1000 = 1.55742 → 1.557 kg/L (per-litre, matches engine input).
   propane_litre: { co2: 1.557, ch4: 0, n2o: 0 },
+  // GRADE-EXPLICIT KEYS — DCCEEW NGA 2025 Table 8, energy content x combined Scope 1 EF per GJ, the
+  // same pre-computation every other key in this table uses. Stored per US GALLON (not per litre like
+  // the keys above) because the engine's fuel-oil path converts to gallons before pricing.
+  // Heating oil: 37.3 GJ/kL x 69.73 kgCO2e/GJ / 1000 = 2.600929 kg/L x 3.785411784 = 9.845587.
+  fuel_oil_distillate_gallon: { co2: 9.845587, ch4: 0, n2o: 0 },
+  // Fuel oil:    39.7 GJ/kL x 73.84 kgCO2e/GJ / 1000 = 2.931448 kg/L x 3.785411784 = 11.096738.
+  fuel_oil_residual_gallon: { co2: 11.096738, ch4: 0, n2o: 0 },
+  // NOTE: AU has no legacy fuel_oil_gallon — it falls through to the US table today. That fallthrough
+  // is UNCHANGED by this commit; nothing reads the two keys above yet.
 }
 
 // New Zealand combustion factors — MfE "Measuring Emissions" 2026 (v2). Published per-unit directly, so
@@ -199,6 +257,11 @@ const EF_NZ = {
     diesel_mobile_litre: { co2: 2.6759, ch4: 0, n2o: 0 }, // stationary value reused for mobile (deliberate, for consistency)
     propane_kg: { co2: 2.97164, ch4: 0, n2o: 0 },        // LPG per kg (MfE)
     gasoline_litre: { co2: 2.36143, ch4: 0, n2o: 0 },    // Transport Regular Petrol (no stationary petrol row)
+    // MfE Measuring Emissions Catalogue 2026 Table 3.2, per-gas columns already AR5-multiplied, so the
+    // combined kgCO2e/L goes in `co2` like every other NZ key. Per US GALLON: the fuel-oil path
+    // converts before pricing. Light 2.97088 x 3.785411784 = 11.246004; Heavy 3.05359 -> 11.559096.
+    fuel_oil_distillate_gallon: { co2: 11.246004, ch4: 0, n2o: 0 },
+    fuel_oil_residual_gallon: { co2: 11.559096, ch4: 0, n2o: 0 },
   },
   industrial: {
     natural_gas_kwh: { co2: 0.195067, ch4: 0, n2o: 0 },  // MfE Stationary Combustion, Industrial
@@ -206,6 +269,9 @@ const EF_NZ = {
     diesel_mobile_litre: { co2: 2.66873, ch4: 0, n2o: 0 },
     propane_kg: { co2: 2.96632, ch4: 0, n2o: 0 },
     gasoline_litre: { co2: 2.36143, ch4: 0, n2o: 0 },    // no Industrial petrol → Regular transport fallback
+    // MfE 2026 Table 3.2, Industrial. Light 2.96335 x 3.785411784 = 11.217500; Heavy 3.04601 -> 11.530402.
+    fuel_oil_distillate_gallon: { co2: 11.217500, ch4: 0, n2o: 0 },
+    fuel_oil_residual_gallon: { co2: 11.530402, ch4: 0, n2o: 0 },
   },
 }
 

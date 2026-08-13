@@ -1543,3 +1543,157 @@ describe('Y. Australia has a published residual mix', () => {
     expect(au.result_tco2e, 'AU market-based now uses the residual mix, not the location factor').toBeCloseTo(81, 9);
   });
 });
+
+// ── Z. GRADE-EXPLICIT FUEL OIL KEYS — SEEDED, NOT YET READ ──────────────────────────────────────
+//
+// One `fuel_oil_gallon` key held a DIFFERENT PRODUCT in each table: US distillate No.2 (byte-identical
+// to diesel), CA light fuel oil, UK and EU residual. lib/vsme/energyContent.ts already carried a
+// FUEL_OIL_GRADE_BY_JUR map to work around it, throwing on an unmapped jurisdiction — one module
+// compensating for an ambiguity the engine did not express.
+//
+// This commit is ADDITIVE ONLY. The legacy key is untouched and is still the only one anything reads;
+// these tests exist so the seeded values are pinned before commit 2 makes them reachable.
+describe('Z. fuel oil grades are seeded per table', () => {
+  const G = 3.785411784; // L_PER_GAL
+
+  const TABLES: [string, Record<string, any>, 'split' | 'combined'][] = [
+    ['EF (US)', EF as any, 'split'],
+    ['EF_CA', EF_CA as any, 'split'],
+    ['EF_EU', EF_EU as any, 'split'],
+    ['EF_UK', EF_UK as any, 'combined'],
+    ['EF_AU', EF_AU as any, 'combined'],
+    ['EF_NZ.commercial', (EF_NZ as any).commercial, 'combined'],
+    ['EF_NZ.industrial', (EF_NZ as any).industrial, 'combined'],
+  ];
+
+  it('Z1 the legacy fuel_oil_gallon is byte-identical in all four tables that had one', () => {
+    // THE WHOLE POINT OF "ADDITIVE ONLY". Nothing customer-visible may move.
+    expect((EF as any).fuel_oil_gallon).toEqual({ co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 });
+    expect((EF_CA as any).fuel_oil_gallon).toEqual({ co2: 10.421234, ch4: 0.000023, n2o: 0.000117 });
+    expect((EF_UK as any).fuel_oil_gallon).toEqual({ co2: 12.018374, ch4: 0, n2o: 0 });
+    expect((EF_EU as any).fuel_oil_gallon).toEqual({ co2: 11.718456, ch4: 0.000454249, n2o: 0.00009085 });
+    // AU and NZ never had one — they fall through to US, and that is unchanged.
+    expect((EF_AU as any).fuel_oil_gallon).toBeUndefined();
+    expect((EF_NZ as any).commercial.fuel_oil_gallon).toBeUndefined();
+  });
+
+  // WHAT IS DELIBERATELY ABSENT, and where the reason lives. Declared here rather than skipped inline,
+  // so removing an entry is what a seeding commit does — and the test that owns each reason fails if
+  // the absence is filled in without also deleting its pin.
+  const NOT_YET_SEEDED: Record<string, readonly ('distillate' | 'residual')[]> = {
+    'EF (US)': ['residual'],                 // EPA table not opened — see Z6
+    'EF_UK': ['distillate', 'residual'],     // DEFRA 2025 table; refresh whole first — see Z9
+  };
+
+  it('Z2 every jurisdiction resolves its OWN grade keys — none falls through to US', () => {
+    // pickEF falls back to EF when a table lacks a key. A silent US substitution is what the split
+    // exists to end, so each table must answer for itself.
+    for (const [name, table] of TABLES) {
+      const absent = NOT_YET_SEEDED[name] ?? [];
+      for (const grade of ['distillate', 'residual'] as const) {
+        const key = `fuel_oil_${grade}_gallon`;
+        expect(table[key] !== undefined, `${name} ${grade}`).toBe(!absent.includes(grade));
+      }
+    }
+  });
+
+  it('Z3 residual is heavier than distillate, everywhere both exist', () => {
+    // A physical sanity check on the transcription: No.6 / heavy oil carries more carbon per litre
+    // than No.2 / light. A transposed pair fails here before anyone reads a workings row.
+    for (const [name, table] of TABLES) {
+      if (!table.fuel_oil_residual_gallon) continue;
+      expect(table.fuel_oil_residual_gallon.co2, `${name}: residual must exceed distillate`)
+        .toBeGreaterThan(table.fuel_oil_distillate_gallon.co2);
+    }
+  });
+
+  it('Z4 storage convention is preserved — combined tables keep ch4/n2o at 0', () => {
+    // Section X stamps gwp_basis from ch4 === 0 && n2o === 0. A new key with the wrong shape would
+    // silently change how its row reports the GWP basis.
+    for (const [name, table, style] of TABLES) {
+      for (const key of ['fuel_oil_distillate_gallon', 'fuel_oil_residual_gallon']) {
+        const v = table[key];
+        if (!v) continue;
+        const isCombined = v.ch4 === 0 && v.n2o === 0;
+        expect(isCombined, `${name}.${key} must be stored ${style}`).toBe(style === 'combined');
+      }
+    }
+  });
+
+  it('Z5 the seeded values reproduce their published per-litre figures', () => {
+    const perL = (x: number) => x / G;
+    // UK is absent by decision — see Z9.
+    // NZ — MfE 2026 Table 3.2
+    expect(perL((EF_NZ as any).commercial.fuel_oil_distillate_gallon.co2)).toBeCloseTo(2.97088, 6);
+    expect(perL((EF_NZ as any).commercial.fuel_oil_residual_gallon.co2)).toBeCloseTo(3.05359, 6);
+    expect(perL((EF_NZ as any).industrial.fuel_oil_distillate_gallon.co2)).toBeCloseTo(2.96335, 6);
+    expect(perL((EF_NZ as any).industrial.fuel_oil_residual_gallon.co2)).toBeCloseTo(3.04601, 6);
+    // CA — ECCC v3.0 Table 4.3 Industrial, g/L
+    expect(perL((EF_CA as any).fuel_oil_distillate_gallon.co2)).toBeCloseTo(2.753, 6);
+    expect(perL((EF_CA as any).fuel_oil_residual_gallon.co2)).toBeCloseTo(3.156, 6);
+    // AU — DCCEEW NGA 2025 Table 8, GJ/kL x kgCO2e/GJ
+    expect(perL((EF_AU as any).fuel_oil_distillate_gallon.co2)).toBeCloseTo(37.3 * 69.73 / 1000, 6);
+    expect(perL((EF_AU as any).fuel_oil_residual_gallon.co2)).toBeCloseTo(39.7 * 73.84 / 1000, 6);
+    // EU — IPCC 2006 Vol.2 derivations recorded in the table header
+    expect(perL((EF_EU as any).fuel_oil_residual_gallon.co2)).toBeCloseTo(3.09569, 5);
+    expect(perL((EF_EU as any).fuel_oil_distillate_gallon.co2)).toBeCloseTo(2.68924, 5);
+  });
+
+  it('Z6 US residual is DELIBERATELY ABSENT until someone opens the EPA table', () => {
+    // ⚠️ NOT AN OVERSIGHT. Every other value here was transcribed from a source the requester had
+    // open. EPA residual No.6 was not, and a factor typed from memory carrying a primary citation is
+    // worse than a missing one — it reads as sourced. Delete this test in the same commit that seeds it.
+    expect((EF as any).fuel_oil_residual_gallon,
+      'if you have just seeded this from EPA Table 1, remove this test and add it to Z2/Z3/Z5').toBeUndefined();
+    // The distillate key IS provable: EPA lists diesel and Distillate No.2 as one fuel, and the legacy
+    // key is byte-identical to diesel_gallon — which is what identifies the legacy grade.
+    expect((EF as any).fuel_oil_distillate_gallon).toEqual((EF as any).diesel_gallon);
+    expect((EF as any).fuel_oil_distillate_gallon).toEqual((EF as any).fuel_oil_gallon);
+  });
+
+  it('Z9 EF_UK has NO grade keys — the table is DEFRA 2025 and must be refreshed whole first', () => {
+    const WHY =
+      'EF_UK IS DEFRA 2025 AND THE GRADE VALUES ARE DEFRA 2026 — seeding them here mixes two editions ' +
+      'in one table. Verified 13 Aug 2026 against the 2026 workbook: natural_gas_kwh, diesel_litre and ' +
+      'gasoline_litre all differ between editions, so the 2025 citation is correct. The fuel-oil row ' +
+      'matches across editions only because that factor did not move — it is NOT evidence of edition. ' +
+      'TO FIX: refresh the WHOLE table to DEFRA 2026, move the header citation with it, and seed the ' +
+      'grades in that same commit. Then delete this test.';
+    expect((EF_UK as any).fuel_oil_distillate_gallon, WHY).toBeUndefined();
+    expect((EF_UK as any).fuel_oil_residual_gallon, WHY).toBeUndefined();
+    // The legacy key stays, untouched, and remains the only fuel-oil factor a UK location can reach.
+    expect((EF_UK as any).fuel_oil_gallon).toEqual({ co2: 12.018374, ch4: 0, n2o: 0 });
+    // The three keys that PROVE the edition. If any of these ever equals its 2026 value, the refresh
+    // has begun and this test is the next thing to update.
+    expect((EF_UK as any).natural_gas_kwh.co2, 'DEFRA 2025; 2026 is 0.18231').toBe(0.18296);
+    expect((EF_UK as any).diesel_litre.co2, 'DEFRA 2025; 2026 is 2.58354').toBe(2.57082);
+    expect((EF_UK as any).gasoline_litre.co2, 'DEFRA 2025; 2026 is 2.075').toBe(2.06916);
+  });
+
+  it('Z7 EU distillate equals the gas/diesel oil derivation it is taken from', () => {
+    // The three inputs are CO2 74100 kg/TJ, NCV 43.0, dens 0.844 — the same row this table already
+    // uses for diesel. Pinned as an equality so the shared provenance is a fact, not a coincidence.
+    expect((EF_EU as any).fuel_oil_distillate_gallon).toEqual((EF_EU as any).diesel_gallon);
+    expect((EF_EU as any).fuel_oil_residual_gallon).toEqual((EF_EU as any).fuel_oil_gallon);
+  });
+
+  it('Z8 NOTHING READS THE NEW KEYS YET — no emission figure can have moved', () => {
+    // The engine's only fuel-oil lookup is the literal 'fuel_oil_gallon'. If a grade key ever appears
+    // in a pickEF call this fails, and that is the signal that commit 2 has started.
+    const src = readFileSync(join(process.cwd(), 'lib/ghg/engine.ts'), 'utf8');
+    const calls = src.split('\n').filter(l => l.includes("pickEF(loc, 'fuel_oil"));
+    // THREE, not two — I miscounted writing this and the assertion caught it. calcLocation prices the
+    // location total, calcInventory's `add` accumulates the per-fuel breakdown, and buildWorkings
+    // emits the row. Commit 2 must switch ALL THREE or the breakdown will disagree with the workings.
+    expect(calls.length, 'three fuel-oil pickEF sites: calcLocation, calcInventory add, buildWorkings').toBe(3);
+    for (const c of calls) expect(c).toContain("pickEF(loc, 'fuel_oil_gallon')");
+    // And the priced figure is unchanged for every jurisdiction that can enter fuel oil today.
+    const fo = (country: string, unit: 'gallons' | 'litres') =>
+      (buildWorkings([loc({ country, has_fuel_oil: true, fuel_oil_gallons: 1000, fuel_oil_unit: unit })],
+        'AR6', 2025, [], 12) as any[]).find(r => r.stream === 'fuel_oil' && !r.declaration).result_tco2e;
+    expect(fo('US', 'gallons')).toBeCloseTo(10.2414216, 9);
+    expect(fo('CA', 'litres')).toBeCloseTo(1000 / G * 10.421234 / 1000 + 1000 / G * (0.000023 * 29.8 + 0.000117 * 273) / 1000, 9);
+    expect(fo('GB', 'litres')).toBeCloseTo(1000 / G * 12.018374 / 1000, 9);
+    expect(fo('DE', 'litres')).toBeCloseTo(1000 / G * (11.718456 + 0.000454249 * 29.8 + 0.00009085 * 273) / 1000, 9);
+  });
+});
