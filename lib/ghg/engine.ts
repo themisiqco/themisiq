@@ -43,6 +43,19 @@ const GWP = {
      r507:  { AR4: 3985, AR5: 3985, AR6: 4775 },
    }
 
+// ⚠️ EDITION UNVERIFIED. EF_SOURCES.combustion cites "US EPA (2024)"; the workbook these values were
+// read from is the 2025 edition, last modified 15 January 2025. Nobody has checked whether the two
+// editions differ, so the citation may name the wrong year — exactly the position EF_UK was in before
+// 13 Aug 2026.
+//   THE DISTILLATE ROW REPRODUCING EXACTLY IS NOT EVIDENCE OF EDITION. That was the UK lesson: DEFRA's
+// residual-oil factor was identical in the 2025 and 2026 workbooks, so matching on it would have
+// "proved" a 2025 table was 2026. An edition check needs rows that CHANGE.
+//   TO CHECK, in rough order of how much customer volume they price:
+//     natural_gas_mmbtu 53.06   natural_gas_mcf 54.43956   natural_gas_therms 5.306
+//     diesel_gallon 10.20608*   gasoline_gallon 8.7775     propane_gallon 5.61561
+//   (*and with it fuel_oil_distillate_gallon and diesel_mobile_gallon, which share the row.)
+// Whichever rows differ between the 2024 and 2025 editions are the ones to pin, the way EF_UK now pins
+// natural_gas_kwh / diesel_litre / gasoline_litre.
    const EF = {
   natural_gas_mcf: { co2: 54.43956, ch4: 0.001026, n2o: 0.0001026 },
   natural_gas_therms: { co2: 5.306, ch4: 0.0001, n2o: 0.00001 },
@@ -52,16 +65,25 @@ const GWP = {
   diesel_gallon: { co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 },
   diesel_litre: { co2: 2.69627, ch4: 0.0001094, n2o: 0.0000219 },
   fuel_oil_gallon: { co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 },
-  // GRADE-EXPLICIT KEYS. fuel_oil_gallon above is UNCHANGED and still the only one read.
-  // Distillate No. 2 is byte-identical to diesel_gallon, and to the legacy fuel_oil_gallon — EPA lists
-  // diesel and Distillate Fuel Oil No. 2 as the same fuel, which is what makes the legacy key
-  // identifiable as the distillate row rather than a guess.
+  // ── GRADE-EXPLICIT KEYS — EPA Table 1 Stationary Combustion, Petroleum Products ────────────────
+  // Both derived as HEAT CONTENT x FACTOR, at full precision, so a verifier retyping the two source
+  // columns reaches our number rather than EPA's rounded per-gallon column.
+  //
+  // DISTILLATE FUEL OIL No. 2 — 0.138 mmBtu/gal x (CO2 73.96 kg/mmBtu, CH4 3 g/mmBtu, N2O 0.6 g/mmBtu):
+  //   co2 0.138 x 73.96 = 10.20648   ch4 0.138 x 3 g = 0.414 g   n2o 0.138 x 0.6 g = 0.0828 g
+  // CONFIRMATION THIS CLOSES: the legacy fuel_oil_gallon above reproduces ALL THREE GASES from that
+  // derivation exactly. The legacy US key IS Distillate No. 2 — established, not assumed. (It is also
+  // byte-identical to diesel_gallon, because EPA lists diesel and Distillate No. 2 as one fuel.)
   fuel_oil_distillate_gallon: { co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 },
-  // ⚠️ RESIDUAL FUEL OIL No. 6 IS NOT SEEDED. EPA publishes it in the same table as the distillate row
-  // above, but I could not open that document to transcribe it, and a factor typed from memory with a
-  // primary citation attached is worse than an absent one — it looks sourced. Seed it from EPA
-  // "Emission Factors for Greenhouse Gas Inventories" Table 1 before commit 2 makes the key reachable;
-  // until then a US location asking for it gets MissingEmissionFactorError, which is loud by design.
+  // RESIDUAL FUEL OIL No. 6 — 0.15 mmBtu/gal x (CO2 75.10 kg/mmBtu, CH4 3 g/mmBtu, N2O 0.6 g/mmBtu):
+  //   co2 0.15 x 75.10 = 11.265      ch4 0.15 x 3 g = 0.45 g     n2o 0.15 x 0.6 g = 0.09 g
+  // EPA'S OWN ROUNDED PER-GALLON COLUMN GIVES 11.27. We carry 11.265 deliberately: the workings table
+  // exists so a verifier can reproduce the row, and heat-content x factor is the derivation they will
+  // retype. Matching EPA's display rounding instead would put us 0.005 kg/gal away from our own stated
+  // arithmetic — the same reasoning as efDisplay's toPrecision(10) over toFixed(3).
+  // Only heat content and the CO2 factor differ between the grades; EPA publishes the same CH4 and N2O
+  // per mmBtu for both, which is why their kg/gal values differ only by the 0.138 -> 0.15 ratio.
+  fuel_oil_residual_gallon: { co2: 11.265, ch4: 0.00045, n2o: 0.00009 },
   gasoline_gallon: { co2: 8.7775, ch4: 0.000375, n2o: 0.000075 },
   gasoline_litre: { co2: 2.31877, ch4: 0.0000991, n2o: 0.0000198 },
   diesel_mobile_gallon: { co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 },

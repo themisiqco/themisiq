@@ -1582,10 +1582,11 @@ describe('Z. fuel oil grades are seeded per table', () => {
   // WHAT IS DELIBERATELY ABSENT, and where the reason lives. Declared here rather than skipped inline,
   // so removing an entry is what a seeding commit does — and the test that owns each reason fails if
   // the absence is filled in without also deleting its pin.
-  const NOT_YET_SEEDED: Record<string, readonly ('distillate' | 'residual')[]> = {
-    'EF (US)': ['residual'],                 // EPA table not opened — see Z6
-    // EF_UK was here until the DEFRA 2026 refresh made its grade keys seedable. One entry left.
-  };
+  // EMPTY. It held 'EF (US)': ['residual'] until the EPA Table 1 residual row was transcribed, and
+  // 'EF_UK': both grades until the DEFRA 2026 refresh. Kept rather than deleted: it is the shape a
+  // future jurisdiction's partial seeding declares itself in, and an empty map asserted by Z16 is a
+  // stronger statement than no map at all.
+  const NOT_YET_SEEDED: Record<string, readonly ('distillate' | 'residual')[]> = {};
 
   it('Z2 every jurisdiction resolves its OWN grade keys — none falls through to US', () => {
     // pickEF falls back to EF when a table lacks a key. A silent US substitution is what the split
@@ -1643,18 +1644,6 @@ describe('Z. fuel oil grades are seeded per table', () => {
     expect(perL((EF_EU as any).fuel_oil_distillate_gallon.co2)).toBeCloseTo(2.68924, 5);
   });
 
-  it('Z6 US residual is DELIBERATELY ABSENT until someone opens the EPA table', () => {
-    // ⚠️ NOT AN OVERSIGHT. Every other value here was transcribed from a source the requester had
-    // open. EPA residual No.6 was not, and a factor typed from memory carrying a primary citation is
-    // worse than a missing one — it reads as sourced. Delete this test in the same commit that seeds it.
-    expect((EF as any).fuel_oil_residual_gallon,
-      'if you have just seeded this from EPA Table 1, remove this test and add it to Z2/Z3/Z5').toBeUndefined();
-    // The distillate key IS provable: EPA lists diesel and Distillate No.2 as one fuel, and the legacy
-    // key is byte-identical to diesel_gallon — which is what identifies the legacy grade.
-    expect((EF as any).fuel_oil_distillate_gallon).toEqual((EF as any).diesel_gallon);
-    expect((EF as any).fuel_oil_distillate_gallon).toEqual((EF as any).fuel_oil_gallon);
-  });
-
   it('Z9 EF_UK is DEFRA 2026 — refreshed whole, and the grade keys are seeded', () => {
     // WAS: "EF_UK has NO grade keys — the table is DEFRA 2025 and must be refreshed whole first."
     // That blocker is gone. The table was refreshed to DEFRA 2026 in full on 13 Aug 2026, so seeding
@@ -1688,12 +1677,33 @@ describe('Z. fuel oil grades are seeded per table', () => {
     expect((EF_UK as any).fuel_oil_distillate_gallon).not.toEqual((EF_UK as any).fuel_oil_gallon);
   });
 
-  it('Z16 NOT_YET_SEEDED now holds one entry: US residual', () => {
-    // The seeding backlog, asserted rather than described. When EPA residual No.6 is transcribed this
-    // becomes empty, and Z6 goes with it.
-    expect(Object.keys(NOT_YET_SEEDED).sort()).toEqual(['EF (US)']);
-    expect(NOT_YET_SEEDED['EF (US)']).toEqual(['residual']);
-    expect(NOT_YET_SEEDED['EF_UK'], 'UK was cleared by the DEFRA 2026 refresh').toBeUndefined();
+  it('Z16 NOT_YET_SEEDED is EMPTY — every table carries both grades', () => {
+    // The seeding backlog is closed. Z6 ("US residual is deliberately absent") went with it.
+    // A future partial seeding declares itself here; until then this asserts there is nothing pending.
+    expect(NOT_YET_SEEDED).toEqual({});
+    for (const [name, table] of TABLES) {
+      expect(table.fuel_oil_distillate_gallon, `${name} distillate`).toBeDefined();
+      expect(table.fuel_oil_residual_gallon, `${name} residual`).toBeDefined();
+    }
+  });
+
+  it('Z17 the US grades derive from EPA heat content x factor, at full precision', () => {
+    const ef = EF as any;
+    // Distillate No.2 — 0.138 mmBtu/gal x (73.96 CO2, 3 g CH4, 0.6 g N2O). ALL THREE reproduce, which
+    // is what ESTABLISHED the legacy key's grade rather than assuming it.
+    expect(ef.fuel_oil_distillate_gallon.co2).toBeCloseTo(0.138 * 73.96, 10);
+    expect(ef.fuel_oil_distillate_gallon.ch4).toBeCloseTo(0.138 * 3 / 1000, 12);
+    expect(ef.fuel_oil_distillate_gallon.n2o).toBeCloseTo(0.138 * 0.6 / 1000, 12);
+    expect(ef.fuel_oil_distillate_gallon, 'legacy key IS Distillate No.2').toEqual(ef.fuel_oil_gallon);
+    // Residual No.6 — 0.15 mmBtu/gal x (75.10 CO2, 3 g CH4, 0.6 g N2O).
+    expect(ef.fuel_oil_residual_gallon.co2).toBeCloseTo(0.15 * 75.10, 10);
+    expect(ef.fuel_oil_residual_gallon.ch4).toBeCloseTo(0.15 * 3 / 1000, 12);
+    expect(ef.fuel_oil_residual_gallon.n2o).toBeCloseTo(0.15 * 0.6 / 1000, 12);
+    // NOT EPA's rounded display column — 11.27 sits 0.005 kg/gal from our own stated arithmetic, and
+    // the workings table exists so a verifier can reproduce the row they are shown.
+    expect(ef.fuel_oil_residual_gallon.co2, 'carry the derivation, not the rounded column').not.toBe(11.27);
+    // EPA publishes the same CH4/N2O per mmBtu for both grades, so they differ only by heat content.
+    expect(ef.fuel_oil_residual_gallon.ch4 / ef.fuel_oil_distillate_gallon.ch4).toBeCloseTo(0.15 / 0.138, 9);
   });
 
   it('Z10 every UK _gallon fallback equals its litre value x 3.785411784', () => {
