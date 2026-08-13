@@ -1874,3 +1874,138 @@ describe('Z. fuel oil grades are seeded per table', () => {
   });
 
 });
+
+// ── AA. PROPANE READ THE ADJACENT ROW ────────────────────────────────────────────────────────────
+//
+// EF.propane_gallon carried 5.61561 = 0.091 x 61.71: PROPANE's heat content (0.091 mmBtu/gal) with
+// the CO2 factor from LIQUEFIED PETROLEUM GASES (61.71 kg/mmBtu), the row directly beneath it in EPA
+// Table 1 Stationary Combustion, Petroleum Products. CH4 and N2O were always derived from Propane's
+// own heat content, so exactly one of the three gases came off the wrong line — which is why nothing
+// noticed: the row looked internally coherent and every consistency property in this suite held.
+//
+// ⚠️ NOT AN EDITION DEFECT, AND THE TWO LOOK IDENTICAL FROM INSIDE THE REPO. A wrong-row read and a
+// stale table both present as "a factor that does not match the current workbook", and they have
+// opposite fixes. The Petroleum Products block carries no blue-text change marker in the 2025 Hub
+// workbook, so those rows are the same in the 2024 edition — 62.87 was the 2024 value too. AA4 pins
+// that finding so a future reader does not "resolve" this by re-dating EF_SOURCES.combustion.
+
+describe('AA. propane CO2 comes from the Propane row, not the LPG row beneath it', () => {
+  const L_PER_GAL = 3.785411784;
+
+  it('AA1 propane_gallon and propane_litre equal their derivations exactly', () => {
+    // 0.091 mmBtu/gal x 62.87 kg CO2/mmBtu. toBeCloseTo(10) rather than toBe, because the product is
+    // computed in floating point here and stored as a decimal literal there.
+    expect(EF.propane_gallon.co2, '0.091 x 62.87').toBeCloseTo(0.091 * 62.87, 10);
+    expect(EF.propane_gallon.co2, 'the stored literal').toBe(5.72117);
+    expect(EF.propane_litre.co2, '5.72117 / L_PER_GAL at 5dp').toBe(1.51137);
+  });
+
+  it('AA2 THE OLD AND NEW VALUES, PINNED — this moved a live customer figure', () => {
+    // US propane Scope 1 rises 1.88% on unchanged consumption. Stored inventories do not move
+    // (workings is a snapshot), so a customer's next inventory differs from their last by this.
+    const OLD_GALLON = 5.61561, NEW_GALLON = 5.72117;
+    const OLD_LITRE = 1.48349,  NEW_LITRE = 1.51137;
+
+    expect(EF.propane_gallon.co2).toBe(NEW_GALLON);
+    expect(EF.propane_gallon.co2, 'the LPG-derived value must not come back').not.toBe(OLD_GALLON);
+    expect(EF.propane_litre.co2).toBe(NEW_LITRE);
+    expect(EF.propane_litre.co2).not.toBe(OLD_LITRE);
+
+    // The size of the correction, so a silent partial revert is visible too.
+    expect((NEW_GALLON - OLD_GALLON) / OLD_GALLON, 'a 1.88% rise').toBeCloseTo(0.0187976, 7);
+    expect(OLD_GALLON, 'the old value WAS Propane heat content x LPG CO2').toBeCloseTo(0.091 * 61.71, 10);
+  });
+
+  it('AA3 propane_litre is propane_gallon divided by 3.785411784', () => {
+    expect(EF.propane_litre.co2).toBeCloseTo(EF.propane_gallon.co2 / L_PER_GAL, 5);
+    // CH4 and N2O are the gallon values through the same constant — confirmed, not assumed.
+    // PRECISION 7, NOT 8: these are stored at 3 significant figures (0.0000721, 0.0000144), so the
+    // exact quotients sit ~2e-8 away. A tighter tolerance fails against correct values — it did on
+    // the first run of this test, which is why the number is spelled out rather than guessed at.
+    expect(EF.propane_litre.ch4).toBeCloseTo(EF.propane_gallon.ch4 / L_PER_GAL, 7);
+    expect(EF.propane_litre.n2o).toBeCloseTo(EF.propane_gallon.n2o / L_PER_GAL, 7);
+  });
+
+  it('AA4 CH4 AND N2O DID NOT MOVE, and still derive from Propane\'s own heat content', () => {
+    // The defect was one column wide. If a "fix" moves these too, it has re-read the whole row from
+    // somewhere else — including, plausibly, the LPG row's 0.092 heat content.
+    expect(EF.propane_gallon.ch4, 'unchanged').toBe(0.000273);
+    expect(EF.propane_gallon.n2o, 'unchanged').toBe(0.0000546);
+    expect(EF.propane_litre.ch4, 'unchanged').toBe(0.0000721);
+    expect(EF.propane_litre.n2o, 'unchanged').toBe(0.0000144);
+    expect(EF.propane_gallon.ch4, '0.091 x 3 g/mmBtu').toBeCloseTo(0.091 * 3 / 1000, 12);
+    expect(EF.propane_gallon.n2o, '0.091 x 0.6 g/mmBtu').toBeCloseTo(0.091 * 0.6 / 1000, 12);
+    // 0.091, NOT the LPG row's 0.092 — the heat content is what the gas factors encode.
+    expect(EF.propane_gallon.ch4 / 0.003, 'implied heat content').toBeCloseTo(0.091, 12);
+    expect(EF.propane_gallon.ch4 / 0.003).not.toBeCloseTo(0.092, 4);
+  });
+
+  it('AA5 THE LPG GUARD — fails loudly if the CO2 factor is ever 61.71 again', () => {
+    const WHY =
+      'PROPANE IS READING THE LPG ROW AGAIN. EPA Table 1 Stationary Combustion, Petroleum Products ' +
+      'lists "Propane" (0.091 mmBtu/gal, CO2 62.87 kg/mmBtu) directly above "Liquefied Petroleum ' +
+      'Gases (LPG)" (0.092 mmBtu/gal, CO2 61.71 kg/mmBtu). They are adjacent rows with different ' +
+      'factors and it is a one-line eye-slip to take the wrong one. 5.61561 = 0.091 x 61.71 is the ' +
+      'exact signature of that slip, and it under-reports every US propane customer by 1.88%. This ' +
+      'is NOT an edition question — see AA6.';
+
+    const impliedCo2Factor = EF.propane_gallon.co2 / (EF.propane_gallon.ch4 / 0.003);
+    expect(impliedCo2Factor, WHY).toBeCloseTo(62.87, 9);
+    expect(impliedCo2Factor, WHY).not.toBeCloseTo(61.71, 4);
+    expect(EF.propane_gallon.co2, WHY).not.toBeCloseTo(0.091 * 61.71, 8);
+    // And the LPG row's own product, in case someone seeds the whole row rather than the CO2 alone.
+    expect(EF.propane_gallon.co2, WHY).not.toBeCloseTo(0.092 * 61.71, 8);
+  });
+
+  it('AA6 the finding is recorded as a WRONG-ROW read, not an edition change', () => {
+    // Both defects present identically from inside the repo, and re-dating the citation is the
+    // plausible wrong fix. The file must say which one this was.
+    const src = readFileSync(join(process.cwd(), 'lib/ghg/engine.ts'), 'utf8');
+    const block = src.slice(src.indexOf('── PROPANE — EPA Table 1'), src.indexOf('propane_litre:'));
+    expect(block.length, 'the propane provenance block is gone').toBeGreaterThan(500);
+    expect(block, 'name the adjacent row so the next reader knows which is which').toContain('Liquefied Petroleum Gases (LPG)');
+    expect(block, 'both heat contents, so the rows can be told apart').toContain('0.092');
+    expect(block, 'the arithmetic, inline').toContain('0.091 x 62.87 = 5.72117');
+    expect(block, 'the value it replaced').toContain('5.61561');
+    expect(block, 'NOT an edition problem').toMatch(/blue-text marker/);
+    // The header's edition warning is NOT resolved by this fix and must survive it.
+    expect(src, 'the edition question is still open for every other key').toContain('⚠️ EDITION UNVERIFIED.');
+  });
+
+  it('AA7 the check-list transposition is gone, and no other US key moved', () => {
+    const src = readFileSync(join(process.cwd(), 'lib/ghg/engine.ts'), 'utf8');
+    // SCOPED TO THE CHECK-LIST LINE, not the whole file: the historical note directly below it
+    // quotes 10.20608 on purpose, to say what the typo was. A file-wide ban would forbid recording
+    // the fix — it failed that way on the first run here.
+    const checklist = src.split('\n').filter(l => l.includes('diesel_gallon 10.206'));
+    expect(checklist, 'the check-list line moved or was renamed').toHaveLength(1);
+    expect(checklist[0], 'the check-list must carry the value the table actually holds')
+      .toContain('10.20648');
+    expect(checklist[0], '10.20608 prices nothing and never did — it was a typo in this list')
+      .not.toContain('10.20608');
+
+    // EVERY OTHER KEY, pinned. A factor-table edit that reaches a second row is the failure mode
+    // this suite cannot otherwise see: each value below is independently sourced and none of them
+    // has any reason to move with propane.
+    expect(EF.natural_gas_mcf).toEqual({ co2: 54.43956, ch4: 0.001026, n2o: 0.0001026 });
+    expect(EF.natural_gas_therms).toEqual({ co2: 5.306, ch4: 0.0001, n2o: 0.00001 });
+    expect(EF.natural_gas_mmbtu).toEqual({ co2: 53.06, ch4: 0.001, n2o: 0.0001 });
+    expect(EF.diesel_gallon).toEqual({ co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 });
+    expect(EF.diesel_litre).toEqual({ co2: 2.69627, ch4: 0.0001094, n2o: 0.0000219 });
+    expect((EF as any).fuel_oil_gallon).toEqual({ co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 });
+    expect(EF.fuel_oil_distillate_gallon).toEqual({ co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 });
+    expect(EF.fuel_oil_residual_gallon).toEqual({ co2: 11.265, ch4: 0.00045, n2o: 0.00009 });
+    expect(EF.gasoline_gallon).toEqual({ co2: 8.7775, ch4: 0.000375, n2o: 0.000075 });
+    expect(EF.gasoline_litre).toEqual({ co2: 2.31877, ch4: 0.0000991, n2o: 0.0000198 });
+    expect(EF.diesel_mobile_gallon).toEqual({ co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 });
+    expect(EF.diesel_mobile_litre).toEqual({ co2: 2.69627, ch4: 0.0001094, n2o: 0.0000219 });
+    expect((EF as any).ammonia).toBe(0);
+    expect((EF as any).steam_mmbtu).toBe(66.33);
+
+    // AND NO OTHER JURISDICTION'S PROPANE MOVED. Four tables carry their own propane, each from a
+    // different publisher; a global find-and-replace on the old figure would be caught here.
+    expect((EF_CA as any).propane_gallon.co2, 'ECCC').toBe(5.734896);
+    expect((EF_UK as any).propane_litre.co2, 'DEFRA').toBe(1.54358);
+    expect((EF_EU as any).propane_gallon.co2, 'IPCC').toBe(5.762);
+  });
+});

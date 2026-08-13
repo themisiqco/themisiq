@@ -55,16 +55,53 @@ const GWP = {
 // "proved" a 2025 table was 2026. An edition check needs rows that CHANGE.
 //   TO CHECK, in rough order of how much customer volume they price:
 //     natural_gas_mmbtu 53.06   natural_gas_mcf 54.43956   natural_gas_therms 5.306
-//     diesel_gallon 10.20608*   gasoline_gallon 8.7775     propane_gallon 5.61561
+//     diesel_gallon 10.20648*   gasoline_gallon 8.7775
 //   (*and with it fuel_oil_distillate_gallon and diesel_mobile_gallon, which share the row.)
+//   diesel_gallon read 10.20608 here until 13 Aug 2026 — a transposed digit in THIS LIST, never in
+//   the table, where all four keys carrying that factor have always held 10.20648. It mattered
+//   because this list is what gets typed into the workbook's search box: a no-hit on a figure that
+//   prices nothing reads as evidence the table is an edition behind.
+//   propane_gallon has LEFT this list — checked 13 Aug 2026, and it was wrong for a different
+//   reason. See its own note at the key.
 // Whichever rows differ between the 2024 and 2025 editions are the ones to pin, the way EF_UK now pins
 // natural_gas_kwh / diesel_litre / gasoline_litre.
    const EF = {
   natural_gas_mcf: { co2: 54.43956, ch4: 0.001026, n2o: 0.0001026 },
   natural_gas_therms: { co2: 5.306, ch4: 0.0001, n2o: 0.00001 },
   natural_gas_mmbtu: { co2: 53.06, ch4: 0.001, n2o: 0.0001 },
-  propane_gallon: { co2: 5.61561, ch4: 0.000273, n2o: 0.0000546 },
-  propane_litre: { co2: 1.48349, ch4: 0.0000721, n2o: 0.0000144 },
+  // ── PROPANE — EPA Table 1 Stationary Combustion, Petroleum Products, row "Propane" ─────────────
+  // ⚠️ THIS CO2 FACTOR WAS WRONG UNTIL 13 AUG 2026, AND THE WRONG VALUE CAME FROM THE ADJACENT ROW.
+  // Table 1 lists Propane and Liquefied Petroleum Gases (LPG) NEXT TO EACH OTHER with DIFFERENT
+  // factors, and they read across almost identically:
+  //     Propane   0.091 mmBtu/gal   CO2 62.87 kg/mmBtu   CH4 3 g/mmBtu   N2O 0.6 g/mmBtu
+  //     LPG       0.092 mmBtu/gal   CO2 61.71 kg/mmBtu   CH4 3 g/mmBtu   N2O 0.6 g/mmBtu
+  // The stored CO2 was 5.61561, which is 0.091 x 61.71 — PROPANE's heat content with LPG's CO2
+  // factor. CH4 and N2O were always right (0.091 x 3 g, 0.091 x 0.6 g), and that asymmetry is what
+  // pins the mistake to the CO2 column alone rather than to a whole-row misread: only one of the
+  // three gases came off the wrong line.
+  //   co2 0.091 x 62.87 = 5.72117   (WAS 5.61561 = 0.091 x 61.71)
+  //   ch4 0.091 x 3 g   = 0.273 g   n2o 0.091 x 0.6 g = 0.0546 g   (both UNCHANGED)
+  // Derived at full precision, like the fuel-oil grade keys below, so a verifier retyping the two
+  // source columns reaches this number rather than the workbook's rounded per-gallon column.
+  // Verified in the 2025 Hub workbook (last modified 15 Jan 2025) — LF, 13 Aug 2026.
+  //
+  // ⚠️ NOT AN EDITION PROBLEM, and keeping the two apart is the point. No row in the Petroleum
+  // Products block carries the blue-text marker the workbook uses to flag changes from the 2024
+  // edition, so those rows are IDENTICAL across the two editions — 62.87 was the 2024 value too.
+  // A wrong-row read and a stale edition present the same way (a factor that does not match the
+  // current workbook) and have opposite fixes. Re-citing EF_SOURCES.combustion as 2025 would never
+  // have found this, and finding this settles nothing about the edition of any other key: the
+  // header warning above stays exactly as it is.
+  //
+  // EVERY US PROPANE CUSTOMER'S SCOPE 1 RISES 1.88% (62.87 / 61.71). Stored inventories do NOT
+  // move — workings is a saved snapshot, recomputed only on re-save — so a customer's 2025 figure
+  // and their next one will differ by this on unchanged consumption.
+  propane_gallon: { co2: 5.72117, ch4: 0.000273, n2o: 0.0000546 },
+  // 5.72117 / 3.785411784 = 1.51137322... -> 1.51137 (WAS 1.48349). CH4 and N2O DID NOT MOVE, and
+  // they are confirmed to be the gallon values through the same constant: 0.000273 / 3.785411784 =
+  // 0.0000721189..., 0.0000546 / 3.785411784 = 0.0000144237..., which are the stored 0.0000721 and
+  // 0.0000144 at the precision this table carries.
+  propane_litre: { co2: 1.51137, ch4: 0.0000721, n2o: 0.0000144 },
   diesel_gallon: { co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 },
   diesel_litre: { co2: 2.69627, ch4: 0.0001094, n2o: 0.0000219 },
   fuel_oil_gallon: { co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 },
