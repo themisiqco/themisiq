@@ -770,7 +770,8 @@ describe('N. no stream can be silent', () => {
     natural_gas:       { declare: { has_natural_gas: true },       quantify: { natural_gas_amount: 500 } },
     propane:           { declare: { has_propane: true },           quantify: { propane_amount: 200 } },
     diesel_stationary: { declare: { has_diesel_stationary: true }, quantify: { diesel_stationary_amount: 300 } },
-    fuel_oil:          { declare: { has_fuel_oil: true },          quantify: { fuel_oil_gallons: 400 } },
+    fuel_oil_distillate: { declare: { has_fuel_oil_distillate: true }, quantify: { fuel_oil_distillate_amount: 400 } },
+    fuel_oil_residual: { declare: { has_fuel_oil_residual: true },  quantify: { fuel_oil_residual_amount: 400 } },
     mobile:            { declare: { has_mobile: true },            quantify: { diesel_mobile_amount: 900 } },
     refrigerants:      { declare: { has_hfc_refrigerants: true },  quantify: { refrigerant_purchased_kg: 12 } },
     purchased_steam:   { declare: { has_purchased_steam: true },   quantify: { purchased_steam_mmbtu: 100 } },
@@ -872,16 +873,16 @@ describe('N. no stream can be silent', () => {
   });
 
   it('N7 an attestation still answers NOT DECLARED, and cannot cover a declared stream', () => {
-    const att: StreamAttestation[] = [{ stream: 'fuel_oil', attested_at: '2026-08-13T00:00:00Z' }];
+    const att: StreamAttestation[] = [{ stream: 'fuel_oil_distillate', attested_at: '2026-08-13T00:00:00Z' }];
     const absent = buildWorkings([loc({ stream_attestations: att })], 'AR6', 2024, [], 12)
-      .filter((r: any) => r.stream === 'fuel_oil') as any[];
+      .filter((r: any) => r.stream === 'fuel_oil_distillate') as any[];
     expect(absent[0].declaration).toBe('attested_absent');
     expect(absent[0].result_tco2e).toBe(0); // a CLAIM of no emissions, not an absence
 
     // Contradiction: the site attests fuel oil absent AND reports using it. The declared state wins,
     // because that is the one a verifier has to resolve.
-    const both = buildWorkings([loc({ has_fuel_oil: true, stream_attestations: att })], 'AR6', 2024, [], 12)
-      .filter((r: any) => r.stream === 'fuel_oil') as any[];
+    const both = buildWorkings([loc({ has_fuel_oil_distillate: true, stream_attestations: att })], 'AR6', 2024, [], 12)
+      .filter((r: any) => r.stream === 'fuel_oil_distillate') as any[];
     expect(both).toHaveLength(1);
     expect(both[0].declaration).toBe('declared_unquantified');
   });
@@ -945,7 +946,7 @@ describe('N10. the golden inventory is unchanged', () => {
     expect(scope12.reduce((n, r) => n + r.result_tco2e, 0)).toBeCloseTo(304.6176, 4);
     // Four streams are absent from this site and every one of them is on the record as absent.
     const declarations = rows.filter(r => r.declaration).map(r => r.stream).sort();
-    expect(declarations).toEqual(['diesel_stationary', 'fuel_oil', 'propane', 'purchased_steam']);
+    expect(declarations).toEqual(['diesel_stationary', 'fuel_oil_distillate', 'fuel_oil_residual', 'propane', 'purchased_steam']);
   });
 });
 
@@ -1809,23 +1810,67 @@ describe('Z. fuel oil grades are seeded per table', () => {
     expect((EF_EU as any).fuel_oil_residual_gallon).toEqual((EF_EU as any).fuel_oil_gallon);
   });
 
-  it('Z8 NOTHING READS THE NEW KEYS YET — no emission figure can have moved', () => {
-    // The engine's only fuel-oil lookup is the literal 'fuel_oil_gallon'. If a grade key ever appears
-    // in a pickEF call this fails, and that is the signal that commit 2 has started.
+  it('Z8 ALL THREE pickEF sites read GRADE keys — the retired fuel_oil_gallon is gone', () => {
+    // WAS: "nothing reads the new keys yet — no emission figure can have moved." That premise died
+    // with the split. Its job now is the inverse: catch a PARTIAL switch.
+    //
+    // Six calls, not three: two grades x calcLocation / calcInventory's per-fuel add / buildWorkings.
+    // Switching two of the three leaves the location total, the per-fuel breakdown and the workings
+    // row disagreeing about the same litres, and only the buildWorkings one would be caught elsewhere
+    // (by section M's recomputation check). This counts them.
     const src = readFileSync(join(process.cwd(), 'lib/ghg/engine.ts'), 'utf8');
     const calls = src.split('\n').filter(l => l.includes("pickEF(loc, 'fuel_oil"));
-    // THREE, not two — I miscounted writing this and the assertion caught it. calcLocation prices the
-    // location total, calcInventory's `add` accumulates the per-fuel breakdown, and buildWorkings
-    // emits the row. Commit 2 must switch ALL THREE or the breakdown will disagree with the workings.
-    expect(calls.length, 'three fuel-oil pickEF sites: calcLocation, calcInventory add, buildWorkings').toBe(3);
-    for (const c of calls) expect(c).toContain("pickEF(loc, 'fuel_oil_gallon')");
-    // And the priced figure is unchanged for every jurisdiction that can enter fuel oil today.
-    const fo = (country: string, unit: 'gallons' | 'litres') =>
-      (buildWorkings([loc({ country, has_fuel_oil: true, fuel_oil_gallons: 1000, fuel_oil_unit: unit })],
-        'AR6', 2025, [], 12) as any[]).find(r => r.stream === 'fuel_oil' && !r.declaration).result_tco2e;
-    expect(fo('US', 'gallons')).toBeCloseTo(10.2414216, 9);
-    expect(fo('CA', 'litres')).toBeCloseTo(1000 / G * 10.421234 / 1000 + 1000 / G * (0.000023 * 29.8 + 0.000117 * 273) / 1000, 9);
-    expect(fo('GB', 'litres')).toBeCloseTo(1000 / G * 12.018380 / 1000, 9);
-    expect(fo('DE', 'litres')).toBeCloseTo(1000 / G * (11.718456 + 0.000454249 * 29.8 + 0.00009085 * 273) / 1000, 9);
+    expect(calls.length, 'two grades x three sites').toBe(6);
+    for (const c of calls) {
+      expect(c, 'a fuel-oil lookup that names no grade is the retired key').toMatch(/fuel_oil_(distillate|residual)_gallon/);
+      expect(c, "'fuel_oil_gallon' was retired — no alias was kept").not.toContain("'fuel_oil_gallon'");
+    }
+    expect(calls.filter(c => c.includes('distillate')).length, 'three distillate sites').toBe(3);
+    expect(calls.filter(c => c.includes('residual')).length, 'three residual sites').toBe(3);
+    // THE RAW/RESOLVED DISTINCTION SURVIVES THE SPLIT. buildWorkings prices the coverage-resolution
+    // -applied figure; the other two read the stored amount. Collapsing them would silently drop
+    // estimation adjustments from the workings row.
+    expect(src).toContain("fuelOilToGallons(figure('fuel_oil_distillate_amount')");
+    expect(src).toContain("fuelOilToGallons(figure('fuel_oil_residual_amount')");
+    expect(src).toContain("fuelOilInGallons(loc, 'distillate')");
+    expect(src).toContain("fuelOilInGallons(loc, 'residual')");
   });
+
+  it('Z18 both grades price and emit rows independently, and a site can burn both', () => {
+    const G = 3.785411784;
+    const both = loc({
+      country: 'US',
+      has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000, fuel_oil_distillate_unit: 'gallons',
+      has_fuel_oil_residual: true, fuel_oil_residual_amount: 1000, fuel_oil_residual_unit: 'gallons',
+    });
+    const rows = (buildWorkings([both], 'AR6', 2025, [], 12) as any[]).filter(r => !r.declaration && String(r.stream).startsWith('fuel_oil'));
+    expect(rows, 'two priced rows, one per grade').toHaveLength(2);
+    expect(rows.map(r => r.source).sort()).toEqual(['Heating oil', 'Heavy fuel oil']);
+    // EPA distillate 10.2414216 vs residual 11.28942 per gallon at AR6.
+    const dist = rows.find(r => r.stream === 'fuel_oil_distillate');
+    const resid = rows.find(r => r.stream === 'fuel_oil_residual');
+    expect(dist.result_tco2e).toBeCloseTo(10.2414216, 9);
+    expect(resid.result_tco2e, 'residual is the heavier oil').toBeGreaterThan(dist.result_tco2e);
+    // The location total is the sum of the two, and the per-fuel breakdown keys them apart.
+    const c = calcLocation(both, 'AR6', 2025);
+    expect(c.s1_total).toBeCloseTo(dist.result_tco2e + resid.result_tco2e, 9);
+    // ⚠️ SITE 2 IS fuelEmissionsByType, NOT calcInventory. My own recon called it "calcInventory's
+    // per-fuel add"; it is a standalone function whose sole caller is pctEstimated, and its Record is
+    // never returned to a caller. So there is nothing to assert on directly — Z8's textual check is
+    // what covers that site. This exercises it end-to-end instead: pctEstimated walks both grades and
+    // must not throw or double-count.
+    expect(() => pctEstimated([both], [], 'AR6', 2025)).not.toThrow();
+    expect(pctEstimated([both], [], 'AR6', 2025), 'null = nothing concierge-derived, so no estimated share to report').toBeNull();
+    // Each grade declares and quantifies alone.
+    expect(streamState(loc({ has_fuel_oil_distillate: true }), 'fuel_oil_distillate')).toBe('declared_unquantified');
+    expect(streamState(loc({ has_fuel_oil_distillate: true }), 'fuel_oil_residual')).toBe('undeclared');
+    expect(streamState(both, 'fuel_oil_distillate')).toBe('quantified');
+    expect(streamState(both, 'fuel_oil_residual')).toBe('quantified');
+    // Metric countries convert litres -> gallons for BOTH grades, independently.
+    const gb = loc({ country: 'GB', has_fuel_oil_residual: true, fuel_oil_residual_amount: 1000, fuel_oil_residual_unit: 'litres' });
+    const gbRow = (buildWorkings([gb], 'AR6', 2026, [], 12) as any[]).find(r => r.stream === 'fuel_oil_residual' && !r.declaration);
+    expect(gbRow.result_tco2e).toBeCloseTo(1000 / G * 12.018380 / 1000, 9);
+    expect(gbRow.note, 'the convert-then-apply note survives per grade').toContain('litres');
+  });
+
 });

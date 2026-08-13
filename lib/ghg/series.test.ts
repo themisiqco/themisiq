@@ -212,7 +212,7 @@ describe('GROUP C — no internal vocabulary reaches the customer', () => {
   // describeYearStatus and none may appear in what it returns.
   const FORBIDDEN = [
     // fuel / unit / country tokens
-    'natural_gas', 'diesel_mobile', 'fuel_oil', 'm3', 'kwh', 'mcf', 'mmbtu',
+    'natural_gas', 'diesel_mobile', 'fuel_oil_distillate', 'fuel_oil_residual', 'm3', 'kwh', 'mcf', 'mmbtu',
     // status + field names
     'dataStatus', 'unverifiableReason', 'exclusions', 'scope12Total', 'locationName',
     'unpriceable', 'MissingEmissionFactorError',

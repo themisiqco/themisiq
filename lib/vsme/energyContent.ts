@@ -24,7 +24,7 @@
  * figures: natural gas, gasoline, diesel, propane (your four to verify), plus
  * the two fuel-oil grades (distillate / residual) resolved by jurisdiction.
  *
- * ⚠️ fuel_oil_gallon IS JURISDICTION-DEPENDENT. The engine's EF tables resolve
+ * (HISTORICAL) fuel_oil_gallon WAS jurisdiction-dependent. The engine's EF tables resolved
  *   this single key to two different fuel grades: distillate / No.2 in the US &
  *   CA tables (CO2 ≈ 10.2–10.4 kg/gal, same as diesel) and residual / No.6 in
  *   the UK & EU tables (CO2 ≈ 11.7–12.0 kg/gal). Energy content differs by grade,
@@ -57,29 +57,26 @@ const SOURCE_BTU = {
   gasoline_per_gal:    120_214,  // EIA: 1 gal motor gasoline = 120,214 Btu
   diesel_per_gal:      137_381,  // EIA: 1 gal diesel (≤15ppm S) = 137,381 Btu
   propane_per_gal:     91_452,   // EIA: 1 gal propane = 91,452 Btu
-  // fuel_oil is grade-dependent by jurisdiction (see FUEL_OIL_* below):
-  fuel_oil_distillate_per_gal: 138_500,  // EIA heating oil No.2 — US, CA tables
-  fuel_oil_residual_per_gal:   149_690,  // EIA residual No.6 (6.287 MMBtu/bbl ÷ 42) — UK, EU tables
+  // Two fuel-oil grades, now ordinary entries: the engine key names the grade, so neither is
+  // jurisdiction-dependent any more.
+  fuel_oil_distillate_per_gal: 138_500,  // EIA heating oil No.2
+  fuel_oil_residual_per_gal:   149_690,  // EIA residual No.6 (6.287 MMBtu/bbl ÷ 42)
 } as const;
 
-// fuel_oil_gallon resolves to a different grade depending on which EF table the
-// engine selected for the location. Keys here MUST match the engine's
-// jurisdiction codes — confirm against pickEF()/the EF table selection.
-const FUEL_OIL_GRADE_BY_JUR: Record<string, "distillate" | "residual"> = {
-  US: "distillate",
-  CA: "distillate",
-  UK: "residual",
-  EU: "residual",
-};
+// FUEL_OIL_GRADE_BY_JUR IS GONE. It mapped a jurisdiction to a grade because the engine had ONE
+// fuel_oil key holding a different product per table, and this module had to guess which. The engine
+// now carries fuel_oil_distillate_gallon and fuel_oil_residual_gallon as separate keys, so the grade
+// arrives with the key and there is nothing left to infer. It also only ever mapped US/CA/UK/EU and
+// THREW on anything else — an AU or NZ location with fuel oil crashed the B3 energy total. That is
+// fixed by deletion, not by adding two more entries.
 
 // --- Derived MWh-per-unit helpers -------------------------------------------
 const mwhPerGal = (btuPerGal: number) => btuPerGal / BTU_PER_MWH;
 const mwhPerLitre = (btuPerGal: number) => mwhPerGal(btuPerGal) / L_PER_GAL;
 const ngMwhPerMcf = (SOURCE_BTU.natural_gas_per_scf * 1000) / BTU_PER_MWH;
 
-/** Jurisdiction-independent EF keys → MWh per native unit.
- *  fuel_oil_gallon is intentionally NOT here — it is grade/jurisdiction
- *  dependent and is resolved in fuelEnergyMWh() via FUEL_OIL_GRADE_BY_JUR.
+/** EF key → MWh per native unit. Every key is jurisdiction-independent, including both fuel-oil
+ *  grades: the grade is now part of the key, so nothing here has to know where the location is.
  *  Physical fuels use SOURCE_BTU; the four energy keys use anchors directly. */
 export const ENERGY_CONTENT_MWH = {
   // ---- Natural gas (physical units need CV; energy units use anchors) ----
@@ -91,6 +88,8 @@ export const ENERGY_CONTENT_MWH = {
 
   // ---- Liquid fuels (gallon source; litre derived via L_PER_GAL) ----
   propane_gallon: mwhPerGal(SOURCE_BTU.propane_per_gal),
+  fuel_oil_distillate_gallon: mwhPerGal(SOURCE_BTU.fuel_oil_distillate_per_gal),
+  fuel_oil_residual_gallon: mwhPerGal(SOURCE_BTU.fuel_oil_residual_per_gal),
   propane_litre: mwhPerLitre(SOURCE_BTU.propane_per_gal),
   diesel_gallon: mwhPerGal(SOURCE_BTU.diesel_per_gal),
   diesel_litre: mwhPerLitre(SOURCE_BTU.diesel_per_gal),
@@ -108,7 +107,7 @@ export type EnergyEfKey = keyof typeof ENERGY_CONTENT_MWH;
 /**
  * Convert an amount in an EF key's native unit to MWh.
  *
- * `jurisdiction` is required ONLY for fuel_oil_gallon (whose grade — and so
+ * No `jurisdiction` parameter any more — it was required only for fuel_oil_gallon (whose grade — and so
  * energy content — depends on the engine's EF table). Pass the same
  * jurisdiction the engine used to pick the EF table.
  *
@@ -116,32 +115,7 @@ export type EnergyEfKey = keyof typeof ENERGY_CONTENT_MWH;
  * jurisdiction for fuel_oil — deliberately loud, so nothing silently
  * contributes zero or the wrong-grade energy to the B3 total.
  */
-export function fuelEnergyMWh(
-  efKey: string,
-  amount: number,
-  jurisdiction?: string
-): number {
-  if (efKey === "fuel_oil_gallon") {
-    if (!jurisdiction) {
-      throw new Error(
-        `[vsme/energyContent] fuel_oil_gallon requires a jurisdiction — its ` +
-        `grade (distillate vs residual) and energy content depend on it.`
-      );
-    }
-    const grade = FUEL_OIL_GRADE_BY_JUR[jurisdiction];
-    if (!grade) {
-      throw new Error(
-        `[vsme/energyContent] No fuel_oil grade mapped for jurisdiction ` +
-        `"${jurisdiction}". Add it to FUEL_OIL_GRADE_BY_JUR.`
-      );
-    }
-    const btu =
-      grade === "residual"
-        ? SOURCE_BTU.fuel_oil_residual_per_gal
-        : SOURCE_BTU.fuel_oil_distillate_per_gal;
-    return amount * mwhPerGal(btu);
-  }
-
+export function fuelEnergyMWh(efKey: string, amount: number): number {
   const factor = (ENERGY_CONTENT_MWH as Record<string, number>)[efKey];
   if (factor === undefined) {
     throw new Error(

@@ -62,19 +62,20 @@ describe('a stored unit is always one its country offers', () => {
     // A US location on litres must not be flipped to gallons: both are offered, so the customer's
     // choice stands. Resetting valid choices is how a silent figure change happens.
     expect(snapUnitsForCountry('US', { diesel_stationary_unit: 'litres' }).diesel_stationary_unit).toBe('litres')
-    expect(snapUnitsForCountry('US', { fuel_oil_unit: 'litres' }).fuel_oil_unit).toBe('litres')
+    expect(snapUnitsForCountry('US', { fuel_oil_distillate_unit: 'litres' }).fuel_oil_distillate_unit).toBe('litres')
+    expect(snapUnitsForCountry('US', { fuel_oil_residual_unit: 'litres' }).fuel_oil_residual_unit).toBe('litres')
     expect(snapUnitsForCountry('US', { purchased_steam_unit: 'gj' }).purchased_steam_unit).toBe('gj')
   })
 
   it('moves a US unit off a metric location', () => {
     const uk = snapUnitsForCountry('GB', {
-      fuel_oil_unit: 'gallons', diesel_stationary_unit: 'gallons',
+      fuel_oil_distillate_unit: 'gallons', fuel_oil_residual_unit: 'gallons', diesel_stationary_unit: 'gallons',
       gasoline_unit: 'gallons', diesel_mobile_unit: 'gallons',
       propane_unit: 'gallons', purchased_steam_unit: 'mmbtu', natural_gas_unit: 'mcf',
     })
     expect(uk).toEqual({
       natural_gas_unit: 'kwh', propane_unit: 'litres', diesel_stationary_unit: 'litres',
-      fuel_oil_unit: 'litres', gasoline_unit: 'litres', diesel_mobile_unit: 'litres',
+      fuel_oil_distillate_unit: 'litres', fuel_oil_residual_unit: 'litres', gasoline_unit: 'litres', diesel_mobile_unit: 'litres',
       purchased_steam_unit: 'gj',
     })
   })

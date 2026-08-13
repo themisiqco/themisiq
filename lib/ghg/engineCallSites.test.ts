@@ -92,14 +92,14 @@ const ALLOWED: AllowEntry[] = [
   {
     file: 'lib/ghg/engine.ts',
     calcLocation: 3,
-    calcGas: 14,
+    calcGas: 16,
     notes: [
       'calcLocation — the definition itself',
       'unpriceableReason — IS the guard; wraps calcLocation in try/catch and returns the refusal',
       'calcInventory — guarded by unpriceableReason; an unpriceable location is excluded from the reduce',
       'calcGas — the definition itself',
-      'calcLocation x6 (gas/propane/diesel/fuel oil/petrol/mobile diesel) — the origin; throws by design',
-      'fuelEmissionsByType x6 — sole caller is pctEstimated, which skips unpriceable locations first',
+      'calcLocation x7 (gas/propane/diesel/heating oil/heavy fuel oil/petrol/mobile diesel) — the origin; throws by design',
+      'fuelEmissionsByType x7 — sole caller is pctEstimated, which skips unpriceable locations first',
       'buildWorkings pushFuel x1 — guarded; buildWorkings emits a declaration:"unpriceable" row and skips the location',
     ],
   },

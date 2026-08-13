@@ -36,8 +36,15 @@ export interface B3Location {
   has_diesel_stationary: boolean;
   diesel_stationary_amount: number;
   diesel_stationary_unit: "gallons" | "litres";
-  has_fuel_oil: boolean;
-  fuel_oil_gallons: number;
+  // ⚠️ tsc DOES NOT FORCE THIS FILE. b3Energy declares its own structural copy of the Location shape
+  // rather than importing Location, so the engine's field rename produced no error here. It was found
+  // by grep, not by the compiler. Any future Location change has to be applied here by hand.
+  has_fuel_oil_distillate: boolean;
+  fuel_oil_distillate_amount: number;
+  fuel_oil_distillate_unit?: "gallons" | "litres";
+  has_fuel_oil_residual: boolean;
+  fuel_oil_residual_amount: number;
+  fuel_oil_residual_unit?: "gallons" | "litres";
   has_mobile: boolean;
   gasoline_amount: number;
   gasoline_unit: "gallons" | "litres";
@@ -49,20 +56,11 @@ export interface B3Location {
   renewable_electricity_kwh: number;
 }
 
-// EU-27, EEA convention (EL = Greece). Mirrors EU_COUNTRIES (page.tsx:321).
-const EU_COUNTRIES = new Set([
-  "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "EL", "HU",
-  "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE",
-]);
-
-/** Mirrors pickEF()'s country resolution (page.tsx:685). Drives fuel_oil grade. */
-function jurisdictionOf(country: string): "US" | "CA" | "UK" | "EU" {
-  const c = (country || "US").toUpperCase().trim();
-  if (c === "GB" || c === "UK") return "UK";
-  if (EU_COUNTRIES.has(c)) return "EU";
-  if (c === "CA") return "CA";
-  return "US"; // engine fallback table
-}
+// jurisdictionOf() AND ITS EU_COUNTRIES SET WERE DELETED HERE. Their only job was resolving which
+// fuel-oil grade a location's EF table implied, for energyContent's FUEL_OIL_GRADE_BY_JUR. The engine
+// now names the grade in the key, so both the map and this mirror of pickEF's country resolution are
+// gone. That mirror was a standing drift risk — a second copy of the engine's jurisdiction rules,
+// maintained by hand, in a module that does not import Location either.
 
 const galSuffix = (unit: "gallons" | "litres") =>
   unit === "gallons" ? "gallon" : "litre";
@@ -73,7 +71,6 @@ const galSuffix = (unit: "gallons" | "litres") =>
  */
 function locationFuelMWh(loc: B3Location): number {
   let mwh = 0;
-  const jur = jurisdictionOf(loc.country);
 
   if (loc.has_natural_gas && loc.natural_gas_amount > 0) {
     // natural gas key uses the raw unit string (the one non-singular case)
@@ -85,9 +82,11 @@ function locationFuelMWh(loc: B3Location): number {
   if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0) {
     mwh += fuelEnergyMWh(`diesel_${galSuffix(loc.diesel_stationary_unit)}`, loc.diesel_stationary_amount);
   }
-  if (loc.has_fuel_oil && loc.fuel_oil_gallons > 0) {
-    // jurisdiction settles distillate (US/CA) vs residual (UK/EU) grade
-    mwh += fuelEnergyMWh("fuel_oil_gallon", loc.fuel_oil_gallons, jur);
+  if (loc.has_fuel_oil_distillate && loc.fuel_oil_distillate_amount > 0) {
+    mwh += fuelEnergyMWh("fuel_oil_distillate_gallon", loc.fuel_oil_distillate_amount);
+  }
+  if (loc.has_fuel_oil_residual && loc.fuel_oil_residual_amount > 0) {
+    mwh += fuelEnergyMWh("fuel_oil_residual_gallon", loc.fuel_oil_residual_amount);
   }
   if (loc.has_mobile && loc.gasoline_amount > 0) {
     mwh += fuelEnergyMWh(`gasoline_${galSuffix(loc.gasoline_unit)}`, loc.gasoline_amount);

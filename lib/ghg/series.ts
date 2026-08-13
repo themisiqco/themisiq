@@ -172,7 +172,7 @@ const UNIT_WORDS: Record<string, string> = {
 };
 export const FUEL_WORDS: Record<string, string> = {
   natural_gas: "gas", propane: "propane", diesel: "diesel", diesel_mobile: "vehicle diesel",
-  gasoline: "petrol", fuel_oil: "fuel oil",
+  gasoline: "petrol", fuel_oil_distillate: "heating oil", fuel_oil_residual: "heavy fuel oil",
 };
 
 /**

@@ -905,10 +905,16 @@ interface Location {
   has_natural_gas: boolean; natural_gas_amount: number; natural_gas_unit: 'mcf' | 'therms' | 'mmbtu' | 'm3' | 'kwh'
   has_propane: boolean; propane_amount: number; propane_unit: 'gallons' | 'litres' | 'kg'
   has_diesel_stationary: boolean; diesel_stationary_amount: number; diesel_stationary_unit: 'gallons' | 'litres'
-  // fuel_oil_gallons is NOT renamed — the key exists in every stored locations_data row. It now
-  // holds the amount in `fuel_oil_unit`, which is 'gallons' when the key is absent. The name is
-  // therefore misleading, which is exactly why nothing reads it directly: go through fuelOilInGallons.
-  has_fuel_oil: boolean; fuel_oil_gallons: number; fuel_oil_unit?: 'gallons' | 'litres'
+  // TWO GRADES, TWO FIELD TRIPLES — and `_amount`, NOT the retired `_gallons` misnomer.
+  // The single key this replaces was `fuel_oil_gallons`, a name that lied about its unit and was kept
+  // only because it existed in every stored locations_data row, so renaming meant a migration. These
+  // are NEW keys: nothing stored carries them, there is nothing to preserve, and deliberately
+  // inheriting a bad name would be indefensible. `_amount` is what every other multi-unit fuel here
+  // uses (natural_gas_amount, propane_amount, diesel_stationary_amount), so fuel oil is now the same
+  // shape as its neighbours instead of the exception that needed a comment to be read correctly.
+  // Read via fuelOilInGallons(loc, grade) — the published factors are per US gallon.
+  has_fuel_oil_distillate: boolean; fuel_oil_distillate_amount: number; fuel_oil_distillate_unit?: 'gallons' | 'litres'
+  has_fuel_oil_residual: boolean; fuel_oil_residual_amount: number; fuel_oil_residual_unit?: 'gallons' | 'litres'
   has_mobile: boolean; gasoline_amount: number; gasoline_unit: 'gallons' | 'litres'; diesel_mobile_amount: number; diesel_mobile_unit: 'gallons' | 'litres'
   uses_ammonia: boolean; has_hfc_refrigerants: boolean; refrigerant_type: string; refrigerant_purchased_kg: number
   electricity_kwh: number; grid_region: string; renewable_electricity_kwh: number; residual_region: string
@@ -1163,7 +1169,8 @@ const emptyLocation = (id: string, name: string, state = ''): Location => ({
   has_natural_gas: false, natural_gas_amount: 0, natural_gas_unit: 'mcf',
   has_propane: false, propane_amount: 0, propane_unit: 'gallons',
   has_diesel_stationary: false, diesel_stationary_amount: 0, diesel_stationary_unit: 'gallons',
-  has_fuel_oil: false, fuel_oil_gallons: 0, fuel_oil_unit: 'gallons',
+  has_fuel_oil_distillate: false, fuel_oil_distillate_amount: 0, fuel_oil_distillate_unit: 'gallons',
+  has_fuel_oil_residual: false, fuel_oil_residual_amount: 0, fuel_oil_residual_unit: 'gallons',
   has_mobile: false, gasoline_amount: 0, gasoline_unit: 'gallons', diesel_mobile_amount: 0, diesel_mobile_unit: 'gallons',
   uses_ammonia: false, has_hfc_refrigerants: false, refrigerant_type: 'r410a', refrigerant_purchased_kg: 0,
   electricity_kwh: 0, grid_region: 'us_average', renewable_electricity_kwh: 0, residual_region: '',
@@ -1236,7 +1243,8 @@ export const UNIT_FIELDS = [
   { field: 'natural_gas_unit',       label: 'natural gas',            options: ngUnitOptions,      list: 'ngUnitOptions' },
   { field: 'propane_unit',           label: 'propane / LPG',          options: propaneUnitOptions, list: 'propaneUnitOptions' },
   { field: 'diesel_stationary_unit', label: 'diesel (stationary)',    options: liquidUnitOptions,  list: 'liquidUnitOptions' },
-  { field: 'fuel_oil_unit',          label: 'fuel oil',               options: liquidUnitOptions,  list: 'liquidUnitOptions' },
+  { field: 'fuel_oil_distillate_unit', label: 'heating oil',          options: liquidUnitOptions,  list: 'liquidUnitOptions' },
+  { field: 'fuel_oil_residual_unit', label: 'heavy fuel oil',         options: liquidUnitOptions,  list: 'liquidUnitOptions' },
   { field: 'gasoline_unit',          label: 'petrol (mobile)',        options: liquidUnitOptions,  list: 'liquidUnitOptions' },
   { field: 'diesel_mobile_unit',     label: 'diesel (mobile)',        options: liquidUnitOptions,  list: 'liquidUnitOptions' },
   { field: 'purchased_steam_unit',   label: 'purchased steam',        options: steamUnitOptions,   list: 'steamUnitOptions' },
@@ -1317,7 +1325,13 @@ export function steamToMmbtu(amount: number, unit?: 'mmbtu' | 'gj'): { mmbtu: nu
   return { mmbtu, note: `${amount} GJ ÷ ${GJ_PER_MMBTU} = ${mmbtu.toFixed(4)} MMBtu (exact, International Table Btu) — the published factor is per MMBtu` }
 }
 
-const fuelOilInGallons = (loc: Location) => fuelOilToGallons(loc.fuel_oil_gallons, loc.fuel_oil_unit)
+// Grade-parameterised. fuelOilToGallons itself is unchanged — it takes (amount, unit) rather than a
+// Location precisely so the workings can convert the resolution-applied figure; this wrapper is only
+// the raw-value convenience calcLocation and calcInventory use.
+type FuelOilGrade = 'distillate' | 'residual'
+const fuelOilInGallons = (loc: Location, grade: FuelOilGrade) => grade === 'distillate'
+  ? fuelOilToGallons(loc.fuel_oil_distillate_amount, loc.fuel_oil_distillate_unit)
+  : fuelOilToGallons(loc.fuel_oil_residual_amount, loc.fuel_oil_residual_unit)
 const steamInMmbtu = (loc: Location) => steamToMmbtu(loc.purchased_steam_mmbtu, loc.purchased_steam_unit)
 
 function propaneEfKey(unit: string): 'propane_gallon' | 'propane_litre' | 'propane_kg' {
@@ -1493,8 +1507,14 @@ function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: numbe
     const g = calcGas(ef, loc.diesel_stationary_amount, gwpVersion)
     s1_stationary += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
   }
-  if (loc.has_fuel_oil && loc.fuel_oil_gallons > 0) {
-    const g = calcGas(pickEF(loc, 'fuel_oil_gallon'), fuelOilInGallons(loc).gallons, gwpVersion)
+  // TWO GRADES, PRICED SEPARATELY. Both read the RAW stored amount here; buildWorkings reads the
+  // resolution-applied figure instead — see the note at its own call site.
+  if (loc.has_fuel_oil_distillate && loc.fuel_oil_distillate_amount > 0) {
+    const g = calcGas(pickEF(loc, 'fuel_oil_distillate_gallon'), fuelOilInGallons(loc, 'distillate').gallons, gwpVersion)
+    s1_stationary += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
+  }
+  if (loc.has_fuel_oil_residual && loc.fuel_oil_residual_amount > 0) {
+    const g = calcGas(pickEF(loc, 'fuel_oil_residual_gallon'), fuelOilInGallons(loc, 'residual').gallons, gwpVersion)
     s1_stationary += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
   }
   if (loc.has_mobile) {
@@ -1610,8 +1630,10 @@ function fuelEmissionsByType(loc: Location, gwpVersion: GwpVersion, year: number
     add('propane', calcGas(pickEF(loc, propaneEfKey(loc.propane_unit) as keyof typeof EF), loc.propane_amount, gwpVersion).total)
   if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0)
     add('diesel', calcGas(pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), loc.diesel_stationary_amount, gwpVersion).total)
-  if (loc.has_fuel_oil && loc.fuel_oil_gallons > 0)
-    add('fuel_oil', calcGas(pickEF(loc, 'fuel_oil_gallon'), fuelOilInGallons(loc).gallons, gwpVersion).total)
+  if (loc.has_fuel_oil_distillate && loc.fuel_oil_distillate_amount > 0)
+    add('fuel_oil_distillate', calcGas(pickEF(loc, 'fuel_oil_distillate_gallon'), fuelOilInGallons(loc, 'distillate').gallons, gwpVersion).total)
+  if (loc.has_fuel_oil_residual && loc.fuel_oil_residual_amount > 0)
+    add('fuel_oil_residual', calcGas(pickEF(loc, 'fuel_oil_residual_gallon'), fuelOilInGallons(loc, 'residual').gallons, gwpVersion).total)
   if (loc.has_mobile) {
     if (loc.gasoline_amount > 0)
       add('gasoline', calcGas(pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), loc.gasoline_amount, gwpVersion).total)
@@ -1694,7 +1716,7 @@ function fuelTypeForDocType(docType: string): string | null {
     case 'utility_bill_gas': return 'natural_gas'
     case 'fuel_propane': return 'propane'
     case 'fuel_diesel': return 'diesel'
-    default: return null // fleet_fuel (two fuels — 3c), service_record, fuel_oil, purchased_steam
+    default: return null // fleet_fuel (two fuels — 3c), service_record, fuel_oil (both grades), purchased_steam
   }
 }
 
@@ -1935,12 +1957,18 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0) pushFuel(loc, 'diesel_stationary', 'Diesel (stationary)', 1, figure('diesel_stationary_amount'), loc.diesel_stationary_unit, pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provOf('diesel_stationary_amount'))
     // Reports the figure AS ENTERED with its own unit, and the conversion as the note — the factored
     // gallons figure is inside the note, so all three steps are on one row.
-    if (loc.has_fuel_oil && loc.fuel_oil_gallons > 0) {
-      // Convert AFTER applying resolutions, then hand pushFuel the gallons figure — the factor is
-      // published per gallon, so the activity it multiplies must be gallons or the row would state a
-      // result the engine did not compute. The note carries the entered figure and the arithmetic.
-      const fo = fuelOilToGallons(figure('fuel_oil_gallons'), loc.fuel_oil_unit)
-      pushFuel(loc, 'fuel_oil', 'Fuel oil', 1, fo.gallons, 'gallons', pickEF(loc, 'fuel_oil_gallon'), provOf('fuel_oil_gallons'), fo.note)
+    // Convert AFTER applying resolutions, then hand pushFuel the gallons figure — the factor is
+    // published per gallon, so the activity it multiplies must be gallons or the row would state a
+    // result the engine did not compute. The note carries the entered figure and the arithmetic.
+    // ⚠️ figure(), NOT the raw field: calcLocation and calcInventory read the stored amount, this reads
+    // the coverage-resolution-applied one. That distinction predates the grade split and survives it.
+    if (loc.has_fuel_oil_distillate && loc.fuel_oil_distillate_amount > 0) {
+      const fo = fuelOilToGallons(figure('fuel_oil_distillate_amount'), loc.fuel_oil_distillate_unit)
+      pushFuel(loc, 'fuel_oil_distillate', 'Heating oil', 1, fo.gallons, 'gallons', pickEF(loc, 'fuel_oil_distillate_gallon'), provOf('fuel_oil_distillate_amount'), fo.note)
+    }
+    if (loc.has_fuel_oil_residual && loc.fuel_oil_residual_amount > 0) {
+      const fo = fuelOilToGallons(figure('fuel_oil_residual_amount'), loc.fuel_oil_residual_unit)
+      pushFuel(loc, 'fuel_oil_residual', 'Heavy fuel oil', 1, fo.gallons, 'gallons', pickEF(loc, 'fuel_oil_residual_gallon'), provOf('fuel_oil_residual_amount'), fo.note)
     }
     if (loc.has_mobile && loc.gasoline_amount > 0) pushFuel(loc, 'mobile', 'Gasoline (mobile)', 1, figure('gasoline_amount'), loc.gasoline_unit, pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provOf('gasoline_amount'))
     if (loc.has_mobile && loc.diesel_mobile_amount > 0) pushFuel(loc, 'mobile', 'Diesel (mobile)', 1, figure('diesel_mobile_amount'), loc.diesel_mobile_unit, pickEF(loc, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provOf('diesel_mobile_amount'))
@@ -2117,7 +2145,7 @@ export function findUnresolvedCoverage(
 // BOTH the init default AND "no such supply" — one field, two meanings. A stream is DECLARED only when
 // it has data OR carries an explicit attestation; otherwise it is UNDECLARED and blocks export.
 export const DECLARABLE_STREAMS = [
-  'natural_gas', 'propane', 'diesel_stationary', 'fuel_oil',
+  'natural_gas', 'propane', 'diesel_stationary', 'fuel_oil_distillate', 'fuel_oil_residual',
   'mobile', 'refrigerants', 'electricity', 'purchased_steam',
 ] as const
 export type DeclarableStream = typeof DECLARABLE_STREAMS[number]
@@ -2136,7 +2164,12 @@ export const STREAM_META: Record<DeclarableStream, { name: string; verb: 'use' |
   natural_gas:       { name: 'natural gas',                          verb: 'use',  scope: 1 },
   propane:           { name: 'propane / LPG',                        verb: 'use',  scope: 1 },
   diesel_stationary: { name: 'diesel in stationary equipment',       verb: 'use',  scope: 1 },
-  fuel_oil:          { name: 'fuel oil',                             verb: 'use',  scope: 1 },
+  // Lowercase noun phrases, like every other entry — `name` is a NOUN, not a title. streamQuestion()
+  // frames it ("Does this location use heating oil (light / distillate)?"), the attestation frames it
+  // ("This location has no heating oil (light / distillate)."), and the declaration row prints it bare.
+  // One string, three frames: a title-cased name would read wrong in two of the three.
+  fuel_oil_distillate: { name: 'heating oil (light / distillate)',   verb: 'use',  scope: 1 },
+  fuel_oil_residual:   { name: 'heavy fuel oil (residual)',          verb: 'use',  scope: 1 },
   mobile:            { name: 'company vehicles or mobile equipment', verb: 'have', scope: 1 },
   refrigerants:      { name: 'refrigeration or cooling',             verb: 'have', scope: 1 },
   electricity:       { name: 'purchased electricity',               verb: 'use',  scope: 2 },
@@ -2172,7 +2205,8 @@ function streamDeclared(loc: Location, s: DeclarableStream): boolean {
     case 'natural_gas': return loc.has_natural_gas
     case 'propane': return loc.has_propane
     case 'diesel_stationary': return loc.has_diesel_stationary
-    case 'fuel_oil': return loc.has_fuel_oil
+    case 'fuel_oil_distillate': return loc.has_fuel_oil_distillate
+    case 'fuel_oil_residual': return loc.has_fuel_oil_residual
     case 'mobile': return loc.has_mobile
     // Either refrigerant answer declares the stream. Ammonia is deliberately never PRICED (NH₃ has no
     // global warming potential), which is exactly why it needs to be declarable — before this change an
@@ -2190,7 +2224,8 @@ function streamQuantified(loc: Location, s: DeclarableStream): boolean {
     case 'natural_gas': return loc.natural_gas_amount > 0
     case 'propane': return loc.propane_amount > 0
     case 'diesel_stationary': return loc.diesel_stationary_amount > 0
-    case 'fuel_oil': return loc.fuel_oil_gallons > 0
+    case 'fuel_oil_distillate': return loc.fuel_oil_distillate_amount > 0
+    case 'fuel_oil_residual': return loc.fuel_oil_residual_amount > 0
     case 'mobile': return loc.gasoline_amount > 0 || loc.diesel_mobile_amount > 0
     case 'refrigerants': return loc.refrigerant_purchased_kg > 0
     case 'purchased_steam': return loc.purchased_steam_mmbtu > 0

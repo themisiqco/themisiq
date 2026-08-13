@@ -84,7 +84,8 @@ const fuelTypesPresent = (locs: Location[]): string[] => {
     if (l.has_natural_gas) present.add('natural_gas')
     if (l.has_propane) present.add('propane')
     if (l.has_diesel_stationary) present.add('diesel')
-    if (l.has_fuel_oil) present.add('fuel_oil')
+    if (l.has_fuel_oil_distillate) present.add('fuel_oil_distillate')
+    if (l.has_fuel_oil_residual) present.add('fuel_oil_residual')
     if (l.has_mobile && l.gasoline_amount > 0) present.add('gasoline')
     if (l.has_mobile && l.diesel_mobile_amount > 0) present.add('diesel_mobile')
     if (l.electricity_kwh > 0) present.add('electricity')
@@ -397,7 +398,7 @@ const UNIT_WORDS: Record<string, string> = {
 }
 const FUEL_WORDS: Record<string, string> = {
   natural_gas: 'gas', propane: 'propane', diesel: 'diesel', diesel_mobile: 'vehicle diesel',
-  gasoline: 'petrol', fuel_oil: 'fuel oil',
+  gasoline: 'petrol', fuel_oil_distillate: 'heating oil', fuel_oil_residual: 'heavy fuel oil',
 }
 
 function unpriceableMessage(u: UnpriceableLocation): string {
@@ -1613,25 +1614,51 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 </div>
               )}
             </QuestionCard>
-            <QuestionCard question={streamQuestion('fuel_oil')} hint="Heating oil for boilers or furnaces — check delivery records" checked={loc.has_fuel_oil} onToggle={v => updateLocation(activeLocation, 'has_fuel_oil', v)}>
-              {loc.has_fuel_oil && (
+            {/* TWO CARDS, NOT ONE WITH A SUB-CHOICE. These are two declarable streams: a site can burn
+                both, each needs its own attestation, and each prices from a different published factor.
+                The nz_use_class <details> pattern models a sub-choice within ONE stream and is the
+                wrong shape here.
+                Titles come from streamQuestion(), exactly like the other six. An earlier draft passed
+                STREAM_META[token].name directly because the supplied copy was title-cased; that made
+                these two cards the only ones not phrased as a question, and a title-cased name reads
+                wrong in the two OTHER places the same string appears (the absence attestation and the
+                declaration row). Storing the noun phrase and letting the existing mechanism frame it
+                gives the same card titles with no special case.
+                ONE UPLOAD SLOT PER CARD, both pointing at docType="fuel_oil": docType is a DOCUMENT
+                type, not a stream, a delivery docket can carry either grade, and fuel_oil sits in
+                CONCIERGE_UNREAD_DOC_TYPES so nothing is extracted from it either way. */}
+            <QuestionCard question={streamQuestion('fuel_oil_distillate')} hint="The oil most commonly burned in building boilers and furnaces. Known as heating oil, light fuel oil, gas oil or No. 2 distillate depending on where you buy it. If your site is an office, warehouse, school or similar, this is what you use." checked={loc.has_fuel_oil_distillate} onToggle={v => updateLocation(activeLocation, 'has_fuel_oil_distillate', v)}>
+              {loc.has_fuel_oil_distillate && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-                    {/* liquidUnitOptions, not a hardcoded pair: it labels the US gallon explicitly
-                        (an imperial gallon is ~20% larger, so "Gallons" alone is a 20% error waiting
-                        to happen) AND withholds gallons entirely from metric countries, which is the
-                        policy every other liquid fuel here already follows. */}
                     {liquidUnitOptions(loc.country).map(([val, label]) => (
-                      <button key={val} onClick={() => updateLocation(activeLocation, 'fuel_oil_unit', val as 'gallons' | 'litres')} style={unitBtn((loc.fuel_oil_unit ?? 'gallons') === val)}>{label}</button>
+                      <button key={val} onClick={() => updateLocation(activeLocation, 'fuel_oil_distillate_unit', val as 'gallons' | 'litres')} style={unitBtn((loc.fuel_oil_distillate_unit ?? 'gallons') === val)}>{label}</button>
                     ))}
                   </div>
-                  <Field label={`Total fuel oil purchased — ${inventory.reporting_year} (${(loc.fuel_oil_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
-                    <input type="number" value={loc.fuel_oil_gallons || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_gallons', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                  <Field label={`Total heating oil purchased — ${inventory.reporting_year} (${(loc.fuel_oil_distillate_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
+                    <input type="number" value={loc.fuel_oil_distillate_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_distillate_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
+                  {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
                 </div>
               )}
             </QuestionCard>
+
+            <QuestionCard question={streamQuestion('fuel_oil_residual')} hint="A thicker oil used in large industrial boilers, kilns and ships. It has to be heated before it will flow. Known as residual fuel oil, heavy fuel oil, bunker fuel or No. 6. If you&apos;re not sure whether you use this, you almost certainly don&apos;t." checked={loc.has_fuel_oil_residual} onToggle={v => updateLocation(activeLocation, 'has_fuel_oil_residual', v)}>
+              {loc.has_fuel_oil_residual && (
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+                    {liquidUnitOptions(loc.country).map(([val, label]) => (
+                      <button key={val} onClick={() => updateLocation(activeLocation, 'fuel_oil_residual_unit', val as 'gallons' | 'litres')} style={unitBtn((loc.fuel_oil_residual_unit ?? 'gallons') === val)}>{label}</button>
+                    ))}
+                  </div>
+                  <Field label={`Total heavy fuel oil purchased — ${inventory.reporting_year} (${(loc.fuel_oil_residual_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
+                    <input type="number" value={loc.fuel_oil_residual_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_residual_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                  </Field>
+                  {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
+                </div>
+              )}
+            </QuestionCard>
+
             <QuestionCard question={streamQuestion('mobile')} hint="Delivery trucks, forklifts, company cars — check fleet fuel cards" checked={loc.has_mobile} onToggle={v => updateLocation(activeLocation, 'has_mobile', v)}>
               {loc.has_mobile && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 14 }}>
