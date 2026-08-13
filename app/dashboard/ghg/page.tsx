@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { CONCIERGE_UNREAD_DOC_TYPES, SUPPORTED_FUELS } from '../../../lib/ghg/conciergeDocTypes'
 import { WIZARD_STEP_NAMES } from '../../../lib/ghg/wizardSteps'
+import { reportingYearOptions, defaultReportingYear } from '../../../lib/ghg/reportingYears'
 import { supabase } from '../../../lib/supabase'
 import { buildMonthlyEmissions } from '../../../lib/ghg/monthlyEmissions'
 import { buildComparabilityDisclosure, buildComparabilityRecord, observationLines } from '../../../lib/ghg/comparability'
@@ -437,7 +438,7 @@ const searchParams = useSearchParams()
   }
   const defaultFrameworks = pack && packFrameworks[pack] ? packFrameworks[pack] : ['sb253']
   const [inventory, setInventory] = useState<Inventory>({
-    company_name: '', company_id: null, reporting_year: 2024, revenue_millions: 0, employee_count: 0,
+    company_name: '', company_id: null, reporting_year: defaultReportingYear(), revenue_millions: 0, employee_count: 0,
     boundary_approach: 'operational_control', california_nexus: false,
     fiscal_year_end_month: 12,
     coverage_resolutions: [],
@@ -540,7 +541,7 @@ const searchParams = useSearchParams()
     setComparabilityCapture(null)
     setComparabilityNote('')
     setInventory({
-      company_name: '', company_id: null, reporting_year: 2024, revenue_millions: 0, employee_count: 0,
+      company_name: '', company_id: null, reporting_year: defaultReportingYear(), revenue_millions: 0, employee_count: 0,
       boundary_approach: 'operational_control', california_nexus: false,
       fiscal_year_end_month: 12,
       coverage_resolutions: [],
@@ -1298,7 +1299,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
         </Field>
         <Field label="Reporting year">
           <select value={inventory.reporting_year} onChange={e => setInventory(i => ({...i, reporting_year: Number(e.target.value)}))} style={inputStyle}>
-            {[2023, 2024, 2025].map(yr => (
+            {reportingYearOptions().map(yr => (
               <option key={yr} value={yr}>{`FY${yr} · ${periodFromYearAndEnd(yr, inventory.fiscal_year_end_month).label}`}</option>
             ))}
           </select>
