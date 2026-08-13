@@ -216,14 +216,13 @@ const EF_UK = {
   // engine.test.ts Z15 pins the identity so a lone edit fails.
   fuel_oil_residual_gallon: { co2: 12.018380, ch4: 0, n2o: 0 },
   //
-  // NAMING NOTE, recorded because it corroborates something still unconfirmed elsewhere:
-  // DEFRA publishes "Gas oil" byte-identical to "Processed fuel oils - distillate oil", and
-  // "Fuel oil" byte-identical to "Processed fuel oils - residual oil". The plain-language and
+  // NAMING NOTE. DEFRA publishes "Gas oil" byte-identical to "Processed fuel oils - distillate oil",
+  // and "Fuel oil" byte-identical to "Processed fuel oils - residual oil". The plain-language and
   // technical names are aliases for the same two figures — one publisher treating gas oil and
-  // distillate fuel oil as one product. That is corroboration, NOT confirmation, for the EU
-  // distillate key, which is derived from IPCC's Gas/Diesel Oil row on a category mapping still
-  // flagged as unverified at EF_EU. A second publisher agreeing is evidence; the IPCC table saying
-  // it is proof, and nobody has opened it.
+  // distillate fuel oil as one product.
+  //   This was written as corroboration for the EU distillate key while its IPCC category mapping was
+  // still unconfirmed. That mapping is now CONFIRMED against IPCC Table 1.1 (13 Aug 2026) — see
+  // EF_EU — so this note stands as a second publisher agreeing, not as the evidence it was.
   // Petrol (average biofuel blend), litres: 2.075 kgCO2e/L (CO2 2.06107, CH4 0.00806, N2O 0.00587).
   gasoline_litre: { co2: 2.075, ch4: 0, n2o: 0 },
   gasoline_gallon: { co2: 7.854729, ch4: 0, n2o: 0 },
@@ -236,6 +235,35 @@ const EF_UK = {
 // ~5–11% above DEFRA's blended figures purely because DEFRA excludes biofuel content. This is the
 // agreed verifier-defensible EU baseline (proceeding on internal recommendation, not verifier sign-off).
 // Metric units are the EU norm: natural gas m3, liquids litres. gallon/mcf are non-breaking fallbacks.
+//
+// ── SOURCE TRACE: TWO OF THE THREE INPUTS ARE IPCC. THE THIRD IS NOT. ───────────────────────────
+// Verified against IPCC 2006 Guidelines Vol.2 Ch.1 — LF, 13 Aug 2026.
+//   CO2 FACTOR — Table 1.4. Gas/Diesel Oil 74 100 kg/TJ, Residual Fuel Oil 77 400 kg/TJ. Both match.
+//   NCV        — Table 1.2. Gas/Diesel Oil 43.0 TJ/Gg, Residual Fuel Oil 40.4 TJ/Gg. Both match.
+//   DENSITY    — ⚠️ NOT FROM IPCC, AND NOT RECORDED ANYWHERE.
+//
+// ⚠️ THE DENSITY GAP. Table 1.2 publishes NCV on a MASS basis (TJ/Gg) and the Guidelines publish no
+// fuel densities at all — §1.4.1.2 and Box 1.1 cover only gross-to-net calorific conversion, never
+// mass-to-volume. So every per-litre figure in this table needs a density the cited source does not
+// contain, and the header line above ("converted via standard net calorific values and densities")
+// names no source for it. The four values in use are 0.510 (propane/LPG), 0.844 (gas/diesel oil),
+// 0.990 (residual fuel oil) and 0.745 (motor gasoline). Where they came from is not written down.
+//   IPCC does constrain ONE of them: Table 1.1 requires residual fuel oil density above 0.90 kg/l,
+//   which 0.990 satisfies. That is a bound, not a citation — it rules the value in, it does not source it.
+//
+// EVERY KEY BELOW EXCEPT THE TWO NATURAL-GAS ONES DEPENDS ON AN UNSOURCED DENSITY:
+//   propane_litre, propane_gallon                          (0.510)
+//   diesel_litre, diesel_gallon,
+//   diesel_mobile_litre, diesel_mobile_gallon,
+//   fuel_oil_distillate_gallon                             (0.844)
+//   fuel_oil_gallon, fuel_oil_residual_gallon              (0.990)
+//   gasoline_litre, gasoline_gallon                        (0.745)
+//   — eleven of thirteen keys.
+// natural_gas_m3 / _mcf escape the density question but have the SAME CLASS of gap: they use a
+// volumetric energy content of "~36 MJ/m3", written with a tilde, which is likewise not in Table 1.2
+// (mass basis) and likewise unsourced.
+//   DO NOT paper over this by inventing a density source. Either find the reference the original
+// author used and name it here, or replace the derivation with a published per-litre factor set.
 const EF_EU = {
   // Natural gas, per m3 (CO2 56100 kg/TJ × ~36 MJ/m3 net): 2.0196 kg CO2/m3.
   natural_gas_m3: { co2: 2.0196, ch4: 0.000036, n2o: 0.0000036 },
@@ -259,10 +287,13 @@ const EF_EU = {
   // DISTILLATE uses the GAS/DIESEL OIL row: CO2 74100 kg/TJ, NCV 43.0, dens 0.844 -> 2.68924 kg CO2/L
   // — the same three inputs this table already records for diesel_litre, so the values below are
   // byte-identical to diesel_gallon.
-  // ⚠️ THE CATEGORY MAPPING IS A JUDGEMENT, NOT A TRANSCRIPTION. IPCC 2006 has no row headed
-  // "distillate fuel oil"; Gas/Diesel Oil is the category distillate heating oil falls under. That
-  // reading is mine and is not written in the Guidelines in those words — confirm it against Table 1.4
-  // before commit 2 makes this key reachable.
+  //
+  // CATEGORY MAPPING CONFIRMED — LF, 13 Aug 2026. This was flagged as a judgement of mine, because
+  // IPCC 2006 has no row headed "distillate fuel oil". It is not a judgement: Table 1.1 DEFINES
+  // Gas/Diesel Oil as including "light heating oil for industrial and commercial uses", so mapping
+  // distillate heating oil to that row is the Guidelines' own categorisation, read off the table.
+  // (DEFRA independently treats "Gas oil" and "Processed fuel oils - distillate oil" as the same
+  // figure — see the note in EF_UK. That was corroboration; Table 1.1 is the confirmation.)
   fuel_oil_distillate_gallon: { co2: 10.179876, ch4: 0.000412231, n2o: 0.000082522 },
   // Motor gasoline (CO2 69300 kg/TJ, NCV 44.3, dens 0.745): 2.28714 kg CO2/L.
   gasoline_litre: { co2: 2.28714, ch4: 0.000099, n2o: 0.0000198 },
