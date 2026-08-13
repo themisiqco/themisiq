@@ -229,6 +229,7 @@ const EF_SOURCES = {
   electricity_nz: 'NZ MfE Measuring Emissions 2026 v2',
   residual_us: 'Green-e Residual Mix 2025 (2023 data, publ. 2026-01-29, CRS) — residual CO₂; eGRID2023 Rev2 (publ. 2025-06-12) CH₄/N₂O. Green-e factors out Green-e-certified voluntary sales (the only published US residual source per CRS).',
   residual_eu: 'AIB European Residual Mixes 2024 (publ. 2025-05-30, Grexel/AIB; Ecoinvent CO₂ inputs) — combined CO₂e, gCO₂/kWh.',
+  residual_au: 'DCCEEW National Greenhouse Accounts Factors 2025, Table 2 — national Residual Mix Factor, 0.81 kg CO₂-e/kWh Scope 2. Calculated on a FINANCIAL-YEAR basis (years ending June) with a lag adjustment using a 3-year average, because Large-scale Generation Certificates are created on a CALENDAR-year basis up to 12 months after the generation they represent. National aggregate only — see RESIDUAL_AU.',
   gwp_ar4: 'IPCC AR4 (2007) — selectable alternate; aligns with CARB AB 32 / Mandatory Reporting Regulation, but not the default for any current framework',
   gwp_ar5: 'IPCC AR5 (2014) — GHG Protocol baseline; selectable alternate, not the default for any current framework',
   gwp_ar6: 'IPCC AR6 (2021) — applied by default across all frameworks (SB 253, CDP, ESRS E1, GRI 305, EcoVadis, IFRS S2)',
@@ -418,6 +419,27 @@ const RESIDUAL_US: Record<string, Record<number, ResidualGas>> = {
   SRVC: { 2023: { co2: 601.89,  ch4: 0.045, n2o: 0.006 } },
 }
 
+// ── AUSTRALIA RESIDUAL MIX (market-based Scope 2) ───────────────────────────
+// DCCEEW National Greenhouse Accounts Factors 2025, Table 2 (p.9): 0.81 kg CO2-e/kWh, Scope 2.
+//
+// ⚠️ NATIONAL ONLY, AND THAT IS THE PUBLISHED SHAPE — NOT AN INCOMPLETE SEEDING.
+// Unlike RESIDUAL_EU (per member state) and RESIDUAL_US (per eGRID subregion), this table has NO
+// region key, because DCCEEW calculates the Residual Mix Factor at national aggregate level: the
+// Large-scale Generation Certificate market covers all networks, and creations can come from
+// off-grid generation, so a per-state residual mix would not correspond to anything DCCEEW
+// publishes. Do not "complete" this with AU_NSW / AU_VIC / … entries — there is nothing to put in
+// them, and inventing state splits would attribute to DCCEEW figures it does not produce. The
+// absent region key is why the type is Record<number, number> and not the nested shape.
+//
+// SCOPE 3 (0.11 kg CO2-e/kWh in the same table) IS DELIBERATELY NOT SEEDED. The engine has no
+// Scope 3 Category 3 electricity line — only the NZ T&D opt-in — so a Scope 3 residual figure would
+// sit here unreachable, and the first person to wire it would have to re-derive which of the two
+// numbers belongs on which line. Same rule as the DEFERRED block above NZ_TD_LOSS.
+//
+// Year key = the WORKBOOK EDITION already cited by EF_SOURCES.electricity_au, so the location-based
+// and market-based figures on one AU inventory name the same document.
+const RESIDUAL_AU: Record<number, number> = { 2025: 0.81 }
+
 // A grid_region is "resolved" iff it's a real GRID_EF key. 'us_average' (the init default), '' and any
 // unmapped string are UNRESOLVED; the deliberate US_AVG/EU_AVG/AU_AVG fallback keys and every AU_/NZ
 // key ARE keys → resolved. Single source of truth for the grid-region gate (does not read the factor).
@@ -477,6 +499,21 @@ const vintageNote = (label: string, resolved: number, year: number): string =>
 // applicable=false means no residual mix exists for this region (e.g. full-disclosure AT, or a
 // region we don't cover) — caller MUST fall back to the location-based factor and stamp the note.
 // US factors carry a gas split so CO2e responds to the GWP set; EU factors are published CO2e (GWP-fixed).
+// THE RESIDUAL REGION KEY, derived once. This expression was copied at FOUR call sites — the calc
+// term, the workings row, the assurance PDF's residual table and the XLSX methods block — and adding
+// Australia meant teaching all four the same new rule. Miss one and the exports tell a different
+// residual story from the workings table, which is the shape of the last three defects in this file.
+//
+// Returns '' when no residual mix applies, which getResidualFactor turns into the location-factor
+// fallback. 'AU' is a COUNTRY token, not a grid region, because the Australian RMF is national (see
+// RESIDUAL_AU); every other value here is a real region key.
+export function residualRegionFor(loc: Pick<Location, 'residual_region' | 'grid_region' | 'country'>): string {
+  if (loc.residual_region) return loc.residual_region
+  if ((loc.grid_region || '').startsWith('EU_')) return loc.grid_region
+  if ((loc.country || '').toUpperCase().trim() === 'AU') return 'AU'
+  return ''
+}
+
 function getResidualFactor(
   region: string,
   year: number,
@@ -502,6 +539,20 @@ function getResidualFactor(
     }
     return { ef: 0, applicable: false, source: EF_SOURCES.residual_eu, vintage: 'n/a', usedRegion: region,
       note: 'No published residual mix for this region; market-based falls back to location factor.' }
+  }
+  // AU: DCCEEW publishes ONE national combined CO2e figure — no gas split, no region lookup, the year
+  // is the only dimension. Dispatched on the country token residualRegionFor emits.
+  if (region === 'AU') {
+    const years = Object.keys(RESIDUAL_AU).map(Number).sort((a, b) => a - b)
+    let y = years[0]; for (const yy of years) { if (yy <= year) y = yy }
+    // Names the publisher, the edition AND the basis. DCCEEW computes the RMF over financial years
+    // (ending June) with a 3-year averaging lag, because LGCs are created on a calendar-year basis up
+    // to 12 months after the generation they represent. A verifier reconciling a CALENDAR-year
+    // inventory against this figure needs that before they start; the full explanation is in
+    // EF_SOURCES.residual_au.
+    const vintage = `DCCEEW ${y} RMF (FY basis, 3-yr avg)`
+    return { ef: RESIDUAL_AU[y], applicable: true, source: EF_SOURCES.residual_au, vintage, usedRegion: region,
+      note: vintageNote(vintage, y, year) }
   }
   // US: Green-e residual CO2 + eGRID CH4/N2O, lb/MWh -> kg/kWh CO2e via selected GWP. region is the eGRID subregion.
   const table = RESIDUAL_US[region]
@@ -1307,7 +1358,7 @@ function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: numbe
   // uncovered kWh @ residual-mix factor. If no residual mix applies (full-disclosure region, or US subregion
   // not yet selected), fall back to the location grid factor for uncovered load and flag it.
   const uncovered_kwh = Math.max(0, loc.electricity_kwh - loc.renewable_electricity_kwh)
-  const resRegion = loc.residual_region || (loc.grid_region.startsWith('EU_') ? loc.grid_region : '')
+  const resRegion = residualRegionFor(loc)
   const res = getResidualFactor(resRegion, year, gwpVersion)
   const market_elec_ef = res.applicable ? res.ef : grid_ef
   const s2_market = ((gridResolved ? uncovered_kwh * market_elec_ef : 0) + steam_kg) / 1000
@@ -1741,7 +1792,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       const gridNote = gf.note ? ` · ${gf.note}` : ''
       rows.push({ location: loc.name || 'Location', stream: 'electricity', source: `Electricity (${gf.usedRegion})`, scope: 2, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${efDisplay(gf.ef)} kg CO₂e/kWh`, ef_source: `${gridSource(loc)}${gridNote}`, factor_vintage: String(gf.usedYear), scope2_method: 'location-based', gwp_basis: GWP_AS_PUBLISHED, result_tco2e: loc.electricity_kwh * gf.ef / 1000, ...provOf('electricity_kwh') })
       // Market-based Scope 2: residual-mix factor on uncovered load, with provenance stamped for the verifier.
-      const resRegion = loc.residual_region || (loc.grid_region.startsWith('EU_') ? loc.grid_region : '')
+      const resRegion = residualRegionFor(loc)
       const res = getResidualFactor(resRegion, year, gwpVersion)
       const uncovered = Math.max(0, loc.electricity_kwh - loc.renewable_electricity_kwh)
       const mktEf = res.applicable ? res.ef : gf.ef

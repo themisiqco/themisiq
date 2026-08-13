@@ -16,6 +16,7 @@ import { join } from 'node:path';
 import {
   buildWorkings, calcLocation, calcInventory, analyzeCoverage, exclusiveEnd,
   isResolvedGridRegion, detectGridRegion, getResidualFactor, getGridFactor,
+  residualRegionFor,
   pickEF, calcGas, emptyLocation, findUnresolvedCoverage, findUndeclaredStreams, applyResolutions, pctEstimated,
   MissingEmissionFactorError, findUnpriceableLocations,
   streamState, DECLARABLE_STREAMS, STREAM_META, nzTdLoss, NZ_TD_LOSS, EF_SOURCES,
@@ -1377,5 +1378,168 @@ describe('X. combustion rows stamp the GWP basis that actually applied', () => {
       .not.toContain('CH4 0');
     // Gas-split rows keep the split verbatim — the verifier path depends on it.
     expect(row('US', 'AR6').emission_factor).toBe('CO2 10.20648, CH4 0.000414, N2O 0.0000828 kg/gallons');
+  });
+});
+
+// ── Y. THE AUSTRALIAN RESIDUAL MIX ──────────────────────────────────────────────────────────────
+//
+// DCCEEW NGA Factors 2025 Table 2 publishes a national Residual Mix Factor: 0.81 kg CO2-e/kWh Scope 2.
+// getResidualFactor had EU and US branches only, so an AU location fell through to the US terminal
+// return and its market-based row read "No published residual mix for this SUBREGION" — a sentence
+// about eGRID, printed directly after a DCCEEW citation, denying a figure DCCEEW publishes in the very
+// workbook the location-based row already cites. It also reached the assurance PDF and the XLSX.
+describe('Y. Australia has a published residual mix', () => {
+  const SETS = ['AR4', 'AR5', 'AR6'] as const;
+  const VINTAGE = 'DCCEEW 2025 RMF (FY basis, 3-yr avg)';
+
+  it('Y1 AU at 2025 — 0.81, applicable, no note', () => {
+    const r = getResidualFactor('AU', 2025, 'AR6');
+    expect(r.ef).toBe(0.81);
+    expect(r.applicable).toBe(true);
+    expect(r.note, 'the workbook edition matches the inventory year — nothing to disclose').toBe('');
+    expect(r.usedRegion).toBe('AU');
+  });
+
+  it('Y2 AU at 2026 resolves BACKWARD and says so', () => {
+    const r = getResidualFactor('AU', 2026, 'AR6');
+    expect(r.ef).toBe(0.81);
+    expect(r.note).toBe(`${VINTAGE} residual mix applied to 2026 inventory (latest vintage held).`);
+  });
+
+  it('Y3 AU at 2023 resolves FORWARD and says so', () => {
+    const r = getResidualFactor('AU', 2023, 'AR6');
+    expect(r.ef).toBe(0.81);
+    expect(r.note).toBe(`${VINTAGE} residual mix applied to 2023 inventory (earliest vintage held).`);
+    expect(r.note, 'a forward resolution must not claim the latest vintage').not.toContain('latest vintage held');
+  });
+
+  it('Y4 the "no published residual mix" strings are unreachable for AU', () => {
+    for (const y of [2023, 2024, 2025, 2026]) {
+      for (const g of SETS) {
+        const r = getResidualFactor('AU', y, g);
+        expect(r.note, `AU ${y} ${g}`).not.toContain('No published residual mix');
+        expect(r.applicable, `AU ${y} ${g}`).toBe(true);
+      }
+    }
+  });
+
+  it('Y5 the vintage discloses the FINANCIAL-YEAR basis', () => {
+    // DCCEEW computes the RMF over years ending June with a 3-year averaging lag, because LGCs are
+    // created on a CALENDAR-year basis up to 12 months after generation. A verifier reconciling a
+    // calendar-year inventory against 0.81 has to know that, and the vintage column is where they look.
+    const v = getResidualFactor('AU', 2025, 'AR6').vintage;
+    expect(v).toBe(VINTAGE);
+    expect(v).toContain('FY basis');
+    expect(v).toContain('3-yr avg');
+    expect(v).toContain('DCCEEW');
+    expect(v.length, 'the vintage sits in a table cell').toBeLessThan(45);
+    // Scope 3 (0.11 in the same table) is NOT seeded — there is no Scope 3 electricity line to put it on.
+    expect(getResidualFactor('AU', 2025, 'AR6').ef).not.toBe(0.11);
+  });
+
+  it('Y6 AU is national — no state key exists, and none may be added silently', () => {
+    // DCCEEW calculates the RMF at national aggregate level: the LGC market spans all networks and
+    // creations can come from off-grid generation. A per-state table would not correspond to anything
+    // published. AU_NSW is a GRID region, not a residual one, and must not resolve.
+    for (const k of ['AU_NSW', 'AU_VIC', 'AU_AVG']) {
+      expect(getResidualFactor(k, 2025, 'AR6').applicable, `${k} must not be a residual key`).toBe(false);
+    }
+  });
+
+  it('Y7 EU and US are unchanged', () => {
+    expect(getResidualFactor('EU_DE', 2025, 'AR6').note)
+      .toBe('AIB 2024 residual mix applied to 2025 inventory (latest vintage held).');
+    expect(getResidualFactor('EU_DE', 2026, 'AR6').ef).toBeCloseTo(0.72456, 9);
+    expect(getResidualFactor('CAMX', 2026, 'AR6').ef).toBeCloseTo(0.19766813612800002, 9);
+    expect(getResidualFactor('EU_AT', 2024, 'AR6').note)
+      .toBe('Full-disclosure regime — no residual mix published; market-based falls back to location factor.');
+    expect(getResidualFactor('', 2026, 'AR6').note)
+      .toBe('No published residual mix for this subregion; market-based falls back to location factor.');
+  });
+
+  // ── residualRegionFor: ONE derivation, four call sites ────────────────────────────────────────
+  const anyLoc = (o: Partial<Location>): Location => loc({ electricity_kwh: 100_000, ...o });
+
+  it('Y8 residualRegionFor matches the OLD inline expression for every non-AU location', () => {
+    // The extraction must not have changed EU or US behaviour. The old expression is reimplemented
+    // here and compared across a spread; AU is excluded because AU is the deliberate difference.
+    const old = (l: Location) => l.residual_region || (l.grid_region.startsWith('EU_') ? l.grid_region : '');
+    const spread: Location[] = [
+      anyLoc({ country: 'US', grid_region: 'US_CA' }),
+      anyLoc({ country: 'US', grid_region: 'US_TX', residual_region: 'ERCT' }),
+      anyLoc({ country: 'DE', grid_region: 'EU_DE' }),
+      anyLoc({ country: 'FR', grid_region: 'EU_FR' }),
+      anyLoc({ country: 'AT', grid_region: 'EU_AT' }),
+      anyLoc({ country: 'CA', grid_region: 'ON' }),
+      anyLoc({ country: 'GB', grid_region: 'UK' }),
+      anyLoc({ country: 'NZ', grid_region: 'NZ' }),
+      anyLoc({ country: 'US', grid_region: 'us_average' }),
+      anyLoc({ country: '', grid_region: '' }),
+    ];
+    for (const l of spread) {
+      expect(residualRegionFor(l), `${l.country || '(blank)'} / ${l.grid_region || '(blank)'}`).toBe(old(l));
+    }
+    // AU is the one intended divergence, and an explicit residual_region still wins over it.
+    expect(residualRegionFor(anyLoc({ country: 'AU', grid_region: 'AU_NSW' }))).toBe('AU');
+    expect(old(anyLoc({ country: 'AU', grid_region: 'AU_NSW' })), 'what it used to return').toBe('');
+    expect(residualRegionFor(anyLoc({ country: 'AU', grid_region: 'AU_NSW', residual_region: 'ERCT' }))).toBe('ERCT');
+  });
+
+  it('Y9 all four call sites call residualRegionFor — read from source, not inferred from values', () => {
+    // A COPY THAT AGREES TODAY MUST STILL FAIL. Four sites derived this identically and adding AU meant
+    // teaching all four; a value test cannot tell a call from a duplicate that happens to match.
+    const files = ['lib/ghg/engine.ts', 'app/dashboard/ghg/page.tsx'];
+    const seen: string[] = [];
+    for (const f of files) {
+      const src = readFileSync(join(process.cwd(), f), 'utf8');
+      for (const [i, ln] of src.split('\n').entries()) {
+        if (!ln.includes('const resRegion')) continue;
+        seen.push(`${f}:${i + 1}`);
+        expect(ln, `${f}:${i + 1} must call the shared helper`).toContain('residualRegionFor(');
+        expect(ln, `${f}:${i + 1} still inlines the old expression`).not.toContain('residual_region ||');
+      }
+      expect(src, `${f} must not keep a stray copy of the inline rule`)
+        .not.toContain("grid_region.startsWith('EU_') ? ");
+    }
+    expect(seen, `expected four resRegion sites, found: ${seen.join(', ')}`).toHaveLength(4);
+  });
+
+  it('Y10 workings, assurance PDF and XLSX resolve the SAME residual region', () => {
+    // The three surfaces each derive it for their own rendering. One helper means they cannot disagree;
+    // this asserts the property for a spread including the new AU case.
+    for (const l of [
+      anyLoc({ country: 'AU', grid_region: 'AU_NSW' }),
+      anyLoc({ country: 'DE', grid_region: 'EU_DE' }),
+      anyLoc({ country: 'US', grid_region: 'US_CA', residual_region: 'CAMX' }),
+      anyLoc({ country: 'CA', grid_region: 'ON' }),
+    ]) {
+      const region = residualRegionFor(l);
+      const mb = (buildWorkings([l], 'AR6', 2025, [], 12) as any[])
+        .find(r => r.scope2_method === 'market-based');
+      const res = getResidualFactor(region, 2025, 'AR6');
+      // The workings row is built from the same region, so its applied factor must match.
+      const expected = res.applicable ? res.ef : getGridFactor(l.grid_region, 2025).ef;
+      expect(mb.result_tco2e, `${l.country}`).toBeCloseTo(100_000 * expected / 1000, 9);
+    }
+  });
+
+  it('Y11 NO NON-AU FIGURE MOVED', () => {
+    const pin: [string, Partial<Location>, number][] = [
+      ['US_CA no subregion', { country: 'US', grid_region: 'US_CA' }, 0.1791],
+      ['US_CA + CAMX', { country: 'US', grid_region: 'US_CA', residual_region: 'CAMX' }, 0.19766813612800002],
+      ['EU_DE', { country: 'DE', grid_region: 'EU_DE' }, 0.72456],
+      ['CA ON', { country: 'CA', grid_region: 'ON' }, 0.038],
+      ['GB', { country: 'GB', grid_region: 'UK' }, 0.177],
+      ['NZ', { country: 'NZ', grid_region: 'NZ' }, 0.0787],
+    ];
+    for (const [label, o, ef] of pin) {
+      const mb = (buildWorkings([anyLoc(o)], 'AR6', 2025, [], 12) as any[])
+        .find(r => r.scope2_method === 'market-based');
+      expect(mb.result_tco2e, label).toBeCloseTo(100_000 * ef / 1000, 9);
+    }
+    // AU is the one that DOES move — from the 0.64 NSW location factor to the 0.81 national RMF.
+    const au = (buildWorkings([anyLoc({ country: 'AU', grid_region: 'AU_NSW' })], 'AR6', 2025, [], 12) as any[])
+      .find(r => r.scope2_method === 'market-based');
+    expect(au.result_tco2e, 'AU market-based now uses the residual mix, not the location factor').toBeCloseTo(81, 9);
   });
 });

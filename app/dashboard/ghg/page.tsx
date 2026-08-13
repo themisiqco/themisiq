@@ -20,7 +20,7 @@ import {
   EF_SOURCES,
   US_STATES, US_SUBREGIONS, AU_STATES, EU_COUNTRY_OPTIONS,
   GRID_REGIONS_CA, GRID_REGIONS_US, FRAMEWORKS,
-  isResolvedGridRegion, getGridFactor, getResidualFactor,
+  isResolvedGridRegion, getGridFactor, getResidualFactor, residualRegionFor,
   detectGridRegion, gridRegionForCountry, pickEF,
   combustionSourcesFor, gridSourcesFor,
   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation, pctEstimated,
@@ -2304,7 +2304,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
     const needsMkt = activeFrameworks.some(f => f.id === 'esrs' || f.id === 'gri')
     const residualRows: string[][] = needsMkt
       ? inventory.locations.filter(l => l.electricity_kwh > 0).map(l => {
-          const resRegion = l.residual_region || (l.grid_region.startsWith('EU_') ? l.grid_region : '')
+          const resRegion = residualRegionFor(l)
           const res = getResidualFactor(resRegion, inventory.reporting_year, 'AR6')
           return [
             l.name || 'Location',
@@ -2355,7 +2355,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
         ? [
             ['Market-based Scope 2', 'Residual-mix factor applied to uncovered load; covered (contractual) kWh counted at zero'],
             ...inventory.locations.filter(l => l.electricity_kwh > 0).map(l => {
-              const resRegion = l.residual_region || (l.grid_region.startsWith('EU_') ? l.grid_region : '')
+              const resRegion = residualRegionFor(l)
               const res = getResidualFactor(resRegion, inventory.reporting_year, fw.gwp as GwpVersion)
               return [`Residual factor — ${l.name}`, res.applicable ? `${res.source} · vintage: ${res.vintage}${res.note ? ` · ${res.note}` : ''}` : `Location-factor fallback${res.note ? ` · ${res.note}` : ''}`]
             }),
