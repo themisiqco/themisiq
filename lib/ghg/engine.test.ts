@@ -979,10 +979,9 @@ describe('O. NZ T&D losses carry their own vintage and disclose a fallback', () 
 
   it('O3 the fallback is DISCLOSED, in the same style as the residual helpers', () => {
     // getResidualFactor: 'AIB 2024 residual mix applied to 2026 inventory (latest vintage held).'
-    // NOTE the spelling difference: the residual and grid helpers say 'vintage held', this one still
-    // says 'available'. Same meaning, two spellings — see the block above nzTdLoss.
+    // Same spelling as getResidualFactor and getGridFactor — one vocabulary across all three helpers.
     const r = tdRow(2026);
-    expect(r.ef_source).toContain('MfE 2025 T&D loss factor applied to 2026 inventory (latest available).');
+    expect(r.ef_source).toContain('MfE 2025 T&D loss factor applied to 2026 inventory (latest vintage held).');
     // The source citation itself survives — the note is appended, not substituted.
     expect(r.ef_source).toContain('T&D losses (Scope 3 Cat 3)');
   });
@@ -993,16 +992,18 @@ describe('O. NZ T&D losses carry their own vintage and disclose a fallback', () 
     expect(r.ef_source, 'a matching year has nothing to disclose').not.toContain('applied to');
   });
 
-  it('O5 resolving FORWARD says so, rather than claiming "latest available"', () => {
+  it('O5 resolving FORWARD says so, rather than claiming the latest vintage', () => {
     // `let ty = years[0]` means a 2023 or 2024 inventory — both selectable in the wizard today —
-    // resolves forward to the 2025 factor, so "latest available" would say the opposite of what
+    // resolves forward to the 2025 factor, so a "latest" claim would say the opposite of what
     // happened. The note must also not blame MfE: they publish an annual T&D series back to 2010, so
     // the missing years are OURS. It claims only our own coverage — see the note in nzTdLoss.
     for (const y of [2023, 2024]) {
       const r = tdRow(y);
       expect(r.factor_vintage, `inv ${y}`).toBe('MfE 2025');
-      expect(r.ef_source, `inv ${y}`).toContain(`MfE 2025 T&D loss factor applied to ${y} inventory (earliest factor held).`);
-      expect(r.ef_source, `inv ${y} must not claim "latest available"`).not.toContain('latest available');
+      expect(r.ef_source, `inv ${y}`).toContain(`MfE 2025 T&D loss factor applied to ${y} inventory (earliest vintage held).`);
+      // TRACKS THE LIVE WORDING. This read `.not.toContain('latest available')`; once that spelling was
+      // retired the assertion could never fail again — a guard that had quietly stopped guarding.
+      expect(r.ef_source, `inv ${y} must not claim the latest vintage`).not.toContain('latest vintage held');
     }
   });
 
@@ -1122,7 +1123,7 @@ describe('P. electricity rows: citation and fallback disclosure', () => {
     expect(getResidualFactor('EU_ZZ', 2024, 'AR6').note)
       .toBe('No published residual mix for this region; market-based falls back to location factor.');
     expect(getResidualFactor('CAMX', 2026, 'AR6').note)
-      .toBe('Green-e 2023 residual mix applied to 2026 inventory (latest vintage held).');
+      .toBe('Green-e 2025 [2023 data] residual mix applied to 2026 inventory (latest vintage held).');
     expect(getResidualFactor('CAMX', 2023, 'AR6').note, 'exact year → silence').toBe('');
     expect(getResidualFactor('', 2026, 'AR6').note)
       .toBe('No published residual mix for this subregion; market-based falls back to location factor.');
@@ -1169,3 +1170,76 @@ function gridSourceFor(country: string): string {
     : country === 'DE' ? EF_SOURCES.electricity_eu
     : EF_SOURCES.electricity_us;
 }
+
+// ── P9–P12. getResidualFactor resolves FORWARD too, and must say so ──────────────────────────────
+//
+// `let y = years[0]` in both residual branches means a year below the earliest key resolves FORWARD,
+// exactly as getGridFactor and nzTdLoss do. Those two branch on direction; this helper fired one
+// wording on `year !== y` and claimed the LATEST vintage while reaching for the EARLIEST.
+//
+// LIVE, NOT HYPOTHETICAL. Every EU region holds a single key (2024), so an EU location on a 2023
+// inventory — 2023 is in the wizard's year list — read "applied to 2023 inventory (latest vintage
+// held)" about the only vintage held. That note reaches the assurance PDF (page.tsx:2310) and the
+// XLSX methods block (page.tsx:2358), not only the workings table.
+describe('P9. residual fallback discloses its direction', () => {
+  it('P9 EU_DE at 2023 resolves FORWARD and says "earliest", never "latest"', () => {
+    const r = getResidualFactor('EU_DE', 2023, 'AR6');
+    expect(r.note).toBe('AIB 2024 residual mix applied to 2023 inventory (earliest vintage held).');
+    expect(r.note, 'the 2024 factor is the only one held — it is not the latest of several')
+      .not.toContain('latest vintage held');
+  });
+
+  it('P10 EU_DE at 2026 still resolves BACKWARD and still says "latest"', () => {
+    expect(getResidualFactor('EU_DE', 2026, 'AR6').note)
+      .toBe('AIB 2024 residual mix applied to 2026 inventory (latest vintage held).');
+  });
+
+  it('P11 EU_DE at 2024 — exact match, no note', () => {
+    expect(getResidualFactor('EU_DE', 2024, 'AR6').note).toBe('');
+  });
+
+  it('P12 a US subregion resolves FORWARD below its earliest key', () => {
+    // Every RESIDUAL_US subregion keys on 2023, so a forward case needs an inventory year <= 2022.
+    // NOT reachable from the wizard today (its list starts at 2023) — constructible here, and it
+    // becomes reachable the moment the year list gains 2022 or a Green-e refresh moves the key.
+    const r = getResidualFactor('CAMX', 2022, 'AR6');
+    expect(r.note).toContain('applied to 2022 inventory (earliest vintage held).');
+    expect(r.note).not.toContain('latest vintage held');
+  });
+
+  it('P13 the note and the vintage name the same factor — neither can drift alone', () => {
+    // THE DRIFT THIS PINS. vintage read `Green-e 2025 [2023 data] + eGRID2023 Rev2` while the note read
+    // `Green-e 2023` — two names for one factor on one row, and "Green-e 2023" is not an edition
+    // Green-e publishes (2023 is the data year, 2025 the edition).
+    //
+    // They are NOT identical strings, deliberately: the vintage documents both inputs (Green-e mix +
+    // eGRID CH4/N2O), while the note is a sentence about which MIX was applied, and eGRID publishes no
+    // mix. So the assertion is containment in the direction the code builds them — the vintage is
+    // derived from the note's factor name — rather than equality. It holds for EU too, where the two
+    // happen to coincide. Asserts the RELATIONSHIP, so it survives a reformat of either string.
+    for (const [region, year] of [['CAMX', 2026], ['CAMX', 2022], ['EU_DE', 2026], ['EU_DE', 2023]] as const) {
+      const r = getResidualFactor(region, year, 'AR6');
+      expect(r.note, `${region} ${year}`).not.toBe('');
+      const factorName = r.note.split(' residual mix applied to ')[0];
+      expect(factorName, `${region} ${year}: the note must open with a factor name`).not.toBe(r.note);
+      expect(r.vintage.startsWith(factorName),
+        `${region} ${year}: vintage "${r.vintage}" must be built from the note's factor name "${factorName}"`).toBe(true);
+    }
+  });
+
+  it('P14 NO FIGURE MOVED — residual factors identical across every year probed', () => {
+    // Disclosure only. ef depends on the resolved year, which the direction split does not touch.
+    for (const year of [2022, 2023, 2024, 2025, 2026]) {
+      expect(getResidualFactor('EU_DE', year, 'AR6').ef, `EU_DE ${year}`).toBeCloseTo(0.72456, 9);
+      expect(getResidualFactor('CAMX', year, 'AR6').ef, `CAMX ${year}`).toBeCloseTo(0.19766813612800002, 9);
+      expect(getResidualFactor('EU_DE', year, 'AR6').applicable).toBe(true);
+    }
+    // The four direction-independent strings are untouched.
+    expect(getResidualFactor('EU_AT', 2024, 'AR6').note)
+      .toBe('Full-disclosure regime — no residual mix published; market-based falls back to location factor.');
+    expect(getResidualFactor('EU_ZZ', 2024, 'AR6').note)
+      .toBe('No published residual mix for this region; market-based falls back to location factor.');
+    expect(getResidualFactor('', 2026, 'AR6').note)
+      .toBe('No published residual mix for this subregion; market-based falls back to location factor.');
+  });
+});

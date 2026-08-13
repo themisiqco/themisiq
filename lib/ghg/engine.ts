@@ -305,15 +305,16 @@ const NZ_TD_LOSS: Record<number, number> = { 2025: 0.00596 }
 // when the factor is OLDER than the inventory (we reached back to the newest one we hold). It is wrong
 // when the factor is NEWER: `let ty = years[0]` means a 2023 or 2024 inventory — both selectable today
 // — resolves FORWARD to the 2025 factor, and a "latest" claim says the opposite of what happened.
-//   ⚠️ THIS HELPER STILL SAYS "(latest available)" WHERE THE OTHER TWO NOW SAY "(latest vintage held)".
-//   getGridFactor and getResidualFactor were aligned on the newer wording; nzTdLoss was out of scope for
-//   that pass and is now the odd one out. Three helpers, two spellings, one meaning — worth unifying.
+//   ONE VOCABULARY ACROSS ALL THREE HELPERS: "(latest vintage held)" / "(earliest vintage held)" are
+//   now the only two spellings getGridFactor, getResidualFactor and nzTdLoss emit. "vintage" is the
+//   right noun because both branches are about WHEN the factor applies, which is also what the
+//   factor_vintage column beside the note reports — one word, one meaning, in both places.
 //
 // ⚠️ THE FORWARD NOTE DESCRIBES OUR COVERAGE, NOT MfE'S. It first read "(no earlier factor published)",
 // which was FALSE: MfE publishes an annual T&D loss series back to 2010. The gap is in NZ_TD_LOSS,
 // which holds one year. A note blaming the publisher for our own single-key table would send a verifier
 // to look for a source document that does not exist, and would quietly excuse a table that should be
-// filled in. "(earliest factor held)" claims only what can be checked from this file.
+// filled in. "(earliest vintage held)" claims only what can be checked from this file.
 // Same rule as the error-message one: state what was observed, never a cause you have not verified.
 function nzTdLoss(year: number): { ef: number; vintage: string; note: string } {
   const years = Object.keys(NZ_TD_LOSS).map(Number).sort((a, b) => a - b)
@@ -325,8 +326,8 @@ function nzTdLoss(year: number): { ef: number; vintage: string; note: string } {
     vintage: `MfE ${ty}`,
     note:
       ty === year ? ''
-      : ty < year ? `MfE ${ty} T&D loss factor applied to ${year} inventory (latest available).`
-      : `MfE ${ty} T&D loss factor applied to ${year} inventory (earliest factor held).`,
+      : ty < year ? `MfE ${ty} T&D loss factor applied to ${year} inventory (latest vintage held).`
+      : `MfE ${ty} T&D loss factor applied to ${year} inventory (earliest vintage held).`,
   }
 }
 // ── DEFERRED: Scope 3 Category 3 (upstream / T&D) ELECTRICITY factors — AU + NZ ──────────────
@@ -437,6 +438,21 @@ function getGridFactor(region: string, year: number): { ef: number; usedRegion: 
       ? `Grid factor for ${best} applied to ${year} inventory (latest vintage held).`
       : `Grid factor for ${best} applied to ${year} inventory (earliest vintage held).` }
 }
+// DIRECTION-AWARE FALLBACK NOTE for the residual helpers. `year !== y` fired one wording in both
+// directions, so a forward resolution claimed the LATEST vintage when it had reached for the EARLIEST.
+// Live, not hypothetical: every EU region holds one key (2024), so an EU location on a 2023 inventory —
+// selectable in the wizard — read "AIB 2024 residual mix applied to 2023 inventory (latest vintage
+// held)", and that note reaches the assurance PDF and the XLSX export, not just the screen.
+//
+// Same two spellings getGridFactor and nzTdLoss emit, and `label` is whatever the caller uses for
+// `vintage`, so the note and the vintage column can never name the factor differently.
+// RESOLUTION SEMANTICS UNCHANGED — `let y = years[0]` still resolves forward, exactly as getGridFactor
+// does. This is disclosure only; no figure moves.
+const vintageNote = (label: string, resolved: number, year: number): string =>
+  resolved === year ? ''
+  : resolved < year ? `${label} residual mix applied to ${year} inventory (latest vintage held).`
+  : `${label} residual mix applied to ${year} inventory (earliest vintage held).`
+
 // Returns the market-based residual factor for a region, in kg CO2e/kWh, with provenance.
 // applicable=false means no residual mix exists for this region (e.g. full-disclosure AT, or a
 // region we don't cover) — caller MUST fall back to the location-based factor and stamp the note.
@@ -453,12 +469,16 @@ function getResidualFactor(
       const years = Object.keys(table).map(Number).sort((a, b) => a - b)
       let y = years[0]; for (const yy of years) { if (yy <= year) y = yy }
       const val = table[y]
+      // ONE binding for the factor's identity, used by BOTH `vintage` and the note. They named the same
+      // factor twice in two places; a single source is what stops them drifting (see the US branch,
+      // where they HAD drifted).
+      const vintage = `AIB ${y}`
       if (val === null) {
-        return { ef: 0, applicable: false, source: EF_SOURCES.residual_eu, vintage: `AIB ${y}`, usedRegion: region,
+        return { ef: 0, applicable: false, source: EF_SOURCES.residual_eu, vintage, usedRegion: region,
           note: 'Full-disclosure regime — no residual mix published; market-based falls back to location factor.' }
       }
-      return { ef: val / 1000, applicable: true, source: EF_SOURCES.residual_eu, vintage: `AIB ${y}`, usedRegion: region,
-        note: year !== y ? `AIB ${y} residual mix applied to ${year} inventory (latest vintage held).` : '' }
+      return { ef: val / 1000, applicable: true, source: EF_SOURCES.residual_eu, vintage, usedRegion: region,
+        note: vintageNote(vintage, y, year) }
     }
     return { ef: 0, applicable: false, source: EF_SOURCES.residual_eu, vintage: 'n/a', usedRegion: region,
       note: 'No published residual mix for this region; market-based falls back to location factor.' }
@@ -472,8 +492,22 @@ function getResidualFactor(
     const gwp = GWP[gwpVersion]
     const lbPerMwh = g.co2 + g.ch4 * gwp.CH4_fossil + g.n2o * gwp.N2O
     const ef = lbPerMwh * 0.453592 / 1000 // lb/MWh -> kg/kWh
-    return { ef, applicable: true, source: EF_SOURCES.residual_us, vintage: `Green-e ${y + 2} [${y} data] + eGRID2023 Rev2`, usedRegion: region,
-      note: year !== y ? `Green-e ${y} residual mix applied to ${year} inventory (latest vintage held).` : '' }
+    // ⚠️ THE NOTE AND THE VINTAGE NAMED THE SAME FACTOR TWO DIFFERENT WAYS, ON ONE ROW.
+    // vintage read `Green-e 2025 [2023 data] + eGRID2023 Rev2`; the note read `Green-e 2023`. "Green-e
+    // 2023" is not an edition Green-e publishes — 2023 is the DATA year, and the edition is 2025. A
+    // verifier reconciling the row against the source would have gone looking for a document that does
+    // not exist. Now built from one binding, so the two cannot say different things again.
+    //
+    // TWO BINDINGS, ONE DERIVED FROM THE OTHER — not one string reused. `vintage` is a PROVENANCE field
+    // and correctly documents both inputs. The note is a SENTENCE about which mix was applied, and
+    // eGRID publishes no residual mix: Green-e does, using eGRID's CH4/N2O. Naming eGRID in that
+    // sentence would misattribute the mix to a publisher that does not produce one. So the note carries
+    // the factor name alone, and the vintage is built FROM it — which is what keeps the two from
+    // drifting while still letting them say the right thing in their different roles.
+    const factorName = `Green-e ${y + 2} [${y} data]`
+    const vintage = `${factorName} + eGRID2023 Rev2`
+    return { ef, applicable: true, source: EF_SOURCES.residual_us, vintage, usedRegion: region,
+      note: vintageNote(factorName, y, year) }
   }
   return { ef: 0, applicable: false, source: EF_SOURCES.residual_us, vintage: 'n/a', usedRegion: region,
     note: 'No published residual mix for this subregion; market-based falls back to location factor.' }
