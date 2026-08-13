@@ -225,15 +225,7 @@ export function factorEditionsForSave(
   return Object.keys(fresh).length > 0 ? fresh : (stored ?? {})
 }
 
-/**
- * Do two inventories name the same editions? The comparison the trends surface will need.
- *
- * Exported now, with tests, but READ BY NOTHING YET — the disclosure surface is a separate change.
- * Flagged because `exclusionsPresent` in lib/ghg/series.ts is computed and rendered nowhere, and
- * `mr_jurisdictions.active` is a whole column no route reads: this repo has a habit of growing
- * derivations that never reach a customer. If this is still unread when the disclosure lands, it
- * should be deleted rather than kept warm.
- */
+/** Do two inventories name the same editions? The comparison behind factorEditionState. */
 export function sameFactorEditions(a: FactorEditions, b: FactorEditions): boolean {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<FactorJurisdiction>
   for (const j of keys) {
@@ -244,4 +236,94 @@ export function sameFactorEditions(a: FactorEditions, b: FactorEditions): boolea
     }
   }
   return true
+}
+
+// ── THE COMPARISON AXIS ──────────────────────────────────────────────────────────────────────────
+//
+// A UNION, NOT A FOURTH BOOLEAN. CompanySeries already carries gwpConsistent, estimationConsistent
+// and exclusionsPresent — three booleans where a state belongs, and one of the three (exclusionsPresent)
+// is computed and rendered nowhere at all. A boolean here would have to answer "are the editions
+// consistent?" for a series where the honest answer is "we cannot say", and false would then mean
+// both "they changed" and "we never recorded them" — the two findings a customer must act on
+// differently. Same shape and same reasoning as StreamState in engine.ts, which exists because a
+// boolean was hiding a third case and the third case was the one that mattered.
+export type FactorEditionState = 'consistent' | 'changed' | 'unknown'
+
+/**
+ * The state of a series' factor editions, from the stored maps in reporting-year order.
+ *
+ * ⚠️ UNKNOWN IS TESTED FIRST, AND THE ORDER IS THE DESIGN DECISION HERE.
+ *
+ * A series can satisfy both at once: 2024 unrecorded, 2025 on DEFRA 2025, 2026 on DEFRA 2026. Both
+ * statements are then true — a year is missing, AND two recorded years demonstrably differ — and the
+ * union shows one message, so one has to win.
+ *
+ * UNKNOWN WINS, because of what each state licenses a reader to conclude. 'changed' says the
+ * movement is partly a factor revision, which quietly asserts that the edition set was FULLY
+ * OBSERVED — that the revision we found is the whole story. With a year unrecorded that is exactly
+ * what we do not know: an unobserved year may hold a further revision, or the same one, and nothing
+ * distinguishes those. Showing 'changed' would report "we can't tell" with the confidence of "here
+ * is what moved". 'unknown' withholds a fact we are sure of; 'changed' would assert one we are not.
+ * This repo already resolves that trade the same way twice — YearDataStatus keeps 'excluded' and
+ * 'unverifiable' apart so "we can't tell" is never reported as "here is what's missing", and
+ * baselineScope12Total is withheld rather than softened to a best guess when the baseline is
+ * unusable.
+ *
+ * ⚠️ AND THE COST IS REAL, so it is written down rather than left to be discovered: a customer whose
+ * 2025→2026 genuinely crossed an edition boundary, but who also holds an unrecorded 2024, sees the
+ * 'unknown' message and therefore does NOT see the base-year recalculation-policy prompt for a
+ * revision we can prove happened. That is the price of not over-claiming. It shrinks to nothing as
+ * the back catalogue is re-saved. If it turns out to matter before then, the fix is at the render
+ * site — show the unknown message AND the recalculation sentence when the recorded years differ —
+ * not a reordering here.
+ */
+// ── THE WORDS ────────────────────────────────────────────────────────────────────────────────────
+//
+// Here rather than in the page, for the reason describeYearStatus() already carries in series.ts:
+// the trend chart and the SBTi surface must not describe the same finding in two different ways in
+// front of the same verifier. Only trends renders it today; the second consumer is why it is a
+// constant and not a literal.
+//
+// ⚠️ TWO FIELDS BECAUSE THE STRIP CANNOT HOLD THE SENTENCE, AND NOTHING IS TRUNCATED.
+// The trends header line is 12px muted text currently holding "Mixed GWP basis — comparison may not
+// be valid" (44 characters). The changed disclosure is 233, and shortening it would drop the
+// base-year recalculation prompt, which is the actionable half. So `label` goes inline beside the
+// GWP span and `detail` goes in an amber panel directly below the header, IN FULL.
+//   `label` IS THE OPENING CLAUSE OF `detail`, VERBATIM, up to the em dash — not a paraphrase and
+// not new copy. The reader sees the same words in both places, so the strip cannot come to say
+// something the panel does not.
+//
+// An exhaustive Record over the union, so adding a fourth state fails tsc here rather than rendering
+// as silence. `null` for consistent is a real entry, not an omission: a series on one factor basis
+// says nothing, exactly as gwpConsistent shows the plain "GWP basis: AR6" and no warning.
+export const FACTOR_EDITION_DISCLOSURE: Record<FactorEditionState, { label: string; detail: string } | null> = {
+  consistent: null,
+  changed: {
+    label: 'Emission factors changed between years',
+    detail:
+      'Emission factors changed between years — year-over-year movement reflects both operational ' +
+      'change and the factor revision. You may wish to consider whether this affects your base-year ' +
+      'recalculation policy.',
+  },
+  unknown: {
+    label: 'Emission-factor editions were not recorded for some years',
+    detail:
+      'Emission-factor editions were not recorded for some years — year-over-year comparison cannot ' +
+      'be confirmed on a consistent factor basis.',
+  },
+}
+
+export function factorEditionState(
+  maps: readonly (FactorEditions | null | undefined)[],
+): FactorEditionState {
+  // No years at all is not a consistent series; there is nothing to have been consistent about.
+  if (maps.length === 0) return 'unknown'
+  // An empty map is the pre-column back catalogue: priced by SOME edition, with no record of which.
+  // It must never read as consistent — see the column comment in the 20260813 migration.
+  if (maps.some(m => !m || Object.keys(m).length === 0)) return 'unknown'
+  const [first, ...rest] = maps as FactorEditions[]
+  // ONE YEAR IS 'consistent', deliberately, and it mirrors gwpConsistent — a one-year series has a
+  // set size of 1 and reports true there too. Nothing is being compared, so nothing is being
+  // mis-stated; the trends header shows no message either way, because 'consistent' is silent.
+  return rest.every(m => sameFactorEditions(first, m)) ? 'consistent' : 'changed'
 }

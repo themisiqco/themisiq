@@ -25,6 +25,7 @@ import {
   type YearExclusion,
 } from "./series";
 import { findUnpriceableLocations, type Location } from "./engine";
+import type { FactorEditions } from "./factorEditions";
 
 export interface LoadSeriesResult {
   series: CompanySeries[];
@@ -147,6 +148,10 @@ interface RawRow {
   employee_count: number | null;
   gwp_version: string | null;
   pct_estimated: number | null;
+  // jsonb, `not null default '{}'` on the table — but typed nullable here anyway, because a row
+  // written before 2026-08-13 predates the column and PostgREST is not the only thing that could
+  // hand us an absent key.
+  factor_editions: FactorEditions | null;
   // reverse embed: object when to-one detected, array otherwise, null when none
   scope3_inventories:
     | { total_scope3_tco2e: number | null }
@@ -164,6 +169,10 @@ interface RawRow {
 const SELECT =
   "company_id, company_name, reporting_year, scope1_total, scope2_location_total, " +
   "scope2_market_total, revenue_millions, employee_count, gwp_version, pct_estimated, " +
+  // Small (one object, a handful of short strings) and NOT derivable from anything else selected
+  // here: workings carries factor_vintage per grid row but nothing for combustion editions, and only
+  // for inventories saved since the provenance pass.
+  "factor_editions, " +
   "workings, locations_data, " +
   "scope3_inventories(total_scope3_tco2e)";
 
@@ -221,6 +230,10 @@ export async function loadCompanySeries(): Promise<LoadSeriesResult> {
         employee_count: r.employee_count,
         gwp_version: r.gwp_version,
         pctEstimated: r.pct_estimated, // map straight through; null = wholly manual, NOT 0
+        // Straight through, INCLUDING the empty object. `?? {}` here rather than a default further
+        // in: an inventory saved before the column existed reads as {} and must stay
+        // distinguishable from one whose editions were recorded — it drives the series to 'unknown'.
+        factorEditions: r.factor_editions ?? {},
       });
     }
 

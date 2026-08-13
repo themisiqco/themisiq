@@ -1,3 +1,6 @@
+import { factorEditionState } from "./factorEditions";
+import type { FactorEditions, FactorEditionState } from "./factorEditions";
+
 /**
  * GHG multi-year series assembly
  * --------------------------------------------------------------------------
@@ -28,8 +31,18 @@
  *   - estimationConsistent flags whether every year is fully evidenced — comparing a
  *     partly-estimated baseline against a fully-evidenced year is not valid either.
  *     baselinePctEstimated carries the baseline year's estimated share for disclosure.
+ *   - factorEditionState flags whether every year was priced by the SAME emission-factor
+ *     editions. A UNION, not a fourth boolean beside the two above — 'we never recorded
+ *     them' is a third answer, and it is the common one until the back catalogue is re-saved.
  *   - Rows with a null company_id (pre-link / unlinked) are skipped — they can't
  *     be grouped by identity. Surface those separately in the UI if needed.
+ *
+ * ⚠️ THIS FILE HAD NO IMPORTS AT ALL until factorEditionState landed, and that was worth
+ * noticing before giving it one. The import is type-plus-two-pure-functions from
+ * ./factorEditions, which reaches ./engine transitively — no React, no Supabase, no I/O, so
+ * "pure & inert" above still holds. The alternative was a second copy of the edition
+ * comparison living here, which is the drift this repo has already paid for twice
+ * (jurisdictionOf in b3Energy.ts, and the duplicated FUEL_WORDS noted further down).
  */
 
 /**
@@ -71,6 +84,12 @@ export interface InventoryRow {
   employee_count?: number | null;
   gwp_version?: string | null;
   pctEstimated?: number | null;     // share of S1+2 estimated (0-100); null = wholly manual / unknown
+  /**
+   * Which factor editions priced this year — `ghg_inventories.factor_editions`.
+   * Absent or `{}` means UNRECORDED, not "no factors applied", and drives the whole series to
+   * 'unknown'. Every inventory saved before 2026-08-13 is in that state and cannot be recovered.
+   */
+  factorEditions?: FactorEditions | null;
   /** Absent is treated as 'ok' — the loader is the one place that decides this, and it always sets it. */
   dataStatus?: YearDataStatus;
   exclusions?: YearExclusion[] | null;   // set when dataStatus === 'excluded'
@@ -138,6 +157,18 @@ export interface CompanySeries {
   /** True if ANY year is 'excluded' or 'unverifiable'. Mirrors gwpConsistent: a flag the consumer
    *  must surface, not a reason to hide the series. */
   exclusionsPresent: boolean;
+  /**
+   * Whether the years being compared were priced by the same emission-factor editions.
+   *
+   * A UNION, NOT A FOURTH BOOLEAN — see factorEditionState's own comment for why, and for why
+   * 'unknown' beats 'changed' when both apply. The three booleans above are the pattern this
+   * deliberately does not extend: 'we cannot say' is a third answer, not a false.
+   *
+   * Rendered on the trends header (app/dashboard/ghg/trends/page.tsx), amber, alongside the
+   * gwpConsistent span. SURFACED, NEVER GATED — a factor revision is a disclosure obligation, not a
+   * reason to withhold a customer's own figures.
+   */
+  factorEditionState: FactorEditionState;
   /** True when the baseline year is plottable. False ⇒ baselineScope12Total and every
    *  vsBaselinePct are null, and a target must not be anchored here. */
   baselineUsable: boolean;
@@ -335,6 +366,10 @@ export function buildCompanySeries(
       baselinePctEstimated,
       estimationConsistent,
       exclusionsPresent: years.some((y) => y.dataStatus !== "ok"),
+      // EVERY year, including unplottable ones. An excluded year was still priced by some edition,
+      // and if that edition is unrecorded the series genuinely cannot be confirmed on one basis —
+      // filtering to plottable years would let a gap in the record hide behind a gap in the data.
+      factorEditionState: factorEditionState(ordered.map((r) => r.factorEditions)),
       baselineUsable,
     });
   }

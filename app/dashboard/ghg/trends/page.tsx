@@ -18,6 +18,7 @@ import { useEffect, useState } from 'react'
 import { BarChart, ComposedChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer, ReferenceLine, LineChart, Line } from 'recharts'
 import { loadCompanySeries, type LoadSeriesResult } from '../../../../lib/ghg/loadSeries'
 import { describeYearStatus } from '../../../../lib/ghg/series'
+import { FACTOR_EDITION_DISCLOSURE } from '../../../../lib/ghg/factorEditions'
 import { supabase } from '../../../../lib/supabase'
 import { computeTrajectory } from '../../../../lib/sbti'
 import { loadMonthly, type LoadMonthlyResult } from '../../../../lib/ghg/loadMonthly'
@@ -195,6 +196,11 @@ export default function TrendsPage() {
 
   const gwpVersion = selected?.years[0]?.gwpVersion ?? 'AR6'
 
+  // null for 'consistent' — the state that says nothing, exactly as a single GWP basis says nothing.
+  // No `?? something` fallback: a series always carries a state, and defaulting an absent one would
+  // be defaulting it to silence, which is the one reading 'unknown' exists to prevent.
+  const editionDisclosure = selected ? FACTOR_EDITION_DISCLOSURE[selected.factorEditionState] : null
+
   // Derived metrics for the cards / intensity strip (all from CompanySeries).
   const latest = selected?.years.at(-1) ?? null
   const baselineRow = selected?.years.find((y) => y.year === selected.baselineYear) ?? null
@@ -260,8 +266,30 @@ export default function TrendsPage() {
               ) : (
                 <span style={{ color: '#ba7517', fontWeight: 600 }}>Mixed GWP basis — comparison may not be valid</span>
               )}
+              {/* Factor editions — the SHORT label only. The full sentence is the panel below; this
+                  strip is 12px muted text and the changed disclosure runs to 233 characters. Both
+                  come from FACTOR_EDITION_DISCLOSURE, and the label is the detail's opening clause
+                  verbatim, so the two cannot drift into saying different things. */}
+              {editionDisclosure && (
+                <>
+                  {' · '}
+                  <span style={{ color: '#ba7517', fontWeight: 600 }}>{editionDisclosure.label}</span>
+                </>
+              )}
             </div>
           </div>
+
+          {/* SURFACED, NOT GATED. A factor revision is a disclosure obligation, not a reason to
+              withhold a customer's own figures — same amber treatment estimationConsistent carries
+              on the SBTi page, and the same rule the GWP span follows above.
+              'unknown' is the COMMON case, not an edge: every inventory saved before 2026-08-13
+              records no editions and cannot be made to, so this panel is what most series show
+              until the back catalogue is re-saved. It must never read as consistent. */}
+          {editionDisclosure && (
+            <div style={{ background: '#FDF6EC', border: '0.5px solid #EAD9BE', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12.5, color: '#8A5A12', lineHeight: 1.6 }}>
+              {editionDisclosure.detail}
+            </div>
+          )}
 
           {/* Metric cards — all derived from CompanySeries */}
           {latest && (

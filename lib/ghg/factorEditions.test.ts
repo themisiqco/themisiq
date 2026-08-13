@@ -3,8 +3,11 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   buildFactorEditions, factorEditionsForSave, factorJurisdiction, sameFactorEditions, FAMILIES_NOT_COVERED,
+  factorEditionState, FACTOR_EDITION_DISCLOSURE,
 } from './factorEditions'
 import type { FactorEditions } from './factorEditions'
+import { buildCompanySeries } from './series'
+import type { InventoryRow } from './series'
 import { EF_SOURCES, emptyLocation, getGridFactor, gridSource, combustionSource } from './engine'
 import type { Location } from './engine'
 
@@ -380,5 +383,209 @@ describe('factor_editions survives the load-then-save round trip', () => {
     expect(pageSrc.length, `${PAGE} looks empty`).toBeGreaterThan(10_000)
     expect(() => lineContaining('factor_editions:')).toThrow(/ambiguous/)  // save + load = 2 matches
     expect(() => lineContaining('factor_editions: data.factor_editions')).not.toThrow()
+  })
+})
+
+// ── THE COMPARISON AXIS AND ITS RENDER SITE ──────────────────────────────────────────────────────
+// A derivation nobody reads is the local failure mode, not a hypothetical one: exclusionsPresent is
+// computed in series.ts and rendered on no surface at all, and mr_jurisdictions.active is a whole
+// column no route consults. G9-G13 are what stop factorEditionState joining them — they read the
+// trends page from disk, because a React render site is unreachable from this suite any other way.
+
+const UK26 = buildFactorEditions([uk()], 2026)
+const UK25 = buildFactorEditions([uk()], 2025)
+
+describe('factorEditionState — a union, because "we cannot say" is a third answer', () => {
+  it('G1 three years on one edition → consistent', () => {
+    expect(factorEditionState([UK26, UK26, UK26])).toBe('consistent')
+    // Distinct objects with equal content, not the same reference — otherwise this would only be
+    // proving that === works.
+    expect(factorEditionState([
+      buildFactorEditions([uk({ id: 'a' })], 2026),
+      buildFactorEditions([uk({ id: 'b' })], 2026),
+      buildFactorEditions([uk({ id: 'c' })], 2026),
+    ])).toBe('consistent')
+  })
+
+  it('G2 a series spanning an edition boundary → changed', () => {
+    // The 2025→2026 UK grid step, which is the whole reason the column exists.
+    expect(factorEditionState([UK25, UK26])).toBe('changed')
+    expect(factorEditionState([UK25, UK25, UK26])).toBe('changed')
+    // Order-independent: a series is not "unchanged" because the newer edition came first.
+    expect(factorEditionState([UK26, UK25])).toBe('changed')
+  })
+
+  it('G3 ANY year with an empty map → unknown, and NEVER consistent', () => {
+    const WHY =
+      'AN UNRECORDED YEAR READ AS CONSISTENT. {} means the inventory predates the column and its ' +
+      'editions cannot be recovered — it does NOT mean the factors matched. Reading it as ' +
+      'consistent asserts a like-for-like basis nobody verified, on the strength of a default value.'
+
+    for (const maps of [
+      [{}, UK26, UK26],
+      [UK26, {}, UK26],
+      [UK26, UK26, {}],
+      [{}],
+      [{}, {}],
+      [null, UK26],
+      [undefined, UK26],
+    ] as (FactorEditions | null | undefined)[][]) {
+      expect(factorEditionState(maps), WHY).toBe('unknown')
+      expect(factorEditionState(maps), WHY).not.toBe('consistent')
+    }
+  })
+
+  it('G4 UNKNOWN BEATS CHANGED when both apply — the ordering decision', () => {
+    // 2024 unrecorded, 2025 and 2026 on different editions: a year is missing AND two recorded years
+    // demonstrably differ. 'changed' would assert the edition set was fully observed — that the
+    // revision we found is the whole story — which is exactly what an unrecorded year denies.
+    expect(factorEditionState([{}, UK25, UK26])).toBe('unknown')
+    expect(factorEditionState([UK25, UK26, {}])).toBe('unknown')
+    // And the same series WITHOUT the gap is 'changed', so this is an ordering test rather than a
+    // test that empty maps break the comparison.
+    expect(factorEditionState([UK25, UK26])).toBe('changed')
+  })
+
+  it('G5 a ONE-YEAR series is consistent when recorded, unknown when not', () => {
+    // Mirrors gwpConsistent, which is true for a single year (set size 1). Nothing is being
+    // compared, so nothing is mis-stated — and 'consistent' renders no message at all, so a
+    // single-year customer is told nothing either way.
+    expect(factorEditionState([UK26])).toBe('consistent')
+    expect(factorEditionState([{}])).toBe('unknown')
+    // No years at all: nothing to have been consistent about.
+    expect(factorEditionState([])).toBe('unknown')
+  })
+
+  it('G6 a difference in EITHER family, in ANY jurisdiction, is a change', () => {
+    const twoCountries = buildFactorEditions([uk(), loc({ id: 'z', country: 'CA', grid_region: 'ON' })], 2026)
+    const sameAgain = buildFactorEditions([uk(), loc({ id: 'z', country: 'CA', grid_region: 'ON' })], 2026)
+    expect(factorEditionState([twoCountries, sameAgain])).toBe('consistent')
+
+    // Combustion label moved, electricity identical.
+    const combMoved: FactorEditions = JSON.parse(JSON.stringify(UK26))
+    combMoved.UK!.combustion!.edition = 'DEFRA 2027'
+    expect(factorEditionState([UK26, combMoved])).toBe('changed')
+
+    // A jurisdiction appearing in one year and not the other.
+    expect(factorEditionState([UK26, twoCountries])).toBe('changed')
+  })
+})
+
+describe('the axis reaches CompanySeries and the loader fills it', () => {
+  const row = (year: number, factorEditions: FactorEditions | null): InventoryRow => ({
+    company_id: 'c1', company_name: 'Acme', reporting_year: year,
+    scope1_total: 100, scope2_location_total: 50, factorEditions,
+  })
+
+  it('G7 buildCompanySeries carries the state, over EVERY year', () => {
+    expect(buildCompanySeries([row(2025, UK25), row(2026, UK26)])[0].factorEditionState).toBe('changed')
+    expect(buildCompanySeries([row(2025, UK26), row(2026, UK26)])[0].factorEditionState).toBe('consistent')
+    expect(buildCompanySeries([row(2025, {}), row(2026, UK26)])[0].factorEditionState).toBe('unknown')
+    // Absent on the row (a hand-built caller, or a loader that stopped mapping it) is unknown too —
+    // it must not default into silence.
+    expect(buildCompanySeries([row(2025, null), row(2026, UK26)])[0].factorEditionState).toBe('unknown')
+  })
+
+  it('G7b UNPLOTTABLE YEARS STILL COUNT — a gap in the record must not hide behind a gap in the data', () => {
+    // An 'excluded' year was still priced by SOME edition. If that edition is unrecorded, the series
+    // genuinely cannot be confirmed on one factor basis, and filtering unplottable years out before
+    // computing the state would report 'consistent' off the two years that happen to be plottable.
+    //
+    // ⚠️ THIS TEST EXISTS BECAUSE A MUTATION SURVIVED. Restricting the input to statusOf(r) === 'ok'
+    // passed all 39 tests in this file — the "every year" claim was a comment in series.ts and
+    // nothing held it. A comment is not a guard.
+    const excluded: InventoryRow = {
+      ...row(2024, {}), dataStatus: 'excluded', exclusions: [],
+    }
+    const s = buildCompanySeries([excluded, row(2025, UK26), row(2026, UK26)])[0]
+    expect(s.factorEditionState, 'the unrecorded excluded year drives the series to unknown').toBe('unknown')
+    expect(s.exclusionsPresent, 'and the year really is unplottable — otherwise this proves nothing').toBe(true)
+    expect(s.years.find(y => y.year === 2024)!.dataStatus).toBe('excluded')
+
+    // Same series with that year RECORDED is consistent, so the test is about the empty map rather
+    // than about excluded years being counted at all.
+    const recorded: InventoryRow = { ...row(2024, UK26), dataStatus: 'excluded', exclusions: [] }
+    expect(buildCompanySeries([recorded, row(2025, UK26), row(2026, UK26)])[0].factorEditionState)
+      .toBe('consistent')
+  })
+
+  it('G8 IT IS NOT A FOURTH BOOLEAN, and the other three axes are untouched', () => {
+    const s = buildCompanySeries([row(2025, UK25), row(2026, UK26)])[0]
+    expect(typeof s.factorEditionState, 'a boolean here would collapse changed and unknown').toBe('string')
+    expect(['consistent', 'changed', 'unknown']).toContain(s.factorEditionState)
+    // The three existing axes still compute, and still mean what they meant.
+    expect(s.gwpConsistent).toBe(true)
+    expect(s.estimationConsistent).toBe(true)
+    expect(s.exclusionsPresent).toBe(false)
+  })
+
+  it('G9 the loader selects the column AND maps it — a write-only column otherwise', () => {
+    const src = readFileSync(join(ROOT, 'lib/ghg/loadSeries.ts'), 'utf8')
+    expect(src, 'not selected = every series reads unknown forever').toContain('"factor_editions, "')
+    expect(src, 'selected but unmapped = the same thing, one layer along')
+      .toContain('factorEditions: r.factor_editions ?? {}')
+  })
+})
+
+describe('the trends page renders a DISTINCT output for each state', () => {
+  const TRENDS = 'app/dashboard/ghg/trends/page.tsx'
+  const trendsSrc = readFileSync(join(ROOT, TRENDS), 'utf8')
+
+  it('G10 the copy is EXACTLY as specified, in one place, and label is detail\'s opening clause', () => {
+    expect(FACTOR_EDITION_DISCLOSURE.changed!.detail).toBe(
+      'Emission factors changed between years — year-over-year movement reflects both operational ' +
+      'change and the factor revision. You may wish to consider whether this affects your base-year ' +
+      'recalculation policy.')
+    expect(FACTOR_EDITION_DISCLOSURE.unknown!.detail).toBe(
+      'Emission-factor editions were not recorded for some years — year-over-year comparison cannot ' +
+      'be confirmed on a consistent factor basis.')
+
+    // NOT A PARAPHRASE AND NOT A TRUNCATION: the label is the detail up to the em dash, verbatim, so
+    // the strip can never come to say something the panel below it does not.
+    for (const st of ['changed', 'unknown'] as const) {
+      const d = FACTOR_EDITION_DISCLOSURE[st]!
+      expect(d.detail.startsWith(d.label + ' —'), `${st}: label must open detail verbatim`).toBe(true)
+      expect(d.label, 'a strip label this long defeats the point').not.toContain('—')
+    }
+  })
+
+  it('G11 consistent is SILENT — a null entry, not a missing one', () => {
+    expect(FACTOR_EDITION_DISCLOSURE.consistent).toBeNull()
+    expect(Object.keys(FACTOR_EDITION_DISCLOSURE).sort()).toEqual(['changed', 'consistent', 'unknown'])
+  })
+
+  it('G12 THE RENDER SITE EXISTS and reads the state — this is the test that stops it becoming exclusionsPresent', () => {
+    const WHY =
+      'THE AXIS IS COMPUTED AND RENDERED NOWHERE. That is exactly what happened to ' +
+      'exclusionsPresent in lib/ghg/series.ts and to mr_jurisdictions.active — a derivation that ' +
+      'exists, passes its own tests, and reaches no customer.'
+    expect(trendsSrc, WHY).toContain('FACTOR_EDITION_DISCLOSURE[selected.factorEditionState]')
+    expect(trendsSrc, `${WHY}\n  the short label belongs in the header strip`)
+      .toContain('{editionDisclosure.label}')
+    expect(trendsSrc, `${WHY}\n  the FULL sentence belongs in the panel`)
+      .toContain('{editionDisclosure.detail}')
+    // Both renders are conditional on the same value, so consistent shows neither.
+    expect(trendsSrc.match(/\{editionDisclosure && \(/g) ?? [], 'strip and panel')
+      .toHaveLength(2)
+  })
+
+  it('G13 SURFACED, NOT GATED — the disclosure hides no figure', () => {
+    // The whole point of the amber treatment: gwpConsistent and estimationConsistent both warn
+    // without withholding. A factor revision is a disclosure obligation, not grounds to blank a
+    // customer's own numbers.
+    expect(trendsSrc, 'amber panel, same tokens as the SBTi estimation panel').toContain('#FDF6EC')
+    expect(trendsSrc).toContain('#EAD9BE')
+    expect(trendsSrc, 'the strip label uses the same amber the GWP warning uses').toContain('#ba7517')
+    // Nothing about the state may appear in a condition that suppresses the chart or the metrics.
+    for (const gate of ['factorEditionState !== ', 'factorEditionState ===']) {
+      expect(trendsSrc, `${gate} would be a gate, not a disclosure`).not.toContain(gate)
+    }
+  })
+
+  it('G14 scans a real file — a moved render site fails loudly instead of passing vacuously', () => {
+    expect(trendsSrc.length, `${TRENDS} looks empty`).toBeGreaterThan(10_000)
+    expect(trendsSrc).toContain("from '../../../../lib/ghg/factorEditions'")
+    // The pre-existing GWP span is still there — this change sits beside it, it does not replace it.
+    expect(trendsSrc).toContain('Mixed GWP basis — comparison may not be valid')
   })
 })
