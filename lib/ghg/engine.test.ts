@@ -1584,7 +1584,7 @@ describe('Z. fuel oil grades are seeded per table', () => {
   // the absence is filled in without also deleting its pin.
   const NOT_YET_SEEDED: Record<string, readonly ('distillate' | 'residual')[]> = {
     'EF (US)': ['residual'],                 // EPA table not opened — see Z6
-    'EF_UK': ['distillate', 'residual'],     // seedable now the table is DEFRA 2026 — see Z9
+    // EF_UK was here until the DEFRA 2026 refresh made its grade keys seedable. One entry left.
   };
 
   it('Z2 every jurisdiction resolves its OWN grade keys — none falls through to US', () => {
@@ -1624,7 +1624,9 @@ describe('Z. fuel oil grades are seeded per table', () => {
 
   it('Z5 the seeded values reproduce their published per-litre figures', () => {
     const perL = (x: number) => x / G;
-    // UK is absent by decision — see Z9.
+    // UK — DEFRA 2026 Fuels tab, combined kgCO2e/L
+    expect(perL((EF_UK as any).fuel_oil_distillate_gallon.co2)).toBeCloseTo(2.75541, 6);
+    expect(perL((EF_UK as any).fuel_oil_residual_gallon.co2)).toBeCloseTo(3.17492, 6);
     // NZ — MfE 2026 Table 3.2
     expect(perL((EF_NZ as any).commercial.fuel_oil_distillate_gallon.co2)).toBeCloseTo(2.97088, 6);
     expect(perL((EF_NZ as any).commercial.fuel_oil_residual_gallon.co2)).toBeCloseTo(3.05359, 6);
@@ -1653,7 +1655,7 @@ describe('Z. fuel oil grades are seeded per table', () => {
     expect((EF as any).fuel_oil_distillate_gallon).toEqual((EF as any).fuel_oil_gallon);
   });
 
-  it('Z9 EF_UK is DEFRA 2026 — refreshed whole, and the grade keys are now SEEDABLE', () => {
+  it('Z9 EF_UK is DEFRA 2026 — refreshed whole, and the grade keys are seeded', () => {
     // WAS: "EF_UK has NO grade keys — the table is DEFRA 2025 and must be refreshed whole first."
     // That blocker is gone. The table was refreshed to DEFRA 2026 in full on 13 Aug 2026, so seeding
     // fuel_oil_distillate_gallon / fuel_oil_residual_gallon here no longer mixes editions.
@@ -1673,10 +1675,25 @@ describe('Z. fuel oil grades are seeded per table', () => {
     expect((EF_UK as any).propane_litre.co2, 'propane did not move between editions').toBe(1.54358);
     // The residual-oil FACTOR did not move either; only its gallon conversion was corrected.
     expect((EF_UK as any).fuel_oil_gallon.co2).toBe(12.018380);
-    // Grade keys are seedable now but are NOT part of this commit. Delete these two lines in the
-    // commit that seeds them, and add EF_UK to Z2/Z3/Z5 in the same change.
-    expect((EF_UK as any).fuel_oil_distillate_gallon, 'seedable now — but not in this commit').toBeUndefined();
-    expect((EF_UK as any).fuel_oil_residual_gallon, 'seedable now — but not in this commit').toBeUndefined();
+  });
+
+  it('Z15 the legacy fuel_oil_gallon and the new residual key are the SAME number, by construction', () => {
+    // The legacy key always WAS the residual row — its comment has said so since it was seeded — so
+    // both hold DEFRA's "Processed fuel oils - residual oil" 3.17492 kg/L converted the same way.
+    // Not a coincidence to be tolerated: an identity to be enforced. Editing one alone means one of
+    // them is wrong, and nothing else in the suite would notice which.
+    expect((EF_UK as any).fuel_oil_residual_gallon).toEqual((EF_UK as any).fuel_oil_gallon);
+    expect((EF_UK as any).fuel_oil_residual_gallon.co2).toBe(12.018380);
+    // Distillate is a genuinely different row and must NOT equal either.
+    expect((EF_UK as any).fuel_oil_distillate_gallon).not.toEqual((EF_UK as any).fuel_oil_gallon);
+  });
+
+  it('Z16 NOT_YET_SEEDED now holds one entry: US residual', () => {
+    // The seeding backlog, asserted rather than described. When EPA residual No.6 is transcribed this
+    // becomes empty, and Z6 goes with it.
+    expect(Object.keys(NOT_YET_SEEDED).sort()).toEqual(['EF (US)']);
+    expect(NOT_YET_SEEDED['EF (US)']).toEqual(['residual']);
+    expect(NOT_YET_SEEDED['EF_UK'], 'UK was cleared by the DEFRA 2026 refresh').toBeUndefined();
   });
 
   it('Z10 every UK _gallon fallback equals its litre value x 3.785411784', () => {
@@ -1694,9 +1711,15 @@ describe('Z. fuel oil grades are seeded per table', () => {
       expect((EF_UK as any)[g].co2, `${g} must be ${l} x L_PER_GAL`)
         .toBeCloseTo((EF_UK as any)[l].co2 * G, 6);
     }
-    // fuel_oil has no litre key — its published 3.17492 kg/L converts straight to the gallon entry.
+    // The three fuel-oil keys have no litre counterpart — DEFRA publishes them per litre and the
+    // engine's fuel-oil path prices per gallon, so each converts straight from its published figure.
     expect((EF_UK as any).fuel_oil_gallon.co2).toBeCloseTo(3.17492 * G, 6);
-    expect(Object.keys(EF_UK).filter(k => k.endsWith('_gallon')), 'five, not six').toHaveLength(5);
+    expect((EF_UK as any).fuel_oil_residual_gallon.co2).toBeCloseTo(3.17492 * G, 6);
+    expect((EF_UK as any).fuel_oil_distillate_gallon.co2).toBeCloseTo(2.75541 * G, 6);
+    // SEVEN now: the five fallbacks plus the two grade keys seeded on the DEFRA 2026 refresh. The
+    // brief that introduced this test said six and there were five; the count is pinned so a key
+    // appearing or vanishing is a decision someone has to make explicitly.
+    expect(Object.keys(EF_UK).filter(k => k.endsWith('_gallon')), 'five fallbacks + two grade keys').toHaveLength(7);
   });
 
   it('Z11 the UK grid holds BOTH editions, and each year resolves to its own', () => {

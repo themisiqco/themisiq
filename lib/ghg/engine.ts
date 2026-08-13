@@ -178,6 +178,30 @@ const EF_UK = {
   // Fuel oil, litres 3.17492 (DEFRA "Processed fuel oils - residual oil") → per US-gallon fallback.
   // The FACTOR is unchanged from 2025; only the gallon conversion is corrected (see the header).
   fuel_oil_gallon: { co2: 12.018380, ch4: 0, n2o: 0 },
+  // ── GRADE-EXPLICIT KEYS — DEFRA/DESNZ 2026 full set, Fuels tab, kg CO2e per litre ──────────────
+  // Seedable now the whole table is 2026; seeding them while it was 2025 would have mixed editions.
+  //
+  // "Processed fuel oils - distillate oil" 2.75541 (CO2 2.72417, CH4 0.00315, N2O 0.02809 — sums
+  //   exactly): 2.75541 x 3.785411784 = 10.430361484 -> 10.430361.
+  fuel_oil_distillate_gallon: { co2: 10.430361, ch4: 0, n2o: 0 },
+  // "Processed fuel oils - residual oil" 3.17492 (CO2 3.16262, CH4 0.0053, N2O 0.00701 — sums to
+  //   3.17493, DEFRA's own rounding against its stated 3.17492):
+  //   3.17492 x 3.785411784 = 12.018379581 -> 12.018380.
+  //
+  // ⚠️ IDENTICAL TO fuel_oil_gallon ABOVE BY CONSTRUCTION, NOT COINCIDENCE. The legacy key always
+  // WAS the residual row — its comment has said so since it was seeded — so both keys are the same
+  // published figure converted the same way. They must move together or one of them is wrong;
+  // engine.test.ts Z15 pins the identity so a lone edit fails.
+  fuel_oil_residual_gallon: { co2: 12.018380, ch4: 0, n2o: 0 },
+  //
+  // NAMING NOTE, recorded because it corroborates something still unconfirmed elsewhere:
+  // DEFRA publishes "Gas oil" byte-identical to "Processed fuel oils - distillate oil", and
+  // "Fuel oil" byte-identical to "Processed fuel oils - residual oil". The plain-language and
+  // technical names are aliases for the same two figures — one publisher treating gas oil and
+  // distillate fuel oil as one product. That is corroboration, NOT confirmation, for the EU
+  // distillate key, which is derived from IPCC's Gas/Diesel Oil row on a category mapping still
+  // flagged as unverified at EF_EU. A second publisher agreeing is evidence; the IPCC table saying
+  // it is proof, and nobody has opened it.
   // Petrol (average biofuel blend), litres: 2.075 kgCO2e/L (CO2 2.06107, CH4 0.00806, N2O 0.00587).
   gasoline_litre: { co2: 2.075, ch4: 0, n2o: 0 },
   gasoline_gallon: { co2: 7.854729, ch4: 0, n2o: 0 },
