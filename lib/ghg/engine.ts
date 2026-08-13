@@ -1652,8 +1652,28 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     const g = calcGas(ef, activity, gwpVersion)
     const gwp = GWP[gwpVersion]
     const efCo2e = ef.co2 + ef.ch4 * gwp.CH4_fossil + ef.n2o * gwp.N2O
+    // ── IS THIS FACTOR A COMBINED CO2e FIGURE, OR A GAS SPLIT? ─────────────────────────────────
+    // DEFRA, DCCEEW and MfE publish one kgCO2e per unit with their OWN GWP set already applied, so
+    // EF_UK / EF_AU / EF_NZ store that figure in `co2` with ch4 and n2o at 0. The row nonetheless
+    // stamped gwp_basis: gwpVersion, so an AU diesel line read "AR6" on a number DCCEEW combined on
+    // AR5 — and which does not move when the toggle does. Probed: 2.71 at AR4, AR5 and AR6 alike.
+    //
+    // DETECTED FROM THE FACTOR, NEVER FROM A COUNTRY LIST. `['GB','AU','NZ']` would be correct today
+    // and silently wrong the day a fourth table converts to combined storage, or one of these three
+    // gains a gas split — the list and the tables would drift with nothing to notice. Reading
+    // ch4 === 0 && n2o === 0 asks the factor that is being applied, at the moment it is applied, so
+    // it cannot disagree with the table it came from: convert EF_CA to combined storage and its rows
+    // start stamping as-published on their own; give EF_UK a real split and its rows start stamping
+    // the live set. Verified to separate the seven tables with no mixed case (see engine.test.ts X4,
+    // which fails if any table stops being uniform).
+    //   The zero is not "this fuel emits no methane" — it is "the publisher already counted it", and
+    // the emission_factor cell now says so rather than printing CH4 0, N2O 0 as though measured.
+    const combinedCo2e = ef.ch4 === 0 && ef.n2o === 0
     rows.push({ location: loc.name || 'Location', stream, source, scope, activity_data: activity, activity_unit: unit,
-      emission_factor: `CO2 ${ef.co2}, CH4 ${ef.ch4}, N2O ${ef.n2o} kg/${unit}`, emission_factor_display: `${efDisplay(efCo2e)} kg CO₂e/${abbrevUnit(unit)}`, ef_source: combustionSource(loc), gwp_basis: gwpVersion, result_tco2e: g.total, ...(convNote ? { note: convNote } : {}), ...(prov ?? {}) })
+      emission_factor: combinedCo2e
+        ? `CO₂e ${ef.co2} kg/${unit} — CH₄/N₂O included`
+        : `CO2 ${ef.co2}, CH4 ${ef.ch4}, N2O ${ef.n2o} kg/${unit}`,
+      emission_factor_display: `${efDisplay(efCo2e)} kg CO₂e/${abbrevUnit(unit)}`, ef_source: combustionSource(loc), gwp_basis: combinedCo2e ? GWP_AS_PUBLISHED : gwpVersion, result_tco2e: g.total, ...(convNote ? { note: convNote } : {}), ...(prov ?? {}) })
   }
   for (const loc of locations) {
     // Decided BEFORE any row is emitted, and with the same helper calcInventory uses. A location

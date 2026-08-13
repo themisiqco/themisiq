@@ -11,12 +11,15 @@
 // calcInventory, analyzeCoverage) it is pinned there; where it is purely a component
 // closure it is marked `it.todo` with the reason. See the Phase-2 report.
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   buildWorkings, calcLocation, calcInventory, analyzeCoverage, exclusiveEnd,
   isResolvedGridRegion, detectGridRegion, getResidualFactor, getGridFactor,
   pickEF, calcGas, emptyLocation, findUnresolvedCoverage, findUndeclaredStreams, applyResolutions, pctEstimated,
   MissingEmissionFactorError, findUnpriceableLocations,
   streamState, DECLARABLE_STREAMS, STREAM_META, nzTdLoss, NZ_TD_LOSS, EF_SOURCES,
+  EF, EF_CA, EF_UK, EF_EU, EF_AU, EF_NZ,
   type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal, type StreamAttestation,
   type DeclarableStream,
 } from './engine';
@@ -1241,5 +1244,138 @@ describe('P9. residual fallback discloses its direction', () => {
       .toBe('No published residual mix for this region; market-based falls back to location factor.');
     expect(getResidualFactor('', 2026, 'AR6').note)
       .toBe('No published residual mix for this subregion; market-based falls back to location factor.');
+  });
+});
+
+// ── X. A ROW MAY NOT CLAIM A GWP SET THAT DID NOT APPLY TO ITS FACTOR ────────────────────────────
+//
+// DEFRA, DCCEEW and MfE publish one kgCO2e per unit with their own GWP set already applied. EF_UK,
+// EF_AU and EF_NZ therefore store that combined figure in `co2` with ch4/n2o at 0 — and pushFuel
+// stamped gwp_basis: gwpVersion regardless, so an Australian diesel row read "AR6" beside a number
+// DCCEEW combined on AR5 and which does not move when the toggle does.
+//
+// GWP_AS_PUBLISHED already existed for exactly this, used on grid, steam and market-based rows.
+// Combustion rows never reached for it.
+//
+// THE CONDITION IS SHAPE-BASED, NOT COUNTRY-BASED — see the comment in pushFuel. X4 is what keeps
+// that honest: it declares each table's storage style as a literal and fails if any table stops being
+// uniform, which is the only way the shape test could start disagreeing with the tables.
+describe('X. combustion rows stamp the GWP basis that actually applied', () => {
+  const AS_PUBLISHED = 'as-published — see factor source';
+  const SETS = ['AR4', 'AR5', 'AR6'] as const;
+
+  // diesel exists in every table; US takes gallons, the metric jurisdictions litres.
+  const dieselLoc = (country: string): Location => loc({
+    country,
+    has_diesel_stationary: true,
+    diesel_stationary_amount: 1000,
+    diesel_stationary_unit: country === 'US' ? 'gallons' : 'litres',
+  });
+  const row = (country: string, g: typeof SETS[number]) =>
+    (buildWorkings([dieselLoc(country)], g, 2025, [], 12) as any[])
+      .find(r => r.stream === 'diesel_stationary' && !r.declaration);
+
+  it('X1 AU, UK and NZ stamp as-published, under every AR set', () => {
+    for (const c of ['AU', 'GB', 'NZ']) {
+      for (const g of SETS) {
+        expect(row(c, g).gwp_basis, `${c} ${g}: the publisher's GWP set is baked in, not ours`).toBe(AS_PUBLISHED);
+        expect(row(c, g).gwp_basis, `${c} ${g}`).not.toBe(g);
+      }
+    }
+  });
+
+  it('X2 US, CA and EU keep stamping the live gwpVersion', () => {
+    // These store a real gas split, so the toggle genuinely changes the figure and the row must say
+    // which set produced it.
+    for (const c of ['US', 'CA', 'DE']) {
+      for (const g of SETS) {
+        expect(row(c, g).gwp_basis, `${c} ${g}`).toBe(g);
+      }
+    }
+  });
+
+  it('X3 NO FIGURE MOVED — every jurisdiction, every AR set', () => {
+    // This is a provenance pass. The combined tables were already inert under the toggle (that is the
+    // defect); the split tables must still respond exactly as before.
+    const inert = ['AU', 'GB', 'NZ'], responds = ['US', 'CA', 'DE'];
+    for (const c of inert) {
+      const [a, b, d] = SETS.map(g => row(c, g).result_tco2e);
+      expect(a, `${c}: a combined factor cannot move with the toggle`).toBe(b);
+      expect(b, `${c}`).toBe(d);
+    }
+    for (const c of responds) {
+      const vals = SETS.map(g => row(c, g).result_tco2e);
+      expect(new Set(vals).size, `${c}: a gas split must respond to the toggle`).toBeGreaterThan(1);
+    }
+    // Absolute pins, so "nothing moved" is measured and not merely self-consistent.
+    expect(row('AU', 'AR6').result_tco2e).toBeCloseTo(2.71, 9);          // 1000 L x 2.710 kg/L
+    expect(row('GB', 'AR6').result_tco2e).toBeCloseTo(2.57082, 9);
+    expect(row('NZ', 'AR6').result_tco2e).toBeCloseTo(2.6759, 9);
+    expect(row('US', 'AR6').result_tco2e).toBeCloseTo(10.2414216, 9);
+  });
+
+  it('X4 every table is UNIFORM in its storage style — the shape test cannot drift from the tables', () => {
+    // THE GUARD BEHIND X1/X2. The stamping condition reads ch4 === 0 && n2o === 0, which is only a
+    // reliable proxy for "combined CO2e" while each table is entirely one style or the other. The
+    // expected style is declared HERE as a literal, so a table that changes shape fails this test —
+    // it does not quietly reclassify itself and take the stamping with it.
+    const DECLARED: [string, Record<string, any>, 'split' | 'combined'][] = [
+      ['EF (US)', EF as any, 'split'],
+      ['EF_CA', EF_CA as any, 'split'],
+      ['EF_EU', EF_EU as any, 'split'],
+      ['EF_UK', EF_UK as any, 'combined'],
+      ['EF_AU', EF_AU as any, 'combined'],
+      ['EF_NZ.commercial', (EF_NZ as any).commercial, 'combined'],
+      ['EF_NZ.industrial', (EF_NZ as any).industrial, 'combined'],
+    ];
+    const offences: string[] = [];
+    for (const [name, table, style] of DECLARED) {
+      const factors = Object.entries(table).filter(([, v]: any) => v && typeof v === 'object');
+      expect(factors.length, `${name} has no factor entries — the walk is broken`).toBeGreaterThan(0);
+      for (const [key, v] of factors as [string, any][]) {
+        const isCombined = v.ch4 === 0 && v.n2o === 0;
+        if (isCombined !== (style === 'combined')) {
+          offences.push(`${name}.${key} is stored ${isCombined ? 'COMBINED' : 'SPLIT'} but the table is declared ${style}`);
+        }
+        // NO FACTOR MAY ZERO EXACTLY ONE GAS. While that holds, `ch4 === 0 && n2o === 0` and a
+        // one-clause `ch4 === 0` are indistinguishable — which is why weakening the condition cannot
+        // be caught behaviourally today. The first factor to zero one gas and not the other is the
+        // moment that stops being true, and this is what surfaces it.
+        if ((v.ch4 === 0) !== (v.n2o === 0)) {
+          offences.push(`${name}.${key} zeroes exactly one gas (ch4=${v.ch4}, n2o=${v.n2o}) — the stamping condition must be re-examined`);
+        }
+      }
+    }
+    expect(offences, offences.length === 0 ? '' :
+      `A FACTOR TABLE CHANGED STORAGE STYLE:\n\n${offences.join('\n')}\n\n` +
+      `pushFuel decides gwp_basis from ch4 === 0 && n2o === 0. That is only a proxy for "the publisher\n` +
+      `combined the gases" while each table is uniform. A mixed table means some rows would stamp\n` +
+      `as-published and others the live AR set, from ONE source, with nothing saying why.\n` +
+      `TO FIX: if the change is intended, update the DECLARED list above IN THE SAME COMMIT and check\n` +
+      `that X1/X2 still name the right jurisdictions.\n`,
+    ).toEqual([]);
+  });
+
+  it('X6 the condition reads the FACTOR, not a country list', () => {
+    // ⚠️ A HARDCODED ['GB','AU','NZ'] PASSES X1-X5 TODAY. It is behaviourally identical for the
+    // current tables and silently wrong the moment a fourth table converts to combined storage or one
+    // of these three gains a gas split — the list and the tables drift with nothing to notice. X4
+    // would eventually catch the fallout; this catches the implementation.
+    const src = readFileSync(join(process.cwd(), 'lib/ghg/engine.ts'), 'utf8');
+    const line = src.split('\n').filter(l => l.includes('const combinedCo2e ='));
+    expect(line, 'combinedCo2e is declared exactly once in pushFuel').toHaveLength(1);
+    expect(line[0], 'the condition must ask the factor being applied')
+      .toBe("    const combinedCo2e = ef.ch4 === 0 && ef.n2o === 0");
+    expect(line[0], 'a country list is what this test exists to reject').not.toContain('country');
+  });
+
+  it('X5 the factor cell says the publisher combined the gases, not that they are zero', () => {
+    // "CO2 2.71, CH4 0, N2O 0" reads as a measurement — this fuel emits no methane. It is not one.
+    const au = row('AU', 'AR6');
+    expect(au.emission_factor).toBe('CO₂e 2.71 kg/litres — CH₄/N₂O included');
+    expect(au.emission_factor, 'a zero that means "already counted" must not print as a measured zero')
+      .not.toContain('CH4 0');
+    // Gas-split rows keep the split verbatim — the verifier path depends on it.
+    expect(row('US', 'AR6').emission_factor).toBe('CO2 10.20648, CH4 0.000414, N2O 0.0000828 kg/gallons');
   });
 });
