@@ -1143,7 +1143,7 @@ describe('P. electricity rows: citation and fallback disclosure', () => {
       ['ON 2023', on, 2023, 0.03],
       ['ON 2026', on, 2026, 0.059],
       ['EU_DE 2026', euDe, 2026, 0.329],
-      ['UK 2026', () => loc({ country: 'GB', grid_region: 'UK', electricity_kwh: 100_000 }), 2026, 0.177],
+      ['UK 2026', () => loc({ country: 'GB', grid_region: 'UK', electricity_kwh: 100_000 }), 2026, 0.13096],
       ['NZ 2026', () => loc({ country: 'NZ', grid_region: 'NZ', electricity_kwh: 100_000 }), 2026, 0.0787],
     ];
     for (const [label, mk, year, ef] of cases) {
@@ -1310,7 +1310,7 @@ describe('X. combustion rows stamp the GWP basis that actually applied', () => {
     }
     // Absolute pins, so "nothing moved" is measured and not merely self-consistent.
     expect(row('AU', 'AR6').result_tco2e).toBeCloseTo(2.71, 9);          // 1000 L x 2.710 kg/L
-    expect(row('GB', 'AR6').result_tco2e).toBeCloseTo(2.57082, 9);
+    expect(row('GB', 'AR6').result_tco2e).toBeCloseTo(2.58354, 9);   // DEFRA 2026
     expect(row('NZ', 'AR6').result_tco2e).toBeCloseTo(2.6759, 9);
     expect(row('US', 'AR6').result_tco2e).toBeCloseTo(10.2414216, 9);
   });
@@ -1567,10 +1567,12 @@ describe('Z. fuel oil grades are seeded per table', () => {
   ];
 
   it('Z1 the legacy fuel_oil_gallon is byte-identical in all four tables that had one', () => {
-    // THE WHOLE POINT OF "ADDITIVE ONLY". Nothing customer-visible may move.
+    // Was "additive only" when section Z landed. EF_UK has since been refreshed to DEFRA 2026, which
+    // corrected its gallon conversion (12.018374 -> 12.018380 — the FACTOR 3.17492 kg/L is unchanged
+    // between editions; only the rounding was). The other three are still untouched.
     expect((EF as any).fuel_oil_gallon).toEqual({ co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 });
     expect((EF_CA as any).fuel_oil_gallon).toEqual({ co2: 10.421234, ch4: 0.000023, n2o: 0.000117 });
-    expect((EF_UK as any).fuel_oil_gallon).toEqual({ co2: 12.018374, ch4: 0, n2o: 0 });
+    expect((EF_UK as any).fuel_oil_gallon).toEqual({ co2: 12.018380, ch4: 0, n2o: 0 });
     expect((EF_EU as any).fuel_oil_gallon).toEqual({ co2: 11.718456, ch4: 0.000454249, n2o: 0.00009085 });
     // AU and NZ never had one — they fall through to US, and that is unchanged.
     expect((EF_AU as any).fuel_oil_gallon).toBeUndefined();
@@ -1582,7 +1584,7 @@ describe('Z. fuel oil grades are seeded per table', () => {
   // the absence is filled in without also deleting its pin.
   const NOT_YET_SEEDED: Record<string, readonly ('distillate' | 'residual')[]> = {
     'EF (US)': ['residual'],                 // EPA table not opened — see Z6
-    'EF_UK': ['distillate', 'residual'],     // DEFRA 2025 table; refresh whole first — see Z9
+    'EF_UK': ['distillate', 'residual'],     // seedable now the table is DEFRA 2026 — see Z9
   };
 
   it('Z2 every jurisdiction resolves its OWN grade keys — none falls through to US', () => {
@@ -1651,23 +1653,120 @@ describe('Z. fuel oil grades are seeded per table', () => {
     expect((EF as any).fuel_oil_distillate_gallon).toEqual((EF as any).fuel_oil_gallon);
   });
 
-  it('Z9 EF_UK has NO grade keys — the table is DEFRA 2025 and must be refreshed whole first', () => {
+  it('Z9 EF_UK is DEFRA 2026 — refreshed whole, and the grade keys are now SEEDABLE', () => {
+    // WAS: "EF_UK has NO grade keys — the table is DEFRA 2025 and must be refreshed whole first."
+    // That blocker is gone. The table was refreshed to DEFRA 2026 in full on 13 Aug 2026, so seeding
+    // fuel_oil_distillate_gallon / fuel_oil_residual_gallon here no longer mixes editions.
+    //
+    // THIS TEST NOW GUARDS THE OPPOSITE THING: that the refresh HELD. If any of the three moved keys
+    // reverts to its 2025 value, the table is back to a mixed or stale edition and any grade keys
+    // seeded on top of it become unattributable.
     const WHY =
-      'EF_UK IS DEFRA 2025 AND THE GRADE VALUES ARE DEFRA 2026 — seeding them here mixes two editions ' +
-      'in one table. Verified 13 Aug 2026 against the 2026 workbook: natural_gas_kwh, diesel_litre and ' +
-      'gasoline_litre all differ between editions, so the 2025 citation is correct. The fuel-oil row ' +
-      'matches across editions only because that factor did not move — it is NOT evidence of edition. ' +
-      'TO FIX: refresh the WHOLE table to DEFRA 2026, move the header citation with it, and seed the ' +
-      'grades in that same commit. Then delete this test.';
-    expect((EF_UK as any).fuel_oil_distillate_gallon, WHY).toBeUndefined();
-    expect((EF_UK as any).fuel_oil_residual_gallon, WHY).toBeUndefined();
-    // The legacy key stays, untouched, and remains the only fuel-oil factor a UK location can reach.
-    expect((EF_UK as any).fuel_oil_gallon).toEqual({ co2: 12.018374, ch4: 0, n2o: 0 });
-    // The three keys that PROVE the edition. If any of these ever equals its 2026 value, the refresh
-    // has begun and this test is the next thing to update.
-    expect((EF_UK as any).natural_gas_kwh.co2, 'DEFRA 2025; 2026 is 0.18231').toBe(0.18296);
-    expect((EF_UK as any).diesel_litre.co2, 'DEFRA 2025; 2026 is 2.58354').toBe(2.57082);
-    expect((EF_UK as any).gasoline_litre.co2, 'DEFRA 2025; 2026 is 2.075').toBe(2.06916);
+      'EF_UK HAS REVERTED TOWARD DEFRA 2025. The table was refreshed WHOLE to DEFRA 2026 because it ' +
+      'has no year dimension — one edition prices every reporting year, so a single key from another ' +
+      'workbook puts two editions in one table with nothing on any row saying which priced it.';
+    expect((EF_UK as any).natural_gas_kwh.co2, WHY).toBe(0.18231);
+    expect((EF_UK as any).diesel_litre.co2, WHY).toBe(2.58354);
+    expect((EF_UK as any).diesel_mobile_litre.co2, `${WHY} (mobile reuses the diesel row)`).toBe(2.58354);
+    expect((EF_UK as any).gasoline_litre.co2, WHY).toBe(2.075);
+    // Unchanged between editions — CONFIRMED against the 2026 workbook, not assumed.
+    expect((EF_UK as any).propane_litre.co2, 'propane did not move between editions').toBe(1.54358);
+    // The residual-oil FACTOR did not move either; only its gallon conversion was corrected.
+    expect((EF_UK as any).fuel_oil_gallon.co2).toBe(12.018380);
+    // Grade keys are seedable now but are NOT part of this commit. Delete these two lines in the
+    // commit that seeds them, and add EF_UK to Z2/Z3/Z5 in the same change.
+    expect((EF_UK as any).fuel_oil_distillate_gallon, 'seedable now — but not in this commit').toBeUndefined();
+    expect((EF_UK as any).fuel_oil_residual_gallon, 'seedable now — but not in this commit').toBeUndefined();
+  });
+
+  it('Z10 every UK _gallon fallback equals its litre value x 3.785411784', () => {
+    // Five _gallon keys, not six — the brief said six and there are five. They are UI-unreachable for
+    // a GB location (liquidUnitOptions('GB') offers litres only), so they matter only as a consistency
+    // property: a stale gallon beside a refreshed litre is a contradiction nothing else would catch.
+    const G = 3.785411784;
+    const pairs: [string, string][] = [
+      ['propane_litre', 'propane_gallon'],
+      ['diesel_litre', 'diesel_gallon'],
+      ['diesel_mobile_litre', 'diesel_mobile_gallon'],
+      ['gasoline_litre', 'gasoline_gallon'],
+    ];
+    for (const [l, g] of pairs) {
+      expect((EF_UK as any)[g].co2, `${g} must be ${l} x L_PER_GAL`)
+        .toBeCloseTo((EF_UK as any)[l].co2 * G, 6);
+    }
+    // fuel_oil has no litre key — its published 3.17492 kg/L converts straight to the gallon entry.
+    expect((EF_UK as any).fuel_oil_gallon.co2).toBeCloseTo(3.17492 * G, 6);
+    expect(Object.keys(EF_UK).filter(k => k.endsWith('_gallon')), 'five, not six').toHaveLength(5);
+  });
+
+  it('Z11 the UK grid holds BOTH editions, and each year resolves to its own', () => {
+    // GRID_EF IS year-keyed, so two editions side by side is correct here where it would be wrong in
+    // EF_UK. Replacing 2025 would have re-priced every stored 2025 UK inventory at the 2026 factor.
+    expect(getGridFactor('UK', 2026).ef, 'DEFRA 2026 UK electricity').toBe(0.13096);
+    expect(getGridFactor('UK', 2026).usedYear).toBe(2026);
+    expect(getGridFactor('UK', 2026).note, 'exact year — nothing to disclose').toBe('');
+    expect(getGridFactor('UK', 2025).ef, 'a 2025 inventory keeps the 2025 factor').toBe(0.177);
+    expect(getGridFactor('UK', 2025).usedYear).toBe(2025);
+    expect(getGridFactor('UK', 2027).usedYear, 'later years hold at the newest edition').toBe(2026);
+  });
+
+  it('Z12 UK figures MOVED; every other jurisdiction is untouched', () => {
+    const kwh = (country: string, year: number) =>
+      (buildWorkings([loc({ country, grid_region: country === 'GB' ? 'UK' : country === 'CA' ? 'ON' : 'US_CA',
+        electricity_kwh: 100_000 })], 'AR6', year, [], 12) as any[])
+        .find(r => r.scope2_method === 'location-based').result_tco2e;
+    // UK electricity moved, by year.
+    expect(kwh('GB', 2026)).toBeCloseTo(13.096, 9);
+    expect(kwh('GB', 2025)).toBeCloseTo(17.7, 9);
+    // UK combustion moved.
+    const gas = (year: number) =>
+      (buildWorkings([loc({ country: 'GB', has_natural_gas: true, natural_gas_amount: 100_000, natural_gas_unit: 'kwh' })],
+        'AR6', year, [], 12) as any[]).find(r => r.stream === 'natural_gas' && !r.declaration).result_tco2e;
+    expect(gas(2026), 'DEFRA 2026: 0.18231').toBeCloseTo(18.231, 9);
+    // Every other jurisdiction: unchanged.
+    expect(kwh('US', 2026)).toBeCloseTo(17.91, 9);
+    expect(kwh('CA', 2026)).toBeCloseTo(5.9, 9);
+  });
+
+  it('Z13 the UK table still stamps as-published — ch4/n2o remain 0 after the refresh', () => {
+    // The refresh must not have introduced a gas split. Section X decides gwp_basis from the shape.
+    for (const [k, v] of Object.entries(EF_UK) as [string, any][]) {
+      expect(v.ch4, `${k}`).toBe(0);
+      expect(v.n2o, `${k}`).toBe(0);
+    }
+    const row = (g: 'AR4' | 'AR6') =>
+      (buildWorkings([loc({ country: 'GB', has_diesel_stationary: true, diesel_stationary_amount: 1000, diesel_stationary_unit: 'litres' })],
+        g, 2026, [], 12) as any[]).find(r => r.stream === 'diesel_stationary' && !r.declaration);
+    expect(row('AR6').gwp_basis).toBe('as-published — see factor source');
+    expect(row('AR4').result_tco2e, 'a combined factor cannot move with the AR toggle').toBe(row('AR6').result_tco2e);
+  });
+
+  it('Z14 no DEFRA 2025 citation survives outside a historical note', () => {
+    const files = ['lib/ghg/engine.ts', 'app/dashboard/ghg/page.tsx', 'app/methodology/page.tsx'];
+    const offences: string[] = [];
+    for (const f of files) {
+      for (const [i, ln] of readFileSync(join(process.cwd(), f), 'utf8').split('\n').entries()) {
+        // ⚠️ TWO BUGS IN THIS GUARD, BOTH FOUND BY MUTATION, BOTH WORTH RECORDING.
+        // (1) The regex was /DEFRA[ /]?(\/DESNZ )?\(?2025/ and did not match "DEFRA/DESNZ (2025)" —
+        //     it consumed the slash before the optional group could. `.{0,14}` spans every spelling
+        //     in the repo: "DEFRA 2025", "DEFRA (2025)", "DEFRA/DESNZ (2025)".
+        // (2) The exceptions were line-level `continue`s. app/methodology/page.tsx:40 is ONE ~2,000
+        //     character string carrying BOTH a combustion citation and an electricity one, so an
+        //     allowed "DEFRA 2025 and 2026" on that line exempted a disallowed "DEFRA/DESNZ (2025)"
+        //     beside it. Reverting the page passed. Allowed spellings are now STRIPPED and the
+        //     remainder tested, so one legitimate mention cannot shelter an illegitimate one.
+        const allowed = [/WAS DEFRA\/DESNZ 2025/g, /2025 workbook/g, /DEFRA 2025\+2026/g, /DEFRA 2025 and 2026/g];
+        let probe = ln;
+        for (const a of allowed) probe = probe.replace(a, '');
+        if (!/DEFRA.{0,14}2025/.test(probe)) continue;
+        offences.push(`${f}:${i + 1} — ${probe.trim().slice(0, 90)}`);
+      }
+    }
+    expect(offences, offences.length === 0 ? '' :
+      `A DEFRA 2025 CITATION SURVIVED THE REFRESH:\n\n${offences.join('\n')}\n\n` +
+      `EF_UK is DEFRA 2026 now. Every citation must move with it or a customer reads one year on the\n` +
+      `methodology page and is priced on another. The Scope 3 DEFRA/Exiobase strings are a DIFFERENT\n` +
+      `dataset and are deliberately not in scope here.\n`).toEqual([]);
   });
 
   it('Z7 EU distillate equals the gas/diesel oil derivation it is taken from', () => {
@@ -1693,7 +1792,7 @@ describe('Z. fuel oil grades are seeded per table', () => {
         'AR6', 2025, [], 12) as any[]).find(r => r.stream === 'fuel_oil' && !r.declaration).result_tco2e;
     expect(fo('US', 'gallons')).toBeCloseTo(10.2414216, 9);
     expect(fo('CA', 'litres')).toBeCloseTo(1000 / G * 10.421234 / 1000 + 1000 / G * (0.000023 * 29.8 + 0.000117 * 273) / 1000, 9);
-    expect(fo('GB', 'litres')).toBeCloseTo(1000 / G * 12.018374 / 1000, 9);
+    expect(fo('GB', 'litres')).toBeCloseTo(1000 / G * 12.018380 / 1000, 9);
     expect(fo('DE', 'litres')).toBeCloseTo(1000 / G * (11.718456 + 0.000454249 * 29.8 + 0.00009085 * 273) / 1000, 9);
   });
 });

@@ -162,7 +162,7 @@ describe('combustion citations follow the jurisdiction that priced them', () => 
 // ── W. THE SAME TREATMENT FOR ELECTRICITY ────────────────────────────────────────────────────────
 //
 // efSources.electricity is the six-jurisdiction CATALOGUE — 'US EPA eGRID2023 (US) / ECCC v3.0 (CA) /
-// DEFRA 2025 (UK) / EEA 2023 (EU) / DCCEEW NGA 2025 (AU) / NZ MfE 2026 (NZ)'. Correct as a catalogue,
+// DEFRA 2025+2026 (UK) / EEA 2023 (EU) / DCCEEW NGA 2025 (AU) / NZ MfE 2026 (NZ)'. Correct as a catalogue,
 // wrong as an attribution: it names six publishers where one priced the rows. Commit 06b6125 split it
 // into EF_SOURCES.electricity_* and removed it from the workings table for exactly that reason; the
 // assurance PDF's methodology page kept it.
@@ -209,20 +209,24 @@ describe('electricity citations follow the jurisdiction that priced them', () =>
       .not.toContain('?')
   })
 
-  it('W6 the two families are resolved independently — four jurisdictions cite different documents', () => {
+  it('W6 the two families are resolved independently — five jurisdictions cite different documents', () => {
     // ⚠️ WRITTEN WRONG FIRST TIME, and the test caught it. The original asserted that combustion and
-    // electricity ALWAYS name different sources, using GB as the example. They are identical for GB:
-    // DEFRA publishes both families in one document, and so does ECCC for CA. Four of six differ,
-    // two legitimately coincide, and asserting otherwise would have pinned a claim about the sources
-    // that is simply false.
-    for (const c of ['US', 'DE', 'AU', 'NZ']) {
+    // electricity ALWAYS name different sources, using GB as the example. They were identical for GB:
+    // DEFRA publishes both families in one document, and so does ECCC for CA.
+    for (const c of ['US', 'DE', 'AU', 'NZ', 'GB']) {
       expect(combustionSourcesFor([loc(c)])[0], `${c}`).not.toBe(gridSourcesFor([loc(c)])[0])
     }
-    // CA and GB coincide because one publisher covers both. Pinned so the coincidence reads as a fact
-    // about the sources rather than as a bug in the helpers.
-    for (const c of ['CA', 'GB']) {
-      expect(combustionSourcesFor([loc(c)])[0], `${c} — one publisher, both families`)
-        .toBe(gridSourcesFor([loc(c)])[0])
-    }
+    // ⚠️ GB MOVED INTO THIS GROUP WITH THE DEFRA 2026 REFRESH, and the reason is worth keeping.
+    // DEFRA still publishes both families in one workbook. But GRID_EF.UK now holds TWO editions
+    // (2025 and 2026) while EF_UK holds one, so electricity_uk was made YEAR-NEUTRAL: naming 2026
+    // there would contradict factor_vintage on a 2025 UK inventory. combustion_uk keeps its year
+    // because EF_UK is single-edition. One publisher, two citation shapes, because the two tables
+    // have different year dimensions.
+    expect(combustionSourcesFor([loc('GB')])[0]).toContain('(2026)')
+    expect(gridSourcesFor([loc('GB')])[0], 'year-neutral — the vintage column carries the year')
+      .not.toMatch(/20\d\d/)
+    // CA still coincides: ECCC covers both families and is single-edition on both sides.
+    expect(combustionSourcesFor([loc('CA')])[0], 'CA — one publisher, both families')
+      .toBe(gridSourcesFor([loc('CA')])[0])
   })
 })

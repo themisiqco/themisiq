@@ -132,8 +132,8 @@ const EF_CA_NG_CO2_M3: Record<string, number> = {
 }
 const M3_PER_MCF = 1000 / 35.3147 // 28.3168
 
-// UK combustion factors — DEFRA/DESNZ 2025 "Greenhouse gas reporting: conversion factors"
-// (condensed set, Fuels tab). The mandatory basis for UK SECR reporting.
+// UK combustion factors — DEFRA/DESNZ 2026 "Greenhouse gas reporting: conversion factors"
+// (full set, Fuels tab). The mandatory basis for UK SECR reporting.
 // STORAGE NOTE: stored as combined kg CO2e in the `co2` field with ch4:0, n2o:0, so calcGas
 // reproduces DEFRA's PUBLISHED figure exactly (Option 2 — exact match for verifier reconciliation).
 // DEFRA bakes in its own GWP basis, so UK fuels intentionally do NOT respond to the AR4/AR5 toggle.
@@ -141,39 +141,46 @@ const M3_PER_MCF = 1000 / 35.3147 // 28.3168
 // diesel/petrol use the "average biofuel blend" rows (forecourt fuel). gallon values are a
 // non-breaking fallback only (US gallon × litre value); UK wizard defaults to kWh/litres.
 //
-// ── EDITION VERIFIED: THIS TABLE IS GENUINELY DEFRA 2025 ────────────────────────────────────────
-// Checked against the DEFRA/DESNZ 2026 workbook — LF, 13 Aug 2026. Three keys differ between the
-// editions, so the 2025 citation above is CORRECT and not a stale header:
-//   natural_gas_kwh   0.18296   (2026: 0.18231)
-//   diesel_litre      2.57082   (2026: 2.58354)
-//   gasoline_litre    2.06916   (2026: 2.07500)
+// ── EDITION HISTORY: 2025 → 2026, REFRESHED WHOLE ───────────────────────────────────────────────
+// This table WAS DEFRA/DESNZ 2025. Refreshed to the 2026 workbook in full — LF, 13 Aug 2026.
+// Refreshed WHOLE and in one commit, deliberately: EF_UK has no year dimension, so one edition prices
+// every reporting year. Seeding a single key from a newer workbook would put two editions in one
+// table with nothing on any row saying which priced it. (GRID_EF.UK below is different — it IS
+// year-keyed, so it legitimately carries 2025 and 2026 side by side.)
 //
-// ⚠️ THE FUEL-OIL ROW IS THE ONE THAT MISLEADS, WHICH IS WHY THIS NOTE EXISTS.
-// fuel_oil_gallon 12.018374 is 3.17492 kg/L, and 3.17492 is ALSO the 2026 workbook's "Processed fuel
-// oils - residual oil" value — the factor did not move between editions. A single matching row is not
-// evidence of which edition a table came from; the three differing rows above are. Anyone re-deriving
-// this from the fuel-oil row alone will reach the wrong conclusion, as very nearly happened here.
+// WHAT MOVED, 2025 -> 2026:
+//   natural_gas_kwh   0.18296 -> 0.18231   (-0.355%)
+//   diesel_litre      2.57082 -> 2.58354   (+0.495%)  — and diesel_mobile_litre, same row
+//   gasoline_litre    2.06916 -> 2.075     (+0.282%)
+// WHAT DID NOT:
+//   propane_litre     1.54358 — CONFIRMED identical in both editions, not assumed.
+//   fuel_oil_gallon   3.17492 kg/L — the residual-oil factor is unchanged between editions. Its
+//     stored per-gallon value moves 12.018374 -> 12.018380 only because it was previously rounded
+//     one digit short; 3.17492 x 3.785411784 = 12.018380.
 //
-// CONSEQUENCE: NO FUEL-OIL GRADE KEYS ARE SEEDED IN THIS TABLE, while US/CA/EU/AU/NZ have them.
-// The published grade values are DEFRA 2026, so adding them here would put two editions in one table.
-// Refresh the WHOLE table to 2026 and move the header citation with it, then seed the grades in the
-// same commit. Pinned by engine.test.ts Z9.
+// ⚠️ THE FUEL-OIL ROW IS WHY THE PREVIOUS EDITION CHECK WAS HARD, AND THE LESSON SURVIVES THE REFRESH.
+// Because 3.17492 is identical in both workbooks, matching on that row alone would have "proved" this
+// table was 2026 when it was 2025. The three keys that MOVED are what identified the edition. Any
+// future edition check must use a row that changes, not one that happens to agree.
 const EF_UK = {
-  // Natural gas, kWh (Gross CV): 0.18296 kgCO2e/kWh (DEFRA Fuels row "Natural gas").
-  natural_gas_kwh: { co2: 0.18296, ch4: 0, n2o: 0 },
-  // Propane, litres: 1.54358 kgCO2e/L.
+  // Natural gas, kWh (Gross CV): 0.18231 kgCO2e/kWh (DEFRA 2026 Fuels row "Natural gas";
+  // CO2 0.18194, CH4 0.00028, N2O 0.00009 — components sum to the total exactly).
+  natural_gas_kwh: { co2: 0.18231, ch4: 0, n2o: 0 },
+  // Propane, litres: 1.54358 kgCO2e/L (CO2 1.5414, CH4 0.00133, N2O 0.00084 — components sum to
+  // 1.54357, DEFRA's own rounding against its stated 1.54358). UNCHANGED from the 2025 edition.
   propane_litre: { co2: 1.54358, ch4: 0, n2o: 0 },
-  propane_gallon: { co2: 5.843083, ch4: 0, n2o: 0 },
-  // Diesel (average biofuel blend), litres: 2.57082 kgCO2e/L.
-  diesel_litre: { co2: 2.57082, ch4: 0, n2o: 0 },
-  diesel_gallon: { co2: 9.731608, ch4: 0, n2o: 0 },
-  diesel_mobile_litre: { co2: 2.57082, ch4: 0, n2o: 0 },
-  diesel_mobile_gallon: { co2: 9.731608, ch4: 0, n2o: 0 },
-  // Fuel oil (residual), litres 3.17492 → per US-gallon fallback.
-  fuel_oil_gallon: { co2: 12.018374, ch4: 0, n2o: 0 },
-  // Petrol (average biofuel blend), litres: 2.06916 kgCO2e/L.
-  gasoline_litre: { co2: 2.06916, ch4: 0, n2o: 0 },
-  gasoline_gallon: { co2: 7.832619, ch4: 0, n2o: 0 },
+  propane_gallon: { co2: 5.843086, ch4: 0, n2o: 0 },
+  // Diesel (average biofuel blend), litres: 2.58354 kgCO2e/L (CO2 2.55035, CH4 0.00029, N2O 0.0329).
+  diesel_litre: { co2: 2.58354, ch4: 0, n2o: 0 },
+  diesel_gallon: { co2: 9.779763, ch4: 0, n2o: 0 },
+  diesel_mobile_litre: { co2: 2.58354, ch4: 0, n2o: 0 },
+  diesel_mobile_gallon: { co2: 9.779763, ch4: 0, n2o: 0 },
+  // Fuel oil, litres 3.17492 (DEFRA "Processed fuel oils - residual oil") → per US-gallon fallback.
+  // The FACTOR is unchanged from 2025; only the gallon conversion is corrected (see the header).
+  fuel_oil_gallon: { co2: 12.018380, ch4: 0, n2o: 0 },
+  // Petrol (average biofuel blend), litres: 2.075 kgCO2e/L (CO2 2.06107, CH4 0.00806, N2O 0.00587).
+  gasoline_litre: { co2: 2.075, ch4: 0, n2o: 0 },
+  gasoline_gallon: { co2: 7.854729, ch4: 0, n2o: 0 },
 }
 
 // EU combustion factors — IPCC 2006 Guidelines Vol.2 Tier-1 defaults (fossil, full oxidation),
@@ -278,18 +285,24 @@ const EF_NZ = {
 const EF_SOURCES = {
   combustion: 'US EPA (2024) Emission Factors for Greenhouse Gas Inventories',
   combustion_ca: 'ECCC (2025) Emission factors and reference values v3.0',
-  combustion_uk: 'UK DEFRA/DESNZ (2025) GHG Conversion Factors for Company Reporting',
+  combustion_uk: 'UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting',
   combustion_eu: 'IPCC (2006) Guidelines Vol.2 — Tier 1 default combustion factors',
   combustion_au: 'DCCEEW NGA Factors 2025 (AR5)',
   combustion_nz: 'NZ MfE Measuring Emissions 2026 v2 (as-published basis — factors stored verbatim, no AR re-basing)',
   // KEPT — exported, and still read by the methodology summary in app/dashboard/ghg/page.tsx as a
   // catalogue of every grid source this engine can apply. It must NOT be used on a workings row:
   // a verifier reading one row needs the ONE source that priced it, not the six it might have been.
-  electricity: 'US EPA eGRID2023 (US) / ECCC v3.0 (CA) / DEFRA 2025 (UK) / EEA 2023 (EU) / DCCEEW NGA 2025 (AU) / NZ MfE 2026 (NZ)',
+  electricity: 'US EPA eGRID2023 (US) / ECCC v3.0 (CA) / DEFRA 2025+2026 (UK) / EEA 2023 (EU) / DCCEEW NGA 2025 (AU) / NZ MfE 2026 (NZ)',
   // The catalogue above, split so gridSource() can resolve the one actually applied.
   electricity_us: 'US EPA eGRID2023',
   electricity_ca: 'ECCC (2025) Emission factors and reference values v3.0',
-  electricity_uk: 'UK DEFRA/DESNZ (2025) GHG Conversion Factors for Company Reporting',
+  // ⚠️ YEAR-NEUTRAL, UNLIKE combustion_uk — deliberately. GRID_EF.UK now holds 2025 AND 2026, and
+  // gridSource() returns one string whatever year priced the row. Naming an edition here would
+  // contradict factor_vintage on the other half of the table: a 2025 inventory would read
+  // "DEFRA (2026)" beside "factor_vintage 2025". The vintage column already carries the year, so the
+  // citation names the document family and the two together are unambiguous. Re-add a year here only
+  // if GRID_EF.UK ever collapses back to a single edition.
+  electricity_uk: 'UK DEFRA/DESNZ GHG Conversion Factors for Company Reporting',
   electricity_eu: 'EEA (2023) Greenhouse gas emission intensity of electricity generation',
   electricity_au: 'DCCEEW NGA Factors 2025',
   electricity_nz: 'NZ MfE Measuring Emissions 2026 v2',
@@ -343,8 +356,17 @@ const GRID_EF: Record<string, Record<number, number>> = {
   US_UT: { 2023: 0.6447 }, US_VA: { 2023: 0.2448 }, US_VT: { 2023: 0.0237 }, US_WA: { 2023: 0.1209 },
   US_WI: { 2023: 0.5278 }, US_WV: { 2023: 0.8931 }, US_WY: { 2023: 0.8316 },
   US_AVG: { 2023: 0.3497 },
-  // United Kingdom — DEFRA/DESNZ 2025, "UK electricity" generation factor (location-based, excl. T&D)
-  UK: { 2025: 0.177 },
+  // United Kingdom — DEFRA/DESNZ "UK electricity" generation factor (location-based, excl. T&D).
+  // TWO EDITIONS SIDE BY SIDE, and that is correct here where it would be wrong in EF_UK: this table
+  // IS year-keyed, so 2025 keeps the figure the 2025 workbook published and 2026 takes the 2026 one.
+  // Replacing 2025 would have re-priced every stored 2025 UK inventory at the 2026 factor — a 26%
+  // move on a figure a customer has already reported.
+  //   2025: 0.177   — DEFRA/DESNZ 2025 workbook. NOT restated from the 2026 edition; whether 2026
+  //                   restates history has not been checked, so the original provenance stands.
+  //   2026: 0.13096 — DEFRA/DESNZ 2026 workbook (CO2 0.12943, CH4 0.00067, N2O 0.00086, summing
+  //                   exactly). ⚠️ A 26% single-year fall is large even for the UK grid; worth a
+  //                   second look at the workbook before this reaches a customer report.
+  UK: { 2025: 0.177, 2026: 0.13096 },
   // EU member states — EEA "GHG emission intensity of electricity generation, country level" (2023),
   // gCO2e/kWh ÷ 1000. Generation-based, location-based Scope 2. EU_AVG = EEA EU-27 aggregate.
   EU_AT: { 2023: 0.085 }, EU_BE: { 2023: 0.145 }, EU_BG: { 2023: 0.281 }, EU_HR: { 2023: 0.134 },
