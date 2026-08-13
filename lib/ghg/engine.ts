@@ -301,10 +301,13 @@ const NZ_TD_LOSS: Record<number, number> = { 2025: 0.00596 }
 // same disclosure obligation, same nearest-year fallback, so the same contract.
 //
 // TWO NOTE WORDINGS, NOT ONE — and the second is the deviation from getResidualFactor, deliberately.
-// The residual helpers say "(latest available)" whichever direction they resolved. That is right when
-// the factor is OLDER than the inventory (we reached back to the newest one we hold). It is wrong when
-// the factor is NEWER: `let ty = years[0]` means a 2023 or 2024 inventory — both selectable today —
-// resolves FORWARD to the 2025 factor, and "latest available" would say the opposite of what happened.
+// The residual helpers say "(latest vintage held)" whichever direction they resolved. That is right
+// when the factor is OLDER than the inventory (we reached back to the newest one we hold). It is wrong
+// when the factor is NEWER: `let ty = years[0]` means a 2023 or 2024 inventory — both selectable today
+// — resolves FORWARD to the 2025 factor, and a "latest" claim says the opposite of what happened.
+//   ⚠️ THIS HELPER STILL SAYS "(latest available)" WHERE THE OTHER TWO NOW SAY "(latest vintage held)".
+//   getGridFactor and getResidualFactor were aligned on the newer wording; nzTdLoss was out of scope for
+//   that pass and is now the odd one out. Three helpers, two spellings, one meaning — worth unifying.
 //
 // ⚠️ THE FORWARD NOTE DESCRIBES OUR COVERAGE, NOT MfE'S. It first read "(no earlier factor published)",
 // which was FALSE: MfE publishes an annual T&D loss series back to 2010. The gap is in NZ_TD_LOSS,
@@ -400,14 +403,39 @@ const RESIDUAL_US: Record<string, Record<number, ResidualGas>> = {
 function isResolvedGridRegion(region: string): boolean {
   return Object.prototype.hasOwnProperty.call(GRID_EF, region)
 }
-function getGridFactor(region: string, year: number): { ef: number; usedRegion: string; usedYear: number } {
+// RETURNS ITS OWN FALLBACK NOTE, in the shape getResidualFactor and nzTdLoss already use. usedYear was
+// stamped as factor_vintage from the start, so the year on the row was never wrong — but a bare year is
+// not a disclosure. Eighty of the 103 GRID_EF keys resolve to 2023 for a 2026 inventory, and the only
+// signal was a column reading "2023" beside a row headed 2026, which a reader has to notice and then
+// interpret. The note says it.
+//
+// PUBLISHER-FREE WORDING, deliberately: ef_source already carries the publisher (gridSource(loc) picks
+// eGRID / ECCC / DEFRA / EEA / DCCEEW / MfE per country), and repeating it here would let the two drift
+// into naming different sources on one row.
+//
+// BOTH DIRECTIONS, because both are reachable. `let best = years[0]` means a year below the earliest
+// key resolves FORWARD — Ontario at 2023 takes the 2024 factor, and 2023 is selectable in the wizard
+// today. "latest vintage held" would be the opposite of what happened there. Same reasoning, and the
+// same "held" (our coverage, not the publisher's), as the NZ T&D note.
+//
+// RESOLUTION SEMANTICS UNCHANGED. `years` was already sorted one line above `years[0]` — there was no
+// enumeration-order hazard to fix — and the forward fallback is left exactly as it was. This adds
+// disclosure only; no figure moves.
+function getGridFactor(region: string, year: number): { ef: number; usedRegion: string; usedYear: number; note: string } {
   const table = GRID_EF[region]
-  if (!table) return { ef: GRID_EF.US_AVG[2023], usedRegion: 'US_AVG', usedYear: 2023 }
+  // Unknown region → US national average. UNCHANGED and still undisclosed: `note: ''` is here only
+  // because the return type requires it. buildWorkings cannot reach this branch (isResolvedGridRegion
+  // gates it), but calcLocation and four UI banners can. Giving it a note or an applicable flag is a
+  // separate decision, deliberately not taken here.
+  if (!table) return { ef: GRID_EF.US_AVG[2023], usedRegion: 'US_AVG', usedYear: 2023, note: '' }
   const years = Object.keys(table).map(Number).sort((a, b) => a - b)
-  if (table[year] !== undefined) return { ef: table[year], usedRegion: region, usedYear: year }
+  if (table[year] !== undefined) return { ef: table[year], usedRegion: region, usedYear: year, note: '' }
   let best = years[0]
   for (const y of years) { if (y <= year) best = y }
-  return { ef: table[best], usedRegion: region, usedYear: best }
+  return { ef: table[best], usedRegion: region, usedYear: best,
+    note: best < year
+      ? `Grid factor for ${best} applied to ${year} inventory (latest vintage held).`
+      : `Grid factor for ${best} applied to ${year} inventory (earliest vintage held).` }
 }
 // Returns the market-based residual factor for a region, in kg CO2e/kWh, with provenance.
 // applicable=false means no residual mix exists for this region (e.g. full-disclosure AT, or a
@@ -430,7 +458,7 @@ function getResidualFactor(
           note: 'Full-disclosure regime — no residual mix published; market-based falls back to location factor.' }
       }
       return { ef: val / 1000, applicable: true, source: EF_SOURCES.residual_eu, vintage: `AIB ${y}`, usedRegion: region,
-        note: year !== y ? `AIB ${y} residual mix applied to ${year} inventory (latest available).` : '' }
+        note: year !== y ? `AIB ${y} residual mix applied to ${year} inventory (latest vintage held).` : '' }
     }
     return { ef: 0, applicable: false, source: EF_SOURCES.residual_eu, vintage: 'n/a', usedRegion: region,
       note: 'No published residual mix for this region; market-based falls back to location factor.' }
@@ -445,7 +473,7 @@ function getResidualFactor(
     const lbPerMwh = g.co2 + g.ch4 * gwp.CH4_fossil + g.n2o * gwp.N2O
     const ef = lbPerMwh * 0.453592 / 1000 // lb/MWh -> kg/kWh
     return { ef, applicable: true, source: EF_SOURCES.residual_us, vintage: `Green-e ${y + 2} [${y} data] + eGRID2023 Rev2`, usedRegion: region,
-      note: year !== y ? `Green-e ${y} residual mix applied to ${year} inventory (latest available).` : '' }
+      note: year !== y ? `Green-e ${y} residual mix applied to ${year} inventory (latest vintage held).` : '' }
   }
   return { ef: 0, applicable: false, source: EF_SOURCES.residual_us, vintage: 'n/a', usedRegion: region,
     note: 'No published residual mix for this subregion; market-based falls back to location factor.' }
@@ -1611,14 +1639,31 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     // getGridFactor call, no US_AVG row). NZ (T&D row below) is always resolved, so no real T&D is lost.
     if (loc.electricity_kwh > 0 && isResolvedGridRegion(loc.grid_region)) {
       const gf = getGridFactor(loc.grid_region, year)
-      rows.push({ location: loc.name || 'Location', stream: 'electricity', source: `Electricity (${gf.usedRegion})`, scope: 2, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${efDisplay(gf.ef)} kg CO₂e/kWh`, ef_source: gridSource(loc), factor_vintage: String(gf.usedYear), scope2_method: 'location-based', gwp_basis: GWP_AS_PUBLISHED, result_tco2e: loc.electricity_kwh * gf.ef / 1000, ...provOf('electricity_kwh') })
+      // ONE note, appended wherever the grid factor priced the row. factor_vintage below is UNCHANGED —
+      // it was already the factor's own year; the note is what turns a year into a disclosure.
+      const gridNote = gf.note ? ` · ${gf.note}` : ''
+      rows.push({ location: loc.name || 'Location', stream: 'electricity', source: `Electricity (${gf.usedRegion})`, scope: 2, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${efDisplay(gf.ef)} kg CO₂e/kWh`, ef_source: `${gridSource(loc)}${gridNote}`, factor_vintage: String(gf.usedYear), scope2_method: 'location-based', gwp_basis: GWP_AS_PUBLISHED, result_tco2e: loc.electricity_kwh * gf.ef / 1000, ...provOf('electricity_kwh') })
       // Market-based Scope 2: residual-mix factor on uncovered load, with provenance stamped for the verifier.
       const resRegion = loc.residual_region || (loc.grid_region.startsWith('EU_') ? loc.grid_region : '')
       const res = getResidualFactor(resRegion, year, gwpVersion)
       const uncovered = Math.max(0, loc.electricity_kwh - loc.renewable_electricity_kwh)
       const mktEf = res.applicable ? res.ef : gf.ef
+      // ⚠️ THE ROW MUST CITE WHAT PRICED IT. When no residual mix applies, mktEf IS gf.ef — the location
+      // grid factor — yet the row cited Green-e (or AIB) and stamped NO vintage at all, because res.vintage
+      // is 'n/a' on that path. So a US site with no eGRID subregion selected showed a 2023 grid factor
+      // under a Green-e citation with an empty vintage column: both structured fields a verifier reads
+      // pointed away from the number in front of them. The prose note said "falls back to location
+      // factor", which is the only reason this was recoverable at all.
+      //   applicable === true is UNTOUCHED: res.ef priced it, so res.source and res.vintage are correct.
+      const mktApplied = res.applicable
+        ? { src: res.source, vintage: res.vintage && res.vintage !== 'n/a' ? { factor_vintage: res.vintage } : {}, gridNote: '' }
+        // gridNote rides along ONLY here. On the applicable path the grid factor did not price this row,
+        // so a note about the grid vintage would describe a factor the row never used — a new falsehood
+        // in place of the one being removed. "Both rows disclose" holds exactly when both are priced by
+        // the same factor, which is this branch.
+        : { src: gridSource(loc), vintage: { factor_vintage: String(gf.usedYear) }, gridNote }
       // Market-based row is a derived (uncovered = grid − renewable) figure, not a verbatim bill read → manual.
-      rows.push({ location: loc.name || 'Location', stream: 'electricity', source: `Electricity (S2 market-based${res.applicable ? `, residual mix ${res.usedRegion}` : ', location-factor fallback'})`, scope: 2, activity_data: uncovered, activity_unit: 'kWh uncovered', emission_factor: `${efDisplay(mktEf)} kg CO₂e/kWh`, ef_source: `${res.source}${res.note ? ` · ${res.note}` : ''}`, ...(res.vintage && res.vintage !== 'n/a' ? { factor_vintage: res.vintage } : {}), scope2_method: 'market-based', gwp_basis: res.applicable && res.source !== EF_SOURCES.residual_eu ? gwpVersion : GWP_AS_PUBLISHED, result_tco2e: uncovered * mktEf / 1000, entry_method: 'manual' })
+      rows.push({ location: loc.name || 'Location', stream: 'electricity', source: `Electricity (S2 market-based${res.applicable ? `, residual mix ${res.usedRegion}` : ', location-factor fallback'})`, scope: 2, activity_data: uncovered, activity_unit: 'kWh uncovered', emission_factor: `${efDisplay(mktEf)} kg CO₂e/kWh`, ef_source: `${mktApplied.src}${res.note ? ` · ${res.note}` : ''}${mktApplied.gridNote}`, ...mktApplied.vintage, scope2_method: 'market-based', gwp_basis: res.applicable && res.source !== EF_SOURCES.residual_eu ? gwpVersion : GWP_AS_PUBLISHED, result_tco2e: uncovered * mktEf / 1000, entry_method: 'manual' })
       // NZ T&D losses — Scope 3 Category 3, NOT Scope 2. Distinct row (scope 3) so it never reads as
       // part of the S2 figure; opt-in per NZ location. Kept in lock-step with calcLocation via nzTdLoss.
       if (loc.country === 'NZ' && loc.nz_td_losses) {

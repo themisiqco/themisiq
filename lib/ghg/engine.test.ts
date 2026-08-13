@@ -16,7 +16,7 @@ import {
   isResolvedGridRegion, detectGridRegion, getResidualFactor, getGridFactor,
   pickEF, calcGas, emptyLocation, findUnresolvedCoverage, findUndeclaredStreams, applyResolutions, pctEstimated,
   MissingEmissionFactorError, findUnpriceableLocations,
-  streamState, DECLARABLE_STREAMS, STREAM_META, nzTdLoss, NZ_TD_LOSS,
+  streamState, DECLARABLE_STREAMS, STREAM_META, nzTdLoss, NZ_TD_LOSS, EF_SOURCES,
   type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal, type StreamAttestation,
   type DeclarableStream,
 } from './engine';
@@ -978,7 +978,9 @@ describe('O. NZ T&D losses carry their own vintage and disclose a fallback', () 
   });
 
   it('O3 the fallback is DISCLOSED, in the same style as the residual helpers', () => {
-    // getResidualFactor: 'AIB 2024 residual mix applied to 2026 inventory (latest available).'
+    // getResidualFactor: 'AIB 2024 residual mix applied to 2026 inventory (latest vintage held).'
+    // NOTE the spelling difference: the residual and grid helpers say 'vintage held', this one still
+    // says 'available'. Same meaning, two spellings — see the block above nzTdLoss.
     const r = tdRow(2026);
     expect(r.ef_source).toContain('MfE 2025 T&D loss factor applied to 2026 inventory (latest available).');
     // The source citation itself survives — the note is appended, not substituted.
@@ -1024,3 +1026,146 @@ describe('O. NZ T&D losses carry their own vintage and disclose a fallback', () 
     }
   });
 });
+
+// ── P. THE ELECTRICITY ROWS CITE WHAT PRICED THEM, AND DISCLOSE A STALE VINTAGE ──────────────────
+//
+// Two defects, one block.
+//
+// (1) CITATION. When no residual mix applies, the market-based row is priced by the LOCATION GRID
+//     FACTOR (`mktEf = res.applicable ? res.ef : gf.ef`) — but it cited Green-e/AIB and stamped no
+//     vintage at all, because res.vintage is 'n/a' on that path. A US site with no eGRID subregion
+//     selected showed a 2023 grid factor under a Green-e citation with an empty vintage column: both
+//     structured fields a verifier reads pointed away from the number in front of them.
+//
+// (2) DISCLOSURE. 80 of 103 GRID_EF keys resolve to 2023 for a 2026 inventory. factor_vintage was
+//     always the factor's own year, so nothing was WRONG — but a bare year is not a disclosure, and
+//     the reader has to notice the mismatch and then interpret it.
+//
+// These tests also pin all five getResidualFactor note strings, which had NO test coverage of any
+// kind before this section — the style the grid note was modelled on was itself unguarded.
+describe('P. electricity rows: citation and fallback disclosure', () => {
+  const elec = (l: Location, y: number) =>
+    (buildWorkings([l], 'AR6', y, [], 12) as any[]).filter(r => r.stream === 'electricity' && !r.declaration);
+  const byMethod = (l: Location, y: number) => {
+    const rows = elec(l, y);
+    return { lb: rows.find(r => r.scope2_method === 'location-based'), mb: rows.find(r => r.scope2_method === 'market-based') };
+  };
+  const usCa = () => loc({ country: 'US', state: 'CA', grid_region: 'US_CA', electricity_kwh: 100_000 });
+  const on = () => loc({ country: 'CA', province: 'ON', grid_region: 'ON', electricity_kwh: 100_000 });
+  const euDe = () => loc({ country: 'DE', grid_region: 'EU_DE', electricity_kwh: 100_000 });
+
+  it('P1 BACKWARD fallback — US_CA at 2026 discloses on BOTH rows, vintage 2023 on both', () => {
+    const { lb, mb } = byMethod(usCa(), 2026);
+    const note = 'Grid factor for 2023 applied to 2026 inventory (latest vintage held).';
+    expect(lb.factor_vintage).toBe('2023');
+    expect(lb.ef_source).toContain(note);
+    // Both rows are priced by the SAME factor here, so both must say so.
+    expect(mb.factor_vintage, 'market-based vintage was null before this fix').toBe('2023');
+    expect(mb.ef_source).toContain(note);
+  });
+
+  it('P2 FORWARD fallback — ON at 2023 says "earliest", never "latest"', () => {
+    // `let best = years[0]` resolves forward when the inventory year precedes every key. 2023 is
+    // selectable in the wizard and ON's earliest key is 2024, so this is live, not hypothetical.
+    const { lb, mb } = byMethod(on(), 2023);
+    const note = 'Grid factor for 2024 applied to 2023 inventory (earliest vintage held).';
+    expect(lb.factor_vintage).toBe('2024');
+    expect(lb.ef_source).toContain(note);
+    expect(lb.ef_source, 'a forward resolution must not claim the latest vintage').not.toContain('latest vintage held');
+    expect(mb.factor_vintage).toBe('2024');
+    expect(mb.ef_source).toContain(note);
+  });
+
+  it('P3 EXACT match emits no note at all', () => {
+    const { lb } = byMethod(on(), 2026);
+    expect(lb.factor_vintage).toBe('2026');
+    expect(lb.ef_source).toBe(EF_SOURCES.electricity_ca);   // citation only, nothing appended
+    expect(lb.ef_source).not.toContain('applied to');
+  });
+
+  it('P4 no residual mix → the market row cites the GRID source, not Green-e, and carries a vintage', () => {
+    // THE FALSEHOOD THIS FIXES. Before: ef_source began with the Green-e citation and factor_vintage
+    // was absent, on a row priced by eGRID.
+    const { lb, mb } = byMethod(usCa(), 2026);
+    expect(mb.ef_source.startsWith(EF_SOURCES.electricity_us), 'must lead with what priced the row').toBe(true);
+    expect(mb.ef_source, 'Green-e did not price this row').not.toContain('Green-e');
+    expect(mb.factor_vintage).not.toBeUndefined();
+    expect(mb.factor_vintage).not.toBeNull();
+    // The residual helper's own fallback note survives — it is why the grid factor is here at all.
+    expect(mb.ef_source).toContain('market-based falls back to location factor.');
+    // And the two rows now agree on the factor they share.
+    expect(mb.emission_factor).toBe(lb.emission_factor);
+  });
+
+  it('P5 residual APPLICABLE → the market row is untouched, and carries NO grid note', () => {
+    // EU_DE has an AIB residual mix, so res.ef prices this row and gf.ef does not. A grid-vintage note
+    // here would describe a factor the row never used — the same class of falsehood as P4, inverted.
+    const { lb, mb } = byMethod(euDe(), 2026);
+    expect(mb.factor_vintage).toBe('AIB 2024');
+    expect(mb.ef_source.startsWith(EF_SOURCES.residual_eu)).toBe(true);
+    expect(mb.ef_source).toContain('AIB 2024 residual mix applied to 2026 inventory (latest vintage held).');
+    expect(mb.ef_source, 'the grid note must not ride along when the grid factor did not price the row')
+      .not.toContain('Grid factor for');
+    // The location-based row beside it DOES disclose — EEA 2023 against a 2026 inventory.
+    expect(lb.ef_source).toContain('Grid factor for 2023 applied to 2026 inventory (latest vintage held).');
+    expect(mb.emission_factor).not.toBe(lb.emission_factor);   // genuinely different factors
+  });
+
+  it('P6 all five getResidualFactor note strings, verbatim — previously untested', () => {
+    // Zero coverage before this: grep for these strings across *.test.ts returned only section O's
+    // comment quoting one of them as the style being copied.
+    expect(getResidualFactor('EU_DE', 2026, 'AR6').note)
+      .toBe('AIB 2024 residual mix applied to 2026 inventory (latest vintage held).');
+    expect(getResidualFactor('EU_DE', 2024, 'AR6').note, 'exact year → silence').toBe('');
+    expect(getResidualFactor('EU_AT', 2024, 'AR6').note)
+      .toBe('Full-disclosure regime — no residual mix published; market-based falls back to location factor.');
+    expect(getResidualFactor('EU_ZZ', 2024, 'AR6').note)
+      .toBe('No published residual mix for this region; market-based falls back to location factor.');
+    expect(getResidualFactor('CAMX', 2026, 'AR6').note)
+      .toBe('Green-e 2023 residual mix applied to 2026 inventory (latest vintage held).');
+    expect(getResidualFactor('CAMX', 2023, 'AR6').note, 'exact year → silence').toBe('');
+    expect(getResidualFactor('', 2026, 'AR6').note)
+      .toBe('No published residual mix for this subregion; market-based falls back to location factor.');
+    // AT is applicable:false but NOT a coverage gap — it must never read as a zero-emission mix.
+    expect(getResidualFactor('EU_AT', 2024, 'AR6').applicable).toBe(false);
+  });
+
+  it('P7 NO FIGURE MOVED — factors and totals pinned across five jurisdictions', () => {
+    // This is a citation and disclosure pass. Every number below is the value the engine produced
+    // before it, asserted directly rather than recomputed from the same tables that could drift.
+    const cases: [string, () => Location, number, number][] = [
+      ['US_CA 2026', usCa, 2026, 0.1791],
+      ['ON 2023', on, 2023, 0.03],
+      ['ON 2026', on, 2026, 0.059],
+      ['EU_DE 2026', euDe, 2026, 0.329],
+      ['UK 2026', () => loc({ country: 'GB', grid_region: 'UK', electricity_kwh: 100_000 }), 2026, 0.177],
+      ['NZ 2026', () => loc({ country: 'NZ', grid_region: 'NZ', electricity_kwh: 100_000 }), 2026, 0.0787],
+    ];
+    for (const [label, mk, year, ef] of cases) {
+      const l = mk();
+      expect(getGridFactor(l.grid_region, year).ef, label).toBe(ef);
+      expect(byMethod(l, year).lb.result_tco2e, `${label} row`).toBeCloseTo(100_000 * ef / 1000, 9);
+      expect(calcLocation(l, 'AR6', year).s2_location, `${label} calc`).toBeCloseTo(100_000 * ef / 1000, 9);
+      expect(calcInventory([l], 'AR6', year).s2_location, `${label} inventory`).toBeCloseTo(100_000 * ef / 1000, 9);
+    }
+  });
+
+  it('P8 the note is the ONLY thing added — vintage and source were already right on the location row', () => {
+    // Guards against a "fix" that starts rewriting factor_vintage on the location-based row. It has
+    // always carried gf.usedYear; the defect was the absent note, not a wrong year.
+    for (const [mk, year, vintage] of [[usCa, 2026, '2023'], [on, 2023, '2024'], [on, 2026, '2026']] as const) {
+      const lb = byMethod(mk(), year).lb;
+      expect(lb.factor_vintage, `${year}`).toBe(vintage);
+      expect(lb.ef_source.split(' · ')[0], `${year} citation must lead`).toBe(gridSourceFor(mk().country));
+    }
+  });
+});
+
+// The country → citation mapping gridSource() applies, mirrored here so P8 asserts against a named
+// expectation rather than against the engine's own output.
+function gridSourceFor(country: string): string {
+  return country === 'CA' ? EF_SOURCES.electricity_ca
+    : country === 'GB' || country === 'UK' ? EF_SOURCES.electricity_uk
+    : country === 'DE' ? EF_SOURCES.electricity_eu
+    : EF_SOURCES.electricity_us;
+}
