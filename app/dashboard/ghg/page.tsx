@@ -8,6 +8,7 @@ import { supabase } from '../../../lib/supabase'
 import { buildMonthlyEmissions } from '../../../lib/ghg/monthlyEmissions'
 import { buildComparabilityDisclosure, buildComparabilityRecord, observationLines } from '../../../lib/ghg/comparability'
 import type { PriorYearState, InventorySummary, ComparabilityCapture, ComparabilityAnswer, ComparabilityRecord } from '../../../lib/ghg/comparability'
+import { factorEditionsForSave } from '../../../lib/ghg/factorEditions'
 import { assessCompleteness } from '../../../lib/ghg/loadSeries'
 import type { YearDataStatus } from '../../../lib/ghg/series'
 import { useEntitlementAccess, useHasConcierge, useGhgLocationAllowance, type EntitlementAccess } from '../../../lib/useEntitlement'
@@ -662,6 +663,12 @@ const searchParams = useSearchParams()
           // was never asked, and that is a fact a verifier reads — substituting an empty disclosure
           // would turn "never asked" into "asked, nothing to report".
           comparability_disclosure: data.comparability_disclosure ?? null,
+          // `?? {}`, not `?? null` like the line above — the two absences are genuinely different.
+          // A null comparability_disclosure means the customer was never ASKED; nobody is asked
+          // about factor editions, so the only absence here is "not recorded", and '{}' is the
+          // column's own default for it. This must be threaded through or the next save writes an
+          // empty map over a real one: the payload is built key by key from `inventory`.
+          factor_editions: data.factor_editions ?? {},
         }))
         // ── Re-hydrate the comparability answer, or clear it ────────────────────────────────────
         //
@@ -1148,6 +1155,13 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       scope1_intensity: inventory.revenue_millions > 0 ? totals_ar6.s1_total / inventory.revenue_millions : 0,
       scope2_intensity: inventory.revenue_millions > 0 ? totals_ar6.s2_location / inventory.revenue_millions : 0,
       gwp_version: 'AR6',
+      // Which factor editions priced the totals above. The electricity edition comes from
+      // getGridFactor().usedYear, NOT from the citation — EF_SOURCES.electricity_uk is deliberately
+      // year-neutral because GRID_EF.UK holds two editions, so the citation records both years
+      // identically and usedYear is the only thing that tells the earlier inventory from the later.
+      // The stored map is passed as the fallback so a save that computes nothing (an inventory with
+      // no priced location yet) leaves an earlier record intact rather than erasing it to '{}'.
+      factor_editions: factorEditionsForSave(inventory.locations, inventory.reporting_year, inventory.factor_editions),
       status: 'draft',
 // ⚠️ THIS IS ALSO THE RECORD OF WHAT THE SAVED TOTALS LEFT OUT. scope1_total / scope2_* above are
 // computed with unpriceable locations EXCLUDED, and buildWorkings emits one `declaration:

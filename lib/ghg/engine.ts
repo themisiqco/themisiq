@@ -23,6 +23,9 @@ import { L_PER_GAL, GJ_PER_MMBTU } from '../unitConversions'
 // neither builds nor reads a comparability disclosure; it carries the field so the stored inventory
 // shape stays in one place. See lib/ghg/comparability.ts.
 import type { ComparabilityRecord } from './comparability'
+// Type only, for the same reason and with the same effect: erased at compile, so the fact that
+// factorEditions.ts imports VALUES back out of this file is not a runtime cycle.
+import type { FactorEditions } from './factorEditions'
 
 // AR4/AR5 do not distinguish fossil vs biogenic methane — both keys carry the single published GWP100.
 // AR6 is the first IPCC set to split them (fossil 29.8 incl. oxidation; biogenic/non-fossil 27.0). N2O AR6 = 273.
@@ -1162,6 +1165,19 @@ locations: Location[]
    * the record is evidence of one moment and is never recomputed.
    */
   comparability_disclosure?: ComparabilityRecord | null
+  /**
+   * Which emission-factor editions priced this inventory — `ghg_inventories.factor_editions`.
+   *
+   * ABSENT / `{}` MEANS UNRECORDED, NOT "no factors applied". Every inventory was priced by some
+   * edition; the ones saved before this column existed cannot say which, because the factor tables
+   * are code and nothing recorded which revision was live at save time. Empty must warn, never
+   * block, and must never be read as "the editions agree".
+   *
+   * Computed at save by lib/ghg/factorEditions.ts from the same locations and reporting_year that
+   * produced the saved totals. Carried here — like comparability_disclosure — only so the stored
+   * inventory shape stays in one place; the engine neither builds nor reads it.
+   */
+  factor_editions?: FactorEditions
 }
 
 const emptyLocation = (id: string, name: string, state = ''): Location => ({
