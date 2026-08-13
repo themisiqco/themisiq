@@ -66,7 +66,22 @@ const GWP = {
 //   - natural_gas CO2 is per-province (see EF_CA_NG_CO2); the value below is a fallback only.
 //   - therms/mmbtu have no ECCC energy-basis factor — CA natural gas uses mcf/m3 only (handled in UI).
 // CH4/N2O use the Commercial/Industrial sector rows (Tables 2.x: ~0.037 CH4; 4.x Industrial for oils).
-// Combustion factors are year-stable across ECCC 2023/24, 2025, 2026, so no year dimension is needed.
+// ── YEAR-STABILITY: WHAT WAS CHECKED, AND WHAT THE CLAIM DOES NOT COVER ─────────────────────────
+// Every factor SEEDED BELOW is identical across all three ECCC applicability sets (2023/24, 2025,
+// 2026), so no year dimension is needed for them. Verified against v3.0 Tables 1.1-1.3, 2.1-2.3,
+// 3.1-3.3 and 4.1-4.3 — LF, 13 Aug 2026.
+//
+// ⚠️ THE CLAIM IS ABOUT THESE ELEVEN KEYS, NOT ABOUT THE DOCUMENT. Ten factors in v3.0 DO diverge
+// between sets. None is seeded here, and each would need a year dimension before it could be:
+//   - natural gas, NON-MARKETABLE — Alberta and Newfoundland. (The MARKETABLE column, which is what
+//     EF_CA_NG_CO2_M3 below carries, is stable; see its own note.)
+//   - producer-consumption CH4 — BC and Saskatchewan. This one also RESTRUCTURES: one lumped row in
+//     Table 2.1 becomes per-province rows in 2.2 and 2.3. A year key alone would not be enough —
+//     the shape of the lookup changes with the set, not just the value.
+//   - petroleum coke — CO2 and N2O, for both refineries and upgraders.
+//   - still gas — CO2, refineries.
+// Seeding any of those without a year dimension would carry a 2023/24 value into a 2026 inventory
+// with nothing on the row saying so — which is the failure GRID_EF already keys by year to avoid.
 const EF_CA = {
   // Natural gas: per m3 in source (1921 g CO2/m3 Ontario fallback; per-province override via EF_CA_NG_CO2).
   // mcf conversion: 1 mcf = 28.3168 m3. CH4 0.037 g/m3, N2O 0.035 g/m3 (Res/Comm/Institutional).
@@ -87,8 +102,13 @@ const EF_CA = {
   diesel_mobile_gallon: { co2: 10.148684, ch4: 0.000295, n2o: 0.000083 },
 }
 
-// Per-province natural gas CO2 (kg/m3) — ECCC Tables 1.1–1.3, "Marketable" column, year-stable.
+// Per-province natural gas CO2 (kg/m3) — ECCC Tables 1.1-1.3, "MARKETABLE" column.
 // Used to override EF_CA.natural_gas_*.co2 for the location's province. CH4/N2O stay sector-based.
+// Year-stable across all three applicability sets (2023/24, 2025, 2026) — verified against v3.0,
+// LF, 13 Aug 2026.
+// ⚠️ THE MARKETABLE COLUMN ONLY. The NON-MARKETABLE column in these same tables is NOT year-stable:
+// Alberta and Newfoundland diverge between sets. Nothing reads it today, and nothing should start
+// without adding a year dimension first — see the block above EF_CA.
 const EF_CA_NG_CO2_M3: Record<string, number> = {
   BC: 1.966, AB: 1.962, SK: 1.920, MB: 1.915, ON: 1.921, QC: 1.926,
   NB: 1.919, NS: 1.919, PE: 1.919, NL: 1.919, YT: 1.966, NT: 1.966, NU: 1.966,
