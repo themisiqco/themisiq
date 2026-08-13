@@ -16,7 +16,7 @@ import {
   isResolvedGridRegion, detectGridRegion, getResidualFactor, getGridFactor,
   pickEF, calcGas, emptyLocation, findUnresolvedCoverage, findUndeclaredStreams, applyResolutions, pctEstimated,
   MissingEmissionFactorError, findUnpriceableLocations,
-  streamState, DECLARABLE_STREAMS, STREAM_META,
+  streamState, DECLARABLE_STREAMS, STREAM_META, nzTdLoss, NZ_TD_LOSS,
   type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal, type StreamAttestation,
   type DeclarableStream,
 } from './engine';
@@ -942,5 +942,85 @@ describe('N10. the golden inventory is unchanged', () => {
     // Four streams are absent from this site and every one of them is on the record as absent.
     const declarations = rows.filter(r => r.declaration).map(r => r.stream).sort();
     expect(declarations).toEqual(['diesel_stationary', 'fuel_oil', 'propane', 'purchased_steam']);
+  });
+});
+
+// ── O. THE NZ T&D ROW STATES THE FACTOR'S OWN VINTAGE, NOT THE INVENTORY'S ───────────────────────
+//
+// nzTdLoss returned a bare number, so the workings row had no provenance to print and stamped
+// `factor_vintage: String(year)` — the INVENTORY year. NZ_TD_LOSS holds exactly one key (2025), so
+// every NZ inventory receives the 2025 factor while the row asserted the factor was contemporaneous
+// with the reporting year: a 2026 inventory printed "factor_vintage 2026" beside a 2025 figure.
+//
+// A stale factor applied silently is one defect. A stale factor with a FALSE vintage printed next to
+// it is worse: the column exists precisely so a verifier does not have to take the year on trust, and
+// a wrong value there is not a gap, it is a wrong answer to the question the column asks.
+//
+// The market-based row next to it already did this correctly — getResidualFactor returns
+// { ef, vintage, note } and the row stamps res.vintage and appends res.note. These tests pin the T&D
+// row to that same contract.
+describe('O. NZ T&D losses carry their own vintage and disclose a fallback', () => {
+  const nzLoc = () => loc({ country: 'NZ', grid_region: 'NZ', electricity_kwh: 100_000, nz_td_losses: true });
+  const tdRow = (year: number) =>
+    buildWorkings([nzLoc()], 'AR6', year, [], 12).find((r: any) => r.scope === 3) as any;
+
+  it('O1 the table still holds exactly one year — the premise these tests rest on', () => {
+    // If a second key is ever added, O2/O3 stop testing a fallback and start testing an exact hit.
+    // Pinned so that addition is a deliberate act rather than a silent change of what O2/O3 mean.
+    expect(Object.keys(NZ_TD_LOSS)).toEqual(['2025']);
+  });
+
+  it('O2 a 2026 inventory stamps the FACTOR year, not the inventory year', () => {
+    // THE DEFECT. Was 'factor_vintage: "2026"' over a 2025 factor.
+    const r = tdRow(2026);
+    expect(r.factor_vintage, 'the row must not claim a vintage the factor does not have').toBe('MfE 2025');
+    expect(r.factor_vintage).not.toBe('2026');
+  });
+
+  it('O3 the fallback is DISCLOSED, in the same style as the residual helpers', () => {
+    // getResidualFactor: 'AIB 2024 residual mix applied to 2026 inventory (latest available).'
+    const r = tdRow(2026);
+    expect(r.ef_source).toContain('MfE 2025 T&D loss factor applied to 2026 inventory (latest available).');
+    // The source citation itself survives — the note is appended, not substituted.
+    expect(r.ef_source).toContain('T&D losses (Scope 3 Cat 3)');
+  });
+
+  it('O4 NO note when the factor year and the inventory year match', () => {
+    const r = tdRow(2025);
+    expect(r.factor_vintage).toBe('MfE 2025');
+    expect(r.ef_source, 'a matching year has nothing to disclose').not.toContain('applied to');
+  });
+
+  it('O5 resolving FORWARD says so, rather than claiming "latest available"', () => {
+    // `let ty = years[0]` means a 2023 or 2024 inventory — both selectable in the wizard today —
+    // resolves forward to the 2025 factor, so "latest available" would say the opposite of what
+    // happened. The note must also not blame MfE: they publish an annual T&D series back to 2010, so
+    // the missing years are OURS. It claims only our own coverage — see the note in nzTdLoss.
+    for (const y of [2023, 2024]) {
+      const r = tdRow(y);
+      expect(r.factor_vintage, `inv ${y}`).toBe('MfE 2025');
+      expect(r.ef_source, `inv ${y}`).toContain(`MfE 2025 T&D loss factor applied to ${y} inventory (earliest factor held).`);
+      expect(r.ef_source, `inv ${y} must not claim "latest available"`).not.toContain('latest available');
+    }
+  });
+
+  it('O6 nzTdLoss returns the residual-helper shape', () => {
+    expect(nzTdLoss(2025)).toEqual({ ef: 0.00596, vintage: 'MfE 2025', note: '' });
+    expect(nzTdLoss(2026).ef).toBe(0.00596);
+    expect(nzTdLoss(2026).note).not.toBe('');
+  });
+
+  it('O7 REGRESSION — no figure moved: the calc term and the row still agree, and still exclude S2', () => {
+    // This is a provenance fix. calcLocation and buildWorkings share nzTdLoss precisely so the calc
+    // term and the workings row cannot diverge; changing the return shape must not break that.
+    for (const y of [2023, 2025, 2026]) {
+      const c = calcLocation(nzLoc(), 'AR6', y);
+      expect(c.s3_td, `inv ${y}`).toBeCloseTo(100_000 * 0.00596 / 1000, 9);
+      expect(tdRow(y).result_tco2e, `inv ${y} row vs calc`).toBeCloseTo(c.s3_td, 9);
+      expect(tdRow(y).emission_factor).toBe('0.00596 kg CO₂e/kWh');
+      // Still Scope 3, still out of every Scope 2 total.
+      expect(tdRow(y).scope).toBe(3);
+      expect(c.s2_location).toBeCloseTo(100_000 * getGridFactor('NZ', y).ef / 1000, 9);
+    }
   });
 });

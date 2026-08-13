@@ -287,10 +287,44 @@ const GRID_EF: Record<string, Record<number, number>> = {
 const NZ_TD_LOSS: Record<number, number> = { 2025: 0.00596 }
 // Nearest-year (≤ requested, else earliest) NZ T&D loss factor, kg CO2e/kWh. Scope 3 Cat 3.
 // Shared by calcLocation and buildWorkings so the calc term and the workings row never diverge.
-function nzTdLoss(year: number): number {
+//
+// ⚠️ RETURNS ITS OWN VINTAGE, BECAUSE THE CALLER CANNOT KNOW IT. This returned a bare number, and the
+// workings row stamped `factor_vintage: String(year)` — the INVENTORY year. NZ_TD_LOSS holds one key,
+// 2025, so every NZ inventory got the 2025 factor while the row claimed the factor was contemporaneous
+// with the reporting year: a 2026 inventory read "factor_vintage 2026" over a 2025 figure. That is not
+// a stale factor silently applied — it is a stale factor with a FALSE vintage printed beside it, which
+// is worse, because the column exists so a verifier does not have to take the year on trust.
+// The caller had no way to do better: a bare number carries no provenance, so `String(year)` was the
+// only year in scope at the call site. Returning the provenance with the factor is the fix.
+//
+// Shaped like getResidualFactor's { ef, vintage, note } for the same reason and in the same style:
+// same disclosure obligation, same nearest-year fallback, so the same contract.
+//
+// TWO NOTE WORDINGS, NOT ONE — and the second is the deviation from getResidualFactor, deliberately.
+// The residual helpers say "(latest available)" whichever direction they resolved. That is right when
+// the factor is OLDER than the inventory (we reached back to the newest one we hold). It is wrong when
+// the factor is NEWER: `let ty = years[0]` means a 2023 or 2024 inventory — both selectable today —
+// resolves FORWARD to the 2025 factor, and "latest available" would say the opposite of what happened.
+//
+// ⚠️ THE FORWARD NOTE DESCRIBES OUR COVERAGE, NOT MfE'S. It first read "(no earlier factor published)",
+// which was FALSE: MfE publishes an annual T&D loss series back to 2010. The gap is in NZ_TD_LOSS,
+// which holds one year. A note blaming the publisher for our own single-key table would send a verifier
+// to look for a source document that does not exist, and would quietly excuse a table that should be
+// filled in. "(earliest factor held)" claims only what can be checked from this file.
+// Same rule as the error-message one: state what was observed, never a cause you have not verified.
+function nzTdLoss(year: number): { ef: number; vintage: string; note: string } {
   const years = Object.keys(NZ_TD_LOSS).map(Number).sort((a, b) => a - b)
   let ty = years[0]; for (const y of years) { if (y <= year) ty = y }
-  return NZ_TD_LOSS[ty]
+  return {
+    ef: NZ_TD_LOSS[ty],
+    // 'MfE 2025', matching 'AIB 2024' / 'Green-e 2025 [2023 data]': publisher + the factor's own
+    // applicability year, NOT the edition year of the document (MfE's 2026 v2 publishes a 2025 factor).
+    vintage: `MfE ${ty}`,
+    note:
+      ty === year ? ''
+      : ty < year ? `MfE ${ty} T&D loss factor applied to ${year} inventory (latest available).`
+      : `MfE ${ty} T&D loss factor applied to ${year} inventory (earliest factor held).`,
+  }
 }
 // ── DEFERRED: Scope 3 Category 3 (upstream / T&D) ELECTRICITY factors — AU + NZ ──────────────
 // NOT WIRED. The engine has no Scope 3 Category 3 electricity line today; only the NZ T&D losses
@@ -1175,7 +1209,7 @@ function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: numbe
   // NZ transmission & distribution losses — Scope 3 Category 3, NOT Scope 2. Kept as a DISTINCT
   // term (s3_td) and deliberately never added into s2_location/s2_market. Opt-in per NZ location.
   const s3_td = (loc.country === 'NZ' && loc.nz_td_losses && loc.electricity_kwh > 0)
-    ? loc.electricity_kwh * nzTdLoss(year) / 1000
+    ? loc.electricity_kwh * nzTdLoss(year).ef / 1000
     : 0
   return { s1_stationary, s1_mobile, s1_fugitive, s1_total, s2_location, s2_market, s3_td, gases, biogenic: loc.biogenic_co2_mt }
 }
@@ -1589,7 +1623,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       // part of the S2 figure; opt-in per NZ location. Kept in lock-step with calcLocation via nzTdLoss.
       if (loc.country === 'NZ' && loc.nz_td_losses) {
         const td = nzTdLoss(year)
-        rows.push({ location: loc.name || 'Location', stream: 'electricity', source: 'Electricity T&D losses (NZ) — Scope 3 Cat 3', scope: 3, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${efDisplay(td)} kg CO₂e/kWh`, ef_source: `${EF_SOURCES.electricity_nz} · T&D losses (Scope 3 Cat 3)`, factor_vintage: String(year), gwp_basis: 'scope3-cat3', result_tco2e: loc.electricity_kwh * td / 1000, entry_method: 'manual' })
+        rows.push({ location: loc.name || 'Location', stream: 'electricity', source: 'Electricity T&D losses (NZ) — Scope 3 Cat 3', scope: 3, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${efDisplay(td.ef)} kg CO₂e/kWh`, ef_source: `${EF_SOURCES.electricity_nz} · T&D losses (Scope 3 Cat 3)${td.note ? ` · ${td.note}` : ''}`, factor_vintage: td.vintage, gwp_basis: 'scope3-cat3', result_tco2e: loc.electricity_kwh * td.ef / 1000, entry_method: 'manual' })
       }
     }
     if (loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0) {
