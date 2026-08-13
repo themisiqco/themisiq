@@ -1197,7 +1197,7 @@ function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof
 // Source citation for an ELECTRICITY row, country-aware — the same shape as combustionSource below.
 // It exists because the workings printed EF_SOURCES.electricity, the whole six-jurisdiction catalogue,
 // on every grid row: a verifier could not tell which source had priced the line in front of them.
-function gridSource(loc: Location): string {
+export function gridSource(loc: Location): string {
   const ctry = (loc.country || '').toUpperCase().trim()
   if (ctry === 'CA') return EF_SOURCES.electricity_ca
   if (ctry === 'GB' || ctry === 'UK') return EF_SOURCES.electricity_uk
@@ -1205,6 +1205,15 @@ function gridSource(loc: Location): string {
   if (ctry === 'NZ') return EF_SOURCES.electricity_nz
   if (EU_COUNTRIES.includes(ctry)) return EF_SOURCES.electricity_eu
   return EF_SOURCES.electricity_us
+}
+
+// Every DISTINCT electricity citation an inventory resolves to. Mirror of combustionSourcesFor, and
+// it exists for the same reason one level along: the assurance PDF printed EF_SOURCES.electricity —
+// the six-jurisdiction CATALOGUE — on its methodology page. That string is correct as a catalogue and
+// wrong as an attribution: it names six publishers where one priced the rows. 06b6125 removed the
+// same catalogue from the workings table; the methodology page kept it.
+export function gridSourcesFor(locations: readonly { country?: string }[]): string[] {
+  return [...new Set(locations.map(l => gridSource(l as Location)))]
 }
 
 // Source citation for a combustion row, country-aware (ECCC for CA, DEFRA for GB/UK, IPCC for EU, EPA otherwise).
@@ -1216,6 +1225,20 @@ function combustionSource(loc: Location): string {
   if (ctry === 'NZ') return EF_SOURCES.combustion_nz
   if (EU_COUNTRIES.includes(ctry)) return EF_SOURCES.combustion_eu
   return EF_SOURCES.combustion
+}
+
+// Every DISTINCT combustion citation an inventory resolves to, in first-appearance order.
+//
+// ONE DERIVATION FOR EVERY EXPORT. The XLSX methods block computed this inline and the assurance PDF
+// did not compute it at all — it printed EF_SOURCES.combustion, the US EPA constant, on every
+// inventory. A Canadian inventory priced end-to-end by ECCC carried a methodology page citing US EPA:
+// not a stale figure but a wrong attribution, on the document a verifier reads first.
+//
+// A SET, not a single string, because an inventory may span jurisdictions. Taking locations[0] would
+// be right for most customers and silently wrong for the multi-country ones — the reading that looks
+// fine until the case that matters.
+export function combustionSourcesFor(locations: readonly { country?: string }[]): string[] {
+  return [...new Set(locations.map(l => combustionSource(l as Location)))]
 }
 
 type GwpVersion = 'AR4' | 'AR5' | 'AR6'

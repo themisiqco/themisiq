@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { DISCLAIMER_PARAS } from './disclaimer'
+import { combustionSourcesFor, gridSourcesFor } from './ghg/engine'
 
 // ── Types (mirror the wizard's shapes) ──
 export interface PdfSourceDoc { id: string; file_name: string; document_type: string; uploaded_at: string; file_path: string }
@@ -130,13 +131,31 @@ export function generateAssurancePDF(
   // ── PAGE 3 — METHODOLOGY ──
   doc.addPage()
   sectionTitle(doc, 'Methodology & Emission Factors', M)
+  // Bound once each. Both are read twice below (length check, then map), and calling them twice would
+  // walk the locations twice to build a value that cannot change between the two calls.
+  const combustionCitations = combustionSourcesFor(inventory.locations)
+  const gridCitations = gridSourcesFor(inventory.locations)
   autoTable(doc, {
     startY: 92,
     head: [['Element', 'Basis']],
     body: [
       ['Organizational boundary', boundaryLabel(inventory.boundary_approach)],
-      ['Combustion factors', efSources.combustion],
-      ['Electricity factors', efSources.electricity],
+      // ONE ROW PER DISTINCT CITATION, for both factor families. Combustion printed
+      // efSources.combustion — the US EPA constant — regardless of jurisdiction; electricity printed
+      // efSources.electricity, the six-jurisdiction CATALOGUE, which is correct as a catalogue and
+      // wrong as an attribution. 06b6125 removed that same catalogue from the workings table and this
+      // page kept it.
+      //
+      // NO FALLBACK WHEN THE SET IS EMPTY, deliberately, and identically to the XLSX. An earlier draft
+      // printed efSources.combustion when nothing resolved, so that a row always appeared. That is the
+      // wrong instinct here: a methodology page citing US EPA BECAUSE ZERO SOURCES RESOLVED asserts
+      // something the inventory does not support, to a verifier, on the document they read to decide
+      // whether the figures are traceable. An absent row is honest; a wrong one is not. The case needs
+      // a locations-less inventory and is unreachable today — emptyLocation() is always seeded — so
+      // this is about which way to be wrong if it ever happens, and inventing a citation is the worse
+      // way. Both exports now behave the same, which is also one less thing to explain.
+      ...combustionCitations.map(src => ['Combustion factors', src]),
+      ...gridCitations.map(src => ['Electricity factors', src]),
       ['GWP values (AR4)', efSources.gwp_ar4],
       ['GWP values (AR5)', efSources.gwp_ar5],
       ...(efSources.gwp_ar6 ? [['GWP values (AR6)', efSources.gwp_ar6]] : []),

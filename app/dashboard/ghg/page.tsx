@@ -21,7 +21,8 @@ import {
   US_STATES, US_SUBREGIONS, AU_STATES, EU_COUNTRY_OPTIONS,
   GRID_REGIONS_CA, GRID_REGIONS_US, FRAMEWORKS,
   isResolvedGridRegion, getGridFactor, getResidualFactor,
-  detectGridRegion, gridRegionForCountry, pickEF, combustionSource,
+  detectGridRegion, gridRegionForCountry, pickEF,
+  combustionSourcesFor, gridSourcesFor,
   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation, pctEstimated,
   applyResolutions, findUnresolvedCoverage, findUndeclaredStreams, findUnpriceableLocations, STREAM_META,
   ngUnitOptions, liquidUnitOptions, propaneUnitOptions, steamUnitOptions,
@@ -2347,8 +2348,8 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
       ...(rev > 0 ? [['S1 intensity (tCO₂e/$M revenue)', (totals.s1_total / rev).toFixed(6)]] : []),
       [''],
       ['METHODS'],
-      ...[...new Set(inventory.locations.map(l => combustionSource(l)))].map(src => ['Combustion factors', src]),
-      ['Electricity factors', EF_SOURCES.electricity],
+      ...combustionSourcesFor(inventory.locations).map(src => ['Combustion factors', src]),
+      ...gridSourcesFor(inventory.locations).map(src => ['Electricity factors', src]),
       ['GWP values', fw.gwp === 'AR4' ? EF_SOURCES.gwp_ar4 : fw.gwp === 'AR5' ? EF_SOURCES.gwp_ar5 : EF_SOURCES.gwp_ar6],
       ...((fw.id === 'esrs' || fw.id === 'gri')
         ? [
