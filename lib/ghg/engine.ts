@@ -196,13 +196,35 @@ const EF_SOURCES = {
   combustion_eu: 'IPCC (2006) Guidelines Vol.2 — Tier 1 default combustion factors',
   combustion_au: 'DCCEEW NGA Factors 2025 (AR5)',
   combustion_nz: 'NZ MfE Measuring Emissions 2026 v2 (as-published basis — factors stored verbatim, no AR re-basing)',
+  // KEPT — exported, and still read by the methodology summary in app/dashboard/ghg/page.tsx as a
+  // catalogue of every grid source this engine can apply. It must NOT be used on a workings row:
+  // a verifier reading one row needs the ONE source that priced it, not the six it might have been.
   electricity: 'US EPA eGRID2023 (US) / ECCC v3.0 (CA) / DEFRA 2025 (UK) / EEA 2023 (EU) / DCCEEW NGA 2025 (AU) / NZ MfE 2026 (NZ)',
+  // The catalogue above, split so gridSource() can resolve the one actually applied.
+  electricity_us: 'US EPA eGRID2023',
+  electricity_ca: 'ECCC (2025) Emission factors and reference values v3.0',
+  electricity_uk: 'UK DEFRA/DESNZ (2025) GHG Conversion Factors for Company Reporting',
+  electricity_eu: 'EEA (2023) Greenhouse gas emission intensity of electricity generation',
+  electricity_au: 'DCCEEW NGA Factors 2025',
+  electricity_nz: 'NZ MfE Measuring Emissions 2026 v2',
   residual_us: 'Green-e Residual Mix 2025 (2023 data, publ. 2026-01-29, CRS) — residual CO₂; eGRID2023 Rev2 (publ. 2025-06-12) CH₄/N₂O. Green-e factors out Green-e-certified voluntary sales (the only published US residual source per CRS).',
   residual_eu: 'AIB European Residual Mixes 2024 (publ. 2025-05-30, Grexel/AIB; Ecoinvent CO₂ inputs) — combined CO₂e, gCO₂/kWh.',
   gwp_ar4: 'IPCC AR4 (2007) — selectable alternate; aligns with CARB AB 32 / Mandatory Reporting Regulation, but not the default for any current framework',
   gwp_ar5: 'IPCC AR5 (2014) — GHG Protocol baseline; selectable alternate, not the default for any current framework',
   gwp_ar6: 'IPCC AR6 (2021) — applied by default across all frameworks (SB 253, CDP, ESRS E1, GRI 305, EcoVadis, IFRS S2)',
 }
+
+// ── GWP BASIS FOR A FACTOR WE DID NOT COMBINE ────────────────────────────────────────────────────
+// A published grid or steam factor arrives as a single kgCO₂e figure that its PUBLISHER produced by
+// combining CH₄ and N₂O at a GWP vintage of their choosing — ECCC, eGRID, DEFRA, EEA, DCCEEW and MfE
+// each pick their own, and NONE of those choices is recorded anywhere in this repo. Stamping such a
+// row with the inventory's selected GWP set would assert that OUR AR6 governs a number ECCC may have
+// published on AR5. That is a new false claim, not a fix.
+// Same reasoning EF_SOURCES.combustion_nz already carries for NZ combustion: "as-published basis —
+// factors stored verbatim, no AR re-basing". This generalises it to every row we did not combine.
+// TO RESOLVE PROPERLY: store the vintage beside each factor table and stamp it here. Until then this
+// string points the verifier at the citation, which is where the answer actually is.
+const GWP_AS_PUBLISHED = 'as-published — see factor source'
 
 const GRID_EF: Record<string, Record<number, number>> = {
   // Canadian provinces / territories — ECCC "Emission factors and reference values" v3.0 (Oct 2025), NIR 1990-2023 consumption intensities
@@ -1056,6 +1078,19 @@ function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof
   return ef
 }
 
+// Source citation for an ELECTRICITY row, country-aware — the same shape as combustionSource below.
+// It exists because the workings printed EF_SOURCES.electricity, the whole six-jurisdiction catalogue,
+// on every grid row: a verifier could not tell which source had priced the line in front of them.
+function gridSource(loc: Location): string {
+  const ctry = (loc.country || '').toUpperCase().trim()
+  if (ctry === 'CA') return EF_SOURCES.electricity_ca
+  if (ctry === 'GB' || ctry === 'UK') return EF_SOURCES.electricity_uk
+  if (ctry === 'AU') return EF_SOURCES.electricity_au
+  if (ctry === 'NZ') return EF_SOURCES.electricity_nz
+  if (EU_COUNTRIES.includes(ctry)) return EF_SOURCES.electricity_eu
+  return EF_SOURCES.electricity_us
+}
+
 // Source citation for a combustion row, country-aware (ECCC for CA, DEFRA for GB/UK, IPCC for EU, EPA otherwise).
 function combustionSource(loc: Location): string {
   const ctry = (loc.country || '').toUpperCase().trim()
@@ -1461,15 +1496,25 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
   // Screen abbreviations for the combined-factor display, matching what renderStep4 showed (gal / L);
   // every other unit (mcf, kg, therms, mmbtu…) passes through unchanged. emission_factor (the gas split)
   // is UNTOUCHED — the CSV / verifier path depends on it. emission_factor_display is display-only.
-  const abbrevUnit = (u: string) => u === 'gallons' ? 'gal' : (u === 'litres' || u === 'liters') ? 'L' : u
+  const abbrevUnit = (u: string) => u === 'gallons' ? 'gal' : (u === 'litres' || u === 'liters') ? 'L' : u === 'm3' ? 'm³' : u
+  // RECOMPUTABLE, NOT TIDY — and this is the whole point of a workings table. toFixed(3) printed a
+  // factor of 1.9316576 as "1.932", so a verifier retyping the row got 231,840 kg where we stated
+  // 231,798.9: a 41 kg divergence on one line, and EVERY priced row failed the same way. A workings
+  // table a verifier cannot reproduce is not evidence, it is decoration.
+  // toPrecision(10) strips float artefacts (1.9316576000000002); String() then emits the shortest
+  // form that round-trips, so the displayed factor multiplies back to the displayed result.
+  const efDisplay = (x: number) => String(Number(x.toPrecision(10)))
   // `convNote` records a convert-then-apply step (fuel oil in litres, steam in GJ) so the workings
   // show entered → conversion → factored rather than a number the reviewer cannot reproduce.
-  const pushFuel = (loc: Location, source: string, scope: number, activity: number, unit: string, ef: { co2: number; ch4: number; n2o: number }, prov?: Provenance, convNote?: string) => {
+  // `stream` TAGS THE ROW WITH THE DECLARABLE STREAM IT SATISFIES, and that tag is what the
+  // declaration loop below counts. It is not decoration: it is how "this stream produced a priced row"
+  // becomes an OBSERVED FACT rather than a second copy of the pricing condition. See the loop's header.
+  const pushFuel = (loc: Location, stream: DeclarableStream, source: string, scope: number, activity: number, unit: string, ef: { co2: number; ch4: number; n2o: number }, prov?: Provenance, convNote?: string) => {
     const g = calcGas(ef, activity, gwpVersion)
     const gwp = GWP[gwpVersion]
     const efCo2e = ef.co2 + ef.ch4 * gwp.CH4_fossil + ef.n2o * gwp.N2O
-    rows.push({ location: loc.name || 'Location', source, scope, activity_data: activity, activity_unit: unit,
-      emission_factor: `CO2 ${ef.co2}, CH4 ${ef.ch4}, N2O ${ef.n2o} kg/${unit}`, emission_factor_display: `${efCo2e.toFixed(3)} kg CO₂e/${abbrevUnit(unit)}`, ef_source: combustionSource(loc), gwp_basis: gwpVersion, result_tco2e: g.total, ...(convNote ? { note: convNote } : {}), ...(prov ?? {}) })
+    rows.push({ location: loc.name || 'Location', stream, source, scope, activity_data: activity, activity_unit: unit,
+      emission_factor: `CO2 ${ef.co2}, CH4 ${ef.ch4}, N2O ${ef.n2o} kg/${unit}`, emission_factor_display: `${efDisplay(efCo2e)} kg CO₂e/${abbrevUnit(unit)}`, ef_source: combustionSource(loc), gwp_basis: gwpVersion, result_tco2e: g.total, ...(convNote ? { note: convNote } : {}), ...(prov ?? {}) })
   }
   for (const loc of locations) {
     // Decided BEFORE any row is emitted, and with the same helper calcInventory uses. A location
@@ -1485,6 +1530,10 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
         note: `EXCLUDED FROM TOTALS — ${blocked.message} No figure for this location is included in any total on this report.` })
       continue
     }
+    // First row index for THIS location. The declaration loop at the end of the iteration reads back
+    // rows.slice(locRowStart) to see which streams actually priced. Captured after the unpriceable
+    // `continue` above, so an excluded location keeps its single exclusion row and gains no others.
+    const locRowStart = rows.length
     // applyResolutions is the single source of the figure AND its provenance/method, so the number
     // in the row and the claim in the audit trail cannot diverge (that divergence was the SEV 0 bug).
     const applied = applyResolutions(loc, resolutions, win.start, win.end)
@@ -1506,9 +1555,9 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       }
       return { source_quotes: quotes, source_doc_ids: a!.docIds, source_file_paths: a!.filePaths, entry_method: 'concierge' }
     }
-    if (loc.has_natural_gas && loc.natural_gas_amount > 0) pushFuel(loc, 'Natural gas', 1, figure('natural_gas_amount'), loc.natural_gas_unit, pickEF(loc, `natural_gas_${loc.natural_gas_unit}` as keyof typeof EF), provOf('natural_gas_amount'))
-    if (loc.has_propane && loc.propane_amount > 0) pushFuel(loc, 'Propane', 1, figure('propane_amount'), loc.propane_unit, pickEF(loc, propaneEfKey(loc.propane_unit) as keyof typeof EF), provOf('propane_amount'))
-    if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0) pushFuel(loc, 'Diesel (stationary)', 1, figure('diesel_stationary_amount'), loc.diesel_stationary_unit, pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provOf('diesel_stationary_amount'))
+    if (loc.has_natural_gas && loc.natural_gas_amount > 0) pushFuel(loc, 'natural_gas', 'Natural gas', 1, figure('natural_gas_amount'), loc.natural_gas_unit, pickEF(loc, `natural_gas_${loc.natural_gas_unit}` as keyof typeof EF), provOf('natural_gas_amount'))
+    if (loc.has_propane && loc.propane_amount > 0) pushFuel(loc, 'propane', 'Propane', 1, figure('propane_amount'), loc.propane_unit, pickEF(loc, propaneEfKey(loc.propane_unit) as keyof typeof EF), provOf('propane_amount'))
+    if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0) pushFuel(loc, 'diesel_stationary', 'Diesel (stationary)', 1, figure('diesel_stationary_amount'), loc.diesel_stationary_unit, pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provOf('diesel_stationary_amount'))
     // Reports the figure AS ENTERED with its own unit, and the conversion as the note — the factored
     // gallons figure is inside the note, so all three steps are on one row.
     if (loc.has_fuel_oil && loc.fuel_oil_gallons > 0) {
@@ -1516,50 +1565,77 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       // published per gallon, so the activity it multiplies must be gallons or the row would state a
       // result the engine did not compute. The note carries the entered figure and the arithmetic.
       const fo = fuelOilToGallons(figure('fuel_oil_gallons'), loc.fuel_oil_unit)
-      pushFuel(loc, 'Fuel oil', 1, fo.gallons, 'gallons', pickEF(loc, 'fuel_oil_gallon'), provOf('fuel_oil_gallons'), fo.note)
+      pushFuel(loc, 'fuel_oil', 'Fuel oil', 1, fo.gallons, 'gallons', pickEF(loc, 'fuel_oil_gallon'), provOf('fuel_oil_gallons'), fo.note)
     }
-    if (loc.has_mobile && loc.gasoline_amount > 0) pushFuel(loc, 'Gasoline (mobile)', 1, figure('gasoline_amount'), loc.gasoline_unit, pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provOf('gasoline_amount'))
-    if (loc.has_mobile && loc.diesel_mobile_amount > 0) pushFuel(loc, 'Diesel (mobile)', 1, figure('diesel_mobile_amount'), loc.diesel_mobile_unit, pickEF(loc, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provOf('diesel_mobile_amount'))
+    if (loc.has_mobile && loc.gasoline_amount > 0) pushFuel(loc, 'mobile', 'Gasoline (mobile)', 1, figure('gasoline_amount'), loc.gasoline_unit, pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provOf('gasoline_amount'))
+    if (loc.has_mobile && loc.diesel_mobile_amount > 0) pushFuel(loc, 'mobile', 'Diesel (mobile)', 1, figure('diesel_mobile_amount'), loc.diesel_mobile_unit, pickEF(loc, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provOf('diesel_mobile_amount'))
     if (!loc.uses_ammonia && loc.has_hfc_refrigerants && loc.refrigerant_purchased_kg > 0) {
       const ref_gwp = REFRIGERANT_GWP[loc.refrigerant_type]?.[gwpVersion] ?? 0
-      rows.push({ location: loc.name || 'Location', source: `Refrigerant (${loc.refrigerant_type})`, scope: 1, activity_data: loc.refrigerant_purchased_kg, activity_unit: 'kg', emission_factor: `GWP ${ref_gwp}`, ef_source: 'IPCC GWP', gwp_basis: gwpVersion, result_tco2e: loc.refrigerant_purchased_kg * ref_gwp / 1000, entry_method: 'manual' })
+      rows.push({ location: loc.name || 'Location', stream: 'refrigerants', source: `Refrigerant (${loc.refrigerant_type})`, scope: 1, activity_data: loc.refrigerant_purchased_kg, activity_unit: 'kg', emission_factor: `GWP₁₀₀ ${ref_gwp}`, ef_source: EF_SOURCES[`gwp_${gwpVersion.toLowerCase()}` as 'gwp_ar6'], gwp_basis: gwpVersion, quantification_method: 'Recharge quantity treated as emitted (IPCC Tier 1 simplified material balance)', result_tco2e: loc.refrigerant_purchased_kg * ref_gwp / 1000, entry_method: 'manual' })
     }
     // Grid-region gate: unresolved grid_region → OMIT the electricity Scope 2 rows entirely (no
     // getGridFactor call, no US_AVG row). NZ (T&D row below) is always resolved, so no real T&D is lost.
     if (loc.electricity_kwh > 0 && isResolvedGridRegion(loc.grid_region)) {
       const gf = getGridFactor(loc.grid_region, year)
-      rows.push({ location: loc.name || 'Location', source: `Electricity (${gf.usedRegion}, ${gf.usedYear})`, scope: 2, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${gf.ef} kg/kWh`, ef_source: EF_SOURCES.electricity, gwp_basis: 'location-based', result_tco2e: loc.electricity_kwh * gf.ef / 1000, ...provOf('electricity_kwh') })
+      rows.push({ location: loc.name || 'Location', stream: 'electricity', source: `Electricity (${gf.usedRegion})`, scope: 2, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${efDisplay(gf.ef)} kg CO₂e/kWh`, ef_source: gridSource(loc), factor_vintage: String(gf.usedYear), scope2_method: 'location-based', gwp_basis: GWP_AS_PUBLISHED, result_tco2e: loc.electricity_kwh * gf.ef / 1000, ...provOf('electricity_kwh') })
       // Market-based Scope 2: residual-mix factor on uncovered load, with provenance stamped for the verifier.
       const resRegion = loc.residual_region || (loc.grid_region.startsWith('EU_') ? loc.grid_region : '')
       const res = getResidualFactor(resRegion, year, gwpVersion)
       const uncovered = Math.max(0, loc.electricity_kwh - loc.renewable_electricity_kwh)
       const mktEf = res.applicable ? res.ef : gf.ef
       // Market-based row is a derived (uncovered = grid − renewable) figure, not a verbatim bill read → manual.
-      rows.push({ location: loc.name || 'Location', source: `Electricity (S2 market-based${res.applicable ? `, residual mix ${res.usedRegion}` : ', location-factor fallback'})`, scope: 2, activity_data: uncovered, activity_unit: 'kWh uncovered', emission_factor: `${mktEf.toFixed(4)} kg/kWh`, ef_source: `${res.source}${res.vintage && res.vintage !== 'n/a' ? ` · vintage: ${res.vintage}` : ''}${res.note ? ` · ${res.note}` : ''}`, gwp_basis: res.applicable ? gwpVersion : 'location-based', result_tco2e: uncovered * mktEf / 1000, entry_method: 'manual' })
+      rows.push({ location: loc.name || 'Location', stream: 'electricity', source: `Electricity (S2 market-based${res.applicable ? `, residual mix ${res.usedRegion}` : ', location-factor fallback'})`, scope: 2, activity_data: uncovered, activity_unit: 'kWh uncovered', emission_factor: `${efDisplay(mktEf)} kg CO₂e/kWh`, ef_source: `${res.source}${res.note ? ` · ${res.note}` : ''}`, ...(res.vintage && res.vintage !== 'n/a' ? { factor_vintage: res.vintage } : {}), scope2_method: 'market-based', gwp_basis: res.applicable && res.source !== EF_SOURCES.residual_eu ? gwpVersion : GWP_AS_PUBLISHED, result_tco2e: uncovered * mktEf / 1000, entry_method: 'manual' })
       // NZ T&D losses — Scope 3 Category 3, NOT Scope 2. Distinct row (scope 3) so it never reads as
       // part of the S2 figure; opt-in per NZ location. Kept in lock-step with calcLocation via nzTdLoss.
       if (loc.country === 'NZ' && loc.nz_td_losses) {
         const td = nzTdLoss(year)
-        rows.push({ location: loc.name || 'Location', source: 'Electricity T&D losses (NZ) — Scope 3 Cat 3', scope: 3, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${td} kg/kWh`, ef_source: `${EF_SOURCES.electricity} · T&D losses (Scope 3 Cat 3)`, gwp_basis: 'scope3-cat3', result_tco2e: loc.electricity_kwh * td / 1000, entry_method: 'manual' })
+        rows.push({ location: loc.name || 'Location', stream: 'electricity', source: 'Electricity T&D losses (NZ) — Scope 3 Cat 3', scope: 3, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${efDisplay(td)} kg CO₂e/kWh`, ef_source: `${EF_SOURCES.electricity_nz} · T&D losses (Scope 3 Cat 3)`, factor_vintage: String(year), gwp_basis: 'scope3-cat3', result_tco2e: loc.electricity_kwh * td / 1000, entry_method: 'manual' })
       }
     }
     if (loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0) {
       // Same rule as fuel oil: the factor is published per MMBtu, so the activity it multiplies must
       // be MMBtu. The note carries the entered GJ figure and the arithmetic.
       const st = steamToMmbtu(loc.purchased_steam_mmbtu, loc.purchased_steam_unit)
-      rows.push({ location: loc.name || 'Location', source: 'Purchased steam', scope: 2, activity_data: st.mmbtu, activity_unit: 'mmbtu', emission_factor: `${EF.steam_mmbtu} kg/mmbtu`, ef_source: EF_SOURCES.combustion, gwp_basis: 'location-based', result_tco2e: st.mmbtu * EF.steam_mmbtu / 1000, entry_method: 'manual', ...(st.note ? { note: st.note } : {}) })
+      rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: 'Purchased steam', scope: 2, activity_data: st.mmbtu, activity_unit: 'mmbtu', emission_factor: `${efDisplay(EF.steam_mmbtu)} kg CO₂e/mmbtu`, ef_source: EF_SOURCES.combustion, scope2_method: 'location-based', gwp_basis: GWP_AS_PUBLISHED, result_tco2e: st.mmbtu * EF.steam_mmbtu / 1000, entry_method: 'manual', ...(st.note ? { note: st.note } : {}) })
     }
-    // ── Declaration rows: a row for EVERY stream that has no data, so absence is never silent ──
-    // Streams WITH data are already emitted above. For the rest: attested_absent (result 0 = a claim of
-    // zero) vs undeclared (result null = an ABSENCE, not a claim — must not look like 0 in a verifier CSV).
+    // ── Declaration rows: EVERY stream gets a row, so no stream can ever be silent ────────────────
+    //
+    // ⚠️ THE TRIGGER IS AN OBSERVED FACT, NOT A SECOND COPY OF THE PRICING CONDITION. This loop used to
+    // ask `streamHasData(loc, s)` — a predicate that had to stay in agreement with ten separate
+    // `flag && amount > 0` conditions above, and did not. A location with has_diesel_stationary true
+    // and no amount entered failed the pricing condition (no priced row) AND passed streamHasData (no
+    // declaration row), so the stream vanished from the workings entirely: not priced, not declared,
+    // nothing. The same hole existed for natural gas, propane, fuel oil, mobile and refrigerants — and
+    // for ammonia, which is deliberately never priced (no GWP) and therefore always fell through.
+    //
+    // Now the loop reads which streams ACTUALLY emitted a row, from the rows themselves. The two can no
+    // longer disagree, because there is nothing left to disagree with: if a stream priced, its tag is
+    // present; if it did not, a declaration row follows. Adding or removing a priced row keeps this
+    // correct with no second edit. A forgotten `stream` tag produces a SPURIOUS declaration row beside
+    // a priced one — visible and loud — rather than silence, which is the right way to fail.
+    const emitted = new Set<DeclarableStream>(rows.slice(locRowStart).map(r => r.stream).filter(Boolean))
     const attestedAt = new Map((loc.stream_attestations ?? []).map(a => [a.stream, a.attested_at]))
     for (const s of DECLARABLE_STREAMS) {
-      if (streamHasData(loc, s)) continue
+      if (emitted.has(s)) continue
       const meta = STREAM_META[s]
       const at = attestedAt.get(s)
+      const base = { location: loc.name || 'Location', stream: s, source: meta.name, scope: meta.scope,
+        activity_data: 0, activity_unit: '—', emission_factor: '—', emission_factor_display: '—',
+        ef_source: '—', gwp_basis: 'declaration' }
+      // DECLARED-BUT-UNQUANTIFIED IS CHECKED BEFORE THE ATTESTATION, and the order is the point. If a
+      // location both says it uses a stream and attests the stream is absent, those two answers
+      // contradict each other, and the row must show the one a verifier needs to resolve. "We use gas
+      // here, and no figure for it is in the report" is the finding; "no gas here" would bury it.
+      if (streamDeclared(loc, s)) {
+        rows.push({ ...base, result_tco2e: null, declaration: 'declared_unquantified', entry_method: 'declared-unquantified',
+          note: `DECLARED, NOT QUANTIFIED — this location ${meta.verb === 'use' ? 'uses' : 'has'} ${meta.name}, and no amount for it has been priced. Nothing from this stream is included in any total on this report.` })
+        continue
+      }
+      // attested_absent: result 0 is a CLAIM of no emissions, made by a named party at a stated time.
+      // undeclared: result null is an ABSENCE of any claim — it must never render as a figure.
       rows.push(at
-        ? { location: loc.name || 'Location', source: meta.name, scope: meta.scope, activity_data: 0, activity_unit: '—', emission_factor: '—', emission_factor_display: '—', ef_source: '—', gwp_basis: 'declaration', result_tco2e: 0, declaration: 'attested_absent', entry_method: 'attestation', note: `No ${meta.name} at this location. Attested ${at}.` }
-        : { location: loc.name || 'Location', source: meta.name, scope: meta.scope, activity_data: 0, activity_unit: '—', emission_factor: '—', emission_factor_display: '—', ef_source: '—', gwp_basis: 'declaration', result_tco2e: null, declaration: 'undeclared', entry_method: 'undeclared', note: 'NOT DECLARED — completeness cannot be asserted for this stream.' })
+        ? { ...base, result_tco2e: 0, declaration: 'attested_absent', entry_method: 'attestation', note: `No ${meta.name} at this location. Attested ${at}.` }
+        : { ...base, result_tco2e: null, declaration: 'undeclared', entry_method: 'undeclared', note: 'NOT DECLARED — completeness cannot be asserted for this stream.' })
     }
   }
   // ── Coverage-resolution audit trail ──────────────────────────────────────
@@ -1675,29 +1751,89 @@ export const STREAM_META: Record<DeclarableStream, { name: string; verb: 'use' |
   purchased_steam:   { name: 'purchased steam or district heating',  verb: 'use',  scope: 2 },
 }
 
-// True iff a location has DATA for a stream (the `has_*` flag or a positive amount). Shared by
-// findUndeclaredStreams and buildWorkings so the gate and the workings agree on what counts as declared.
-function streamHasData(loc: Location, s: DeclarableStream): boolean {
+// ── ONE CONVENTION, ALL EIGHT STREAMS ────────────────────────────────────────────────────────────
+//
+// `streamHasData` answered ONE question — "is there data?" — for a situation with THREE answers, and
+// answered it a different way per stream: natural gas, propane, diesel, fuel oil and mobile read the
+// `has_*` flag; electricity and purchased steam read an amount; refrigerants OR'd two flags. So the
+// same customer action produced different outcomes depending on which convention that stream happened
+// to be written under — a checked steam box with no figure was reported as undeclared, while a checked
+// diesel box with no figure was reported as nothing at all.
+//
+// THE CONVENTION, applied to every stream: TWO INDEPENDENT SIGNALS, NEVER ONE FIELD ANSWERING BOTH.
+//   DECLARATION — the customer's own yes/no answer to "do you use this here?".
+//   QUANTITY    — a positive amount on the field(s) the stream is priced from.
+// Chosen this way round because the two questions are genuinely different and the wizard asks them
+// separately: the checkbox says the stream EXISTS, the number says HOW MUCH. Collapsing them is what
+// made "we use diesel here" and "we have never been asked about diesel" indistinguishable.
+//
+// ⚠️ ELECTRICITY IS THE ONE STREAM WITH NO CHECKBOX — the wizard offers a bare kWh field, so there is
+// no yes/no answer to read and the quantity is the only signal that exists. Its declared-unquantified
+// state is therefore UNREACHABLE from the wizard, and that is a property of the input, not an
+// exception to the convention. If an electricity checkbox is ever added, delete this note and let
+// streamDeclared read it; nothing else here changes.
+export type StreamState = 'undeclared' | 'declared_unquantified' | 'quantified'
+
+// SIGNAL 1 — the customer said this stream exists here.
+function streamDeclared(loc: Location, s: DeclarableStream): boolean {
   switch (s) {
     case 'natural_gas': return loc.has_natural_gas
     case 'propane': return loc.has_propane
     case 'diesel_stationary': return loc.has_diesel_stationary
     case 'fuel_oil': return loc.has_fuel_oil
     case 'mobile': return loc.has_mobile
+    // Either refrigerant answer declares the stream. Ammonia is deliberately never PRICED (NH₃ has no
+    // global warming potential), which is exactly why it needs to be declarable — before this change an
+    // ammonia site with a recharge figure produced no row of any kind.
     case 'refrigerants': return loc.has_hfc_refrigerants || loc.uses_ammonia
-    case 'electricity': return loc.electricity_kwh > 0
-    case 'purchased_steam': return loc.purchased_steam_mmbtu > 0
+    // has_purchased_steam EXISTED and was ignored here; that was the steam half of the inconsistency.
+    case 'purchased_steam': return loc.has_purchased_steam
+    case 'electricity': return loc.electricity_kwh > 0   // no checkbox — see the note above
   }
 }
 
+// SIGNAL 2 — a figure was supplied. Mobile carries two fuels and either one quantifies the stream.
+function streamQuantified(loc: Location, s: DeclarableStream): boolean {
+  switch (s) {
+    case 'natural_gas': return loc.natural_gas_amount > 0
+    case 'propane': return loc.propane_amount > 0
+    case 'diesel_stationary': return loc.diesel_stationary_amount > 0
+    case 'fuel_oil': return loc.fuel_oil_gallons > 0
+    case 'mobile': return loc.gasoline_amount > 0 || loc.diesel_mobile_amount > 0
+    case 'refrigerants': return loc.refrigerant_purchased_kg > 0
+    case 'purchased_steam': return loc.purchased_steam_mmbtu > 0
+    case 'electricity': return loc.electricity_kwh > 0
+  }
+}
+
+// The three states, from the location alone. buildWorkings does NOT use this to decide whether to emit
+// a declaration row — it counts the rows it actually produced, which is stronger. This is for callers
+// that hold a Location and no workings (the export gate), and for tests.
+export function streamState(loc: Location, s: DeclarableStream): StreamState {
+  if (!streamDeclared(loc, s)) return 'undeclared'
+  return streamQuantified(loc, s) ? 'quantified' : 'declared_unquantified'
+}
+
+// ⚠️ THIS GATE NOW BLOCKS ON declared_unquantified TOO, AND THAT IS A TIGHTENING — read before changing.
+// It blocks export unless every stream is either quantified or attested absent. Before this change a
+// location with has_diesel_stationary true and no amount entered PASSED: streamHasData read the bare
+// flag, called it data, and let an inventory export while silently omitting a stream the customer had
+// said they have. That is precisely what the gate exists to prevent, so the state now blocks.
+// No case is loosened — every outcome either stays as it was or moves from pass to block.
+// `state` is returned so a caller can tell the two blocking reasons apart: "nobody answered" needs the
+// question asked, "answered yes, no figure" needs a number. The wizard's copy does not yet distinguish
+// them and tells the customer to enter the data or attest absent, which is right for both.
 export function findUndeclaredStreams(
   locations: Location[]
-): { locId: string; locName: string; stream: DeclarableStream }[] {
+): { locId: string; locName: string; stream: DeclarableStream; state: StreamState }[] {
   return locations.flatMap(loc => {
     const attested = new Set((loc.stream_attestations ?? []).map(a => a.stream))
     return DECLARABLE_STREAMS
-      .filter(s => !streamHasData(loc, s) && !attested.has(s))
-      .map(stream => ({ locId: loc.id, locName: loc.name || 'Location', stream }))
+      .map(stream => ({ stream, state: streamState(loc, stream) }))
+      // An attestation answers 'undeclared' — nobody had been asked, now someone has. It does NOT
+      // answer 'declared_unquantified': a site cannot attest a stream absent and also report using it.
+      .filter(({ stream, state }) => state !== 'quantified' && !(state === 'undeclared' && attested.has(stream)))
+      .map(({ stream, state }) => ({ locId: loc.id, locName: loc.name || 'Location', stream, state }))
   })
 }
 

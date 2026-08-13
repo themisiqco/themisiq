@@ -943,6 +943,13 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // gridReady, with its own amber message; deliberately NOT gating the step-2 Continue.
   const undeclaredStreams = findUndeclaredStreams(inventory.locations)
   const declarationsReady = undeclaredStreams.length === 0
+  // SPLIT BY WHY THE STREAM BLOCKS, because the two states need OPPOSITE instructions and one message
+  // cannot carry both. "Enter the data or attest absent" is right for a stream nobody was asked about
+  // and WRONG for one the site has said it uses: attesting absent would contradict its own answer, and
+  // it is the option a customer reaches for first because it needs no figure. The gate treats them the
+  // same (both block); only the instruction differs. Both lists render when both are present.
+  const streamsNeverAnswered = undeclaredStreams.filter(u => u.state === 'undeclared')
+  const streamsWithoutFigure = undeclaredStreams.filter(u => u.state === 'declared_unquantified')
   // Pricing gate. A location whose fuel unit has no published factor for its country cannot be
   // priced at all; it is EXCLUDED from every total (never counted as zero) and named wherever a
   // total that excludes it is shown.
@@ -1343,10 +1350,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.2)', borderRadius: 10, padding: '1rem' }}>
             <div style={{ fontSize: 12, fontWeight: 500, color: '#0C447C', marginBottom: 10 }}>CDP requires prior year comparison figures</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <Field label={`Prior year Scope 1 (${inventory.reporting_year - 1}) mtCO₂e`}>
+              <Field label={`Prior year Scope 1 (${inventory.reporting_year - 1}) tCO₂e`}>
                 <input type="number" value={inventory.prior_year_s1 || ''} onChange={e => setInventory(i => ({...i, prior_year_s1: Number(e.target.value)}))} placeholder="0" style={inputStyle} />
               </Field>
-              <Field label={`Prior year Scope 2 (${inventory.reporting_year - 1}) mtCO₂e`}>
+              <Field label={`Prior year Scope 2 (${inventory.reporting_year - 1}) tCO₂e`}>
                 <input type="number" value={inventory.prior_year_s2 || ''} onChange={e => setInventory(i => ({...i, prior_year_s2: Number(e.target.value)}))} placeholder="0" style={inputStyle} />
               </Field>
             </div>
@@ -1767,7 +1774,16 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
               // has neither entered nor attested. Attesting writes a StreamAttestation (stream + timestamp);
               // the stream then declares and drops off the list. Does NOT block step-2 Continue — this is
               // an export-time gate, surfaced here so it can be cleared where the fuel data lives.
-              const activeUndeclared = undeclaredStreams.filter(u => u.locId === loc.id)
+              // ⚠️ streamsNeverAnswered, NOT undeclaredStreams. This block offers ONE action — attest
+              // absent — and that action is only ever correct for a stream nobody has answered on. Once
+              // findUndeclaredStreams began returning declared-with-no-figure streams too, this list
+              // would have offered "This location has no diesel in stationary equipment" for a site
+              // whose diesel box is ticked: a checkbox that contradicts the answer above it, writes a
+              // conflicting attestation, and then appears to do nothing, because the declared state
+              // still wins and the stream stays on the list. A dead control that silently records a
+              // contradiction. Those streams are cleared by entering a figure in the fields above; the
+              // export banner names them with that instruction.
+              const activeUndeclared = streamsNeverAnswered.filter(u => u.locId === loc.id)
               if (activeUndeclared.length === 0) return null
               const attest = (streams: DeclarableStream[]) => {
                 const at = new Date().toISOString()
@@ -1814,7 +1830,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
               ].map(({ label, val, color, bold }) => (
                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '0.5px solid rgba(255,255,255,0.07)' }}>
                   <span style={{ fontSize: 12, color: bold ? '#f9fafb' : '#d1d5db', fontWeight: bold ? 600 : 300 }}>{label}</span>
-                  <span style={{ fontSize: 12, color, fontWeight: bold ? 700 : 400 }}>{val.toFixed(2)} mt</span>
+                  <span style={{ fontSize: 12, color, fontWeight: bold ? 700 : 400 }}>{val.toFixed(2)} tCO₂e</span>
                 </div>
               ))}
               <div style={{ marginTop: 10, fontSize: 11, color: '#9ca3af', lineHeight: 1.6 }}>EPA 2024 (US) · ECCC v3.0 (CA) · DEFRA 2025 (UK) · IPCC AR6 GWP · eGRID 2023</div>
@@ -1993,7 +2009,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                     <div style={{ padding: '0 1.25rem 1.25rem', borderTop: '0.5px solid #e8e7e4' }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', margin: '1rem 0 0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase' as const }}>Calculation workings — ISO 14064-3 / ISAE 3410 transparency</div>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-                        <thead><tr>{['Source', 'Activity data', 'Emission factor', 'Factor source', 'GWP basis', 'Result (mtCO₂e)'].map(h => <th key={h} style={{ background: '#f8f7f5', padding: '6px 10px', textAlign: 'left', fontSize: 10, fontWeight: 600, color: '#888784', borderBottom: '0.5px solid #e8e7e4' }}>{h}</th>)}</tr></thead>
+                        <thead><tr>{['Source', 'Activity data', 'Emission factor', 'Factor source', 'Factor vintage', 'Scope 2 method', 'GWP basis', 'Result (tCO₂e)'].map(h => <th key={h} style={{ background: '#f8f7f5', padding: '6px 10px', textAlign: 'left', fontSize: 10, fontWeight: 600, color: '#888784', borderBottom: '0.5px solid #e8e7e4' }}>{h}</th>)}</tr></thead>
                         <tbody>
                           {locRows.map((r, ri) => {
                             // Declaration rows (Phase 3b) are now VISIBLE (the point of Phase 4). result_tco2e
@@ -2004,6 +2020,8 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                                 <td style={{ ...wTd, color: '#888784' }}>—</td>
                                 <td style={{ ...wTd, color: '#888784' }}>—</td>
                                 <td style={{ ...wTd, color: '#888784' }}>{r.note}</td>
+                                <td style={{ ...wTd, color: '#888784' }}>—</td>
+                                <td style={{ ...wTd, color: '#888784' }}>—</td>
                                 <td style={{ ...wTd, color: '#888784' }}>{r.gwp_basis}</td>
                                 <td style={{ ...wTd, color: '#888784', fontWeight: 600 }}>0.0000</td>
                               </tr>
@@ -2016,6 +2034,28 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                                 <td style={{ ...wTd, color: '#ba7517' }}>—</td>
                                 <td style={{ ...wTd, color: '#ba7517' }}>—</td>
                                 <td style={{ ...wTd, color: '#ba7517' }}>{r.note}</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>{r.gwp_basis}</td>
+                                <td style={{ ...wTd, color: '#ba7517', fontWeight: 600 }}>—</td>
+                              </tr>
+                            }
+                            // The operator confirmed the stream is here and gave no figure. Same amber as
+                            // 'undeclared' below, because it blocks export for the same reason and is the
+                            // more concerning of the two. Without this branch it fell through to the
+                            // normal fuel row: the note rendered, but unhighlighted and among priced
+                            // rows — the least visible of the four states, and the worst one to lose.
+                            // This surface has no badges, so r.note does that work; it opens
+                            // "DECLARED, NOT QUANTIFIED —" and comes from the engine, which is what keeps
+                            // this page and the verifier page saying the same thing about the same row.
+                            if (r.declaration === 'declared_unquantified') {
+                              return <tr key={ri} style={{ background: '#FEF3E2' }}>
+                                <td style={{ ...wTd, color: '#ba7517', fontWeight: 600 }}>{r.source}</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>{r.note}</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
                                 <td style={{ ...wTd, color: '#ba7517' }}>{r.gwp_basis}</td>
                                 <td style={{ ...wTd, color: '#ba7517', fontWeight: 600 }}>—</td>
                               </tr>
@@ -2026,6 +2066,8 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                                 <td style={{ ...wTd, color: '#ba7517' }}>—</td>
                                 <td style={{ ...wTd, color: '#ba7517' }}>—</td>
                                 <td style={{ ...wTd, color: '#ba7517' }}>{r.note}</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
                                 <td style={{ ...wTd, color: '#ba7517' }}>{r.gwp_basis}</td>
                                 <td style={{ ...wTd, color: '#ba7517', fontWeight: 600 }}>—</td>
                               </tr>
@@ -2049,7 +2091,12 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                               </td>
                               <td style={wTd}>{r.emission_factor_display}</td>
                               <td style={wTd}>{r.ef_source}</td>
-                              <td style={wTd}>{r.gwp_basis}</td>
+                              <td style={wTd}>{r.factor_vintage || '—'}</td>
+                              <td style={wTd}>{r.scope2_method || '—'}</td>
+                              <td style={wTd}>
+                                {r.gwp_basis}
+                                {r.quantification_method && <div style={{ fontSize: 10, color: '#888784', marginTop: 3, lineHeight: 1.4, whiteSpace: 'normal' }}>{r.quantification_method}</div>}
+                              </td>
                               <td style={{ ...wTd, fontWeight: 600, color: s2 ? '#0F6E56' : '#7425e3' }}>{r.result_tco2e == null ? '—' : r.result_tco2e.toFixed(4)}</td>
                             </tr>
                           })}
@@ -2165,10 +2212,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                         ['Company', inventory.company_name || '—'],
                         ['Reporting year', String(inventory.reporting_year)],
                         ['GWP basis', `IPCC ${fw.gwp}`],
-                        ['Scope 1 total', `${totals.s1_total.toFixed(4)} mtCO₂e`],
-                        ['Scope 2 (location)', `${totals.s2_location.toFixed(4)} mtCO₂e`],
-                        ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Scope 2 (market)', `${totals.s2_market.toFixed(4)} mtCO₂e`]] : []),
-                        ...(rev > 0 ? [['S1 intensity', `${(totals.s1_total/rev).toFixed(6)} mtCO₂e/$M`]] : []),
+                        ['Scope 1 total', `${totals.s1_total.toFixed(4)} tCO₂e`],
+                        ['Scope 2 (location)', `${totals.s2_location.toFixed(4)} tCO₂e`],
+                        ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Scope 2 (market)', `${totals.s2_market.toFixed(4)} tCO₂e`]] : []),
+                        ...(rev > 0 ? [['S1 intensity', `${(totals.s1_total/rev).toFixed(6)} tCO₂e/$M`]] : []),
                         ...(emp > 0 && fw.id === 'ecovadis' ? [['S1 per employee', `${(totals.s1_total/emp*1000).toFixed(2)} kgCO₂e`]] : []),
                         ['Deadline', fw.deadline],
                       ].map(([label, val]) => (
@@ -2196,8 +2243,11 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                         {unresolvedGridLocations.length > 0 && (
                           <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {unresolvedGridLocations.length} location{unresolvedGridLocations.length > 1 ? 's' : ''} need{unresolvedGridLocations.length > 1 ? '' : 's'} a grid region: {unresolvedGridLocations.map(l => l.name).join(', ')}</div>
                         )}
-                        {undeclaredStreams.length > 0 && (
-                          <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {undeclaredStreams.length} undeclared stream{undeclaredStreams.length > 1 ? 's' : ''} — enter the data or attest absent on the Energy &amp; fuel step: {undeclaredStreams.map(u => `${u.locName}: ${STREAM_META[u.stream].name}`).join('; ')}</div>
+                        {streamsNeverAnswered.length > 0 && (
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {streamsNeverAnswered.length} undeclared stream{streamsNeverAnswered.length > 1 ? 's' : ''} — enter the data or attest absent on the Energy &amp; fuel step: {streamsNeverAnswered.map(u => `${u.locName}: ${STREAM_META[u.stream].name}`).join('; ')}</div>
+                        )}
+                        {streamsWithoutFigure.length > 0 && (
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {streamsWithoutFigure.length} stream{streamsWithoutFigure.length > 1 ? 's' : ''} declared with no figure — enter the amount on the Energy &amp; fuel step. You have said {streamsWithoutFigure.length > 1 ? 'these streams are' : 'this stream is'} present here, so attesting absent is not the fix: {streamsWithoutFigure.map(u => `${u.locName}: ${STREAM_META[u.stream].name}`).join('; ')}</div>
                         )}
                         <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>Export is locked until every figure read from your bills is confirmed, every coverage gap, overlap, or boundary-straddle is resolved, and every emission stream is either entered or attested absent. Check the Energy &amp; fuel data step.</div>
                       </div>
@@ -2283,17 +2333,17 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
       ['Locations', inventory.locations.length],
       [''],
       ['RESULTS'],
-      ['Scope 1 total (mtCO₂e)', totals.s1_total.toFixed(4)],
-      ['Scope 2 location-based (mtCO₂e)', totals.s2_location.toFixed(4)],
-      ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Scope 2 market-based (mtCO₂e)', totals.s2_market.toFixed(4)]] : []),
+      ['Scope 1 total (tCO₂e)', totals.s1_total.toFixed(4)],
+      ['Scope 2 location-based (tCO₂e)', totals.s2_location.toFixed(4)],
+      ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Scope 2 market-based (tCO₂e)', totals.s2_market.toFixed(4)]] : []),
       ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Biogenic CO₂ (mtCO₂) — reported separately', totals.biogenic.toFixed(4)]] : []),
       // Distinct Scope 3 (Cat 3) line — NZ electricity T&D losses. Only when present; never in S1/S2.
-      ...(totals.s3_td > 0 ? [['Scope 3 Cat 3 — electricity T&D (mtCO₂e)', totals.s3_td.toFixed(4)]] : []),
+      ...(totals.s3_td > 0 ? [['Scope 3 Cat 3 — electricity T&D (tCO₂e)', totals.s3_td.toFixed(4)]] : []),
       ...(fw.id === 'cdp' ? [
-        [`Prior year Scope 1 (${inventory.reporting_year - 1}) mtCO₂e`, inventory.prior_year_s1],
-        [`Prior year Scope 2 (${inventory.reporting_year - 1}) mtCO₂e`, inventory.prior_year_s2],
+        [`Prior year Scope 1 (${inventory.reporting_year - 1}) tCO₂e`, inventory.prior_year_s1],
+        [`Prior year Scope 2 (${inventory.reporting_year - 1}) tCO₂e`, inventory.prior_year_s2],
       ] : []),
-      ...(rev > 0 ? [['S1 intensity (mtCO₂e/$M revenue)', (totals.s1_total / rev).toFixed(6)]] : []),
+      ...(rev > 0 ? [['S1 intensity (tCO₂e/$M revenue)', (totals.s1_total / rev).toFixed(6)]] : []),
       [''],
       ['METHODS'],
       ...[...new Set(inventory.locations.map(l => combustionSource(l)))].map(src => ['Combustion factors', src]),
@@ -2748,9 +2798,9 @@ interface AuditRow {
 const TRACKED_FIELDS: Record<string, string> = {
   company_name: 'Company name',
   reporting_year: 'Reporting year',
-  scope1_total: 'Scope 1 total (mtCO₂e)',
-  scope2_location_total: 'Scope 2 location-based (mtCO₂e)',
-  scope2_market_total: 'Scope 2 market-based (mtCO₂e)',
+  scope1_total: 'Scope 1 total (tCO₂e)',
+  scope2_location_total: 'Scope 2 location-based (tCO₂e)',
+  scope2_market_total: 'Scope 2 market-based (tCO₂e)',
   revenue_millions: 'Revenue (USD M)',
   employee_count: 'Employees',
   boundary_approach: 'Boundary approach',

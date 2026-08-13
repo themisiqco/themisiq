@@ -16,7 +16,9 @@ import {
   isResolvedGridRegion, detectGridRegion, getResidualFactor, getGridFactor,
   pickEF, calcGas, emptyLocation, findUnresolvedCoverage, findUndeclaredStreams, applyResolutions, pctEstimated,
   MissingEmissionFactorError, findUnpriceableLocations,
+  streamState, DECLARABLE_STREAMS, STREAM_META,
   type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal, type StreamAttestation,
+  type DeclarableStream,
 } from './engine';
 import { buildMonthlyEmissions, reconcile } from './monthlyEmissions';
 
@@ -672,5 +674,273 @@ describe('GROUP L — unpriceable locations are isolated, excluded, and recorded
     }) as Location;
     expect(() => calcInventory([exploding], 'AR6', 2024)).toThrow(TypeError);
     expect(() => findUnpriceableLocations([exploding], 'AR6', 2024)).toThrow(TypeError);
+  });
+});
+
+// ── M. RECOMPUTATION: a verifier retyping the table must land on the number we printed ────────────
+//
+// THE DEFECT THIS PINS. emission_factor_display rounded with toFixed(3), so a natural-gas factor of
+// 1.9316576 kg CO₂e/m³ printed as "1.932". A verifier retyping 120,000 m³ × 1.932 got 231,840 kg
+// against our stated 231,798.9 — a 41 kg divergence, on EVERY priced row, on the one surface whose
+// whole purpose is to be reproducible. Nothing failed; the arithmetic was right and the evidence for
+// it was wrong.
+//
+// The assertion is the verifier's own procedure, not a paraphrase of it: parse the number back OUT of
+// the rendered string and multiply it by the rendered activity data. If that does not reach the
+// rendered result, the row cannot be checked by hand and the workings table is decoration.
+describe('M. workings rows recompute from what they display', () => {
+  // The tolerance is the precision a verifier reads results at — result_tco2e renders to 3–4 dp — so
+  // 1e-6 tCO2e (one milligram) is far inside it while still catching a rounded factor.
+  const TOL = 1e-6
+
+  const priced = (rows: any[]) => rows.filter(r =>
+    r.result_tco2e != null && r.activity_data > 0 && typeof r.emission_factor_display === 'string' &&
+    /[\d.]/.test(r.emission_factor_display) && r.declaration === undefined && r.gwp_basis !== 'coverage_resolution')
+
+  // Pulls the leading number out of "1.9316576 kg CO₂e/m³" the way a reader would.
+  const displayedFactor = (s: string): number => Number(String(s).match(/^-?[\d.]+/)?.[0])
+
+  const everyRowRecomputes = (rows: any[], label: string) => {
+    const rs = priced(rows)
+    expect(rs.length, `${label}: no priced rows — the assertion would pass vacuously`).toBeGreaterThan(0)
+    for (const r of rs) {
+      const f = displayedFactor(r.emission_factor_display)
+      expect(Number.isFinite(f), `${label}: ${r.source} — factor not parseable from "${r.emission_factor_display}"`).toBe(true)
+      const recomputed = r.activity_data * f / 1000
+      expect(Math.abs(recomputed - r.result_tco2e),
+        `${label}: ${r.source} — displayed ${r.activity_data} × ${f} = ${recomputed} tCO2e, row states ${r.result_tco2e}`,
+      ).toBeLessThan(TOL)
+    }
+  }
+
+  it('M1 the natural-gas m³ row that started this: 120,000 m³ recomputes exactly', () => {
+    // CA, not GB: the 1.9316576 kg CO₂e/m³ factor is the ECCC one. GB/UK publish no m³ natural-gas
+    // factor at all, so that location is 'unpriceable' and emits no priced row — which is what the
+    // first draft of this test hit, and a useful reminder that the fixture has to be a location the
+    // engine can actually price.
+    const l = { ...loc(), name: 'CA site', country: 'CA',
+      has_natural_gas: true, natural_gas_amount: 120000, natural_gas_unit: 'm3' } as any
+    const rows = buildWorkings([l], 'AR6', 2024, []);
+    const gas = rows.find((r: any) => r.source === 'Natural gas')!
+    // The factor must NOT be the rounded form that produced the 41 kg divergence.
+    expect(gas.emission_factor_display).not.toContain('1.932 ')
+    everyRowRecomputes(rows, 'M1')
+  })
+
+  it('M2 every priced row across fuels, electricity, steam and refrigerant recomputes', () => {
+    const l = { ...loc(), name: 'Mixed', country: 'US', grid_region: 'US_CA',
+      has_natural_gas: true, natural_gas_amount: 5000, natural_gas_unit: 'mcf',
+      has_propane: true, propane_amount: 900, propane_unit: 'gallons',
+      has_diesel_stationary: true, diesel_stationary_amount: 400, diesel_stationary_unit: 'gallons',
+      has_mobile: true, gasoline_amount: 1200, gasoline_unit: 'gallons',
+      diesel_mobile_amount: 700, diesel_mobile_unit: 'gallons',
+      electricity_kwh: 250000, renewable_electricity_kwh: 50000,
+      has_purchased_steam: true, purchased_steam_mmbtu: 300, purchased_steam_unit: 'mmbtu' } as any
+    everyRowRecomputes(buildWorkings([l], 'AR6', 2024, []), 'M2')
+  })
+
+  it('M3 holds under AR4 and AR5 too — the factor is combined at the selected set', () => {
+    const l = { ...loc(), name: 'EU site', country: 'DE', grid_region: 'EU_DE',
+      has_natural_gas: true, natural_gas_amount: 8000, natural_gas_unit: 'm3',
+      electricity_kwh: 90000 } as any
+    for (const gwp of ['AR4', 'AR5', 'AR6'] as const) everyRowRecomputes(buildWorkings([l], gwp, 2024, []), `M3 ${gwp}`)
+  })
+})
+
+// ── N. EVERY STREAM PRODUCES A ROW, IN EVERY STATE ───────────────────────────────────────────────
+//
+// The defect: `has_diesel_stationary: true` with `diesel_stationary_amount: 0` failed the priced-row
+// condition (`flag && amount > 0`) AND passed the declaration loop's `streamHasData` (bare flag), so
+// the stream produced NO ROW AT ALL — not priced, not attested, not undeclared. The customer had
+// affirmatively said the site burns diesel, and the workings a verifier reads said nothing whatever
+// about it. The same hole existed for natural gas, propane, fuel oil, mobile and refrigerants.
+//
+// These tests do NOT check the specific conditions — that would just be a third copy of the thing that
+// drifted. They check the PROPERTY: across every stream and every combination of declaration and
+// quantity, the count of rows for that stream is never zero.
+describe('N. no stream can be silent', () => {
+  // Per stream: how to declare it, and how to quantify it. Split deliberately — the two signals are
+  // applied independently below so all four combinations get exercised, including the stale-data case
+  // (an amount left behind after the box was unchecked).
+  const FIXTURES: Record<DeclarableStream, { declare: Partial<Location>; quantify: Partial<Location> }> = {
+    natural_gas:       { declare: { has_natural_gas: true },       quantify: { natural_gas_amount: 500 } },
+    propane:           { declare: { has_propane: true },           quantify: { propane_amount: 200 } },
+    diesel_stationary: { declare: { has_diesel_stationary: true }, quantify: { diesel_stationary_amount: 300 } },
+    fuel_oil:          { declare: { has_fuel_oil: true },          quantify: { fuel_oil_gallons: 400 } },
+    mobile:            { declare: { has_mobile: true },            quantify: { diesel_mobile_amount: 900 } },
+    refrigerants:      { declare: { has_hfc_refrigerants: true },  quantify: { refrigerant_purchased_kg: 12 } },
+    purchased_steam:   { declare: { has_purchased_steam: true },   quantify: { purchased_steam_mmbtu: 100 } },
+    // Electricity has NO checkbox in the wizard — the kWh field is both signals at once, so its
+    // declared-unquantified state is unreachable by construction. Same entry for both keys records
+    // that rather than hiding it; the four combinations below collapse to two, and still never zero.
+    electricity:       { declare: { electricity_kwh: 850_000, grid_region: 'US_CA' },
+                         quantify: { electricity_kwh: 850_000, grid_region: 'US_CA' } },
+  };
+
+  const rowsFor = (s: DeclarableStream, declared: boolean, quantified: boolean) => {
+    const f = FIXTURES[s];
+    const l = loc({ ...(declared ? f.declare : {}), ...(quantified ? f.quantify : {}) });
+    return buildWorkings([l], 'AR6', 2024, [], 12).filter((r: any) => r.stream === s);
+  };
+
+  it('N1 every stream emits at least one row in all four declared/quantified combinations', () => {
+    // THE CENTRAL ASSERTION. 8 streams x 4 combinations = 32 cases, none of which may vanish.
+    const silent: string[] = [];
+    for (const s of DECLARABLE_STREAMS) {
+      for (const declared of [true, false]) {
+        for (const quantified of [true, false]) {
+          if (rowsFor(s, declared, quantified).length === 0) {
+            silent.push(`${s} (declared=${declared}, quantified=${quantified})`);
+          }
+        }
+      }
+    }
+    expect(silent, `these stream/state combinations produced NO ROW — the stream is invisible to a verifier:\n${silent.join('\n')}`).toEqual([]);
+  });
+
+  it('N2 the three states map to three distinct row kinds', () => {
+    for (const s of DECLARABLE_STREAMS) {
+      const undeclared = rowsFor(s, false, false);
+      const declaredOnly = rowsFor(s, true, false);
+      const priced = rowsFor(s, true, true);
+
+      expect(undeclared.map((r: any) => r.declaration), `${s} undeclared`).toEqual(['undeclared']);
+      expect(priced.every((r: any) => r.declaration === undefined), `${s} priced rows carry no declaration`).toBe(true);
+      expect(priced.length, `${s} produced no priced row`).toBeGreaterThan(0);
+
+      if (s === 'electricity') continue; // no checkbox — declare implies quantify, see FIXTURES
+      expect(declaredOnly.map((r: any) => r.declaration), `${s} declared but unquantified`).toEqual(['declared_unquantified']);
+    }
+  });
+
+  it('N3 declared-but-unquantified is NOT collapsed into NOT DECLARED', () => {
+    // The requirement this test exists for: "we use diesel here, and no figure for it is in the
+    // report" is a stronger and more concerning assertion than "nobody has been asked about diesel".
+    // Present is not enough — the two rows must READ differently to whoever is reviewing them.
+    const declared = rowsFor('diesel_stationary', true, false)[0] as any;
+    const undeclared = rowsFor('diesel_stationary', false, false)[0] as any;
+
+    expect(declared.declaration).not.toBe(undeclared.declaration);
+    expect(declared.note).not.toBe(undeclared.note);
+    expect(declared.note).toContain('DECLARED, NOT QUANTIFIED');
+    expect(undeclared.note).toContain('NOT DECLARED');
+    // Both are absences of a figure, so neither may render as a number a verifier could add up.
+    expect(declared.result_tco2e).toBeNull();
+    expect(undeclared.result_tco2e).toBeNull();
+    // And the wording names the stream in the same words the customer was asked in.
+    expect(declared.note).toContain(STREAM_META.diesel_stationary.name);
+  });
+
+  it('N4 no stream ever gets BOTH a priced row and a declaration row', () => {
+    // The other direction of the same invariant. If the declaration trigger ever drifted back toward
+    // duplicating the pricing condition, the likely symptom is a duplicate: a stream priced AND
+    // reported undeclared on the same location, which would double-report it to a verifier.
+    for (const s of DECLARABLE_STREAMS) {
+      for (const declared of [true, false]) {
+        for (const quantified of [true, false]) {
+          const rows = rowsFor(s, declared, quantified) as any[];
+          const hasPriced = rows.some(r => r.declaration === undefined);
+          const hasDeclaration = rows.some(r => r.declaration !== undefined);
+          expect(hasPriced && hasDeclaration, `${s} (declared=${declared}, quantified=${quantified}) emitted both`).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('N5 an amount left behind after the box is unchecked reads as NOT DECLARED, not as data', () => {
+    // The fourth combination, called out separately because it is the one a customer can reach by
+    // changing their mind: the figure is still in the record, but nobody is currently asserting the
+    // stream exists. It must not price, and it must not be silent.
+    const rows = rowsFor('propane', false, true) as any[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0].declaration).toBe('undeclared');
+    expect(rows[0].result_tco2e).toBeNull();
+  });
+
+  it('N6 ammonia is declared and reported, though it is deliberately never priced', () => {
+    // NH3 has no global warming potential, so the refrigerant row is gated on `!uses_ammonia` and an
+    // ammonia site NEVER produces a priced row. Under the old bare-flag check that made it invisible
+    // even with a recharge figure on file — the hole at its widest, because the quantity was there.
+    const l = loc({ uses_ammonia: true, refrigerant_purchased_kg: 50 });
+    const rows = buildWorkings([l], 'AR6', 2024, [], 12).filter((r: any) => r.stream === 'refrigerants') as any[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0].declaration).toBe('declared_unquantified');
+  });
+
+  it('N7 an attestation still answers NOT DECLARED, and cannot cover a declared stream', () => {
+    const att: StreamAttestation[] = [{ stream: 'fuel_oil', attested_at: '2026-08-13T00:00:00Z' }];
+    const absent = buildWorkings([loc({ stream_attestations: att })], 'AR6', 2024, [], 12)
+      .filter((r: any) => r.stream === 'fuel_oil') as any[];
+    expect(absent[0].declaration).toBe('attested_absent');
+    expect(absent[0].result_tco2e).toBe(0); // a CLAIM of no emissions, not an absence
+
+    // Contradiction: the site attests fuel oil absent AND reports using it. The declared state wins,
+    // because that is the one a verifier has to resolve.
+    const both = buildWorkings([loc({ has_fuel_oil: true, stream_attestations: att })], 'AR6', 2024, [], 12)
+      .filter((r: any) => r.stream === 'fuel_oil') as any[];
+    expect(both).toHaveLength(1);
+    expect(both[0].declaration).toBe('declared_unquantified');
+  });
+
+  it('N8 streamState agrees with the rows for every stream and combination', () => {
+    // streamState is what the export gate reads; the rows are what a verifier reads. They are derived
+    // by different routes on purpose (predicate vs observed rows), so this pins them together.
+    for (const s of DECLARABLE_STREAMS) {
+      for (const declared of [true, false]) {
+        for (const quantified of [true, false]) {
+          const f = FIXTURES[s];
+          const l = loc({ ...(declared ? f.declare : {}), ...(quantified ? f.quantify : {}) });
+          const rows = buildWorkings([l], 'AR6', 2024, [], 12).filter((r: any) => r.stream === s) as any[];
+          const state = streamState(l, s);
+          const expected = rows.some(r => r.declaration === undefined) ? 'quantified'
+            : rows[0].declaration === 'declared_unquantified' ? 'declared_unquantified' : 'undeclared';
+          expect(state, `${s} (declared=${declared}, quantified=${quantified})`).toBe(expected);
+        }
+      }
+    }
+  });
+
+  it('N9 the export gate blocks declared-but-unquantified, and no case is loosened', () => {
+    // A TIGHTENING, pinned so it is a deliberate property rather than a side effect. Before this
+    // change a location that said it burns diesel and gave no figure PASSED the gate and exported an
+    // inventory silently missing that stream.
+    const gap = findUndeclaredStreams([loc({ has_diesel_stationary: true })]);
+    expect(gap.some(g => g.stream === 'diesel_stationary' && g.state === 'declared_unquantified')).toBe(true);
+
+    // Quantified streams never block.
+    const ok = findUndeclaredStreams([loc({ has_diesel_stationary: true, diesel_stationary_amount: 300 })]);
+    expect(ok.some(g => g.stream === 'diesel_stationary')).toBe(false);
+
+    // An attestation still clears an undeclared stream.
+    const attested = findUndeclaredStreams([loc({ stream_attestations: [{ stream: 'propane', attested_at: 'x' }] })]);
+    expect(attested.some(g => g.stream === 'propane')).toBe(false);
+  });
+});
+
+// ── N10. GOLDEN REGRESSION — THIS FIX MOVES NO NUMBER ────────────────────────────────────────────
+describe('N10. the golden inventory is unchanged', () => {
+  const golden = (): Location => loc({
+    country: 'CA', province: 'ON', grid_region: 'ON',
+    has_natural_gas: true, natural_gas_amount: 120_000, natural_gas_unit: 'm3',
+    has_mobile: true, diesel_mobile_amount: 5_000, diesel_mobile_unit: 'litres',
+    has_hfc_refrigerants: true, refrigerant_type: 'r410a', refrigerant_purchased_kg: 12,
+    electricity_kwh: 850_000,
+  });
+
+  it('ON, RY2025, gas 120,000 m3 + diesel mobile 5,000 L + R-410A 12 kg + 850,000 kWh = 304.6176 tCO2e', () => {
+    const t = calcInventory([golden()], 'AR6', 2025) as any;
+    expect(t.s1_total + t.s2_location).toBeCloseTo(304.6176, 4);
+    // The components, so a future failure says WHICH one moved rather than only that the total did.
+    expect(t.s1_total).toBeCloseTo(272.317564, 6);   // gas 231.798912 + diesel 13.446652 + R-410A 27.072
+    expect(t.s2_location).toBeCloseTo(32.3, 6);      // 850,000 kWh x ON 2025 grid 0.038
+  });
+
+  it('the declaration rows carry no figure, so the workings still sum to the same total', () => {
+    const rows = buildWorkings([golden()], 'AR6', 2025, [], 12) as any[];
+    const scope12 = rows.filter(r => r.result_tco2e != null && r.scope !== 3 && r.scope2_method !== 'market-based');
+    expect(scope12.reduce((n, r) => n + r.result_tco2e, 0)).toBeCloseTo(304.6176, 4);
+    // Four streams are absent from this site and every one of them is on the record as absent.
+    const declarations = rows.filter(r => r.declaration).map(r => r.stream).sort();
+    expect(declarations).toEqual(['diesel_stationary', 'fuel_oil', 'propane', 'purchased_steam']);
   });
 });

@@ -31,6 +31,15 @@ interface WorkingRow {
   // activity_data: null; undeclared-stream rows carry result_tco2e: null.
   activity_data: number | null; activity_unit: string
   emission_factor: string; ef_source: string; gwp_basis: string
+  // Split OUT of gwp_basis rather than replacing it: gwp_basis carries 'coverage_resolution',
+  // which factorSourceOf/rowNoteOf discriminate on, so repurposing it would break the row that
+  // tells a verifier an estimation note is not a factor citation.
+  scope2_method?: string
+  // The factor's own vintage, distinct from the inventory's reporting year. 'Electricity (ON, 2025)'
+  // read like a reporting year and was in fact the year of the ECCC factor table applied.
+  factor_vintage?: string
+  // Refrigerants: what the figure counts. Recharge treated as emitted.
+  quantification_method?: string
   result_tco2e: number | null
   // Concierge provenance (present only for bill-sourced rows). Lets a verifier trace a figure
   // back to the quote read off the bill; 'concierge-extrapolated' rows are grossed-up estimates.
@@ -59,7 +68,13 @@ interface WorkingRow {
   // every column and no badge, sitting in the ordinary striped background, because the union did
   // not name it and neither branch matched. The one row on the page that says a total is short was
   // the least visible thing in the table.
-  declaration?: 'attested_absent' | 'undeclared' | 'unpriceable'
+  //
+  // 'declared_unquantified' arrived the same way and had to be added for the same reason: the
+  // operator has affirmatively said the stream is here and supplied no figure, which is a STRONGER
+  // gap than a stream nobody was asked about — and it was rendering with no badge and no amber.
+  // A value the engine can emit and this union does not name renders as an ordinary row. Any future
+  // declaration state must be added here in the same change that adds it to the engine.
+  declaration?: 'attested_absent' | 'undeclared' | 'unpriceable' | 'declared_unquantified'
   // Present only on 'unpriceable' rows: what could not be priced. The engine's own tokens.
   unpriceable?: { fuel?: string; unit?: string; country?: string }
 }
@@ -573,9 +588,9 @@ export default function VerifierPage() {
 
         <SectionHead>Emissions Summary</SectionHead>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10, marginBottom: '2rem' }}>
-          <Stat label="Scope 1 (tCO2e)" value={(inv.scope1_total ?? 0).toFixed(3)} color="#B91C1C" />
-          <Stat label="Scope 2 location (tCO2e)" value={(inv.scope2_location_total ?? 0).toFixed(3)} color="#0F6E56" />
-          <Stat label="Scope 2 market (tCO2e)" value={(inv.scope2_market_total ?? 0).toFixed(3)} color="#0C447C" />
+          <Stat label="Scope 1 (tCO₂e)" value={(inv.scope1_total ?? 0).toFixed(3)} color="#B91C1C" />
+          <Stat label="Scope 2 location (tCO₂e)" value={(inv.scope2_location_total ?? 0).toFixed(3)} color="#0F6E56" />
+          <Stat label="Scope 2 market (tCO₂e)" value={(inv.scope2_market_total ?? 0).toFixed(3)} color="#0C447C" />
           {/* The S1-intensity tile was removed deliberately: intensity is derived from
               revenue_millions, and revenue is no longer disclosed to a verifier. A tile reading
               0.0000 because its numerator stopped arriving would be worse than no tile. */}
@@ -607,7 +622,7 @@ export default function VerifierPage() {
                       differing column order between them would make a reconciliation harder than it
                       needs to be. Until now this column existed there and not here, so ef_source was
                       stored on every row and shown to the operator but never to the verifier. */}
-                  {['Location', 'Source', 'Scope', 'Activity data', 'Emission factor', 'Factor source', 'GWP', 'Result (tCO2e)'].map(h => (
+                  {['Location', 'Source', 'Scope', 'Activity data', 'Emission factor', 'Factor source', 'Factor vintage', 'Scope 2 method', 'GWP basis', 'Result (tCO₂e)'].map(h => (
                     <th key={h} style={{ color: '#fff', textAlign: 'left', padding: '8px 10px', fontWeight: 500, fontSize: 11, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -615,10 +630,13 @@ export default function VerifierPage() {
               <tbody>
                 {inv.workings.map((w, i) => (
                   <tr key={i} style={{
-                    // 'unpriceable' takes the same amber as 'undeclared'. Both are rows a verifier
-                    // must not read past: one says nobody established whether something is there,
-                    // the other says the totals on this page are short by a known site.
-                    background: w.declaration === 'undeclared' || w.declaration === 'unpriceable' ? '#FEF3E2'
+                    // 'unpriceable' and 'declared_unquantified' take the same amber as 'undeclared'.
+                    // All three are rows a verifier must not read past: one says nobody established
+                    // whether something is there, one says the operator confirmed it IS there and gave
+                    // no figure, the third says the totals on this page are short by a known site.
+                    // Equal weight is deliberate — the badge and the sentence separate them, not the
+                    // colour. Grey means resolved, amber means stop; a fourth shade would blur that.
+                    background: w.declaration === 'undeclared' || w.declaration === 'unpriceable' || w.declaration === 'declared_unquantified' ? '#FEF3E2'
                       : w.declaration === 'attested_absent' ? '#f4f4f2'
                       : i % 2 === 0 ? '#fff' : '#f8f7f5',
                     borderBottom: '0.5px solid #e8e7e4',
@@ -668,6 +686,23 @@ export default function VerifierPage() {
                           </div>
                         </>
                       )}
+                      {/* PLACED IMMEDIATELY AFTER 'undeclared', because these two are the pair a reader
+                          must never confuse, and adjacency in the source is how they stay legible as a
+                          pair when either is edited. The badge shares NO WORD with "Not declared" for the
+                          same reason: at 10px in one colour, "Declared…" and "Not declared" are one
+                          negation apart, and this is the more concerning of the two. It mirrors
+                          "Confirmed absent" instead, so the two operator-answered states read as a
+                          matched pair with opposite polarity. */}
+                      {w.declaration === 'declared_unquantified' && (
+                        <>
+                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: '#ba7517', background: 'rgba(186,117,23,0.12)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Present, no figure</span>
+                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: '#ba7517' }}>
+                            The operator has confirmed this location has this, and has given no figure for it.
+                            Whatever it emitted is missing from every total on this page. This is not a figure of
+                            zero — and unlike a stream nobody was asked about, this one is known to be here.
+                          </div>
+                        </>
+                      )}
                       {/* Says what the row is as EVIDENCE, like the two above. The engine's own note
                           renders in the Result column and carries the factor-lookup reason verbatim;
                           this states the consequence a verifier is deciding on — the totals shown
@@ -712,7 +747,18 @@ export default function VerifierPage() {
                         {factorSourceOf(w)}
                       </div>
                     </td>
-                    <td style={{ padding: '8px 10px', color: '#555553' }}>{w.gwp_basis}</td>
+                    {/* Vintage and method are their OWN columns now. 'location-based' used to render
+                        under a heading that said GWP, which told a verifier a Scope 2 method was a GWP
+                        set; and the factor's year was inside the Source label where it read as the
+                        reporting year. Both are structured fields on the row, so both get a column. */}
+                    <td style={{ padding: '8px 10px', color: '#555553', whiteSpace: 'nowrap' }}>{w.factor_vintage || '—'}</td>
+                    <td style={{ padding: '8px 10px', color: '#555553', whiteSpace: 'nowrap' }}>{w.scope2_method || '—'}</td>
+                    <td style={{ padding: '8px 10px', color: '#555553' }}>
+                      <div style={{ maxWidth: 200, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{w.gwp_basis}</div>
+                      {w.quantification_method && (
+                        <div style={{ marginTop: 3, fontSize: 10, color: '#888784', lineHeight: 1.4 }}>{w.quantification_method}</div>
+                      )}
+                    </td>
                     <td style={{ padding: '8px 10px', color: '#7425e3', fontWeight: 600, whiteSpace: 'nowrap' }}>{w.result_tco2e == null ? '—' : w.result_tco2e.toFixed(3)}</td>
                   </tr>
                 ))}
