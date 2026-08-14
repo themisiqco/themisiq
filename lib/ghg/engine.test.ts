@@ -2796,3 +2796,187 @@ describe('W. metric fuel oil prices per litre, from the publisher\'s own figure'
     }
   });
 });
+
+// ── AB. THE CH4/N2O SECTOR BASIS IS PINNED, IN EVERY TABLE ──────────────────────────────────────
+//
+// THE GAP THIS CLOSES. CH4 and N2O rates were asserted NOWHERE. Every existing pin checked CO2 or a
+// combined CO2e; the trace-gas rates had to be REVERSE-ENGINEERED out of the stored per-litre values
+// to find out which sector table they came from. That is why the choice sat undocumented in five
+// tables at once, and why a future sector change could have landed silently.
+//
+// Publishers split stationary CH4/N2O by END-USE SECTOR. Each table below sits somewhere on that
+// axis, and each assertion states WHERE as an expression from the published per-TJ or per-unit rate,
+// so a change of sector fails here rather than passing.
+describe('AB. CH4/N2O rates are pinned to the sector table they came from', () => {
+  const G = 3.785411784;
+
+  // ── EF (US) — EPA Hub 2025 Table 1. Petroleum Products carry ONE column, not a sector set.
+  const EPA_PETROLEUM = { ch4_g_per_mmbtu: 3, n2o_g_per_mmbtu: 0.6 };
+  const EPA_NATGAS = { ch4_g_per_mmbtu: 1, n2o_g_per_mmbtu: 0.1 };
+
+  it('AB1 EPA petroleum CH4/N2O are UNIFORM across the block — this is what makes "no choice" true', () => {
+    // ⚠️ THE LOAD-BEARING ASSERTION FOR EF'S SECTOR COMMENT. "No end-use choice was made" is only true
+    // while EPA publishes a single 3 / 0.6 for every petroleum product. Each key stores
+    // heat-content x rate, so dividing CH4 by N2O recovers the published RATIO independent of the heat
+    // content — and it must be 3/0.6 = 5 on every petroleum key. If EPA ever splits the block by
+    // sector, the rows stop agreeing and this fails.
+    const expected = EPA_PETROLEUM.ch4_g_per_mmbtu / EPA_PETROLEUM.n2o_g_per_mmbtu;   // 5
+    // ⚠️ SPLIT BY STORED PRECISION, NOT BY TOLERANCE-SHOPPING. The per-gallon keys carry the ratio
+    // EXACTLY, because they are heat content x rate at full precision. The per-LITRE keys are those
+    // values divided by L_PER_GAL and rounded to 3 significant figures, so their ratio drifts up to
+    // 0.14% — a property of the rounding, not of the rate. Asserting both at the same tolerance would
+    // either fail on the litre keys or stop being exact on the gallon ones.
+    const fullPrecision = ['propane_gallon', 'diesel_gallon', 'fuel_oil_gallon',
+      'fuel_oil_distillate_gallon', 'fuel_oil_residual_gallon', 'gasoline_gallon', 'diesel_mobile_gallon'];
+    for (const key of fullPrecision) {
+      const k = (EF as any)[key];
+      expect(k.ch4 / k.n2o, `${key}: EPA petroleum ratio 3 / 0.6, exactly`).toBeCloseTo(expected, 9);
+    }
+    const rounded = ['propane_litre', 'diesel_litre', 'gasoline_litre', 'diesel_mobile_litre'];
+    for (const key of rounded) {
+      const k = (EF as any)[key];
+      // 1% band: ~7x the worst observed rounding drift (0.14%), and ~230x tighter than the gap to any
+      // other sector rate, so it still fails instantly if a key moves off the petroleum column.
+      expect(Math.abs((k.ch4 / k.n2o) / expected - 1), `${key}: EPA petroleum ratio within rounding`).toBeLessThan(0.01);
+    }
+    // Natural gas is the OTHER published pair, 1 / 0.1 — same ratio, different level, so the ratio
+    // test above cannot tell them apart. The level is pinned directly below.
+    for (const key of ['natural_gas_mmbtu', 'natural_gas_mcf', 'natural_gas_therms']) {
+      const k = (EF as any)[key];
+      expect(k.ch4 / k.n2o, `${key}: EPA gas ratio 1 / 0.1`)
+        .toBeCloseTo(EPA_NATGAS.ch4_g_per_mmbtu / EPA_NATGAS.n2o_g_per_mmbtu, 6);
+    }
+  });
+
+  it('AB2 EF CH4/N2O ARE heat content x the published rate', () => {
+    // The level, asserted as the expression. Heat contents are EPA's own, quoted at each key.
+    const perMmbtu = (hc: number, g: number) => hc * g / 1000;   // g/mmBtu -> kg/unit
+    const P = EPA_PETROLEUM.ch4_g_per_mmbtu, N = EPA_PETROLEUM.n2o_g_per_mmbtu;
+    expect((EF as any).natural_gas_mmbtu.ch4).toBeCloseTo(perMmbtu(1, EPA_NATGAS.ch4_g_per_mmbtu), 9);
+    expect((EF as any).natural_gas_mmbtu.n2o).toBeCloseTo(perMmbtu(1, EPA_NATGAS.n2o_g_per_mmbtu), 9);
+    expect((EF as any).propane_gallon.ch4).toBeCloseTo(perMmbtu(0.091, P), 9);       // 0.091 mmBtu/gal
+    expect((EF as any).propane_gallon.n2o).toBeCloseTo(perMmbtu(0.091, N), 9);
+    expect((EF as any).fuel_oil_distillate_gallon.ch4).toBeCloseTo(perMmbtu(0.138, P), 9);  // 0.138
+    expect((EF as any).fuel_oil_distillate_gallon.n2o).toBeCloseTo(perMmbtu(0.138, N), 9);
+    expect((EF as any).fuel_oil_residual_gallon.ch4).toBeCloseTo(perMmbtu(0.15, P), 9);     // 0.15
+    expect((EF as any).fuel_oil_residual_gallon.n2o).toBeCloseTo(perMmbtu(0.15, N), 9);
+    expect((EF as any).gasoline_gallon.ch4).toBeCloseTo(perMmbtu(0.125, P), 9);             // 0.125
+    expect((EF as any).gasoline_gallon.n2o).toBeCloseTo(perMmbtu(0.125, N), 9);
+  });
+
+  // ── EF_EU — IPCC 2006 Vol.2 Ch.2. Values are Table 2.2/2.3 (identical for these fuels).
+  // T2.4/T2.5 would be 10 for the liquids and 5 for LPG/gas; N2O does not move between tables.
+  const IPCC_T22 = {
+    natural_gas:    { ch4: 1, n2o: 0.1 },
+    lpg:            { ch4: 1, n2o: 0.1 },
+    gas_diesel_oil: { ch4: 3, n2o: 0.6 },
+    residual_oil:   { ch4: 3, n2o: 0.6 },
+    motor_gasoline: { ch4: 3, n2o: 0.6 },
+  };
+  const perLitre = (rate: number, ncv: number, density: number) => rate * ncv * 1e-6 * density;
+
+  it('AB3 EF_EU is on IPCC Table 2.2/2.3 — the INDUSTRIAL tables, not commercial or residential', () => {
+    const EU = EF_EU as any;
+    // ⚠️ RELATIVE, 1%, AND NOT AN EQUALITY. These trace-gas values are stored at 2-4 SIGNIFICANT
+    // FIGURES depending on the key (propane N2O is 0.0000024, two figures), so an equality would pin
+    // each key's ROUNDING rather than its rate, and would have to be re-derived by hand per key. The
+    // worst observed drift is 0.51%; the gap to Table 2.4 is +233% for the liquids and +400% for LPG
+    // and gas. A 1% band therefore distinguishes the sector tables by a factor of ~230 while staying
+    // indifferent to how many figures a key happens to carry.
+    const near = (actual: number, expected: number, what: string) =>
+      expect(Math.abs(actual / expected - 1), `${what}: within stored rounding of the T2.2/2.3 rate`).toBeLessThan(0.01);
+    near(EU.propane_litre.ch4, perLitre(IPCC_T22.lpg.ch4, 47.3, 0.510), 'propane CH4');
+    near(EU.propane_litre.n2o, perLitre(IPCC_T22.lpg.n2o, 47.3, 0.510), 'propane N2O');
+    near(EU.diesel_litre.ch4, perLitre(IPCC_T22.gas_diesel_oil.ch4, 43.0, 0.844), 'diesel CH4');
+    near(EU.diesel_litre.n2o, perLitre(IPCC_T22.gas_diesel_oil.n2o, 43.0, 0.844), 'diesel N2O');
+    near(EU.fuel_oil_residual_litre.ch4, perLitre(IPCC_T22.residual_oil.ch4, 40.4, 0.990), 'residual CH4');
+    near(EU.fuel_oil_residual_litre.n2o, perLitre(IPCC_T22.residual_oil.n2o, 40.4, 0.990), 'residual N2O');
+    near(EU.gasoline_litre.ch4, perLitre(IPCC_T22.motor_gasoline.ch4, 44.3, 0.745), 'gasoline CH4');
+    near(EU.gasoline_litre.n2o, perLitre(IPCC_T22.motor_gasoline.n2o, 44.3, 0.745), 'gasoline N2O');
+    // Natural gas takes the volumetric route: rate x 36 MJ/m3, and lands exactly.
+    expect(EU.natural_gas_m3.ch4).toBeCloseTo(IPCC_T22.natural_gas.ch4 * 36e-6, 12);
+    expect(EU.natural_gas_m3.n2o).toBeCloseTo(IPCC_T22.natural_gas.n2o * 36e-6, 12);
+    // Distillate shares the gas/diesel oil row, so it must carry diesel's rates unchanged.
+    expect(EU.fuel_oil_distillate_litre.ch4).toBe(EU.diesel_litre.ch4);
+    expect(EU.fuel_oil_distillate_litre.n2o).toBe(EU.diesel_litre.n2o);
+  });
+
+  it('AB4 EF_EU is DEFINITIVELY NOT on Table 2.4 or 2.5', () => {
+    // Asserted as an exclusion, not just an equality: the point of the comment is that the choice IS
+    // identifiable in one direction (not commercial/residential) even though 2.2 and 2.3 cannot be
+    // told apart from the stored values. If a sector selector is ever added, this is what should
+    // start failing for the locations that move.
+    const EU = EF_EU as any;
+    const T24 = { gas_diesel_oil: 10, motor_gasoline: 10, residual_oil: 10, lpg: 5, natural_gas: 5 };
+    expect(EU.diesel_litre.ch4).not.toBeCloseTo(perLitre(T24.gas_diesel_oil, 43.0, 0.844), 8);
+    expect(EU.gasoline_litre.ch4).not.toBeCloseTo(perLitre(T24.motor_gasoline, 44.3, 0.745), 8);
+    expect(EU.fuel_oil_residual_litre.ch4).not.toBeCloseTo(perLitre(T24.residual_oil, 40.4, 0.990), 8);
+    expect(EU.propane_litre.ch4).not.toBeCloseTo(perLitre(T24.lpg, 47.3, 0.510), 8);
+    expect(EU.natural_gas_m3.ch4).not.toBeCloseTo(T24.natural_gas * 36e-6, 8);
+    // The switch is NOT uniform scaling — liquids 3.33x, LPG and gas 5x. Recorded so a future change
+    // is not applied as one multiplier.
+    expect(T24.gas_diesel_oil / IPCC_T22.gas_diesel_oil.ch4).toBeCloseTo(10 / 3, 9);
+    expect(T24.lpg / IPCC_T22.lpg.ch4).toBe(5);
+  });
+
+  it('AB5 EPA and IPCC DISAGREE on LPG, and both are preserved', () => {
+    // EPA puts propane on the petroleum 3 / 0.6; IPCC keeps LPG on the gaseous 1 / 0.1. Two
+    // publishers, not a transcription error. Pinned so a "harmonising" edit fails loudly.
+    const usRatePerMmbtu = (EF as any).propane_gallon.ch4 / 0.091 * 1000;   // back to g/mmBtu
+    expect(usRatePerMmbtu, 'EPA propane sits on the petroleum rate').toBeCloseTo(3, 6);
+    const euRatePerTJ = (EF_EU as any).propane_litre.ch4 / (47.3e-6 * 0.510);
+    expect(euRatePerTJ, 'IPCC LPG sits on the gaseous rate').toBeCloseTo(1, 2);
+    expect(Math.round(usRatePerMmbtu), 'the two publishers differ, deliberately').not.toBe(Math.round(euRatePerTJ));
+  });
+
+  // ── EF_CA — ECCC v3.0, named end-use rows, g/unit published directly.
+  it('AB6 EF_CA CH4/N2O are the named ECCC end-use rows, in g/L', () => {
+    const CA = EF_CA as any;
+    // Light Fuel Oil - Industrial 0.006 / 0.031 g/L; Heavy Fuel Oil - Industrial 0.12 / 0.064 g/L.
+    expect(CA.fuel_oil_distillate_litre.ch4).toBeCloseTo(0.006 / 1000, 10);
+    expect(CA.fuel_oil_distillate_litre.n2o).toBeCloseTo(0.031 / 1000, 10);
+    expect(CA.fuel_oil_residual_litre.ch4).toBeCloseTo(0.12 / 1000, 10);
+    expect(CA.fuel_oil_residual_litre.n2o).toBeCloseTo(0.064 / 1000, 10);
+    // Diesel "Refineries and Others" 0.078 / 0.022 g/L; propane "All Other Uses" 0.024 / 0.108 g/L;
+    // motor gasoline 0.100 / 0.02 g/L. Three DIFFERENT end-use rows, which is the choice the comment
+    // records — if any key silently moved to another row, its rate changes and this fails.
+    expect(CA.diesel_litre.ch4).toBeCloseTo(0.078 / 1000, 10);
+    expect(CA.diesel_litre.n2o).toBeCloseTo(0.022 / 1000, 10);
+    expect(CA.propane_litre.ch4).toBeCloseTo(0.024 / 1000, 10);
+    expect(CA.propane_litre.n2o).toBeCloseTo(0.108 / 1000, 10);
+    expect(CA.gasoline_litre.ch4).toBeCloseTo(0.100 / 1000, 10);
+    expect(CA.gasoline_litre.n2o).toBeCloseTo(0.02 / 1000, 10);
+    // And the gallon forms are those same rates x L_PER_GAL, so no key drifts between bases.
+    expect(CA.gasoline_gallon.ch4).toBeCloseTo(0.100 / 1000 * G, 5);
+  });
+
+  it('AB7 UK, AU and NZ have NO sector-varying gas split to pin — the gases are combined at source', () => {
+    // Their publishers give one CO2e per unit, so ch4/n2o are 0 by convention and no sector could act
+    // on them. Asserted so the ABSENCE of a sector pin for these three reads as "nothing to pin"
+    // rather than "nobody wrote one". X4 separately guards that each table stays uniform in style.
+    for (const [name, table] of [['EF_UK', EF_UK], ['EF_AU', EF_AU],
+                                 ['EF_NZ.commercial', (EF_NZ as any).commercial],
+                                 ['EF_NZ.industrial', (EF_NZ as any).industrial]] as [string, any][]) {
+      for (const [key, v] of Object.entries(table) as [string, any][]) {
+        if (!v || typeof v !== 'object') continue;
+        expect(v.ch4, `${name}.${key} combines its gases into co2`).toBe(0);
+        expect(v.n2o, `${name}.${key} combines its gases into co2`).toBe(0);
+      }
+    }
+  });
+
+  it('AB8 NZ is the only table with a use-class selector, and it is undisclosed on the row', () => {
+    // The precedent the EU and CA open items point at — pinned with BOTH halves, because a future
+    // design should start from what nz_use_class actually delivers rather than what it appears to.
+    const commercial = loc({ country: 'NZ', nz_use_class: 'commercial', has_diesel_stationary: true,
+      diesel_stationary_amount: 1000, diesel_stationary_unit: 'litres' });
+    const industrial = { ...commercial, nz_use_class: 'industrial' as const };
+    const rowOf = (l: Location) => (buildWorkings([l], 'AR6', 2025, [], 12) as any[])
+      .find(r => r.stream === 'diesel_stationary' && !r.declaration);
+    // The selector genuinely changes the figure...
+    expect(rowOf(commercial).result_tco2e).not.toBe(rowOf(industrial).result_tco2e);
+    // ...and NOTHING on the row says which class produced it.
+    expect(rowOf(commercial).ef_source, 'same citation for both classes').toBe(rowOf(industrial).ef_source);
+    expect(JSON.stringify(rowOf(industrial)), 'use class appears nowhere on the row').not.toContain('industrial');
+  });
+});

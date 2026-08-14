@@ -65,6 +65,29 @@ const GWP = {
 //   reason. See its own note at the key.
 // Whichever rows differ between the 2024 and 2025 editions are the ones to pin, the way EF_UK now pins
 // natural_gas_kwh / diesel_litre / gasoline_litre.
+//
+// ── END-USE SECTOR: NO CHOICE WAS MADE, BECAUSE EPA OFFERS NONE ─────────────────────────────────
+// Verified against EPA Hub 2025 Table 1 (Stationary Combustion) — LF, 14 Aug 2026.
+//
+// EVERY ROW in the Petroleum Products block carries an IDENTICAL 3 g CH4 / 0.6 g N2O per mmBtu —
+// Distillate No. 1, No. 2, No. 4, Residual No. 5, No. 6, LPG, Propane, Motor Gasoline, Kerosene and
+// Crude Oil alike. There is ONE column, not a sector set. Natural Gas is 1 / 0.1. So the CH4/N2O in
+// every key below is the only value EPA publishes for that fuel, and no end-use selection was made
+// here or is available to make. Contrast EF_CA (which picks a named end-use row per key) and EF_EU
+// (which sits on IPCC's industrial tables while three other sector tables exist).
+//
+// ⚠️ EPA'S OWN NOTE UNDER TABLE 1 SAYS OTHERWISE, AND IT IS QUOTED HERE SO NOBODY GOES LOOKING.
+// Verbatim: "The CH4 and N2O emission factors provided represent emissions in terms of fuel type and
+// by end-use sector (i.e., residential, commercial, industrial, electricity generation)." The
+// published table has NO sector columns. A verifier reading that note will look for them, fail to
+// find them, and reasonably wonder whether we dropped a dimension. We did not — there is nothing
+// there to drop. Do not go hunting for a sector split in this workbook on the strength of that note.
+//
+// ⚠️ EPA AND IPCC DISAGREE ON LPG, AND THE DIVERGENCE IS DELIBERATE ON BOTH SIDES. EPA gives
+// propane/LPG the same 3 / 0.6 as every other petroleum product; IPCC gives LPG 1 / 0.1, distinct
+// from the liquids in all four of its sector tables. Neither is wrong: each table follows its own
+// publisher, and EF_EU carries the matching note. DO NOT "fix" one to agree with the other — that
+// would substitute a publisher's judgement we do not hold for the one we cited.
    const EF = {
   natural_gas_mcf: { co2: 54.43956, ch4: 0.001026, n2o: 0.0001026 },
   natural_gas_therms: { co2: 5.306, ch4: 0.0001, n2o: 0.00001 },
@@ -164,6 +187,25 @@ const GWP = {
 //   - natural_gas CO2 is per-province (see EF_CA_NG_CO2); the value below is a fallback only.
 //   - therms/mmbtu have no ECCC energy-basis factor — CA natural gas uses mcf/m3 only (handled in UI).
 // CH4/N2O use the Commercial/Industrial sector rows (Tables 2.x: ~0.037 CH4; 4.x Industrial for oils).
+//
+// ── END-USE SECTOR: A CHOICE WAS MADE, PER KEY, AND HERE IS WHY ─────────────────────────────────
+// ECCC splits stationary combustion by END USE and publishes several variants of the same fuel. For
+// Light Fuel Oil alone v3.0 carries five, including "Forestry, Construction, Public Administration
+// and Commercial/Institutional" alongside "Industrial" and "Residential". Each key below names the
+// row it took — Light/Heavy Fuel Oil "Industrial", diesel "Refineries and Others", propane "All
+// Other Uses" — so the choice is recorded rather than implied.
+//
+// WHY INDUSTRIAL: it is the row that covers the largest share of the commercial and industrial sites
+// this product serves, and it keeps all three oil keys on ONE consistent end use rather than mixing
+// a Commercial oil with an Industrial one at the same location, which would make a site's own rows
+// incomparable. It is a defensible default, not a derivation.
+//
+// ⚠️ AND IT IS APPLIED TO EVERY CANADIAN LOCATION, WITH NO SELECTOR. A Toronto office burning
+// heating oil is priced on the INDUSTRIAL row today, not on the "Forestry, Construction, Public
+// Administration and Commercial/Institutional" row that describes it. Nothing on the workings row or
+// in the citation discloses which end use applied. Same open design item as EF_EU records, reached
+// from the opposite direction: there the sector was unidentified, here it is named but unchosen by
+// the customer. EF_NZ's nz_use_class is the only table with a selector.
 // ── YEAR-STABILITY: WHAT WAS CHECKED, AND WHAT THE CLAIM DOES NOT COVER ─────────────────────────
 // Every factor SEEDED BELOW is identical across all three ECCC applicability sets (2023/24, 2025,
 // 2026), so no year dimension is needed for them. Verified against v3.0 Tables 1.1-1.3, 2.1-2.3,
@@ -256,6 +298,13 @@ const M3_PER_MCF = 1000 / 35.3147 // 28.3168
 // Because 3.17492 is identical in both workbooks, matching on that row alone would have "proved" this
 // table was 2026 when it was 2025. The three keys that MOVED are what identified the edition. Any
 // future edition check must use a row that changes, not one that happens to agree.
+// ── END-USE SECTOR: NO CHOICE EXISTS. DEFRA's Fuels tab publishes ONE figure per fuel, with no
+// end-use or sector dimension for any of the keys below — and because the figures are combined CO2e
+// with the gases already summed at source, there is no CH4/N2O split for a sector to act on even in
+// principle. Stated explicitly because an ABSENT note is ambiguous between "no choice was made" and
+// "a choice was made and not recorded"; here it is the former. (DEFRA does publish per-VEHICLE and
+// per-passenger transport tables, but those are per km — a different activity basis from anything
+// this engine collects. See the mobile-combustion note on EF.)
 const EF_UK = {
   // Natural gas, kWh (Gross CV): 0.18231 kgCO2e/kWh (DEFRA 2026 Fuels row "Natural gas";
   // CO2 0.18194, CH4 0.00028, N2O 0.00009 — components sum to the total exactly).
@@ -374,15 +423,41 @@ const EF_UK = {
 // 48,0 TJ/Gg) = 0.75 kg/m3. So "~36 MJ/m3" is a density in disguise, and the same class of gap as
 // the liquids rather than a separate mystery. Still unsourced.
 //
-// ⚠️ OPEN — THE CH4/N2O BASIS IS NOT RECORDED ANYWHERE, AND THERE ARE TWO OF THEM. Annex VI carries
-// no CH4/N2O combustion factors at all (its Section 3 Table 6 gives GWPs only), so the MRR does not
-// help here. Reversing the stored values out against their own NCV and density gives:
+// ── CH4/N2O: THE SECTOR CHOICE, NOW IDENTIFIED ──────────────────────────────────────────────────
+// Annex VI carries no CH4/N2O combustion factors at all (its Section 3 Table 6 gives GWPs only), so
+// these come from IPCC 2006 Vol.2 Ch.2, which publishes them BY END-USE SECTOR across four tables.
+// Identified 14 Aug 2026 by reversing the stored values out against their own NCV and density:
 //     natural gas 1.000 / 0.100 kg/TJ     propane/LPG 0.999 / 0.0995
 //     gas/diesel oil 3.001 / 0.601        residual 3.000 / 0.600      motor gasoline 3.000 / 0.600
-// So PROPANE IS ON THE GASEOUS-FUEL PAIR (1 / 0.1) WHILE THE OTHER LIQUIDS ARE ON 3 / 0.6. That is a
-// substantive category choice and no comment records it, nor which Ch.2 table row either pair came
-// from. Recorded as OPEN. Do not invent a citation for it, and do not "harmonise" propane onto 3/0.6
-// — that would move a stored figure on a guess.
+//
+// THE VALUES ARE TABLE 2.2 (energy industries) OR 2.3 (manufacturing/construction). Those two are
+// IDENTICAL for these fuels, so the stored numbers CANNOT distinguish them and this comment must not
+// claim to. What they definitively are NOT is 2.4 or 2.5. How the four tables differ — N2O does not
+// move at all, only CH4:
+//
+//     Fuel                T2.2/2.3    T2.4 commercial/institutional    T2.5 residential/agriculture
+//     Gas/Diesel Oil          3                   10                              10
+//     Motor Gasoline          3                   10                              10
+//     Residual Fuel Oil       3                   10                              10
+//     LPG                     1                    5                               5
+//     Natural Gas             1                    5                               5
+//
+// ⚠️ THE SWITCH IS NOT UNIFORM SCALING: LPG and natural gas move 5x while the three liquids move
+// 3.33x, so a sector change cannot be applied as one multiplier.
+//
+// ⚠️ OPEN DESIGN ITEM — NOT A DEFECT. Sitting on the industrial tables is defensible and is what the
+// stored values do. The gap is that there is NO SELECTOR and NO DISCLOSURE: every EU location is
+// priced on them, so a Berlin office and a Ruhr smelter get identical CH4, and nothing on the
+// workings row or in the citation says which sector table applied. EF_NZ's nz_use_class is the
+// existing precedent for a per-location selector — see that table. Whole-row effect is small (+0.19%
+// to +0.30% per unit at AR6 if 2.4 were applied), because CH4 is a trace term against CO2, which is
+// why this can wait for a design rather than a patch.
+//
+// ⚠️ IPCC AND EPA DISAGREE ON LPG, AND BOTH ARE FOLLOWED DELIBERATELY. IPCC keeps LPG on the gaseous
+// pair (1 / 0.1) in all four tables, distinct from the liquids; EPA gives propane/LPG the same
+// 3 / 0.6 as every other petroleum product. So EF_EU.propane_litre and EF.propane_gallon visibly
+// disagree on the same fuel. That is two publishers, not a transcription error — the matching note
+// is on EF. DO NOT harmonise either onto the other.
 //
 // ── BASIS: WHY 100% FOSSIL IS THE RIGHT CHOICE HERE, not a caveat ───────────────────────────────
 // These run ~5–11% above DEFRA's figures because DEFRA BLENDS UK BIOFUEL CONTENT (4.92% by volume,
@@ -524,6 +599,10 @@ function euDerivationNote(loc: Location, key: string): string | undefined {
 // values are PRE-COMPUTED here (energy_content × combined-EF/GJ) and stored AS-IS in `co2` with ch4:0,
 // n2o:0 — so calcGas reproduces the NGA-derived figure exactly and AU intentionally does NOT respond to
 // the AR4/AR5/AR6 toggle (AR5 is already baked into the published combined EF). Metric units (m³, litres).
+// ── END-USE SECTOR: NO CHOICE EXISTS. NGA Tables 4 and 8 are keyed by FUEL and energy content, not
+// by end-use sector, for every fuel used below. As with EF_UK the stored values are combined CO2e
+// (ch4/n2o at 0), so no sector-varying gas split is being collapsed. Recorded so the absence of a
+// sector note here reads as "the publisher offers none" rather than "nobody looked".
 const EF_AU = {
   // Natural gas (NGA Table 4, ex-Table 39 energy content): 0.0393 GJ/m³ × 51.53 kgCO2e/GJ = 2.0251 → 2.025 kg/m³.
   natural_gas_m3: { co2: 2.025, ch4: 0, n2o: 0 },
@@ -562,6 +641,18 @@ const EF_AU = {
 // gains a kg input path); liquids per litre. Petrol has NO stationary factor in MfE — it exists only as a
 // Transport fuel, so gasoline_litre maps to Transport Regular Petrol (2.36143); Industrial has no petrol
 // row and falls back to that same Regular transport value.
+// ── END-USE SECTOR: THE ONLY TABLE WITH A SELECTOR, AND THE PRECEDENT FOR THE OTHERS ────────────
+// MfE publishes stationary combustion by use class, and this is the one table where the customer
+// picks: Location.nz_use_class ('commercial' | 'industrial', defaulting to commercial), read by
+// pickEF's NZ branch and offered in the wizard behind an "Advanced" <details>.
+//
+// ⚠️ IT IS THE MODEL FOR THE OPEN ITEMS ON EF_CA AND EF_EU — and it also shows what such a selector
+// still would NOT give you, so a future design starts from the real baseline: nz_use_class appears on
+// NO workings row and in NO citation (combustionSource returns one string for both classes), and
+// factorEditions does not record it, so two inventories differing only in use class compare EQUAL.
+// A verifier cannot today tell which use class priced an NZ figure. Any selector added elsewhere
+// should carry the disclosure this one lacks.
+// UNCHANGED BY THE 14 Aug 2026 sector-documentation pass — that pass added comments only.
 const EF_NZ = {
   commercial: {
     natural_gas_kwh: { co2: 0.19543, ch4: 0, n2o: 0 },   // MfE Stationary Combustion, Commercial
