@@ -129,7 +129,33 @@ const GWP = {
   diesel_mobile_gallon: { co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 },
   diesel_mobile_litre: { co2: 2.69627, ch4: 0.0001094, n2o: 0.0000219 },
   ammonia: 0,
-  steam_mmbtu: 66.33,
+  // ── PURCHASED STEAM / DISTRICT HEAT — EPA Hub 2025 Table 7 (Steam and Heat) ────────────────────
+  // ⚠️ THIS WAS THE BARE SCALAR 66.33 UNTIL 14 AUG 2026 — THE CO2 COLUMN ALONE. Table 7 publishes
+  // three columns and we stored one, then displayed that one as "kg CO₂e/mmbtu" and stamped the row
+  // GWP_AS_PUBLISHED — the basis this engine reserves for a publisher that already combined the
+  // gases (DEFRA, DCCEEW, MfE). EPA did not: it publishes them separately, and we dropped two. So
+  // the row asserted a completeness it did not have. Same class as the propane defect above — a
+  // factor and a citation that do not describe each other.
+  //   CO2 66.33 kg/mmBtu, CH4 1.25 g/mmBtu, N2O 0.125 g/mmBtu in the source; stored in kg here, like
+  // every other US mass-basis key.
+  //
+  // DERIVED, NOT INDEPENDENTLY MEASURED. Table 7's own note: "These factors assume natural gas fuel
+  // is used to generate steam or heat at 80 percent thermal efficiency." Every cell is the Table 1
+  // natural gas row divided by 0.80 —
+  //   53.06 / 0.8 = 66.325 -> 66.33     1.00 / 0.8 = 1.25     0.10 / 0.8 = 0.125
+  // — so an EPA natural-gas revision MUST move this key too, and a commit that updates one and not
+  // the other leaves two rows of the same table disagreeing. engine.test.ts pins that identity
+  // against EF.natural_gas_mmbtu rather than the three literals alone, so a desync fails there.
+  //
+  // SCOPE OF THE FACTOR, verbatim from the table's second note: "The factors represented in the
+  // table above represent combustion emissions only (tank-to-wheel) and do not represent upstream
+  // emissions or well-to-wheel emissions."
+  //
+  // ⚠️ STILL APPLIED TO EVERY COUNTRY. pickEF is not consulted for steam — see both read sites — so
+  // a UK district-heating location is priced by this US EPA row. That is a known limitation,
+  // disclosed to the customer in the wizard, and ef_source stays EF_SOURCES.combustion so the
+  // citation names what actually priced the row. Per-jurisdiction routing is separate work.
+  steam_mmbtu: { co2: 66.33, ch4: 0.00125, n2o: 0.000125 },
 }
 
 // Canadian combustion factors — ECCC "Emission factors and reference values" v3.0 (Oct 2025).
@@ -1408,8 +1434,12 @@ const efMiss = (key: string, country: string): CombustionEF =>
   ({ __missing: { key, country: country || '(unset)' } } as unknown as CombustionEF)
 
 // The ONE resolution step every branch below shares: take the table hit if there is one, else the
-// uniform miss. Scalar table entries (EF.ammonia, EF.steam_mmbtu) are not factors and count as a
-// miss — spreading a number yields `{}`, which would otherwise read as a complete factor of zero.
+// uniform miss. Scalar table entries — EF.ammonia, which is deliberately never priced because it has
+// no GWP — are not factors and count as a miss: spreading a number yields `{}`, which would
+// otherwise read as a complete factor of zero.
+//   EF.steam_mmbtu was the other such entry until 14 Aug 2026 and is now a real triple. Steam still
+// does not route through pickEF, but that is now a routing decision (the US factor is applied to
+// every country, and ef_source says so) rather than something the factor's shape forbids.
 const efOr = (base: unknown, key: string, ctry: string): CombustionEF =>
   base && typeof base === 'object' ? { ...(base as CombustionEF) } : efMiss(key, ctry)
 
@@ -1590,8 +1620,12 @@ function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: numbe
   // contribution — exactly like an absent Scope 1 fuel. Steam (grid-independent) is unaffected.
   const gridResolved = isResolvedGridRegion(loc.grid_region)
   const grid_ef = gridResolved ? getGridFactor(loc.grid_region, year).ef : 0
-  const steam_kg = loc.has_purchased_steam ? steamInMmbtu(loc).mmbtu * EF.steam_mmbtu : 0
-  const s2_location = ((gridResolved ? loc.electricity_kwh * grid_ef : 0) + steam_kg) / 1000
+  // Steam prices through calcGas like every other stream, so EPA Table 7's CH4 and N2O are counted at
+  // the active GWP set instead of being dropped by a bare CO2-only multiply. calcGas returns TONNES
+  // while the electricity term is still kg, so the /1000 moved onto the electricity term alone rather
+  // than wrapping the sum. Same expression in both S2 figures below — see the note there.
+  const steam_t = loc.has_purchased_steam ? calcGas(EF.steam_mmbtu, steamInMmbtu(loc).mmbtu, gwpVersion).total : 0
+  const s2_location = (gridResolved ? loc.electricity_kwh * grid_ef : 0) / 1000 + steam_t
   // Market-based: covered (contractual) kWh @ 0 (RECs/PPAs/green tariffs assumed zero-emission — documented);
   // uncovered kWh @ residual-mix factor. If no residual mix applies (full-disclosure region, or US subregion
   // not yet selected), fall back to the location grid factor for uncovered load and flag it.
@@ -1599,7 +1633,10 @@ function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: numbe
   const resRegion = residualRegionFor(loc)
   const res = getResidualFactor(resRegion, year, gwpVersion)
   const market_elec_ef = res.applicable ? res.ef : grid_ef
-  const s2_market = ((gridResolved ? uncovered_kwh * market_elec_ef : 0) + steam_kg) / 1000
+  // steam_t is the SAME term in both figures, unchanged: no market instrument applies to steam today,
+  // so location- and market-based carry an identical steam contribution. Recovering CH4/N2O above
+  // moves both by the same amount, which keeps that identity intact.
+  const s2_market = (gridResolved ? uncovered_kwh * market_elec_ef : 0) / 1000 + steam_t
   // NZ transmission & distribution losses — Scope 3 Category 3, NOT Scope 2. Kept as a DISTINCT
   // term (s3_td) and deliberately never added into s2_location/s2_market. Opt-in per NZ location.
   const s3_td = (loc.country === 'NZ' && loc.nz_td_losses && loc.electricity_kwh > 0)
@@ -1934,6 +1971,42 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
   // toPrecision(10) strips float artefacts (1.9316576000000002); String() then emits the shortest
   // form that round-trips, so the displayed factor multiplies back to the displayed result.
   const efDisplay = (x: number) => String(Number(x.toPrecision(10)))
+  // ── IS THIS FACTOR A COMBINED CO2e FIGURE, OR A GAS SPLIT? ───────────────────────────────────
+  // DEFRA, DCCEEW and MfE publish one kgCO2e per unit with their OWN GWP set already applied, so
+  // EF_UK / EF_AU / EF_NZ store that figure in `co2` with ch4 and n2o at 0. The row nonetheless
+  // stamped gwp_basis: gwpVersion, so an AU diesel line read "AR6" on a number DCCEEW combined on
+  // AR5 — and which does not move when the toggle does. Probed: 2.71 at AR4, AR5 and AR6 alike.
+  //
+  // DETECTED FROM THE FACTOR, NEVER FROM A COUNTRY LIST. `['GB','AU','NZ']` would be correct today
+  // and silently wrong the day a fourth table converts to combined storage, or one of these three
+  // gains a gas split — the list and the tables would drift with nothing to notice. Reading
+  // ch4 === 0 && n2o === 0 asks the factor that is being applied, at the moment it is applied, so
+  // it cannot disagree with the table it came from: convert EF_CA to combined storage and its rows
+  // start stamping as-published on their own; give EF_UK a real split and its rows start stamping
+  // the live set. Verified to separate the seven tables with no mixed case (see engine.test.ts X4,
+  // which fails if any table stops being uniform).
+  //   The zero is not "this fuel emits no methane" — it is "the publisher already counted it", and
+  // the emission_factor cell now says so rather than printing CH4 0, N2O 0 as though measured.
+  //
+  // ── ONE PLACE, TWO CALLERS, AND THE SECOND ONE IS WHY THIS IS A FUNCTION ──────────────────────
+  // This lived inline in pushFuel, which priced every Scope 1 stream. The Scope 2 steam row did not
+  // call pushFuel and hardcoded `gwp_basis: GWP_AS_PUBLISHED` instead — a SECOND answer to the same
+  // question, arrived at by assertion, and the wrong one: EPA Table 7 publishes a gas split, so
+  // as-published claimed the publisher had combined gases it had in fact listed separately (and that
+  // we had dropped). Returning the three provenance cells TOGETHER means no row can state a factor
+  // and a basis that disagree about that same factor — the question is asked of the factor, once,
+  // wherever the factor is used.
+  const factorCells = (ef: CombustionEF, unit: string) => {
+    const combinedCo2e = ef.ch4 === 0 && ef.n2o === 0
+    const gwp = GWP[gwpVersion]
+    return {
+      emission_factor: combinedCo2e
+        ? `CO₂e ${ef.co2} kg/${unit} — CH₄/N₂O included`
+        : `CO2 ${ef.co2}, CH4 ${ef.ch4}, N2O ${ef.n2o} kg/${unit}`,
+      emission_factor_display: `${efDisplay(ef.co2 + ef.ch4 * gwp.CH4_fossil + ef.n2o * gwp.N2O)} kg CO₂e/${abbrevUnit(unit)}`,
+      gwp_basis: combinedCo2e ? GWP_AS_PUBLISHED : gwpVersion,
+    }
+  }
   // `convNote` records a convert-then-apply step (fuel oil in litres, steam in GJ) so the workings
   // show entered → conversion → factored rather than a number the reviewer cannot reproduce.
   // `stream` TAGS THE ROW WITH THE DECLARABLE STREAM IT SATISFIES, and that tag is what the
@@ -1941,30 +2014,9 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
   // becomes an OBSERVED FACT rather than a second copy of the pricing condition. See the loop's header.
   const pushFuel = (loc: Location, stream: DeclarableStream, source: string, scope: number, activity: number, unit: string, ef: { co2: number; ch4: number; n2o: number }, prov?: Provenance, convNote?: string) => {
     const g = calcGas(ef, activity, gwpVersion)
-    const gwp = GWP[gwpVersion]
-    const efCo2e = ef.co2 + ef.ch4 * gwp.CH4_fossil + ef.n2o * gwp.N2O
-    // ── IS THIS FACTOR A COMBINED CO2e FIGURE, OR A GAS SPLIT? ─────────────────────────────────
-    // DEFRA, DCCEEW and MfE publish one kgCO2e per unit with their OWN GWP set already applied, so
-    // EF_UK / EF_AU / EF_NZ store that figure in `co2` with ch4 and n2o at 0. The row nonetheless
-    // stamped gwp_basis: gwpVersion, so an AU diesel line read "AR6" on a number DCCEEW combined on
-    // AR5 — and which does not move when the toggle does. Probed: 2.71 at AR4, AR5 and AR6 alike.
-    //
-    // DETECTED FROM THE FACTOR, NEVER FROM A COUNTRY LIST. `['GB','AU','NZ']` would be correct today
-    // and silently wrong the day a fourth table converts to combined storage, or one of these three
-    // gains a gas split — the list and the tables would drift with nothing to notice. Reading
-    // ch4 === 0 && n2o === 0 asks the factor that is being applied, at the moment it is applied, so
-    // it cannot disagree with the table it came from: convert EF_CA to combined storage and its rows
-    // start stamping as-published on their own; give EF_UK a real split and its rows start stamping
-    // the live set. Verified to separate the seven tables with no mixed case (see engine.test.ts X4,
-    // which fails if any table stops being uniform).
-    //   The zero is not "this fuel emits no methane" — it is "the publisher already counted it", and
-    // the emission_factor cell now says so rather than printing CH4 0, N2O 0 as though measured.
-    const combinedCo2e = ef.ch4 === 0 && ef.n2o === 0
     rows.push({ location: loc.name || 'Location', stream, source, scope, activity_data: activity, activity_unit: unit,
-      emission_factor: combinedCo2e
-        ? `CO₂e ${ef.co2} kg/${unit} — CH₄/N₂O included`
-        : `CO2 ${ef.co2}, CH4 ${ef.ch4}, N2O ${ef.n2o} kg/${unit}`,
-      emission_factor_display: `${efDisplay(efCo2e)} kg CO₂e/${abbrevUnit(unit)}`, ef_source: combustionSource(loc), gwp_basis: combinedCo2e ? GWP_AS_PUBLISHED : gwpVersion, result_tco2e: g.total, ...(convNote ? { note: convNote } : {}), ...(prov ?? {}) })
+      ...factorCells(ef, unit),
+      ef_source: combustionSource(loc), result_tco2e: g.total, ...(convNote ? { note: convNote } : {}), ...(prov ?? {}) })
   }
   for (const loc of locations) {
     // Decided BEFORE any row is emitted, and with the same helper calcInventory uses. A location
@@ -2069,7 +2121,13 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       // Same rule as fuel oil: the factor is published per MMBtu, so the activity it multiplies must
       // be MMBtu. The note carries the entered GJ figure and the arithmetic.
       const st = steamToMmbtu(loc.purchased_steam_mmbtu, loc.purchased_steam_unit)
-      rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: 'Purchased steam', scope: 2, activity_data: st.mmbtu, activity_unit: 'mmbtu', emission_factor: `${efDisplay(EF.steam_mmbtu)} kg CO₂e/mmbtu`, ef_source: EF_SOURCES.combustion, scope2_method: 'location-based', gwp_basis: GWP_AS_PUBLISHED, result_tco2e: st.mmbtu * EF.steam_mmbtu / 1000, entry_method: 'manual', ...(st.note ? { note: st.note } : {}) })
+      // ⚠️ SHARES factorCells AND calcGas, BUT DELIBERATELY NOT pushFuel. Two reasons, and neither is
+      // the factor's shape: pushFuel stamps `ef_source: combustionSource(loc)`, which is COUNTRY-
+      // ROUTED, so a UK steam row would cite DEFRA while EF.steam_mmbtu (US EPA) priced it — the
+      // exact citation/factor mismatch the AU/NZ fuel-oil work existed to remove. And steam is Scope
+      // 2, carrying scope2_method, which pushFuel has no parameter for. So it borrows the two things
+      // that decide what the figure IS and states its own citation.
+      rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: 'Purchased steam', scope: 2, activity_data: st.mmbtu, activity_unit: 'mmbtu', ...factorCells(EF.steam_mmbtu, 'mmbtu'), ef_source: EF_SOURCES.combustion, scope2_method: 'location-based', result_tco2e: calcGas(EF.steam_mmbtu, st.mmbtu, gwpVersion).total, entry_method: 'manual', ...(st.note ? { note: st.note } : {}) })
     }
     // ── Declaration rows: EVERY stream gets a row, so no stream can ever be silent ────────────────
     //

@@ -2000,12 +2000,111 @@ describe('AA. propane CO2 comes from the Propane row, not the LPG row beneath it
     expect(EF.diesel_mobile_gallon).toEqual({ co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 });
     expect(EF.diesel_mobile_litre).toEqual({ co2: 2.69627, ch4: 0.0001094, n2o: 0.0000219 });
     expect((EF as any).ammonia).toBe(0);
-    expect((EF as any).steam_mmbtu).toBe(66.33);
+    // steam_mmbtu was the bare scalar 66.33 — EPA Table 7's CO2 column alone — until 14 Aug 2026.
+    // Full three-column pin and the 80%-efficiency derivation live in group S below.
+    expect((EF as any).steam_mmbtu).toEqual({ co2: 66.33, ch4: 0.00125, n2o: 0.000125 });
 
     // AND NO OTHER JURISDICTION'S PROPANE MOVED. Four tables carry their own propane, each from a
     // different publisher; a global find-and-replace on the old figure would be caught here.
     expect((EF_CA as any).propane_gallon.co2, 'ECCC').toBe(5.734896);
     expect((EF_UK as any).propane_litre.co2, 'DEFRA').toBe(1.54358);
     expect((EF_EU as any).propane_gallon.co2, 'IPCC').toBe(5.762);
+  });
+});
+
+// ── S. PURCHASED STEAM CARRIES EPA TABLE 7 IN FULL ───────────────────────────────────────────────
+//
+// THE DEFECT THIS PINS. EF.steam_mmbtu was the bare scalar 66.33 — Table 7's CO2 column, alone. The
+// workings row displayed it as "kg CO₂e/mmbtu" and hardcoded gwp_basis: GWP_AS_PUBLISHED, which in
+// this engine means "the publisher already counted the other gases". That is true of DEFRA, DCCEEW
+// and MfE. It is FALSE of EPA, which publishes CH4 and N2O as their own columns — the two we had
+// dropped. So a CO2-only number was labelled CO2e and stamped with a basis asserting a completeness
+// it did not have: a factor and a citation that do not describe each other.
+describe('S. purchased steam — EPA Hub 2025 Table 7, all three columns', () => {
+  // Table 7 as published. Source units: CO2 kg/mmBtu, CH4 and N2O GRAMS/mmBtu.
+  const TABLE_7 = { co2_kg: 66.33, ch4_g: 1.25, n2o_g: 0.125 };
+  const steamLoc = (o: Partial<Location> = {}) =>
+    loc({ country: 'US', has_purchased_steam: true, purchased_steam_mmbtu: 1000, purchased_steam_unit: 'mmbtu', ...o });
+  const steamRow = (gwp: 'AR4' | 'AR5' | 'AR6' = 'AR6', l = steamLoc()) =>
+    (buildWorkings([l], gwp, 2025, [], 12) as any[]).find(r => r.stream === 'purchased_steam' && !r.declaration);
+
+  it('S1 the stored triple is Table 7, in kg', () => {
+    // Stored in kg like every other US mass-basis key, so the grams columns divide by 1000.
+    expect((EF as any).steam_mmbtu).toEqual({
+      co2: TABLE_7.co2_kg, ch4: TABLE_7.ch4_g / 1000, n2o: TABLE_7.n2o_g / 1000,
+    });
+  });
+
+  it('S2 every column IS the Table 1 natural gas row at 80% thermal efficiency', () => {
+    // Table 7's own note: "These factors assume natural gas fuel is used to generate steam or heat at
+    // 80 percent thermal efficiency." So this is a DERIVED row, not an independent measurement, and
+    // an EPA natural-gas revision must move it too. Pinning the identity — rather than only the three
+    // literals — is what catches a commit that updates one table row and not the other.
+    const ng = EF.natural_gas_mmbtu, steam = (EF as any).steam_mmbtu;
+    // CO2: 53.06 / 0.8 = 66.325, which EPA publishes rounded to 66.33. The rounding is EPA's, so the
+    // assertion is to their 2dp — not an invitation to store 66.325.
+    expect(Math.round((ng.co2 / 0.8) * 100) / 100, 'CO2: 53.06 / 0.8 -> 66.33').toBe(steam.co2);
+    // CH4 and N2O divide exactly, so no rounding step is involved and none is allowed for.
+    expect(ng.ch4 / 0.8, 'CH4: 1.00 g / 0.8 = 1.25 g').toBe(steam.ch4);
+    expect(ng.n2o / 0.8, 'N2O: 0.10 g / 0.8 = 0.125 g').toBe(steam.n2o);
+  });
+
+  it('S3 the row stamps the LIVE GWP set, never as-published', () => {
+    // The whole point of the fix. GWP_AS_PUBLISHED was hardcoded here; it is now DETECTED by the same
+    // ch4 === 0 && n2o === 0 test every combustion row uses (see factorCells), which the restored
+    // triple answers 'false'. If this ever reads as-published again, either the gases were dropped
+    // once more or the detection was replaced by an assertion.
+    for (const g of ['AR4', 'AR5', 'AR6'] as const) {
+      expect(steamRow(g).gwp_basis, `${g}: EPA splits the gases — we combine them, so we own the basis`).toBe(g);
+      expect(steamRow(g).gwp_basis, `${g}`).not.toBe('as-published — see factor source');
+    }
+  });
+
+  it('S4 the combined CO2e per mmBtu, at each AR set', () => {
+    // The customer-visible impact, pinned so a GWP-table edit cannot move it silently.
+    // AR4 25/298, AR5 28/265, AR6 29.8/273 — restated here as literals rather than read from GWP, so
+    // this is an independent second copy and not a tautology.
+    const combined = { AR4: 66.3985, AR5: 66.398125, AR6: 66.401375 };
+    for (const [g, expected] of Object.entries(combined)) {
+      const row = steamRow(g as 'AR6');
+      expect(Number(String(row.emission_factor_display).match(/^[\d.]+/)![0]), `${g} displayed factor`).toBeCloseTo(expected, 9);
+      // Every one of them exceeds the old CO2-only figure — that IS the recovered CH4/N2O.
+      expect(expected).toBeGreaterThan(66.33);
+    }
+  });
+
+  it('S5 totals and workings state the SAME steam figure', () => {
+    // calcLocation and buildWorkings price steam independently (two call sites, one factor). They
+    // must not disagree — the invariant that applies to every other stream.
+    for (const g of ['AR4', 'AR5', 'AR6'] as const) {
+      const l = steamLoc();
+      const c = calcLocation(l, g, 2025);
+      const row = steamRow(g, l);
+      expect(c.s2_location, `${g}: calcLocation vs workings`).toBeCloseTo(row.result_tco2e, 12);
+      // No market instrument applies to steam, so the two S2 methods carry an identical steam term.
+      expect(c.s2_market, `${g}: market-based carries the same steam term`).toBeCloseTo(c.s2_location, 12);
+      // And the inventory total agrees with the location it is made of.
+      expect(calcInventory([l], g, 2025).s2_location, `${g}: calcInventory`).toBeCloseTo(row.result_tco2e, 12);
+    }
+  });
+
+  it('S6 the displayed factor is a true CO2e, and the split is shown as a split', () => {
+    const row = steamRow('AR6');
+    // THE ORIGINAL MISLABEL: 66.33 is CO2 only. It must never again appear under a CO₂e label.
+    expect(row.emission_factor_display, 'a CO2-only figure labelled CO₂e is the defect').not.toBe('66.33 kg CO₂e/mmbtu');
+    expect(row.emission_factor_display).toBe('66.401375 kg CO₂e/mmbtu');
+    // The raw cell shows the three published columns, so a verifier can see what was combined.
+    expect(row.emission_factor).toBe('CO2 66.33, CH4 0.00125, N2O 0.000125 kg/mmbtu');
+    // And it must NOT claim the publisher pre-combined them — that wording belongs to DEFRA/MfE rows.
+    expect(row.emission_factor).not.toContain('CH₄/N₂O included');
+  });
+
+  it('S7 a GJ-entered location converts first, then prices on the full triple', () => {
+    // The convert-then-apply path must reach the same factor. 1000 GJ / 1.055056 = 947.8171 mmBtu.
+    const row = steamRow('AR6', steamLoc({ purchased_steam_mmbtu: 1000, purchased_steam_unit: 'gj' }));
+    expect(row.activity_unit).toBe('mmbtu');
+    expect(row.activity_data).toBeLessThan(1000);
+    expect(row.note, 'the conversion arithmetic stays on the row').toContain('GJ');
+    expect(row.result_tco2e).toBeCloseTo(row.activity_data * 66.401375 / 1000, 12);
   });
 });

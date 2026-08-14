@@ -92,7 +92,7 @@ const ALLOWED: AllowEntry[] = [
   {
     file: 'lib/ghg/engine.ts',
     calcLocation: 3,
-    calcGas: 16,
+    calcGas: 18,
     notes: [
       'calcLocation — the definition itself',
       'unpriceableReason — IS the guard; wraps calcLocation in try/catch and returns the refusal',
@@ -101,6 +101,10 @@ const ALLOWED: AllowEntry[] = [
       'calcLocation x7 (gas/propane/diesel/heating oil/heavy fuel oil/petrol/mobile diesel) — the origin; throws by design',
       'fuelEmissionsByType x7 — sole caller is pctEstimated, which skips unpriceable locations first',
       'buildWorkings pushFuel x1 — guarded; buildWorkings emits a declaration:"unpriceable" row and skips the location',
+      // The two steam sites, added 14 Aug 2026 when EF.steam_mmbtu became a real triple (EPA Table 7)
+      // and steam started pricing through calcGas instead of a bare CO2-only multiply.
+      'calcLocation steam x1 — CANNOT refuse: EF.steam_mmbtu is a module literal, not a pickEF lookup, so assertPriceable always passes. Inside unpriceableReason\'s try/catch regardless',
+      'buildWorkings steam row x1 — same factor, so same reason it cannot refuse; and it sits after the declaration:"unpriceable" continue, so a blocked location never reaches it',
     ],
   },
   {
