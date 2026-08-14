@@ -74,7 +74,7 @@ interface WorkingRow {
   // gap than a stream nobody was asked about — and it was rendering with no badge and no amber.
   // A value the engine can emit and this union does not name renders as an ordinary row. Any future
   // declaration state must be added here in the same change that adds it to the engine.
-  declaration?: 'attested_absent' | 'undeclared' | 'unpriceable' | 'declared_unquantified'
+  declaration?: 'attested_absent' | 'undeclared' | 'unpriceable' | 'declared_unquantified' | 'no_published_factor'
   // Present only on 'unpriceable' rows: what could not be priced. The engine's own tokens.
   unpriceable?: { fuel?: string; unit?: string; country?: string }
 }
@@ -636,7 +636,7 @@ export default function VerifierPage() {
                     // no figure, the third says the totals on this page are short by a known site.
                     // Equal weight is deliberate — the badge and the sentence separate them, not the
                     // colour. Grey means resolved, amber means stop; a fourth shade would blur that.
-                    background: w.declaration === 'undeclared' || w.declaration === 'unpriceable' || w.declaration === 'declared_unquantified' ? '#FEF3E2'
+                    background: w.declaration === 'undeclared' || w.declaration === 'unpriceable' || w.declaration === 'declared_unquantified' || w.declaration === 'no_published_factor' ? '#FEF3E2'
                       : w.declaration === 'attested_absent' ? '#f4f4f2'
                       : i % 2 === 0 ? '#fff' : '#f8f7f5',
                     borderBottom: '0.5px solid #e8e7e4',
@@ -707,6 +707,25 @@ export default function VerifierPage() {
                           renders in the Result column and carries the factor-lookup reason verbatim;
                           this states the consequence a verifier is deciding on — the totals shown
                           elsewhere on this page do not include this site. */}
+                      {/* PLACED BESIDE 'unpriceable', THE ONE IT WOULD BE CONFUSED WITH, AND THE BADGES
+                          SHARE NO WORD. Both mean "no factor was available", and a verifier must be
+                          able to tell them apart at a glance because the SCOPE of what is missing
+                          differs completely: 'unpriceable' drops a WHOLE LOCATION from every total,
+                          this drops ONE STREAM at a location whose other streams are fully priced.
+                          This row also shows the quantity, which that one cannot — the operator did
+                          supply a figure, and how big it is, is what a verifier is judging. */}
+                      {w.declaration === 'no_published_factor' && (
+                        <>
+                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: '#ba7517', background: 'rgba(186,117,23,0.12)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Stream not priced</span>
+                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: '#ba7517' }}>
+                            The operator reported a quantity for this stream, and no emission factor is published
+                            for it in this jurisdiction. The quantity shown is what they reported; the emissions it
+                            represents are missing from every total on this page. This is not a figure of zero, and
+                            no other country&apos;s factor has been substituted. The rest of this location is priced
+                            and included.
+                          </div>
+                        </>
+                      )}
                       {w.declaration === 'unpriceable' && (
                         <>
                           <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: '#ba7517', background: 'rgba(186,117,23,0.12)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Excluded from totals</span>

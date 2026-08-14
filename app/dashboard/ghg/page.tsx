@@ -26,6 +26,7 @@ import {
   combustionSourcesFor, gridSourcesFor,
   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation, pctEstimated,
   applyResolutions, findUnresolvedCoverage, findUndeclaredStreams, findUnpriceableLocations, STREAM_META,
+  findSteamFactorGaps, steamFactorFor,
   ngUnitOptions, liquidUnitOptions, propaneUnitOptions, steamUnitOptions,
   snapUnitsForCountry,
   validateElectricity, validateNaturalGas, validateCompleteness,
@@ -976,6 +977,13 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // One phrasing of "this total leaves something out", used at every site that shows a total.
   const exclusionNote = pricingReady ? null
     : `Excludes ${unpriceableLocations.length} location${unpriceableLocations.length > 1 ? 's' : ''} we can't work out yet — ${unpriceableLocations.map(u => u.locName).join(', ')}.`
+  // ── STEAM WITH NO FACTOR — its own readiness condition, beside gridReady / pricingReady ─────────
+  // A location that declared and quantified purchased steam in a jurisdiction with no published
+  // factor (CA/AU/NZ/EU) and supplied no provider figure. Its steam contributes NOTHING to any total,
+  // so exporting would hand a verifier an assurance package whose Scope 2 is short by a stream the
+  // customer positively declared. The remedy is the supplier-factor field on the Energy & fuel step.
+  const steamFactorGaps = findSteamFactorGaps(inventory.locations)
+  const steamFactorsReady = steamFactorGaps.length === 0
   const needsPriorYear = inventory.selected_frameworks.includes('cdp')
   const needsEmployees = inventory.selected_frameworks.includes('ecovadis')
   const needsBiogenic = inventory.selected_frameworks.includes('esrs') || inventory.selected_frameworks.includes('gri')
@@ -1798,16 +1806,55 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   <Field label={`Total purchased steam — ${inventory.reporting_year} (${(loc.purchased_steam_unit ?? 'mmbtu') === 'gj' ? 'GJ' : 'MMBtu'})`}>
                     <input type="number" value={loc.purchased_steam_mmbtu || ''} onChange={e => updateLocation(activeLocation, 'purchased_steam_mmbtu', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {/* A jurisdiction limitation, disclosed rather than hidden. There is ONE steam
-                      factor in the engine (EF.steam_mmbtu) with no UK/EU/CA variant, so every network
-                      gets the same figure. Same register as the market-based electricity hint: state
-                      what happens, state the better alternative, do not alarm. */}
-                  <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.5 }}>
-                    We apply one published emissions factor to purchased steam, whatever network supplies it.
-                    District-heating networks vary, so if your supplier publishes its own factor, that figure
-                    is more accurate than ours — worth giving your verifier where steam is a material part of
-                    your footprint.
-                  </div>
+                  {/* ── WHAT WE CAN AND CANNOT PRICE HERE, PER JURISDICTION ────────────────────
+                      Replaces a blanket "we apply one published factor whatever network supplies it",
+                      which stopped being true once steam started routing per country. The two states
+                      say different things and must not be merged: where a national factor exists we
+                      apply it and a supplier figure is an OPTIONAL improvement; where none exists the
+                      supplier figure is the ONLY way the stream can be priced at all, and export is
+                      blocked until it arrives. */}
+                  {(() => {
+                    const entry = steamFactorFor(loc)
+                    const hasSupplier = typeof loc.purchased_steam_supplier_ef === 'number' && loc.purchased_steam_supplier_ef > 0
+                    const basisLabel = (b: string) => b === 'kwh' ? 'kWh' : b === 'mmbtu' ? 'MMBtu' : 'GJ'
+                    // Default the supplier factor's basis to the unit this location is entered in, so
+                    // the customer types the number their provider gave them without converting. It is
+                    // STORED alongside the value, never re-read from purchased_steam_unit later —
+                    // changing the activity unit afterwards must not silently redefine the factor.
+                    const supBasis = loc.purchased_steam_supplier_ef_basis
+                      ?? ((loc.purchased_steam_unit ?? 'mmbtu') === 'gj' ? 'kwh' : (loc.purchased_steam_unit ?? 'mmbtu'))
+                    return <>
+                      {entry.kind === 'published' ? (
+                        <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.5 }}>
+                          We apply the published factor for this jurisdiction ({entry.source}).
+                          District-heating networks vary, so if your supplier publishes its own factor, that figure
+                          is more accurate than ours and will be used instead — worth giving your verifier where
+                          steam is a material part of your footprint.
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 11, color: '#ba7517', lineHeight: 1.5, background: '#FEF3E2', border: '1px solid #f0d9b5', borderRadius: 6, padding: '10px 12px' }}>
+                          <strong>No published factor for this jurisdiction.</strong> {entry.guidance}
+                          {' '}Until you enter one, this stream is reported as unquantified and export stays locked —
+                          we will not price it with another country&rsquo;s factor.
+                        </div>
+                      )}
+                      <Field label={`Supplier emission factor — kg CO₂e per ${basisLabel(supBasis)}${entry.kind === 'published' ? ' (optional)' : ' (required)'}`}>
+                        <input type="number" step="any" value={loc.purchased_steam_supplier_ef ?? ''} placeholder={entry.kind === 'published' ? 'Leave blank to use the published factor' : 'e.g. 0.198'}
+                          onChange={e => {
+                            const v = e.target.value === '' ? undefined : Number(e.target.value)
+                            updateLocation(activeLocation, 'purchased_steam_supplier_ef', v as never)
+                            // Basis is stamped WITH the value, not inferred at read time.
+                            updateLocation(activeLocation, 'purchased_steam_supplier_ef_basis', supBasis as never)
+                          }} style={inputStyle} />
+                      </Field>
+                      {hasSupplier && (
+                        <Field label="Where this factor came from — provider and document (printed on your workings for the verifier)">
+                          <input type="text" value={loc.purchased_steam_supplier_source ?? ''} placeholder="e.g. Vattenfall Bristol Heat Network, 2025 emissions statement"
+                            onChange={e => updateLocation(activeLocation, 'purchased_steam_supplier_source', e.target.value as never)} style={inputStyle} />
+                        </Field>
+                      )}
+                    </>
+                  })()}
                   {isPaid ? <DocUpload label="Upload steam / district heating bills" locIdx={activeLocation} docType="purchased_steam" docs={loc.source_docs.filter(d => d.document_type === 'purchased_steam')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:purchased_steam`]} /> : <LockedDocUpload label="Upload steam / district heating bills" />}
                 </div>
               )}
@@ -2103,6 +2150,29 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                                 <td style={{ ...wTd, color: '#ba7517', fontWeight: 600 }}>—</td>
                               </tr>
                             }
+                            // ── NO PUBLISHED FACTOR ──────────────────────────────────────────────
+                            // Its own branch rather than folding into declared_unquantified above,
+                            // for ONE reason: this row HAS an activity figure and that one prints it.
+                            // "You told us 4,000 GJ and we could not price it" is a materially
+                            // different finding from "no figure was given", and the entered quantity
+                            // is the part a verifier needs in order to judge how much is missing.
+                            if (r.declaration === 'no_published_factor') {
+                              return <tr key={ri} style={{ background: '#FEF3E2' }}>
+                                <td style={{ ...wTd, color: '#ba7517', fontWeight: 600 }}>{r.source}</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>{r.activity_data == null ? '—' : `${r.activity_data.toLocaleString()} ${r.activity_unit}`}</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>
+                                  {r.note}
+                                  {/* What was actually checked, where a search was done. Absent for
+                                      the EU entry, which never claims one. */}
+                                  {r.quantification_method && <div style={{ fontSize: 10, marginTop: 3, lineHeight: 1.4, whiteSpace: 'normal' }}>{r.quantification_method}</div>}
+                                </td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
+                                <td style={{ ...wTd, color: '#ba7517' }}>{r.gwp_basis}</td>
+                                <td style={{ ...wTd, color: '#ba7517', fontWeight: 600 }}>—</td>
+                              </tr>
+                            }
                             if (r.declaration === 'undeclared') {
                               return <tr key={ri} style={{ background: '#FEF3E2' }}>
                                 <td style={{ ...wTd, color: '#ba7517', fontWeight: 600 }}>{r.source}</td>
@@ -2272,7 +2342,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                     {exclusionNote && (
                       <div style={{ fontSize: 11, color: '#ba7517', marginBottom: 16, lineHeight: 1.5 }}>⚠ {exclusionNote}</div>
                     )}
-                    {(!conciergeReady || !gridReady || !declarationsReady || !pricingReady) && (
+                    {(!conciergeReady || !gridReady || !declarationsReady || !pricingReady || !steamFactorsReady) && (
                       <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.3)', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
                         {unpriceableLocations.length > 0 && (
                           <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {unpriceableLocations.length} location{unpriceableLocations.length > 1 ? 's' : ''} can&apos;t be worked out and would be left out of this report: {unpriceableLocations.map(u => u.locName).join(', ')} — fix the country or the unit on the Energy &amp; fuel step</div>
@@ -2292,6 +2362,13 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                         {streamsWithoutFigure.length > 0 && (
                           <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {streamsWithoutFigure.length} stream{streamsWithoutFigure.length > 1 ? 's' : ''} declared with no figure — enter the amount on the Energy &amp; fuel step. You have said {streamsWithoutFigure.length > 1 ? 'these streams are' : 'this stream is'} present here, so attesting absent is not the fix: {streamsWithoutFigure.map(u => `${u.locName}: ${STREAM_META[u.stream].name}`).join('; ')}</div>
                         )}
+                        {/* Names the ACTION, not just the problem. Unlike every other gate here the
+                            remedy is not "enter a number you already have" — the customer has to go
+                            and ask their provider for one, so the message has to say that plainly or
+                            it reads as an unexplained lock. */}
+                        {steamFactorGaps.length > 0 && (
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {steamFactorGaps.length} location{steamFactorGaps.length > 1 ? 's' : ''} report{steamFactorGaps.length > 1 ? '' : 's'} purchased steam with no published factor for {steamFactorGaps.length > 1 ? 'their jurisdictions' : 'that jurisdiction'} — ask your district energy provider for their emission intensity and enter it on the Energy &amp; fuel step: {steamFactorGaps.map(g => `${g.locName} (${g.jurisdiction})`).join('; ')}</div>
+                        )}
                         <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>Export is locked until every figure read from your bills is confirmed, every coverage gap, overlap, or boundary-straddle is resolved, and every emission stream is either entered or attested absent. Check the Energy &amp; fuel data step.</div>
                       </div>
                     )}
@@ -2301,10 +2378,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                         <span style={{ fontSize: 12, color: "#555553", lineHeight: 1.6 }}>I confirm that the data entered is accurate to the best of my knowledge and has been sourced from actual utility bills and operational records. I understand that ThemisIQ applies the correct methodology to the data I provide, and that accuracy of the underlying data is my responsibility.</span>
                       </label>
                     </div>
-                    <button onClick={() => dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && generateExport(fw.id)} style={{ fontSize: 14, fontWeight: 500, opacity: (dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady) ? 1 : 0.4, cursor: (dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady) ? "pointer" : "not-allowed", padding: '12px 28px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', border: 'none', }}>
+                    <button onClick={() => dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady && generateExport(fw.id)} style={{ fontSize: 14, fontWeight: 500, opacity: (dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady) ? 1 : 0.4, cursor: (dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady) ? "pointer" : "not-allowed", padding: '12px 28px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', border: 'none', }}>
                       ⬇ Download {fw.name} Report (CSV)
                     </button>
-                    <button onClick={() => dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && generateAssurance()} style={{ fontSize: 14, fontWeight: 500, opacity: (dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady) ? 1 : 0.4, cursor: (dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady) ? 'pointer' : 'not-allowed', padding: '12px 28px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', marginLeft: 10 }}>Download Full Assurance Package (PDF)</button>
+                    <button onClick={() => dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady && generateAssurance()} style={{ fontSize: 14, fontWeight: 500, opacity: (dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady) ? 1 : 0.4, cursor: (dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady) ? 'pointer' : 'not-allowed', padding: '12px 28px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', marginLeft: 10 }}>Download Full Assurance Package (PDF)</button>
                   </div>
                   <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem', fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
                     <strong>Disclaimer:</strong>
@@ -2323,7 +2400,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           {/* SBTi nudge — shown once the inventory is saved AND its figures confirmed (a settled
               baseline). Affirmative next-step, not a warning. Always shows when gated (no sbti_targets
               read); copy reads fine whether or not targets already exist. GHG-gated page ⇒ no entitlement check. */}
-          {inventoryId && dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && (
+          {inventoryId && dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady && (
             <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.25)', borderRadius: 10, padding: '1.25rem', marginTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' as const }}>
               <div style={{ flex: 1, minWidth: 280 }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Your inventory is the baseline for science-based targets.</div>

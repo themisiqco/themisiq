@@ -39,6 +39,11 @@ export const L_PER_GAL = 3.785411784;        // US liquid gallon → litres (exa
 const LB_PER_KG = 1 / 0.45359237;     // kg → lb (exact, NIST avoirdupois)
 export const GJ_PER_MMBTU = 1.05505585262;   // 1 MMBtu = 1.05505585262 GJ (IEA)
 const MJ_PER_KWH = 3.6;               // 1 kWh = 3.6 MJ (exact, SI)
+// Derived from MJ_PER_KWH, not retyped: 1 GJ = 1000 MJ, so 1 GJ = 1000/3.6 kWh = 277.777… kWh.
+// Exported because the GHG engine prices UK district heat from a DEFRA factor published per kWh and
+// must convert a GJ-entered figure onto that basis. It is EXACT — the kilowatt-hour is defined as
+// 3.6 MJ — so applying it is arithmetic, not an estimate, exactly like GJ_PER_MMBTU above.
+export const KWH_PER_GJ = 1000 / MJ_PER_KWH;
 
 // PROPANE density anchor — VERIFY PROVENANCE before this goes near a real
 // inventory. Nominal liquid propane ≈ 4.24 lb/US-gal at 60°F (EIA / NPGA).

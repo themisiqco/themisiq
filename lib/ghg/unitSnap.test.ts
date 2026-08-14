@@ -65,6 +65,13 @@ describe('a stored unit is always one its country offers', () => {
     expect(snapUnitsForCountry('US', { fuel_oil_distillate_unit: 'litres' }).fuel_oil_distillate_unit).toBe('litres')
     expect(snapUnitsForCountry('US', { fuel_oil_residual_unit: 'litres' }).fuel_oil_residual_unit).toBe('litres')
     expect(snapUnitsForCountry('US', { purchased_steam_unit: 'gj' }).purchased_steam_unit).toBe('gj')
+    // ⚠️ THE LIVE-DATA CASE, AND THE REASON GB STILL OFFERS GJ AT ALL. There is a stored GB location
+    // holding 212121 with unit 'gj'. When kWh was added as GB's default, dropping GJ from the list
+    // would have re-snapped that row to 'kwh' — silently reinterpreting 212121 GJ as 212121 kWh, a
+    // 277-fold understatement, with no conversion and no flag. That is the live "unit switch relabels
+    // without converting" defect, reached by widening a list rather than by clicking anything.
+    expect(snapUnitsForCountry('GB', { purchased_steam_unit: 'gj' }).purchased_steam_unit).toBe('gj')
+    expect(snapUnitsForCountry('GB', { purchased_steam_unit: 'kwh' }).purchased_steam_unit).toBe('kwh')
   })
 
   it('moves a US unit off a metric location', () => {
@@ -76,7 +83,11 @@ describe('a stored unit is always one its country offers', () => {
     expect(uk).toEqual({
       natural_gas_unit: 'kwh', propane_unit: 'litres', diesel_stationary_unit: 'litres',
       fuel_oil_distillate_unit: 'litres', fuel_oil_residual_unit: 'litres', gasoline_unit: 'litres', diesel_mobile_unit: 'litres',
-      purchased_steam_unit: 'gj',
+      // kWh, not GJ, since 14 Aug 2026: DEFRA publishes district heat per kWh and UK heat networks
+      // bill in kWh by law, so kWh leads steamUnitOptions('GB') and opts[0] is what an unofferable
+      // unit snaps to. GJ is still offered — see the next test, which pins that a STORED GJ figure is
+      // left alone. Both matter and they are different cases.
+      purchased_steam_unit: 'kwh',
     })
   })
 

@@ -210,17 +210,47 @@ describe('no edition is invented for a family that priced nothing', () => {
     expect(buildFactorEditions([], 2026)).toEqual({})
   })
 
-  it('F15 steam and refrigerants are NOT filed under combustion', () => {
-    // EF.steam_mmbtu is the US EPA table for every country — pickEF is never consulted — so a UK
-    // steam location under "DEFRA 2026" would be a wrong attribution. Refrigerants price from
-    // REFRIGERANT_GWP, whose edition is the AR set that gwp_version already records.
-    expect([...FAMILIES_NOT_COVERED].sort()).toEqual(['purchased_steam', 'refrigerants'])
+  it('F15 refrigerants are NOT filed under combustion; steam is its OWN family', () => {
+    // Refrigerants price from REFRIGERANT_GWP, whose edition is the AR set gwp_version already records.
+    expect([...FAMILIES_NOT_COVERED].sort()).toEqual(['refrigerants'])
+    // ⚠️ THIS TEST ASSERTED `{}` UNTIL 14 AUG 2026, and the change is the point rather than a
+    // relaxation. Steam WAS excluded because EF.steam_mmbtu was the US EPA table for every country and
+    // pickEF was never consulted, so filing a GB steam location under a UK edition would have named a
+    // publisher that had not priced the row. Steam now routes per jurisdiction through STEAM_EF, so
+    // DEFRA genuinely did price this one and recording it is the truthful answer.
+    //   It is its OWN family, not part of combustion: EPA Table 7 / DEFRA's Scope 2 district-heat row
+    // are different TABLES from the combustion citations, with different assumptions behind them.
     const ed = buildFactorEditions([
       loc({ country: 'GB', grid_region: 'UK', has_natural_gas: false, natural_gas_amount: 0, electricity_kwh: 0,
             has_purchased_steam: true, purchased_steam_mmbtu: 500,
             has_hfc_refrigerants: true, refrigerant_purchased_kg: 40 }),
     ], 2026)
-    expect(ed, 'neither family is country-routed, so neither names a jurisdiction edition').toEqual({})
+    expect(ed, 'steam names its own family; refrigerants name nothing').toEqual({
+      UK: { steam: { source: EF_SOURCES.steam_uk, edition: 'DEFRA 2026' } },
+    })
+    expect(ed.UK?.combustion, 'steam must NOT be filed under combustion').toBeUndefined()
+  })
+
+  it('F15b a jurisdiction with no published steam factor names no steam edition', () => {
+    // CA/AU/NZ/EU publish nothing for purchased steam. An edition here would invent a publication.
+    for (const country of ['CA', 'AU', 'NZ', 'DE']) {
+      const ed = buildFactorEditions([
+        loc({ country, grid_region: '', has_natural_gas: false, natural_gas_amount: 0, electricity_kwh: 0,
+              has_purchased_steam: true, purchased_steam_mmbtu: 500 }),
+      ], 2026)
+      expect(ed, `${country}: no published steam factor, so no steam edition`).toEqual({})
+    }
+  })
+
+  it('F15c a SUPPLIER-specific factor records no edition, even in a seeded jurisdiction', () => {
+    // The row was priced by the customer's own provider figure, not by DEFRA. Filing it under
+    // "DEFRA 2026" would put a publication claim on a private number.
+    const ed = buildFactorEditions([
+      loc({ country: 'GB', grid_region: 'UK', has_natural_gas: false, natural_gas_amount: 0, electricity_kwh: 0,
+            has_purchased_steam: true, purchased_steam_mmbtu: 500,
+            purchased_steam_supplier_ef: 0.198, purchased_steam_supplier_ef_basis: 'kwh' }),
+    ], 2026)
+    expect(ed).toEqual({})
   })
 })
 

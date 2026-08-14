@@ -28,6 +28,7 @@
 
 import {
   EF_SOURCES, combustionSource, gridSource, getGridFactor, isResolvedGridRegion, streamState,
+  efJurisdiction, steamFactorFor,
 } from './engine'
 import type { Location } from './engine'
 
@@ -47,8 +48,20 @@ import type { Location } from './engine'
  */
 export type FactorJurisdiction = 'US' | 'CA' | 'UK' | 'EU' | 'AU' | 'NZ'
 
-/** The two factor families that are country-routed. See FAMILIES_NOT_COVERED below for the rest. */
-export type FactorFamily = 'combustion' | 'electricity'
+/**
+ * The factor families that are country-routed. See FAMILIES_NOT_COVERED below for the rest.
+ *
+ * STEAM IS ITS OWN FAMILY RATHER THAN PART OF combustion, and the reason is not tidiness. Folding it
+ * in would file a Scope 2 purchased-heat row under a Scope 1 combustion citation: combustionSource()
+ * would name EPA's fuels workbook or DEFRA's Fuels tab on a row priced by EPA Table 7 or DEFRA's
+ * Scope 2 district-heat row. Those are different tables with different assumptions behind them (the
+ * US steam factor is an ASSUMED gas boiler at 80% efficiency), and a verifier reading the edition map
+ * would be pointed at the wrong one. It is also only published in two of the six jurisdictions, so a
+ * shared family would have to carry an absence the combustion family never has.
+ */
+export type FactorFamily = 'combustion' | 'electricity' | 'steam'
+/** Iterated wherever every family must be visited. One list, so a new family cannot be half-added. */
+const FAMILIES: readonly FactorFamily[] = ['combustion', 'electricity', 'steam']
 
 export type FactorEdition = {
   /** The citation as the workings row and the assurance PDF print it — engine-derived, never retyped. */
@@ -69,20 +82,23 @@ export type FactorEditions = Partial<Record<FactorJurisdiction, Partial<Record<F
 // ── WHAT COUNTS AS COMBUSTION ────────────────────────────────────────────────────────────────────
 // The six Scope 1 streams priced through pickEF, i.e. the ones combustionSource() actually cites.
 //
-// THREE STREAMS ARE DELIBERATELY ABSENT, and none of the omissions is an oversight:
+// THREE STREAMS ARE ABSENT FROM THIS LIST, and none of the omissions is an oversight:
 //   refrigerants    — priced from REFRIGERANT_GWP, a GWP table, not a combustion factor. Its edition
 //                     is the AR set, which gwp_version already records.
-//   purchased_steam — priced from EF.steam_mmbtu, which is the US EPA table for EVERY country;
-//                     pickEF is never consulted. Filing a UK steam location under "DEFRA 2026" would
-//                     be a wrong attribution, which is exactly the class of defect combustionSource
-//                     was introduced to fix.
+//   purchased_steam — ITS OWN FAMILY as of 14 Aug 2026, no longer an omission. It was excluded while
+//                     EF.steam_mmbtu was the US EPA table for EVERY country and pickEF was never
+//                     consulted: filing a UK steam location under "DEFRA 2026" would have been a
+//                     wrong attribution. Steam now routes per jurisdiction through STEAM_EF, so the
+//                     attribution is real — and it is a family of its own rather than part of this
+//                     list, because combustionSource() would cite the wrong TABLE for it. See the
+//                     note on FactorFamily.
 //   electricity     — its own family, resolved by year rather than by table.
 const COMBUSTION_STREAMS = [
   'natural_gas', 'propane', 'diesel_stationary', 'fuel_oil_distillate', 'fuel_oil_residual', 'mobile',
 ] as const
 
 /** Recorded here so the omissions above are greppable from the consuming code, not just commented. */
-export const FAMILIES_NOT_COVERED = ['refrigerants', 'purchased_steam'] as const
+export const FAMILIES_NOT_COVERED = ['refrigerants'] as const
 
 // ── THE JURISDICTION LOOKUP ──────────────────────────────────────────────────────────────────────
 //
@@ -97,13 +113,29 @@ export const FAMILIES_NOT_COVERED = ['refrigerants', 'purchased_steam'] as const
 // automatically. Only a genuinely NEW jurisdiction — a seventh combustion_* / electricity_* pair in
 // EF_SOURCES — requires an edit, and factorEditions.test.ts fails against EF_SOURCES itself when one
 // appears, so it cannot land silently.
-const CITATIONS: Record<FactorJurisdiction, { combustion: string; electricity: string }> = {
-  US: { combustion: EF_SOURCES.combustion,    electricity: EF_SOURCES.electricity_us },
+// `steam` is OPTIONAL, and the four absences are the honest shape: only the US and UK publish a
+// purchased-steam factor at all. An entry here would assert a table that does not exist.
+const CITATIONS: Record<FactorJurisdiction, { combustion: string; electricity: string; steam?: string }> = {
+  US: { combustion: EF_SOURCES.combustion,    electricity: EF_SOURCES.electricity_us, steam: EF_SOURCES.steam_us },
   CA: { combustion: EF_SOURCES.combustion_ca, electricity: EF_SOURCES.electricity_ca },
-  UK: { combustion: EF_SOURCES.combustion_uk, electricity: EF_SOURCES.electricity_uk },
+  UK: { combustion: EF_SOURCES.combustion_uk, electricity: EF_SOURCES.electricity_uk, steam: EF_SOURCES.steam_uk },
   EU: { combustion: EF_SOURCES.combustion_eu, electricity: EF_SOURCES.electricity_eu },
   AU: { combustion: EF_SOURCES.combustion_au, electricity: EF_SOURCES.electricity_au },
   NZ: { combustion: EF_SOURCES.combustion_nz, electricity: EF_SOURCES.electricity_nz },
+}
+
+// ── THE STEAM EDITION ────────────────────────────────────────────────────────────────────────────
+// Declared, like COMBUSTION_EDITION below and for the same reason. Only the two seeded jurisdictions
+// appear; an absent key means "this jurisdiction publishes no steam factor", which is exactly what
+// STEAM_EF says, and is a different claim from an edition of "none".
+//
+// ⚠️ A SUPPLIER-SPECIFIC FACTOR RECORDS NO EDITION, and that is correct rather than a gap. This column
+// answers "which published edition priced these figures"; a factor the customer obtained from their
+// own district energy provider is not an edition of anything, and inventing a label for it would put a
+// publication claim on a private figure. The workings row carries the supplier attribution instead.
+const STEAM_EDITION: Partial<Record<FactorJurisdiction, string>> = {
+  US: 'US EPA 2025 Table 7',
+  UK: 'DEFRA 2026',
 }
 
 const JURISDICTIONS = Object.keys(CITATIONS) as FactorJurisdiction[]
@@ -119,6 +151,14 @@ const JURISDICTIONS = Object.keys(CITATIONS) as FactorJurisdiction[]
  * over EF_SOURCES is what actually prevents the miss, and it runs before any of this ships.
  */
 export function factorJurisdiction(loc: Location, family: FactorFamily): FactorJurisdiction | null {
+  // STEAM RESOLVES BY ROUTER, NOT BY CITATION, and it is the stronger of the two couplings. The other
+  // families have to match a string because their citation functions re-branch on country privately;
+  // steam is dispatched by efJurisdiction(), so asking that same function IS asking the engine which
+  // table it used. There is no string in between to drift.
+  if (family === 'steam') {
+    const j = efJurisdiction(loc) as FactorJurisdiction
+    return CITATIONS[j].steam ? j : null
+  }
   const cite = family === 'combustion' ? combustionSource(loc) : gridSource(loc)
   return JURISDICTIONS.find(j => CITATIONS[j][family] === cite) ?? null
 }
@@ -183,6 +223,22 @@ export function buildFactorEditions(locations: readonly Location[], year: number
       const j = factorJurisdiction(loc, 'electricity')
       if (j) (gridYears[j] ??= new Set()).add(getGridFactor(loc.grid_region, year).usedYear)
     }
+
+    // ── STEAM — quantified AND priced by a PUBLISHED table.
+    // Three ways this records nothing, all of them deliberate:
+    //   - not quantified: same gate as the other two families, no row priced, no edition.
+    //   - jurisdiction publishes no factor (CA/AU/NZ/EU): steamFactorFor returns an absence, and there
+    //     is no edition to name. buildWorkings emits a no_published_factor row instead.
+    //   - a SUPPLIER-SPECIFIC factor priced it: not a published edition. See STEAM_EDITION's note.
+    //     Checked via steamFactorFor rather than steamPricing precisely so a supplier figure at a US or
+    //     UK location does NOT get filed under EPA/DEFRA — the row was not priced by that table.
+    if (streamState(loc, 'purchased_steam') === 'quantified'
+        && !(typeof loc.purchased_steam_supplier_ef === 'number' && loc.purchased_steam_supplier_ef > 0)
+        && steamFactorFor(loc).kind === 'published') {
+      const j = factorJurisdiction(loc, 'steam')
+      const edition = j ? STEAM_EDITION[j] : undefined
+      if (j && edition) (out[j] ??= {}).steam = { source: CITATIONS[j].steam!, edition }
+    }
   }
 
   for (const j of JURISDICTIONS) {
@@ -229,7 +285,11 @@ export function factorEditionsForSave(
 export function sameFactorEditions(a: FactorEditions, b: FactorEditions): boolean {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<FactorJurisdiction>
   for (const j of keys) {
-    for (const f of ['combustion', 'electricity'] as const) {
+    // FAMILIES, not a literal list — a hardcoded pair here would silently ignore a third family, so
+    // two inventories differing only in their steam edition would have compared EQUAL and the trends
+    // page would have reported 'consistent' across a factor change. That is the exact failure this
+    // module exists to prevent, one family along.
+    for (const f of FAMILIES) {
       const x = a[j]?.[f], y = b[j]?.[f]
       if (!x !== !y) return false
       if (x && y && (x.source !== y.source || x.edition !== y.edition)) return false

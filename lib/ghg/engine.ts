@@ -18,7 +18,7 @@ import { SB253_FRAMEWORK_DEADLINE } from '../sb253'
 
 // The two EXACT conversion anchors, from the repo's conversion authority. Imported rather than
 // copied: lib/unitConversions.ts is the single source and its header forbids inlining these.
-import { L_PER_GAL, GJ_PER_MMBTU } from '../unitConversions'
+import { L_PER_GAL, GJ_PER_MMBTU, KWH_PER_GJ } from '../unitConversions'
 // Type only — erased at compile, no runtime dependency and nothing added to the bundle. The engine
 // neither builds nor reads a comparability disclosure; it carries the field so the stored inventory
 // shape stays in one place. See lib/ghg/comparability.ts.
@@ -292,6 +292,28 @@ const EF_UK = {
   // Petrol (average biofuel blend), litres: 2.075 kgCO2e/L (CO2 2.06107, CH4 0.00806, N2O 0.00587).
   gasoline_litre: { co2: 2.075, ch4: 0, n2o: 0 },
   gasoline_gallon: { co2: 7.854729, ch4: 0, n2o: 0 },
+  // ── DISTRICT HEAT AND STEAM — Scope 2, PER kWh ────────────────────────────────────────────────
+  // DESNZ/DEFRA 2026 conversion factors, flat file v1.2 (updated 2026-07-10), Scope 2 sheet,
+  // "Heat and steam" > "District heat and steam". Published columns, per kWh:
+  //     kg CO2e 0.17529 | kg CO2e of CO2 0.17355 | kg CO2e of CH4 0.00122 | kg CO2e of N2O 0.00052
+  //
+  // ⚠️ THE CONSTITUENT COLUMNS ARE "kg CO2e OF" EACH GAS — CO2e, NOT GAS MASS. DEFRA has already
+  // multiplied by its own (AR5) GWPs. Loading 0.00122 into `ch4` would make calcGas multiply by a GWP
+  // a second time, inflating methane ~28-fold. So this takes the same combined-CO2e-in-`co2` shape as
+  // every other EF_UK key, and factorCells detects the zeros and stamps GWP_AS_PUBLISHED. The zeros
+  // mean "DEFRA already counted them", exactly as the convention comment in buildWorkings says.
+  //
+  // ⚠️ KEY IS _kwh, NOT _mmbtu, AND THAT IS LOAD-BEARING. DEFRA publishes per kWh and UK heat networks
+  // bill in kWh by law. Converting 0.17529 to a per-mmBtu figure would bury a unit conversion inside a
+  // stored factor where no verifier can audit it; the conversion belongs on the activity, on the row,
+  // in the note. steamToBasis does it there.
+  //
+  // NO CV BASIS APPLIES, and its absence is correct rather than an omission: natural gas carries
+  // explicit Gross CV (0.18231) and Net CV (0.20199) rows because it is a FUEL, whereas a kWh of
+  // delivered heat is measured heat and has no calorific basis to state.
+  // DEFRA's "Onsite heat and steam" row carries an identical factor, so no district/onsite split is
+  // needed here — one key answers both.
+  steam_kwh: { co2: 0.17529, ch4: 0, n2o: 0 },
 }
 
 // EU combustion factors — IPCC 2006 Guidelines Vol.2 Tier-1 defaults (fossil, full oxidation),
@@ -432,6 +454,18 @@ const EF_SOURCES = {
   combustion_eu: 'IPCC (2006) Guidelines Vol.2 — Tier 1 default combustion factors',
   combustion_au: 'DCCEEW NGA Factors 2025 (AR5)',
   combustion_nz: 'NZ MfE Measuring Emissions 2026 v2 (as-published basis — factors stored verbatim, no AR re-basing)',
+  // ── STEAM / DISTRICT HEAT — NAMED TO THE TABLE, UNLIKE combustion ─────────────────────────────
+  // These cite the exact table, which combustion above does NOT ('US EPA (2024) Emission Factors for
+  // Greenhouse Gas Inventories' names a workbook, not a row). Steam had been citing that same string,
+  // so a verifier reading a steam row and a stationary-combustion row saw one identical citation for
+  // two different tables with different assumptions behind them. Cheap to fix here because each steam
+  // factor now carries its own source in STEAM_EF; the general citation-granularity question for the
+  // combustion_* family is untouched and still open.
+  steam_us: 'US EPA (2025) GHG Emission Factors Hub, Table 7 — Steam and Heat (natural gas at 80% thermal efficiency; combustion only, tank-to-wheel)',
+  steam_uk: 'UK DESNZ/DEFRA (2026) GHG Conversion Factors, flat file v1.2 — Scope 2, District heat and steam',
+  // Not a published table: the customer's own supplier figure. Named so a verifier can see instantly
+  // that this row was NOT priced from a national default, which is the whole point of allowing it.
+  steam_supplier: 'Supplier-specific factor supplied by the district energy provider (see row note)',
   // KEPT — exported, and still read by the methodology summary in app/dashboard/ghg/page.tsx as a
   // catalogue of every grid source this engine can apply. It must NOT be used on a workings row:
   // a verifier reading one row needs the ONE source that priced it, not the six it might have been.
@@ -841,6 +875,32 @@ const US_STATES = ['AK','AL','AR','AZ','CA','CO','CT','DC','DE','FL','GA','HI','
 const AU_STATES = ['NSW','ACT','VIC','QLD','SA','WA','TAS','NT']
 // EU-27 ISO codes (EL = Greece per EEA/EU convention). Maps country -> EU_XX grid key.
 const EU_COUNTRIES = ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','EL','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE']
+
+// ── THE ONE COUNTRY ROUTER FOR FACTOR SELECTION ──────────────────────────────────────────────────
+//
+// Which FACTOR TABLE a location resolves to — not its country. DE and FR are both 'EU'; an unlisted
+// country is 'US', because that is pickEF's documented fallback and recording it truthfully beats
+// pretending a Japanese location has a table of its own.
+//
+// EXTRACTED FROM pickEF, WHICH NOW SWITCHES ON IT, so steam can dispatch on the same answer instead
+// of carrying a second copy of the branching. lib/vsme/b3Energy.ts once held exactly that second copy
+// (`jurisdictionOf()`) and was deleted for it: it mapped US/CA/UK/EU only and threw on Australia.
+// factorEditions.ts documents the same lesson from the other side. One router, two callers.
+//
+// ⚠️ THE CITATION ROUTERS ARE STILL SEPARATE. combustionSource() and gridSource() each branch on
+// country themselves, and this does not unify them — that is a larger change than this one, and
+// their answers are citations rather than table identities. Flagged, not fixed.
+export type EfJurisdiction = 'US' | 'CA' | 'UK' | 'EU' | 'AU' | 'NZ'
+
+export function efJurisdiction(loc: { country?: string }): EfJurisdiction {
+  const ctry = (loc.country || '').toUpperCase().trim()
+  if (ctry === 'GB' || ctry === 'UK') return 'UK'
+  if (EU_COUNTRIES.includes(ctry)) return 'EU'
+  if (ctry === 'AU') return 'AU'
+  if (ctry === 'NZ') return 'NZ'
+  if (ctry === 'CA') return 'CA'
+  return 'US'
+}
 // EU-27 dropdown options: [ISO, label with flag], alphabetical by country name.
 const EU_COUNTRY_OPTIONS: Array<[string, string]> = [
   ['AT','🇦🇹 Austria'],['BE','🇧🇪 Belgium'],['BG','🇧🇬 Bulgaria'],['HR','🇭🇷 Croatia'],
@@ -984,8 +1044,22 @@ interface Location {
   has_mobile: boolean; gasoline_amount: number; gasoline_unit: 'gallons' | 'litres'; diesel_mobile_amount: number; diesel_mobile_unit: 'gallons' | 'litres'
   uses_ammonia: boolean; has_hfc_refrigerants: boolean; refrigerant_type: string; refrigerant_purchased_kg: number
   electricity_kwh: number; grid_region: string; renewable_electricity_kwh: number; residual_region: string
-  // Same as fuel_oil_gallons: key kept, unit added, 'mmbtu' when absent. Read via steamInMmbtu.
-  has_purchased_steam: boolean; purchased_steam_mmbtu: number; purchased_steam_unit?: 'mmbtu' | 'gj'
+  // Same as fuel_oil_gallons: key kept, unit added, 'mmbtu' when absent. Read via steamPricing.
+  // ⚠️ THE KEY STILL SAYS _mmbtu AND THE UNIT MAY BE kWh. Deliberate, and unchanged from the original
+  // convention: renaming the column would orphan every stored figure. The unit field is authoritative.
+  has_purchased_steam: boolean; purchased_steam_mmbtu: number; purchased_steam_unit?: SteamUnit
+  // ── SUPPLIER-SPECIFIC STEAM FACTOR ────────────────────────────────────────────────────────────
+  // The remedy for a jurisdiction STEAM_EF has no published factor for (CA/AU/NZ/EU). Absent means
+  // "not supplied" and the stream cannot be priced — it does NOT mean zero, and nothing anywhere may
+  // treat it as such. A positive value OUTRANKS a published default even where one exists, because a
+  // figure from the network that supplied the heat is primary data (see steamPricing).
+  //   Stored as kg CO2e per `_basis` unit: one combined figure, since that is how a district energy
+  // provider publishes. Its own basis is recorded rather than inherited from purchased_steam_unit, so
+  // changing the activity unit later cannot silently re-interpret the factor.
+  purchased_steam_supplier_ef?: number
+  purchased_steam_supplier_ef_basis?: SteamBasis
+  /** Who supplied it and from what document — printed on the workings row for the verifier. */
+  purchased_steam_supplier_source?: string
   biogenic_co2_mt: number
   // New Zealand-only (optional, default-safe): use-class picks the EF_NZ variant (Commercial default /
   // Industrial — no Residential in MfE data); nz_td_losses toggles the optional Scope 3 Cat 3 T&D line.
@@ -1253,6 +1327,8 @@ const emptyLocation = (id: string, name: string, state = ''): Location => ({
   has_mobile: false, gasoline_amount: 0, gasoline_unit: 'gallons', diesel_mobile_amount: 0, diesel_mobile_unit: 'gallons',
   uses_ammonia: false, has_hfc_refrigerants: false, refrigerant_type: 'r410a', refrigerant_purchased_kg: 0,
   electricity_kwh: 0, grid_region: 'us_average', renewable_electricity_kwh: 0, residual_region: '',
+  // Supplier fields deliberately ABSENT rather than 0: absent means "not supplied", and 0 would be a
+  // factor of zero — a claim that purchased heat is emission-free.
   has_purchased_steam: false, purchased_steam_mmbtu: 0, purchased_steam_unit: 'mmbtu',
   biogenic_co2_mt: 0,
   nz_use_class: 'commercial', nz_td_losses: false,
@@ -1296,10 +1372,25 @@ function liquidUnitOptions(country: string): Array<[string, string]> {
 // those customers must convert by hand. Adding them means a third unit plus an energy conversion —
 // deliberately out of scope of this change, and recorded so it is not mistaken for a decision that
 // kWh is wrong.
+// ⚠️ ORDER IS THE DEFAULT, AND THAT IS WHY GB LISTS kWh FIRST AND STILL LISTS GJ.
+// snapUnitsForCountry keeps a held unit when the list still offers it and otherwise takes opts[0].
+// So:
+//   - kWh first  => a NEW GB location, and any location switched to GB holding a unit GB does not
+//     offer, defaults to kWh — which is how UK heat networks bill, and the basis DEFRA publishes on.
+//   - GJ RETAINED => a GB location already holding 'gj' keeps it. Dropping GJ from the list would
+//     re-snap those rows to kWh and SILENTLY REINTERPRET the stored number — 212121 GJ would start
+//     reading as 212121 kWh, a 277-fold error, with no conversion and no flag. That is the live
+//     "unit switch relabels without converting" defect, and widening a list must never trigger it.
 function steamUnitOptions(country: string): Array<[string, string]> {
-  const ctry = (country || '').toUpperCase().trim()
-  const metric = ctry === 'CA' || ctry === 'GB' || ctry === 'UK' || ctry === 'AU' || ctry === 'NZ' || EU_COUNTRIES.includes(ctry)
-  return metric ? [['gj', 'GJ']] : [['mmbtu', 'MMBtu'], ['gj', 'GJ']]
+  switch (efJurisdiction({ country })) {
+    // DEFRA publishes per kWh; GJ kept so stored metric values are never re-snapped (see above).
+    case 'UK': return [['kwh', 'kWh'], ['gj', 'GJ']]
+    // EPA Table 7 publishes per mmBtu. Unchanged.
+    case 'US': return [['mmbtu', 'MMBtu'], ['gj', 'GJ']]
+    // CA/EU/AU/NZ have no published factor at all — the customer supplies their provider's figure,
+    // and GJ is the basis district energy is metered in across these markets. Unchanged.
+    default: return [['gj', 'GJ']]
+  }
 }
 
 function propaneUnitOptions(country: string): Array<[string, string]> {
@@ -1398,10 +1489,36 @@ export function fuelOilToGallons(amount: number, unit?: 'gallons' | 'litres'): {
   return { gallons, note: `${amount} litres ÷ ${L_PER_GAL} = ${gallons.toFixed(4)} US gallons (exact, NIST) — the published factor is per gallon` }
 }
 
-export function steamToMmbtu(amount: number, unit?: 'mmbtu' | 'gj'): { mmbtu: number; note?: string } {
-  if ((unit ?? 'mmbtu') === 'mmbtu') return { mmbtu: amount }
-  const mmbtu = amount / GJ_PER_MMBTU
-  return { mmbtu, note: `${amount} GJ ÷ ${GJ_PER_MMBTU} = ${mmbtu.toFixed(4)} MMBtu (exact, International Table Btu) — the published factor is per MMBtu` }
+// ── STEAM: CONVERT TO THE BASIS THIS JURISDICTION'S FACTOR IS PUBLISHED IN ──────────────────────
+// The unit a customer enters and the unit a factor is published in are two different facts, and
+// steam is the stream where they genuinely diverge by country: EPA Table 7 is per mmBtu, DEFRA's
+// Scope 2 district heat row is per kWh. steamToMmbtu hardcoded mmBtu as THE canonical basis, which
+// was true only while the US factor was the only one.
+//
+// So the basis is a PARAMETER, supplied by the factor itself (STEAM_EF entries carry their own
+// `basis`), never chosen here. A factor and the unit it is per are one thing; this is what keeps
+// them from separating.
+export type SteamUnit = 'mmbtu' | 'gj' | 'kwh'
+/** The units a steam factor can be published in. A subset of SteamUnit: nobody publishes per GJ. */
+export type SteamBasis = 'mmbtu' | 'kwh'
+
+export function steamToBasis(amount: number, unit: SteamUnit | undefined, basis: SteamBasis): { amount: number; note?: string } {
+  const from = unit ?? 'mmbtu'
+  if (from === basis) return { amount }
+  // Each note names the DEFINING constant, not just the arithmetic — a verifier retyping the row has
+  // to be able to see which Btu (there are several) or which kWh is meant. Same standard as the
+  // fuel-oil note's "(exact, NIST)".
+  if (basis === 'mmbtu') {
+    // Only GJ reaches here: no jurisdiction offers kWh alongside a per-mmBtu factor.
+    const out = from === 'gj' ? amount / GJ_PER_MMBTU : amount / KWH_PER_GJ / GJ_PER_MMBTU
+    return { amount: out, note: from === 'gj'
+      ? `${amount} GJ ÷ ${GJ_PER_MMBTU} = ${out.toFixed(4)} MMBtu (exact, International Table Btu) — the published factor is per MMBtu`
+      : `${amount} kWh ÷ ${KWH_PER_GJ} ÷ ${GJ_PER_MMBTU} = ${out.toFixed(4)} MMBtu (exact: 1 kWh ≡ 3.6 MJ, International Table Btu) — the published factor is per MMBtu` }
+  }
+  const out = from === 'gj' ? amount * KWH_PER_GJ : amount * GJ_PER_MMBTU * KWH_PER_GJ
+  return { amount: out, note: from === 'gj'
+    ? `${amount} GJ × ${KWH_PER_GJ} = ${out.toFixed(4)} kWh (exact, 1 kWh ≡ 3.6 MJ by definition) — the published factor is per kWh`
+    : `${amount} MMBtu × ${GJ_PER_MMBTU} × ${KWH_PER_GJ} = ${out.toFixed(4)} kWh (exact: International Table Btu, 1 kWh ≡ 3.6 MJ) — the published factor is per kWh` }
 }
 
 // Grade-parameterised. fuelOilToGallons itself is unchanged — it takes (amount, unit) rather than a
@@ -1411,13 +1528,133 @@ type FuelOilGrade = 'distillate' | 'residual'
 const fuelOilInGallons = (loc: Location, grade: FuelOilGrade) => grade === 'distillate'
   ? fuelOilToGallons(loc.fuel_oil_distillate_amount, loc.fuel_oil_distillate_unit)
   : fuelOilToGallons(loc.fuel_oil_residual_amount, loc.fuel_oil_residual_unit)
-const steamInMmbtu = (loc: Location) => steamToMmbtu(loc.purchased_steam_mmbtu, loc.purchased_steam_unit)
-
 function propaneEfKey(unit: string): 'propane_gallon' | 'propane_litre' | 'propane_kg' {
   return unit === 'gallons' ? 'propane_gallon' : unit === 'kg' ? 'propane_kg' : 'propane_litre'
 }
 // A complete published factor: the three gases calcGas needs to price an activity figure.
 type CombustionEF = { co2: number; ch4: number; n2o: number }
+
+// ── PURCHASED STEAM / DISTRICT HEAT, BY JURISDICTION ─────────────────────────────────────────────
+//
+// ⚠️ THIS TABLE HAS NO US FALLBACK, AND ITS ABSENCE IS THE WHOLE DESIGN. Every pickEF branch ends
+// `?? (EF as any)[key]`, so a country missing a key silently gets the US EPA figure while the row
+// cites that country's own publisher. For combustion that fallback is a documented trade; for steam
+// it would be indefensible, because the US steam factor is not a measurement at all — it is EPA
+// ASSUMING a natural-gas boiler at 80% thermal efficiency. Serving that to a Canadian customer under
+// an ECCC citation invents a boiler that may not exist. (It is also exactly what the commercial data
+// vendors do: "District steam, Canada" factors trace back to Energy Star Portfolio Manager, i.e. EPA.)
+//
+// STRUCTURALLY ENFORCED, NOT CONVENTIONAL. This is a TOTAL Record over EfJurisdiction — every
+// jurisdiction has an explicit entry, so there is no lookup miss for a fallback to catch, and no `??`
+// anywhere in the steam path. Adding a jurisdiction fails tsc here until someone states what its
+// steam factor IS. A test also greps this region for `EF[` / `?? EF` so re-introducing a fallback
+// fails loudly rather than quietly repricing four countries.
+//
+// ⚠️ 'unpublished' AND 'not_searched' ARE DIFFERENT CLAIMS AND MUST STAY DISTINGUISHABLE IN CODE.
+// A comment saying "we looked and found nothing" reads identically to one saying "nobody looked", and
+// the two license completely different actions: the first is settled until the publisher moves, the
+// second is an open task. Making it a discriminant means the customer-facing wording cannot claim a
+// search that never happened, and a future reader cannot mistake one for the other.
+type SteamPublished = {
+  kind: 'published'
+  ef: CombustionEF
+  /** The unit the factor is published in. The activity converts onto THIS, never the reverse. */
+  basis: SteamBasis
+  source: string
+}
+type SteamAbsent = {
+  /** 'unpublished' = primary source searched, factor confirmed absent. 'not_searched' = no primary source consulted. */
+  kind: 'unpublished' | 'not_searched'
+  /** What was actually checked. Empty for 'not_searched' — there is nothing to report. */
+  searched: string
+  /** Customer-facing remedy. Must not assert a search that did not happen. */
+  guidance: string
+}
+export type SteamEntry = SteamPublished | SteamAbsent
+
+const STEAM_EF: Record<EfJurisdiction, SteamEntry> = {
+  // EPA Hub 2025 Table 7 — a real gas split, so calcGas applies OUR selected GWP set and the row
+  // stamps the live gwpVersion. See the key's own note in EF.
+  US: { kind: 'published', ef: EF.steam_mmbtu, basis: 'mmbtu', source: EF_SOURCES.steam_us },
+  // DEFRA 2026 Scope 2 district heat — combined CO2e per kWh with AR5 already applied, hence the
+  // zeros and the as-published stamp. See the key's own note in EF_UK.
+  UK: { kind: 'published', ef: EF_UK.steam_kwh, basis: 'kwh', source: EF_SOURCES.steam_uk },
+  CA: {
+    kind: 'unpublished',
+    searched: 'ECCC "Emission factors and reference values" v3.0 (Oct 2025), full document. Sections cover fossil fuel combustion, grid electricity and biogas. The only occurrence of "steam" is "Steam-flaked corn" — a beef-cattle diet parameter in Table 9.',
+    // The B.C. Best Practices Methodology (2025) prescribes the supplier-specific route explicitly:
+    // an organisation buying heat or cooling determines emissions from the fuels the district energy
+    // plant consumed, its generation, and its distribution and heat-transfer efficiencies. So this is
+    // not us declining to guess — it is the published Canadian method.
+    guidance: 'No published Canadian factor exists for purchased steam or district heat. Canadian practice (B.C. Best Practices Methodology, 2025) is to use a supplier-specific factor derived from the district energy system\'s own fuels, generation and distribution efficiencies. Ask your provider for their emission intensity and enter it below.',
+  },
+  AU: {
+    kind: 'unpublished',
+    searched: 'DCCEEW National Greenhouse Accounts Factors 2025, all 27 sheets. Tables 1 and 2 are the only Scope 2 tables and both are scoped explicitly to "purchased or acquired electricity".',
+    guidance: 'No published Australian factor exists for purchased steam or district heat. Ask your district energy provider for their emission intensity and enter it below.',
+  },
+  NZ: {
+    // ⚠️ THE TABLE OF CONTENTS LIES, AND THAT IS WHY THIS IS WRITTEN OUT. The catalogue has a page
+    // titled "Purchased Electricity, Heat, and Steam" — a reader checking the contents would conclude
+    // a steam factor exists. It contains two sections, Purchased Electricity and Transmission and
+    // distribution losses, and NOT ONE factor label in the entire catalogue contains "steam". The
+    // heading names a category MfE does not populate.
+    kind: 'unpublished',
+    searched: 'MfE Measuring Emissions Catalogue 2026 v2, all 3,252 rows of the flat file. No factor label contains "steam". The page titled "Purchased Electricity, Heat, and Steam" holds only Purchased Electricity and T&D losses.',
+    guidance: 'No published New Zealand factor exists for purchased steam or district heat. Ask your district energy provider for their emission intensity and enter it below.',
+  },
+  EU: {
+    // ⚠️ NOT THE SAME CLAIM AS CA/AU/NZ. No primary source was searched. There is no single EU-wide
+    // publisher across 27 member states, so "we looked and there is none" is a statement nobody here
+    // is entitled to make. If a member-state publisher is ever seeded, this becomes 'published' for
+    // that state and this entry stops covering it.
+    kind: 'not_searched',
+    searched: '',
+    guidance: 'No EU-wide factor for purchased steam or district heat is applied by this platform. District heating in the EU is supplied by local networks whose fuel mix and efficiency vary widely. Ask your district energy provider for their emission intensity and enter it below.',
+  },
+}
+
+/** The steam factor (or the reasoned absence) for a location. The ONLY steam lookup — no fallback. */
+export function steamFactorFor(loc: { country?: string }): SteamEntry {
+  return STEAM_EF[efJurisdiction(loc)]
+}
+
+/**
+ * What actually prices a location's steam, once the customer's own supplier figure is taken into
+ * account. Returns null when the stream cannot be priced at all, which is a REPORTABLE STATE and not
+ * an error — see the declaration row in buildWorkings and findSteamFactorGaps.
+ *
+ * A SUPPLIER FIGURE OUTRANKS A PUBLISHED DEFAULT, deliberately. The published factors are national
+ * averages (or, for the US, an assumed boiler); a figure from the network that actually supplied the
+ * heat is primary data. This is the same precedence Scope 3 Category 1 already applies — supplier-
+ * specific first, default second — and the B.C. methodology prescribes it for exactly this stream.
+ */
+export function steamPricing(loc: Location): { ef: CombustionEF; basis: SteamBasis; source: string; supplier: boolean } | null {
+  const sup = loc.purchased_steam_supplier_ef
+  if (typeof sup === 'number' && sup > 0) {
+    // A supplier states ONE kg CO2e per unit with its own GWP set baked in — the same shape as DEFRA,
+    // so it takes the same zeros convention and factorCells stamps it as-published. Storing it in
+    // `ch4`/`n2o` would double-count, and claiming our AR set governs their arithmetic would be false.
+    return {
+      ef: { co2: sup, ch4: 0, n2o: 0 },
+      basis: loc.purchased_steam_supplier_ef_basis ?? 'kwh',
+      source: `${EF_SOURCES.steam_supplier}${loc.purchased_steam_supplier_source ? ` — ${loc.purchased_steam_supplier_source}` : ''}`,
+      supplier: true,
+    }
+  }
+  const entry = steamFactorFor(loc)
+  return entry.kind === 'published'
+    ? { ef: entry.ef, basis: entry.basis, source: entry.source, supplier: false }
+    : null
+}
+
+/** The priced steam figure in tonnes, or 0 when the stream cannot be priced. Shared by both callers. */
+function steamTonnes(loc: Location, gwpVersion: GwpVersion): number {
+  if (!loc.has_purchased_steam || loc.purchased_steam_mmbtu <= 0) return 0
+  const p = steamPricing(loc)
+  if (!p) return 0
+  return calcGas(p.ef, steamToBasis(loc.purchased_steam_mmbtu, loc.purchased_steam_unit, p.basis).amount, gwpVersion).total
+}
 
 // What pickEF returns when NEITHER the country's own table NOR the US fallback carries the key.
 // It deliberately carries no gases — a blank must not be priced as zero — and instead records what
@@ -1474,24 +1711,29 @@ function assertPriceable(ef: CombustionEF | MissingEF | null | undefined): asser
 
 function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof typeof EF_UK | keyof typeof EF_EU | keyof typeof EF_AU | keyof (typeof EF_NZ)['commercial']): CombustionEF {
   const ctry = (loc.country || '').toUpperCase().trim()
-  if (ctry === 'GB' || ctry === 'UK') {
+  // Switches on the shared router rather than re-branching on country. Behaviour is unchanged: the
+  // arms below are the same six, in the same order of precedence, with the same US fallbacks.
+  // ⚠️ STEAM DOES NOT COME THROUGH HERE, precisely because of those `?? (EF as any)[key]` fallbacks.
+  // See STEAM_EF.
+  const j = efJurisdiction(loc)
+  if (j === 'UK') {
     return efOr((EF_UK as any)[key] ?? (EF as any)[key], String(key), ctry)
   }
-  if (EU_COUNTRIES.includes(ctry)) {
+  if (j === 'EU') {
     return efOr((EF_EU as any)[key] ?? (EF as any)[key], String(key), ctry)
   }
   // Australia: EF_AU per-unit table; missing keys (e.g. fuel oil) fall back to US EF (UK/EU parity).
-  if (ctry === 'AU') {
+  if (j === 'AU') {
     return efOr((EF_AU as any)[key] ?? (EF as any)[key], String(key), ctry)
   }
   // New Zealand: EF_NZ is use-class keyed (commercial default / industrial); missing keys fall back to US EF.
-  if (ctry === 'NZ') {
+  if (j === 'NZ') {
     const nzTable = (EF_NZ as any)[loc.nz_use_class ?? 'commercial']
     return efOr(nzTable?.[key] ?? (EF as any)[key], String(key), ctry)
   }
   // US / default / any unlisted country. Structurally identical to the five above — it used to be
   // the odd one out, returning the raw table value, and that asymmetry WAS the crash.
-  if (ctry !== 'CA') {
+  if (j !== 'CA') {
     return efOr((EF as any)[key], String(key), ctry)
   }
   const ef = efOr((EF_CA as any)[key] ?? (EF as any)[key], String(key), ctry)
@@ -1620,11 +1862,14 @@ function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: numbe
   // contribution — exactly like an absent Scope 1 fuel. Steam (grid-independent) is unaffected.
   const gridResolved = isResolvedGridRegion(loc.grid_region)
   const grid_ef = gridResolved ? getGridFactor(loc.grid_region, year).ef : 0
-  // Steam prices through calcGas like every other stream, so EPA Table 7's CH4 and N2O are counted at
-  // the active GWP set instead of being dropped by a bare CO2-only multiply. calcGas returns TONNES
-  // while the electricity term is still kg, so the /1000 moved onto the electricity term alone rather
-  // than wrapping the sum. Same expression in both S2 figures below — see the note there.
-  const steam_t = loc.has_purchased_steam ? calcGas(EF.steam_mmbtu, steamInMmbtu(loc).mmbtu, gwpVersion).total : 0
+  // Steam prices through calcGas like every other stream, so a split factor's CH4 and N2O are counted
+  // at the active GWP set. calcGas returns TONNES while the electricity term is still kg, so the /1000
+  // sits on the electricity term alone rather than wrapping the sum.
+  // ⚠️ ZERO HERE MEANS "NOT PRICED", NOT "NO EMISSIONS" — steamTonnes returns 0 when the jurisdiction
+  // has no published factor and no supplier figure was given. The location total is therefore SHORT by
+  // a stream the customer declared, which is why buildWorkings emits a loud no_published_factor row and
+  // findSteamFactorGaps blocks export. Do NOT read this 0 as evidence of anything.
+  const steam_t = steamTonnes(loc, gwpVersion)
   const s2_location = (gridResolved ? loc.electricity_kwh * grid_ef : 0) / 1000 + steam_t
   // Market-based: covered (contractual) kWh @ 0 (RECs/PPAs/green tariffs assumed zero-emission — documented);
   // uncovered kWh @ residual-mix factor. If no residual mix applies (full-disclosure region, or US subregion
@@ -1962,8 +2207,17 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
   const win = periodFromYearAndEnd(year, fiscalYearEndMonth)
   // Screen abbreviations for the combined-factor display, matching what renderStep4 showed (gal / L);
   // every other unit (mcf, kg, therms, mmbtu…) passes through unchanged. emission_factor (the gas split)
-  // is UNTOUCHED — the CSV / verifier path depends on it. emission_factor_display is display-only.
-  const abbrevUnit = (u: string) => u === 'gallons' ? 'gal' : (u === 'litres' || u === 'liters') ? 'L' : u === 'm3' ? 'm³' : u
+  // is UNTOUCHED — the VERIFIER PAGE depends on it: app/verify/[token] renders emission_factor, and its
+  // WorkingRow type has no emission_factor_display member at all, so the split string is the only
+  // factor a verifier sees. emission_factor_display is the dashboard's cell and is display-only.
+  //   (This comment said "the CSV / verifier path" until 14 Aug 2026. The CSV half was false —
+  //   generateExport emits organisation, results, methods and a location breakdown, and NO workings
+  //   rows whatever, so it reads neither field.)
+  // 'kwh' -> 'kWh' so a DEFRA district-heat row renders the unit the way DEFRA writes it, and the way
+  // the electricity rows beside it already do. 'mmbtu' is deliberately NOT prettified to 'MMBtu' here:
+  // it is the pre-existing rendering on every stored US steam snapshot, and changing it would make
+  // saved workings differ from freshly computed ones for no gain in correctness.
+  const abbrevUnit = (u: string) => u === 'gallons' ? 'gal' : (u === 'litres' || u === 'liters') ? 'L' : u === 'm3' ? 'm³' : u === 'kwh' ? 'kWh' : u
   // RECOMPUTABLE, NOT TIDY — and this is the whole point of a workings table. toFixed(3) printed a
   // factor of 1.9316576 as "1.932", so a verifier retyping the row got 231,840 kg where we stated
   // 231,798.9: a 41 kg divergence on one line, and EVERY priced row failed the same way. A workings
@@ -2120,14 +2374,38 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     if (loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0) {
       // Same rule as fuel oil: the factor is published per MMBtu, so the activity it multiplies must
       // be MMBtu. The note carries the entered GJ figure and the arithmetic.
-      const st = steamToMmbtu(loc.purchased_steam_mmbtu, loc.purchased_steam_unit)
-      // ⚠️ SHARES factorCells AND calcGas, BUT DELIBERATELY NOT pushFuel. Two reasons, and neither is
-      // the factor's shape: pushFuel stamps `ef_source: combustionSource(loc)`, which is COUNTRY-
-      // ROUTED, so a UK steam row would cite DEFRA while EF.steam_mmbtu (US EPA) priced it — the
-      // exact citation/factor mismatch the AU/NZ fuel-oil work existed to remove. And steam is Scope
-      // 2, carrying scope2_method, which pushFuel has no parameter for. So it borrows the two things
-      // that decide what the figure IS and states its own citation.
-      rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: 'Purchased steam', scope: 2, activity_data: st.mmbtu, activity_unit: 'mmbtu', ...factorCells(EF.steam_mmbtu, 'mmbtu'), ef_source: EF_SOURCES.combustion, scope2_method: 'location-based', result_tco2e: calcGas(EF.steam_mmbtu, st.mmbtu, gwpVersion).total, entry_method: 'manual', ...(st.note ? { note: st.note } : {}) })
+      const priced = steamPricing(loc)
+      if (!priced) {
+        // ── NO PUBLISHED FACTOR, AND NO SUPPLIER FIGURE ──────────────────────────────────────────
+        // NOT MissingEF/assertPriceable, deliberately. That path throws, and unpriceableReason turns a
+        // throw into a WHOLE-LOCATION exclusion — a Canadian plant with gas, diesel and electricity
+        // would report nothing at all because of one district-heat line. Disproportionate, and it
+        // reads as a bug. So the other streams price normally and this one row carries the gap.
+        //   activity_data IS THE ENTERED FIGURE, unlike the declared_unquantified rows below which
+        // carry 0 because no figure exists. Here one does, and showing it is the honest record: "you
+        // told us 500 GJ and we could not price it" is a different, more useful statement to a
+        // verifier than "no figure".
+        const entry = steamFactorFor(loc)
+        const absent = entry.kind === 'published' ? null : entry
+        rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: 'Purchased steam', scope: 2,
+          activity_data: loc.purchased_steam_mmbtu, activity_unit: loc.purchased_steam_unit ?? 'mmbtu',
+          emission_factor: '—', emission_factor_display: '—', ef_source: '—', scope2_method: '—',
+          gwp_basis: 'declaration', result_tco2e: null,
+          declaration: 'no_published_factor', entry_method: 'no-published-factor',
+          // The two absence kinds produce DIFFERENT prose. 'unpublished' may say a search was done and
+          // name it; 'not_searched' must not, and says only what this platform applies.
+          steam_absence: absent?.kind ?? 'not_searched',
+          note: `NOT QUANTIFIED — NO EMISSION FACTOR. ${absent?.guidance ?? ''} Nothing from this stream is included in any total on this report.`,
+          ...(absent?.searched ? { quantification_method: `Checked: ${absent.searched}` } : {}) })
+      } else {
+      const st = steamToBasis(loc.purchased_steam_mmbtu, loc.purchased_steam_unit, priced.basis)
+      // ⚠️ SHARES factorCells AND calcGas, BUT DELIBERATELY NOT pushFuel. pushFuel stamps
+      // `ef_source: combustionSource(loc)` — the COMBUSTION citation for the country, which would name
+      // DEFRA's fuels table on a Scope 2 district-heat row. Steam cites its own table (STEAM_EF entries
+      // carry their source), and it carries scope2_method, which pushFuel has no parameter for. So it
+      // borrows the two things that decide what the figure IS and states its own citation.
+      rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: `Purchased steam${priced.supplier ? ' (supplier-specific factor)' : ''}`, scope: 2, activity_data: st.amount, activity_unit: priced.basis, ...factorCells(priced.ef, priced.basis), ef_source: priced.source, scope2_method: 'location-based', result_tco2e: calcGas(priced.ef, st.amount, gwpVersion).total, entry_method: priced.supplier ? 'supplier-specific' : 'manual', ...(st.note ? { note: st.note } : {}) })
+      }
     }
     // ── Declaration rows: EVERY stream gets a row, so no stream can ever be silent ────────────────
     //
@@ -2375,6 +2653,34 @@ export function findUndeclaredStreams(
   })
 }
 
+// ── STEAM THAT CANNOT BE PRICED — the export gate's probe ────────────────────────────────────────
+//
+// A SEPARATE PROBE, NOT A FOURTH StreamState. StreamState answers "what did the customer tell us"
+// (undeclared / declared_unquantified / quantified) from the location alone, and its three-way shape
+// is load-bearing — the comment above it explains why a boolean was not enough. This asks a different
+// question, "can we price what they told us", whose answer depends on the JURISDICTION and not on the
+// customer's answers at all. Folding it into StreamState would make a stream's declared state change
+// when the country dropdown moves, which is not what that type means.
+//
+// It composes into the export gate beside gridReady / pricingReady / declarationsReady — the pattern
+// the page already uses for exactly this: one independent readiness condition per unrelated defect.
+//
+// ⚠️ THIS BLOCKS EXPORT, AND THE REMEDY IS purchased_steam_supplier_ef. A stream the customer declared
+// and quantified is being left out of every total; shipping an assurance package that way would put an
+// incomplete Scope 2 in front of a verifier. The supplier-factor field is what lets them clear it, and
+// blocking without that field would strand them with no way out.
+export function findSteamFactorGaps(
+  locations: Location[],
+): { locId: string; locName: string; jurisdiction: EfJurisdiction; kind: 'unpublished' | 'not_searched'; guidance: string }[] {
+  return locations.flatMap(loc => {
+    if (!loc.has_purchased_steam || loc.purchased_steam_mmbtu <= 0) return []
+    if (steamPricing(loc)) return []
+    const entry = steamFactorFor(loc)
+    if (entry.kind === 'published') return []   // unreachable; steamPricing would have returned it
+    return [{ locId: loc.id, locName: loc.name || 'Location', jurisdiction: efJurisdiction(loc), kind: entry.kind, guidance: entry.guidance }]
+  })
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Public API. Declarations above are kept in their original (verbatim) order;
 // exports are collected here so the move stays byte-for-byte auditable.
@@ -2393,6 +2699,9 @@ export {
   combustionSource, calcGas, calcLocation, calcInventory, fieldFor,
   buildWorkings, emptyLocation,
   ngUnitOptions, normalizeNgUnit, liquidUnitOptions, propaneUnitOptions, steamUnitOptions,
+  // Steam: the registry itself is deliberately NOT exported. The only ways in are steamFactorFor and
+  // steamPricing, so no caller — including a test — can index it and bolt a `?? EF` onto the result.
+  // The seeding tests assert through steamFactorFor, which is the path the engine actually uses.
   validateElectricity, validateNaturalGas, validateCompleteness,
   parseLocalDate, periodFromYearAndEnd, monthKey, monthLabel,
   daysBetween, exclusiveEnd, analyzeCoverage,

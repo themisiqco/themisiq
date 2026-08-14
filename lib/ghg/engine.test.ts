@@ -20,6 +20,7 @@ import {
   pickEF, calcGas, emptyLocation, findUnresolvedCoverage, findUndeclaredStreams, applyResolutions, pctEstimated,
   MissingEmissionFactorError, findUnpriceableLocations,
   streamState, DECLARABLE_STREAMS, STREAM_META, nzTdLoss, NZ_TD_LOSS, EF_SOURCES,
+  efJurisdiction, steamFactorFor, findSteamFactorGaps, snapUnitsForCountry, steamToBasis,
   EF, EF_CA, EF_UK, EF_EU, EF_AU, EF_NZ,
   type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal, type StreamAttestation,
   type DeclarableStream,
@@ -2106,5 +2107,220 @@ describe('S. purchased steam — EPA Hub 2025 Table 7, all three columns', () =>
     expect(row.activity_data).toBeLessThan(1000);
     expect(row.note, 'the conversion arithmetic stays on the row').toContain('GJ');
     expect(row.result_tco2e).toBeCloseTo(row.activity_data * 66.401375 / 1000, 12);
+  });
+});
+
+// ── T. PURCHASED STEAM IS PER-JURISDICTION ───────────────────────────────────────────────────────
+//
+// THE DEFECT THIS CLOSES. EF.steam_mmbtu priced EVERY country. A London office on a UK heat network
+// was costed with an ASSUMED American natural-gas boiler at 80% thermal efficiency: 1000 GJ read
+// 62.9364 tCO2e against DEFRA's 48.6917, a 23% overstatement. The citation was at least honest —
+// it said US EPA — but the number was not the UK's.
+//
+// The rule this suite defends is narrower than "steam is per-country": it is that NO JURISDICTION
+// SILENTLY BORROWS ANOTHER'S FACTOR. Four of six publish nothing at all, and the correct output for
+// those is a stated absence, never a number.
+describe('T. purchased steam — per jurisdiction, with no US fallback', () => {
+  const steamLoc = (o: Partial<Location> = {}) =>
+    loc({ has_purchased_steam: true, purchased_steam_mmbtu: 1000, purchased_steam_unit: 'gj', ...o });
+  const steamRow = (l: Location, gwp: 'AR4' | 'AR5' | 'AR6' = 'AR6') =>
+    (buildWorkings([l], gwp, 2025, [], 12) as any[]).find(r => r.stream === 'purchased_steam');
+  const UNSEEDED = ['CA', 'AU', 'NZ', 'DE'] as const;
+
+  it('T1 GB prices from EF_UK.steam_kwh, and NOT from EF', () => {
+    // 1000 GJ = 277,777.78 kWh; x 0.17529 = 48,691.67 kg = 48.6917 t.
+    const row = steamRow(steamLoc({ country: 'GB' }));
+    expect(row.result_tco2e).toBeCloseTo(48.6917, 4);
+    expect(row.activity_unit, 'converted onto the basis DEFRA publishes on').toBe('kwh');
+    expect(row.ef_source).toBe(EF_SOURCES.steam_uk);
+    // The US figure must be nowhere near it — this is the 23% the defect was worth.
+    expect(row.result_tco2e).not.toBeCloseTo(62.9364, 2);
+  });
+
+  it('T2 GB stamps as-published; US stamps the live set — both DETECTED from the factor', () => {
+    // DEFRA combines the gases at AR5 and stores them in `co2` with zeros; EPA Table 7 publishes a
+    // real split. factorCells reads ch4 === 0 && n2o === 0, so neither stamp is written by hand.
+    for (const g of ['AR4', 'AR5', 'AR6'] as const) {
+      expect(steamRow(steamLoc({ country: 'GB' }), g).gwp_basis, `GB ${g}`).toBe('as-published — see factor source');
+      expect(steamRow(steamLoc({ country: 'US', purchased_steam_unit: 'mmbtu' }), g).gwp_basis, `US ${g}`).toBe(g);
+    }
+  });
+
+  it('T3 US is UNCHANGED — 100 MMBtu still prices at 6.6401375 t', () => {
+    const row = steamRow(steamLoc({ country: 'US', purchased_steam_mmbtu: 100, purchased_steam_unit: 'mmbtu' }));
+    expect(row.result_tco2e).toBeCloseTo(6.6401375, 9);
+    expect(row.activity_unit).toBe('mmbtu');
+    expect(row.ef_source).toBe(EF_SOURCES.steam_us);
+  });
+
+  it('T4 CA/AU/NZ/EU produce NO NUMBER and NO borrowed factor', () => {
+    // ⚠️ ASSERTS THE ABSENCE POSITIVELY. A test that only checked "the total did not change" would
+    // pass just as happily if the factor silently became 0 — the failure mode this must catch.
+    for (const country of UNSEEDED) {
+      const l = steamLoc({ country });
+      const row = steamRow(l);
+      expect(row.declaration, `${country}`).toBe('no_published_factor');
+      expect(row.result_tco2e, `${country}: null, never 0 — 0 is a claim of no emissions`).toBeNull();
+      expect(row.emission_factor, `${country}: no factor may be shown`).toBe('—');
+      expect(row.ef_source, `${country}: no citation, because nothing priced it`).toBe('—');
+      // The reported quantity IS carried — "you told us 1000 GJ and we could not price it".
+      expect(row.activity_data, `${country}`).toBe(1000);
+      expect(row.activity_unit, `${country}`).toBe('gj');
+      // And nothing reached the totals.
+      expect(calcLocation(l, 'AR6', 2025).s2_location, `${country}`).toBe(0);
+      expect(calcLocation(l, 'AR6', 2025).s2_market, `${country}`).toBe(0);
+    }
+  });
+
+  it('T5 no unseeded jurisdiction lands on the US figure, at any AR set', () => {
+    // The specific regression: a `?? EF` reappearing in the steam path. 1000 GJ under the US factor
+    // is 62.9364 t; if any of these ever equals that, the fallback is back.
+    for (const country of UNSEEDED) {
+      for (const g of ['AR4', 'AR5', 'AR6'] as const) {
+        const t = calcLocation(steamLoc({ country }), g, 2025).s2_location;
+        expect(t, `${country} ${g} must not be the US factor`).not.toBeCloseTo(62.9364, 2);
+        expect(t, `${country} ${g}`).toBe(0);
+      }
+    }
+  });
+
+  it('T6 STRUCTURAL — the steam registry contains no fallback to EF', () => {
+    // A behavioural test cannot see a fallback that only fires for a jurisdiction added later. This
+    // reads the source of the registry region itself, the way engineCallSites.test.ts does.
+    const src = readFileSync(join(__dirname, 'engine.ts'), 'utf8');
+    const start = src.indexOf('const STEAM_EF: Record<EfJurisdiction, SteamEntry>');
+    const end = src.indexOf('function steamTonnes');
+    expect(start, 'STEAM_EF declaration not found — has it been renamed?').toBeGreaterThan(-1);
+    expect(end, 'steamTonnes not found — has it been renamed?').toBeGreaterThan(start);
+    const region = src.slice(start, end).split('\n').filter(l => !l.trim().startsWith('//')).join('\n');
+    // EVERY reference to a factor TABLE in this region, whole-identifier so STEAM_EF itself does not
+    // match. Exactly two are legitimate — the seeded US and UK entries. Any third is either a new
+    // jurisdiction borrowing a table it should not, or a `??` fallback: both are the defect.
+    const tableRefs = [...region.matchAll(/(?<![A-Za-z0-9_$])(EF|EF_CA|EF_UK|EF_EU|EF_AU|EF_NZ)(\.[A-Za-z0-9_]+|\s*\[|\s+as\s+any)/g)]
+      .map(m => m[0].trim());
+    expect([...new Set(tableRefs)].sort(),
+      'A FACTOR TABLE IS REFERENCED IN THE STEAM REGISTRY THAT SHOULD NOT BE.\n\n' +
+      'Every pickEF branch ends `?? (EF as any)[key]`, and steam must not. The US steam factor is not\n' +
+      'a measurement — EPA derives it by ASSUMING a natural-gas boiler at 80% thermal efficiency — so\n' +
+      'serving it to a Canadian location under an ECCC citation invents a boiler that may not exist.\n' +
+      'That is also exactly what the commercial factor vendors do, and the defect we are fixing.\n' +
+      'STEAM_EF is a TOTAL Record precisely so there is no lookup miss for a fallback to catch.\n' +
+      'TO FIX: if a jurisdiction genuinely gained a published factor, seed it and add a `published`\n' +
+      'entry naming its own table — do not reach for another country\'s.',
+    ).toEqual(['EF.steam_mmbtu', 'EF_UK.steam_kwh']);
+  });
+
+  it('T7 the two absence kinds are distinguishable in code, not just in prose', () => {
+    // CONFIRMED-UNPUBLISHED (searched, none exists) vs NOT-INVESTIGATED (no primary source consulted)
+    // license different actions, and a comment cannot be read by a caller.
+    for (const country of ['CA', 'AU', 'NZ']) {
+      const e = steamFactorFor({ country }) as any;
+      expect(e.kind, `${country} was searched`).toBe('unpublished');
+      expect(e.searched.length, `${country} must record WHAT was searched`).toBeGreaterThan(40);
+    }
+    const eu = steamFactorFor({ country: 'DE' }) as any;
+    expect(eu.kind, 'no EU primary source was consulted').toBe('not_searched');
+    expect(eu.searched, 'must not claim a search').toBe('');
+    // And the customer-facing wording must not assert one either.
+    expect(eu.guidance.toLowerCase()).not.toContain('no published');
+    expect(steamRow(steamLoc({ country: 'DE' })).quantification_method, 'no "Checked:" line for the EU').toBeUndefined();
+    expect(steamRow(steamLoc({ country: 'CA' })).quantification_method).toContain('Checked:');
+  });
+
+  it('T8 a supplier-specific factor prices the stream and outranks a published default', () => {
+    // The remedy that makes the export block survivable, and primary data where a default exists.
+    const ca = steamLoc({ country: 'CA', purchased_steam_supplier_ef: 0.198, purchased_steam_supplier_ef_basis: 'kwh',
+                          purchased_steam_supplier_source: 'Enwave Toronto, 2025 statement' });
+    const row = steamRow(ca);
+    expect(row.declaration, 'no longer a gap').toBeUndefined();
+    // 1000 GJ = 277,777.78 kWh x 0.198 = 55,000 kg = 55 t.
+    expect(row.result_tco2e).toBeCloseTo(55, 6);
+    expect(row.ef_source).toContain('Enwave Toronto');
+    expect(row.entry_method).toBe('supplier-specific');
+    // A supplier figure is one combined CO2e on the provider's own GWP basis — same convention as DEFRA.
+    expect(row.gwp_basis).toBe('as-published — see factor source');
+    // It also beats the published GB default, because it is primary data for the network that supplied it.
+    const gb = steamLoc({ country: 'GB', purchased_steam_supplier_ef: 0.198, purchased_steam_supplier_ef_basis: 'kwh' });
+    expect(steamRow(gb).result_tco2e).toBeCloseTo(55, 6);
+    expect(steamRow(gb).result_tco2e).not.toBeCloseTo(48.6917, 3);
+  });
+
+  it('T9 other streams still price when steam cannot — no whole-location exclusion', () => {
+    // The reason this is NOT MissingEF/assertPriceable: that throws, and unpriceableReason turns a
+    // throw into a whole-location exclusion. A Canadian plant must not report nothing because of one
+    // district-heat line.
+    const l = steamLoc({ country: 'CA', grid_region: 'ON', electricity_kwh: 100_000,
+                         has_natural_gas: true, natural_gas_amount: 500, natural_gas_unit: 'm3' });
+    const c = calcLocation(l, 'AR6', 2025);
+    expect(c.s1_total, 'gas still priced').toBeGreaterThan(0);
+    expect(c.s2_location, 'electricity still priced').toBeGreaterThan(0);
+    expect(findUnpriceableLocations([l], 'AR6', 2025), 'the location is NOT excluded').toEqual([]);
+    // And the steam gap is reported by its own probe rather than by silence.
+    expect(findSteamFactorGaps([l]).map(g => g.jurisdiction)).toEqual(['CA']);
+  });
+
+  it('T10 findSteamFactorGaps fires exactly when the stream cannot be priced', () => {
+    expect(findSteamFactorGaps([steamLoc({ country: 'GB' })]), 'published factor').toEqual([]);
+    expect(findSteamFactorGaps([steamLoc({ country: 'US', purchased_steam_unit: 'mmbtu' })]), 'published factor').toEqual([]);
+    expect(findSteamFactorGaps([steamLoc({ country: 'CA', purchased_steam_supplier_ef: 0.2, purchased_steam_supplier_ef_basis: 'kwh' })]), 'supplier figure').toEqual([]);
+    expect(findSteamFactorGaps([loc({ country: 'CA' })]), 'no steam declared').toEqual([]);
+    expect(findSteamFactorGaps([steamLoc({ country: 'CA', purchased_steam_mmbtu: 0 })]), 'declared, no figure').toEqual([]);
+    expect(findSteamFactorGaps([steamLoc({ country: 'CA' })]).length, 'declared, quantified, unpriceable').toBe(1);
+    // A zero supplier factor is NOT a factor — it is an empty field, and must not price the stream at 0.
+    expect(findSteamFactorGaps([steamLoc({ country: 'CA', purchased_steam_supplier_ef: 0 })]).length, '0 is not a factor').toBe(1);
+  });
+
+  it('T11 unit conversion reaches the right basis, and the note names the defining constant', () => {
+    // GB kWh direct — no conversion, so no note.
+    const gbKwh = steamRow(steamLoc({ country: 'GB', purchased_steam_mmbtu: 277777.7778, purchased_steam_unit: 'kwh' }));
+    expect(gbKwh.note, 'no conversion happened').toBeUndefined();
+    expect(gbKwh.result_tco2e).toBeCloseTo(48.6917, 3);
+    // GB GJ -> kWh.
+    const gbGj = steamRow(steamLoc({ country: 'GB' }));
+    expect(gbGj.note).toContain('1000 GJ × 277.77777777777777 = 277777.7778 kWh');
+    expect(gbGj.note).toContain('exact, 1 kWh ≡ 3.6 MJ by definition');
+    expect(gbGj.note).toContain('the published factor is per kWh');
+    // US MMBtu direct — no conversion.
+    expect(steamRow(steamLoc({ country: 'US', purchased_steam_mmbtu: 100, purchased_steam_unit: 'mmbtu' })).note).toBeUndefined();
+    // US GJ -> MMBtu, with the Btu definition named as before.
+    const usGj = steamRow(steamLoc({ country: 'US' }));
+    expect(usGj.note).toContain('1000 GJ ÷ 1.05505585262 = 947.8171 MMBtu');
+    expect(usGj.note).toContain('exact, International Table Btu');
+    expect(usGj.note).toContain('the published factor is per MMBtu');
+  });
+
+  it('T12 the stored GB fixture means the same thing before and after kWh was added', () => {
+    // 212121 GJ is live stored data. Widening GB's unit list must not re-snap or re-interpret it.
+    const held = snapUnitsForCountry('GB', { purchased_steam_unit: 'gj' });
+    expect(held.purchased_steam_unit, 'a stored GJ value stays GJ').toBe('gj');
+    const l = steamLoc({ country: 'GB', purchased_steam_mmbtu: 212121, purchased_steam_unit: 'gj' });
+    // 212121 GJ = 58,922,500 kWh x 0.17529 = 10,328,525.025 kg.
+    expect(steamRow(l).result_tco2e).toBeCloseTo(10328.525025, 5);
+    // And it is NOT being read as 212121 kWh, which would be the silent-relabel failure.
+    expect(steamRow(l).result_tco2e).not.toBeCloseTo(212121 * 0.17529 / 1000, 3);
+  });
+
+  it('T13 totals, workings and the location breakdown agree on the same steam figure', () => {
+    for (const country of ['GB', 'US']) {
+      for (const g of ['AR4', 'AR5', 'AR6'] as const) {
+        const l = steamLoc({ country, purchased_steam_unit: country === 'US' ? 'mmbtu' : 'gj' });
+        const row = steamRow(l, g);
+        expect(calcLocation(l, g, 2025).s2_location, `${country} ${g}`).toBeCloseTo(row.result_tco2e, 12);
+        expect(calcInventory([l], g, 2025).s2_location, `${country} ${g}`).toBeCloseTo(row.result_tco2e, 12);
+      }
+    }
+  });
+
+  it('T14 efJurisdiction is the ONE router, and pickEF agrees with it', () => {
+    // The steam registry keys on efJurisdiction; pickEF switches on it. If they ever disagreed, steam
+    // would be looked up under a different table from the fuels at the same location.
+    const cases: [string, string][] = [['US', 'US'], ['us', 'US'], ['', 'US'], ['JP', 'US'],
+      ['GB', 'UK'], ['UK', 'UK'], ['CA', 'CA'], ['DE', 'EU'], ['FR', 'EU'], ['AU', 'AU'], ['NZ', 'NZ']];
+    for (const [country, expected] of cases) {
+      expect(efJurisdiction({ country }), country).toBe(expected);
+    }
+    // pickEF's behaviour is unchanged by the refactor: a GB diesel litre is still DEFRA's, a JP one the US fallback.
+    expect(pickEF(loc({ country: 'GB' }), 'diesel_litre' as any).co2).toBe(2.58354);
+    expect(pickEF(loc({ country: 'JP' }), 'diesel_gallon' as any).co2).toBe(10.20648);
   });
 });
