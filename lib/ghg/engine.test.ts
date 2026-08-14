@@ -1844,8 +1844,12 @@ describe('Z. fuel oil grades are seeded per table', () => {
     // THE RAW/RESOLVED DISTINCTION SURVIVES THE SPLIT. buildWorkings prices the coverage-resolution
     // -applied figure; the other two read the stored amount. Collapsing them would silently drop
     // estimation adjustments from the workings row.
-    expect(src).toContain("fuelOilToGallons(figure('fuel_oil_distillate_amount')");
-    expect(src).toContain("fuelOilToGallons(figure('fuel_oil_residual_amount')");
+    // Asserted as the PROPERTY rather than the call spelling: buildWorkings hoists the resolved
+    // figure into `entered` (so the activity column can show it) before converting, so
+    // `fuelOilToGallons(figure(...))` is no longer one substring. What must remain true is that the
+    // workings path reads figure() and the calc path reads the raw amount.
+    expect(src).toContain("figure('fuel_oil_distillate_amount')");
+    expect(src).toContain("figure('fuel_oil_residual_amount')");
     expect(src).toContain("fuelOilInGallons(loc, 'distillate')");
     expect(src).toContain("fuelOilInGallons(loc, 'residual')");
   });
@@ -2116,10 +2120,19 @@ describe('S. purchased steam — EPA Hub 2025 Table 7, all three columns', () =>
   it('S7 a GJ-entered location converts first, then prices on the full triple', () => {
     // The convert-then-apply path must reach the same factor. 1000 GJ / 1.055056 = 947.8171 mmBtu.
     const row = steamRow('AR6', steamLoc({ purchased_steam_mmbtu: 1000, purchased_steam_unit: 'gj' }));
-    expect(row.activity_unit).toBe('mmbtu');
-    expect(row.activity_data).toBeLessThan(1000);
+    // ⚠️ ACTIVITY IS THE ENTERED FIGURE since 14 Aug 2026 — it read 947.8171 mmbtu, an intermediate
+    // the customer never saw. The conversion is in the note and the factor is rescaled onto GJ, so
+    // the row still reconciles: entered x displayed = result.
+    expect(row.activity_unit).toBe('gj');
+    expect(row.activity_data).toBe(1000);
     expect(row.note, 'the conversion arithmetic stays on the row').toContain('GJ');
-    expect(row.result_tco2e).toBeCloseTo(row.activity_data * 66.401375 / 1000, 12);
+    // Tolerance 6, matching section M's TOL: the displayed factor is efDisplay'd to 10 significant
+    // figures, so a recompute from it reconciles to ~1e-9 relative and not bit-exactly. That rounding
+    // is the point of toPrecision(10) — it is what makes the printed factor multiply back.
+    const shown = Number(String(row.emission_factor_display).match(/^[\d.]+/)![0]);
+    expect(row.result_tco2e).toBeCloseTo(row.activity_data * shown / 1000, 6);
+    // And the underlying figure is untouched by the presentation change.
+    expect(row.result_tco2e).toBeCloseTo(947.8171203133172 * 66.401375 / 1000, 9);
   });
 });
 
@@ -2144,7 +2157,10 @@ describe('T. purchased steam — per jurisdiction, with no US fallback', () => {
     // 1000 GJ = 277,777.78 kWh; x 0.17529 = 48,691.67 kg = 48.6917 t.
     const row = steamRow(steamLoc({ country: 'GB' }));
     expect(row.result_tco2e).toBeCloseTo(48.6917, 4);
-    expect(row.activity_unit, 'converted onto the basis DEFRA publishes on').toBe('kwh');
+    // Activity is the ENTERED unit; the conversion onto DEFRA's kWh basis is in the note and the
+    // displayed factor is rescaled to match. T11 pins the note text.
+    expect(row.activity_unit, 'the unit the customer entered').toBe('gj');
+    expect(row.activity_data, 'the figure the customer entered').toBe(1000);
     expect(row.ef_source).toBe(EF_SOURCES.steam_uk);
     // The US figure must be nowhere near it — this is the 23% the defect was worth.
     expect(row.result_tco2e).not.toBeCloseTo(62.9364, 2);
@@ -2286,6 +2302,7 @@ describe('T. purchased steam — per jurisdiction, with no US fallback', () => {
   it('T11 unit conversion reaches the right basis, and the note names the defining constant', () => {
     // GB kWh direct — no conversion, so no note.
     const gbKwh = steamRow(steamLoc({ country: 'GB', purchased_steam_mmbtu: 277777.7778, purchased_steam_unit: 'kwh' }));
+    expect(gbKwh.activity_unit).toBe('kwh');
     expect(gbKwh.note, 'no conversion happened').toBeUndefined();
     expect(gbKwh.result_tco2e).toBeCloseTo(48.6917, 3);
     // GB GJ -> kWh.
@@ -2453,15 +2470,15 @@ describe('U. EU combustion — sourced inputs, bounded densities, disclosed deri
     expect(priced.length, 'seven priced combustion rows').toBe(7);
     for (const r of priced) {
       expect(r.note, `${r.source}: no derivation disclosed`).toBeTruthy();
-      expect(r.note, `${r.source}: must not claim the source published this basis`).toContain('DERIVED BY THEMISIQ');
-      expect(r.note, `${r.source}: must disclose the unpublished input`).toMatch(/published by (neither|either source)/);
+      expect(r.note, `${r.source}: must not claim the source published this basis`).toMatch(/value DERIVED, not published/);
+      expect(r.note, `${r.source}: must disclose the unpublished input`).toContain('from neither cited source');
       expect(r.ef_source, `${r.source}: citation must name the instrument`).toContain('2018/2066');
-      expect(r.ef_source, `${r.source}: citation must name the density conversion`).toContain('NOT published by either source');
+      expect(r.ef_source, `${r.source}: citation must flag the derivation`).toContain('per-volume derived');
     }
     // A fuel-oil row converts litres->gallons AND is density-derived. BOTH notes must survive.
     const fo = priced.find(r => r.stream === 'fuel_oil_residual');
     expect(fo.note).toContain('US gallons');
-    expect(fo.note).toContain('DERIVED BY THEMISIQ');
+    expect(fo.note).toMatch(/value DERIVED, not published/);
   });
 
   it('U7 the note names the RIGHT fuel — the key drives both the factor and the prose', () => {
@@ -2484,7 +2501,7 @@ describe('U. EU combustion — sourced inputs, bounded densities, disclosed deri
       const r = (buildWorkings([loc({ country, has_diesel_stationary: true, diesel_stationary_amount: 400,
         diesel_stationary_unit: country === 'US' ? 'gallons' : 'litres' })], 'AR6', 2025, [], 12) as any[])
         .find(x => x.source === 'Diesel (stationary)');
-      expect(r?.note ?? '', `${country} publishes per unit — nothing to disclose`).not.toContain('DERIVED BY THEMISIQ');
+      expect(r?.note ?? '', `${country} publishes per unit — nothing to disclose`).not.toMatch(/value DERIVED, not published/);
     }
   });
 
@@ -2500,4 +2517,118 @@ describe('U. EU combustion — sourced inputs, bounded densities, disclosed deri
     'fuel_oil_gallon / _distillate_gallon / _residual_gallon price real EU rows and the litre->gallon ' +
     'round trip does not close. Awaiting Lisa\'s decision on whether to restate the values.',
   );
+});
+
+// ── V. THE ACTIVITY COLUMN SHOWS WHAT THE CUSTOMER ENTERED ──────────────────────────────────────
+//
+// THE DEFECT. A French site entering 1,000 litres of heating oil read "264.17205 gallons" in the
+// Activity data column — the litres→gallons intermediate promoted into the column a verifier reads
+// FIRST to confirm what the company consumed, with the actual entry demoted into the note.
+//
+// SIX JURISDICTIONS, NOT ONE. Fuel-oil factors are stored per US gallon, so every metric jurisdiction
+// was affected (CA/UK/EU/AU/NZ) plus a US site that chose litres. Steam had the same shape for a GB
+// site entering GJ and a US site entering GJ.
+//
+// ⚠️ AND THE FACTOR HAD TO MOVE WITH IT. Showing the entered litres beside the published per-GALLON
+// factor would have left the row unreproducible by exactly L_PER_GAL: 1000 × 10.21468899 = 10.2147 t
+// against a stated 2.6984 t. Section M asserts that reconciliation but its fixtures never exercised a
+// converted row (M1 CA gas, M2 steam already in mmbtu, M3 EU gas), so nothing would have caught it.
+// These tests close that hole: every case below asserts BOTH halves.
+describe('V. activity data is the entered figure, and the row still reconciles', () => {
+  const G = 3.785411784;
+  const shownFactor = (r: any) => Number(String(r.emission_factor_display).match(/^[\d.]+/)![0]);
+  const rowFor = (l: Location, stream: string) =>
+    (buildWorkings([l], 'AR6', 2025, [], 12) as any[]).find(r => r.stream === stream && !r.declaration);
+
+  // Every (jurisdiction, unit) combination the blast-radius sweep turned up, plus the two that were
+  // already correct, so a regression in either direction fails.
+  const FUEL_OIL: [string, 'gallons' | 'litres'][] = [
+    ['US', 'gallons'], ['US', 'litres'], ['CA', 'litres'], ['GB', 'litres'],
+    ['DE', 'litres'], ['AU', 'litres'], ['NZ', 'litres'],
+  ];
+
+  it('V1 fuel oil reports the entered figure and unit in EVERY jurisdiction', () => {
+    for (const [country, unit] of FUEL_OIL) {
+      const r = rowFor(loc({ country, has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000,
+        fuel_oil_distillate_unit: unit }), 'fuel_oil_distillate');
+      expect(r.activity_data, `${country}/${unit}: the figure the customer typed`).toBe(1000);
+      expect(r.activity_unit, `${country}/${unit}: the unit the customer chose`).toBe(unit);
+    }
+  });
+
+  it('V2 and the row reconciles — entered x displayed factor = result', () => {
+    // The half that would have been silently lost. Under the old shape this passed only because the
+    // activity was ALREADY in the factor's unit.
+    for (const [country, unit] of FUEL_OIL) {
+      const r = rowFor(loc({ country, has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000,
+        fuel_oil_distillate_unit: unit }), 'fuel_oil_distillate');
+      expect(r.activity_data * shownFactor(r) / 1000, `${country}/${unit} must recompute`).toBeCloseTo(r.result_tco2e, 6);
+    }
+  });
+
+  it('V3 a litres row shows a per-LITRE factor, not the stored per-gallon one', () => {
+    // The specific misreading this removes: "10.21468899 kg CO₂e/gal" printed beside 1,000 litres.
+    const eu = rowFor(loc({ country: 'DE', has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000,
+      fuel_oil_distillate_unit: 'litres' }), 'fuel_oil_distillate');
+    expect(eu.emission_factor_display, 'per litre, matching the activity beside it').toContain('/L');
+    expect(shownFactor(eu)).toBeCloseTo(10.21468899 / G, 6);
+    // A US site that entered gallons is untouched — its factor IS published per gallon.
+    const us = rowFor(loc({ country: 'US', has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000,
+      fuel_oil_distillate_unit: 'gallons' }), 'fuel_oil_distillate');
+    expect(us.emission_factor_display).toContain('/gal');
+    expect(shownFactor(us)).toBeCloseTo(10.2414216, 7);
+  });
+
+  it('V4 steam reports the entered figure, in both converting jurisdictions', () => {
+    const cases: [string, 'gj' | 'kwh' | 'mmbtu'][] = [['GB', 'gj'], ['GB', 'kwh'], ['US', 'gj'], ['US', 'mmbtu']];
+    for (const [country, unit] of cases) {
+      const r = rowFor(loc({ country, has_purchased_steam: true, purchased_steam_mmbtu: 1000,
+        purchased_steam_unit: unit }), 'purchased_steam');
+      expect(r.activity_data, `${country}/${unit}`).toBe(1000);
+      expect(r.activity_unit, `${country}/${unit}`).toBe(unit);
+      expect(r.activity_data * shownFactor(r) / 1000, `${country}/${unit} must recompute`).toBeCloseTo(r.result_tco2e, 6);
+    }
+  });
+
+  it('V5 NO PRICED FIGURE MOVED — the change is presentation only', () => {
+    // Pinned against the values measured live before the change. If any of these moves, the factor
+    // rescale has leaked into calcGas, which prices off the UNSCALED factor by design.
+    const eu = (u: 'litres') => calcLocation(loc({ country: 'FR',
+      has_diesel_stationary: true, diesel_stationary_amount: 1000, diesel_stationary_unit: u,
+      has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000, fuel_oil_distillate_unit: u }), 'AR6', 2025);
+    const c = eu('litres');
+    expect(c.s1_total).toBeCloseTo(2.69843662 + 2.698435354636, 9);
+    // Both rows priced 2.6984 t before this change and must still price 2.6984 t.
+    const diesel = rowFor(loc({ country: 'FR', has_diesel_stationary: true, diesel_stationary_amount: 1000,
+      diesel_stationary_unit: 'litres' }), 'diesel_stationary');
+    const heating = rowFor(loc({ country: 'FR', has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000,
+      fuel_oil_distillate_unit: 'litres' }), 'fuel_oil_distillate');
+    expect(diesel.result_tco2e.toFixed(4)).toBe('2.6984');
+    expect(heating.result_tco2e.toFixed(4)).toBe('2.6984');
+    expect(heating.result_tco2e).toBeCloseTo((1000 / G) * 10.21468899 / 1000, 6);   // still priced via gallons
+  });
+
+  it('V6 the EU citation is one line, and still satisfies F16 and F17', () => {
+    // F16 needs every token of COMBUSTION_EDITION.EU ('IPCC 2006'); F17 needs a (YYYY). Asserted here
+    // too so a shortening pass fails in the file it is being shortened in.
+    const c = EF_SOURCES.combustion_eu;
+    expect(c).toContain('IPCC');
+    expect(c).toContain('2006');
+    expect(/\((\d{4})\)/.test(c), 'F17: a four-digit year in parentheses').toBe(true);
+    expect(c).toContain('2018/2066');
+    expect(c.length, 'one line — the derivation belongs in the note').toBeLessThan(140);
+    expect(c, 'the citation must not defer to the note for its own content').not.toContain('see row note');
+  });
+
+  it('V7 the EU note still carries the density and its bound', () => {
+    const r = rowFor(loc({ country: 'DE', has_diesel_stationary: true, diesel_stationary_amount: 1000,
+      diesel_stationary_unit: 'litres' }), 'diesel_stationary');
+    expect(r.note).toContain('0.844 kg/L');
+    expect(r.note).toContain('EN 590');
+    expect(r.note).toContain('0.820–0.845');
+    expect(r.note).toContain('from neither cited source');
+    // Trimmed, but not to the point of being uncheckable — the arithmetic must survive.
+    expect(r.note).toContain('74 100 kg CO₂/TJ × 43.0 TJ/Gg × 0.844 kg/L = 2.68924');
+    expect(r.note.length, 'the citation covers the instrument; the note must not restate it').toBeLessThan(280);
+  });
 });

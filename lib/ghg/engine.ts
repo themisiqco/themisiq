@@ -451,30 +451,25 @@ const EF_EU = {
 // let a row cite one fuel's derivation beside another fuel's factor.
 const EU_DERIVATION: Partial<Record<string, string>> = {
   natural_gas_m3:
-    'DERIVED BY THEMISIQ, NOT PUBLISHED PER m³ — 56 100 kg CO₂/TJ × 36 MJ/m³ = 2.0196 kg CO₂/m³. ' +
-    'MRR Annex VI Table 1 / IPCC give the factor per TJ and the NCV per mass (48.0 TJ/Gg). The ' +
-    '36 MJ/m³ volumetric energy content is published by neither source, and implies a gas density of ' +
-    '0.75 kg/m³ which is likewise uncited.',
+    'Per-m³ value DERIVED, not published: 56 100 kg CO₂/TJ × 36 MJ/m³ = 2.0196 kg CO₂/m³. The ' +
+    '36 MJ/m³ energy content is from neither cited source; against the published NCV (48.0 TJ/Gg) it ' +
+    'implies a gas density of 0.75 kg/m³, likewise uncited.',
   propane_litre:
-    'DERIVED BY THEMISIQ, NOT PUBLISHED PER LITRE — 63 100 kg CO₂/TJ × 47.3 TJ/Gg × 0.510 kg/L = ' +
-    '1.52216 kg CO₂/L. Factor and NCV are MRR Annex VI Table 1 (source: IPCC 2006 GL). ⚠️ The 0.510 ' +
-    'kg/L density is published by neither source AND no European standard bounding it has been ' +
-    'found — it is the least supported input in this table.',
+    'Per-litre value DERIVED, not published: 63 100 kg CO₂/TJ × 47.3 TJ/Gg × 0.510 kg/L = 1.52216 ' +
+    'kg CO₂/L. ⚠️ The density is from neither cited source AND no European standard bounding it has ' +
+    'been found — the least supported input in this table.',
   diesel_litre:
-    'DERIVED BY THEMISIQ, NOT PUBLISHED PER LITRE — 74 100 kg CO₂/TJ × 43.0 TJ/Gg × 0.844 kg/L = ' +
-    '2.68924 kg CO₂/L. Factor and NCV are MRR Annex VI Table 1 (source: IPCC 2006 GL). The 0.844 ' +
-    'kg/L density is published by neither; it falls inside the EN 590 range for automotive diesel ' +
-    'sold in the EU (0.820–0.845 kg/L at 15 °C) and at that range\'s conservative upper end.',
+    'Per-litre value DERIVED, not published: 74 100 kg CO₂/TJ × 43.0 TJ/Gg × 0.844 kg/L = 2.68924 ' +
+    'kg CO₂/L. The density is from neither cited source; 0.844 kg/L is inside EN 590 for EU ' +
+    'automotive diesel (0.820–0.845 kg/L at 15 °C), at its conservative upper end.',
   fuel_oil_residual_gallon:
-    'DERIVED BY THEMISIQ, NOT PUBLISHED PER LITRE — 77 400 kg CO₂/TJ × 40.4 TJ/Gg × 0.990 kg/L = ' +
-    '3.09569 kg CO₂/L. Factor and NCV are MRR Annex VI Table 1 (source: IPCC 2006 GL). The 0.990 ' +
-    'kg/L density is published by neither; it satisfies IPCC Table 1.1, which requires residual fuel ' +
-    'oil density above 0.90 kg/L — a one-sided bound, not a citation.',
+    'Per-litre value DERIVED, not published: 77 400 kg CO₂/TJ × 40.4 TJ/Gg × 0.990 kg/L = 3.09569 ' +
+    'kg CO₂/L. The density is from neither cited source; 0.990 kg/L satisfies IPCC Table 1.1 ' +
+    '(residual oil above 0.90 kg/L) — a one-sided bound, not a citation.',
   gasoline_litre:
-    'DERIVED BY THEMISIQ, NOT PUBLISHED PER LITRE — 69 300 kg CO₂/TJ × 44.3 TJ/Gg × 0.745 kg/L = ' +
-    '2.28714 kg CO₂/L. Factor and NCV are MRR Annex VI Table 1 (source: IPCC 2006 GL). The 0.745 ' +
-    'kg/L density is published by neither; it falls inside the EN 228 range for petrol sold in the ' +
-    'EU (0.720–0.775 kg/L at 15 °C), near its midpoint.',
+    'Per-litre value DERIVED, not published: 69 300 kg CO₂/TJ × 44.3 TJ/Gg × 0.745 kg/L = 2.28714 ' +
+    'kg CO₂/L. The density is from neither cited source; 0.745 kg/L is inside EN 228 for EU petrol ' +
+    '(0.720–0.775 kg/L at 15 °C), near its midpoint.',
 }
 // Keys that share a derivation with one already written above, mapped rather than duplicated so the
 // prose cannot drift between two rows describing the same three inputs. diesel_mobile IS diesel;
@@ -566,7 +561,7 @@ const EF_SOURCES = {
   // Citing both gives the verifier the legal instrument and the underlying science.
   //   ⚠️ TWO TESTS CONSTRAIN THIS STRING. F16 requires every token of COMBUSTION_EDITION.EU
   // ('IPCC 2006') to appear in it; F17 requires a four-digit year in parentheses. Keep '(2006)'.
-  combustion_eu: 'EU MRR — Commission Implementing Regulation (EU) 2018/2066 Annex VI Table 1, carrying IPCC (2006) Guidelines Vol.2 defaults; per-litre and per-m³ values derived by ThemisIQ from those MASS-BASIS factors using fuel densities NOT published by either source — see row note',
+  combustion_eu: 'EU MRR Reg. (EU) 2018/2066, Annex VI Table 1 — IPCC (2006) Vol.2 defaults; published mass-basis, per-volume derived',
   combustion_au: 'DCCEEW NGA Factors 2025 (AR5)',
   combustion_nz: 'NZ MfE Measuring Emissions 2026 v2 (as-published basis — factors stored verbatim, no AR re-basing)',
   // ── STEAM / DISTRICT HEAT — NAMED TO THE TABLE, UNLIKE combustion ─────────────────────────────
@@ -2384,14 +2379,38 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
   // ⚠️ TAKES THE FACTOR KEY, NOT THE FACTOR, and looks it up itself. That is what makes the row's
   // derivation note and its number provably the same fuel: passing both separately would let a row
   // print gas/diesel oil's arithmetic beside motor gasoline's factor, and nothing would catch it.
-  const pushFuel = (loc: Location, stream: DeclarableStream, source: string, scope: number, activity: number, unit: string, efKey: string, prov?: Provenance, convNote?: string) => {
+  //
+  // ── ACTIVITY IS WHAT THE CUSTOMER ENTERED. THE FACTOR MOVES TO MEET IT. ──────────────────────────
+  // `entered` / `enteredUnit` are the figure and unit off the form; `pricedIn` is that figure
+  // converted to the unit the published factor is per, and it is what actually prices the row.
+  //
+  // Until 14 Aug 2026 the CONVERTED figure went into the activity column: a French site that entered
+  // 1,000 litres of heating oil read "264.17205 gallons", with the entry demoted into the note. The
+  // activity column is the first thing a verifier reads to confirm what the company consumed, and it
+  // was showing an intermediate the company never saw. Six jurisdictions were affected — every metric
+  // one, plus a US site that chose litres — because fuel-oil factors are stored per US gallon.
+  //
+  // ⚠️ THE FACTOR HAD TO BE RESCALED IN THE SAME CHANGE, and this is the part that is easy to miss.
+  // Showing 1,000 litres beside a per-GALLON factor would leave the row UNREPRODUCIBLE: 1000 ×
+  // 10.21468899 = 10.2147 t against a stated 2.6984 t, wrong by exactly L_PER_GAL. So the displayed
+  // factor is scaled onto the entered unit by the same ratio the activity was, and `entered ×
+  // displayed = result` holds again. calcGas still prices off the UNSCALED factor and the converted
+  // amount, so no figure moves — this is presentation, and the note carries the conversion.
+  //   Section M asserts that reconciliation, but note that its fixtures never exercised a converted
+  // row (M1 CA gas, M2 steam already in mmbtu, M3 EU gas), which is why the old shape survived.
+  const pushFuel = (loc: Location, stream: DeclarableStream, source: string, scope: number, entered: number, enteredUnit: string, efKey: string, prov?: Provenance, convNote?: string, pricedIn?: number) => {
     const ef = pickEF(loc, efKey as keyof typeof EF)
-    const g = calcGas(ef, activity, gwpVersion)
+    const priced = pricedIn ?? entered
+    const g = calcGas(ef, priced, gwpVersion)
+    // ratio 1 when no conversion happened, which is every row outside fuel oil — those keep the
+    // published factor object untouched rather than passing it through a multiply by 1.
+    const ratio = entered === 0 ? 1 : priced / entered
+    const efShown = ratio === 1 ? ef : { co2: ef.co2 * ratio, ch4: ef.ch4 * ratio, n2o: ef.n2o * ratio }
     // Two notes can both apply — a fuel-oil row in an EU country converts litres→gallons AND is
     // priced by a density-derived factor. Joined rather than one overwriting the other.
     const note = [convNote, euDerivationNote(loc, efKey)].filter(Boolean).join(' · ')
-    rows.push({ location: loc.name || 'Location', stream, source, scope, activity_data: activity, activity_unit: unit,
-      ...factorCells(ef, unit),
+    rows.push({ location: loc.name || 'Location', stream, source, scope, activity_data: entered, activity_unit: enteredUnit,
+      ...factorCells(efShown, enteredUnit),
       ef_source: combustionSource(loc), result_tco2e: g.total, ...(note ? { note } : {}), ...(prov ?? {}) })
   }
   for (const loc of locations) {
@@ -2444,12 +2463,15 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     // ⚠️ figure(), NOT the raw field: calcLocation and calcInventory read the stored amount, this reads
     // the coverage-resolution-applied one. That distinction predates the grade split and survives it.
     if (loc.has_fuel_oil_distillate && loc.fuel_oil_distillate_amount > 0) {
-      const fo = fuelOilToGallons(figure('fuel_oil_distillate_amount'), loc.fuel_oil_distillate_unit)
-      pushFuel(loc, 'fuel_oil_distillate', 'Heating oil', 1, fo.gallons, 'gallons', 'fuel_oil_distillate_gallon', provOf('fuel_oil_distillate_amount'), fo.note)
+      const entered = figure('fuel_oil_distillate_amount')
+      const fo = fuelOilToGallons(entered, loc.fuel_oil_distillate_unit)
+      // entered figure + entered unit in the activity column; fo.gallons prices it. See pushFuel.
+      pushFuel(loc, 'fuel_oil_distillate', 'Heating oil', 1, entered, loc.fuel_oil_distillate_unit ?? 'gallons', 'fuel_oil_distillate_gallon', provOf('fuel_oil_distillate_amount'), fo.note, fo.gallons)
     }
     if (loc.has_fuel_oil_residual && loc.fuel_oil_residual_amount > 0) {
-      const fo = fuelOilToGallons(figure('fuel_oil_residual_amount'), loc.fuel_oil_residual_unit)
-      pushFuel(loc, 'fuel_oil_residual', 'Heavy fuel oil', 1, fo.gallons, 'gallons', 'fuel_oil_residual_gallon', provOf('fuel_oil_residual_amount'), fo.note)
+      const entered = figure('fuel_oil_residual_amount')
+      const fo = fuelOilToGallons(entered, loc.fuel_oil_residual_unit)
+      pushFuel(loc, 'fuel_oil_residual', 'Heavy fuel oil', 1, entered, loc.fuel_oil_residual_unit ?? 'gallons', 'fuel_oil_residual_gallon', provOf('fuel_oil_residual_amount'), fo.note, fo.gallons)
     }
     if (loc.has_mobile && loc.gasoline_amount > 0) pushFuel(loc, 'mobile', 'Gasoline (mobile)', 1, figure('gasoline_amount'), loc.gasoline_unit, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}`, provOf('gasoline_amount'))
     if (loc.has_mobile && loc.diesel_mobile_amount > 0) pushFuel(loc, 'mobile', 'Diesel (mobile)', 1, figure('diesel_mobile_amount'), loc.diesel_mobile_unit, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}`, provOf('diesel_mobile_amount'))
@@ -2526,7 +2548,16 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       // DEFRA's fuels table on a Scope 2 district-heat row. Steam cites its own table (STEAM_EF entries
       // carry their source), and it carries scope2_method, which pushFuel has no parameter for. So it
       // borrows the two things that decide what the figure IS and states its own citation.
-      rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: `Purchased steam${priced.supplier ? ' (supplier-specific factor)' : ''}`, scope: 2, activity_data: st.amount, activity_unit: priced.basis, ...factorCells(priced.ef, priced.basis), ef_source: priced.source, scope2_method: 'location-based', result_tco2e: calcGas(priced.ef, st.amount, gwpVersion).total, entry_method: priced.supplier ? 'supplier-specific' : 'manual', ...(st.note ? { note: st.note } : {}) })
+      // SAME RULE AS pushFuel, and steam needs it for the same reason: a GB site entering 1,000 GJ
+      // read "277777.8 kwh" in the activity column, and a US site entering GJ read MMBtu. The entered
+      // figure goes in the activity column and the factor is rescaled onto that unit, so
+      // `entered × displayed = result` holds. Unlike fuel oil this conversion can never be designed
+      // away — GB bills in kWh or GJ, the US in MMBtu or GJ, and one factor serves both.
+      const enteredUnit = loc.purchased_steam_unit ?? 'mmbtu'
+      const steamRatio = loc.purchased_steam_mmbtu === 0 ? 1 : st.amount / loc.purchased_steam_mmbtu
+      const steamEfShown = steamRatio === 1 ? priced.ef
+        : { co2: priced.ef.co2 * steamRatio, ch4: priced.ef.ch4 * steamRatio, n2o: priced.ef.n2o * steamRatio }
+      rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: `Purchased steam${priced.supplier ? ' (supplier-specific factor)' : ''}`, scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: enteredUnit, ...factorCells(steamEfShown, enteredUnit), ef_source: priced.source, scope2_method: 'location-based', result_tco2e: calcGas(priced.ef, st.amount, gwpVersion).total, entry_method: priced.supplier ? 'supplier-specific' : 'manual', ...(st.note ? { note: st.note } : {}) })
       }
     }
     // ── Declaration rows: EVERY stream gets a row, so no stream can ever be silent ────────────────
