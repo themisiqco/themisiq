@@ -28,7 +28,7 @@
 
 import {
   EF_SOURCES, combustionSource, gridSource, getGridFactor, isResolvedGridRegion, streamState,
-  efJurisdiction, steamFactorFor,
+  efJurisdiction, steamFactorFor, findUnpriceableLocations,
 } from './engine'
 import type { Location } from './engine'
 
@@ -203,6 +203,46 @@ export function buildFactorEditions(locations: readonly Location[], year: number
   const gridYears: Partial<Record<FactorJurisdiction, Set<number>>> = {}
 
   for (const loc of locations) {
+    // ── EXCLUDED FROM THE TOTALS => NO EDITION, FOR ANY FAMILY ─────────────────────────────────
+    //
+    // A location whose fuel is recorded in a unit no table carries (a US site holding gas in m3) is
+    // excluded WHOLE from every total — see the header on unpriceableReason in engine.ts, which is
+    // explicit that "a location either contributes everything or nothing" and that its electricity
+    // goes with it. Nothing it holds reaches a figure on the report.
+    //
+    // ⚠️ THIS IS THE INVERSE OF THE INVENTED-PUBLICATION CASE, AND THEY ARE ONE RULE.
+    // The electricity gate below refuses an edition for a family that priced nothing, because that
+    // would attach a provenance claim to a TABLE THAT DID NOT PRICE ANYTHING. This refuses an
+    // edition for a location that priced nothing, because that would attach a provenance claim to a
+    // FIGURE THAT IS NOT IN THE REPORT. One states a publication that does not apply; the other
+    // states a calculation that did not happen. Both put something in this column that no number on
+    // the report stands behind, which is the one thing it must never carry.
+    //
+    // ALL THREE FAMILIES, not just combustion. An excluded location can hold quantified electricity
+    // with a resolved grid region, and quantified steam with a published factor, and before this
+    // gate both recorded an edition — the exclusion is decided per LOCATION and the family gates
+    // are decided per STREAM, so no stream-level condition could have caught it.
+    //
+    // ⚠️ AR6 IS HARDCODED, AND WHAT MAKES THAT SAFE IS ASSERTED — engine.test.ts L6, "the probe is
+    // GWP-independent — the same locations are excluded on AR4, AR5 and AR6". Go there before
+    // changing this line; it is also what licenses app/dashboard/ghg/page.tsx to probe once at AR6
+    // and reuse the answer for all three bases, so the two hardcodes stand or fall together.
+    //   The property is STRUCTURAL, not incidental: MissingEmissionFactorError has exactly ONE throw
+    // site (assertPriceable), and no function in the chain that reaches it — pickEF, efOr, efMiss,
+    // isPriceableEF, assertPriceable — takes a GwpVersion parameter at all. The AR set is passed to
+    // calcGas AFTER a factor has been found, only to scale CH4/N2O. A table cannot become
+    // GWP-conditional without one of those signatures changing first.
+    //   The one soft edge, stated so it is not discovered later: the factor KEY is a caller-supplied
+    // string, so a future call site could in principle build one from the GWP set. None does — every
+    // key is composed from loc.*_unit fields and grade literals — but that is a convention, not a
+    // type. L6 is the behavioural backstop for it, and it currently exercises ONE of the eighteen
+    // routes to exclusion (US natural gas in m3); widening it would tighten this guarantee.
+    //   It also adds NO new failure path to the save: unpriceableReason absorbs
+    // MissingEmissionFactorError and rethrows everything else, and calcInventory and pctEstimated
+    // already probe these same locations EARLIER in the same payload, so any other error has already
+    // been raised before this line runs.
+    if (findUnpriceableLocations([loc], 'AR6', year).length > 0) continue
+
     // ── COMBUSTION — only if this location actually burned something priced by the table.
     // Reuses streamState rather than re-reading has_*/amount pairs: that convention exists precisely
     // because a `has_*` flag alone once meant both "no such supply" and "not yet asked", and a

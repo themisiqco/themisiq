@@ -8,7 +8,7 @@ import {
 import type { FactorEditions } from './factorEditions'
 import { buildCompanySeries } from './series'
 import type { InventoryRow } from './series'
-import { EF_SOURCES, emptyLocation, getGridFactor, gridSource, combustionSource } from './engine'
+import { EF_SOURCES, emptyLocation, getGridFactor, gridSource, combustionSource, findUnpriceableLocations } from './engine'
 import type { Location } from './engine'
 
 // THE COLUMN EXISTS BECAUSE A 26% FALL LOOKED LIKE PERFORMANCE.
@@ -701,5 +701,117 @@ describe('the states a verifier and a customer each see', () => {
     // The two surfaces answer DIFFERENT questions and must not borrow each other's words: the series
     // states talk about years, the verifier page about one inventory.
     expect(page, 'the verifier page must not import the series wording').not.toContain('between years')
+  })
+})
+
+// ── AN EXCLUDED LOCATION NAMES NO EDITION ────────────────────────────────────────────────────────
+//
+// THE DEFECT. A location whose fuel is recorded in a unit no table carries is excluded WHOLE from
+// every total — calcInventory skips it, buildWorkings replaces its rows with one exclusion row, and
+// the wizard banners it. buildFactorEditions did not know: it recorded {US: combustion} for a
+// location that contributed nothing, and as of the verifier whitelist that reached a verifier, who
+// would read "US EPA 2024 - combustion" with no way to know it describes excluded emissions.
+//
+// It is the INVERSE of the case the electricity gate guards. That one refuses an edition for a
+// family that priced nothing (a claim about a table that did not price anything); this refuses one
+// for a LOCATION that priced nothing (a claim about a figure that is not in the report). Same rule.
+describe('a location excluded from the totals records no edition', () => {
+  // Every (country, stream, unit) that makes calcLocation refuse, enumerated by brute force over the
+  // engine rather than hand-listed — 18 of them. Kept as the fixture list so the fix is asserted
+  // against ALL routes to exclusion, not just the US m3 gas case that surfaced it.
+  const UNPRICEABLE: [string, Partial<Location>][] = [
+    ['US gas m3',        { country: 'US', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' }],
+    ['US gas kwh',       { country: 'US', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' }],
+    ['US propane kg',    { country: 'US', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
+    ['CA gas kwh',       { country: 'CA', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' }],
+    ['CA propane kg',    { country: 'CA', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
+    ['GB gas m3',        { country: 'GB', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' }],
+    ['GB propane kg',    { country: 'GB', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
+    ['DE gas kwh',       { country: 'DE', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' }],
+    ['DE propane kg',    { country: 'DE', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
+    ['AU gas kwh',       { country: 'AU', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' }],
+    ['AU propane kg',    { country: 'AU', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
+    ['NZ gas m3',        { country: 'NZ', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' }],
+    ['JP gas m3',        { country: 'JP', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' }],
+    ['JP gas kwh',       { country: 'JP', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' }],
+    ['JP propane kg',    { country: 'JP', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
+    ['(unset) gas m3',   { country: '', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' }],
+    ['(unset) gas kwh',  { country: '', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' }],
+    ['(unset) propane kg', { country: '', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
+  ]
+  // The fixture builder used by the rest of this file adds gas + electricity, which would make every
+  // case unpriceable for the wrong reason. These start clean.
+  const bare = (over: Partial<Location>): Location => ({ ...emptyLocation('l1', 'Site'), ...over })
+
+  it('F26 EVERY route to exclusion records nothing — all 18', () => {
+    for (const [name, over] of UNPRICEABLE) {
+      const l = bare(over)
+      // NOT VACUOUS: assert the location really is excluded before asserting the consequence. A
+      // fixture that stopped being unpriceable would otherwise pass this test by accident.
+      expect(findUnpriceableLocations([l], 'AR6', 2025).length, `${name}: fixture must be unpriceable`).toBe(1)
+      expect(buildFactorEditions([l], 2025), `${name}: excluded location must name no edition`).toEqual({})
+    }
+  })
+
+  it('F27 all three families are covered, not just combustion', () => {
+    // The exclusion is decided per LOCATION; the family gates are decided per STREAM. So no
+    // stream-level condition could have caught this, and each family had to be checked separately.
+    const base = { country: 'US', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' as const }
+    // electricity: resolved region AND quantified kWh — its own gate is fully satisfied.
+    const withElec = bare({ ...base, grid_region: 'US_CA', electricity_kwh: 100_000 })
+    expect(findUnpriceableLocations([withElec], 'AR6', 2025).length).toBe(1)
+    expect(buildFactorEditions([withElec], 2025), 'electricity edition on an excluded location').toEqual({})
+    // steam: quantified, published US factor, no supplier figure — its own gate is fully satisfied.
+    const withSteam = bare({ ...base, has_purchased_steam: true, purchased_steam_mmbtu: 100, purchased_steam_unit: 'mmbtu' })
+    expect(findUnpriceableLocations([withSteam], 'AR6', 2025).length).toBe(1)
+    expect(buildFactorEditions([withSteam], 2025), 'steam edition on an excluded location').toEqual({})
+    // And all three at once.
+    const all = bare({ ...base, grid_region: 'US_CA', electricity_kwh: 100_000,
+      has_purchased_steam: true, purchased_steam_mmbtu: 100, purchased_steam_unit: 'mmbtu' })
+    expect(buildFactorEditions([all], 2025)).toEqual({})
+  })
+
+  it('F28 A MIXED INVENTORY STILL RECORDS THE EDITION, FROM THE PRICEABLE LOCATION', () => {
+    // ⚠️ THE TEST THAT MATTERS MOST, AND THE ONE A NAIVE FIX BREAKS. The obvious wrong shape is to
+    // drop the whole JURISDICTION when any of its locations is excluded — a US site on m3 gas would
+    // then erase the US combustion edition earned by the US site beside it that priced perfectly.
+    // That would turn a defect that records too much into one that records too little, and the
+    // second is worse: the first over-claims provenance, the second loses it for real figures.
+    // The gate is a per-location `continue`, so the loop reaches the good location either way.
+    const good = { ...emptyLocation('good', 'Priceable'), country: 'US', grid_region: 'US_CA',
+      has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf' as const,
+      electricity_kwh: 50_000 }
+    const bad = { ...emptyLocation('bad', 'Excluded'), country: 'US',
+      has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' as const }
+    expect(findUnpriceableLocations([good], 'AR6', 2025).length, 'good must be priceable').toBe(0)
+    expect(findUnpriceableLocations([bad], 'AR6', 2025).length, 'bad must be excluded').toBe(1)
+
+    const mixed = buildFactorEditions([good, bad], 2025)
+    const aloneGood = buildFactorEditions([good], 2025)
+    // Same jurisdiction, same family, one of each: the edition survives, sourced from the good one.
+    expect(mixed, 'the excluded location must not erase its neighbour\'s edition').toEqual(aloneGood)
+    expect(mixed.US?.combustion?.edition).toBe('US EPA 2024')
+    expect(mixed.US?.electricity?.edition).toBe('2023')
+    // Order must not matter — the excluded one first is the same answer.
+    expect(buildFactorEditions([bad, good], 2025)).toEqual(aloneGood)
+    // And an inventory of ONLY the excluded location records nothing at all.
+    expect(buildFactorEditions([bad], 2025)).toEqual({})
+  })
+
+  it('F29 a priceable location is completely unaffected', () => {
+    // The regression guard on the gate itself: an over-broad probe would silently empty the column
+    // for every inventory, and every other test in this file would still pass if it only checked
+    // the excluded cases.
+    const gb = uk()
+    expect(findUnpriceableLocations([gb], 'AR6', 2026).length).toBe(0)
+    expect(buildFactorEditions([gb], 2026)).toEqual({
+      UK: {
+        combustion:  { source: EF_SOURCES.combustion_uk, edition: 'DEFRA 2026' },
+        electricity: { source: EF_SOURCES.electricity_uk, edition: '2026' },
+      },
+    })
+    // Steam too — a published-factor US steam location still names its edition.
+    const steam = bare({ country: 'US', has_purchased_steam: true, purchased_steam_mmbtu: 100, purchased_steam_unit: 'mmbtu' })
+    expect(buildFactorEditions([steam], 2025).US?.steam?.edition).toBe('US EPA 2025 Table 7')
   })
 })
