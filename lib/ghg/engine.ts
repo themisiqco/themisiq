@@ -200,6 +200,12 @@ const EF_CA = {
   fuel_oil_distillate_gallon: { co2: 10.421239, ch4: 0.000023, n2o: 0.000117 },
   // Heavy Fuel Oil - Industrial: 3156 / 0.12 / 0.064 g/L.
   fuel_oil_residual_gallon: { co2: 11.946760, ch4: 0.000454, n2o: 0.000242 },
+  // ── PER-LITRE KEYS — ECCC's OWN PUBLISHED BASIS, and the ones a CA location now prices from.
+  // ECCC v3.0 Table 4.3 (2026 set), INDUSTRIAL rows — the same rows the gallon keys above were
+  // converted from, so this is a de-conversion back to source, not a new transcription. g/L -> kg/L.
+  // The gallon keys stay as US-entry fallbacks; CA offers litres only, so they are unreachable here.
+  fuel_oil_distillate_litre: { co2: 2.753, ch4: 0.000006, n2o: 0.000031 },
+  fuel_oil_residual_litre: { co2: 3.156, ch4: 0.00012, n2o: 0.000064 },
   // Motor gasoline (Table 4.x): 2307 / 0.100 / 0.02 g/L.
   gasoline_litre: { co2: 2.307, ch4: 0.0001, n2o: 0.00002 },
   gasoline_gallon: { co2: 8.732941, ch4: 0.000379, n2o: 0.000076 },
@@ -281,6 +287,12 @@ const EF_UK = {
   // published figure converted the same way. They must move together or one of them is wrong;
   // engine.test.ts Z15 pins the identity so a lone edit fails.
   fuel_oil_residual_gallon: { co2: 12.018380, ch4: 0, n2o: 0 },
+  // ── PER-LITRE KEYS — DEFRA'S OWN PRINTED FIGURES, verbatim, no arithmetic at all.
+  // "Processed fuel oils - distillate oil" 2.75541 and "- residual oil" 3.17492 kg CO2e/L, exactly as
+  // the two comments above quote them. The gallon keys are these numbers x 3.785411784; these are the
+  // numbers DEFRA prints. A UK verifier can now find the row value in the flat file unchanged.
+  fuel_oil_distillate_litre: { co2: 2.75541, ch4: 0, n2o: 0 },
+  fuel_oil_residual_litre: { co2: 3.17492, ch4: 0, n2o: 0 },
   //
   // NAMING NOTE. DEFRA publishes "Gas oil" byte-identical to "Processed fuel oils - distillate oil",
   // and "Fuel oil" byte-identical to "Processed fuel oils - residual oil". The plain-language and
@@ -428,6 +440,19 @@ const EF_EU = {
   // (DEFRA independently treats "Gas oil" and "Processed fuel oils - distillate oil" as the same
   // figure — see the note in EF_UK. That was corroboration; Table 1.1 is the confirmation.)
   fuel_oil_distillate_gallon: { co2: 10.179876, ch4: 0.000412231, n2o: 0.000082522 },
+  // ── PER-LITRE KEYS — THE DERIVATION'S OWN OUTPUT, one conversion step earlier than the gallon keys.
+  // The header derives per LITRE (CO2/TJ x NCV x density) and the gallon keys convert that result; a
+  // litre-entering EU location now prices from the derivation directly, so the row's displayed factor
+  // is the number the note's arithmetic produces. DISTILLATE IS BYTE-IDENTICAL TO diesel_litre, for
+  // the reason recorded above: IPCC Table 1.1 defines Gas/Diesel Oil as including light heating oil,
+  // so both read the same row. Z7 pins that identity on the litre keys too.
+  fuel_oil_distillate_litre: { co2: 2.68924, ch4: 0.0001089, n2o: 0.0000218 },
+  // RESIDUAL: the header gives CO2 3.09569 kg/L explicitly. CH4/N2O are NOT written out per litre
+  // anywhere, so they are computed by the table's OWN documented method rather than back-converted
+  // from the gallon key -- 3 kg CH4/TJ x 40.4e-6 x 0.990 = 1.19988e-4 and 0.6 x 40.4e-6 x 0.990 =
+  // 2.39976e-5, stored at this table's 4-significant-figure convention. They reproduce the stored
+  // gallon values exactly under x 3.785411784, which is the cross-check that they are the same row.
+  fuel_oil_residual_litre: { co2: 3.09569, ch4: 0.00012, n2o: 0.000024 },
   // Motor gasoline (CO2 69300 kg/TJ, NCV 44.3, dens 0.745): 2.28714 kg CO2/L.
   gasoline_litre: { co2: 2.28714, ch4: 0.000099, n2o: 0.0000198 },
   gasoline_gallon: { co2: 8.657763, ch4: 0.000374756, n2o: 0.000074951 },
@@ -462,7 +487,7 @@ const EU_DERIVATION: Partial<Record<string, string>> = {
     'Per-litre value DERIVED, not published: 74 100 kg CO₂/TJ × 43.0 TJ/Gg × 0.844 kg/L = 2.68924 ' +
     'kg CO₂/L. The density is from neither cited source; 0.844 kg/L is inside EN 590 for EU ' +
     'automotive diesel (0.820–0.845 kg/L at 15 °C), at its conservative upper end.',
-  fuel_oil_residual_gallon:
+  fuel_oil_residual_litre:
     'Per-litre value DERIVED, not published: 77 400 kg CO₂/TJ × 40.4 TJ/Gg × 0.990 kg/L = 3.09569 ' +
     'kg CO₂/L. The density is from neither cited source; 0.990 kg/L satisfies IPCC Table 1.1 ' +
     '(residual oil above 0.90 kg/L) — a one-sided bound, not a citation.',
@@ -475,9 +500,16 @@ const EU_DERIVATION: Partial<Record<string, string>> = {
 // prose cannot drift between two rows describing the same three inputs. diesel_mobile IS diesel;
 // fuel_oil_distillate IS the gas/diesel oil row (IPCC Table 1.1 defines Gas/Diesel Oil as including
 // light heating oil, confirmed 13 Aug 2026); the _gallon forms are unit conversions of their _litre.
+// ⚠️ KEYED ON THE LIVE (PER-LITRE) KEYS, WITH THE GALLON FORMS AS ALIASES. When fuel oil moved to
+// per-litre pricing the live key became fuel_oil_*_litre, which was in NEITHER map — so the density
+// disclosure silently vanished from every EU fuel-oil row while the figures stayed correct. Group U
+// caught it. Any new fuel-oil key must appear here or its row loses the disclosure without failing
+// anything else.
 const EU_DERIVATION_ALIAS: Record<string, string> = {
   diesel_gallon: 'diesel_litre', diesel_mobile_litre: 'diesel_litre', diesel_mobile_gallon: 'diesel_litre',
-  fuel_oil_distillate_gallon: 'diesel_litre', fuel_oil_gallon: 'fuel_oil_residual_gallon',
+  // Distillate IS the gas/diesel oil row — IPCC Table 1.1 — so both bases point at diesel's derivation.
+  fuel_oil_distillate_litre: 'diesel_litre', fuel_oil_distillate_gallon: 'diesel_litre',
+  fuel_oil_residual_gallon: 'fuel_oil_residual_litre', fuel_oil_gallon: 'fuel_oil_residual_litre',
   gasoline_gallon: 'gasoline_litre', propane_gallon: 'propane_litre', natural_gas_mcf: 'natural_gas_m3',
 }
 
@@ -509,6 +541,15 @@ const EF_AU = {
   fuel_oil_distillate_gallon: { co2: 9.845587, ch4: 0, n2o: 0 },
   // Fuel oil:    39.7 GJ/kL x 73.84 kgCO2e/GJ / 1000 = 2.931448 kg/L x 3.785411784 = 11.096738.
   fuel_oil_residual_gallon: { co2: 11.096738, ch4: 0, n2o: 0 },
+  // ── PER-LITRE KEYS — the energy-content x EF/GJ product itself, before the gallon conversion.
+  // DCCEEW publishes per kL and per GJ, never per litre or per gallon, so BOTH bases are derived
+  // here; these are simply the earlier of the two steps and match the arithmetic quoted above:
+  //   heating oil 37.3 GJ/kL x 69.73 kgCO2e/GJ / 1000 = 2.600929 kg/L
+  //   fuel oil    39.7 GJ/kL x 73.84 kgCO2e/GJ / 1000 = 2.931448 kg/L
+  // Carried at full precision rather than this table's usual 3dp rounding, matching what the
+  // gallon keys were built from — rounding here would move the figure instead of re-basing it.
+  fuel_oil_distillate_litre: { co2: 2.600929, ch4: 0, n2o: 0 },
+  fuel_oil_residual_litre: { co2: 2.931448, ch4: 0, n2o: 0 },
   // NOTE: AU has no legacy fuel_oil_gallon — it falls through to the US table today. That fallthrough
   // is UNCHANGED by this commit; nothing reads the two keys above yet.
 }
@@ -533,6 +574,9 @@ const EF_NZ = {
     // converts before pricing. Light 2.97088 x 3.785411784 = 11.246004; Heavy 3.05359 -> 11.559096.
     fuel_oil_distillate_gallon: { co2: 11.246004, ch4: 0, n2o: 0 },
     fuel_oil_residual_gallon: { co2: 11.559096, ch4: 0, n2o: 0 },
+    // PER-LITRE — MfE's own printed kg CO2-e/L, the figures the two gallon keys above were built from.
+    fuel_oil_distillate_litre: { co2: 2.97088, ch4: 0, n2o: 0 },
+    fuel_oil_residual_litre: { co2: 3.05359, ch4: 0, n2o: 0 },
   },
   industrial: {
     natural_gas_kwh: { co2: 0.195067, ch4: 0, n2o: 0 },  // MfE Stationary Combustion, Industrial
@@ -543,6 +587,9 @@ const EF_NZ = {
     // MfE 2026 Table 3.2, Industrial. Light 2.96335 x 3.785411784 = 11.217500; Heavy 3.04601 -> 11.530402.
     fuel_oil_distillate_gallon: { co2: 11.217500, ch4: 0, n2o: 0 },
     fuel_oil_residual_gallon: { co2: 11.530402, ch4: 0, n2o: 0 },
+    // PER-LITRE — MfE 2026 Table 3.2 Industrial, printed values.
+    fuel_oil_distillate_litre: { co2: 2.96335, ch4: 0, n2o: 0 },
+    fuel_oil_residual_litre: { co2: 3.04601, ch4: 0, n2o: 0 },
   },
 }
 
@@ -1148,7 +1195,7 @@ interface Location {
   // inheriting a bad name would be indefensible. `_amount` is what every other multi-unit fuel here
   // uses (natural_gas_amount, propane_amount, diesel_stationary_amount), so fuel oil is now the same
   // shape as its neighbours instead of the exception that needed a comment to be read correctly.
-  // Read via fuelOilInGallons(loc, grade) — the published factors are per US gallon.
+  // Read via fuelOilPricing(loc, grade, amount), which picks the basis the publisher printed.
   has_fuel_oil_distillate: boolean; fuel_oil_distillate_amount: number; fuel_oil_distillate_unit?: 'gallons' | 'litres'
   has_fuel_oil_residual: boolean; fuel_oil_residual_amount: number; fuel_oil_residual_unit?: 'gallons' | 'litres'
   has_mobile: boolean; gasoline_amount: number; gasoline_unit: 'gallons' | 'litres'; diesel_mobile_amount: number; diesel_mobile_unit: 'gallons' | 'litres'
@@ -1635,9 +1682,44 @@ export function steamToBasis(amount: number, unit: SteamUnit | undefined, basis:
 // Location precisely so the workings can convert the resolution-applied figure; this wrapper is only
 // the raw-value convenience calcLocation and calcInventory use.
 type FuelOilGrade = 'distillate' | 'residual'
-const fuelOilInGallons = (loc: Location, grade: FuelOilGrade) => grade === 'distillate'
-  ? fuelOilToGallons(loc.fuel_oil_distillate_amount, loc.fuel_oil_distillate_unit)
-  : fuelOilToGallons(loc.fuel_oil_residual_amount, loc.fuel_oil_residual_unit)
+// ── WHICH BASIS PRICES A FUEL-OIL FIGURE ─────────────────────────────────────────────────────────
+//
+// ONE DECISION, THREE CONSUMERS — calcLocation, fuelEmissionsByType and buildWorkings — so the total,
+// the per-fuel breakdown and the workings row cannot disagree about what priced the same litres.
+// Same shape and same reasoning as steamPricing.
+//
+// WHY IT EXISTS. Fuel oil was stored per US GALLON in every table and every location converted onto
+// that basis. Only EPA publishes per gallon; ECCC (g/L), DEFRA (kg/L), DCCEEW (per kL) and MfE (kg/L)
+// all publish per litre, so five of six jurisdictions carried a conversion WE imposed, and their
+// displayed factor was a rescale of a rescale rather than the publisher's own printed number. A
+// French site showed 2.698435355 kg CO₂e/L for heating oil beside 2.69843662 for diesel — the same
+// gas/diesel oil derivation, differing in the ninth decimal purely from the round trip.
+//
+// ⚠️ THE PROBE IS STRUCTURAL, NOT A JURISDICTION LIST. It asks pickEF for the litre key and uses it
+// if the answer is a complete factor. pickEF falls back to EF, and EF carries NO fuel-oil litre key,
+// so a hit is only ever possible when the location's OWN table publishes per litre. A hand-kept list
+// of "metric jurisdictions" here would be a second copy of the seeding, and would silently misroute
+// the day a table gains or loses a key — the drift factorEditions.ts already documents.
+//
+// US-IN-LITRES DELIBERATELY STILL CONVERTS, and that is correct rather than an omission: EPA's basis
+// genuinely IS the gallon, so the conversion is a real convert-then-apply step and the note says so.
+// No US per-litre fuel-oil factor is invented to avoid it.
+function fuelOilPricing(loc: Location, grade: FuelOilGrade, amount: number): { key: string; priced: number; note?: string } {
+  const unit = grade === 'distillate' ? loc.fuel_oil_distillate_unit : loc.fuel_oil_residual_unit
+  const litreKey = `fuel_oil_${grade}_litre`
+  if ((unit ?? 'gallons') === 'litres' && isPriceableEF(pickEF(loc, litreKey as keyof typeof EF))) {
+    // Priced where the publisher priced it: no conversion, so no conversion note either.
+    return { key: litreKey, priced: amount }
+  }
+  const fo = fuelOilToGallons(amount, unit)
+  return { key: `fuel_oil_${grade}_gallon`, priced: fo.gallons, note: fo.note }
+}
+
+// REMOVED 14 Aug 2026: fuelOilInGallons(loc, grade). It was the raw-value convenience calcLocation and
+// fuelEmissionsByType used, and both now go through fuelOilPricing, which decides the BASIS as well as
+// the amount. Keeping it would have left a helper that always converts to gallons sitting beside a
+// chooser that usually does not — the next caller to reach for it would silently re-impose the round
+// trip this change removed. fuelOilToGallons (the (amount, unit) form) is still used, inside the chooser.
 function propaneEfKey(unit: string): 'propane_gallon' | 'propane_litre' | 'propane_kg' {
   return unit === 'gallons' ? 'propane_gallon' : unit === 'kg' ? 'propane_kg' : 'propane_litre'
 }
@@ -1811,9 +1893,14 @@ function splitFactorKey(key: string): { fuel: string; unit: string } {
   return i < 0 ? { fuel: key || '(unknown fuel)', unit: '(unknown unit)' } : { fuel: key.slice(0, i), unit: key.slice(i + 1) }
 }
 
+/** Does this lookup carry a complete factor? The non-throwing half of assertPriceable, shared with it
+ *  so "priceable" has ONE definition. Used to ask a table whether it publishes on a given basis. */
+const isPriceableEF = (ef: CombustionEF | MissingEF | null | undefined): ef is CombustionEF =>
+  !!ef && typeof ef.co2 === 'number' && typeof ef.ch4 === 'number' && typeof ef.n2o === 'number'
+
 // The refusal. Asserts rather than returns a boolean so callers narrow without a cast.
 function assertPriceable(ef: CombustionEF | MissingEF | null | undefined): asserts ef is CombustionEF {
-  if (ef && typeof ef.co2 === 'number' && typeof ef.ch4 === 'number' && typeof ef.n2o === 'number') return
+  if (isPriceableEF(ef)) return
   const miss = (ef as MissingEF | null | undefined)?.__missing
   const { fuel, unit } = splitFactorKey(miss?.key ?? '')
   throw new MissingEmissionFactorError(fuel, unit, miss?.country ?? '(unknown country)', miss?.key ?? '(unknown key)')
@@ -1945,11 +2032,13 @@ function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: numbe
   // TWO GRADES, PRICED SEPARATELY. Both read the RAW stored amount here; buildWorkings reads the
   // resolution-applied figure instead — see the note at its own call site.
   if (loc.has_fuel_oil_distillate && loc.fuel_oil_distillate_amount > 0) {
-    const g = calcGas(pickEF(loc, 'fuel_oil_distillate_gallon'), fuelOilInGallons(loc, 'distillate').gallons, gwpVersion)
+    const fo = fuelOilPricing(loc, 'distillate', loc.fuel_oil_distillate_amount)
+    const g = calcGas(pickEF(loc, fo.key as keyof typeof EF), fo.priced, gwpVersion)
     s1_stationary += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
   }
   if (loc.has_fuel_oil_residual && loc.fuel_oil_residual_amount > 0) {
-    const g = calcGas(pickEF(loc, 'fuel_oil_residual_gallon'), fuelOilInGallons(loc, 'residual').gallons, gwpVersion)
+    const fo = fuelOilPricing(loc, 'residual', loc.fuel_oil_residual_amount)
+    const g = calcGas(pickEF(loc, fo.key as keyof typeof EF), fo.priced, gwpVersion)
     s1_stationary += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
   }
   if (loc.has_mobile) {
@@ -2075,10 +2164,14 @@ function fuelEmissionsByType(loc: Location, gwpVersion: GwpVersion, year: number
     add('propane', calcGas(pickEF(loc, propaneEfKey(loc.propane_unit) as keyof typeof EF), loc.propane_amount, gwpVersion).total)
   if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0)
     add('diesel', calcGas(pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), loc.diesel_stationary_amount, gwpVersion).total)
-  if (loc.has_fuel_oil_distillate && loc.fuel_oil_distillate_amount > 0)
-    add('fuel_oil_distillate', calcGas(pickEF(loc, 'fuel_oil_distillate_gallon'), fuelOilInGallons(loc, 'distillate').gallons, gwpVersion).total)
-  if (loc.has_fuel_oil_residual && loc.fuel_oil_residual_amount > 0)
-    add('fuel_oil_residual', calcGas(pickEF(loc, 'fuel_oil_residual_gallon'), fuelOilInGallons(loc, 'residual').gallons, gwpVersion).total)
+  if (loc.has_fuel_oil_distillate && loc.fuel_oil_distillate_amount > 0) {
+    const fod = fuelOilPricing(loc, 'distillate', loc.fuel_oil_distillate_amount)
+    add('fuel_oil_distillate', calcGas(pickEF(loc, fod.key as keyof typeof EF), fod.priced, gwpVersion).total)
+  }
+  if (loc.has_fuel_oil_residual && loc.fuel_oil_residual_amount > 0) {
+    const forr = fuelOilPricing(loc, 'residual', loc.fuel_oil_residual_amount)
+    add('fuel_oil_residual', calcGas(pickEF(loc, forr.key as keyof typeof EF), forr.priced, gwpVersion).total)
+  }
   if (loc.has_mobile) {
     if (loc.gasoline_amount > 0)
       add('gasoline', calcGas(pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), loc.gasoline_amount, gwpVersion).total)
@@ -2464,14 +2557,15 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     // the coverage-resolution-applied one. That distinction predates the grade split and survives it.
     if (loc.has_fuel_oil_distillate && loc.fuel_oil_distillate_amount > 0) {
       const entered = figure('fuel_oil_distillate_amount')
-      const fo = fuelOilToGallons(entered, loc.fuel_oil_distillate_unit)
-      // entered figure + entered unit in the activity column; fo.gallons prices it. See pushFuel.
-      pushFuel(loc, 'fuel_oil_distillate', 'Heating oil', 1, entered, loc.fuel_oil_distillate_unit ?? 'gallons', 'fuel_oil_distillate_gallon', provOf('fuel_oil_distillate_amount'), fo.note, fo.gallons)
+      // Same decision as calcLocation, from the same helper. Where the publisher prints per litre the
+      // key IS the litre key, fo.priced === entered, and there is no conversion note to carry.
+      const fo = fuelOilPricing(loc, 'distillate', entered)
+      pushFuel(loc, 'fuel_oil_distillate', 'Heating oil', 1, entered, loc.fuel_oil_distillate_unit ?? 'gallons', fo.key, provOf('fuel_oil_distillate_amount'), fo.note, fo.priced)
     }
     if (loc.has_fuel_oil_residual && loc.fuel_oil_residual_amount > 0) {
       const entered = figure('fuel_oil_residual_amount')
-      const fo = fuelOilToGallons(entered, loc.fuel_oil_residual_unit)
-      pushFuel(loc, 'fuel_oil_residual', 'Heavy fuel oil', 1, entered, loc.fuel_oil_residual_unit ?? 'gallons', 'fuel_oil_residual_gallon', provOf('fuel_oil_residual_amount'), fo.note, fo.gallons)
+      const fo = fuelOilPricing(loc, 'residual', entered)
+      pushFuel(loc, 'fuel_oil_residual', 'Heavy fuel oil', 1, entered, loc.fuel_oil_residual_unit ?? 'gallons', fo.key, provOf('fuel_oil_residual_amount'), fo.note, fo.priced)
     }
     if (loc.has_mobile && loc.gasoline_amount > 0) pushFuel(loc, 'mobile', 'Gasoline (mobile)', 1, figure('gasoline_amount'), loc.gasoline_unit, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}`, provOf('gasoline_amount'))
     if (loc.has_mobile && loc.diesel_mobile_amount > 0) pushFuel(loc, 'mobile', 'Diesel (mobile)', 1, figure('diesel_mobile_amount'), loc.diesel_mobile_unit, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}`, provOf('diesel_mobile_amount'))
