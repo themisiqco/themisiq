@@ -28,7 +28,7 @@
 
 import {
   EF_SOURCES, combustionSource, gridSource, getGridFactor, isResolvedGridRegion, streamState,
-  efJurisdiction, steamFactorFor, findUnpriceableLocations,
+  efJurisdiction, steamFactorFor, findUnpriceableLocations, SUPPLIER_SPECIFIC_ENTRY_METHOD,
 } from './engine'
 import type { Location } from './engine'
 
@@ -99,6 +99,60 @@ const COMBUSTION_STREAMS = [
 
 /** Recorded here so the omissions above are greppable from the consuming code, not just commented. */
 export const FAMILIES_NOT_COVERED = ['refrigerants'] as const
+
+// ── DID ANYTHING HERE PRICE FROM A PUBLISHED FACTOR TABLE? ───────────────────────────────────────
+//
+// WHY THIS EXISTS. An empty factor_editions map has TWO meanings and the surfaces could not tell them
+// apart, so both told a verifier the same false thing: that the inventory predated the write path and
+// that every figure was priced from a published table. There are fourteen ways to reach {} on a
+// current save and both sentences are false for most of them. This is the discriminator:
+//   TRUE  -> something WAS priced from a published table, so an empty map is a STALE RECORD.
+//   FALSE -> nothing was, so an empty map is the CORRECT and complete answer.
+//
+// ⚠️ IT READS A STORED SNAPSHOT, NOT THE LIVE ENGINE, AND THAT IS THE WHOLE DESIGN.
+// workings and factor_editions are written by the SAME save, so they describe the same calculation by
+// construction. Recomputing from locations_data instead would have made the verifier page's output
+// depend on deploy time — two verifiers opening one token a week apart could read different text
+// about identical frozen figures, and the customer's trends page would say a third thing. Passing the
+// rows in keeps this pure and keeps every surface reading one stored fact.
+//
+// ⚠️ THE TWO EXCLUSIONS ARE STRUCTURAL, NOT RESTATED. Both are derived from the declaration that
+// already owns them, so neither can drift:
+//   - FAMILIES_NOT_COVERED (above) — refrigerants price from REFRIGERANT_GWP, a GWP table whose
+//     edition gwp_version already records. ANYONE ADDING A FAMILY THERE CHANGES THIS PREDICATE TOO,
+//     automatically, because this reads that list rather than repeating it.
+//   - SUPPLIER_SPECIFIC_ENTRY_METHOD (engine.ts) — a district-heating figure from the customer's own
+//     provider prices a row but is not an edition of any publication, so it must not count as one.
+// Both were found by measurement, not by inspection: a naive "did any row price" test got 12 of the
+// 14 routes right and these exact two wrong.
+//
+// Structurally typed rather than importing WorkingRow: the verifier page and the engine each have
+// their own row shape, and this needs only the five fields both carry.
+export type PricedRowProbe = {
+  stream?: string | null
+  result_tco2e?: number | null
+  declaration?: string | null
+  entry_method?: string | null
+  gwp_basis?: string | null
+}
+
+export function anyPublishedFactorApplied(rows: readonly PricedRowProbe[] | null | undefined): boolean {
+  if (!Array.isArray(rows)) return false
+  return rows.some(r => {
+    if (!r) return false
+    // A declaration row records an ABSENCE — attested, undeclared, unpriceable, declared-unquantified,
+    // or a stream no jurisdiction publishes a factor for. None of them priced anything.
+    if (r.declaration) return false
+    // result_tco2e null is the engine's own marker for "no figure". Coverage-resolution rows are audit
+    // entries rather than calculations and carry their own gwp_basis token.
+    if (r.result_tco2e == null) return false
+    if (r.gwp_basis === 'coverage_resolution') return false
+    // The two exclusions, read from their own declarations.
+    if (r.stream && (FAMILIES_NOT_COVERED as readonly string[]).includes(r.stream)) return false
+    if (r.entry_method === SUPPLIER_SPECIFIC_ENTRY_METHOD) return false
+    return true
+  })
+}
 
 // ── THE JURISDICTION LOOKUP ──────────────────────────────────────────────────────────────────────
 //
@@ -405,25 +459,70 @@ export const FACTOR_EDITION_DISCLOSURE: Record<FactorEditionState, { label: stri
       'change and the factor revision. You may wish to consider whether this affects your base-year ' +
       'recalculation policy.',
   },
+  // ⚠️ 'some years' IS NOW LITERALLY TRUE, WHERE IT USED TO BE A GUESS. This message previously fired
+  // for any empty map, including years that applied no published factor table at all and had nothing
+  // to record — telling a customer editions "were not recorded" for a year where there was nothing to
+  // record. Those years are now skipped rather than counted, so this fires only on a real gap: a year
+  // that DID price from a published table and did not record which edition.
   unknown: {
     label: 'Emission-factor editions were not recorded for some years',
     detail:
       'Emission-factor editions were not recorded for some years — year-over-year comparison cannot ' +
-      'be confirmed on a consistent factor basis.',
+      'be confirmed on a consistent factor basis. Years that applied no published emission factor ' +
+      'table are not counted here; this refers to years where a published table was applied and the ' +
+      'edition was not recorded.',
   },
 }
 
+/**
+ * One year's contribution to the comparison.
+ *
+ * ⚠️ THE SIGNATURE CHANGED, from `readonly FactorEditions[]` to this. It had to: the distinction this
+ * function now makes CANNOT be derived from the maps alone — an empty map looks identical whether the
+ * year priced everything from published tables and failed to record them, or priced nothing from a
+ * published table at all. `anyPublished` comes from the year's own stored workings via
+ * anyPublishedFactorApplied, so it is a fact about the same save, not a recomputation.
+ */
+export type FactorEditionYear = {
+  editions: FactorEditions | null | undefined
+  /** Did that year's workings price ANYTHING from a published factor table? See anyPublishedFactorApplied. */
+  anyPublished: boolean
+}
+
+const isEmpty = (m: FactorEditions | null | undefined) => !m || Object.keys(m).length === 0
+
 export function factorEditionState(
-  maps: readonly (FactorEditions | null | undefined)[],
+  years: readonly FactorEditionYear[],
 ): FactorEditionState {
   // No years at all is not a consistent series; there is nothing to have been consistent about.
-  if (maps.length === 0) return 'unknown'
-  // An empty map is the pre-column back catalogue: priced by SOME edition, with no record of which.
-  // It must never read as consistent — see the column comment in the 20260813 migration.
-  if (maps.some(m => !m || Object.keys(m).length === 0)) return 'unknown'
-  const [first, ...rest] = maps as FactorEditions[]
+  if (years.length === 0) return 'unknown'
+
+  // ⚠️ AN EMPTY MAP HAS TWO MEANINGS AND THIS USED TO COLLAPSE THEM. The comment that stood here —
+  // "An empty map is the pre-column back catalogue: priced by SOME edition, with no record of which"
+  // — was the origin of a false claim on the verifier surface, and it was simply not true: there are
+  // fourteen ways to reach {} on a CURRENT save, and in most of them nothing was ever priced from a
+  // published table. `anyPublished` is what tells them apart, read from the year's own stored
+  // workings.
+  //
+  //   empty + anyPublished  -> A GENUINE GAP. Something was priced from a published table and the
+  //                            edition was not recorded. Poisons the series to 'unknown', as before.
+  //   empty + !anyPublished -> NOTHING TO RECORD. That year applied no published factor table at all,
+  //                            so it has no factor basis to be consistent or inconsistent WITH. It is
+  //                            SKIPPED, not counted as a gap.
+  const gap = years.some(y => isEmpty(y.editions) && y.anyPublished)
+  if (gap) return 'unknown'
+  const recorded = years.filter(y => !isEmpty(y.editions)).map(y => y.editions as FactorEditions)
+
+  // EVERY YEAR HAD NOTHING TO RECORD -> 'consistent', which renders NOTHING. Not 'unknown': that
+  // message says a consistent factor basis could not be CONFIRMED, which implies there should have
+  // been one to confirm. A series that applied no published factor table in any year has nothing
+  // withheld and nothing to warn about, and the honest surface for that is silence.
+  //   The same answer covers one-recorded-year-among-nothing-recordable-years: one basis, no gap.
+  if (recorded.length === 0) return 'consistent'
+
   // ONE YEAR IS 'consistent', deliberately, and it mirrors gwpConsistent — a one-year series has a
   // set size of 1 and reports true there too. Nothing is being compared, so nothing is being
   // mis-stated; the trends header shows no message either way, because 'consistent' is silent.
+  const [first, ...rest] = recorded
   return rest.every(m => sameFactorEditions(first, m)) ? 'consistent' : 'changed'
 }

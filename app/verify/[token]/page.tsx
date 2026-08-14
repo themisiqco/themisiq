@@ -5,6 +5,7 @@ import { supabase } from '../../../lib/supabase'
 import { VERIFIER_DOC_LINK_NOTICE, VERIFIER_DOC_TAB_DID_NOT_OPEN } from '../../../lib/verifierDocNotice'
 import { docTypeLabel } from '../../../lib/ghg/conciergeDocTypes'
 import type { ComparabilityRecord } from '../../../lib/ghg/comparability'
+import { anyPublishedFactorApplied } from '../../../lib/ghg/factorEditions'
 import type { FactorEditions } from '../../../lib/ghg/factorEditions'
 
 // METADATA ONLY — no old_values / new_values. The RPC used to return full before/after row
@@ -615,14 +616,22 @@ export default function VerifierPage() {
             <SectionHead>Emission Factor Editions</SectionHead>
             <div style={{ marginBottom: '2rem' }}>
               {Object.keys(inv.factor_editions).length === 0 ? (
+                /* ── TWO EMPTIES, TWO MEANINGS ────────────────────────────────────────────────────
+                   An empty map used to render one block asserting the inventory predated the write
+                   path and that every figure came from a published table. There are fourteen ways to
+                   reach {} on a current save and both sentences are false for most of them — a
+                   Canadian steam-only inventory saved today reads {} and applied no published table
+                   at all. anyPublishedFactorApplied reads the STORED workings, written by the same
+                   save as this map, and tells the two apart. No recompute: the page renders what was
+                   saved, so two verifiers opening one token weeks apart read the same words. */
+                anyPublishedFactorApplied(inv.workings) ? (
                 <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.25rem 1.5rem' }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', marginBottom: 8 }}>
                     Not recorded for this inventory
                   </div>
                   <p style={{ fontSize: 12, color: '#555553', lineHeight: 1.65, margin: 0 }}>
-                    This inventory was last calculated before the platform began recording which edition of
-                    each emission factor table was applied, and that record cannot be reconstructed after the
-                    fact.
+                    This inventory was last calculated before the platform recorded which edition of each
+                    emission factor table it applied, and that record cannot be reconstructed after the fact.
                   </p>
                   <p style={{ fontSize: 12, color: '#555553', lineHeight: 1.65, margin: '10px 0 0' }}>
                     <strong>This does not mean no emission factors were used.</strong> Every figure on this page
@@ -637,6 +646,28 @@ export default function VerifierPage() {
                     calculated.
                   </p>
                 </div>
+              ) : (
+                <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.25rem 1.5rem' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', marginBottom: 8 }}>
+                    No published factor editions apply
+                  </div>
+                  <p style={{ fontSize: 12, color: '#555553', lineHeight: 1.65, margin: 0 }}>
+                    No figure on this report was priced from a published emission factor table, so there is no
+                    edition to record. This is a statement about this inventory, not a limitation of the report.
+                  </p>
+                  <p style={{ fontSize: 12, color: '#555553', lineHeight: 1.65, margin: '10px 0 0' }}>
+                    <strong>This does not mean the figures are incomplete or unsupported.</strong> Each row of the
+                    calculation workings states how it was arrived at. Some streams are reported without being
+                    priced — because no published factor exists for that fuel in that country, or because the
+                    operator declared a stream and gave no figure — and the workings row for each says which.
+                  </p>
+                  <p style={{ fontSize: 12, color: '#555553', lineHeight: 1.65, margin: '10px 0 0' }}>
+                    You can confirm from the calculation workings what each stream contributed and why. There is
+                    no factor edition to check here, because no published table was applied. If a stream shows
+                    no figure, its row states the reason.
+                  </p>
+                </div>
+              )
               ) : (
                 <>
                   <p style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, margin: '0 0 12px' }}>

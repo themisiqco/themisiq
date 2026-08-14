@@ -1897,6 +1897,16 @@ const STEAM_EF: Record<EfJurisdiction, SteamEntry> = {
   },
 }
 
+/**
+ * The `entry_method` a steam row carries when the customer's own provider figure priced it.
+ *
+ * ⚠️ A NAMED CONSTANT BECAUSE A SECOND MODULE MATCHES ON IT. factorEditions.anyPublishedFactorApplied
+ * has to tell a row priced from a PUBLISHED table from one priced by a private figure, and a bare
+ * string literal in two files is the drift this repo keeps writing tests against. Exported so the
+ * producer and the consumer of the value cannot disagree about its spelling.
+ */
+export const SUPPLIER_SPECIFIC_ENTRY_METHOD = 'supplier-specific'
+
 /** The steam factor (or the reasoned absence) for a location. The ONLY steam lookup — no fallback. */
 export function steamFactorFor(loc: { country?: string }): SteamEntry {
   return STEAM_EF[efJurisdiction(loc)]
@@ -2742,7 +2752,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       const steamRatio = loc.purchased_steam_mmbtu === 0 ? 1 : st.amount / loc.purchased_steam_mmbtu
       const steamEfShown = steamRatio === 1 ? priced.ef
         : { co2: priced.ef.co2 * steamRatio, ch4: priced.ef.ch4 * steamRatio, n2o: priced.ef.n2o * steamRatio }
-      rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: `Purchased steam${priced.supplier ? ' (supplier-specific factor)' : ''}`, scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: enteredUnit, ...factorCells(steamEfShown, enteredUnit), ef_source: priced.source, scope2_method: 'location-based', result_tco2e: calcGas(priced.ef, st.amount, gwpVersion).total, entry_method: priced.supplier ? 'supplier-specific' : 'manual', ...(st.note ? { note: st.note } : {}) })
+      rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: `Purchased steam${priced.supplier ? ' (supplier-specific factor)' : ''}`, scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: enteredUnit, ...factorCells(steamEfShown, enteredUnit), ef_source: priced.source, scope2_method: 'location-based', result_tco2e: calcGas(priced.ef, st.amount, gwpVersion).total, entry_method: priced.supplier ? SUPPLIER_SPECIFIC_ENTRY_METHOD : 'manual', ...(st.note ? { note: st.note } : {}) })
       }
     }
     // ── Declaration rows: EVERY stream gets a row, so no stream can ever be silent ────────────────

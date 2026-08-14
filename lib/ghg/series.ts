@@ -90,6 +90,18 @@ export interface InventoryRow {
    * 'unknown'. Every inventory saved before 2026-08-13 is in that state and cannot be recovered.
    */
   factorEditions?: FactorEditions | null;
+  /**
+   * Did that year's workings price ANYTHING from a published factor table?
+   *
+   * ⚠️ THIS IS WHAT STOPS AN EMPTY MAP MEANING TWO THINGS AT ONCE. Absent or `{}` in factorEditions
+   * used to drive the whole series to 'unknown' on the assumption that the year was priced by SOME
+   * edition nobody recorded. That is false for most of the fourteen ways to reach `{}`: a year whose
+   * only stream was Canadian district heat applied no published table at all and has nothing to
+   * record. Set by the loader from the stored workings; see anyPublishedFactorApplied.
+   * Defaults to FALSE when absent — a row that cannot say is treated as having nothing to record,
+   * which is silent, rather than as a gap, which would warn about a year we know nothing about.
+   */
+  anyPublishedFactor?: boolean;
   /** Absent is treated as 'ok' — the loader is the one place that decides this, and it always sets it. */
   dataStatus?: YearDataStatus;
   exclusions?: YearExclusion[] | null;   // set when dataStatus === 'excluded'
@@ -369,7 +381,9 @@ export function buildCompanySeries(
       // EVERY year, including unplottable ones. An excluded year was still priced by some edition,
       // and if that edition is unrecorded the series genuinely cannot be confirmed on one basis —
       // filtering to plottable years would let a gap in the record hide behind a gap in the data.
-      factorEditionState: factorEditionState(ordered.map((r) => r.factorEditions)),
+      factorEditionState: factorEditionState(
+        ordered.map((r) => ({ editions: r.factorEditions, anyPublished: r.anyPublishedFactor === true })),
+      ),
       baselineUsable,
     });
   }

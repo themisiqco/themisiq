@@ -26,6 +26,8 @@ import {
 } from "./series";
 import { findUnpriceableLocations, type Location } from "./engine";
 import type { FactorEditions } from "./factorEditions";
+import { anyPublishedFactorApplied } from "./factorEditions";
+import type { PricedRowProbe } from "./factorEditions";
 
 export interface LoadSeriesResult {
   series: CompanySeries[];
@@ -234,6 +236,10 @@ export async function loadCompanySeries(): Promise<LoadSeriesResult> {
         // in: an inventory saved before the column existed reads as {} and must stay
         // distinguishable from one whose editions were recorded — it drives the series to 'unknown'.
         factorEditions: r.factor_editions ?? {},
+        // Derived from the SAME saved workings this row already carries, so the flag and the map
+        // describe one calculation. Not recomputed from locations_data: that would make the series
+        // depend on deploy time rather than on what was saved.
+        anyPublishedFactor: anyPublishedFactorApplied(r.workings as PricedRowProbe[] | null),
       });
     }
 

@@ -3,12 +3,12 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   buildFactorEditions, factorEditionsForSave, factorJurisdiction, sameFactorEditions, FAMILIES_NOT_COVERED,
-  factorEditionState, FACTOR_EDITION_DISCLOSURE,
+  factorEditionState, FACTOR_EDITION_DISCLOSURE, anyPublishedFactorApplied,
 } from './factorEditions'
 import type { FactorEditions } from './factorEditions'
 import { buildCompanySeries } from './series'
 import type { InventoryRow } from './series'
-import { EF_SOURCES, emptyLocation, getGridFactor, gridSource, combustionSource, findUnpriceableLocations } from './engine'
+import { EF_SOURCES, emptyLocation, getGridFactor, gridSource, combustionSource, findUnpriceableLocations, buildWorkings } from './engine'
 import type { Location } from './engine'
 
 // THE COLUMN EXISTS BECAUSE A 26% FALL LOOKED LIKE PERFORMANCE.
@@ -425,41 +425,50 @@ describe('factor_editions survives the load-then-save round trip', () => {
 const UK26 = buildFactorEditions([uk()], 2026)
 const UK25 = buildFactorEditions([uk()], 2025)
 
+// ⚠️ THE SIGNATURE CHANGED — factorEditionState now takes { editions, anyPublished } per year,
+// because an empty map alone cannot say whether the year had a GAP or had nothing to record.
+// `gap()` is the old meaning of {}: a year that DID price from a published table and did not record
+// which edition. `nothing()` is the meaning that used to be collapsed into it.
+const rec = (editions: FactorEditions) => ({ editions, anyPublished: true })
+const gap = (editions: FactorEditions | null | undefined = {}) => ({ editions, anyPublished: true })
+const nothing = () => ({ editions: {} as FactorEditions, anyPublished: false })
+
 describe('factorEditionState — a union, because "we cannot say" is a third answer', () => {
   it('G1 three years on one edition → consistent', () => {
-    expect(factorEditionState([UK26, UK26, UK26])).toBe('consistent')
+    expect(factorEditionState([rec(UK26), rec(UK26), rec(UK26)])).toBe('consistent')
     // Distinct objects with equal content, not the same reference — otherwise this would only be
     // proving that === works.
     expect(factorEditionState([
-      buildFactorEditions([uk({ id: 'a' })], 2026),
-      buildFactorEditions([uk({ id: 'b' })], 2026),
-      buildFactorEditions([uk({ id: 'c' })], 2026),
+      rec(buildFactorEditions([uk({ id: 'a' })], 2026)),
+      rec(buildFactorEditions([uk({ id: 'b' })], 2026)),
+      rec(buildFactorEditions([uk({ id: 'c' })], 2026)),
     ])).toBe('consistent')
   })
 
   it('G2 a series spanning an edition boundary → changed', () => {
     // The 2025→2026 UK grid step, which is the whole reason the column exists.
-    expect(factorEditionState([UK25, UK26])).toBe('changed')
-    expect(factorEditionState([UK25, UK25, UK26])).toBe('changed')
+    expect(factorEditionState([rec(UK25), rec(UK26)])).toBe('changed')
+    expect(factorEditionState([rec(UK25), rec(UK25), rec(UK26)])).toBe('changed')
     // Order-independent: a series is not "unchanged" because the newer edition came first.
-    expect(factorEditionState([UK26, UK25])).toBe('changed')
+    expect(factorEditionState([rec(UK26), rec(UK25)])).toBe('changed')
   })
 
   it('G3 ANY year with an empty map → unknown, and NEVER consistent', () => {
     const WHY =
-      'AN UNRECORDED YEAR READ AS CONSISTENT. {} means the inventory predates the column and its ' +
-      'editions cannot be recovered — it does NOT mean the factors matched. Reading it as ' +
-      'consistent asserts a like-for-like basis nobody verified, on the strength of a default value.'
+      'A YEAR WITH A REAL GAP READ AS CONSISTENT. These years DID price from a published table and ' +
+      'did not record which edition, so the basis cannot be compared — it does NOT mean the factors ' +
+      'matched. Reading it as consistent asserts a like-for-like basis nobody verified. (A year that ' +
+      'applied no published table at all is a DIFFERENT case and is skipped, not counted here — G7.)'
 
     for (const maps of [
-      [{}, UK26, UK26],
-      [UK26, {}, UK26],
-      [UK26, UK26, {}],
-      [{}],
-      [{}, {}],
-      [null, UK26],
-      [undefined, UK26],
-    ] as (FactorEditions | null | undefined)[][]) {
+      [gap(), rec(UK26), rec(UK26)],
+      [rec(UK26), gap(), rec(UK26)],
+      [rec(UK26), rec(UK26), gap()],
+      [gap()],
+      [gap(), gap()],
+      [gap(null), rec(UK26)],
+      [gap(undefined), rec(UK26)],
+    ]) {
       expect(factorEditionState(maps), WHY).toBe('unknown')
       expect(factorEditionState(maps), WHY).not.toBe('consistent')
     }
@@ -469,19 +478,19 @@ describe('factorEditionState — a union, because "we cannot say" is a third ans
     // 2024 unrecorded, 2025 and 2026 on different editions: a year is missing AND two recorded years
     // demonstrably differ. 'changed' would assert the edition set was fully observed — that the
     // revision we found is the whole story — which is exactly what an unrecorded year denies.
-    expect(factorEditionState([{}, UK25, UK26])).toBe('unknown')
-    expect(factorEditionState([UK25, UK26, {}])).toBe('unknown')
+    expect(factorEditionState([gap(), rec(UK25), rec(UK26)])).toBe('unknown')
+    expect(factorEditionState([rec(UK25), rec(UK26), gap()])).toBe('unknown')
     // And the same series WITHOUT the gap is 'changed', so this is an ordering test rather than a
     // test that empty maps break the comparison.
-    expect(factorEditionState([UK25, UK26])).toBe('changed')
+    expect(factorEditionState([rec(UK25), rec(UK26)])).toBe('changed')
   })
 
   it('G5 a ONE-YEAR series is consistent when recorded, unknown when not', () => {
     // Mirrors gwpConsistent, which is true for a single year (set size 1). Nothing is being
     // compared, so nothing is mis-stated — and 'consistent' renders no message at all, so a
     // single-year customer is told nothing either way.
-    expect(factorEditionState([UK26])).toBe('consistent')
-    expect(factorEditionState([{}])).toBe('unknown')
+    expect(factorEditionState([rec(UK26)])).toBe('consistent')
+    expect(factorEditionState([gap()])).toBe('unknown')
     // No years at all: nothing to have been consistent about.
     expect(factorEditionState([])).toBe('unknown')
   })
@@ -489,22 +498,26 @@ describe('factorEditionState — a union, because "we cannot say" is a third ans
   it('G6 a difference in EITHER family, in ANY jurisdiction, is a change', () => {
     const twoCountries = buildFactorEditions([uk(), loc({ id: 'z', country: 'CA', grid_region: 'ON' })], 2026)
     const sameAgain = buildFactorEditions([uk(), loc({ id: 'z', country: 'CA', grid_region: 'ON' })], 2026)
-    expect(factorEditionState([twoCountries, sameAgain])).toBe('consistent')
+    expect(factorEditionState([rec(twoCountries), rec(sameAgain)])).toBe('consistent')
 
     // Combustion label moved, electricity identical.
     const combMoved: FactorEditions = JSON.parse(JSON.stringify(UK26))
     combMoved.UK!.combustion!.edition = 'DEFRA 2027'
-    expect(factorEditionState([UK26, combMoved])).toBe('changed')
+    expect(factorEditionState([rec(UK26), rec(combMoved)])).toBe('changed')
 
     // A jurisdiction appearing in one year and not the other.
-    expect(factorEditionState([UK26, twoCountries])).toBe('changed')
+    expect(factorEditionState([rec(UK26), rec(twoCountries)])).toBe('changed')
   })
 })
 
 describe('the axis reaches CompanySeries and the loader fills it', () => {
-  const row = (year: number, factorEditions: FactorEditions | null): InventoryRow => ({
+  // ⚠️ anyPublishedFactor DEFAULTS TO TRUE HERE, and that is what these fixtures mean. Every empty
+  // map below stands for a year that DID price from a published table and did not record the edition
+  // — a real GAP. The other meaning of {} (a year that applied no published table at all) is a
+  // different fixture and is covered by V-1b; conflating them is the bug this whole commit removes.
+  const row = (year: number, factorEditions: FactorEditions | null, anyPublishedFactor = true): InventoryRow => ({
     company_id: 'c1', company_name: 'Acme', reporting_year: year,
-    scope1_total: 100, scope2_location_total: 50, factorEditions,
+    scope1_total: 100, scope2_location_total: 50, factorEditions, anyPublishedFactor,
   })
 
   it('G7 buildCompanySeries carries the state, over EVERY year', () => {
@@ -514,6 +527,9 @@ describe('the axis reaches CompanySeries and the loader fills it', () => {
     // Absent on the row (a hand-built caller, or a loader that stopped mapping it) is unknown too —
     // it must not default into silence.
     expect(buildCompanySeries([row(2025, null), row(2026, UK26)])[0].factorEditionState).toBe('unknown')
+    // ...but an empty year that had NOTHING to record is skipped, not counted as a gap. Same maps as
+    // the line three above; only the meaning of the empty differs, and the series answer follows it.
+    expect(buildCompanySeries([row(2025, {}, false), row(2026, UK26)])[0].factorEditionState).toBe('consistent')
   })
 
   it('G7b UNPLOTTABLE YEARS STILL COUNT — a gap in the record must not hide behind a gap in the data', () => {
@@ -566,9 +582,13 @@ describe('the trends page renders a DISTINCT output for each state', () => {
       'Emission factors changed between years — year-over-year movement reflects both operational ' +
       'change and the factor revision. You may wish to consider whether this affects your base-year ' +
       'recalculation policy.')
+    // The trailing sentence was added when years with nothing to record stopped being counted here:
+    // without it, 'some years' invited a customer to go looking for a year that has no gap in it.
     expect(FACTOR_EDITION_DISCLOSURE.unknown!.detail).toBe(
       'Emission-factor editions were not recorded for some years — year-over-year comparison cannot ' +
-      'be confirmed on a consistent factor basis.')
+      'be confirmed on a consistent factor basis. Years that applied no published emission factor ' +
+      'table are not counted here; this refers to years where a published table was applied and the ' +
+      'edition was not recorded.')
 
     // NOT A PARAPHRASE AND NOT A TRUNCATION: the label is the detail up to the em dash, verbatim, so
     // the strip can never come to say something the panel below it does not.
@@ -630,18 +650,117 @@ describe('the trends page renders a DISTINCT output for each state', () => {
 describe('the states a verifier and a customer each see', () => {
   const page = readFileSync(join(process.cwd(), 'app', 'verify', '[token]', 'page.tsx'), 'utf8')
 
-  it('V-1 factorEditionState returns unknown for an empty map', () => {
-    // The pin the whole empty-state disclosure rests on. An empty map is the pre-write-path back
-    // catalogue: priced by SOME edition, with no record of which. It must never read as consistent.
-    expect(factorEditionState([{}])).toBe('unknown')
-    expect(factorEditionState([{} as FactorEditions, {} as FactorEditions])).toBe('unknown')
-    expect(factorEditionState([null])).toBe('unknown')
-    expect(factorEditionState([undefined])).toBe('unknown')
+  // ⚠️ V-1 WAS SPLIT, NOT LOOSENED. It asserted "an empty map is unknown" on the comment it was
+  // written from — "the pre-write-path back catalogue: priced by SOME edition, with no record of
+  // which". That comment was false, and it is the origin of the false claim the verifier page made.
+  // The two halves below are the two meanings it was collapsing; neither is weaker than the original.
+  it('V-1a an empty map with a REAL GAP is still unknown', () => {
+    // The year DID price from a published table and did not record which edition. Unchanged behaviour,
+    // and it must never read as consistent — that would assert a like-for-like basis nobody verified.
+    expect(factorEditionState([gap()])).toBe('unknown')
+    expect(factorEditionState([gap(), gap()])).toBe('unknown')
+    expect(factorEditionState([gap(null)])).toBe('unknown')
+    expect(factorEditionState([gap(undefined)])).toBe('unknown')
     expect(factorEditionState([])).toBe('unknown')
-    // And a populated map beside an empty one is STILL unknown - the empty year poisons the series,
-    // which is the documented precedence in factorEditionState's own header.
+    // A populated year beside a gap year is STILL unknown — the gap poisons the series, which is the
+    // documented precedence in factorEditionState's own header.
     const populated: FactorEditions = { UK: { combustion: { source: 'x', edition: 'DEFRA 2026' } } }
-    expect(factorEditionState([{}, populated])).toBe('unknown')
+    expect(factorEditionState([gap(), rec(populated)])).toBe('unknown')
+  })
+
+  it('V-1b an empty map with NOTHING RECORDABLE is skipped, not counted as a gap', () => {
+    // The CA STEAM TEST case: a year whose only stream applied no published factor table. It has no
+    // factor basis to be consistent or inconsistent WITH, so it must not drag the series to 'unknown'
+    // — that message says a consistent basis could not be CONFIRMED, which implies there was one.
+    const populated: FactorEditions = { UK: { combustion: { source: 'x', edition: 'DEFRA 2026' } } }
+    // Every year nothing-recordable -> consistent, which renders NOTHING at all.
+    expect(factorEditionState([nothing()])).toBe('consistent')
+    expect(factorEditionState([nothing(), nothing(), nothing()])).toBe('consistent')
+    // One recorded year among nothing-recordable years -> one basis, no gap.
+    expect(factorEditionState([nothing(), rec(populated), nothing()])).toBe('consistent')
+    // And the comparison still works across the recorded years, with the others skipped.
+    expect(factorEditionState([nothing(), rec(UK25), rec(UK26)])).toBe('changed')
+    // A mix of ALL THREE kinds: the gap still wins, because 'changed' would assert the edition set
+    // was fully observed when one year demonstrably was not.
+    expect(factorEditionState([nothing(), gap(), rec(UK25), rec(UK26)])).toBe('unknown')
+  })
+
+  it('V-2c the predicate decides which empty state renders, over all fourteen routes', () => {
+    // The discriminator itself, asserted end to end rather than only its wording. Each fixture is a
+    // route to {}, and every one of them must land on B (nothing recordable) — none of them priced
+    // from a published table. The two controls land on the other side.
+    const w = (l: Location | null) => buildWorkings(l ? [l] : [], 'AR6', 2025, [], 12) as never[]
+    const bare = (o: Partial<Location>): Location => ({ ...emptyLocation('l1', 'S'), ...o })
+    const NOTHING_RECORDABLE: [string, Location | null][] = [
+      ['brand-new', bare({ country: 'US' })],
+      ['no locations', null],
+      ['declared-unquantified', bare({ country: 'US', has_natural_gas: true, natural_gas_amount: 0 })],
+      ['steam CA', bare({ country: 'CA', has_purchased_steam: true, purchased_steam_mmbtu: 1000, purchased_steam_unit: 'gj' })],
+      ['steam AU', bare({ country: 'AU', has_purchased_steam: true, purchased_steam_mmbtu: 1000, purchased_steam_unit: 'gj' })],
+      ['steam NZ', bare({ country: 'NZ', has_purchased_steam: true, purchased_steam_mmbtu: 1000, purchased_steam_unit: 'gj' })],
+      ['steam EU', bare({ country: 'DE', has_purchased_steam: true, purchased_steam_mmbtu: 1000, purchased_steam_unit: 'gj' })],
+      ['steam SUPPLIER-specific', bare({ country: 'GB', has_purchased_steam: true, purchased_steam_mmbtu: 1000, purchased_steam_unit: 'gj', purchased_steam_supplier_ef: 0.198, purchased_steam_supplier_ef_basis: 'kwh' })],
+      ['electricity us_average', bare({ country: 'US', electricity_kwh: 100_000 })],
+      ['electricity region ""', bare({ country: 'US', grid_region: '', electricity_kwh: 100_000 })],
+      ['electricity unmapped country', bare({ country: 'JP', grid_region: '', electricity_kwh: 100_000 })],
+      ['refrigerants only', bare({ country: 'US', has_hfc_refrigerants: true, refrigerant_purchased_kg: 40 })],
+      ['biogenic only', bare({ country: 'US', biogenic_co2_mt: 10 })],
+      ['every location excluded', bare({ country: 'US', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' })],
+    ]
+    expect(NOTHING_RECORDABLE.length, 'all fourteen routes').toBe(14)
+    for (const [name, l] of NOTHING_RECORDABLE) {
+      expect(buildFactorEditions(l ? [l] : [], 2025), `${name}: must reach {}`).toEqual({})
+      expect(anyPublishedFactorApplied(w(l)), `${name}: nothing was priced from a published table`).toBe(false)
+    }
+    // ⚠️ THE TWO A NAIVE "did any row price" TEST GETS WRONG, called out because they are the reason
+    // this predicate lives beside FAMILIES_NOT_COVERED rather than on the page. Both DO price a row.
+    const supplier = NOTHING_RECORDABLE.find(([n]) => n.includes('SUPPLIER'))![1]!
+    const refrig = NOTHING_RECORDABLE.find(([n]) => n.includes('refrigerants'))![1]!
+    for (const [n, l] of [['supplier steam', supplier], ['refrigerants', refrig]] as [string, Location][]) {
+      const priced = (w(l) as { result_tco2e?: number | null; declaration?: string }[])
+        .filter(r => r.result_tco2e != null && !r.declaration)
+      expect(priced.length, `${n}: really does emit a priced row`).toBeGreaterThan(0)
+      expect(anyPublishedFactorApplied(w(l)), `${n}: but not from a published table`).toBe(false)
+    }
+    // CONTROLS — something WAS priced from a published table.
+    const pub = bare({ country: 'US', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf' })
+    expect(anyPublishedFactorApplied(w(pub))).toBe(true)
+    // MIXED: one stream published (CA electricity), one not (CA steam, no published factor).
+    const mixed = bare({ country: 'CA', grid_region: 'ON', electricity_kwh: 50_000,
+      has_purchased_steam: true, purchased_steam_mmbtu: 1000, purchased_steam_unit: 'gj' })
+    expect(anyPublishedFactorApplied(w(mixed)), 'one published stream is enough').toBe(true)
+    // Degenerate inputs must not throw.
+    expect(anyPublishedFactorApplied(null)).toBe(false)
+    expect(anyPublishedFactorApplied(undefined)).toBe(false)
+    expect(anyPublishedFactorApplied([])).toBe(false)
+  })
+
+  it('V-2b the B state — NOTHING RECORDABLE — renders its own words', () => {
+    // What a real customer's first verifier reads if their inventory is CA STEAM TEST shaped.
+    expect(page).toContain('No published factor editions apply')
+    expect(page).toContain('was priced from a published emission factor table, so there is no')
+    expect(page).toContain('not a limitation of the report')
+    expect(page).toContain('This does not mean the figures are incomplete or unsupported')
+    expect(page).toContain('no published table was applied')
+    // The page must branch on the predicate, not on the map alone.
+    expect(page).toContain('anyPublishedFactorApplied(inv.workings)')
+  })
+
+  it('V-2d the discipline scan applies to BOTH empty states', () => {
+    // V-2 checked wording A only. B is the one a stranger reads above three zeros, so it needs the
+    // same guarantee: nothing in either block may read as a warning about the figures themselves.
+    const blocks = [
+      ['A', 'Not recorded for this inventory'],
+      ['B', 'No published factor editions apply'],
+    ] as const
+    for (const [which, anchor] of blocks) {
+      const i = page.indexOf(anchor)
+      expect(i, `${which}: block not found`).toBeGreaterThan(-1)
+      const body = page.slice(i, i + 1600).toLowerCase()
+      for (const alarm of ['error', 'invalid', 'incorrect', 'unreliable', 'cannot be relied']) {
+        expect(body, `${which} must not read as a warning about the figures ("${alarm}")`).not.toContain(alarm)
+      }
+    }
   })
 
   it('V-2 the EMPTY state renders a stated disclosure, not a blank', () => {
