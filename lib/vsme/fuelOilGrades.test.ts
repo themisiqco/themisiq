@@ -82,22 +82,33 @@ describe('fuel-oil grades reach the VSME energy path without a jurisdiction', ()
   })
 })
 
-describe('the retired fuel_oil token is gone from both FUEL_WORDS maps', () => {
-  // FUEL_WORDS exists TWICE — lib/ghg/series.ts (exported, read by comparability.ts) and a local copy
-  // in app/dashboard/ghg/page.tsx. series.ts:154 already records that duplication as known debt. Until
-  // it is collapsed, both must carry the same tokens or one surface prints "fuel_oil_residual" raw.
+describe('the retired fuel_oil token is gone from the ONE FUEL_WORDS map', () => {
+  // FUEL_WORDS USED TO EXIST TWICE — lib/ghg/series.ts (exported, read by comparability.ts) and a
+  // byte-identical local copy in app/dashboard/ghg/page.tsx — and V7 below existed to keep the two in
+  // step. The wizard now imports the exported one, so there is nothing to keep in step and V7's job
+  // has INVERTED: it asserts the second copy has not come back.
   it('V6 series.ts carries both grades and not the retired token', () => {
     expect(FUEL_WORDS.fuel_oil_distillate).toBe('heating oil')
     expect(FUEL_WORDS.fuel_oil_residual).toBe('heavy fuel oil')
     expect(FUEL_WORDS.fuel_oil, 'the single-key token was retired, not aliased').toBeUndefined()
   })
 
-  it('V7 the page.tsx copy is in step with it', () => {
-    const line = pageSrc.split('\n').filter(l => l.includes("gasoline: 'petrol'"))
-    expect(line, "page.tsx's FUEL_WORDS entry is declared once").toHaveLength(1)
-    expect(line[0]).toContain("fuel_oil_distillate: 'heating oil'")
-    expect(line[0]).toContain("fuel_oil_residual: 'heavy fuel oil'")
-    expect(line[0], 'the retired token must not survive here either').not.toMatch(/fuel_oil:/)
+  it('V7 page.tsx holds NO second copy — it imports the one above', () => {
+    // Anchored on the map's own first line rather than the identifier: page.tsx must still MENTION
+    // FUEL_WORDS (it imports and calls it), so grepping the name would fail against correct code.
+    // What must not reappear is a declaration, and `gasoline: 'petrol'` is unique to the map body.
+    const body = pageSrc.split('\n').filter(l => l.includes("gasoline: 'petrol'"))
+    expect(body, 'a local FUEL_WORDS map has come back — collapse it onto lib/ghg/series.ts').toHaveLength(0)
+    expect(pageSrc, 'no local declaration under any name').not.toMatch(/const FUEL_WORDS/)
+    // ...and the import that replaced it is really there, so the assertion above cannot pass because
+    // the whole feature was deleted. Matched on the import LINE containing the name rather than on an
+    // exact statement: FUEL_WORDS was collapsed first and its two sibling maps followed on the same
+    // day, so the statement now names three symbols and pinning its spelling would break on the next
+    // one added. lib/ghg/wordMaps.test.ts owns the general form of this guard.
+    const importLine = pageSrc.split('\n').filter(l => l.includes("from '../../../lib/ghg/series'") && !l.startsWith('import type'))
+    expect(importLine, 'one value import from series.ts').toHaveLength(1)
+    expect(importLine[0], 'FUEL_WORDS must be imported').toContain('FUEL_WORDS')
+    expect(pageSrc, 'and it is still used to word the unpriceable-location message').toContain('FUEL_WORDS[u.fuel]')
   })
 })
 

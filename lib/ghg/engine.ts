@@ -739,6 +739,57 @@ const EF_SOURCES = {
   gwp_ar6: 'IPCC AR6 (2021) — applied by default across all frameworks (SB 253, CDP, ESRS E1, GRI 305, EcoVadis, IFRS S2)',
 }
 
+// ── THE EDITION LABEL PER JURISDICTION — ONE DECLARATION, TWO CONSUMERS ──────────────────────────
+//
+// The short label naming which published edition priced a row: the workings column `factor_vintage`,
+// and `ghg_inventories.factor_editions` via lib/ghg/factorEditions.ts. BOTH MAPS MOVED HERE ON
+// 14 AUG 2026; until then they were declared inside factorEditions.ts and the workings table had
+// no access to them, which is why every combustion and steam row rendered its vintage as '—' while
+// the grid, T&D and residual rows beside it carried theirs. The verifier reading one inventory saw
+// the edition recorded in one place and blank in another, for the same factor.
+//
+// They cannot live in factorEditions.ts: that module imports this one, so this one cannot import back.
+// Here is also the honest home — this is the file that owns EF, EF_CA, EF_UK, EF_EU, EF_AU and EF_NZ,
+// and an edition label is a fact about those tables.
+//
+// ⚠️ DECLARED, NOT PARSED. No regex runs over citation prose, and that is a deliberate answer rather
+// than convenience. A regex is not merely fragile here, it is already WRONG against the current table.
+// The obvious pattern — the year in parentheses, /\((\d{4})\)/ — matches five of the six citations and
+// misses Australia outright, because DCCEEW's parenthesised token is not a year:
+//     'DCCEEW NGA Factors 2025 (AR5)'   →  captures nothing; a laxer pattern captures "AR5"
+// The looser alternative, first four-digit run, gets Australia right and is one edit away from being
+// wrong elsewhere: any citation that ever names a standard number, a directive year or a page range
+// before its edition silently yields the wrong answer, with no failure to notice.
+//
+// So the label is written down. It is a second copy of a fact — the risk that always comes with a
+// declaration — and EDITION LABELS MATCH THEIR CITATION (factorEditions.test.ts) is the test that
+// closes it, asserting every whitespace-separated token of each label appears in the citation it
+// claims to summarise. Refreshing a factor table without updating its label fails there, loudly,
+// naming both strings.
+const COMBUSTION_EDITION: Record<EfJurisdiction, string> = {
+  US: 'US EPA 2024',      // ⚠️ EF_SOURCES.combustion's year is itself UNVERIFIED — see the EF header.
+  CA: 'ECCC 2025 v3.0',
+  UK: 'DEFRA 2026',
+  EU: 'IPCC 2006',
+  AU: 'DCCEEW NGA 2025',
+  NZ: 'MfE 2026 v2',
+}
+
+// PARTIAL, and the four absences are the honest shape: only the US and UK publish a purchased-steam
+// factor at all. An entry for the others would assert a table that does not exist, and STEAM_EF
+// already says so in its own vocabulary ('unpublished' / 'not_searched').
+//
+// ⚠️ A SUPPLIER-SPECIFIC FACTOR RECORDS NO EDITION, and that is correct rather than a gap. This label
+// answers "which published edition priced this row"; a factor the customer obtained from their own
+// district energy provider is not an edition of anything, and inventing a label for it would put a
+// publication claim on a private figure. Both consumers gate on that: buildWorkings leaves
+// factor_vintage unset on a supplier-priced row, and buildFactorEditions records no steam entry for
+// one. The row's own citation (EF_SOURCES.steam_supplier) carries the attribution instead.
+const STEAM_EDITION: Partial<Record<EfJurisdiction, string>> = {
+  US: 'US EPA 2025 Table 7',
+  UK: 'DEFRA 2026',
+}
+
 // ── GWP BASIS FOR A FACTOR WE DID NOT COMBINE ────────────────────────────────────────────────────
 // A published grid or steam factor arrives as a single kgCO₂e figure that its PUBLISHER produced by
 // combining CH₄ and N₂O at a GWP vintage of their choosing — ECCC, eGRID, DEFRA, EEA, DCCEEW and MfE
@@ -1097,7 +1148,21 @@ function getResidualFactor(
     note: 'No published residual mix for this subregion; market-based falls back to location factor.' }
 }
 
-const CA_PROVINCES = ['BC', 'AB', 'SK', 'MB', 'ON', 'QC', 'NB', 'NS', 'PE', 'NL', 'YT', 'NT', 'NU']
+// ⚠️ THE ORDER IS PRESENTATION, AND IT IS DELIBERATE — DO NOT "RESTORE" THE STANDARD ONE.
+// This list held the Statistics Canada west-to-east order (BC AB SK MB ON QC NB NS PE NL YT NT NU)
+// until 14 Aug 2026. It was changed to ON-first ON PURPOSE, and the previous order was not lost by
+// accident: Ontario is where most Canadian commercial activity sits, so it is the option most
+// customers are looking for, and this array's only consumers put it in front of one.
+//   Nothing computes on the order. There are exactly two consumers — CA_PROVINCES.includes() in
+// detectGridRegion (membership, order-blind) and two .map()s that render <option> lists: the step-1
+// locations table in app/dashboard/ghg/page.tsx and GRID_REGIONS_CA, which drives step 2. So the
+// order is the DROPDOWN ORDER and nothing else, and no figure can move by changing it.
+//   IT IS ALSO WHY THIS IS ONE ARRAY. Step 1 previously held its own literal in this ON-first order
+// while step 2 rendered the west-to-east one, so a customer answered the same question twice with
+// the options shuffled between screens. Consolidating was the fix; keeping the better order cost
+// nothing. lib/ghg/provinceList.test.ts pins the order, not just the membership — order was the
+// thing that disagreed.
+const CA_PROVINCES = ['ON', 'BC', 'AB', 'QC', 'MB', 'SK', 'NS', 'NB', 'NL', 'PE', 'NT', 'NU', 'YT']
 // eGRID subregions for the US market-based residual-mix picker (item 5). Code -> readable label.
 // Users select their exact subregion via EPA Power Profiler (ZIP lookup) rather than inferring from state,
 // because several states span multiple subregions (e.g. TX = ERCT + SPP; NY = NYCW/NYLI/NYUP).
@@ -1189,8 +1254,32 @@ function gridRegionForCountry(country: string): string {
   if (EU_COUNTRIES.includes(ctry)) return 'EU_' + ctry
   return ''
 }
-const GRID_REGIONS_CA = CA_PROVINCES.map(p => { const y = GRID_EF[p]; const latest = Math.max(...Object.keys(y).map(Number)); return { value: p, label: p, ef: y[latest] } })
-const GRID_REGIONS_US = US_STATES.map(s => { const y = GRID_EF['US_' + s]; const latest = Math.max(...Object.keys(y).map(Number)); return { value: 'US_' + s, label: s, ef: y[latest] } })
+// ── OPTION LISTS: value AND label ONLY. THERE IS NO `.ef` HERE, AND THERE MUST NOT BE. ───────────
+//
+// Both objects carried a third field, `ef`, built as `y[Math.max(...Object.keys(y).map(Number))]` —
+// the newest year in each region's table, computed ONCE AT IMPORT, with no access to any inventory.
+// It was removed on 14 Aug 2026. A field whose value is a factor chosen without reference to the
+// reporting year has exactly one honest use, and it is not a use: any surface that renders it states
+// a number the engine will not apply.
+//
+// ⚠️ IT WAS RENDERED, AND IT WAS WRONG BY A FACTOR OF TWO. The CA province dropdown printed `{r.ef}`,
+// so on a 2023 Ontario inventory the customer chose "ON — 0.059" and getGridFactor then priced the
+// location at 0.03. Same screen, 1.97x apart, nothing reconciling them. Every other factor surface —
+// the US dropdown, all four confirmation banners, the step-1 grid label — already called
+// getGridFactor(region, inventory.reporting_year). This was the one display path reading the
+// year-blind constant, and it was wrong for EVERY Canadian province on any pre-2026 inventory.
+//
+// The render site was fixed first and the field left in place, read only by the tests that proved it
+// disagreed with the engine. That was the wrong shape: a field that exists to be wrong is an
+// invitation, and `{r.ef}` compiles. Deleting it makes the regression a TYPE ERROR rather than a
+// silent 1.97x, and lib/ghg/gridDisplay.test.ts now reconstructs the year-blind value from GRID_EF
+// itself — the formula is what could come back, not the field.
+//
+// ⚠️ THE ANSWER TO "WHICH FACTOR" IS getGridFactor(region, year). Nothing on this line may cache one.
+// Callers needing the number ask the engine at the reporting year; these lists exist to fill a
+// <select> and to resolve a stored region to its display label.
+const GRID_REGIONS_CA = CA_PROVINCES.map(p => ({ value: p, label: p }))
+const GRID_REGIONS_US = US_STATES.map(s => ({ value: 'US_' + s, label: s }))
 
 const FRAMEWORKS = [
   {
@@ -2603,9 +2692,19 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     // Two notes can both apply — a fuel-oil row in an EU country converts litres→gallons AND is
     // priced by a density-derived factor. Joined rather than one overwriting the other.
     const note = [convNote, euDerivationNote(loc, efKey)].filter(Boolean).join(' · ')
+    // `factor_vintage` IS THE EDITION LABEL, NOT THE REPORTING YEAR — the same distinction section O
+    // pinned for the NZ T&D row after it stamped the inventory year over a 2025 factor. A combustion
+    // table has no year dimension: EF_UK is DEFRA 2026 whichever year is being reported, so the vintage
+    // is a property of the TABLE and is constant across reporting years by construction. That is the
+    // opposite of the grid row beside it, whose vintage is getGridFactor().usedYear because GRID_EF IS
+    // year-keyed. Both answer "which edition priced this line"; they differ because the tables do.
+    //   ONE DECLARATION, shared with ghg_inventories.factor_editions — see COMBUSTION_EDITION. A
+    // separate source here would let the workings row and the stored edition map name two different
+    // publications for one figure, which is precisely the disagreement factor_editions exists to end.
     rows.push({ location: loc.name || 'Location', stream, source, scope, activity_data: entered, activity_unit: enteredUnit,
       ...factorCells(efShown, enteredUnit),
-      ef_source: combustionSource(loc), result_tco2e: g.total, ...(note ? { note } : {}), ...(prov ?? {}) })
+      ef_source: combustionSource(loc), factor_vintage: COMBUSTION_EDITION[efJurisdiction(loc)],
+      result_tco2e: g.total, ...(note ? { note } : {}), ...(prov ?? {}) })
   }
   for (const loc of locations) {
     // Decided BEFORE any row is emitted, and with the same helper calcInventory uses. A location
@@ -2752,7 +2851,13 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       const steamRatio = loc.purchased_steam_mmbtu === 0 ? 1 : st.amount / loc.purchased_steam_mmbtu
       const steamEfShown = steamRatio === 1 ? priced.ef
         : { co2: priced.ef.co2 * steamRatio, ch4: priced.ef.ch4 * steamRatio, n2o: priced.ef.n2o * steamRatio }
-      rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: `Purchased steam${priced.supplier ? ' (supplier-specific factor)' : ''}`, scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: enteredUnit, ...factorCells(steamEfShown, enteredUnit), ef_source: priced.source, scope2_method: 'location-based', result_tco2e: calcGas(priced.ef, st.amount, gwpVersion).total, entry_method: priced.supplier ? SUPPLIER_SPECIFIC_ENTRY_METHOD : 'manual', ...(st.note ? { note: st.note } : {}) })
+      // ⚠️ NO VINTAGE ON A SUPPLIER-PRICED ROW, AND THE ABSENCE IS THE CORRECT ANSWER. A figure from
+      // the customer's own district energy provider is not an edition of any publication; labelling it
+      // 'US EPA 2025 Table 7' because the site happens to be American would put a publication's name
+      // on a private number. The column renders '—' there, which is what "no published edition" looks
+      // like, and ef_source already names the supplier route. Same gate buildFactorEditions applies.
+      const steamVintage = priced.supplier ? undefined : STEAM_EDITION[efJurisdiction(loc)]
+      rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: `Purchased steam${priced.supplier ? ' (supplier-specific factor)' : ''}`, scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: enteredUnit, ...factorCells(steamEfShown, enteredUnit), ef_source: priced.source, ...(steamVintage ? { factor_vintage: steamVintage } : {}), scope2_method: 'location-based', result_tco2e: calcGas(priced.ef, st.amount, gwpVersion).total, entry_method: priced.supplier ? SUPPLIER_SPECIFIC_ENTRY_METHOD : 'manual', ...(st.note ? { note: st.note } : {}) })
       }
     }
     // ── Declaration rows: EVERY stream gets a row, so no stream can ever be silent ────────────────
@@ -3041,6 +3146,7 @@ export {
   CA_PROVINCES, US_STATES, US_SUBREGIONS, AU_STATES,
   EU_COUNTRIES, EU_COUNTRY_OPTIONS,
   GRID_REGIONS_CA, GRID_REGIONS_US, FRAMEWORKS,
+  COMBUSTION_EDITION, STEAM_EDITION,
   // Functions
   nzTdLoss, isResolvedGridRegion, getGridFactor, getResidualFactor,
   detectGridRegion, gridRegionForCountry, propaneEfKey, pickEF,

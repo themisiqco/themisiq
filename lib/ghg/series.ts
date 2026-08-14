@@ -193,14 +193,26 @@ const num = (v: number | null | undefined): number | null =>
 // Lives here, not in either page, so the trend chart and the SBTi surface cannot describe the same
 // year in two different ways. Pure string building — no rendering, no DOM.
 //
-// ⚠️ DUPLICATE WORD MAPS. app/dashboard/ghg/page.tsx has its own COUNTRY_WORDS / UNIT_WORDS /
-// FUEL_WORDS for the wizard's own message. They should be collapsed onto these; that means editing
-// the wizard, which is outside this change. Until then, a unit added to one must be added to both.
+// ── THE ONE HOME FOR THE DISPLAY VOCABULARY ──────────────────────────────────────────────────────
 //
-// COUNTRY_WORDS and FUEL_WORDS are EXPORTED because lib/ghg/comparability.ts needs the same words
-// for its structural observations. Importing them is deliberate: a third copy is what this comment
-// is already warning about, and two surfaces naming the same country two ways in front of a
-// verifier is the defect these maps exist to prevent.
+// All three maps are EXPORTED and all three have exactly one declaration, here. There is nothing left
+// for this comment to point at, which is the point of it.
+//
+// ⚠️ THIS WAS NOT ALWAYS TRUE, AND THE HISTORY IS THE REASON TO KEEP IT THAT WAY.
+// app/dashboard/ghg/page.tsx carried its own COUNTRY_WORDS / UNIT_WORDS / FUEL_WORDS for the
+// unpriceable-location message — three second copies, each byte-identical to the map beneath it, for
+// long enough that this comment's earlier version simply recorded them as known debt. They were
+// collapsed onto these on 14 Aug 2026, verified identical (33 / 9 / 7 keys, same values, same key
+// order) before merging rather than assumed identical.
+//
+// WHAT THE DUPLICATION COST, stated so a future reader does not reintroduce it for convenience: a
+// fuel, unit or country added to one map and not the other makes ONE surface print the raw token —
+// 'fuel_oil_residual', 'mmbtu', 'EL' — beside the other surface's word, for the same inventory, in
+// front of the same verifier. Nothing fails, nothing warns, and the two readings disagree about what
+// the customer told us. lib/ghg/wordMaps.test.ts asserts the second copies have not returned.
+//
+// UNIT_WORDS is exported ONLY because the wizard needs it; nothing else reads it yet. COUNTRY_WORDS
+// and FUEL_WORDS are read by lib/ghg/comparability.ts as well.
 export const COUNTRY_WORDS: Record<string, string> = {
   US: "United States", CA: "Canada", GB: "the UK", UK: "the UK", AU: "Australia", NZ: "New Zealand",
   AT: "Austria", BE: "Belgium", BG: "Bulgaria", HR: "Croatia", CY: "Cyprus", CZ: "Czechia",
@@ -209,7 +221,7 @@ export const COUNTRY_WORDS: Record<string, string> = {
   MT: "Malta", NL: "the Netherlands", PL: "Poland", PT: "Portugal", RO: "Romania", SK: "Slovakia",
   SI: "Slovenia", ES: "Spain", SE: "Sweden",
 };
-const UNIT_WORDS: Record<string, string> = {
+export const UNIT_WORDS: Record<string, string> = {
   m3: "cubic metres", kwh: "kilowatt-hours", mcf: "thousand cubic feet", therms: "therms",
   mmbtu: "MMBtu", gj: "gigajoules", litres: "litres", gallons: "US gallons", kg: "kilograms",
 };

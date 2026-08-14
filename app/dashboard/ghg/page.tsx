@@ -10,6 +10,7 @@ import { buildComparabilityDisclosure, buildComparabilityRecord, observationLine
 import type { PriorYearState, InventorySummary, ComparabilityCapture, ComparabilityAnswer, ComparabilityRecord } from '../../../lib/ghg/comparability'
 import { factorEditionsForSave } from '../../../lib/ghg/factorEditions'
 import { assessCompleteness } from '../../../lib/ghg/loadSeries'
+import { COUNTRY_WORDS, UNIT_WORDS, FUEL_WORDS } from '../../../lib/ghg/series'
 import type { YearDataStatus } from '../../../lib/ghg/series'
 import { useEntitlementAccess, useHasConcierge, useGhgLocationAllowance, type EntitlementAccess } from '../../../lib/useEntitlement'
 import { generateAssurancePDF } from '../../../lib/assurancePdf'
@@ -19,7 +20,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 
 import {
   EF_SOURCES,
-  US_STATES, US_SUBREGIONS, AU_STATES, EU_COUNTRY_OPTIONS,
+  US_STATES, CA_PROVINCES, US_SUBREGIONS, AU_STATES, EU_COUNTRY_OPTIONS,
   GRID_REGIONS_CA, GRID_REGIONS_US, FRAMEWORKS,
   isResolvedGridRegion, getGridFactor, getResidualFactor, residualRegionFor,
   detectGridRegion, gridRegionForCountry, pickEF,
@@ -386,23 +387,17 @@ const CONCIERGE_READABLE_MEDIA = new Set(['application/pdf', 'image/jpeg', 'imag
 //
 // Anything not in these maps falls back to the raw token rather than a blank: an unfamiliar word
 // the customer can still search for beats a sentence with a hole in it.
-const COUNTRY_WORDS: Record<string, string> = {
-  US: 'United States', CA: 'Canada', GB: 'the UK', UK: 'the UK', AU: 'Australia', NZ: 'New Zealand',
-  AT: 'Austria', BE: 'Belgium', BG: 'Bulgaria', HR: 'Croatia', CY: 'Cyprus', CZ: 'Czechia',
-  DK: 'Denmark', EE: 'Estonia', FI: 'Finland', FR: 'France', DE: 'Germany', EL: 'Greece',
-  HU: 'Hungary', IE: 'Ireland', IT: 'Italy', LV: 'Latvia', LT: 'Lithuania', LU: 'Luxembourg',
-  MT: 'Malta', NL: 'the Netherlands', PL: 'Poland', PT: 'Portugal', RO: 'Romania', SK: 'Slovakia',
-  SI: 'Slovenia', ES: 'Spain', SE: 'Sweden',
-}
-const UNIT_WORDS: Record<string, string> = {
-  m3: 'cubic metres', kwh: 'kilowatt-hours', mcf: 'thousand cubic feet', therms: 'therms',
-  mmbtu: 'MMBtu', gj: 'gigajoules', litres: 'litres', gallons: 'US gallons', kg: 'kilograms',
-}
-const FUEL_WORDS: Record<string, string> = {
-  natural_gas: 'gas', propane: 'propane', diesel: 'diesel', diesel_mobile: 'vehicle diesel',
-  gasoline: 'petrol', fuel_oil_distillate: 'heating oil', fuel_oil_residual: 'heavy fuel oil',
-}
-
+//
+// ⚠️ ALL THREE MAPS ARE IMPORTED FROM lib/ghg/series.ts, NOT DECLARED HERE — see the import at the
+// top of this file. Until 14 Aug 2026 this file carried its own COUNTRY_WORDS, UNIT_WORDS and
+// FUEL_WORDS, each a byte-identical second copy of the one over there (33 / 9 / 7 keys, same values,
+// same key order — checked, not assumed, before merging).
+//   The cost of the duplication was never a wrong figure, which is why it survived: it was a wrong
+// WORD. A unit added to one map and not the other makes this message print 'mmbtu' where the trends
+// surface prints 'MMBtu', or 'fuel_oil_residual' where the other says 'heavy fuel oil' — two
+// descriptions of one inventory, in front of one verifier, with nothing failing to flag it.
+//   lib/ghg/wordMaps.test.ts asserts none of the three has come back as a local declaration, and
+// that the import that replaced them is real.
 function unpriceableMessage(u: UnpriceableLocation): string {
   const country = COUNTRY_WORDS[u.country] ?? (u.country === '(unset)' ? '' : u.country)
   const unit = UNIT_WORDS[u.unit] ?? u.unit
@@ -1500,7 +1495,12 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
 {loc.country === 'CA' && (
   <select value={loc.province || ''} onChange={e => updateLocation(i, 'province', e.target.value)} style={{ ...inputStyle, width: 130 }}>
     <option value="">Province…</option>
-    {['ON','BC','AB','QC','MB','SK','NS','NB','NL','PE','NT','NU','YT'].map(p => (
+    {/* CA_PROVINCES, not a literal. The literal here held the same thirteen codes in a DIFFERENT
+        ORDER, so the wizard offered the same list twice — this dropdown ON-first, and step 2's
+        grid-region dropdown (GRID_REGIONS_CA, derived from CA_PROVINCES) BC-first — with nothing
+        saying why. detectGridRegion() also validates against CA_PROVINCES, so a province typed here
+        and not there would have selected fine and then resolved to no grid region at all. */}
+    {CA_PROVINCES.map(p => (
       <option key={p} value={p}>{p}</option>
     ))}
   </select>
@@ -1513,9 +1513,24 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
     ))}
   </select>
 )}
-{loc.country && loc.country !== 'US' && loc.country !== 'CA' && loc.country !== 'AU' && gridRegionForCountry(loc.country) && (
+{/* ── ONE GRID LABEL, FOR EVERY COUNTRY ─────────────────────────────────────────────────────────
+    This read `loc.country !== 'US' && !== 'CA' && !== 'AU' && gridRegionForCountry(loc.country)`,
+    and the three exclusions were REDUNDANT: gridRegionForCountry only answers for countries whose
+    grid is NATIONAL (UK, NZ, EU-27) and returns '' for exactly those three. So the condition said
+    twice, in two vocabularies, "only country-level grids" — and the effect was that a US, Canadian
+    or Australian customer who had just picked their state or province saw nothing, while the
+    customer beside them picking France saw their factor immediately. Nothing recorded that as
+    deliberate, and step 2 shows all six jurisdictions a factor from the same lookup.
+      Gated on isResolvedGridRegion(loc.grid_region) — THE SAME GATE STEP 2 USES, deliberately, so
+    the two steps cannot disagree about whether a location's grid is resolved. updateLocation has
+    already stored the region by the time this renders: from the country for UK/EU/NZ, from
+    detectGridRegion for a US or AU state, and directly for a CA province.
+      ⚠️ getGridFactor(region, inventory.reporting_year), never a year-blind constant — see
+    lib/ghg/gridDisplay.test.ts, where a dropdown reading GRID_REGIONS_CA's `.ef` offered Ontario at
+    0.059 while the engine priced it at 0.03. */}
+{isResolvedGridRegion(loc.grid_region) && (
   <span style={{ fontSize: 12, color: '#0F6E56', alignSelf: 'center', whiteSpace: 'nowrap' }}>
-    Grid: {gridRegionForCountry(loc.country)} ({getGridFactor(gridRegionForCountry(loc.country), inventory.reporting_year).ef} kg/kWh)
+    Grid: {loc.grid_region} ({getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg/kWh)
   </span>
 )}
 {loc.country && loc.country !== 'US' && loc.country !== 'CA' && loc.country !== 'AU' && !gridRegionForCountry(loc.country) && (
