@@ -5,6 +5,7 @@ import { supabase } from '../../../lib/supabase'
 import { VERIFIER_DOC_LINK_NOTICE, VERIFIER_DOC_TAB_DID_NOT_OPEN } from '../../../lib/verifierDocNotice'
 import { docTypeLabel } from '../../../lib/ghg/conciergeDocTypes'
 import type { ComparabilityRecord } from '../../../lib/ghg/comparability'
+import type { FactorEditions } from '../../../lib/ghg/factorEditions'
 
 // METADATA ONLY — no old_values / new_values. The RPC used to return full before/after row
 // snapshots of ghg_inventories, which put every column back within reach of a verifier regardless of
@@ -101,6 +102,15 @@ interface InventoryData {
   // Optional AND nullable, and the two mean different things at the render: absent = the RPC did
   // not send it; null = the question was never answered. Neither renders anything.
   comparability_disclosure?: ComparabilityRecord | null
+  // Which edition of each factor table priced these figures — ISO 14064-3:2019 7.1.4.9(b) obliges the
+  // verifier to confirm the factor set, and gwp_version above answers that for GWP only.
+  //
+  // ⚠️ ABSENT AND EMPTY MEAN DIFFERENT THINGS AND BOTH RENDER. Absent = the RPC did not send it (a
+  // page served before the whitelist migration). Empty {} = the inventory predates the write path,
+  // so the editions are genuinely unrecorded — and THAT renders a stated disclosure, not a blank.
+  // The column is `not null default '{}'`, so empty is the common case until a back catalogue is
+  // re-saved: 23 of 29 inventories at the time of whitelisting.
+  factor_editions?: FactorEditions | null
 }
 interface VerifierPayload {
   inventory?: InventoryData
@@ -165,6 +175,10 @@ const AUDIT_FIELD_LABELS: Record<string, string> = {
   gwp_version:           'GWP basis',
   pct_estimated:         'Share of estimated data',
   comparability_disclosure: 'Comparison with prior period',
+  // ⚠️ A COLUMN NAMED IN THE RPC WITH NO ENTRY HERE RENDERS AS "Another field" — the failure the
+  // factor_editions column comment warned about, and the reason verifierWhitelist.test.ts now
+  // asserts this map against the migration itself rather than trusting the next person to remember.
+  factor_editions:       'Emission factor editions',
 }
 const auditFieldLabel = (key: string): string => AUDIT_FIELD_LABELS[key] ?? 'Another field'
 
@@ -584,6 +598,85 @@ export default function VerifierPage() {
               </p>
             )}
           </div>
+        )}
+
+        {/* ── WHICH EDITION OF EACH FACTOR TABLE PRICED THESE FIGURES ──────────────────────────────
+            ISO 14064-3:2019 7.1.4.9(b) obliges the verifier to confirm which factor set the figures
+            use. gwp_version answers that for GWP; this answers it for the factor tables themselves.
+
+            ⚠️ THE EMPTY MAP RENDERS A STATED DISCLOSURE, NOT A BLANK. `not null default '{}'` means
+            every inventory saved before the write path projects {} — 23 of 29 at the time of
+            whitelisting — and a blank section would leave a verifier to guess between "no factors
+            were used" and "we did not record which". Those are opposite meanings, and this repo's
+            standing rule is that an absence is never rendered as a value. So the empty state gets
+            MORE words than the populated one, not fewer. */}
+        {inv.factor_editions !== undefined && inv.factor_editions !== null && (
+          <>
+            <SectionHead>Emission Factor Editions</SectionHead>
+            <div style={{ marginBottom: '2rem' }}>
+              {Object.keys(inv.factor_editions).length === 0 ? (
+                <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.25rem 1.5rem' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', marginBottom: 8 }}>
+                    Not recorded for this inventory
+                  </div>
+                  <p style={{ fontSize: 12, color: '#555553', lineHeight: 1.65, margin: 0 }}>
+                    This inventory was last calculated before the platform began recording which edition of
+                    each emission factor table was applied, and that record cannot be reconstructed after the
+                    fact.
+                  </p>
+                  <p style={{ fontSize: 12, color: '#555553', lineHeight: 1.65, margin: '10px 0 0' }}>
+                    <strong>This does not mean no emission factors were used.</strong> Every figure on this page
+                    was priced by a published factor table, and each row of the calculation workings names the
+                    source it used. What is unavailable is the specific edition — the publication year or
+                    version — of those tables at the time the figures were calculated.
+                  </p>
+                  <p style={{ fontSize: 12, color: '#555553', lineHeight: 1.65, margin: '10px 0 0' }}>
+                    You can confirm from this report which publisher and table priced each figure. You cannot
+                    confirm from it which edition of that table was in force. Recalculating the inventory
+                    records the editions from that point onward; it does not recover them for figures already
+                    calculated.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, margin: '0 0 12px' }}>
+                    The edition of each published factor table applied to this inventory, captured at the
+                    calculation that produced the totals above. Listed per jurisdiction and factor family; a
+                    jurisdiction or family appears only where it priced something.
+                  </p>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                      <thead><tr>{['Jurisdiction', 'Factor family', 'Source', 'Edition'].map(h => (
+                        <th key={h} style={{ background: '#f8f7f5', padding: '6px 10px', textAlign: 'left', fontSize: 10, fontWeight: 600, color: '#888784', borderBottom: '0.5px solid #e8e7e4', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}</tr></thead>
+                      <tbody>
+                        {Object.entries(inv.factor_editions).flatMap(([juris, families]) =>
+                          Object.entries(families ?? {}).map(([family, ed]) => (
+                            <tr key={`${juris}:${family}`}>
+                              <td style={{ padding: '8px 10px', color: '#0d0d0d', fontWeight: 600, whiteSpace: 'nowrap' }}>{juris}</td>
+                              <td style={{ padding: '8px 10px', color: '#555553', whiteSpace: 'nowrap' }}>{family}</td>
+                              <td style={{ padding: '8px 10px', color: '#555553' }}>{ed?.source}</td>
+                              <td style={{ padding: '8px 10px', color: '#0d0d0d', whiteSpace: 'nowrap' }}>{ed?.edition}</td>
+                            </tr>
+                          )))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {/* ⚠️ THE SNAPSHOT CAVEAT, AND IT APPLIES TO THE WHOLE PAGE, NOT ONLY THIS TABLE.
+                      Both this map and the calculation workings are written at the same save, so they
+                      describe each other correctly — but neither is recomputed when the engine's
+                      tables change. Without this line a verifier could read a recorded edition as a
+                      statement about the factor tables TODAY. See the report for why this sentence
+                      sits here rather than being inferred. */}
+                  <p style={{ fontSize: 11, color: '#888784', lineHeight: 1.6, margin: '12px 0 0' }}>
+                    These editions describe the calculation that produced the figures on this page, not the
+                    factor tables currently held by the platform. They were recorded at the same time as the
+                    calculation workings above, so the two describe the same calculation.
+                  </p>
+                </>
+              )}
+            </div>
+          </>
         )}
 
         <SectionHead>Emissions Summary</SectionHead>

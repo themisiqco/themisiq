@@ -619,3 +619,87 @@ describe('the trends page renders a DISTINCT output for each state', () => {
     expect(trendsSrc).toContain('Mixed GWP basis — comparison may not be valid')
   })
 })
+
+// ── THE VERIFIER-FACING STATES ──────────────────────────────────────────────────────────────────
+//
+// ⚠️ THE VERIFIER PAGE HAS TWO STATES, NOT THREE, AND CONFLATING THEM IS THE TRAP.
+// factorEditionState's 'consistent' | 'changed' | 'unknown' describes a SERIES - several reporting
+// years compared against each other - and drives the customer's trends page. The verifier page shows
+// ONE inventory, which either recorded its editions or did not. A single inventory cannot be
+// 'changed' relative to anything, so there is no third state to render there.
+describe('the states a verifier and a customer each see', () => {
+  const page = readFileSync(join(process.cwd(), 'app', 'verify', '[token]', 'page.tsx'), 'utf8')
+
+  it('V-1 factorEditionState returns unknown for an empty map', () => {
+    // The pin the whole empty-state disclosure rests on. An empty map is the pre-write-path back
+    // catalogue: priced by SOME edition, with no record of which. It must never read as consistent.
+    expect(factorEditionState([{}])).toBe('unknown')
+    expect(factorEditionState([{} as FactorEditions, {} as FactorEditions])).toBe('unknown')
+    expect(factorEditionState([null])).toBe('unknown')
+    expect(factorEditionState([undefined])).toBe('unknown')
+    expect(factorEditionState([])).toBe('unknown')
+    // And a populated map beside an empty one is STILL unknown - the empty year poisons the series,
+    // which is the documented precedence in factorEditionState's own header.
+    const populated: FactorEditions = { UK: { combustion: { source: 'x', edition: 'DEFRA 2026' } } }
+    expect(factorEditionState([{}, populated])).toBe('unknown')
+  })
+
+  it('V-2 the EMPTY state renders a stated disclosure, not a blank', () => {
+    // The substantive requirement: 23 of 29 production inventories project {}, and a verifier must be
+    // able to tell "we did not record which edition" from "no factors were used". Those are opposite
+    // meanings, and this repo does not render an absence as a value.
+    expect(page).toContain('Not recorded for this inventory')
+    // It must SAY the opposite meaning out loud rather than leaving it to be inferred.
+    expect(page).toContain('This does not mean no emission factors were used')
+    // What a verifier CAN still conclude - the per-row citations survive.
+    expect(page).toContain('each row of the calculation workings names the')
+    // What they CANNOT - and that re-saving is not retrospective.
+    expect(page).toContain('You cannot')
+    expect(page).toContain('does not recover them for figures already')
+    // And it must not read as a warning about the figures themselves.
+    for (const alarm of ['error', 'invalid', 'incorrect', 'unreliable', 'cannot be relied']) {
+      expect(page.slice(page.indexOf('Not recorded for this inventory'),
+                        page.indexOf('Not recorded for this inventory') + 1600).toLowerCase(),
+        `the empty-state disclosure must not read as a warning about the figures ("${alarm}")`,
+      ).not.toContain(alarm)
+    }
+  })
+
+  it('V-3 the POPULATED state names the editions and carries the snapshot caveat', () => {
+    expect(page).toContain('Emission Factor Editions')
+    expect(page).toContain("'Jurisdiction', 'Factor family', 'Source', 'Edition'")
+    // ⚠️ THE CAVEAT IS THE PART THAT IS EASY TO DROP. Without it a verifier can read a recorded
+    // edition as a statement about the factor tables the platform holds TODAY. It is a snapshot.
+    expect(page).toContain('not the')
+    expect(page).toContain('factor tables currently held by the platform')
+    // And it must state the one thing that IS guaranteed: the map and the workings were written
+    // together, so they describe the same calculation.
+    expect(page).toContain('recorded at the same time as the')
+  })
+
+  it('V-4 absent, empty and populated are three DIFFERENT renders', () => {
+    // Absent (the RPC did not send it) must render nothing at all - it is not a claim about the
+    // inventory. Empty and populated both render, differently. The guard is the `!== undefined`.
+    expect(page).toContain('inv.factor_editions !== undefined && inv.factor_editions !== null')
+    expect(page).toContain('Object.keys(inv.factor_editions).length === 0')
+  })
+
+  it('V-5 the SERIES states keep their own wording, and consistent stays silent', () => {
+    // The customer-facing trends surface, unchanged by the verifier work. Quoted here so the two
+    // surfaces' wording can be compared in one place - the repo's standing rule is that the same
+    // finding must not be described two different ways in front of the same reader.
+    expect(FACTOR_EDITION_DISCLOSURE.consistent, 'a series on one basis says nothing').toBeNull()
+    expect(FACTOR_EDITION_DISCLOSURE.changed!.label).toBe('Emission factors changed between years')
+    expect(FACTOR_EDITION_DISCLOSURE.changed!.detail).toContain('base-year')
+    expect(FACTOR_EDITION_DISCLOSURE.unknown!.label).toContain('were not recorded for some years')
+    expect(FACTOR_EDITION_DISCLOSURE.unknown!.detail).toContain('cannot')
+    // label IS the opening clause of detail, verbatim - the strip and the panel cannot diverge.
+    for (const s of ['changed', 'unknown'] as const) {
+      expect(FACTOR_EDITION_DISCLOSURE[s]!.detail.startsWith(FACTOR_EDITION_DISCLOSURE[s]!.label),
+        `${s}: the short label must open the long detail verbatim`).toBe(true)
+    }
+    // The two surfaces answer DIFFERENT questions and must not borrow each other's words: the series
+    // states talk about years, the verifier page about one inventory.
+    expect(page, 'the verifier page must not import the series wording').not.toContain('between years')
+  })
+})
