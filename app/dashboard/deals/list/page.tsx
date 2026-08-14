@@ -20,7 +20,10 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../../../lib/supabase'
 import Nav from '../../../components/Nav'
 import PaywallCard from '../../../components/PaywallCard'
-import { useEntitlementState } from '../../../../lib/useEntitlement'
+// useEntitlementAccess, NOT useEntitlementState: `isPaid` is TRUE for an expired customer by
+// contract, so this list stayed open to someone whose term had run out while the trigger refused
+// their next insert. The pipeline export below is a paid deliverable and must follow the term.
+import { useEntitlementAccess } from '../../../../lib/useEntitlement'
 import { exportPipelineXlsx, PIPELINE_SELECT, type PipelineDealRow } from '../../../../lib/deals/exportPipelineXlsx'
 
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
@@ -64,10 +67,18 @@ function frameworkSummary(frameworks: string[] | null): { count: number; text: s
 }
 
 export default function DealsListPage() {
-  // `entLoading` is why this reads the state form: `isPaid` starts false, so rendering the
-  // paywall from the bare boolean showed it to EVERY paying customer on EVERY load and then
-  // removed it. The wall still fires on a resolved false — only the flash is gone.
-  const { isPaid, loading: entLoading } = useEntitlementState('deals')
+  // The 'loading' arm is why this reads the access form rather than a bare boolean: `isPaid` starts
+  // false, so rendering the paywall from it showed the wall to EVERY paying customer on EVERY load
+  // and then removed it. The wall still fires on a resolved answer — only the flash is gone.
+  //
+  // ⚠️ ONLY 'active' OPENS THIS PAGE. 'expired', 'none' and 'unknown' all wall: the first because
+  // the term ran out, the second because it was never bought, the third because a failed read must
+  // fail closed. They share one wall here — this page has no per-population copy and inventing some
+  // was not in scope — but the CAP wall in the wizard does distinguish them, which is where a
+  // lapsed customer is told what actually happened.
+  const access = useEntitlementAccess('deals')
+  const entLoading = access === 'loading'
+  const isPaid = access === 'active'
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [rows, setRows] = useState<DealRow[]>([])

@@ -31,11 +31,17 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabase'
-import { useEntitlementState } from '../../../../lib/useEntitlement'
+// useEntitlementAccess, NOT useEntitlementState — the state form's `isPaid` is TRUE for an expired
+// customer by contract with its seventeen callers, and this page needs to tell 'expired' from
+// 'never purchased' to choose which upsell to show (and 'unknown' to show neither).
+import { useEntitlementAccess } from '../../../../lib/useEntitlement'
+// Decided in lib/deals/gates.ts; this page renders the outcome and holds no second copy of the rule.
+import { resolveReportGate, type SessionState, type ReportUpsell } from '../../../../lib/deals/gates'
 import { useReportTitle, reportTitle } from '../../../../lib/useReportTitle'
 import { filenameDate } from '../../../../lib/filename'
 import PaywallCard from '../../../components/PaywallCard'
 import { DISCLAIMER_PARAS } from '../../../../lib/disclaimer'
+import { FLAT_MODULE_PRICES } from '../../../../lib/pricing'
 import {
   getFrameworkApplicability, getObligations, getComplianceCost, sectorRisks,
   assessmentView, isRevenueDeclared, notAssessedNote as notAssessedNoteOf, partiallyAssessedNote,
@@ -109,9 +115,13 @@ type FreeTierScope =
 
 function DealsReportInner() {
   const params = useSearchParams()
-  // State form, not the bare boolean: `isPaid` starts false, so the paywall below rendered for
-  // every paying customer before the entitlement resolved. Ordering matters too — see the guard.
-  const { isPaid, loading: entLoading } = useEntitlementState('deals')
+  // Five states, not a boolean: the paywall must not flash at a paying customer before the read
+  // resolves ('loading'), and the upsell at the foot must be able to tell a lapsed customer from
+  // one who never purchased — and to say nothing at all when the read failed.
+  const access = useEntitlementAccess('deals')
+  // Separate from `access`, which resolves a signed-out reader to 'none' through the same derivation
+  // as a signed-in customer with no row. Only one of the two should be asked to sign in.
+  const [sessionState, setSessionState] = useState<SessionState>('loading')
   const id = params.get('id')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -132,8 +142,13 @@ function DealsReportInner() {
         if (!session?.access_token) {
           setError('Please sign in to view the report.'); setLoading(false)
           setFreeTier({ state: 'resolved', newestOwnDealId: null })
+          // RESOLVED 'anon' rather than left on 'loading', for the same reason the free-tier scope
+          // beside it is resolved: an unresolved fact holds the loading state up forever, and the
+          // sign-in message below would never render.
+          setSessionState('anon')
           return
         }
+        setSessionState('authed')
 
         // TWO QUERIES, CONCURRENT AND UNCONDITIONAL.
         //
@@ -181,6 +196,9 @@ function DealsReportInner() {
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Something went wrong.'); setLoading(false)
         setFreeTier({ state: 'resolved', newestOwnDealId: null })
+        // Same reason as the two lines above: a thrown read must still resolve every fact the gate
+        // waits on, or the page hangs on "Loading report…" instead of showing the error it caught.
+        setSessionState(prev => (prev === 'loading' ? 'anon' : prev))
       }
     })()
   }, [id])
@@ -205,31 +223,35 @@ function DealsReportInner() {
   // case and the page would wait forever on a fact it was never going to be told.
   if (!id) return <Centered>No deal id provided.</Centered>
 
-  // BEFORE the paywall, and covering BOTH facts. An unresolved entitlement is not a refusal, and
-  // nor is an unresolved free-tier scope. This page is printed, so a paywall flashing into a print
-  // preview is worse than on screen. Reuses the page's own waiting state so no new one appears.
-  if (entLoading || freeTier.state === 'loading') return <Centered>Loading report…</Centered>
+  // ── DECIDED IN lib/deals/gates.ts. THIS PAGE ONLY RENDERS THE OUTCOME. ─────────────────────
+  // The reasoning behind each arm — why the free deal opens its own report, why identity rather than
+  // count settles the lapsed case, why a foreign id can never satisfy it — travelled to the resolver
+  // with the rule. Nothing here re-derives it.
+  const gate = resolveReportGate({
+    access,
+    session: sessionState,
+    freeTierDealId: freeTier.state === 'resolved' ? freeTier.newestOwnDealId : null,
+    freeTierResolved: freeTier.state === 'resolved',
+    requestedId: id,
+  })
 
-  // THE FREE DEAL OPENS ITS REPORT. Gating the whole report on `isPaid` meant a free deal could be
-  // screened end to end and then produced nothing to take away, which is the thing the free tier
-  // exists to demonstrate.
-  //
-  // Identity, not count: the reader may open THIS deal because it is the one their free tier
-  // covers, not because they happen to have exactly one. That also settles the lapsed case — an
-  // entitled user who saved several and then lapsed keeps the most recently worked on.
-  //
-  // A deal that is not theirs cannot satisfy this, because `newestOwnDealId` is selected under the
-  // owner filter AND under RLS, so a foreign id can never equal it — the unentitled reader gets the
-  // paywall, and the row itself was never readable in the first place.
-  const freeDealAllowed = freeTier.state === 'resolved' && freeTier.newestOwnDealId !== null && freeTier.newestOwnDealId === id
-  // ONLY REACHABLE BY SOMEONE WHO HAS OPENED A REPORT BEFORE. `freeDealAllowed` lets the newest
-  // own deal through, so this wall fires on the SECOND one — the reader is demonstrably in the
-  // Deals module, and the question they actually have is why this report is locked when the last
-  // one was not. The first sentence answers that; a generic "unlock this module" does not.
+  // BEFORE the paywall. An unresolved entitlement is not a refusal, and nor is an unresolved
+  // free-tier scope. This page is printed, so a paywall flashing into a print preview is worse than
+  // on screen. Reuses the page's own waiting state so no new one appears.
+  if (gate.kind === 'loading') return <Centered>Loading report…</Centered>
+
+  // The effect has already set `error` for this case; the gate arm exists so the paywall below
+  // cannot fire at someone whose only problem is that they are signed out.
+  if (gate.kind === 'signed-out') return <Centered>{error ?? 'Please sign in to view the report.'}</Centered>
+
+  // ONLY REACHABLE BY SOMEONE WHO HAS OPENED A REPORT BEFORE. The gate lets the newest own deal
+  // through, so this wall fires on the SECOND one — the reader is demonstrably in the Deals module,
+  // and the question they actually have is why this report is locked when the last one was not. The
+  // first sentence answers that; a generic "unlock this module" does not.
   //
   // Wording is the neighbouring Deals surfaces', not a new register: the title is deals/list's
   // verbatim, and the deliverables are the free-deal wall's own list in deals/page.tsx.
-  if (!isPaid && !freeDealAllowed) return (
+  if (gate.kind === 'paywalled') return (
     <PaywallCard
       title="Unlock the Deals module"
       body="Screening one target is free. This report belongs to another one — unlock Deals to open it, keep a pipeline of targets, and take away the diligence report, the Excel export and the shareable assessment."
@@ -247,7 +269,10 @@ function DealsReportInner() {
   // identify what the reader is holding. Eight characters matches the climate-risk and materiality
   // reports; the date comes from the same instant as the footer date and the PDF filename.
   const reference = `${String(deal.id).slice(0, 8)}-${filenameDate(generatedAt)}`
-  return <DealReport deal={deal} reportDate={reportDate} reference={reference} />
+  // `upsell` is 'none' for an entitled reader AND for one whose entitlement could not be read — see
+  // resolveReportGate. Passed down rather than re-derived in DealReport, which would be a second
+  // copy of the rule one component along.
+  return <DealReport deal={deal} reportDate={reportDate} reference={reference} upsell={gate.upsell} />
 }
 
 // ─── Small shared components & styles ─────────────────────────────────────────
@@ -293,7 +318,7 @@ function NotAssessed({ title, children }: { title: string; children: React.React
 }
 
 // ─── The report ───────────────────────────────────────────────────────────────
-function DealReport({ deal, reportDate, reference }: { deal: DealRow; reportDate: string; reference: string }) {
+function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; reportDate: string; reference: string; upsell: ReportUpsell }) {
   const sector = deal.sector ?? ''
   const jurisdiction = deal.jurisdiction ?? ''
   const currency = deal.currency ?? 'USD'
@@ -793,6 +818,47 @@ function DealReport({ deal, reportDate, reference }: { deal: DealRow; reportDate
             <p key={'disc' + i} style={{ ...p, fontSize: 11, color: '#888784' }}>{para}</p>
           ))}
         </section>
+
+        {/* ── UPSELL — SCREEN ONLY, AND ONLY WHERE THERE IS SOMETHING TO SELL ────────────────────
+            `.no-print`, deliberately. This document is printed and sent to counterparties, deal
+            teams and investment committees; a "buy ThemisIQ" panel inside a saved PDF would travel
+            with it into rooms it was never meant for, and would sit under the Important Notice it
+            has nothing to do with. On screen it is the last thing the reader passes.
+
+            IT DOES NOT WEAKEN THE REPORT. Everything above is unchanged and complete for a free
+            reader — that is what the free tier exists to demonstrate. This is appended after the
+            document ends, not carved out of it.
+
+            RENDERS FOR NOBODY WHO IS ENTITLED, and for nobody whose entitlement could not be read:
+            resolveReportGate collapses both to 'none'. The two remaining branches are the same
+            populations enforce_deals_free_tier_cap() distinguishes in its two RAISE EXCEPTION
+            messages — telling a lapsed customer to "unlock" invites them to buy what they own.
+            Link target matches the existing PaywallCard rather than /order, so the two commercial
+            routes out of this module agree. */}
+        {upsell !== 'none' && (
+          <div className="no-print" style={{ marginTop: 40, background: '#0d0d0d', borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 10 }}>Deals &amp; Investment</div>
+            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.5rem', fontWeight: 400, color: '#fff', marginBottom: 10 }}>
+              {upsell === 'expired'
+                ? 'Your Deals access has expired.'
+                : 'That was your free target.'}
+            </div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 20, lineHeight: 1.6, maxWidth: 520, margin: '0 auto 20px' }}>
+              {/* ⚠️ THE PRICE IS INTERPOLATED, NOT WRITTEN. lib/pricing.ts is the single source of
+                  truth and cartQuote() charges from the same table, so a hardcoded '$4,900' here
+                  would go stale silently the day Deals is repriced — quoting a customer one figure
+                  in the upsell and charging another at checkout. Formatted with
+                  toLocaleString('en-US') to match app/deals/page.tsx, so every surface renders the
+                  number identically. Reads $4,900 today, which is what the approved copy says. */}
+              {upsell === 'expired'
+                ? 'Your saved targets and their reports are still here, and you can still work on them. Renewing lets you screen new ones again.'
+                : `This report stays available. Screening further targets is $${FLAT_MODULE_PRICES['deals'].toLocaleString('en-US')} USD a year: unlimited targets, saved to one pipeline you can export as a single spreadsheet, plus the link you hand a target to make disclosure a condition of proceeding.`}
+            </div>
+            <a href="/pricing?modules=deals" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
+              See Deals pricing →
+            </a>
+          </div>
+        )}
 
         <div style={{ marginTop: 32, paddingTop: 16, borderTop: '0.5px solid #e8e7e4', fontSize: 11, color: '#888784', textAlign: 'center', lineHeight: 1.7 }}>
           ThemisIQ Compliance Inc. · www.themisiq.co · Reference {reference} · Generated {reportDate}

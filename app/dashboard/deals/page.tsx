@@ -4,8 +4,16 @@ import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Nav from '../../components/Nav'
 import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS } from '../../../lib/sb253'
-import { useEntitlementState } from '../../../lib/useEntitlement'
+// useEntitlementAccess, NOT useEntitlementState. The state form's `isPaid` is TRUE for an expired
+// customer by contract with its seventeen callers, so reading it here made the client disagree with
+// enforce_deals_free_tier_cap(), whose first test is `term_end > now()`. See resolveWizardGate.
+import { useEntitlementAccess } from '../../../lib/useEntitlement'
 import { supabase } from '../../../lib/supabase'
+// THE GATE IS DECIDED IN lib/deals/gates.ts AND ONLY RENDERED HERE. Its header carries the
+// invariant: this page holds no second copy of the rule. Anything below that re-derives "is this
+// user walled" or "may they see results" has reintroduced the drift the extraction removed.
+import { resolveWizardGate, type FreeTierDeal, type SessionState } from '../../../lib/deals/gates'
+import { saveDealDraft, takeDealDraft } from '../../../lib/deals/draft'
 import {
   getObligations, getApplicableFrameworks, getFrameworkApplicability, getComplianceCost,
   sectorRisks, DEFAULT_PIPELINE_TARGETS, DEAL_CURRENCIES, JURISDICTIONS,
@@ -61,22 +69,9 @@ const verifyChip: React.CSSProperties = { fontSize: 10, fontWeight: 700, padding
 
 // ─── Page wrapper ─────────────────────────────────────────────────────────────
 
-// The free-tier gate's view of "does this user already have a saved deal", as a DISCRIMINATED
-// UNION rather than a nullable value.
-//
-// The head count carried the distinction as `number | null` — null not-yet-counted, 0 none — and
-// that only worked while nobody had to read the row itself. Now the wall needs the deal's id and
-// name, so a nullable row would carry THREE meanings in two states: not loaded, loaded-and-absent,
-// loaded-and-present. `undefined` vs `null` would technically separate the first two and would be
-// misread by the first person to write `if (!savedDeal)`.
-//
-// On the union there is no id to read on the arms that have none, so "render a link to their deal
-// before we know whether they have one" is not expressible. Same reasoning as ObligationPrice's
-// quote arm in lib/obligations.ts.
-type FreeTierDeal =
-  | { state: 'loading' }                                  // not yet asked, or answer in flight
-  | { state: 'none' }                                     // asked: this user has saved nothing
-  | { state: 'saved'; id: string; name: string }          // asked: their most recent saved deal
+// FreeTierDeal MOVED TO lib/deals/gates.ts, unchanged, so the resolver and this page cannot describe
+// the same lookup two ways. Its reasoning — why a discriminated union rather than a nullable row,
+// and why the 'none' arm covers a signed-out visitor — travelled with it.
 
 // ONE loading shell, used by the Suspense boundary AND by the free-tier gate below. The gate has
 // to render something while it does not yet know whether to wall, and it must not be a different
@@ -102,12 +97,25 @@ export default function DealsDashboard() {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 function DealsDashboardInner() {
-  // Both facts the free-tier gate needs, each with its own "not yet known" state. See the gate
-  // itself, below the derivations, for why neither may be read before it resolves.
-  const { isPaid, loading: entLoading } = useEntitlementState('deals')
+  // The THREE facts the gate needs, each with its own "not yet known" state. See resolveWizardGate
+  // for why none may be read before it resolves.
+  //
+  // FIVE STATES, NOT A BOOLEAN. 'expired' and 'none' are different customers with different next
+  // actions, and 'unknown' is not a customer fact at all — it says the read failed. The bare
+  // `isPaid` this replaced collapsed the first two into true and the third into false, which is how
+  // a lapsed customer reached an unlocked screen and only met the cap when a save failed.
+  const access = useEntitlementAccess('deals')
+  // SEPARATE FROM `access`, because a signed-out visitor and a signed-in customer who never
+  // purchased both resolve to 'none' — one derivation, deliberately — and only one of them should be
+  // asked to sign in. Starts 'loading': `userId` alone had no third state, so `!userId` was true on
+  // first paint for a signed-in user too.
+  // Named `sessionState`, not `session`: the load effect destructures Supabase's own `session` out
+  // of getSession(), and two different things called `session` in one component is how the wrong one
+  // gets read.
+  const [sessionState, setSessionState] = useState<SessionState>('loading')
   // Starts on the 'loading' arm, which is NOT 'none'. Reading an unresolved answer as "no saved
   // deals" opens the wizard to someone who should be walled; reading it as "has one" walls someone
-  // who should not be. The union above is what keeps those three states from collapsing into two.
+  // who should not be. The union is what keeps those three states from collapsing into two.
   const [savedDeal, setSavedDeal] = useState<FreeTierDeal>({ state: 'loading' })
   const [step, setStep] = useState(0)
   const [deal, setDeal] = useState({
@@ -186,7 +194,15 @@ function DealsDashboardInner() {
       // union stays on 'loading' forever for a signed-out visitor and the gate below holds the
       // loading shell up permanently, replacing a usable wizard with a spinner. Signed out,
       // handleSave already says 'Please log in to save your deal.'
-      if (cancelled || !session) { setSavedDeal({ state: 'none' }); return }
+      if (cancelled || !session) {
+        setSavedDeal({ state: 'none' })
+        // RESOLVED 'anon', not left on 'loading'. Same reasoning as the line beside it: an
+        // unresolved session holds the loading shell up forever, and the results gate would then
+        // never render either the results or the sign-in prompt.
+        setSessionState('anon')
+        return
+      }
+      setSessionState('authed')
       setUserId(session.user.id)
 
       // ── Free-tier lookup ─────────────────────────────────────────────────
@@ -219,7 +235,25 @@ function DealsDashboardInner() {
       // blank in another.
       else setSavedDeal({ state: 'saved', id: recent.id, name: (recent.target_name || '').trim() || 'Untitled deal' })
 
-      if (!dealIdParam) return          // no id -> start clean; nothing is loaded and dealId stays null
+      if (!dealIdParam) {
+        // ── BACK FROM /login WITH A DRAFT ─────────────────────────────────────────────────────
+        // ONLY ON THE no-id PATH, and that is what keeps it safe. With an ?id= this effect is about
+        // to hydrate a SAVED deal, and merging a stale draft over it would silently edit a stored
+        // row with figures from a different target. A bare /dashboard/deals is the blank-new-deal
+        // path, which is exactly where a returning draft belongs.
+        //
+        // takeDealDraft() reads AND removes, so this cannot re-fire over the next deal started in
+        // this tab. Merged OVER the defaults, never under — see parseDealDraft's own note.
+        const draft = takeDealDraft()
+        if (draft) {
+          setDeal(d => ({ ...d, ...draft }))
+          // `dirty`, not `saved`: they have unsaved work in the form again, which is the same state
+          // they were in before the bounce. Marking it saved would let them close the tab believing
+          // the draft had been stored.
+          setDirty(true)
+        }
+        return          // no id -> start clean; nothing is loaded and dealId stays null
+      }
       const { data, error } = await supabase
         .from('deals')
         .select('*')
@@ -482,6 +516,60 @@ function DealsDashboardInner() {
     setTimeout(() => setCopiedShare(false), 2000)
   }
 
+  // ── THE GATE, DECIDED ONCE ───────────────────────────────────────────────────
+  //
+  // Computed HERE rather than beside the early returns below, because the step renderers need
+  // `resultsShown` and they are declared above those returns. One call, one answer, read by both.
+  const gate = resolveWizardGate({ access, session: sessionState, savedDeal, dealIdParam })
+
+  // ⚠️ THE FORM IS OPEN TO A SIGNED-OUT VISITOR; THE FINDINGS ARE NOT.
+  //
+  // The screening engine is pure and client-side and stays that way — this is a RENDER gate, not a
+  // move to the server, and anyone reading the bundle can still run the maths. What it protects is
+  // not the algorithm, it is the deliverable: the frameworks table, the near-threshold panels, the
+  // data-room gaps, the risk findings and the cost estimate are the product, and they are what the
+  // free tier trades for an account.
+  //
+  // ⚠️ 'hidden' IS NOT 'not yet known'. gate.kind is 'open' by the time any step renders — the two
+  // other arms return early below — so this reads a decided answer, never a default.
+  const resultsShown = gate.kind !== 'open' || gate.results === 'shown'
+
+  // "Does this account hold a Deals row at all" — the TERM-BLIND question, and the only place it is
+  // still asked. It gates feature visibility in step 4 (the report link, the share controls), never
+  // the free-deal cap, which resolveWizardGate decides on 'active' alone. See its use site.
+  const hasDealsRow = access === 'active' || access === 'expired'
+
+  // Sends them to /login and back, with the form's contents surviving the round trip. Same shape as
+  // startCheckout's unauthenticated branch in lib/checkout.ts: stash the intent, bounce, restore.
+  // `next` returns to the bare wizard — NOT to a ?id=, which does not exist yet — and the load
+  // effect's no-id branch is what picks the draft back up.
+  const signInForResults = () => {
+    saveDealDraft(deal)
+    window.location.href = `/login?next=${encodeURIComponent('/dashboard/deals')}`
+  }
+
+  // ONE prompt, rendered wherever a results block is withheld, so a signed-out visitor is never
+  // shown an empty panel that reads as "nothing found". Absence of a finding is not a finding —
+  // the same rule the NOT ASSESSED states throughout this wizard already follow.
+  //
+  // ⚠️ A FUNCTION RETURNING JSX, CALLED AS signInPrompt() — NOT A COMPONENT USED AS <SignInPrompt/>.
+  // Declaring a component inside another component creates a NEW component type on every render, so
+  // React unmounts and remounts the subtree each time; react-hooks/static-components flags exactly
+  // that. It has no state to lose today, which is precisely why the wrong version would have looked
+  // fine. It closes over `deal`, so hoisting it out of the component is not free either.
+  const signInPrompt = () => (
+    <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '2rem', textAlign: 'center' as const, marginBottom: 20 }}>
+      <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 8 }}>Sign in to see your results</div>
+      <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, maxWidth: 460, margin: '0 auto 18px' }}>
+        Screening one target is free. Everything you have entered is kept — signing in brings you
+        straight back to this deal with the figures still in place.
+      </div>
+      <button onClick={signInForResults} style={{ fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>
+        Sign in to see your results →
+      </button>
+    </div>
+  )
+
   // ─── Steps ──────────────────────────────────────────────────────────────────
 
   const renderStep0 = () => (
@@ -568,6 +656,16 @@ function DealsDashboardInner() {
     <div>
       <h2 style={sectionHead}>ESG framework screening</h2>
       <p style={sectionSub}>ThemisIQ has identified the frameworks that apply to this deal based on sector, jurisdiction and deal size. Review and confirm.</p>
+
+      {/* ── FINDINGS WITHHELD UNTIL THERE IS A SESSION ─────────────────────────────────────────
+          Everything between here and the data-room INPUTS below is a finding: the frameworks list,
+          the partial-assessment caveats, the near-threshold panels. The inputs themselves stay
+          open — a signed-out visitor fills the form in, they just do not read the answer.
+          The prompt REPLACES the blocks rather than sitting above empty ones: a hidden findings
+          list and an empty findings list look identical, and this wizard's whole NOT ASSESSED
+          vocabulary exists because an absence must never render as a finding. */}
+      {!resultsShown && signInPrompt()}
+      {resultsShown && <>
 
       {/* Same three states the report uses — a blank revenue field must not render as a negative finding.
           The `unevaluated` conjunct is what keeps the copy and the gate describing the same rows:
@@ -661,6 +759,10 @@ function DealsDashboardInner() {
         </div>
       )}
 
+      </>}
+
+      {/* ── INPUT, NOT A FINDING — stays open to a signed-out visitor. These two toggles are the
+          only fields on this step; the gaps panel BELOW them is the finding they produce. */}
       <div style={{ border: '1px solid #e8e7e4', borderRadius: 12, padding: '1.25rem', marginBottom: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d', marginBottom: 12 }}>Data room status</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -682,7 +784,8 @@ function DealsDashboardInner() {
         </div>
       </div>
 
-      {(!deal.has_ghg_data || !deal.has_esg_report) && (
+      {/* THE FINDING the toggles above produce, so it is withheld with the rest of them. */}
+      {resultsShown && (!deal.has_ghg_data || !deal.has_esg_report) && (
         <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '1rem' }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 4 }}>⚠ Data room gaps identified</div>
           <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
@@ -974,7 +1077,15 @@ function DealsDashboardInner() {
         </div>
       )}
 
-      {isPaid ? (
+      {/* ⚠️ DELIBERATELY TERM-BLIND, UNLIKE THE CAP GATE. This branch decides whether to show the
+          REPORT LINK and the share-link controls — not whether the free-deal cap applies — and it
+          keeps its pre-existing meaning: "does this account hold a Deals row at all". An expired
+          customer therefore keeps the link to a report they can still open (resolveReportGate lets
+          the newest own deal through) and keeps control of a share link they have already
+          published. Narrowing this to 'active' would revoke both from someone whose saved work the
+          trigger deliberately leaves editable, which is a different decision from the one asked for
+          and should be made on its own. Named rather than inlined so it is greppable. */}
+      {hasDealsRow ? (
         <div>
           {/* The report is the finished document; this screen is where you go to it. It needs a
               saved deal because it loads by id, so the unsaved state matches the share block
@@ -1077,57 +1188,96 @@ function DealsDashboardInner() {
     </div>
   )
 
-  const steps = [renderStep0, renderStep1, renderStep2, renderStep3, renderStep4]
-
-  // ── FREE-TIER GATE — walls before step 0 ────────────────────────────────────
+  // ── STEPS 2-4 ARE FINDINGS END TO END ────────────────────────────────────────
   //
-  // DECIDE NOTHING UNTIL BOTH FACTS ARE IN. `isPaid` starts false and `savedDeal` starts on its
-  // 'loading' arm, so any render that reads either before it resolves is reading a default, not an
-  // answer. Rendering the wizard first and replacing it with the wall is the worse of the two
-  // failures — they may have started typing into a form that is about to vanish — and rendering
-  // the wall first tells a paying customer they have lost access they have not lost. The shell
-  // says neither. It is the SAME shell as the Suspense fallback, so this is not a new wait state.
-  if (entLoading || savedDeal.state === 'loading') return <DealsShell />
-
-  // `!dealIdParam` IS THE EDIT EXEMPTION, and it is what keeps the client agreeing with the
-  // database. The trigger is BEFORE INSERT only, so an unentitled user's UPDATEs are permitted
-  // server-side; walling the edit path would have the client enforce a stricter rule than the
-  // thing that actually enforces. They saved it while it was allowed — they can still open it.
+  // Risk findings, the cost estimate and the report/share step hold NO input fields at all, so they
+  // are withheld whole rather than block by block. Step 1 is the mixed one and is gated inside its
+  // own renderer; step 0 is pure input and is never withheld.
   //
-  // Keyed on the URL PARAM, not on the loaded `dealId`, so the decision does not wait on a third
-  // async fact. The cost is that a bogus `?id=` suppresses the wall and lands on a blank NEW
-  // deal — at which point the trigger refuses the insert and handleSave surfaces its message.
-  // That is the intended division: the trigger enforces, this only explains it earlier.
-  // UNCHANGED IN MEANING from the head-count version: entitlement resolved and false, at least one
-  // saved deal, no ?id=. Only the middle term's representation changed — `savedDealCount >= 1`
-  // became the 'saved' arm, which additionally carries the id and name the link below needs.
-  const walled = !isPaid && savedDeal.state === 'saved' && !dealIdParam
-  if (walled) return (
+  // DECLARED PER STEP, AT THE ONE PLACE THE STEPS ARE ASSEMBLED. `findingsOnly` is REQUIRED by the
+  // type, so a sixth step cannot be added without someone answering the question — the alternative
+  // (a list of indices, or a wrapper applied to some entries) lets a new step default quietly into
+  // being ungated, which is the failure this shape exists to make impossible.
+  const steps: { render: () => React.ReactElement; findingsOnly: boolean }[] = [
+    { render: renderStep0, findingsOnly: false },   // pure input — never withheld
+    { render: renderStep1, findingsOnly: false },   // MIXED: gated inside its own renderer
+    { render: renderStep2, findingsOnly: true },
+    { render: renderStep3, findingsOnly: true },
+    { render: renderStep4, findingsOnly: true },
+  ]
+
+  // ── RENDERING THE GATE DECIDED ABOVE. NOTHING HERE RE-DERIVES IT. ──────────────────────────
+  //
+  // That is the invariant the extraction bought: the five gate states are assertable in
+  // lib/deals/gates.test.ts, which they were not while this decision lived inline in a component in
+  // a repo with no DOM harness.
+  //
+  // The SAME shell as the Suspense fallback, so an unresolved gate is not a new wait state. Reading
+  // any fact before it resolves reads a default, not an answer.
+  if (gate.kind === 'loading') return <DealsShell />
+
+  if (gate.kind === 'walled') return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '3rem 1.5rem' }}>
         <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 10 }}>Deals &amp; Investment</div>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.5rem', fontWeight: 400, color: '#fff', marginBottom: 10 }}>You have used your free deal</div>
+          {/* ⚠️ THREE POPULATIONS, THREE MESSAGES — the same split enforce_deals_free_tier_cap()
+              already makes in its two RAISE EXCEPTION branches. Until this gate became term-aware
+              an expired customer never reached this wall at all; now they do, and showing them the
+              never-purchased copy would invite them to buy a module they already own. 'unknown' gets
+              neither claim: the entitlement read failed, so nothing about their account was
+              established and an error that guesses at a cause eventually names the wrong one. */}
+          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.5rem', fontWeight: 400, color: '#fff', marginBottom: 10 }}>
+            {gate.reason === 'free-deal-used' ? 'You have used your free deal'
+              : gate.reason === 'expired' ? 'Your Deals access has expired.'
+              : 'We could not confirm your access.'}
+          </div>
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 20, lineHeight: 1.6 }}>
-            Screening one target is free. To screen another — and to keep a pipeline of them, with the
-            diligence report, the Excel export and the shareable assessment — unlock the Deals module.
+            {gate.reason === 'free-deal-used' ? (
+              <>
+                Screening one target is free. To screen another — and to keep a pipeline of them, with the
+                diligence report, the Excel export and the shareable assessment — unlock the Deals module.
+              </>
+            ) : gate.reason === 'expired' ? (
+              'Your saved targets are still here and you can keep working on them. Renewing lets you screen new targets again.'
+            ) : (
+              'Something went wrong reading your subscription, so we have not loaded the screen rather than guess what you have. Reload the page — if it happens again, email hello@themisiq.co and we will sort it out.'
+            )}
           </div>
           {/* ⚠️ THIS LINK IS THE ONLY ROUTE BACK TO THEIR SAVED DEAL. DO NOT REMOVE IT AS
               DECORATION. The deal is reachable at exactly one URL — /dashboard/deals?id=<id> —
-              and both surfaces that would otherwise hand over that id, /dashboard/deals/list and
-              /dashboard/deals/report, are FULLY WALLED on this same entitlement. There is no nav
+              and /dashboard/deals/list is FULLY WALLED on this same entitlement. There is no nav
               entry, no search, and no other page that lists it. If this anchor is deleted, or its
               href loses the id, an unentitled user's own work becomes unreachable to them while
               still counting against the cap that put this wall in front of them.
-              It is also why the lookup above selects the row rather than counting rows. */}
+              It is also why the lookup above selects the row rather than counting rows.
+              ⚠️ THE OLD VERSION OF THIS NOTE ALSO NAMED /dashboard/deals/report AS FULLY WALLED.
+              It is not, and was not: resolveReportGate lets the free deal open its own report. The
+              claim was stale, and it is corrected rather than removed because the rest of the
+              paragraph — the id being the only route back — still holds and still matters.
+              Reads gate.dealId / gate.dealName, NOT savedDeal: the resolver decided this, and a
+              second read of the raw state here is exactly the drift the extraction removed. */}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <a href={`/dashboard/deals?id=${savedDeal.id}`} style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: '#fff', color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
-              Open your saved deal — {savedDeal.name} →
+            <a href={`/dashboard/deals?id=${gate.dealId}`} style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: '#fff', color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
+              Open your saved deal — {gate.dealName} →
             </a>
-            <a href="/pricing?modules=deals#build-your-stack" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
-              See pricing &amp; unlock →
-            </a>
+            {/* ⚠️ NO COMMERCIAL CTA ON THE 'unknown' BRANCH, AND THIS IS THE SAME REFUSAL
+                resolveReportGate MAKES BY COLLAPSING 'unknown' TO upsell: 'none'. The entitlement
+                read FAILED, so we do not know what this person holds — and the one thing worse than
+                withholding a sale is selling a live subscriber the module they are already paying
+                for. Nothing about their account was established, so nothing may be sold against it.
+                The anchor above still renders for all three reasons: it asserts no commercial fact,
+                and it is their only route back to their own work.
+                THE LABEL SPLITS TOO. 'unlock' is the free-tier word — it invites a purchase of
+                something not yet owned. An EXPIRED customer already bought this module, so it is
+                the wrong verb for them by the same reasoning the three-populations note above
+                gives; they get the neutral pricing label the report upsell uses. */}
+            {gate.reason !== 'unknown' && (
+              <a href="/pricing?modules=deals#build-your-stack" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
+                {gate.reason === 'expired' ? 'See Deals pricing →' : 'See pricing & unlock →'}
+              </a>
+            )}
           </div>
         </div>
       </div>
@@ -1167,7 +1317,11 @@ function DealsDashboardInner() {
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '2rem 2.5rem' }}>
         <div style={{ display: 'grid', gridTemplateColumns: step === 4 ? '1fr' : '1fr 260px', gap: '2rem', alignItems: 'start' }}>
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '2rem' }}>
-            {steps[step]()}
+            {/* THE ONE PLACE A STEP IS RENDERED, so the findings gate cannot be bypassed by any
+                route into a step. `findingsOnly` is the step's own declaration; `resultsShown` is
+                the resolver's answer. Step 1 declares false and gates internally — it holds the
+                only inputs that share a screen with findings. */}
+            {steps[step].findingsOnly && !resultsShown ? signInPrompt() : steps[step].render()}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
               <button onClick={() => setStep(s => Math.max(0, s - 1))} style={{ fontSize: 13, padding: '9px 20px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: step === 0 ? 'not-allowed' : 'pointer', opacity: step === 0 ? 0.4 : 1 }}>← Back</button>
               <button onClick={handleSave} disabled={saving} style={{ fontSize: 13, fontWeight: saved ? 500 : 600, padding: '9px 20px', borderRadius: 8, background: saved ? '#E1F5EE' : GRAD, border: saved ? '1px solid #0F6E56' : 'none', color: saved ? '#0F6E56' : '#0d0d0d', cursor: saving ? 'not-allowed' : 'pointer' }}>{saving ? 'Saving…' : saved ? '✓ Saved' : 'Save deal'}</button>
