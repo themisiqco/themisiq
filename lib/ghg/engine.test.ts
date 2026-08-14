@@ -1555,6 +1555,15 @@ describe('Y. Australia has a published residual mix', () => {
 //
 // This commit is ADDITIVE ONLY. The legacy key is untouched and is still the only one anything reads;
 // these tests exist so the seeded values are pinned before commit 2 makes them reachable.
+//
+// ⚠️ THE IDS RUN IN ORDER, AND THAT IS A PROPERTY TO MAINTAIN, NOT A COINCIDENCE. Z1-Z5 then Z7-Z18,
+// each block sitting where its number says. They did not: the file once ran Z1-Z5, Z9, Z15-Z17,
+// Z10-Z14, Z7, Z8, Z18, so "delete Z10 through Z14" selected a nine-test span and the deletion was
+// caught by the test COUNT rather than by anyone reading it. A new test appends at Z19; it does not
+// slot in beside a thematic neighbour.
+//   Z6 IS DELIBERATELY ABSENT — it asserted "US residual is deliberately absent" and was retired with
+// the backlog it belonged to. See Z16, which records that. Do not renumber to close the hole: the ids
+// are cross-referenced from prose elsewhere, including lib/ghg/engine.ts (Z7) and sections U and W (Z5).
 describe('Z. fuel oil grades are seeded per table', () => {
   const G = 3.785411784; // L_PER_GAL
 
@@ -1652,6 +1661,55 @@ describe('Z. fuel oil grades are seeded per table', () => {
     expect(perL((EF_EU as any).fuel_oil_distillate_gallon.co2)).toBeCloseTo(74100 * 43.0e-6 * 0.844, 5);
   });
 
+  it('Z7 EU distillate equals the gas/diesel oil derivation it is taken from', () => {
+    // The three inputs are CO2 74100 kg/TJ, NCV 43.0, dens 0.844 — the same row this table already
+    // uses for diesel. Pinned as an equality so the shared provenance is a fact, not a coincidence.
+    expect((EF_EU as any).fuel_oil_distillate_gallon).toEqual((EF_EU as any).diesel_gallon);
+    expect((EF_EU as any).fuel_oil_residual_gallon).toEqual((EF_EU as any).fuel_oil_gallon);
+  });
+
+  it('Z8 ALL THREE pickEF sites read GRADE keys — the retired fuel_oil_gallon is gone', () => {
+    // WAS: "nothing reads the new keys yet — no emission figure can have moved." That premise died
+    // with the split. Its job now is the inverse: catch a PARTIAL switch.
+    //
+    // Six calls, not three: two grades x calcLocation / calcInventory's per-fuel add / buildWorkings.
+    // Switching two of the three leaves the location total, the per-fuel breakdown and the workings
+    // row disagreeing about the same litres, and only the buildWorkings one would be caught elsewhere
+    // (by section M's recomputation check). This counts them.
+    // ⚠️ THE SHAPE HAS CHANGED TWICE, AND THIS NOW ASSERTS THE PROPERTY RATHER THAN THE SPELLING.
+    // No call site names a grade key any more: fuelOilPricing() picks litre-or-gallon per jurisdiction
+    // and every consumer prices off `fo.key`. Counting literal occurrences was the right test while
+    // the key was written at each site and is simply not measurable now — so what is asserted is the
+    // thing that actually mattered: THREE pricing sites, each going through the ONE chooser, and no
+    // path reaching the retired ungraded key.
+    const src = readFileSync(join(process.cwd(), 'lib/ghg/engine.ts'), 'utf8');
+    const calls = src.split('\n').filter(l => /fuelOilPricing\(loc, '(distillate|residual)'/.test(l));
+    expect(calls.length, 'two grades x three sites, all through the one chooser').toBe(6);
+    expect(calls.filter(c => c.includes("'distillate'")).length, 'three distillate sites').toBe(3);
+    expect(calls.filter(c => c.includes("'residual'")).length, 'three residual sites').toBe(3);
+    // The chooser itself may only ever build a graded key — never the retired 'fuel_oil_gallon'.
+    const chooser = src.slice(src.indexOf('function fuelOilPricing'), src.indexOf('const fuelOilInGallons'));
+    expect(chooser).toContain('`fuel_oil_${grade}_litre`');
+    expect(chooser).toContain('`fuel_oil_${grade}_gallon`');
+    expect(chooser, "'fuel_oil_gallon' was retired — no alias was kept").not.toContain("'fuel_oil_gallon'");
+    // THE RAW/RESOLVED DISTINCTION SURVIVES THE SPLIT. buildWorkings prices the coverage-resolution
+    // -applied figure; the other two read the stored amount. Collapsing them would silently drop
+    // estimation adjustments from the workings row.
+    // Asserted as the PROPERTY rather than the call spelling: buildWorkings hoists the resolved
+    // figure into `entered` (so the activity column can show it) before converting, so
+    // `fuelOilToGallons(figure(...))` is no longer one substring. What must remain true is that the
+    // workings path reads figure() and the calc path reads the raw amount.
+    // buildWorkings prices the coverage-resolution-APPLIED figure...
+    expect(src).toContain("fuelOilPricing(loc, 'distillate', entered)");
+    expect(src).toContain("fuelOilPricing(loc, 'residual', entered)");
+    // ...while the two calc paths read the STORED amount. Collapsing them would silently drop
+    // estimation adjustments from the workings row. (fuelOilInGallons, the old raw-value wrapper, is
+    // gone: it always converted to gallons, which is now the exception rather than the rule.)
+    expect(src).toContain("fuelOilPricing(loc, 'distillate', loc.fuel_oil_distillate_amount)");
+    expect(src).toContain("fuelOilPricing(loc, 'residual', loc.fuel_oil_residual_amount)");
+    expect(src, 'the always-convert wrapper must not come back').not.toContain('const fuelOilInGallons =');
+  });
+
   it('Z9 EF_UK is DEFRA 2026 — refreshed whole, and the grade keys are seeded', () => {
     // WAS: "EF_UK has NO grade keys — the table is DEFRA 2025 and must be refreshed whole first."
     // That blocker is gone. The table was refreshed to DEFRA 2026 in full on 13 Aug 2026, so seeding
@@ -1672,46 +1730,6 @@ describe('Z. fuel oil grades are seeded per table', () => {
     expect((EF_UK as any).propane_litre.co2, 'propane did not move between editions').toBe(1.54358);
     // The residual-oil FACTOR did not move either; only its gallon conversion was corrected.
     expect((EF_UK as any).fuel_oil_gallon.co2).toBe(12.018380);
-  });
-
-  it('Z15 the legacy fuel_oil_gallon and the new residual key are the SAME number, by construction', () => {
-    // The legacy key always WAS the residual row — its comment has said so since it was seeded — so
-    // both hold DEFRA's "Processed fuel oils - residual oil" 3.17492 kg/L converted the same way.
-    // Not a coincidence to be tolerated: an identity to be enforced. Editing one alone means one of
-    // them is wrong, and nothing else in the suite would notice which.
-    expect((EF_UK as any).fuel_oil_residual_gallon).toEqual((EF_UK as any).fuel_oil_gallon);
-    expect((EF_UK as any).fuel_oil_residual_gallon.co2).toBe(12.018380);
-    // Distillate is a genuinely different row and must NOT equal either.
-    expect((EF_UK as any).fuel_oil_distillate_gallon).not.toEqual((EF_UK as any).fuel_oil_gallon);
-  });
-
-  it('Z16 NOT_YET_SEEDED is EMPTY — every table carries both grades', () => {
-    // The seeding backlog is closed. Z6 ("US residual is deliberately absent") went with it.
-    // A future partial seeding declares itself here; until then this asserts there is nothing pending.
-    expect(NOT_YET_SEEDED).toEqual({});
-    for (const [name, table] of TABLES) {
-      expect(table.fuel_oil_distillate_gallon, `${name} distillate`).toBeDefined();
-      expect(table.fuel_oil_residual_gallon, `${name} residual`).toBeDefined();
-    }
-  });
-
-  it('Z17 the US grades derive from EPA heat content x factor, at full precision', () => {
-    const ef = EF as any;
-    // Distillate No.2 — 0.138 mmBtu/gal x (73.96 CO2, 3 g CH4, 0.6 g N2O). ALL THREE reproduce, which
-    // is what ESTABLISHED the legacy key's grade rather than assuming it.
-    expect(ef.fuel_oil_distillate_gallon.co2).toBeCloseTo(0.138 * 73.96, 10);
-    expect(ef.fuel_oil_distillate_gallon.ch4).toBeCloseTo(0.138 * 3 / 1000, 12);
-    expect(ef.fuel_oil_distillate_gallon.n2o).toBeCloseTo(0.138 * 0.6 / 1000, 12);
-    expect(ef.fuel_oil_distillate_gallon, 'legacy key IS Distillate No.2').toEqual(ef.fuel_oil_gallon);
-    // Residual No.6 — 0.15 mmBtu/gal x (75.10 CO2, 3 g CH4, 0.6 g N2O).
-    expect(ef.fuel_oil_residual_gallon.co2).toBeCloseTo(0.15 * 75.10, 10);
-    expect(ef.fuel_oil_residual_gallon.ch4).toBeCloseTo(0.15 * 3 / 1000, 12);
-    expect(ef.fuel_oil_residual_gallon.n2o).toBeCloseTo(0.15 * 0.6 / 1000, 12);
-    // NOT EPA's rounded display column — 11.27 sits 0.005 kg/gal from our own stated arithmetic, and
-    // the workings table exists so a verifier can reproduce the row they are shown.
-    expect(ef.fuel_oil_residual_gallon.co2, 'carry the derivation, not the rounded column').not.toBe(11.27);
-    // EPA publishes the same CH4/N2O per mmBtu for both grades, so they differ only by heat content.
-    expect(ef.fuel_oil_residual_gallon.ch4 / ef.fuel_oil_distillate_gallon.ch4).toBeCloseTo(0.15 / 0.138, 9);
   });
 
   it('Z10 every UK _gallon fallback equals its litre value x 3.785411784', () => {
@@ -1810,53 +1828,44 @@ describe('Z. fuel oil grades are seeded per table', () => {
       `dataset and are deliberately not in scope here.\n`).toEqual([]);
   });
 
-  it('Z7 EU distillate equals the gas/diesel oil derivation it is taken from', () => {
-    // The three inputs are CO2 74100 kg/TJ, NCV 43.0, dens 0.844 — the same row this table already
-    // uses for diesel. Pinned as an equality so the shared provenance is a fact, not a coincidence.
-    expect((EF_EU as any).fuel_oil_distillate_gallon).toEqual((EF_EU as any).diesel_gallon);
-    expect((EF_EU as any).fuel_oil_residual_gallon).toEqual((EF_EU as any).fuel_oil_gallon);
+  it('Z15 the legacy fuel_oil_gallon and the new residual key are the SAME number, by construction', () => {
+    // The legacy key always WAS the residual row — its comment has said so since it was seeded — so
+    // both hold DEFRA's "Processed fuel oils - residual oil" 3.17492 kg/L converted the same way.
+    // Not a coincidence to be tolerated: an identity to be enforced. Editing one alone means one of
+    // them is wrong, and nothing else in the suite would notice which.
+    expect((EF_UK as any).fuel_oil_residual_gallon).toEqual((EF_UK as any).fuel_oil_gallon);
+    expect((EF_UK as any).fuel_oil_residual_gallon.co2).toBe(12.018380);
+    // Distillate is a genuinely different row and must NOT equal either.
+    expect((EF_UK as any).fuel_oil_distillate_gallon).not.toEqual((EF_UK as any).fuel_oil_gallon);
   });
 
-  it('Z8 ALL THREE pickEF sites read GRADE keys — the retired fuel_oil_gallon is gone', () => {
-    // WAS: "nothing reads the new keys yet — no emission figure can have moved." That premise died
-    // with the split. Its job now is the inverse: catch a PARTIAL switch.
-    //
-    // Six calls, not three: two grades x calcLocation / calcInventory's per-fuel add / buildWorkings.
-    // Switching two of the three leaves the location total, the per-fuel breakdown and the workings
-    // row disagreeing about the same litres, and only the buildWorkings one would be caught elsewhere
-    // (by section M's recomputation check). This counts them.
-    // ⚠️ THE SHAPE HAS CHANGED TWICE, AND THIS NOW ASSERTS THE PROPERTY RATHER THAN THE SPELLING.
-    // No call site names a grade key any more: fuelOilPricing() picks litre-or-gallon per jurisdiction
-    // and every consumer prices off `fo.key`. Counting literal occurrences was the right test while
-    // the key was written at each site and is simply not measurable now — so what is asserted is the
-    // thing that actually mattered: THREE pricing sites, each going through the ONE chooser, and no
-    // path reaching the retired ungraded key.
-    const src = readFileSync(join(process.cwd(), 'lib/ghg/engine.ts'), 'utf8');
-    const calls = src.split('\n').filter(l => /fuelOilPricing\(loc, '(distillate|residual)'/.test(l));
-    expect(calls.length, 'two grades x three sites, all through the one chooser').toBe(6);
-    expect(calls.filter(c => c.includes("'distillate'")).length, 'three distillate sites').toBe(3);
-    expect(calls.filter(c => c.includes("'residual'")).length, 'three residual sites').toBe(3);
-    // The chooser itself may only ever build a graded key — never the retired 'fuel_oil_gallon'.
-    const chooser = src.slice(src.indexOf('function fuelOilPricing'), src.indexOf('const fuelOilInGallons'));
-    expect(chooser).toContain('`fuel_oil_${grade}_litre`');
-    expect(chooser).toContain('`fuel_oil_${grade}_gallon`');
-    expect(chooser, "'fuel_oil_gallon' was retired — no alias was kept").not.toContain("'fuel_oil_gallon'");
-    // THE RAW/RESOLVED DISTINCTION SURVIVES THE SPLIT. buildWorkings prices the coverage-resolution
-    // -applied figure; the other two read the stored amount. Collapsing them would silently drop
-    // estimation adjustments from the workings row.
-    // Asserted as the PROPERTY rather than the call spelling: buildWorkings hoists the resolved
-    // figure into `entered` (so the activity column can show it) before converting, so
-    // `fuelOilToGallons(figure(...))` is no longer one substring. What must remain true is that the
-    // workings path reads figure() and the calc path reads the raw amount.
-    // buildWorkings prices the coverage-resolution-APPLIED figure...
-    expect(src).toContain("fuelOilPricing(loc, 'distillate', entered)");
-    expect(src).toContain("fuelOilPricing(loc, 'residual', entered)");
-    // ...while the two calc paths read the STORED amount. Collapsing them would silently drop
-    // estimation adjustments from the workings row. (fuelOilInGallons, the old raw-value wrapper, is
-    // gone: it always converted to gallons, which is now the exception rather than the rule.)
-    expect(src).toContain("fuelOilPricing(loc, 'distillate', loc.fuel_oil_distillate_amount)");
-    expect(src).toContain("fuelOilPricing(loc, 'residual', loc.fuel_oil_residual_amount)");
-    expect(src, 'the always-convert wrapper must not come back').not.toContain('const fuelOilInGallons =');
+  it('Z16 NOT_YET_SEEDED is EMPTY — every table carries both grades', () => {
+    // The seeding backlog is closed. Z6 ("US residual is deliberately absent") went with it.
+    // A future partial seeding declares itself here; until then this asserts there is nothing pending.
+    expect(NOT_YET_SEEDED).toEqual({});
+    for (const [name, table] of TABLES) {
+      expect(table.fuel_oil_distillate_gallon, `${name} distillate`).toBeDefined();
+      expect(table.fuel_oil_residual_gallon, `${name} residual`).toBeDefined();
+    }
+  });
+
+  it('Z17 the US grades derive from EPA heat content x factor, at full precision', () => {
+    const ef = EF as any;
+    // Distillate No.2 — 0.138 mmBtu/gal x (73.96 CO2, 3 g CH4, 0.6 g N2O). ALL THREE reproduce, which
+    // is what ESTABLISHED the legacy key's grade rather than assuming it.
+    expect(ef.fuel_oil_distillate_gallon.co2).toBeCloseTo(0.138 * 73.96, 10);
+    expect(ef.fuel_oil_distillate_gallon.ch4).toBeCloseTo(0.138 * 3 / 1000, 12);
+    expect(ef.fuel_oil_distillate_gallon.n2o).toBeCloseTo(0.138 * 0.6 / 1000, 12);
+    expect(ef.fuel_oil_distillate_gallon, 'legacy key IS Distillate No.2').toEqual(ef.fuel_oil_gallon);
+    // Residual No.6 — 0.15 mmBtu/gal x (75.10 CO2, 3 g CH4, 0.6 g N2O).
+    expect(ef.fuel_oil_residual_gallon.co2).toBeCloseTo(0.15 * 75.10, 10);
+    expect(ef.fuel_oil_residual_gallon.ch4).toBeCloseTo(0.15 * 3 / 1000, 12);
+    expect(ef.fuel_oil_residual_gallon.n2o).toBeCloseTo(0.15 * 0.6 / 1000, 12);
+    // NOT EPA's rounded display column — 11.27 sits 0.005 kg/gal from our own stated arithmetic, and
+    // the workings table exists so a verifier can reproduce the row they are shown.
+    expect(ef.fuel_oil_residual_gallon.co2, 'carry the derivation, not the rounded column').not.toBe(11.27);
+    // EPA publishes the same CH4/N2O per mmBtu for both grades, so they differ only by heat content.
+    expect(ef.fuel_oil_residual_gallon.ch4 / ef.fuel_oil_distillate_gallon.ch4).toBeCloseTo(0.15 / 0.138, 9);
   });
 
   it('Z18 both grades price and emit rows independently, and a site can burn both', () => {

@@ -29,6 +29,7 @@
 import {
   EF_SOURCES, combustionSource, gridSource, getGridFactor, isResolvedGridRegion, streamState,
   efJurisdiction, steamFactorFor, findUnpriceableLocations, SUPPLIER_SPECIFIC_ENTRY_METHOD,
+  COMBUSTION_EDITION, STEAM_EDITION,
 } from './engine'
 import type { Location } from './engine'
 
@@ -178,19 +179,14 @@ const CITATIONS: Record<FactorJurisdiction, { combustion: string; electricity: s
   NZ: { combustion: EF_SOURCES.combustion_nz, electricity: EF_SOURCES.electricity_nz },
 }
 
-// ── THE STEAM EDITION ────────────────────────────────────────────────────────────────────────────
-// Declared, like COMBUSTION_EDITION below and for the same reason. Only the two seeded jurisdictions
-// appear; an absent key means "this jurisdiction publishes no steam factor", which is exactly what
-// STEAM_EF says, and is a different claim from an edition of "none".
-//
-// ⚠️ A SUPPLIER-SPECIFIC FACTOR RECORDS NO EDITION, and that is correct rather than a gap. This column
-// answers "which published edition priced these figures"; a factor the customer obtained from their
-// own district energy provider is not an edition of anything, and inventing a label for it would put a
-// publication claim on a private figure. The workings row carries the supplier attribution instead.
-const STEAM_EDITION: Partial<Record<FactorJurisdiction, string>> = {
-  US: 'US EPA 2025 Table 7',
-  UK: 'DEFRA 2026',
-}
+// ── THE EDITION LABELS ARE IMPORTED, NOT DECLARED HERE ───────────────────────────────────────────
+// COMBUSTION_EDITION and STEAM_EDITION moved to lib/ghg/engine.ts on 14 Aug 2026, unchanged. This
+// module has two consumers now, not one: the stored factor_editions map below, and the workings
+// table's `factor_vintage` column, which rendered '—' on every combustion and steam row for as long
+// as the labels lived in here — engine.ts imports nothing from this file (this file imports IT), so
+// the column had no way to reach them. Two declarations would let one inventory name two different
+// editions for one figure, which is the exact disagreement this column exists to end.
+// The reasoning behind each label, and behind declaring rather than parsing them, moved with them.
 
 const JURISDICTIONS = Object.keys(CITATIONS) as FactorJurisdiction[]
 
@@ -215,32 +211,6 @@ export function factorJurisdiction(loc: Location, family: FactorFamily): FactorJ
   }
   const cite = family === 'combustion' ? combustionSource(loc) : gridSource(loc)
   return JURISDICTIONS.find(j => CITATIONS[j][family] === cite) ?? null
-}
-
-// ── THE COMBUSTION EDITION ───────────────────────────────────────────────────────────────────────
-//
-// DECLARED, NOT PARSED. No regex runs over citation prose, and that is the deliberate answer to
-// "where does the edition come from" rather than an accident of convenience.
-//
-// A regex is not merely fragile here, it is already WRONG against the current table. The obvious
-// pattern — the year in parentheses, /\((\d{4})\)/ — matches five of the six citations and misses
-// Australia outright, because DCCEEW's parenthesised token is not a year:
-//     'DCCEEW NGA Factors 2025 (AR5)'   →  captures nothing; a laxer pattern captures "AR5"
-// The looser alternative, first four-digit run, gets Australia right and is one edit away from being
-// wrong elsewhere: any citation that ever names a standard number, a directive year or a page range
-// before its edition silently yields the wrong answer, with no failure to notice.
-//
-// So the label is written down. It is a second copy of a fact — the risk that always comes with a
-// declaration — and EDITION LABELS MATCH THEIR CITATION is the test that closes it, asserting every
-// whitespace-separated token of each label appears in the citation it claims to summarise. Refreshing
-// a factor table without updating its label fails there, loudly, naming both strings.
-const COMBUSTION_EDITION: Record<FactorJurisdiction, string> = {
-  US: 'US EPA 2024',      // ⚠️ EF_SOURCES.combustion's year is itself UNVERIFIED — see the EF header.
-  CA: 'ECCC 2025 v3.0',
-  UK: 'DEFRA 2026',
-  EU: 'IPCC 2006',
-  AU: 'DCCEEW NGA 2025',
-  NZ: 'MfE 2026 v2',
 }
 
 /**
