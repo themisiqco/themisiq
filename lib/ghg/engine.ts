@@ -316,42 +316,87 @@ const EF_UK = {
   steam_kwh: { co2: 0.17529, ch4: 0, n2o: 0 },
 }
 
-// EU combustion factors — IPCC 2006 Guidelines Vol.2 Tier-1 defaults (fossil, full oxidation),
-// converted to per-unit via standard net calorific values and densities. CO2 from Ch.1 Table 1.4;
-// CH4/N2O stationary defaults from Ch.2. Gas split is stored (calcGas applies AR4/AR5).
-// BASIS NOTE: these are 100% fossil Tier-1 defaults — they reconcile with ECCC (±1%) and run
-// ~5–11% above DEFRA's blended figures purely because DEFRA excludes biofuel content. This is the
-// agreed verifier-defensible EU baseline (proceeding on internal recommendation, not verifier sign-off).
+// EU combustion factors — mass-basis emission factors and NCVs from EU MRR Annex VI Table 1, which
+// carries the IPCC 2006 Vol.2 Tier-1 defaults (fossil, full oxidation) as EU law, CONVERTED HERE to
+// per-litre / per-m3 using fuel densities NEITHER SOURCE PUBLISHES. CH4/N2O are Ch.2 stationary
+// defaults. Gas split is stored (calcGas applies AR4/AR5/AR6).
 // Metric units are the EU norm: natural gas m3, liquids litres. gallon/mcf are non-breaking fallbacks.
 //
-// ── SOURCE TRACE: TWO OF THE THREE INPUTS ARE IPCC. THE THIRD IS NOT. ───────────────────────────
-// Verified against IPCC 2006 Guidelines Vol.2 Ch.1 — LF, 13 Aug 2026.
-//   CO2 FACTOR — Table 1.4. Gas/Diesel Oil 74 100 kg/TJ, Residual Fuel Oil 77 400 kg/TJ. Both match.
-//   NCV        — Table 1.2. Gas/Diesel Oil 43.0 TJ/Gg, Residual Fuel Oil 40.4 TJ/Gg. Both match.
-//   DENSITY    — ⚠️ NOT FROM IPCC, AND NOT RECORDED ANYWHERE.
+// ── SOURCE TRACE ─────────────────────────────────────────────────────────────────────────────────
+// CO2 AND NCV — FULLY SOURCED as of 14 Aug 2026. Commission Implementing Regulation (EU) 2018/2066
+// (the MRR), Annex VI, Table 1 "Fuel emission factors related to net calorific value (NCV) and net
+// calorific values per mass of fuel", Source column "IPCC 2006 GL". Every value used here appears
+// verbatim, so the pair is confirmed twice over — as directly applicable EU law, and as the IPCC
+// science that law cites:
+//     Motor gasoline             69,3 t CO2/TJ    44,3 TJ/Gg
+//     Gas/Diesel oil             74,1             43,0
+//     Residual fuel oil          77,4             40,4
+//     Liquefied petroleum gases  63,1             47,3
+//     Natural gas                56,1             48,0
+//   This CLOSED the five values the 13 Aug IPCC check had not covered: CO2 56 100 / 63 100 / 69 300
+//   and NCV 47.3 / 44.3 were previously carried on the header's word "standard" alone.
 //
-// ⚠️ THE DENSITY GAP. Table 1.2 publishes NCV on a MASS basis (TJ/Gg) and the Guidelines publish no
-// fuel densities at all — §1.4.1.2 and Box 1.1 cover only gross-to-net calorific conversion, never
-// mass-to-volume. So every per-litre figure in this table needs a density the cited source does not
-// contain, and the header line above ("converted via standard net calorific values and densities")
-// names no source for it. The four values in use are 0.510 (propane/LPG), 0.844 (gas/diesel oil),
-// 0.990 (residual fuel oil) and 0.745 (motor gasoline). Where they came from is not written down.
-//   IPCC does constrain ONE of them: Table 1.1 requires residual fuel oil density above 0.90 kg/l,
-//   which 0.990 satisfies. That is a bound, not a citation — it rules the value in, it does not source it.
+// ⚠️ DENSITY — STILL NOT PUBLISHED BY EITHER SOURCE. Annex VI Table 1 is MASS BASIS, exactly like
+// IPCC Table 1.2 (TJ/Gg); it publishes no densities, and the Guidelines publish none either
+// (§1.4.1.2 and Box 1.1 cover gross-to-net calorific conversion, never mass-to-volume). So the
+// conversion to a volume basis — the basis every EU customer enters data in — rests on four numbers
+// neither cited source contains. The MRR closes the factor/NCV question and does NOT close this one.
 //
-// EVERY KEY BELOW EXCEPT THE TWO NATURAL-GAS ONES DEPENDS ON AN UNSOURCED DENSITY:
-//   propane_litre, propane_gallon                          (0.510)
-//   diesel_litre, diesel_gallon,
-//   diesel_mobile_litre, diesel_mobile_gallon,
-//   fuel_oil_distillate_gallon                             (0.844)
-//   fuel_oil_gallon, fuel_oil_residual_gallon              (0.990)
-//   gasoline_litre, gasoline_gallon                        (0.745)
-//   — eleven of thirteen keys.
-// natural_gas_m3 / _mcf escape the density question but have the SAME CLASS of gap: they use a
-// volumetric energy content of "~36 MJ/m3", written with a tilde, which is likewise not in Table 1.2
-// (mass basis) and likewise unsourced.
-//   DO NOT paper over this by inventing a density source. Either find the reference the original
-// author used and name it here, or replace the derivation with a published per-litre factor set.
+// WHAT IS KNOWN ABOUT EACH DENSITY. A specification gives a RANGE; it BOUNDS a value, it does not
+// produce one. None of these is a citation, and the row notes must not read as though it were:
+//   0.844 gas/diesel oil  — inside EN 590 (automotive diesel under Directive 98/70/EC): 0.820–0.845
+//                           kg/L at 15 °C. Sits 1 unit below the TOP of the range, ~1.4% above the
+//                           midpoint. CONSERVATIVE: more mass per litre means more CO2 per litre.
+//   0.745 motor gasoline  — inside EN 228 (petrol): 0.720–0.775 kg/L at 15 °C. ~0.3% BELOW the
+//                           midpoint, i.e. representative rather than conservative.
+//   0.990 residual fuel oil— satisfies IPCC Table 1.1, which requires residual density above 0.90
+//                           kg/L. A bound, and the weakest of the three (one-sided, no upper limit).
+//   0.510 propane/LPG     — ⚠️ NO EUROPEAN STANDARD FOUND THAT BOUNDS IT. Unsourced AND unbounded,
+//                           the only one of the four in that state. See its key for the decision.
+//   ⚠️ THE FIRST TWO SIT ON DIFFERENT BASES — diesel at a conservative endpoint, petrol at a
+//   representative midpoint. NOBODY CHOSE THAT. It is what comes of values arriving from an
+//   unrecorded source, and it is recorded here rather than quietly harmonised: harmonising would
+//   move stored figures on an argument no source supports either.
+//
+// NATURAL GAS decomposes the same way now that the NCV is known. 36 MJ/m3 ÷ 48.0 MJ/kg (Annex VI's
+// 48,0 TJ/Gg) = 0.75 kg/m3. So "~36 MJ/m3" is a density in disguise, and the same class of gap as
+// the liquids rather than a separate mystery. Still unsourced.
+//
+// ⚠️ OPEN — THE CH4/N2O BASIS IS NOT RECORDED ANYWHERE, AND THERE ARE TWO OF THEM. Annex VI carries
+// no CH4/N2O combustion factors at all (its Section 3 Table 6 gives GWPs only), so the MRR does not
+// help here. Reversing the stored values out against their own NCV and density gives:
+//     natural gas 1.000 / 0.100 kg/TJ     propane/LPG 0.999 / 0.0995
+//     gas/diesel oil 3.001 / 0.601        residual 3.000 / 0.600      motor gasoline 3.000 / 0.600
+// So PROPANE IS ON THE GASEOUS-FUEL PAIR (1 / 0.1) WHILE THE OTHER LIQUIDS ARE ON 3 / 0.6. That is a
+// substantive category choice and no comment records it, nor which Ch.2 table row either pair came
+// from. Recorded as OPEN. Do not invent a citation for it, and do not "harmonise" propane onto 3/0.6
+// — that would move a stored figure on a guess.
+//
+// ── BASIS: WHY 100% FOSSIL IS THE RIGHT CHOICE HERE, not a caveat ───────────────────────────────
+// These run ~5–11% above DEFRA's figures because DEFRA BLENDS UK BIOFUEL CONTENT (4.92% by volume,
+// per the DfT renewable-fuel statistics DEFRA's own methodology paper cites) and IPCC Tier 1 does not.
+// That is a UK fuel-SUPPLY figure. Applying it across 27 member states would import one country's
+// blending mandate into 26 others. A 100% fossil basis makes no national supply assumption, which is
+// why it is the appropriate baseline for a table shared by all of them. They also reconcile with
+// ECCC to ±1%.
+//
+// ── ROUTES CONSIDERED AND REJECTED — do not re-open without new information ──────────────────────
+//  1. FIND THE ORIGINAL AUTHOR'S REFERENCE. CLOSED. EF_EU originates at a21e894 (26 May 2026) in
+//     final form: densities present from the first line, no commit body, and the header word
+//     "standard" was doing the sourcing work and names nothing. It is not recoverable from history.
+//  2. USE DEFRA'S DENSITIES. REJECTED — see the basis note above. Not for being British: for
+//     embedding a UK supply mandate in a 27-country table.
+//  3. REPLACE WITH A PUBLISHED EU-WIDE PER-LITRE SET. CLOSED — none exists. The EU's own fuel data
+//     (Fuel Quality Directive 98/70/EC, EEA dataset) is life-cycle GHG intensity per unit ENERGY
+//     reported by fuel suppliers, not corporate combustion factors per litre.
+//  4. GO PER-MEMBER-STATE (ADEME Base Carbone for FR, UBA for DE, …). NOT A DEFECT, a possible future
+//     direction. It means 27 tables and 27 vintages, most member states have no national database,
+//     and it contradicts the deliberate design at factorEditions.ts ("DE AND FR ARE BOTH 'EU', AND
+//     THAT IS THE POINT").
+//
+// DO NOT paper over the density gap by inventing a source. Disclosure is the instrument here: every
+// density-derived row carries euDerivationNote() below, which states the arithmetic and says plainly
+// that the density is not published by the cited source.
 const EF_EU = {
   // Natural gas, per m3 (CO2 56100 kg/TJ × ~36 MJ/m3 net): 2.0196 kg CO2/m3.
   natural_gas_m3: { co2: 2.0196, ch4: 0.000036, n2o: 0.0000036 },
@@ -386,6 +431,65 @@ const EF_EU = {
   // Motor gasoline (CO2 69300 kg/TJ, NCV 44.3, dens 0.745): 2.28714 kg CO2/L.
   gasoline_litre: { co2: 2.28714, ch4: 0.000099, n2o: 0.0000198 },
   gasoline_gallon: { co2: 8.657763, ch4: 0.000374756, n2o: 0.000074951 },
+}
+
+// ── THE DERIVATION, ON THE ROW ───────────────────────────────────────────────────────────────────
+//
+// WHY THIS EXISTS. Until 14 Aug 2026 an EU combustion row printed a per-litre factor, cited IPCC, and
+// left `note` EMPTY — the one field whose purpose is to show a convert-then-apply step. Fuel oil and
+// steam both populate it; EU combustion, which needs it most, did not. The row therefore asserted
+// that its cited source had published a figure that source has never published.
+//
+// EACH NOTE MUST DO THREE THINGS and no more: state the arithmetic a verifier can retype, name the
+// density, and say plainly that the density is NOT from the cited source. Where a European
+// specification bounds the value it is named AS A BOUND — "inside the EN 590 range" — never as a
+// citation. EN 590 gives 0.820–0.845 kg/L; it cannot produce 0.844 any more than IPCC Table 1.1's
+// ">0.90" produced 0.990. Writing "density per EN 590" would replace one overstatement with another.
+//
+// KEYED ON THE FACTOR KEY, and pushFuel now takes that key and looks the factor up ITSELF, so the
+// note and the number are derived from the same key by construction. Passing both separately would
+// let a row cite one fuel's derivation beside another fuel's factor.
+const EU_DERIVATION: Partial<Record<string, string>> = {
+  natural_gas_m3:
+    'DERIVED BY THEMISIQ, NOT PUBLISHED PER m³ — 56 100 kg CO₂/TJ × 36 MJ/m³ = 2.0196 kg CO₂/m³. ' +
+    'MRR Annex VI Table 1 / IPCC give the factor per TJ and the NCV per mass (48.0 TJ/Gg). The ' +
+    '36 MJ/m³ volumetric energy content is published by neither source, and implies a gas density of ' +
+    '0.75 kg/m³ which is likewise uncited.',
+  propane_litre:
+    'DERIVED BY THEMISIQ, NOT PUBLISHED PER LITRE — 63 100 kg CO₂/TJ × 47.3 TJ/Gg × 0.510 kg/L = ' +
+    '1.52216 kg CO₂/L. Factor and NCV are MRR Annex VI Table 1 (source: IPCC 2006 GL). ⚠️ The 0.510 ' +
+    'kg/L density is published by neither source AND no European standard bounding it has been ' +
+    'found — it is the least supported input in this table.',
+  diesel_litre:
+    'DERIVED BY THEMISIQ, NOT PUBLISHED PER LITRE — 74 100 kg CO₂/TJ × 43.0 TJ/Gg × 0.844 kg/L = ' +
+    '2.68924 kg CO₂/L. Factor and NCV are MRR Annex VI Table 1 (source: IPCC 2006 GL). The 0.844 ' +
+    'kg/L density is published by neither; it falls inside the EN 590 range for automotive diesel ' +
+    'sold in the EU (0.820–0.845 kg/L at 15 °C) and at that range\'s conservative upper end.',
+  fuel_oil_residual_gallon:
+    'DERIVED BY THEMISIQ, NOT PUBLISHED PER LITRE — 77 400 kg CO₂/TJ × 40.4 TJ/Gg × 0.990 kg/L = ' +
+    '3.09569 kg CO₂/L. Factor and NCV are MRR Annex VI Table 1 (source: IPCC 2006 GL). The 0.990 ' +
+    'kg/L density is published by neither; it satisfies IPCC Table 1.1, which requires residual fuel ' +
+    'oil density above 0.90 kg/L — a one-sided bound, not a citation.',
+  gasoline_litre:
+    'DERIVED BY THEMISIQ, NOT PUBLISHED PER LITRE — 69 300 kg CO₂/TJ × 44.3 TJ/Gg × 0.745 kg/L = ' +
+    '2.28714 kg CO₂/L. Factor and NCV are MRR Annex VI Table 1 (source: IPCC 2006 GL). The 0.745 ' +
+    'kg/L density is published by neither; it falls inside the EN 228 range for petrol sold in the ' +
+    'EU (0.720–0.775 kg/L at 15 °C), near its midpoint.',
+}
+// Keys that share a derivation with one already written above, mapped rather than duplicated so the
+// prose cannot drift between two rows describing the same three inputs. diesel_mobile IS diesel;
+// fuel_oil_distillate IS the gas/diesel oil row (IPCC Table 1.1 defines Gas/Diesel Oil as including
+// light heating oil, confirmed 13 Aug 2026); the _gallon forms are unit conversions of their _litre.
+const EU_DERIVATION_ALIAS: Record<string, string> = {
+  diesel_gallon: 'diesel_litre', diesel_mobile_litre: 'diesel_litre', diesel_mobile_gallon: 'diesel_litre',
+  fuel_oil_distillate_gallon: 'diesel_litre', fuel_oil_gallon: 'fuel_oil_residual_gallon',
+  gasoline_gallon: 'gasoline_litre', propane_gallon: 'propane_litre', natural_gas_mcf: 'natural_gas_m3',
+}
+
+/** The derivation disclosure for a row, or undefined where the publisher gave us the figure directly. */
+function euDerivationNote(loc: Location, key: string): string | undefined {
+  if (efJurisdiction(loc) !== 'EU') return undefined
+  return EU_DERIVATION[EU_DERIVATION_ALIAS[key] ?? key]
 }
 
 // Australia combustion factors — DCCEEW National Greenhouse Accounts (NGA) Factors 2025 (AR5 basis).
@@ -451,7 +555,18 @@ const EF_SOURCES = {
   combustion: 'US EPA (2024) Emission Factors for Greenhouse Gas Inventories',
   combustion_ca: 'ECCC (2025) Emission factors and reference values v3.0',
   combustion_uk: 'UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting',
-  combustion_eu: 'IPCC (2006) Guidelines Vol.2 — Tier 1 default combustion factors',
+  // ⚠️ NAMES THE DENSITY CONVERSION, AND THAT CLAUSE IS THE POINT OF THE STRING.
+  // This read 'IPCC (2006) Guidelines Vol.2 — Tier 1 default combustion factors' until 14 Aug 2026,
+  // printed on a PER-LITRE figure. Both cited sources publish on a MASS basis (t CO2/TJ and TJ/Gg);
+  // neither publishes a density. So the row told a verifier that IPCC had published a number IPCC has
+  // never published, and the note field that exists to show the conversion was empty. A verifier
+  // opening Vol.2 to check 2.68924 kg CO2/L found TJ/Gg and no such figure, with nothing joining them.
+  //   MRR Annex VI is named FIRST because it is the EU-applicable instrument — directly applicable law
+  // for EU installations — and it carries the same values with "IPCC 2006 GL" as its own stated source.
+  // Citing both gives the verifier the legal instrument and the underlying science.
+  //   ⚠️ TWO TESTS CONSTRAIN THIS STRING. F16 requires every token of COMBUSTION_EDITION.EU
+  // ('IPCC 2006') to appear in it; F17 requires a four-digit year in parentheses. Keep '(2006)'.
+  combustion_eu: 'EU MRR — Commission Implementing Regulation (EU) 2018/2066 Annex VI Table 1, carrying IPCC (2006) Guidelines Vol.2 defaults; per-litre and per-m³ values derived by ThemisIQ from those MASS-BASIS factors using fuel densities NOT published by either source — see row note',
   combustion_au: 'DCCEEW NGA Factors 2025 (AR5)',
   combustion_nz: 'NZ MfE Measuring Emissions 2026 v2 (as-published basis — factors stored verbatim, no AR re-basing)',
   // ── STEAM / DISTRICT HEAT — NAMED TO THE TABLE, UNLIKE combustion ─────────────────────────────
@@ -2266,11 +2381,18 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
   // `stream` TAGS THE ROW WITH THE DECLARABLE STREAM IT SATISFIES, and that tag is what the
   // declaration loop below counts. It is not decoration: it is how "this stream produced a priced row"
   // becomes an OBSERVED FACT rather than a second copy of the pricing condition. See the loop's header.
-  const pushFuel = (loc: Location, stream: DeclarableStream, source: string, scope: number, activity: number, unit: string, ef: { co2: number; ch4: number; n2o: number }, prov?: Provenance, convNote?: string) => {
+  // ⚠️ TAKES THE FACTOR KEY, NOT THE FACTOR, and looks it up itself. That is what makes the row's
+  // derivation note and its number provably the same fuel: passing both separately would let a row
+  // print gas/diesel oil's arithmetic beside motor gasoline's factor, and nothing would catch it.
+  const pushFuel = (loc: Location, stream: DeclarableStream, source: string, scope: number, activity: number, unit: string, efKey: string, prov?: Provenance, convNote?: string) => {
+    const ef = pickEF(loc, efKey as keyof typeof EF)
     const g = calcGas(ef, activity, gwpVersion)
+    // Two notes can both apply — a fuel-oil row in an EU country converts litres→gallons AND is
+    // priced by a density-derived factor. Joined rather than one overwriting the other.
+    const note = [convNote, euDerivationNote(loc, efKey)].filter(Boolean).join(' · ')
     rows.push({ location: loc.name || 'Location', stream, source, scope, activity_data: activity, activity_unit: unit,
       ...factorCells(ef, unit),
-      ef_source: combustionSource(loc), result_tco2e: g.total, ...(convNote ? { note: convNote } : {}), ...(prov ?? {}) })
+      ef_source: combustionSource(loc), result_tco2e: g.total, ...(note ? { note } : {}), ...(prov ?? {}) })
   }
   for (const loc of locations) {
     // Decided BEFORE any row is emitted, and with the same helper calcInventory uses. A location
@@ -2311,9 +2433,9 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       }
       return { source_quotes: quotes, source_doc_ids: a!.docIds, source_file_paths: a!.filePaths, entry_method: 'concierge' }
     }
-    if (loc.has_natural_gas && loc.natural_gas_amount > 0) pushFuel(loc, 'natural_gas', 'Natural gas', 1, figure('natural_gas_amount'), loc.natural_gas_unit, pickEF(loc, `natural_gas_${loc.natural_gas_unit}` as keyof typeof EF), provOf('natural_gas_amount'))
-    if (loc.has_propane && loc.propane_amount > 0) pushFuel(loc, 'propane', 'Propane', 1, figure('propane_amount'), loc.propane_unit, pickEF(loc, propaneEfKey(loc.propane_unit) as keyof typeof EF), provOf('propane_amount'))
-    if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0) pushFuel(loc, 'diesel_stationary', 'Diesel (stationary)', 1, figure('diesel_stationary_amount'), loc.diesel_stationary_unit, pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provOf('diesel_stationary_amount'))
+    if (loc.has_natural_gas && loc.natural_gas_amount > 0) pushFuel(loc, 'natural_gas', 'Natural gas', 1, figure('natural_gas_amount'), loc.natural_gas_unit, `natural_gas_${loc.natural_gas_unit}`, provOf('natural_gas_amount'))
+    if (loc.has_propane && loc.propane_amount > 0) pushFuel(loc, 'propane', 'Propane', 1, figure('propane_amount'), loc.propane_unit, propaneEfKey(loc.propane_unit), provOf('propane_amount'))
+    if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0) pushFuel(loc, 'diesel_stationary', 'Diesel (stationary)', 1, figure('diesel_stationary_amount'), loc.diesel_stationary_unit, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}`, provOf('diesel_stationary_amount'))
     // Reports the figure AS ENTERED with its own unit, and the conversion as the note — the factored
     // gallons figure is inside the note, so all three steps are on one row.
     // Convert AFTER applying resolutions, then hand pushFuel the gallons figure — the factor is
@@ -2323,14 +2445,14 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     // the coverage-resolution-applied one. That distinction predates the grade split and survives it.
     if (loc.has_fuel_oil_distillate && loc.fuel_oil_distillate_amount > 0) {
       const fo = fuelOilToGallons(figure('fuel_oil_distillate_amount'), loc.fuel_oil_distillate_unit)
-      pushFuel(loc, 'fuel_oil_distillate', 'Heating oil', 1, fo.gallons, 'gallons', pickEF(loc, 'fuel_oil_distillate_gallon'), provOf('fuel_oil_distillate_amount'), fo.note)
+      pushFuel(loc, 'fuel_oil_distillate', 'Heating oil', 1, fo.gallons, 'gallons', 'fuel_oil_distillate_gallon', provOf('fuel_oil_distillate_amount'), fo.note)
     }
     if (loc.has_fuel_oil_residual && loc.fuel_oil_residual_amount > 0) {
       const fo = fuelOilToGallons(figure('fuel_oil_residual_amount'), loc.fuel_oil_residual_unit)
-      pushFuel(loc, 'fuel_oil_residual', 'Heavy fuel oil', 1, fo.gallons, 'gallons', pickEF(loc, 'fuel_oil_residual_gallon'), provOf('fuel_oil_residual_amount'), fo.note)
+      pushFuel(loc, 'fuel_oil_residual', 'Heavy fuel oil', 1, fo.gallons, 'gallons', 'fuel_oil_residual_gallon', provOf('fuel_oil_residual_amount'), fo.note)
     }
-    if (loc.has_mobile && loc.gasoline_amount > 0) pushFuel(loc, 'mobile', 'Gasoline (mobile)', 1, figure('gasoline_amount'), loc.gasoline_unit, pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provOf('gasoline_amount'))
-    if (loc.has_mobile && loc.diesel_mobile_amount > 0) pushFuel(loc, 'mobile', 'Diesel (mobile)', 1, figure('diesel_mobile_amount'), loc.diesel_mobile_unit, pickEF(loc, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), provOf('diesel_mobile_amount'))
+    if (loc.has_mobile && loc.gasoline_amount > 0) pushFuel(loc, 'mobile', 'Gasoline (mobile)', 1, figure('gasoline_amount'), loc.gasoline_unit, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}`, provOf('gasoline_amount'))
+    if (loc.has_mobile && loc.diesel_mobile_amount > 0) pushFuel(loc, 'mobile', 'Diesel (mobile)', 1, figure('diesel_mobile_amount'), loc.diesel_mobile_unit, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}`, provOf('diesel_mobile_amount'))
     if (!loc.uses_ammonia && loc.has_hfc_refrigerants && loc.refrigerant_purchased_kg > 0) {
       const ref_gwp = REFRIGERANT_GWP[loc.refrigerant_type]?.[gwpVersion] ?? 0
       rows.push({ location: loc.name || 'Location', stream: 'refrigerants', source: `Refrigerant (${loc.refrigerant_type})`, scope: 1, activity_data: loc.refrigerant_purchased_kg, activity_unit: 'kg', emission_factor: `GWP₁₀₀ ${ref_gwp}`, ef_source: EF_SOURCES[`gwp_${gwpVersion.toLowerCase()}` as 'gwp_ar6'], gwp_basis: gwpVersion, quantification_method: 'Recharge quantity treated as emitted (IPCC Tier 1 simplified material balance)', result_tco2e: loc.refrigerant_purchased_kg * ref_gwp / 1000, entry_method: 'manual' })

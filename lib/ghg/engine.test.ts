@@ -1641,9 +1641,15 @@ describe('Z. fuel oil grades are seeded per table', () => {
     // AU — DCCEEW NGA 2025 Table 8, GJ/kL x kgCO2e/GJ
     expect(perL((EF_AU as any).fuel_oil_distillate_gallon.co2)).toBeCloseTo(37.3 * 69.73 / 1000, 6);
     expect(perL((EF_AU as any).fuel_oil_residual_gallon.co2)).toBeCloseTo(39.7 * 73.84 / 1000, 6);
-    // EU — IPCC 2006 Vol.2 derivations recorded in the table header
-    expect(perL((EF_EU as any).fuel_oil_residual_gallon.co2)).toBeCloseTo(3.09569, 5);
-    expect(perL((EF_EU as any).fuel_oil_distillate_gallon.co2)).toBeCloseTo(2.68924, 5);
+    // EU — MRR Annex VI Table 1 (t CO2/TJ, TJ/Gg) x density. ASSERTED AS THE EXPRESSION, like the AU
+    // lines above: these used to read `toBeCloseTo(3.09569, 5)` against a literal copied out of the
+    // table's own comment, which would have passed with ANY density.
+    // Tolerance 5 (not 6) because the stored per-litre value is the exact derivation rounded to 6
+    // significant figures BEFORE the gallon conversion, and the gallon conversion itself used an
+    // imprecise L_PER_GAL. Group U asserts both facts precisely; this line only has to catch a
+    // changed input.
+    expect(perL((EF_EU as any).fuel_oil_residual_gallon.co2)).toBeCloseTo(77400 * 40.4e-6 * 0.990, 5);
+    expect(perL((EF_EU as any).fuel_oil_distillate_gallon.co2)).toBeCloseTo(74100 * 43.0e-6 * 0.844, 5);
   });
 
   it('Z9 EF_UK is DEFRA 2026 — refreshed whole, and the grade keys are seeded', () => {
@@ -1819,8 +1825,15 @@ describe('Z. fuel oil grades are seeded per table', () => {
     // Switching two of the three leaves the location total, the per-fuel breakdown and the workings
     // row disagreeing about the same litres, and only the buildWorkings one would be caught elsewhere
     // (by section M's recomputation check). This counts them.
+    // ⚠️ TWO LOOKUP SHAPES SINCE 14 AUG 2026, AND BOTH MUST BE COUNTED. pushFuel now takes the FACTOR
+    // KEY and calls pickEF itself, so that a row's derivation note and its number come from the same
+    // key by construction. buildWorkings therefore names the grade key as a bare argument rather than
+    // inside a pickEF(...) call, and a filter looking only for `pickEF(loc, 'fuel_oil` silently
+    // stopped seeing it — the count fell to 4 and the test caught it, which is the test working.
+    // Counting both shapes keeps the property intact: THREE pricing sites, two grades, six lookups.
     const src = readFileSync(join(process.cwd(), 'lib/ghg/engine.ts'), 'utf8');
-    const calls = src.split('\n').filter(l => l.includes("pickEF(loc, 'fuel_oil"));
+    const calls = src.split('\n').filter(l =>
+      l.includes("pickEF(loc, 'fuel_oil") || /pushFuel\(.*'fuel_oil_(distillate|residual)_gallon'/.test(l));
     expect(calls.length, 'two grades x three sites').toBe(6);
     for (const c of calls) {
       expect(c, 'a fuel-oil lookup that names no grade is the retired key').toMatch(/fuel_oil_(distillate|residual)_gallon/);
@@ -2323,4 +2336,168 @@ describe('T. purchased steam — per jurisdiction, with no US fallback', () => {
     expect(pickEF(loc({ country: 'GB' }), 'diesel_litre' as any).co2).toBe(2.58354);
     expect(pickEF(loc({ country: 'JP' }), 'diesel_gallon' as any).co2).toBe(10.20648);
   });
+});
+
+// ── U. THE EU DERIVATION IS SOURCED, BOUNDED WHERE POSSIBLE, AND DISCLOSED ───────────────────────
+//
+// THE PRIMARY DEFECT THIS CLOSES was not the unsourced densities — it was that the workings row
+// asserted something false. It printed a PER-LITRE factor, cited "IPCC (2006) Guidelines Vol.2", and
+// left `note` empty. Both cited sources publish on a MASS basis and neither publishes a density, so a
+// verifier opening Vol.2 to check 2.68924 kg CO2/L found TJ/Gg and no such number, with nothing on
+// the row explaining the step between. The methodology page repeated the claim.
+//
+// These tests exist because the previous ones could not have caught any of it: Z5 asserted the table
+// against a literal copied from its own comment, and NO test anywhere referenced a density.
+describe('U. EU combustion — sourced inputs, bounded densities, disclosed derivation', () => {
+  // MRR Annex VI Table 1, "Fuel emission factors related to net calorific value (NCV) and net
+  // calorific values per mass of fuel", Source column "IPCC 2006 GL". Transcribed ONCE here and used
+  // as the expression for every assertion below, so a mis-transcription fails everywhere at once
+  // rather than being silently agreed with by a hard-coded expectation.
+  const ANNEX_VI = {
+    motor_gasoline:  { co2_t_per_TJ: 69.3, ncv_TJ_per_Gg: 44.3 },
+    gas_diesel_oil:  { co2_t_per_TJ: 74.1, ncv_TJ_per_Gg: 43.0 },
+    residual_oil:    { co2_t_per_TJ: 77.4, ncv_TJ_per_Gg: 40.4 },
+    lpg:             { co2_t_per_TJ: 63.1, ncv_TJ_per_Gg: 47.3 },
+    natural_gas:     { co2_t_per_TJ: 56.1, ncv_TJ_per_Gg: 48.0 },
+  };
+  // kg CO2 per litre = (t/TJ x 1000 -> kg/TJ) x (TJ/Gg x 1e-6 -> TJ/kg) x (kg/L)
+  const perLitre = (f: { co2_t_per_TJ: number; ncv_TJ_per_Gg: number }, density: number) =>
+    f.co2_t_per_TJ * 1000 * f.ncv_TJ_per_Gg * 1e-6 * density;
+  const DENSITY = { lpg: 0.510, gas_diesel_oil: 0.844, residual_oil: 0.990, motor_gasoline: 0.745 };
+  const G = 3.785411784;   // L_PER_GAL, the repo's conversion authority
+  const EU = EF_EU as any;
+
+  // ⚠️ THE STORED VALUES ARE THE EXACT DERIVATION ROUNDED TO 6 SIGNIFICANT FIGURES, and nothing in
+  // the table said so until this test. 63100 x 47.3e-6 x 0.510 is 1.5221613, stored as 1.52216; the
+  // same rule holds for all four liquids. So the right assertion is EQUALITY against round6(expression)
+  // — stronger than any toBeCloseTo, and it states the storage convention as a fact rather than
+  // absorbing it into a tolerance.
+  const round6 = (x: number) => Number(x.toPrecision(6));
+
+  it('U1 every EU CO2 factor IS the Annex VI expression, at 6 significant figures', () => {
+    // Changing ANY of the three inputs now fails. Under the old assertions, changing the density and
+    // recomputing both the litre and gallon forms consistently left the suite green.
+    expect(EU.propane_litre.co2).toBe(round6(perLitre(ANNEX_VI.lpg, DENSITY.lpg)));
+    expect(EU.diesel_litre.co2).toBe(round6(perLitre(ANNEX_VI.gas_diesel_oil, DENSITY.gas_diesel_oil)));
+    expect(EU.diesel_mobile_litre.co2).toBe(round6(perLitre(ANNEX_VI.gas_diesel_oil, DENSITY.gas_diesel_oil)));
+    expect(EU.gasoline_litre.co2).toBe(round6(perLitre(ANNEX_VI.motor_gasoline, DENSITY.motor_gasoline)));
+    // Natural gas takes the volumetric route instead of NCV x density — 56 100 kg/TJ x 36 MJ/m3 — and
+    // lands exactly, needing no rounding at all.
+    expect(EU.natural_gas_m3.co2).toBe(56100 * 36e-6);
+    // Fuel oil is stored per US gallon. Divide back to the litre basis and it reaches the SAME rounded
+    // derivation, but only to ~2e-6 — because the gallon key was built from the rounded litre value
+    // using an imprecise L_PER_GAL. That second discrepancy is U9's subject, not this test's.
+    expect(EU.fuel_oil_residual_gallon.co2 / G).toBeCloseTo(round6(perLitre(ANNEX_VI.residual_oil, DENSITY.residual_oil)), 5);
+    expect(EU.fuel_oil_distillate_gallon.co2 / G).toBeCloseTo(round6(perLitre(ANNEX_VI.gas_diesel_oil, DENSITY.gas_diesel_oil)), 5);
+  });
+
+  it('U2 the natural-gas volumetric figure decomposes to a density against Annex VI NCV', () => {
+    // 36 MJ/m3 / 48.0 MJ/kg = 0.75 kg/m3. Recorded so "~36 MJ/m3" is understood as a density in
+    // disguise — the same class of gap as the liquids — rather than a separate mystery.
+    const impliedDensity = 36 / (ANNEX_VI.natural_gas.ncv_TJ_per_Gg * 1000 / 1000);
+    expect(impliedDensity).toBeCloseTo(0.75, 10);
+  });
+
+  it('U3 densities fall INSIDE their European specification ranges — a bound, not a citation', () => {
+    // ⚠️ RANGE ASSERTIONS ON PURPOSE. EN 590 and EN 228 specify a range for fuel sold in the EU; they
+    // cannot produce a point value, so an equality test here would overstate what the source supports
+    // and would freeze a number no publisher actually printed. What IS assertable is that our value is
+    // one the specification admits.
+    // EN 590, automotive diesel under Directive 98/70/EC: 0.820-0.845 kg/L at 15 C.
+    expect(DENSITY.gas_diesel_oil).toBeGreaterThanOrEqual(0.820);
+    expect(DENSITY.gas_diesel_oil).toBeLessThanOrEqual(0.845);
+    // EN 228, petrol: 0.720-0.775 kg/L at 15 C.
+    expect(DENSITY.motor_gasoline).toBeGreaterThanOrEqual(0.720);
+    expect(DENSITY.motor_gasoline).toBeLessThanOrEqual(0.775);
+    // IPCC Table 1.1 bounds residual fuel oil from BELOW only. Asserted as the one-sided bound it is.
+    expect(DENSITY.residual_oil).toBeGreaterThan(0.90);
+  });
+
+  it('U4 the two liquid densities sit on DIFFERENT bases, and that is recorded not fixed', () => {
+    // Diesel at the conservative top of EN 590, petrol at the EN 228 midpoint. Nobody chose this; it
+    // is what comes of values arriving from an unrecorded source. Pinned so the inconsistency stays
+    // visible — and NOT harmonised, because harmonising would move a stored figure on an argument no
+    // source supports.
+    const dieselMid = (0.820 + 0.845) / 2, petrolMid = (0.720 + 0.775) / 2;
+    expect(DENSITY.gas_diesel_oil, 'diesel is above its midpoint (conservative)').toBeGreaterThan(dieselMid);
+    expect(DENSITY.gas_diesel_oil, 'and within 0.002 of the top of the range').toBeGreaterThan(0.845 - 0.002);
+    expect(Math.abs(DENSITY.motor_gasoline - petrolMid), 'petrol is essentially at its midpoint').toBeLessThan(0.005);
+  });
+
+  it('U5 propane 0.510 has NO bound test, and its absence is deliberate', () => {
+    // ⚠️ READ THIS BEFORE ADDING ONE. Every other density above is checked against a published range.
+    // Propane/LPG has none: no European standard bounding it was found, so it is unsourced AND
+    // unbounded — the only input in this table in that state. An invented bound here would be exactly
+    // the defect this whole change removes, one layer down: a test that manufactures the confidence
+    // it is supposed to measure. The gap is asserted as a FACT instead, so it cannot be quietly lost.
+    expect(DENSITY.lpg, 'still the stored value — if this moves, the derivation moved with it').toBe(0.510);
+    // And the row must SAY SO to the verifier rather than looking like the bounded ones.
+    const row = (buildWorkings([loc({ country: 'DE', has_propane: true, propane_amount: 500, propane_unit: 'litres' })],
+      'AR6', 2025, [], 12) as any[]).find(r => r.stream === 'propane' && !r.declaration);
+    expect(row.note).toContain('no European standard bounding it has been found');
+  });
+
+  it('U6 every density-derived EU row carries the derivation, and names the density as unpublished', () => {
+    // The empty note field WAS the defect. Each row must now state the arithmetic and disclose which
+    // input the citation does not cover.
+    const l = loc({ country: 'FR', grid_region: 'EU_FR',
+      has_natural_gas: true, natural_gas_amount: 800, natural_gas_unit: 'm3',
+      has_propane: true, propane_amount: 500, propane_unit: 'litres',
+      has_diesel_stationary: true, diesel_stationary_amount: 400, diesel_stationary_unit: 'litres',
+      has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 300, fuel_oil_distillate_unit: 'litres',
+      has_fuel_oil_residual: true, fuel_oil_residual_amount: 200, fuel_oil_residual_unit: 'litres',
+      has_mobile: true, gasoline_amount: 600, gasoline_unit: 'litres', diesel_mobile_amount: 700, diesel_mobile_unit: 'litres' });
+    const priced = (buildWorkings([l], 'AR6', 2025, [], 12) as any[])
+      .filter(r => r.scope === 1 && r.result_tco2e != null && !r.declaration);
+    // Seven, not six: has_mobile emits petrol AND mobile-diesel as separate rows.
+    expect(priced.length, 'seven priced combustion rows').toBe(7);
+    for (const r of priced) {
+      expect(r.note, `${r.source}: no derivation disclosed`).toBeTruthy();
+      expect(r.note, `${r.source}: must not claim the source published this basis`).toContain('DERIVED BY THEMISIQ');
+      expect(r.note, `${r.source}: must disclose the unpublished input`).toMatch(/published by (neither|either source)/);
+      expect(r.ef_source, `${r.source}: citation must name the instrument`).toContain('2018/2066');
+      expect(r.ef_source, `${r.source}: citation must name the density conversion`).toContain('NOT published by either source');
+    }
+    // A fuel-oil row converts litres->gallons AND is density-derived. BOTH notes must survive.
+    const fo = priced.find(r => r.stream === 'fuel_oil_residual');
+    expect(fo.note).toContain('US gallons');
+    expect(fo.note).toContain('DERIVED BY THEMISIQ');
+  });
+
+  it('U7 the note names the RIGHT fuel — the key drives both the factor and the prose', () => {
+    // pushFuel takes the factor KEY and looks the factor up itself, so a row cannot print one fuel's
+    // derivation beside another fuel's number. This is what that buys.
+    const rows = (buildWorkings([loc({ country: 'DE',
+      has_diesel_stationary: true, diesel_stationary_amount: 400, diesel_stationary_unit: 'litres',
+      has_mobile: true, gasoline_amount: 600, gasoline_unit: 'litres' })], 'AR6', 2025, [], 12) as any[]);
+    const diesel = rows.find(r => r.source === 'Diesel (stationary)');
+    const petrol = rows.find(r => r.source === 'Gasoline (mobile)');
+    expect(diesel.note).toContain('74 100 kg CO₂/TJ × 43.0 TJ/Gg × 0.844 kg/L');
+    expect(diesel.note).toContain('EN 590');
+    expect(petrol.note).toContain('69 300 kg CO₂/TJ × 44.3 TJ/Gg × 0.745 kg/L');
+    expect(petrol.note).toContain('EN 228');
+    expect(petrol.note, 'petrol must not carry the diesel bound').not.toContain('EN 590');
+  });
+
+  it('U8 only EU rows carry the derivation note — US/CA/UK/AU/NZ are published per unit', () => {
+    for (const country of ['US', 'CA', 'GB', 'AU', 'NZ']) {
+      const r = (buildWorkings([loc({ country, has_diesel_stationary: true, diesel_stationary_amount: 400,
+        diesel_stationary_unit: country === 'US' ? 'gallons' : 'litres' })], 'AR6', 2025, [], 12) as any[])
+        .find(x => x.source === 'Diesel (stationary)');
+      expect(r?.note ?? '', `${country} publishes per unit — nothing to disclose`).not.toContain('DERIVED BY THEMISIQ');
+    }
+  });
+
+  it.todo(
+    'U9 EU _gallon/_mcf keys should reproduce EXACTLY from their _litre/_m3 form using L_PER_GAL — ' +
+    'they do not. Stored vs exact: propane_gallon 5.762 / 5.762002401, diesel_gallon 10.179876 / ' +
+    '10.179880786, fuel_oil_gallon 11.718456 / 11.718461406, gasoline_gallon 8.657763 / 8.657766708, ' +
+    'natural_gas_mcf 57.188649 / 57.188609280. The gallon keys imply four DIFFERENT values of ' +
+    'L_PER_GAL (3.785410004-3.785410207 against the exact 3.785411784) and an M3_PER_MCF of ' +
+    '28.316819667 against 28.3168. Effect is ~0.5 ppm. THREE OF THESE ARE LIVE: EU liquids are ' +
+    'litres-only, so propane_gallon / diesel_gallon / gasoline_gallon / natural_gas_mcf are ' +
+    'unreachable, but fuel oil reaches its per-gallon key through convert-then-apply, so ' +
+    'fuel_oil_gallon / _distillate_gallon / _residual_gallon price real EU rows and the litre->gallon ' +
+    'round trip does not close. Awaiting Lisa\'s decision on whether to restate the values.',
+  );
 });
