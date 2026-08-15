@@ -724,8 +724,16 @@ function DisclosureRoadmap({ matrix }: { matrix: any[] }) {
         const m = ESRS_DR_MAP[t.code]
         return (
           <section key={t.code} className="page" style={{ marginTop: 18 }}>
+            {/* Topic NAME comes from the matrix row (t.label), never from ESRS_DR_MAP.name.
+                `material` is a filter over `matrix`, so t is the same object MatrixTable renders
+                — one topic name, one source, one spelling per PDF. The two used to disagree on
+                E3/E4/E5/S4 ("Water and marine resources" here vs "Water & marine resources" in
+                the matrix table) because ESRS_DR_MAP.name was a second, hand-written copy of the
+                mr_esrs_topics labels. It is also the STORED label, so a report reprints the name
+                as it stood when the assessment ran rather than whatever the bundle says today.
+                ESRS_DR_MAP keeps `relief` and `drs`, which are its actual job. */}
             <h3 style={{ ...h3, marginTop: 0, marginBottom: 6 }}>
-              <span style={{ color: '#aaa', fontSize: 12 }}>{t.code}</span> {m.name}
+              <span style={{ color: '#aaa', fontSize: 12 }}>{t.code}</span> {t.label}
               {m.relief && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 600, color: '#854F0B', background: '#FAEEDA', border: '0.5px solid #EF9F27', borderRadius: 99, padding: '2px 8px', verticalAlign: 'middle' }}>FY25–26 phase-in</span>}
             </h3>
             <table style={tbl}>

@@ -16,6 +16,18 @@
 --   adoption permitted for FY2026. At time of writing it is in the Parliament/Council
 --   scrutiny period; entry into force approximately 10 November 2026.
 --
+-- ✎ CORRECTED 16 AUGUST 2026 — INITIAL CAPITALS. As first written, this seed carried all 37
+--   labels in lower case ('climate change mitigation'). That was faithful to spec §11.1, which
+--   presents the sub-topics as prose lists and lowercases their entries — but NOT faithful to the
+--   annex, which capitalises the first letter of every sub-topic. The 37 strings below now carry
+--   the annex's capitalisation. Only character 0 of each label changed; no code, sort_order,
+--   parent_code or standard_version was touched, and the S1.6/S2.6 asymmetry is unaffected.
+--   Reasoning, the row-count-guarded corrective UPDATE, and the verification queries are in
+--   supabase/migrations/20260816_mr_esrs_subtopics_label_case_fix.sql. That file remains the
+--   audit record of the defect; this one is now correct on its own, so running it first and
+--   20260816 afterwards leaves the latter a passing no-op. This file is therefore independently
+--   re-runnable again.
+--
 -- ⚠️ APPENDIX A IS NON-BINDING GUIDANCE AND IS NOT A SUBSTITUTE FOR THE MATERIALITY
 -- PROCESS — the annex says so itself. This table is a checklist of candidate topics to
 -- assess, NOT a list of topics that are material, and nothing downstream may treat a row's
@@ -346,6 +358,11 @@ end $$;
 -- Labels are VERBATIM from ESRS 1 Appendix A. Do not tidy the capitalisation, expand the
 -- parentheticals, or split a label at a comma: the parenthetical lists ARE the standard's own
 -- text, and under ESRS (2026) they absorb what were separate sub-sub-topics in ESRS (2023).
+-- The LEADING CAPITAL on every label is the annex's, not house style — it was missing in the
+-- first version of this seed and restored on 16 Aug 2026 (see ✎ in the header). Nothing after
+-- character 0 is capitalised: it is 'Climate change mitigation', never 'Climate Change
+-- Mitigation'. The Title Case used for the TEN TOPIC names in 20260815_mr_esrs_topic_labels.sql
+-- is a different convention, and the annex applies it only at topic level.
 --
 -- ⚠️ S1 AND S2 SHARE ONE ROW IN APPENDIX A; THIS TABLE GIVES THEM TWELVE.
 -- Appendix A merges them into a single topic row "Own Workforce and Workers in the Value Chain
@@ -374,63 +391,63 @@ end $$;
 -- editing this file and re-running it, never by editing the row.
 insert into public.mr_esrs_subtopics (code, topic_code, label, sort_order, standard_version, parent_code) values
   -- E1 Climate Change — 3
-  ('E1.1', 'E1', 'climate change mitigation', 1, 'esrs_2026', null),
-  ('E1.2', 'E1', 'climate change adaptation', 2, 'esrs_2026', null),
-  ('E1.3', 'E1', 'energy', 3, 'esrs_2026', null),
+  ('E1.1', 'E1', 'Climate change mitigation', 1, 'esrs_2026', null),
+  ('E1.2', 'E1', 'Climate change adaptation', 2, 'esrs_2026', null),
+  ('E1.3', 'E1', 'Energy', 3, 'esrs_2026', null),
 
   -- E2 Pollution — 5
-  ('E2.1', 'E2', 'pollution of air', 1, 'esrs_2026', null),
-  ('E2.2', 'E2', 'pollution of water', 2, 'esrs_2026', null),
-  ('E2.3', 'E2', 'pollution of soil', 3, 'esrs_2026', null),
-  ('E2.4', 'E2', 'substances of concern, including substances of very high concern', 4, 'esrs_2026', null),
-  ('E2.5', 'E2', 'microplastics', 5, 'esrs_2026', null),
+  ('E2.1', 'E2', 'Pollution of air', 1, 'esrs_2026', null),
+  ('E2.2', 'E2', 'Pollution of water', 2, 'esrs_2026', null),
+  ('E2.3', 'E2', 'Pollution of soil', 3, 'esrs_2026', null),
+  ('E2.4', 'E2', 'Substances of concern, including substances of very high concern', 4, 'esrs_2026', null),
+  ('E2.5', 'E2', 'Microplastics', 5, 'esrs_2026', null),
 
   -- E3 Water — 1
-  ('E3.1', 'E3', 'water use, including withdrawal, consumption, discharges and storage', 1, 'esrs_2026', null),
+  ('E3.1', 'E3', 'Water use, including withdrawal, consumption, discharges and storage', 1, 'esrs_2026', null),
 
   -- E4 Biodiversity and Ecosystems — 4
-  ('E4.1', 'E4', 'drivers of biodiversity and ecosystem change (including terrestrial and marine habitat change, invasive species)', 1, 'esrs_2026', null),
-  ('E4.2', 'E4', 'state of species', 2, 'esrs_2026', null),
-  ('E4.3', 'E4', 'the extent and condition of terrestrial and marine ecosystems', 3, 'esrs_2026', null),
-  ('E4.4', 'E4', 'ecosystem services', 4, 'esrs_2026', null),
+  ('E4.1', 'E4', 'Drivers of biodiversity and ecosystem change (including terrestrial and marine habitat change, invasive species)', 1, 'esrs_2026', null),
+  ('E4.2', 'E4', 'State of species', 2, 'esrs_2026', null),
+  ('E4.3', 'E4', 'The extent and condition of terrestrial and marine ecosystems', 3, 'esrs_2026', null),
+  ('E4.4', 'E4', 'Ecosystem services', 4, 'esrs_2026', null),
 
   -- E5 Circular Economy and Resource Use — 3
-  ('E5.1', 'E5', 'resource inflows', 1, 'esrs_2026', null),
-  ('E5.2', 'E5', 'resource outflows related to products and services', 2, 'esrs_2026', null),
-  ('E5.3', 'E5', 'resource outflows (waste)', 3, 'esrs_2026', null),
+  ('E5.1', 'E5', 'Resource inflows', 1, 'esrs_2026', null),
+  ('E5.2', 'E5', 'Resource outflows related to products and services', 2, 'esrs_2026', null),
+  ('E5.3', 'E5', 'Resource outflows (waste)', 3, 'esrs_2026', null),
 
   -- S1 Own Workforce — the shared labour set, first of two copies.
   -- NOTE S1.6: no "water and sanitation" — the annex confines that to S2.
-  ('S1.1', 'S1', 'working conditions (including adequate wages, work-life balance, working time, secure employment) and social protection', 1, 'esrs_2026', null),
-  ('S1.2', 'S1', 'social dialogue and collective bargaining, freedom of association, information and consultation rights of workers, including through works councils', 2, 'esrs_2026', null),
-  ('S1.3', 'S1', 'health and safety', 3, 'esrs_2026', null),
-  ('S1.4', 'S1', 'training and skills development', 4, 'esrs_2026', null),
-  ('S1.5', 'S1', 'diversity and equal treatment (including gender equality, equal pay for work of equal value, employment and inclusion of people with disabilities, non-discrimination, anti-harassment, measures against violence)', 5, 'esrs_2026', null),
-  ('S1.6', 'S1', 'other labour-related human rights (including child labour, forced labour, privacy and adequate housing)', 6, 'esrs_2026', null),
+  ('S1.1', 'S1', 'Working conditions (including adequate wages, work-life balance, working time, secure employment) and social protection', 1, 'esrs_2026', null),
+  ('S1.2', 'S1', 'Social dialogue and collective bargaining, freedom of association, information and consultation rights of workers, including through works councils', 2, 'esrs_2026', null),
+  ('S1.3', 'S1', 'Health and safety', 3, 'esrs_2026', null),
+  ('S1.4', 'S1', 'Training and skills development', 4, 'esrs_2026', null),
+  ('S1.5', 'S1', 'Diversity and equal treatment (including gender equality, equal pay for work of equal value, employment and inclusion of people with disabilities, non-discrimination, anti-harassment, measures against violence)', 5, 'esrs_2026', null),
+  ('S1.6', 'S1', 'Other labour-related human rights (including child labour, forced labour, privacy and adequate housing)', 6, 'esrs_2026', null),
 
   -- S2 Workers in the Value Chain — the same six, second copy.
   -- NOTE S2.6: "water and sanitation" IS present here. This asymmetry with S1.6 is deliberate.
-  ('S2.1', 'S2', 'working conditions (including adequate wages, work-life balance, working time, secure employment) and social protection', 1, 'esrs_2026', null),
-  ('S2.2', 'S2', 'social dialogue and collective bargaining, freedom of association, information and consultation rights of workers, including through works councils', 2, 'esrs_2026', null),
-  ('S2.3', 'S2', 'health and safety', 3, 'esrs_2026', null),
-  ('S2.4', 'S2', 'training and skills development', 4, 'esrs_2026', null),
-  ('S2.5', 'S2', 'diversity and equal treatment (including gender equality, equal pay for work of equal value, employment and inclusion of people with disabilities, non-discrimination, anti-harassment, measures against violence)', 5, 'esrs_2026', null),
-  ('S2.6', 'S2', 'other labour-related human rights (including child labour, forced labour, privacy and adequate housing, water and sanitation)', 6, 'esrs_2026', null),
+  ('S2.1', 'S2', 'Working conditions (including adequate wages, work-life balance, working time, secure employment) and social protection', 1, 'esrs_2026', null),
+  ('S2.2', 'S2', 'Social dialogue and collective bargaining, freedom of association, information and consultation rights of workers, including through works councils', 2, 'esrs_2026', null),
+  ('S2.3', 'S2', 'Health and safety', 3, 'esrs_2026', null),
+  ('S2.4', 'S2', 'Training and skills development', 4, 'esrs_2026', null),
+  ('S2.5', 'S2', 'Diversity and equal treatment (including gender equality, equal pay for work of equal value, employment and inclusion of people with disabilities, non-discrimination, anti-harassment, measures against violence)', 5, 'esrs_2026', null),
+  ('S2.6', 'S2', 'Other labour-related human rights (including child labour, forced labour, privacy and adequate housing, water and sanitation)', 6, 'esrs_2026', null),
 
   -- S3 Affected Communities — 3
-  ('S3.1', 'S3', 'communities'' economic, social and cultural rights (including land-related impacts, security-related impacts, adequate housing and food, water and sanitation)', 1, 'esrs_2026', null),
-  ('S3.2', 'S3', 'communities'' civil and political rights (including freedom of expression, freedom of assembly, impacts on human rights defenders)', 2, 'esrs_2026', null),
-  ('S3.3', 'S3', 'rights of indigenous peoples (including free, prior and informed consent (FPIC), self-determination, cultural rights)', 3, 'esrs_2026', null),
+  ('S3.1', 'S3', 'Communities'' economic, social and cultural rights (including land-related impacts, security-related impacts, adequate housing and food, water and sanitation)', 1, 'esrs_2026', null),
+  ('S3.2', 'S3', 'Communities'' civil and political rights (including freedom of expression, freedom of assembly, impacts on human rights defenders)', 2, 'esrs_2026', null),
+  ('S3.3', 'S3', 'Rights of indigenous peoples (including free, prior and informed consent (FPIC), self-determination, cultural rights)', 3, 'esrs_2026', null),
 
   -- S4 Consumers and End-users — 3
-  ('S4.1', 'S4', 'information-related impacts for consumers or users (including privacy, access to information, freedom of expression)', 1, 'esrs_2026', null),
-  ('S4.2', 'S4', 'personal safety of consumers or end-users (including health and safety, protection of children, security of a person)', 2, 'esrs_2026', null),
-  ('S4.3', 'S4', 'social inclusion of consumers or end-users (including access to products and services, responsible marketing practices, non-discrimination)', 3, 'esrs_2026', null),
+  ('S4.1', 'S4', 'Information-related impacts for consumers or users (including privacy, access to information, freedom of expression)', 1, 'esrs_2026', null),
+  ('S4.2', 'S4', 'Personal safety of consumers or end-users (including health and safety, protection of children, security of a person)', 2, 'esrs_2026', null),
+  ('S4.3', 'S4', 'Social inclusion of consumers or end-users (including access to products and services, responsible marketing practices, non-discrimination)', 3, 'esrs_2026', null),
 
   -- G1 Business Conduct — 3
-  ('G1.1', 'G1', 'corporate culture, including anti-corruption and bribery, the protection of whistle-blowers and animal welfare', 1, 'esrs_2026', null),
-  ('G1.2', 'G1', 'political influence, including lobbying activities', 2, 'esrs_2026', null),
-  ('G1.3', 'G1', 'management of relationships with suppliers, including payment practices, especially late payment to small- and medium-sized undertakings', 3, 'esrs_2026', null)
+  ('G1.1', 'G1', 'Corporate culture, including anti-corruption and bribery, the protection of whistle-blowers and animal welfare', 1, 'esrs_2026', null),
+  ('G1.2', 'G1', 'Political influence, including lobbying activities', 2, 'esrs_2026', null),
+  ('G1.3', 'G1', 'Management of relationships with suppliers, including payment practices, especially late payment to small- and medium-sized undertakings', 3, 'esrs_2026', null)
 on conflict (code, standard_version) do update
   set topic_code  = excluded.topic_code,
       label       = excluded.label,
