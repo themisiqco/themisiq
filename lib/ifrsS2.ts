@@ -61,6 +61,14 @@ export const IFRS_S2_CITATION = 'IFRS S2 Climate-related Disclosures (ISSB, June
 export const IFRS_S2_ADOPTION_COUNT =
   '28 jurisdictions have adopted the ISSB standards on a voluntary or mandatory basis, with a further 12 planning to (April 2026)'
 
+// The ATTRIBUTION for IFRS_S2_ADOPTION_COUNT — who counted, and as of when. It lives here for the
+// same reason the count does: one claim, one owner. Until 14 August 2026 this existed only in this
+// file's header comment, so no surface could cite it, and /deals printed the figure unsourced.
+// PAIRED, NEVER SUBSTITUTED. It does not replace the '(April 2026)' qualifier inside the count —
+// that says what the figure is as of; this says who published it. A surface printing the count
+// prints this beside it, and neither alone is a citation.
+export const IFRS_S2_ADOPTION_SOURCE = 'S&P Global ISSB tracker, 22 April 2026'
+
 // The chip, tag or nav-width form — and it CARRIES NO NUMBER, deliberately. A number needs its
 // qualifier and its as-of date to mean anything, and neither fits a chip; a chip reading
 // 'IFRS S2 · 28 jurisdictions' would reintroduce the exact ambiguity this file exists to end, in
