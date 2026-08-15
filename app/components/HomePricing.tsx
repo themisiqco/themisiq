@@ -21,7 +21,7 @@ const MODULES: { id: ModuleId; name: string; frameworks: string; href: string }[
 const MODULE_CTA: Record<ModuleId, { headline: string; btn: string; href: string }> = {
   ghg:    { headline: 'Ready to see your emissions?', btn: 'See your emissions instantly →', href: '/dashboard/ghg' },
   cbam:   { headline: 'Is your EU customer asking for your actual emissions?', btn: 'Calculate your embedded emissions →', href: '/dashboard/cbam' },
-  risk:   { headline: 'Ready to assess your climate risk?', btn: 'Assess your climate risk →', href: '/dashboard/ghg' },
+  risk:   { headline: 'Ready to assess your climate risk?', btn: 'Assess your climate risk →', href: '/dashboard/climate-risk' },
   supply: { headline: 'Ready to map your supply chain?', btn: 'Map your supply chain →', href: '/supply-chain' },
   people: { headline: 'Do you know your gender pay gap?', btn: 'Calculate your pay gap →', href: '/people' },
   deals:  { headline: 'Ready to screen your next target?', btn: 'Screen a target →', href: '/deals' },

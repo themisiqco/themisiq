@@ -2,6 +2,7 @@
 import Nav from '../components/Nav'
 import { FLAT_MODULE_PRICES } from '@/lib/pricing'
 import { SB261_TABLE_STATUS } from '@/lib/sb261'
+import { IFRS_S2_ADOPTION_COUNT, IFRS_S2_ADOPTION_SOURCE } from '@/lib/ifrsS2'
 import Footer from '@/app/components/Footer'
 export default function Page() {
   return (
@@ -38,18 +39,21 @@ export default function Page() {
             </div>
           </div>
 
-          {/* STAT CARDS */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {/* STAT CARDS — stacked, not 2x2. The IFRS S2 card carries IFRS_S2_ADOPTION_COUNT WHOLE
+              (lib/ifrsS2.ts forbids decomposing it: '28' alone is the figure that started this), and
+              the whole string needs the full column width to read. */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
             {[
-              { val: '4', unit: 'stakeholders', label: 'investors · lenders · boards · regulators', color: '#0C447C', bg: '#E6F1FB' },
-              { val: '36+', unit: 'jurisdictions', label: 'adopting ISSB / IFRS S2 globally', color: '#7425e3', bg: '#EDE9FE' },
-              { val: '3', unit: 'scenarios', label: 'IPCC pathways modelled', color: '#ba7517', bg: '#FEF3E2' },
-              { val: '2', unit: 'risk types', label: 'physical & transition', color: '#0F6E56', bg: '#E1F5EE' },
-            ].map(({ val, unit, label, color, bg }) => (
+              { val: '4', unit: 'stakeholders', label: 'investors · lenders · boards · regulators', source: null, color: '#0C447C', bg: '#E6F1FB' },
+              { val: 'IFRS S2', unit: 'per jurisdiction', label: IFRS_S2_ADOPTION_COUNT, source: IFRS_S2_ADOPTION_SOURCE, color: '#7425e3', bg: '#EDE9FE' },
+              { val: '3', unit: 'scenarios', label: 'IPCC pathways modelled', source: null, color: '#ba7517', bg: '#FEF3E2' },
+              { val: '2', unit: 'risk types', label: 'physical & transition', source: null, color: '#0F6E56', bg: '#E1F5EE' },
+            ].map(({ val, unit, label, source, color, bg }) => (
               <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid ${color}22` }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '2.2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color, marginTop: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{unit}</div>
                 <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 300, lineHeight: 1.4 }}>{label}</div>
+                {source && <div style={{ fontSize: 11, color: '#888784', marginTop: 6, fontWeight: 300, lineHeight: 1.4 }}>{source}</div>}
               </div>
             ))}
           </div>
@@ -95,7 +99,7 @@ export default function Page() {
           {[
             { title: 'Guided risk assessment', desc: 'Step-by-step through governance, strategy, risk management, and metrics — the four TCFD pillars that IFRS S2, CSRD, and SB 261 all build on. No blank framework documents.' },
             { title: 'Physical risk screening', desc: 'Acute and chronic physical hazards — flood, heat, wildfire, water stress — screened against your facility locations across IPCC scenarios.' },
-            { title: 'Transition risk analysis', desc: 'Policy, legal, technology, market, and reputation risks modelled under orderly, disorderly, and hot-house pathways.' },
+            { title: 'Transition risk analysis', desc: 'Policy, legal, technology, market and reputation risks modelled across three IPCC pathways, each scored and compared against the other two.' },
             { title: 'Scenario modelling', desc: 'Three IPCC scenarios so your disclosure shows resilience under multiple climate futures — the scenario analysis investors and IFRS S2 expect.' },
             { title: 'Immutable audit trail', desc: 'Every entry, edit, and deletion is logged with user, timestamp, and previous value — written by the database, not the application.' },
             { title: 'Multi-framework export', desc: 'One assessment maps to TCFD, IFRS S2, CSRD ESRS E1, and SB 261 — a publishable, board-ready climate-related financial risk report in your branding.' },

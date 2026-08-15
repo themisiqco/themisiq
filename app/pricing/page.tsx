@@ -80,7 +80,7 @@ const MODULES: Module[] = [
       headline: 'Ready to assess your climate risk?',
       sub: 'Physical and transition risk quantified. TCFD and SB 261 ready.',
       btn: 'Assess your climate risk →',
-      href: '/dashboard/ghg',
+      href: '/dashboard/climate-risk',
     },
   },
   {
