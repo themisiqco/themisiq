@@ -23,7 +23,7 @@ export async function GET() {
       auth: { persistSession: false, autoRefreshToken: false },
     })
 
-    const [regionsRes, industriesRes, jurisdictionsRes, scenariosRes] = await Promise.all([
+    const [regionsRes, industriesRes, jurisdictionsRes, scenariosRes, topicsRes] = await Promise.all([
       supabase.from('mr_regions')
         .select('code, label, continent, sort_order')
         .eq('active', true)
@@ -31,12 +31,39 @@ export async function GET() {
       supabase.from('mr_industries').select('code, label, carbon_exposure').order('label'),
       supabase.from('mr_jurisdictions').select('code, label, policy_intensity').order('label'),
       supabase.from('mr_scenarios').select('code, label, framework, descriptor, physical_mult, transition_mult'),
+      // The ten topical standards. FATAL if it fails: without them the wizard's impact step has
+      // no topics to score at all, which is not a degraded state — it is a broken one.
+      supabase.from('mr_esrs_topics').select('code, label, category, sort_order').order('sort_order'),
     ])
 
-    const firstErr = [regionsRes, industriesRes, jurisdictionsRes, scenariosRes].find(r => r.error)
+    const firstErr = [regionsRes, industriesRes, jurisdictionsRes, scenariosRes, topicsRes].find(r => r.error)
     if (firstErr?.error) {
       console.error('Materiality reference-route fetch error:', firstErr.error)
       return NextResponse.json({ error: 'Failed to load reference data' }, { status: 500 })
+    }
+
+    // ── Per-version topic labels — DELIBERATELY OUTSIDE the fatal set above ──
+    // Every select in that Promise.all is fatal on error (firstErr -> 500), and the wizard's
+    // handler for a failed reference fetch is a bare `if (!res.ok) return` — so a 500 here leaves
+    // regionGroups EMPTY and the region dropdown silently blank. A topic-LABEL outage must never
+    // do that: it would take out the geography picker for want of a display name.
+    //
+    // So this degrades instead. An empty array means the client falls back per-topic to
+    // mr_esrs_topics.label — the same pre-versioning default /api/materiality uses — and the
+    // wizard stays fully usable with 2023 wording rather than not loading.
+    //
+    // ALL versions are returned unfiltered, not just the one the user has picked: the whole table
+    // is 10 rows today and 30 fully seeded, so the client filters in memory and a version change
+    // is instant with no refetch, no loading state, and no window where names are stale.
+    const labelsRes = await supabase
+      .from('mr_esrs_topic_labels')
+      .select('topic_code, standard_version, label')
+    if (labelsRes.error) {
+      console.error(
+        'Materiality reference-route: mr_esrs_topic_labels fetch failed; serving [] so the client '
+        + 'falls back to mr_esrs_topics.label. Region and industry lists are unaffected.',
+        labelsRes.error,
+      )
     }
 
     return NextResponse.json({
@@ -44,6 +71,11 @@ export async function GET() {
       industries: industriesRes.data ?? [],
       jurisdictions: jurisdictionsRes.data ?? [],
       scenarios: scenariosRes.data ?? [],
+      topics: topicsRes.data ?? [],
+      // [] means "no version-specific names available" — from an empty table OR a failed read.
+      // The client cannot tell those apart and must not claim to: it reports the fallback as a
+      // fallback, never as a reason. (Same discipline as labelResolution in /api/materiality.)
+      topicLabels: labelsRes.data ?? [],
     })
   } catch (error) {
     console.error('Materiality reference route error:', error)

@@ -40,13 +40,17 @@ export async function POST(req: NextRequest) {
     //              Silently turning that into null would hide a client defect behind a blank that
     //              looks deliberate, on the one field a verifier is entitled to rely on.
     //
-    // ⚠️ THE WIZARD DOES NOT SEND THIS FIELD, and app/dashboard/climate-risk/page.tsx is out of
-    // scope for this change (its hardcoded ESRS_TOPICS list still carries 2023 wording, and
-    // fixing it needs the wizard to ASK which standard applies first — separate task). So until
-    // that lands, EVERY assessment created through the UI takes the absent path: standard_version
-    // is NULL and the report prints "not stated". This route makes 2026 topic names POSSIBLE; it
-    // does not make them happen. The field must therefore stay OPTIONAL — requiring it here would
-    // break the live wizard on deploy.
+    // THE FIELD STAYS OPTIONAL, PERMANENTLY. The wizard now asks (a chooser on the CSRD card of
+    // the mode gate in app/dashboard/climate-risk/page.tsx) and always sends the key — including
+    // an explicit null when the user selects "Prefer not to state yet". But optional is not a
+    // transitional state waiting to be tightened into required:
+    //   * IFRS S2 runs go to /api/materiality/resilience and never state an ESRS version, because
+    //     an s2 report is not an ESRS filing and has no ESRS matrix for one to govern;
+    //   * "not stated" is a legitimate answer for a CSRD assessment run before the customer has
+    //     settled which version they will file under;
+    //   * and a cached bundle or a direct API caller must not lose an otherwise valid assessment
+    //     over a display-only field.
+    // Requiring it here would break all three. The honest blank is the feature.
     const rawStandardVersion = body.standardVersion
     let standardVersion: StandardVersion | null = null
     if (rawStandardVersion != null && rawStandardVersion !== '') {

@@ -4,6 +4,14 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useEntitlement } from '../../../lib/useEntitlement'
 import Nav from '../../components/Nav'
+// resolveTopicLabels is the SAME pure function /api/materiality uses at write time. Importing it
+// here rather than reimplementing the overlay is the point: the wizard and the write path cannot
+// disagree about which name belongs to which version, or about what counts as a fallback.
+// lib/materiality.ts has no imports of its own — no Supabase, no React — so it is client-safe.
+import {
+  resolveTopicLabels,
+  type StandardVersion, type EsrsTopic, type TopicLabelRow,
+} from '../../../lib/materiality'
 
 // ─── Design tokens (matching the live climate page) ───────────────────────────
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
@@ -102,19 +110,59 @@ const SCENARIOS = [
   { code: 'ngfs_hothouse', label: 'NGFS Hot House', descriptor: 'Limited action', desc: 'Little further climate action — minimal transition risk but the most severe physical damage.' },
 ]
 
-// ESRS topics with one-line plain-English descriptions (UX fix #2)
-const ESRS_TOPICS = [
-  { code: 'E1', label: 'Climate change', desc: 'Your greenhouse gas emissions and exposure to a changing climate.' },
-  { code: 'E2', label: 'Pollution', desc: 'Air, water, and soil pollution your operations release.' },
-  { code: 'E3', label: 'Water & marine resources', desc: 'Your water use and effect on water and marine ecosystems.' },
-  { code: 'E4', label: 'Biodiversity & ecosystems', desc: 'Your impact on species, habitats, and land use.' },
-  { code: 'E5', label: 'Resource use & circular economy', desc: 'Raw-material consumption, waste, and recyclability.' },
-  { code: 'S1', label: 'Own workforce', desc: 'Working conditions, safety, and rights of your employees.' },
-  { code: 'S2', label: 'Workers in the value chain', desc: 'Labour conditions among your suppliers and contractors.' },
-  { code: 'S3', label: 'Affected communities', desc: 'Effect of your operations on local and indigenous communities.' },
-  { code: 'S4', label: 'Consumers & end-users', desc: 'Health, safety, and rights of the people who use your products.' },
-  { code: 'G1', label: 'Business conduct', desc: 'Ethics, anti-corruption, and responsible governance practices.' },
-]
+// Plain-English one-liner per ESRS topic, shown under the topic name on the impact step.
+//
+// THE LABELS ARE NO LONGER HERE. Topic NAMES now come from the database — mr_esrs_topics, with
+// mr_esrs_topic_labels overlaid for the chosen standard version — because they differ between
+// ESRS (2023) and ESRS (2026) and a hardcoded copy would silently print one standard's wording
+// under the other's stated version. This map keeps only `desc`, keyed by code.
+//
+// desc IS DELIBERATELY NOT VERSIONED AND NOT IN THE DATABASE. It is wizard-only UX guidance that
+// never reaches a report, so it is not a disclosure and needs no provenance. Putting ThemisIQ
+// prose into mr_esrs_topic_labels would blur exactly the distinction that table's header defends:
+// every value in it is transcribed law. The cost of that choice, stated so it is a known one:
+// these ten sentences are version-blind, so all ten must read correctly under BOTH standards,
+// and a future revision that changes what a topic MEANS (rather than what it is called) will not
+// be caught by anything here.
+//
+// ⚠️ S1 AND S2 CARRY EXTRA WEIGHT. Under ESRS (2026) both topics take Appendix A's joint title
+// "Own Workforce and Workers in the Value Chain", so the two rows on the impact step read
+// identically apart from a small grey code prefix — while asking for two SEPARATE scores. These
+// two descriptions are the disambiguator, and are written to be read as a contrasting pair
+// ("employ directly" / "not by you"). Do not shorten them into symmetry.
+// Copy for the ESRS-version chooser on the mode gate.
+//
+// Typed as Record<StandardVersion, …>, which makes it EXHAUSTIVE BY CONSTRUCTION: if a fourth
+// version is ever added to the StandardVersion union, this object stops typechecking until the
+// chooser offers it. That is worth more than a comment — a version the customer cannot select is
+// a version they cannot state, on a field Art. 2(2) requires them to state.
+const STANDARD_VERSION_COPY: Record<StandardVersion, { l: string; d: string }> = {
+  esrs_2026: { l: 'ESRS (2026)', d: 'The revised standards in full. Required from FY2027.' },
+  esrs_2023_reliefs: { l: 'ESRS (2023) with reliefs', d: 'The 2023 standards plus the reliefs the new act permits.' },
+  esrs_2023: { l: 'ESRS (2023)', d: 'As last amended by Del. Reg. (EU) 2025/1416.' },
+}
+// Display order, most-forward-looking first — deliberately NOT the union's declaration order,
+// which is chronological. Listed separately so ordering is a UI decision and exhaustiveness stays
+// a type decision; the two should not constrain each other.
+const STANDARD_VERSION_ORDER: StandardVersion[] = ['esrs_2026', 'esrs_2023_reliefs', 'esrs_2023']
+
+const ESRS_TOPIC_DESC: Record<string, string> = {
+  E1: 'Your greenhouse gas emissions and exposure to a changing climate.',
+  E2: 'Air, water, and soil pollution your operations release.',
+  // Was "…and effect on water and marine ecosystems" — 2023-specific, since ESRS (2026) narrows
+  // this topic to "Water". Reworded to the water-use substance common to both.
+  E3: 'Your water use — withdrawal, consumption, discharge and storage.',
+  E4: 'Your impact on species, habitats, and land use.',
+  // Was "Raw-material consumption, waste, and recyclability" — reworded to the inflow/outflow
+  // framing both standards use, so it fits "Resource use and circular economy" (2023) and
+  // "Circular Economy and Resource Use" (2026) equally.
+  E5: 'Material inflows, product and waste outflows, and circularity.',
+  S1: 'People you employ directly — pay, hours, health and safety, equal treatment.',
+  S2: 'People employed by your suppliers and contractors, not by you.',
+  S3: 'Effect of your operations on local and indigenous communities.',
+  S4: 'Health, safety, and rights of the people who use your products.',
+  G1: 'Ethics, anti-corruption, and responsible governance practices.',
+}
 
 // Asset-profile descriptions (UX fix #1)
 const ASSET_PROFILES = [
@@ -203,6 +251,18 @@ export default function MaterialityWizard() {
   const isPaid = useEntitlement('climate-risk')
   const [mode, setMode] = useState<Mode | null>(null)
   const [step, setStep] = useState(0)
+  // Which ESRS version this assessment is prepared under. NULL is a REAL state — "not stated" —
+  // and is the default on purpose: Art. 2(2) of Del. Reg. C(2026) 5010 requires the undertaking to
+  // STATE which version it applied, so an assumed one would be a false statement about which law
+  // was applied, made in their name. There is no pre-selected radio below; the user picks, or
+  // explicitly declines to state.
+  const [standardVersion, setStandardVersion] = useState<StandardVersion | null>(null)
+  // The ten topical standards and their per-version names, both from the DB via
+  // /api/materiality/reference. dbTopics carries mr_esrs_topics.label — the pre-versioning default
+  // and the per-topic fallback; topicLabels holds EVERY version's names, so switching version is a
+  // client-side filter with no refetch.
+  const [dbTopics, setDbTopics] = useState<EsrsTopic[]>([])
+  const [topicLabels, setTopicLabels] = useState<TopicLabelRow[]>([])
   const [companyName, setCompanyName] = useState('')
   const [legalEntity, setLegalEntity] = useState('')
   const [reportingPeriod, setReportingPeriod] = useState('FY2025')
@@ -242,10 +302,27 @@ export default function MaterialityWizard() {
           g.regions.push({ code: r.code, label: r.label })
         }
         if (!cancelled) setRegionGroups(groups)
+
+        // Topics and their per-version names, from the same single request. ALL versions are
+        // loaded at once (30 rows fully seeded) and filtered in memory, so changing the standard
+        // version relabels the impact step instantly — no refetch, no loading state, and no
+        // window where a name on screen belongs to the previously selected version.
+        if (!cancelled) {
+          setDbTopics(data.topics ?? [])
+          setTopicLabels(data.topicLabels ?? [])
+        }
       } catch { /* leave empty; the region step shows a loading hint until data arrives */ }
     })()
     return () => { cancelled = true }
   }, [])
+
+  // Topic names for the version currently selected, resolved by the SAME pure function the write
+  // path uses. Per-topic fallback to mr_esrs_topics.label when a version has no row — which is the
+  // live state for esrs_2023 and esrs_2023_reliefs, neither of which is seeded yet.
+  //
+  // `resolution` is not persisted from here: the route recomputes it server-side at write, from
+  // the database rather than from whatever this client happens to hold. This is display only.
+  const displayTopics = resolveTopicLabels(dbTopics, topicLabels, standardVersion).topics
 
   const SCENARIO_RATIONALE = "Yes — SSP2-4.5 (~2.7°C) is the most common starting choice and a reasonable middle case, so it's fine to leave it as-is. Change it only if you have a specific reason to test a more optimistic or more severe future. You can always re-run with a different scenario later."
   const HORIZON_RATIONALE = "Medium term (to 2040) is the default lens for a first screening. Companies with long-lived physical assets may prefer the long-term view."
@@ -276,6 +353,10 @@ export default function MaterialityWizard() {
         body: JSON.stringify({
           mode, companyName, legalEntity, reportingPeriod, industryCode, regionCodes, jurisdictionCodes,
           assetProfile, scenarioCode, horizon, impactOverrides,
+          // null is sent deliberately, not omitted: the route treats absent and null identically,
+          // and sending it makes "the user was asked and declined to state" visible in the request
+          // rather than indistinguishable from an old client that never knew about the field.
+          standardVersion,
           rationale: {
             scenario: scenarioCode === 'ssp245' ? SCENARIO_RATIONALE : 'User-selected scenario.',
             horizon: horizon === 'medium' ? HORIZON_RATIONALE : 'User-selected horizon.',
@@ -320,7 +401,7 @@ export default function MaterialityWizard() {
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Climate Risk &amp; Materiality</div>
           <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Which assessment do you need?</h1>
           <p style={{ ...sectionSub, marginBottom: 24 }}>Assess your climate-related physical and transition risk, and determine what's material under your reporting standard. Double materiality adds impact materiality to single (financial) materiality. Choose the standard you report under.</p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'stretch' }}>
             {[
               { m: 's2' as Mode, t: 'IFRS S2', sub: 'Single (financial) materiality · resilience', d: 'How climate-related risks affect your enterprise value. Produces the multi-scenario climate resilience report — the resilience analysis IFRS S2 (and CSRD) call for.', feat: false },
               { m: 'csrd' as Mode, t: 'CSRD / ESRS', sub: 'Double materiality', d: 'Financial materiality plus impact materiality across all ten ESRS topics, plotted on the double-materiality matrix.', feat: true },
@@ -329,7 +410,46 @@ export default function MaterialityWizard() {
                 <div style={{ fontSize: 16, fontWeight: 600, color: '#0d0d0d', marginBottom: 2 }}>{o.t}</div>
                 <div style={{ fontSize: 13, color: '#7425e3', marginBottom: 10 }}>{o.sub}</div>
                 <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, flex: 1, marginBottom: 16 }}>{o.d}</div>
-                <button onClick={() => { setMode(o.m); setStep(0) }} style={{ fontSize: 13, fontWeight: 500, padding: '10px 20px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>Start {o.t} assessment</button>
+
+                {/* ── ESRS version, CSRD card only ────────────────────────────────────────
+                    It lives HERE rather than as a wizard step for three reasons: the screen's own
+                    subtitle already says "Choose the standard you report under", and the version
+                    is that question one level finer; it is before the impact step, so topic names
+                    are right the first time they are shown; and it needs no step index, so
+                    renderStep()'s hardcoded 0-4 are untouched.
+                    It is CSRD-only because an IFRS S2 run produces no ESRS matrix — the version
+                    would govern nothing in its output. */}
+                {o.m === 'csrd' && (
+                  <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: '#0d0d0d', marginBottom: 3 }}>Which version of ESRS do you report under?</div>
+                    <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.5, marginBottom: 10 }}>
+                      All three apply to FY2026 and you must state which you used. It sets the topic names in your report. You can leave this until later.
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {[
+                        ...STANDARD_VERSION_ORDER.map(v => ({ v: v as StandardVersion | null, ...STANDARD_VERSION_COPY[v] })),
+                        // NULL is offered explicitly, and nothing is pre-selected. Defaulting to a
+                        // version would put a statement about which law was applied into the
+                        // customer's report that they never made.
+                        { v: null, l: 'Prefer not to state yet', d: 'Recorded as "not stated". Topic names fall back to the platform defaults.' },
+                      ].map(opt => {
+                        const sel = standardVersion === opt.v
+                        return (
+                          <div key={String(opt.v)} onClick={() => setStandardVersion(opt.v)} style={{ border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, borderRadius: 8, padding: '7px 10px', cursor: 'pointer', background: sel ? '#EDE9FE' : '#fff' }}>
+                            <div style={{ fontSize: 12, fontWeight: sel ? 600 : 500, color: sel ? '#7425e3' : '#0d0d0d' }}>{opt.l}</div>
+                            <div style={{ fontSize: 10.5, color: '#888784', marginTop: 1, lineHeight: 1.4 }}>{opt.d}</div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Starting an IFRS S2 assessment CLEARS any version picked in the CSRD card. A
+                    user reading both cards may well select a version and then choose s2; without
+                    this, that choice would ride along into a run it has no meaning for. Explicit
+                    at the point of divergence rather than trusting the radio to be untouched. */}
+                <button onClick={() => { setMode(o.m); setStep(0); if (o.m === 's2') setStandardVersion(null) }} style={{ fontSize: 13, fontWeight: 500, padding: '10px 20px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>Start {o.t} assessment</button>
               </div>
             ))}
           </div>
@@ -490,15 +610,25 @@ export default function MaterialityWizard() {
     <div>
       <h2 style={sectionHead}>Impact materiality</h2>
       <p style={sectionSub}>The inside-out view: how much does your business affect each ESRS topic? Pre-filled from your industry — adjust to your reality. This axis is what makes the assessment "double".</p>
+      {/* Topics come from the DB, named for the selected version. While the reference fetch is in
+          flight (or if it failed) the list is empty — say so rather than render an empty box that
+          reads as "no topics apply to you". */}
+      {displayTopics.length === 0 && (
+        <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 14px', fontSize: 12, color: '#888784' }}>
+          Loading the ESRS topic list…
+        </div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {ESRS_TOPICS.map(t => {
+        {displayTopics.map(t => {
           const cur = impactOverrides[t.code]
           return (
             <div key={t.code} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: '#f8f7f5', borderRadius: 10, padding: '10px 14px' }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, color: '#0d0d0d' }}><span style={{ color: '#aaa', fontSize: 11 }}>{t.code}</span> {t.label}</div>
-                {/* UX fix #2: one-line description per topic */}
-                <div style={{ fontSize: 11, color: '#888784', marginTop: 2, lineHeight: 1.5 }}>{t.desc}</div>
+                {/* Version-blind UX guidance, keyed by code — see ESRS_TOPIC_DESC. Under ESRS
+                    (2026) S1 and S2 share one title, so for those two this line is the ONLY thing
+                    telling the rows apart. */}
+                <div style={{ fontSize: 11, color: '#888784', marginTop: 2, lineHeight: 1.5 }}>{ESRS_TOPIC_DESC[t.code] ?? ''}</div>
               </div>
               <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                 {[{ l: 'low', v: 2 }, { l: 'med', v: 5 }, { l: 'high', v: 8 }].map(o => {
@@ -976,7 +1106,11 @@ export default function MaterialityWizard() {
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Climate Risk &amp; Materiality</div>
             <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>{mode === 'csrd' ? 'CSRD double materiality' : 'IFRS S2 single materiality'}</div>
           </div>
-          <button onClick={() => { setMode(null); setStep(0); setResult(null) }} style={{ fontSize: 12, color: '#888784', background: 'none', border: '1px solid #e8e7e4', borderRadius: 8, padding: '6px 14px', cursor: 'pointer' }}>Switch mode</button>
+          {/* setStandardVersion(null) is not optional here. Returning to the mode gate must clear
+              the version, or the next assessment silently inherits this one's — and it would
+              survive a browser check, because a plausible value is exactly what it would look
+              like. Same at "New assessment" below. */}
+          <button onClick={() => { setMode(null); setStep(0); setResult(null); setStandardVersion(null) }} style={{ fontSize: 12, color: '#888784', background: 'none', border: '1px solid #e8e7e4', borderRadius: 8, padding: '6px 14px', cursor: 'pointer' }}>Switch mode</button>
         </div>
       </div>
 
@@ -1018,7 +1152,7 @@ export default function MaterialityWizard() {
           ) : (
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
               <button onClick={() => { setStep(0); setResult(null); setResilienceResult(null); setAcknowledgedReport(false) }} style={{ fontSize: 13, padding: '9px 20px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: 'pointer' }}>↺ Start over</button>
-              <button onClick={() => { setMode(null); setStep(0); setResult(null); setResilienceResult(null); setAcknowledgedReport(false) }} style={{ fontSize: 13, fontWeight: 500, padding: '9px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>New assessment →</button>
+              <button onClick={() => { setMode(null); setStep(0); setResult(null); setResilienceResult(null); setAcknowledgedReport(false); setStandardVersion(null) }} style={{ fontSize: 13, fontWeight: 500, padding: '9px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>New assessment →</button>
             </div>
           )}
         </div>
