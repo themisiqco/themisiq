@@ -113,12 +113,12 @@ const MODULES: Module[] = [
   {
     id: 'deals',
     name: 'Deals & Investment',
-    description: 'IFRS S2 / TCFD · SB 253 M&A liability · SFDR Art.8/9 · ILPA ESG template · SBTi (portfolio) · IFC Performance Standards',
+    description: 'SB 253 M&A liability · CSRD / ESRS E1 · SECR · CS3D · Canada S-211 · SFDR Art.8/9',
     tags: [{ label: 'LP / investor', color: 'purple' }],
     cta: {
-      headline: 'Ready to quantify your M&A exposure?',
+      headline: 'Ready to screen your next target?',
       sub: 'Climate diligence in days. SB 253 liability assessed before you sign.',
-      btn: 'Assess your M&A exposure →',
+      btn: 'Screen a target →',
       href: '/deals',
     },
   },

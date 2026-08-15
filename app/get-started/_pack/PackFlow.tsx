@@ -228,7 +228,7 @@ export const PACKS: Record<string, PackConfig> = {
       },
       {
         title: 'Complete your Deals & Investment profile',
-        description: 'Quantify portfolio and M&A exposure against TCFD, SFDR and ILPA expectations.',
+        description: 'Screen a target against SB 253, CSRD, SECR and CS3D, with each threshold tested limb by limb.',
         href: '/dashboard/deals?pack=investor',
         cta: 'Start deals →',
         state: 'locked',

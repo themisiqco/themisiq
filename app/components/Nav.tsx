@@ -11,7 +11,7 @@ const MODULES_NAV: { href: string; label: string; labelShort: string; sub: strin
   { href: '/climate-ghg', label: 'GHG Emissions', labelShort: 'GHG Emissions', sub: 'SB 253 · CDP · ESRS E1 · GHG Protocol · Scope 3' },
   { href: '/climate-risk', label: 'Climate Risk', labelShort: 'Climate Risk', sub: 'TCFD · IFRS S2 · ESRS E1 · scenario analysis' },
   { href: '/supply-chain', label: 'Supply Chain', labelShort: 'Supply Chain', sub: 'Supplier Portal · CS3D · EcoVadis · ESRS S2' },
-  { href: '/deals', label: 'Deals & Investment', labelShort: 'Deals', sub: 'M&A diligence · PE · IFRS S2 · LP ESG' },
+  { href: '/deals', label: 'Deals & Investment', labelShort: 'Deals', sub: 'M&A diligence · PE · IFRS S2 · SB 253' },
   { href: '/people', label: 'People & Workforce', labelShort: 'People', sub: 'ESRS S1 · EU Pay Transparency · CA Pay Data' },
   { href: '/ai-governance', label: 'AI Governance', labelShort: 'AI Governance', sub: 'EU AI Act · NIST AI RMF · ISO 42001' },
   { href: '/cyber', label: 'Cyber Governance', labelShort: 'Cyber', sub: 'NIS2 · DORA · SEC cyber · ISO 27001' },

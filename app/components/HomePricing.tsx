@@ -24,7 +24,7 @@ const MODULE_CTA: Record<ModuleId, { headline: string; btn: string; href: string
   risk:   { headline: 'Ready to assess your climate risk?', btn: 'Assess your climate risk →', href: '/dashboard/ghg' },
   supply: { headline: 'Ready to map your supply chain?', btn: 'Map your supply chain →', href: '/supply-chain' },
   people: { headline: 'Do you know your gender pay gap?', btn: 'Calculate your pay gap →', href: '/people' },
-  deals:  { headline: 'Ready to quantify your M&A exposure?', btn: 'Assess your M&A exposure →', href: '/deals' },
+  deals:  { headline: 'Ready to screen your next target?', btn: 'Screen a target →', href: '/deals' },
   ai:     { headline: 'Do you know which AI systems are high-risk?', btn: 'Start your AI inventory →', href: '/ai-governance' },
   cyber:  { headline: 'Are you NIS2 and DORA compliant?', btn: 'Check your cyber readiness →', href: '/cyber' },
 }
