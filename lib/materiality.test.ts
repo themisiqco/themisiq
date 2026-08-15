@@ -8,14 +8,24 @@
 //
 // All assertions reach the private compute functions through the one public seam,
 // runAssessment(input, ref), exactly as the API route does.
+//
+// GROUP H is later and different in kind: not characterisation, but the ONLY guard on
+// resolveTopicLabels. That function is pure and every state it distinguishes SUCCEEDS — a
+// regression there does not throw, it prints one ESRS version's topic name under another
+// version's stated heading. Nothing else in the codebase can catch that. It calls the function
+// directly rather than through runAssessment, because the routes resolve labels before the
+// engine runs and the engine never sees the difference.
 import { describe, it, expect } from 'vitest'
 import {
   runAssessment,
   runResilience,
   computeProvenance,
+  resolveTopicLabels,
   type ReferenceData,
   type AssessmentInput,
   type ModelConfig,
+  type EsrsTopic,
+  type TopicLabelRow,
 } from './materiality'
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
@@ -434,5 +444,110 @@ describe('GROUP G — provenance summary counts the reference values THIS result
     // A single (non-resilience) assessment on one SSP counts that scenario just once.
     const single = runAssessment(baseInput({ mode: 'csrd', scenarioCode: 'ssp245' }), ref).provenance
     expect(single.nPrimarySource).toBe(1)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('GROUP H — resolveTopicLabels: every state succeeds, so only a test can tell them apart', () => {
+  // WHY THIS GROUP EARNS ITS KEEP. resolveTopicLabels is pure, and EVERY state it distinguishes
+  // is a success — no throw, no empty result, no 500. A regression here would not surface as an
+  // error; it would quietly print one ESRS version's topic name under another version's stated
+  // heading, in a document a verifier reads. Article 2(2) of Del. Reg. C(2026) 5010 makes the
+  // version a required statement, which is exactly what makes a wrong name beside it a defect
+  // rather than a cosmetic slip. Nothing else in the codebase can catch it.
+  //
+  // Fixtures use the three topics whose 2023 and 2026 names actually differ, so a test that
+  // passes for the wrong reason is unlikely.
+  const TOPICS: EsrsTopic[] = [
+    { code: 'E3', label: 'Water & marine resources', category: 'env', sort_order: 3 },
+    { code: 'E5', label: 'Resource use & circular economy', category: 'env', sort_order: 5 },
+    { code: 'G1', label: 'Business conduct', category: 'gov', sort_order: 10 },
+  ]
+  const ROWS_2026: TopicLabelRow[] = [
+    { topic_code: 'E3', standard_version: 'esrs_2026', label: 'Water' },
+    { topic_code: 'E5', standard_version: 'esrs_2026', label: 'Circular Economy and Resource Use' },
+    { topic_code: 'G1', standard_version: 'esrs_2026', label: 'Business Conduct' },
+  ]
+  const labels = (r: { topics: EsrsTopic[] }) => r.topics.map(t => t.label)
+  const DEFAULTS = TOPICS.map(t => t.label)
+
+  it('(a) no standardVersion stated → defaults kept, source default_no_version, nothing fails', () => {
+    // The ONLY path the live wizard takes today: it does not send standardVersion, so every
+    // assessment created through the UI lands here until the wizard UX task ships.
+    const r = resolveTopicLabels(TOPICS, [], null)
+    expect(labels(r)).toEqual(DEFAULTS)
+    expect(r.resolution).toEqual({
+      standardVersion: null, resolved: 0, source: 'default_no_version', fallbackTopics: [],
+    })
+  })
+
+  it('(b) version stated but no label rows → defaults kept, source default_none_resolved, all codes listed', () => {
+    // esrs_2023 today: the CHECK admits it but nothing is seeded, because AR 16 was not reachable
+    // at transcription fidelity. fallbackTopics is populated here — these codes WERE looked up.
+    const r = resolveTopicLabels(TOPICS, [], 'esrs_2023')
+    expect(labels(r)).toEqual(DEFAULTS)
+    expect(r.resolution.source).toBe('default_none_resolved')
+    expect(r.resolution.resolved).toBe(0)
+    expect(r.resolution.fallbackTopics).toEqual(['E3', 'E5', 'G1'])
+  })
+
+  it('(c) label fetch failed (null) → defaults kept, source default_fetch_error, list EMPTY not full', () => {
+    // null means the read errored — a different fact from "returned no rows", and reported as a
+    // different source. They must not collapse: [] with no error is also what a dropped RLS
+    // policy looks like, so a shared code would hide a grants regression behind a plausible one.
+    // fallbackTopics stays empty because no per-topic determination was ever made.
+    const r = resolveTopicLabels(TOPICS, null, 'esrs_2026')
+    expect(labels(r)).toEqual(DEFAULTS)
+    expect(r.resolution).toEqual({
+      standardVersion: 'esrs_2026', resolved: 0, source: 'default_fetch_error', fallbackTopics: [],
+    })
+  })
+
+  it('full resolve → every name replaced, source versioned, report shows no disclosure', () => {
+    const r = resolveTopicLabels(TOPICS, ROWS_2026, 'esrs_2026')
+    expect(labels(r)).toEqual(['Water', 'Circular Economy and Resource Use', 'Business Conduct'])
+    expect(r.resolution).toEqual({
+      standardVersion: 'esrs_2026', resolved: 3, source: 'versioned', fallbackTopics: [],
+    })
+  })
+
+  it('PARTIAL seed → source versioned_partial, and it names exactly which topics fell back', () => {
+    // The invisible case: ONE matrix table carrying two standards' wording, with a single version
+    // stated above it. Without versioned_partial this reads as a clean resolve.
+    const r = resolveTopicLabels(TOPICS, ROWS_2026.slice(0, 1), 'esrs_2026')
+    expect(labels(r)).toEqual(['Water', 'Resource use & circular economy', 'Business conduct'])
+    expect(r.resolution.source).toBe('versioned_partial')
+    expect(r.resolution.resolved).toBe(1)
+    expect(r.resolution.fallbackTopics).toEqual(['E5', 'G1'])
+  })
+
+  // ── RULE-ENFORCING TEST 1 of 2 ──
+  it('RULE: unfiltered rows must never put one version\'s label under another version\'s heading', () => {
+    // The routes filter by standard_version in SQL, so this defends against a FUTURE caller that
+    // does not — a shared fetch, a cache, a hand-written script. Handed 2026 rows while resolving
+    // for 2023, the function must decline every one of them rather than apply a name the stated
+    // standard does not use. Deleting the version check inside resolveTopicLabels turns this red.
+    const r = resolveTopicLabels(TOPICS, ROWS_2026, 'esrs_2023')
+    expect(labels(r)).toEqual(DEFAULTS)
+    expect(r.topics[0].label).toBe('Water & marine resources')   // NOT 'Water'
+    expect(r.resolution.source).toBe('default_none_resolved')
+    expect(r.resolution.resolved).toBe(0)
+  })
+
+  // ── RULE-ENFORCING TEST 2 of 2 ──
+  it('RULE: only `label` is ever replaced, so no label state can reach computeMatrix\'s assessed/no_baseline branch', () => {
+    // computeMatrix decides assessed vs no_baseline from `isE1 || !!base` — code and baselines,
+    // never a label. This test pins the other half of that contract: resolveTopicLabels must not
+    // touch code, category or sort_order, so a label problem cannot change WHICH topics are
+    // assessed, or their order, or their grouping. See GROUP C for the branch itself.
+    const r = resolveTopicLabels(TOPICS, ROWS_2026, 'esrs_2026')
+    expect(r.topics).toHaveLength(TOPICS.length)
+    r.topics.forEach((t, i) => {
+      expect(t.code).toBe(TOPICS[i].code)
+      expect(t.category).toBe(TOPICS[i].category)
+      expect(t.sort_order).toBe(TOPICS[i].sort_order)
+    })
+    // …and the inputs are not mutated in place: the caller's reference set is untouched.
+    expect(TOPICS.map(t => t.label)).toEqual(DEFAULTS)
   })
 })

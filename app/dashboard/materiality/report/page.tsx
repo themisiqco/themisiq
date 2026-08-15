@@ -20,6 +20,50 @@ import { DISCLAIMER_PARAS } from '../../../../lib/disclaimer'
 
 // ─── Lookup helpers (labels we don't store on the assessment row) ─────────────
 
+// Article 2(2) of the 2026 delegated act requires the undertaking to STATE which ESRS version it
+// applied for a financial year beginning in 2026. That is why this prints on the report's face
+// rather than in an appendix, and why a null renders "Not stated" and never an assumed version.
+const STANDARD_VERSION_LABEL: Record<string, string> = {
+  esrs_2023: 'ESRS (2023), as last amended by Del. Reg. (EU) 2025/1416',
+  esrs_2023_reliefs: 'ESRS (2023) with the reliefs permitted by Del. Reg. C(2026) 5010',
+  esrs_2026: 'ESRS (2026) — Del. Reg. C(2026) 5010, applied in full',
+}
+
+// How the topic names in this report were arrived at, from workings.labelResolution.
+//
+// EVERY STRING BELOW STATES WHAT WAS OBSERVED, NEVER A CAUSE. "No version-specific topic names
+// were resolved" is checkable; "not yet transcribed" would be a guess — an empty result with no
+// error is also exactly what a dropped RLS policy looks like, so naming transcription as the
+// reason would hide a grants regression behind a plausible sentence. Same discipline as the
+// window.open note in CLAUDE.md: report the observation, let the reader diagnose.
+//
+// The default names are described as "the platform's default names" and are NEVER attributed to
+// a standard. They are the pre-versioning labels in mr_esrs_topics, whose provenance is not
+// established — printing them under a stated version as if they were that version's wording is
+// exactly what this disclosure exists to prevent.
+function labelResolutionNote(lr: any): string | null {
+  // Absent on records saved before Part 3 shipped — itself an observation, and reported as one.
+  if (!lr || typeof lr !== 'object') {
+    return 'This assessment predates version-specific topic naming. The topic names shown are the platform\'s default names.'
+  }
+  switch (lr.source) {
+    case 'versioned':
+      return null
+    case 'versioned_partial':
+      return `Version-specific topic names were resolved for ${lr.resolved} of ${lr.resolved + (lr.fallbackTopics?.length ?? 0)} topics. `
+        + `The names shown for ${(lr.fallbackTopics ?? []).join(', ')} are the platform's default names, not names taken from the standard version stated above.`
+    case 'default_none_resolved':
+      return 'No version-specific topic names were resolved for the standard version stated above. The topic names shown are the platform\'s default names.'
+    case 'default_fetch_error':
+      return 'Version-specific topic names could not be read when this assessment was run. The topic names shown are the platform\'s default names.'
+    case 'default_no_version':
+      return 'No ESRS standard version was stated for this assessment. The topic names shown are the platform\'s default names.'
+    default:
+      // An unrecognised source value is itself worth surfacing rather than swallowing.
+      return 'The basis for the topic names in this report could not be determined. The names shown may be the platform\'s default names.'
+  }
+}
+
 const SECTOR_LABEL: Record<string, string> = {
   energy: 'Energy & Utilities', finance: 'Financial Services', realestate: 'Real Estate',
   tech: 'Technology', health: 'Healthcare & Pharma', manuf: 'Industrials & Manufacturing',
@@ -280,9 +324,23 @@ function ReportInner() {
             <Row k="Scenario tested" v={`${SCENARIO_LABEL[a.scenario_code]?.l || a.scenario_code} (${SCENARIO_LABEL[a.scenario_code]?.d || ''})`} />
             <Row k="Time horizon" v={`${a.horizon} term`} />
             <Row k="Asset profile" v={a.asset_profile} />
+            {/* Art. 2(2) disclosure — on the report's FACE, not in an appendix. A null is a real
+                state ("not stated"), never an assumed version: an assumed one would be a false
+                statement about which law was applied, which is worse than an absent one. */}
+            <Row k="ESRS standard version" v={STANDARD_VERSION_LABEL[a.standard_version] || 'Not stated'} />
             <Row k="Model version" v={a.model_version || result.modelVersion || '—'} />
             <Row k="Assessment date" v={reportDate} />
           </div>
+          {/* Rendered only when the topic names are not fully version-resolved. A fallback that is
+              invisible is indistinguishable from a correct resolve — and with a standard version
+              printed directly above, an unannounced default would read as that standard's own
+              wording. See labelResolutionNote: it states what was observed, never a cause. */}
+          {labelResolutionNote(a.workings?.labelResolution) && (
+            <p style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, margin: '0 0 24px', padding: '10px 12px', background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 8 }}>
+              <strong style={{ color: '#0d0d0d' }}>Topic naming.</strong>{' '}
+              {labelResolutionNote(a.workings?.labelResolution)}
+            </p>
+          )}
         </section>
 
         {/* ── EXECUTIVE SUMMARY ─────────────────────────────────────────── */}

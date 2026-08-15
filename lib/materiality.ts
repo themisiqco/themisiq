@@ -43,6 +43,111 @@ export type RegionHazard = { region_code: string; hazard: string; intensity: num
 export type IndustryHazard = { industry_code: string; hazard: string; sensitivity: number } & ProvenanceFields
 export type Jurisdiction = { code: string; label: string; policy_intensity: number } & ProvenanceFields
 export type EsrsTopic = { code: string; label: string; category: string; sort_order: number }
+
+// ── ESRS standard versions and per-version topic labels ──────────────────────────────────────
+// The ten topical-standard CODES are stable across both standards; only the display NAMES move
+// (E3 'Water and marine resources' -> 'Water', E5 -> 'Circular Economy and Resource Use', and
+// S1/S2 take Appendix A's joint title). So mr_esrs_topics keeps ten rows and a single-column PK,
+// and mr_esrs_topic_labels carries the name per (topic, standard_version). See
+// supabase/migrations/20260815_mr_esrs_topic_labels.sql.
+//
+// Article 2(1) of the 2026 delegated act allows all three to coexist for FY2026; Article 2(2)
+// requires the undertaking to STATE which it applied. That is why this is a disclosure rather
+// than a preference, and why an unrecognised value is a 400 at the route rather than a coerced
+// default: absent is an honest "not stated", wrong means the client believes it stated something.
+export type StandardVersion = 'esrs_2023' | 'esrs_2023_reliefs' | 'esrs_2026'
+export const STANDARD_VERSIONS = ['esrs_2023', 'esrs_2023_reliefs', 'esrs_2026'] as const
+export function isStandardVersion(v: unknown): v is StandardVersion {
+  return typeof v === 'string' && (STANDARD_VERSIONS as readonly string[]).includes(v)
+}
+
+export type TopicLabelRow = { topic_code: string; standard_version: string; label: string }
+
+// How the topic names in a saved assessment were arrived at. Persisted to
+// workings.labelResolution and rendered by the report, because a fallback that is invisible is
+// indistinguishable from a correct resolve — and the report states a standard version on its
+// face, so an unannounced default would read as that standard's wording.
+export type LabelResolution = {
+  standardVersion: StandardVersion | null
+  // How many of the topics got a name from mr_esrs_topic_labels for this version.
+  resolved: number
+  source:
+    | 'versioned'              // every topic resolved — no fallback anywhere
+    | 'versioned_partial'      // SOME resolved, some fell back: one table, two standards' wording
+    | 'default_none_resolved'  // lookup ran, matched nothing
+    | 'default_no_version'     // no standardVersion stated, so no lookup was attempted
+    | 'default_fetch_error'    // the lookup itself failed
+  // Topic codes that were LOOKED UP AND NOT FOUND. Empty when no lookup was attempted
+  // ('default_no_version') or when the lookup failed wholesale ('default_fetch_error') — in both
+  // of those, `source` is the fact, and listing every code would imply a per-topic determination
+  // that never happened.
+  fallbackTopics: string[]
+}
+
+// Overlay per-version topic names onto the reference topics, and report exactly what happened.
+//
+// PURE. Called by the routes BEFORE runAssessment, so the labels are resolved once, at write, and
+// then frozen into results for the life of the record — which is correct: a report should reprint
+// the name as it stood when the assessment ran, not whatever the table says years later.
+//
+// TWO INVARIANTS, both load-bearing:
+//   1. It only ever replaces `label`. code, category and sort_order pass through untouched, so
+//      nothing downstream — least of all computeMatrix's assessed/no_baseline branch — can change
+//      behaviour because of a label. A missing label is a LABEL problem, never an assessment one.
+//   2. It never substitutes a name it did not find. Every topic either gets its own version's
+//      label or keeps mr_esrs_topics.label, and the latter is counted and reported. The default
+//      is the PRE-VERSIONING label the module has always displayed — not a transcription, and not
+//      a claim about what any particular standard calls that topic.
+//
+// `labelRows === null` means the fetch FAILED, which is a different fact from "returned no rows"
+// and is reported as such. The two must not be collapsed: [] with no error is also what a dropped
+// RLS policy looks like, so naming a cause we cannot observe would hide a grants regression.
+export function resolveTopicLabels(
+  topics: EsrsTopic[],
+  labelRows: TopicLabelRow[] | null,
+  standardVersion: StandardVersion | null,
+): { topics: EsrsTopic[]; resolution: LabelResolution } {
+  if (!standardVersion) {
+    return {
+      topics,
+      resolution: { standardVersion: null, resolved: 0, source: 'default_no_version', fallbackTopics: [] },
+    }
+  }
+  if (labelRows === null) {
+    return {
+      topics,
+      resolution: { standardVersion, resolved: 0, source: 'default_fetch_error', fallbackTopics: [] },
+    }
+  }
+
+  const byCode = new Map<string, string>()
+  for (const r of labelRows) {
+    // Defensive: the route filters by version in SQL, but this function must be safe to call with
+    // an unfiltered set — silently applying another version's name is the one outcome forbidden.
+    if (r.standard_version === standardVersion && r.label) byCode.set(r.topic_code, r.label)
+  }
+
+  const fallbackTopics: string[] = []
+  const out = topics.map(t => {
+    const versioned = byCode.get(t.code)
+    if (versioned) return { ...t, label: versioned }
+    fallbackTopics.push(t.code)
+    return t
+  })
+
+  const resolved = out.length - fallbackTopics.length
+  const source: LabelResolution['source'] =
+    resolved === out.length && out.length > 0 ? 'versioned'
+      : resolved === 0 ? 'default_none_resolved'
+        : 'versioned_partial'
+
+  return {
+    topics: out,
+    // On a full resolve there is nothing to list; on none-resolved the codes WERE looked up, so
+    // listing them is accurate and useful.
+    resolution: { standardVersion, resolved, source, fallbackTopics },
+  }
+}
 export type TopicBaseline = { industry_code: string; topic_code: string; financial_base: number; impact_base: number } & ProvenanceFields
 export type IndustryOpportunity = { industry_code: string; opportunity_category: string; relevance: number; sort_order: number } & ProvenanceFields
 export type IndustryTransitionDriver = { industry_code: string; transition_driver: string; weight: number; sort_order: number } & ProvenanceFields
@@ -81,6 +186,12 @@ export type AssessmentInput = {
   scenarioCode: string
   horizon: 'short' | 'medium' | 'long'
   impactOverrides?: Record<string, number>   // topic_code -> 0..10
+  // Which ESRS version the assessment is prepared under. NULL means NOT STATED, which is a real
+  // and honest state — not a default. It affects DISPLAY NAMES only (see resolveTopicLabels);
+  // no score, band, quadrant or dataStatus reads it, so a label problem can never change whether
+  // a topic is assessed. Carried on AssessmentInput so it lands in workings.input beside the
+  // other engine inputs, mirroring model_version, which is both a column and a jsonb key.
+  standardVersion?: StandardVersion | null
 }
 
 // ---------- Output ----------
