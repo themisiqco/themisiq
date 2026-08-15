@@ -326,16 +326,22 @@ function ReportInner() {
             <Row k="Asset profile" v={a.asset_profile} />
             {/* Art. 2(2) disclosure — on the report's FACE, not in an appendix. A null is a real
                 state ("not stated"), never an assumed version: an assumed one would be a false
-                statement about which law was applied, which is worse than an absent one. */}
-            <Row k="ESRS standard version" v={STANDARD_VERSION_LABEL[a.standard_version] || 'Not stated'} />
+                statement about which law was applied, which is worse than an absent one.
+                CSRD ONLY. An IFRS S2 run produces no ESRS matrix and is not an ESRS filing, so an
+                ESRS version line on it would be a disclosure about a standard the document does
+                not report under — noise at best, misleading at worst. The column is still written
+                (null) for s2 records; it is simply not a fact that report has to state. */}
+            {isCsrd && <Row k="ESRS standard version" v={STANDARD_VERSION_LABEL[a.standard_version] || 'Not stated'} />}
             <Row k="Model version" v={a.model_version || result.modelVersion || '—'} />
             <Row k="Assessment date" v={reportDate} />
           </div>
           {/* Rendered only when the topic names are not fully version-resolved. A fallback that is
               invisible is indistinguishable from a correct resolve — and with a standard version
               printed directly above, an unannounced default would read as that standard's own
-              wording. See labelResolutionNote: it states what was observed, never a cause. */}
-          {labelResolutionNote(a.workings?.labelResolution) && (
+              wording. See labelResolutionNote: it states what was observed, never a cause.
+              CSRD ONLY, for the same reason as the row above: it explains where ESRS TOPIC names
+              came from, and an s2 report has no topic table for it to explain. */}
+          {isCsrd && labelResolutionNote(a.workings?.labelResolution) && (
             <p style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, margin: '0 0 24px', padding: '10px 12px', background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 8 }}>
               <strong style={{ color: '#0d0d0d' }}>Topic naming.</strong>{' '}
               {labelResolutionNote(a.workings?.labelResolution)}
