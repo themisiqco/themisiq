@@ -76,7 +76,7 @@ The engine is pure calc (no React/Supabase): all factor tables, coverage analysi
 - **Monthly = evidenced only. Annual = evidenced + estimated. They are SUPPOSED to diverge on extrapolated inventories.** Never gross up monthly slices — a dated slice must not assert consumption no bill supports. `reconcile()` models the expected gap; a non-zero `unexplained_delta` is a real defect. (`reconcile` is exported + tested but not yet surfaced in the UI — separate design.)
 - **Coverage gate is keyed per `(document_type, fuelType)` and iterates `cov.issues` (all conditions present), not the scalar `status`.** A fleet_fuel doc's gasoline and diesel are separate groups; a gap masked by an overlap must still block.
 - **`s3_td` (NZ electricity T&D, Scope 3 Cat 3) is a DISTINCT total — never folded into S1/S2.** `calcInventory` surfaces it separately.
-- **Run `npx vitest run lib/ghg/engine.test.ts` (50 green) before and after any engine change.** If a previously-green test breaks, stop.
+- **Run `npx vitest run lib/ghg/engine.test.ts` (178 passed, 1 todo — verified 19 Aug 2026) before and after any engine change.** If a previously-green test breaks, stop. The count only ever goes up; treat a *lower* number as a sign that tests were removed, not that this line is stale again.
 
 ---
 
