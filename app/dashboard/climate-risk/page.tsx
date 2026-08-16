@@ -8,8 +8,11 @@ import Nav from '../../components/Nav'
 // here rather than reimplementing the overlay is the point: the wizard and the write path cannot
 // disagree about which name belongs to which version, or about what counts as a fallback.
 // lib/materiality.ts has no imports of its own — no Supabase, no React — so it is client-safe.
+// checkReportingPeriod is imported for the same reason: the wizard shows the customer the conflict
+// BEFORE they submit, and the route freezes the identical verdict into the record. One definition,
+// so the warning on screen and the disclosure on the report cannot disagree.
 import {
-  resolveTopicLabels,
+  resolveTopicLabels, checkReportingPeriod,
   type StandardVersion, type EsrsTopic, type TopicLabelRow,
 } from '../../../lib/materiality'
 
@@ -474,13 +477,50 @@ export default function MaterialityWizard() {
         </div>
         <div>
           <label style={labelStyle}>Reporting period</label>
+          {/* FY2027 added 18 Aug 2026. It was missing, and it is the ONE period for which ESRS
+              (2026) is not merely permitted but required — so the only unambiguously correct
+              pairing of period and version could not be expressed. This list goes stale annually;
+              if it is edited again, extend it rather than shifting the window, because a period a
+              past assessment stated must remain selectable for a re-run. */}
           <select style={inputStyle} value={reportingPeriod} onChange={e => setReportingPeriod(e.target.value)}>
             <option value="FY2024">FY2024</option>
             <option value="FY2025">FY2025</option>
             <option value="FY2026">FY2026</option>
+            <option value="FY2027">FY2027</option>
           </select>
         </div>
       </div>
+
+      {/* ── Period / ESRS-version disagreement — A WARNING, NOT A GATE ──────────────────────────
+          Art. 2(2) makes the version the UNDERTAKING's statement; refusing to record it would be
+          making that statement for them. So this never disables the Continue button and never
+          changes what is submitted — it shows the customer the disagreement while they can still
+          act on it, and the same verdict is frozen into the record and printed on the report.
+
+          Only reachable in csrd mode, because the version chooser is CSRD-only and an s2 run
+          clears it. Renders for 'conflict' alone: 'unparseable' cannot arise from a <select>, and
+          reporting it here would describe a state this screen cannot produce. */}
+      {(() => {
+        const chk = checkReportingPeriod(reportingPeriod, standardVersion)
+        if (chk.status !== 'conflict') return null
+        return (
+          <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.3)', borderRadius: 10, padding: '10px 14px', marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 3 }}>
+              The reporting period and the ESRS version you selected do not agree
+            </div>
+            <div style={{ fontSize: 11.5, color: '#555553', lineHeight: 1.6 }}>
+              {chk.message}{' '}
+              {/* The register differs between the three rules and the copy says so, rather than
+                  presenting an inference from Article 2(1)'s scope as a prohibition in terms. */}
+              {chk.certainty === 'inferred' && (
+                <>This one is read from the scope of Article 2(1) rather than from a prohibition in terms.{' '}</>
+              )}
+              You can continue — which version applies is your disclosure to make, and it is recorded
+              as you state it. This note is carried onto the report.
+            </div>
+          </div>
+        )
+      })()}
       <label style={labelStyle}>Primary sector</label>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
         {SECTORS.map(s => {

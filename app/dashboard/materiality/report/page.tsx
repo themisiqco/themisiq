@@ -548,6 +548,28 @@ function ReportInner() {
               wording. See labelResolutionNote: it states what was observed, never a cause.
               CSRD ONLY, for the same reason as the row above: it explains where ESRS TOPIC names
               came from, and an s2 report has no topic table for it to explain. */}
+          {/* ── Period / ESRS-version disagreement, AS RECORDED AT WRITE ───────────────────────
+              Read straight from workings.disclosure.periodVersionCheck — deliberately NOT
+              re-derived here. The rule can change; what this assessment found cannot, and a report
+              re-run months later must reprint the finding it was written with.
+
+              Absent on every record saved before 18 Aug 2026, which is why the optional chain
+              simply yields nothing rather than a "could not be checked" note: those records were
+              never checked, and saying so on the cover would read as a defect in the assessment
+              rather than as the date the check shipped.
+
+              'conflict' only. 'ok' needs no words; 'not_stated' is already visible from the two
+              rows above; and 'unparseable' belongs to a free-text API caller, not to this cover. */}
+          {isCsrd && a.workings?.disclosure?.periodVersionCheck?.status === 'conflict' && (
+            <p style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, margin: '0 0 12px', padding: '10px 12px', background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.3)', borderRadius: 8 }}>
+              <strong style={{ color: '#0d0d0d' }}>Reporting period and standard version.</strong>{' '}
+              {a.workings.disclosure.periodVersionCheck.message}{' '}
+              {a.workings.disclosure.periodVersionCheck.certainty === 'inferred' && (
+                <>This is read from the scope of Article 2(1) rather than from a prohibition in terms.{' '}</>
+              )}
+              Both are stated here as the undertaking supplied them; neither has been altered.
+            </p>
+          )}
           {isCsrd && labelResolutionNote(a.workings?.labelResolution) && (
             <p style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, margin: '0 0 24px', padding: '10px 12px', background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 8 }}>
               <strong style={{ color: '#0d0d0d' }}>Topic naming.</strong>{' '}

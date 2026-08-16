@@ -16,7 +16,7 @@ import { getAuthedClient, bearerFrom, AuthError } from '../../../lib/supabaseAut
 import {
   runAssessment, regionsWithNoHazardData, ReferenceData, AssessmentInput,
   resolveTopicLabels, isStandardVersion, STANDARD_VERSIONS,
-  resolveDisclosureRequirements, DR_FALLBACK_VERSION,
+  resolveDisclosureRequirements, DR_FALLBACK_VERSION, checkReportingPeriod,
   type StandardVersion, type TopicLabelRow, type DisclosureRequirementRow,
 } from '../../../lib/materiality'
 
@@ -62,6 +62,22 @@ export async function POST(req: NextRequest) {
         }, { status: 400 })
       }
       standardVersion = rawStandardVersion
+    }
+
+    // Hoisted out of the insert below so the period/version check can see it. Same normalisation
+    // as before — type check, trim, empty-becomes-null — and nothing else parses it: the field is
+    // report-only context, and checkReportingPeriod reads it without changing what is stored.
+    const reportingPeriod = typeof body.reportingPeriod === 'string' && body.reportingPeriod.trim()
+      ? body.reportingPeriod.trim() : null
+
+    // Art. 2(2) is the undertaking's statement to make, so this WARNS and never blocks — see the
+    // long note on checkReportingPeriod. Computed here, at write, and frozen into workings below.
+    const periodVersionCheck = checkReportingPeriod(reportingPeriod, standardVersion)
+    if (periodVersionCheck.status === 'conflict') {
+      console.warn(
+        `Materiality: REPORTING PERIOD / STANDARD VERSION CONFLICT (${periodVersionCheck.certainty}) — `
+        + `${periodVersionCheck.message} Recorded and reported; the assessment proceeds.`,
+      )
     }
 
     const input: AssessmentInput = {
@@ -278,8 +294,14 @@ export async function POST(req: NextRequest) {
         workings: {
           input, modelVersion: result.modelVersion,
           disclosure: {
-            reportingPeriod: typeof body.reportingPeriod === 'string' && body.reportingPeriod.trim() ? body.reportingPeriod.trim() : null,
+            reportingPeriod,
             legalEntity: typeof body.legalEntity === 'string' && body.legalEntity.trim() ? body.legalEntity.trim() : null,
+            // Whether the period and the stated ESRS version can both be true, AS ASSESSED WHEN
+            // THIS RECORD WAS WRITTEN. Frozen rather than re-derived at read for the same reason
+            // as disclosureRequirements: a later change to the rule must not silently restate what
+            // a historical report found. A 'conflict' is printed on the report's face, beside the
+            // version it disagrees with.
+            periodVersionCheck,
           },
           // How the topic names above were arrived at. Recorded because a fallback that is
           // invisible is indistinguishable from a correct resolve, and the report states a

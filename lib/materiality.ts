@@ -61,6 +61,132 @@ export function isStandardVersion(v: unknown): v is StandardVersion {
   return typeof v === 'string' && (STANDARD_VERSIONS as readonly string[]).includes(v)
 }
 
+// ── REPORTING PERIOD vs STANDARD VERSION — A WARNING THAT NEVER BLOCKS ───────────────────────────
+//
+// A test report read "Reporting period FY2025" beside "ESRS standard version: ESRS (2026)". That
+// combination cannot occur. Article 2 of Commission Delegated Regulation C(2026) 5010 applies the
+// revised standards to financial years beginning on or after 1 January 2027, with early adoption
+// permitted for FY2026 only.
+//
+// ⚠️ WHY THIS WARNS AND NEVER 400s, AND IT IS NOT BECAUSE THE PARSE IS WEAK.
+// Article 2(2) requires the UNDERTAKING to state which version it applied. A statement we refuse to
+// record is a statement we have made on their behalf. Their disclosure is theirs to get wrong; our
+// job is to show them the disagreement on the page a verifier reads.
+//
+// Two further reasons, either of which is on its own sufficient:
+//   * THE RULE NEEDS A DATE THIS FIELD DOES NOT HOLD. Article 2 keys on the day the financial year
+//     BEGINS. The field stores a label — "FY2026" for a year beginning 1 April 2026 and one
+//     beginning 1 December 2026 are different cases, and nothing here can tell them apart. A hard
+//     refusal would assert a certainty the data cannot support: the same failure as naming a
+//     pop-up blocker that never fired.
+//   * IT COULD ONLY FIRE ON A CONFIDENT PARSE. Wizard traffic (a fixed FY#### select) would be
+//     refused while an unparseable free-text string from an API caller sailed through. Asymmetric
+//     enforcement on a compliance field is worse than none.
+//
+// ⚠️ UNPARSEABLE IS REPORTED AS UNPARSEABLE, NEVER FOLDED INTO 'ok'. "We could not read the period"
+// and "the period agrees with the version" are different facts about the record, and only one of
+// them is a finding. An empty result is a result.
+//
+// The record this produces is FROZEN INTO workings.disclosure AT WRITE, alongside labelResolution
+// and drResolution and for the same reason: a report must reprint the conflict as it stood when the
+// assessment ran, not re-derive it against a rule that has since moved. Historical rows are never
+// rewritten — an assessment that stated an impossible combination stated it.
+
+export type PeriodVersionStatus =
+  | 'ok'           // parsed, and the period is inside the stated version's window
+  | 'conflict'     // parsed, and it is not
+  | 'unparseable'  // both stated, but no four-digit year could be read from the period
+  | 'not_stated'   // one or both absent — nothing to compare, and no claim is made
+
+export type PeriodVersionCheck = {
+  standardVersion: StandardVersion | null
+  reportingPeriod: string | null
+  /** The year read from reportingPeriod, or null when none could be. */
+  fiscalYear: number | null
+  status: PeriodVersionStatus
+  // The register of the conflict, because the three are not equally firm and the copy must not
+  // pretend they are:
+  //   'explicit' — the act states the limit in terms (early adoption for FY2026 only; from FY2027
+  //                only the revised standards apply).
+  //   'inferred' — read off the SCOPE of Article 2(1) (financial years beginning between 1 January
+  //                and 31 December 2026) rather than from a prohibition in terms.
+  // null unless status === 'conflict'.
+  certainty: 'explicit' | 'inferred' | null
+  /** What was OBSERVED. Never a cause, never advice — each surface adds its own framing. */
+  message: string | null
+}
+
+// Two exact shapes, both unambiguous: "FY2026" (what the wizard emits) and a bare "2026". Anything
+// else is unparseable and says so. Deliberately NOT permissive — "2025/26", "H1 2026" and
+// "Year ended 31 March 2026" each have a defensible reading and a wrong one, and guessing on this
+// field is how the report ends up asserting a period the customer never stated.
+const FISCAL_YEAR_RE = /^(?:FY[ ]?)?(\d{4})$/i
+
+export function parseFiscalYear(v: string | null | undefined): number | null {
+  if (typeof v !== 'string') return null
+  const m = FISCAL_YEAR_RE.exec(v.trim())
+  if (!m) return null
+  const y = Number(m[1])
+  return y >= 1990 && y <= 2100 ? y : null
+}
+
+export function checkReportingPeriod(
+  reportingPeriod: string | null,
+  standardVersion: StandardVersion | null,
+): PeriodVersionCheck {
+  const base = { standardVersion, reportingPeriod, fiscalYear: null as number | null }
+
+  // No claim is possible without both. A null standardVersion is a legitimate "not stated"
+  // (Art. 2(2) permits the statement to be absent; an assumed one would be false), and a null
+  // period is simply a field the user left alone. Neither is a finding.
+  if (!standardVersion || !reportingPeriod) {
+    return { ...base, status: 'not_stated', certainty: null, message: null }
+  }
+
+  const fiscalYear = parseFiscalYear(reportingPeriod)
+  if (fiscalYear == null) {
+    return {
+      ...base,
+      status: 'unparseable',
+      certainty: null,
+      message: `The reporting period "${reportingPeriod}" does not carry a four-digit year, `
+        + 'so it could not be checked against the ESRS version stated.',
+    }
+  }
+
+  const stated = { ...base, fiscalYear }
+
+  // ESRS (2026): financial years beginning on or after 1 January 2027, early adoption for FY2026.
+  if (standardVersion === 'esrs_2026' && fiscalYear < 2026) {
+    return {
+      ...stated, status: 'conflict', certainty: 'explicit',
+      message: `ESRS (2026) applies to financial years beginning on or after 1 January 2027, with `
+        + `early adoption permitted for FY2026 only. The reporting period stated is FY${fiscalYear}.`,
+    }
+  }
+
+  // The reliefs are an Article 2(1) option for financial years beginning in calendar 2026. Read off
+  // that article's SCOPE rather than from a prohibition in terms, hence 'inferred'.
+  if (standardVersion === 'esrs_2023_reliefs' && fiscalYear !== 2026) {
+    return {
+      ...stated, status: 'conflict', certainty: 'inferred',
+      message: `The reliefs in Article 2(1) are offered for financial years beginning between `
+        + `1 January and 31 December 2026. The reporting period stated is FY${fiscalYear}.`,
+    }
+  }
+
+  // From FY2027 only the revised standards apply.
+  if (standardVersion === 'esrs_2023' && fiscalYear > 2026) {
+    return {
+      ...stated, status: 'conflict', certainty: 'explicit',
+      message: `ESRS (2023) applies to financial years beginning before 1 January 2027. `
+        + `The reporting period stated is FY${fiscalYear}.`,
+    }
+  }
+
+  return { ...stated, status: 'ok', certainty: null, message: null }
+}
+
 export type TopicLabelRow = { topic_code: string; standard_version: string; label: string }
 
 // ── THE FIVE SOURCE STATES, DECLARED ONCE AND SHARED ────────────────────────────────────────────

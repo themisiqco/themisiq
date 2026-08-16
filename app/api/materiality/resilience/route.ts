@@ -14,7 +14,7 @@ import { getAuthedClient, bearerFrom, AuthError } from '../../../../lib/supabase
 import {
   runResilience, regionsWithNoHazardData, ReferenceData, AssessmentInput,
   resolveTopicLabels, isStandardVersion, STANDARD_VERSIONS,
-  resolveDisclosureRequirements, DR_FALLBACK_VERSION,
+  resolveDisclosureRequirements, DR_FALLBACK_VERSION, checkReportingPeriod,
   type StandardVersion, type TopicLabelRow, type DisclosureRequirementRow,
 } from '../../../../lib/materiality'
 
@@ -43,6 +43,21 @@ export async function POST(req: NextRequest) {
         }, { status: 400 })
       }
       standardVersion = rawStandardVersion
+    }
+
+    // Same hoist and same check as /api/materiality — see the note there. It runs on this route too
+    // even though the wizard clears the version when starting an s2 run: a direct API caller can
+    // still send both, and a check that exists on one of two writers is a check that will be missed.
+    // With standardVersion null (every wizard-created resilience record) it returns 'not_stated'
+    // and says nothing, which is the correct outcome, not a suppressed one.
+    const reportingPeriod = typeof body.reportingPeriod === 'string' && body.reportingPeriod.trim()
+      ? body.reportingPeriod.trim() : null
+    const periodVersionCheck = checkReportingPeriod(reportingPeriod, standardVersion)
+    if (periodVersionCheck.status === 'conflict') {
+      console.warn(
+        `Resilience: REPORTING PERIOD / STANDARD VERSION CONFLICT (${periodVersionCheck.certainty}) — `
+        + `${periodVersionCheck.message} Recorded and reported; the analysis proceeds.`,
+      )
     }
 
     const input: AssessmentInput = {
@@ -252,8 +267,10 @@ export async function POST(req: NextRequest) {
         workings: {
           input, modelVersion: resilience.modelVersion, analysisType: 'resilience',
           disclosure: {
-            reportingPeriod: typeof body.reportingPeriod === 'string' && body.reportingPeriod.trim() ? body.reportingPeriod.trim() : null,
+            reportingPeriod,
             legalEntity: typeof body.legalEntity === 'string' && body.legalEntity.trim() ? body.legalEntity.trim() : null,
+            // Frozen at write. See /api/materiality for why it is not re-derived at read.
+            periodVersionCheck,
           },
           // See /api/materiality for why this is recorded rather than inferred.
           labelResolution,
