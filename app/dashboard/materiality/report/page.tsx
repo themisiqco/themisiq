@@ -64,6 +64,68 @@ function labelResolutionNote(lr: any): string | null {
   }
 }
 
+// ── How the DISCLOSURE REQUIREMENTS in this report were arrived at, from workings.drResolution ──
+//
+// A SEPARATE NOTE FROM labelResolutionNote, AND A LOUDER ONE, because the two fallbacks are not
+// the same kind of event. A label fallback shows a familiar name attributed to no standard. A
+// requirement fallback shows ANOTHER STANDARD'S REQUIREMENTS — and since ESRS (2026) renumbered
+// them, the codes collide: 49 exist in both versions with different titles. A reader cannot tell
+// the vintage of a row by looking at it, which is exactly why it has to be said in words.
+//
+// SAME DISCIPLINE AS ITS SIBLING: every string states what was OBSERVED, never a cause. An empty
+// result with no error is also what a dropped RLS policy looks like.
+//
+// The FALLBACK is named as ESRS (2023) explicitly rather than as "the default", because that is
+// what it is — a different instrument, not a house style.
+function drResolutionNote(dr: any): string | null {
+  // Absent on every record saved before Part B. That is an observation, and reporting it is why
+  // this is a separate key rather than extra fields on labelResolution: an old record simply has
+  // no drResolution, where a widened labelResolution would have been half-populated and
+  // indistinguishable from a partial failure.
+  if (!dr || typeof dr !== 'object') {
+    return 'This assessment predates version-specific disclosure requirements. The requirements below are ThemisIQ\'s ESRS (2023) set as it stood in the platform at the time, and are not attributed to a stated standard version.'
+  }
+  const fell: string[] = Array.isArray(dr.fallbackTopics) ? dr.fallbackTopics : []
+  const unserved: string[] = Array.isArray(dr.unservedTopics) ? dr.unservedTopics : []
+  const parts: string[] = []
+
+  // ⚠️ THE MIXED-VINTAGE SENTENCE COMES FIRST AND IS UNCONDITIONAL ON `source`. A roadmap can mix
+  // vintages under several source states, and this is the fact a preparer acts on — it must not be
+  // reachable only through one branch of a switch.
+  if (fell.length > 0) {
+    parts.push(
+      `The requirements shown for ${fell.join(', ')} are taken from ESRS (2023), not from the standard version stated above. `
+      + 'Disclosure-requirement codes were renumbered between the two versions, so a code in those sections may correspond to a different requirement under the version stated.',
+    )
+  }
+  if (unserved.length > 0) {
+    parts.push(`No disclosure requirements are held for ${unserved.join(', ')} in any version, so no requirements are listed for ${unserved.length === 1 ? 'it' : 'them'}. That is an absence of stored requirements, not a finding that none apply.`)
+  }
+  switch (dr.source) {
+    case 'versioned':
+      break
+    case 'versioned_partial':
+      break   // the per-topic sentences above already say which topics and how
+    case 'default_none_resolved':
+      parts.push('No disclosure requirements were held for the standard version stated above, so the requirements below are ESRS (2023) throughout.')
+      break
+    case 'default_fetch_error':
+      parts.push('Version-specific disclosure requirements could not be read when this assessment was run, so the requirements below are ESRS (2023) throughout.')
+      break
+    case 'default_no_version':
+      parts.push('No ESRS standard version was stated for this assessment, so the requirements below are ESRS (2023).')
+      break
+    default:
+      parts.push('The basis for the disclosure requirements in this report could not be determined.')
+  }
+  // Stated whenever any row lacks a summary, independently of how the version resolved — the two
+  // are unrelated facts and a reader needs both.
+  if (typeof dr.datapointsMissing === 'number' && dr.datapointsMissing > 0) {
+    parts.push(`${dr.datapointsMissing} of ${dr.requirementCount ?? '?'} requirements below carry no datapoint summary. Those rows say so; an absent summary is not an indication that there is nothing to collect.`)
+  }
+  return parts.length ? parts.join(' ') : null
+}
+
 const SECTOR_LABEL: Record<string, string> = {
   energy: 'Energy & Utilities', finance: 'Financial Services', realestate: 'Real Estate',
   tech: 'Technology', health: 'Healthcare & Pharma', manuf: 'Industrials & Manufacturing',
@@ -486,7 +548,16 @@ function ReportInner() {
                 Mapped to ESRS Set 1 (Commission Delegated Regulation (EU) 2023/2772), the standards in force for FY2025–2026 reporting. The revised ESRS ("ESRS 2.0"), adopted mid-2026 and applying from FY2027 (early adoption permitted FY2026), reduce mandatory datapoints by approximately 60%; ThemisIQ tracks both. Topics marked "FY25–26 phase-in" (E4, S2, S3, S4) may be phased in for FY2025–2026 under the quick-fix amendment, Del. Reg. (EU) 2025/1416, subject to the ESRS 2.17 summary disclosure where the topic is material.
               </p>
             </section>
-            <DisclosureRoadmap matrix={matrix} />
+            {/* Stated BEFORE the tables, because it governs every row in them. A reader who has
+                already worked through the roadmap has relied on it. */}
+            {drResolutionNote(a.workings?.drResolution) && (
+              <section className="page" style={{ marginTop: 0 }}>
+                <p style={{ ...p, fontSize: 11, color: '#854F0B', background: '#FAEEDA', border: '0.5px solid #EF9F27', borderRadius: 6, padding: '10px 12px' }}>
+                  {drResolutionNote(a.workings?.drResolution)}
+                </p>
+              </section>
+            )}
+            <DisclosureRoadmap matrix={matrix} requirements={a.workings?.disclosureRequirements} />
           </>
         )}
 
@@ -774,18 +845,40 @@ function MatrixTable({ topics }: { topics: any[] }) {
 // physical (top) and transition (right) groups is the two-channel exposure.
 
 
-// ── Disclosure roadmap: material topics → the ESRS Set 1 DRs they trigger ──
+// ── Disclosure roadmap: material topics → the DRs they trigger, AS FROZEN AT WRITE ──
+//
+// ⚠️ THE REQUIREMENTS COME FROM THE RECORD, NOT FROM ESRS_DR_MAP. `workings.disclosureRequirements`
+// was resolved against the assessment's stated standard version when it ran, and frozen. Reading
+// the constant here would reprint TODAY's bundle under a version the report states on its face —
+// and because ESRS (2026) renumbered the DRs, that is not a stale-name problem. 49 codes exist
+// under both versions with different titles; S1-14 is 'Health and safety' under 2023 and
+// 'Work-life balance metrics' under 2026. A preparer sent to S1-14 for injury data under a 2026
+// report collects work-life balance instead, and nothing errors.
+//
+// ESRS_DR_MAP is still read for ONE thing — the `relief` phase-in flag — because that flag has no
+// home in the requirements table. It is 2023-only and Part C settles what happens to it.
+//
 // Each material topic renders as its own `.page` section so print pagination keeps
 // each topic's table whole without trying to hold the entire (tall) roadmap together.
-function DisclosureRoadmap({ matrix }: { matrix: any[] }) {
+function DisclosureRoadmap({ matrix, requirements }: { matrix: any[]; requirements: any[] }) {
+  // Group the frozen rows by topic, preserving their stored order — sort_order is per topic and
+  // was already applied at write.
+  const byTopic = new Map<string, any[]>()
+  for (const r of Array.isArray(requirements) ? requirements : []) {
+    if (!r || typeof r.topic_code !== 'string') continue
+    const list = byTopic.get(r.topic_code) ?? []
+    list.push(r)
+    byTopic.set(r.topic_code, list)
+  }
   const material = [...matrix]
-    .filter((t: any) => Math.max(t.financial ?? 0, t.impact ?? 0) >= 5 && ESRS_DR_MAP[t.code])
+    .filter((t: any) => Math.max(t.financial ?? 0, t.impact ?? 0) >= 5 && (byTopic.get(t.code)?.length ?? 0) > 0)
     .sort((a: any, b: any) => Math.max(b.financial, b.impact) - Math.max(a.financial, a.impact))
   if (!material.length) return null
   return (
     <>
       {material.map((t: any) => {
-        const m = ESRS_DR_MAP[t.code]
+        const m = ESRS_DR_MAP[t.code]           // `relief` only — see the header
+        const drs = byTopic.get(t.code) ?? []
         return (
           <section key={t.code} className="page" style={{ marginTop: 18 }}>
             {/* Topic NAME comes from the matrix row (t.label), never from ESRS_DR_MAP.name.
@@ -798,15 +891,24 @@ function DisclosureRoadmap({ matrix }: { matrix: any[] }) {
                 ESRS_DR_MAP keeps `relief` and `drs`, which are its actual job. */}
             <h3 style={{ ...h3, marginTop: 0, marginBottom: 6 }}>
               <span style={{ color: '#aaa', fontSize: 12 }}>{t.code}</span> {t.label}
-              {m.relief && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 600, color: '#854F0B', background: '#FAEEDA', border: '0.5px solid #EF9F27', borderRadius: 99, padding: '2px 8px', verticalAlign: 'middle' }}>FY25–26 phase-in</span>}
+              {m?.relief && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 600, color: '#854F0B', background: '#FAEEDA', border: '0.5px solid #EF9F27', borderRadius: 99, padding: '2px 8px', verticalAlign: 'middle' }}>FY25–26 phase-in</span>}
             </h3>
             <table style={tbl}>
               <thead><tr style={trh}><th style={{ ...th, width: '30%' }}>Disclosure requirement</th><th style={th}>Key datapoints to collect</th></tr></thead>
               <tbody>
-                {m.drs.map(d => (
-                  <tr key={d.code} style={tr}>
-                    <td style={td}><strong>{d.code}</strong>&nbsp;{d.title}</td>
-                    <td style={td}>{d.data}</td>
+                {drs.map((d: any) => (
+                  <tr key={d.dr_code} style={tr}>
+                    <td style={td}><strong>{d.dr_code}</strong>&nbsp;{d.title}</td>
+                    {/* ⚠️ A NULL datapoints RENDERS AS AN EXPLICIT ABSENCE, NEVER AS AN EMPTY CELL.
+                        Every esrs_2026 row is null today: the summaries are ThemisIQ-authored prose,
+                        and the 2026 equivalents have to be WRITTEN against renumbered and rescoped
+                        requirements rather than transcribed. An empty cell under a column headed
+                        "Key datapoints to collect" reads as "nothing to collect" — a finding this
+                        column cannot support, and the same absence-rendered-as-a-finding failure the
+                        GHG engine's declaration states exist to prevent. */}
+                    <td style={d.datapoints ? td : { ...td, color: '#888784', fontStyle: 'italic' }}>
+                      {d.datapoints || 'Not yet summarised — see the standard text for this requirement.'}
+                    </td>
                   </tr>
                 ))}
               </tbody>

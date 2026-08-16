@@ -63,6 +63,17 @@ export function isStandardVersion(v: unknown): v is StandardVersion {
 
 export type TopicLabelRow = { topic_code: string; standard_version: string; label: string }
 
+// ── THE FIVE SOURCE STATES, DECLARED ONCE AND SHARED ────────────────────────────────────────────
+// Both resolvers answer the same five-way question about their own lookup, so the VOCABULARY is
+// shared. The RECORDS are not — see the note on DrResolution for why extending LabelResolution
+// with disclosure-requirement fields would have been the wrong move.
+export type ResolutionSource =
+  | 'versioned'              // every item resolved — no fallback anywhere
+  | 'versioned_partial'      // SOME resolved, some fell back: one artefact, two standards' content
+  | 'default_none_resolved'  // lookup ran, matched nothing
+  | 'default_no_version'     // no standardVersion stated, so no lookup was attempted
+  | 'default_fetch_error'    // the lookup itself failed
+
 // How the topic names in a saved assessment were arrived at. Persisted to
 // workings.labelResolution and rendered by the report, because a fallback that is invisible is
 // indistinguishable from a correct resolve — and the report states a standard version on its
@@ -71,17 +82,185 @@ export type LabelResolution = {
   standardVersion: StandardVersion | null
   // How many of the topics got a name from mr_esrs_topic_labels for this version.
   resolved: number
-  source:
-    | 'versioned'              // every topic resolved — no fallback anywhere
-    | 'versioned_partial'      // SOME resolved, some fell back: one table, two standards' wording
-    | 'default_none_resolved'  // lookup ran, matched nothing
-    | 'default_no_version'     // no standardVersion stated, so no lookup was attempted
-    | 'default_fetch_error'    // the lookup itself failed
+  source: ResolutionSource
   // Topic codes that were LOOKED UP AND NOT FOUND. Empty when no lookup was attempted
   // ('default_no_version') or when the lookup failed wholesale ('default_fetch_error') — in both
   // of those, `source` is the fact, and listing every code would imply a per-topic determination
   // that never happened.
   fallbackTopics: string[]
+}
+
+// ── DISCLOSURE REQUIREMENTS — A SIBLING RECORD, NOT AN EXTENSION OF LabelResolution ─────────────
+//
+// The two were nearly merged. They should not be, and the reason is the one thing that matters
+// about this whole layer: THE TWO FALLBACKS ARE NOT THE SAME KIND OF EVENT.
+//
+//   A LABEL fallback serves mr_esrs_topics.label — the pre-versioning name the module has always
+//   displayed. The reader sees a familiar name that is not attributed to any standard. Harmless,
+//   and the existing disclosure says so in exactly those terms.
+//
+//   A REQUIREMENT fallback serves THE 2023 ROWS — a DIFFERENT STANDARD'S REQUIREMENTS. That is not
+//   a default, it is a SUBSTITUTION, and under a stated version of ESRS (2026) it is the precise
+//   defect this table was built to end. One shared `source` enum whose 'default_none_resolved'
+//   meant "a familiar name" on one record and "another standard's requirements" on the other would
+//   be a category error encoded in a type.
+//
+// Three further reasons, so the decision survives someone tidying it later:
+//
+//   · DIFFERENT CARDINALITY, SO `resolved` WOULD LIE. LabelResolution.resolved counts topics, out
+//     of ten. A requirement resolve spans up to 64 rows across those ten. A single `resolved: 7`
+//     on a merged record would be unreadable without knowing which question it answered.
+//
+//   · PARTIAL IS WORSE HERE, AND DIFFERENTLY. A partial label resolve is one table carrying two
+//     spellings. A partial REQUIREMENT resolve is a roadmap in which some topics list 2026
+//     requirements and others list 2023 ones, all under one stated version — and because the codes
+//     collide (49 of them exist in both versions with different titles), the reader cannot tell
+//     which is which by looking. It needs its own per-topic partition, which LabelResolution's
+//     single `fallbackTopics` array cannot carry.
+//
+//   · EXTENDING WOULD RETRO-CHANGE EVERY SAVED RECORD. workings.labelResolution is persisted on
+//     every existing assessment. Adding fields to it means an old record is a partially-populated
+//     new record, and labelResolutionNote would have to tell "saved before requirements were
+//     versioned" from "the requirement lookup failed" — reintroducing exactly the
+//     absent-versus-failed collapse that type was written to prevent. A separate key is simply
+//     ABSENT on an old record, which is an observation the note can state plainly.
+//
+// What IS shared is ResolutionSource above: the same five-way question about a lookup, declared
+// once. That is the reuse that is safe — the vocabulary, not the record.
+
+/** A row of mr_esrs_disclosure_requirements, as fetched and as frozen into workings. */
+export type DisclosureRequirementRow = {
+  dr_code: string
+  standard_version: string
+  topic_code: string
+  title: string
+  /** NULL = not yet written. NEVER render as an empty cell — see DrResolution.datapointsMissing. */
+  datapoints: string | null
+  sort_order: number
+}
+
+// How the disclosure requirements in a saved assessment were arrived at.
+//
+// resolvedTopics / fallbackTopics / unservedTopics PARTITION the topic codes: every topic is in
+// exactly one, and together they account for all of them. A count alone could not express the
+// state that matters — WHICH topics are showing another standard's requirements — and that is the
+// only thing a preparer can act on.
+export type DrResolution = {
+  standardVersion: StandardVersion | null
+  source: ResolutionSource
+  /** Topics whose requirements came from the STATED version. */
+  resolvedTopics: string[]
+  /** Topics served from the fallback version instead. THESE ARE THE DANGEROUS ONES. */
+  fallbackTopics: string[]
+  /** Topics with no requirements in either version — printed as nothing, disclosed as nothing. */
+  unservedTopics: string[]
+  /** Which version the fallback rows came from. Null when no fallback was used. */
+  fallbackVersion: StandardVersion | null
+  /** Total requirement rows frozen into this assessment, across every topic. */
+  requirementCount: number
+  /**
+   * Rows whose `datapoints` is null — 'not yet written', which is NOT 'nothing to collect'.
+   * Counted at write so the report can state the gap rather than render an empty column that
+   * reads as a finding. Every esrs_2026 row is null today.
+   */
+  datapointsMissing: number
+}
+
+/** The version served when a stated version has no rows of its own. */
+export const DR_FALLBACK_VERSION: StandardVersion = 'esrs_2023'
+
+/**
+ * Resolve the disclosure requirements for one assessment, per topic, and report exactly what
+ * happened.
+ *
+ * PURE, and called at WRITE alongside resolveTopicLabels — the rows are then frozen into the
+ * record for its life. Same argument as the labels, one level down and with more consequence: a
+ * report must reprint the requirements as they stood when the assessment ran, never today's
+ * bundle. If this resolved at READ time, re-seeding the table would silently re-point every
+ * historical roadmap at requirements the preparer was never shown.
+ *
+ * FALLBACK IS PER TOPIC, NOT PER ASSESSMENT. A version that has rows for some topics and not
+ * others produces a mixed roadmap, and the mix is recorded topic by topic. Resolving all-or-
+ * nothing would have been simpler and would have hidden the case that matters.
+ *
+ * `rows === null` means the fetch FAILED — distinct from "returned no rows", which is also what a
+ * dropped RLS policy looks like. The two are never collapsed.
+ */
+export function resolveDisclosureRequirements(
+  topicCodes: string[],
+  rows: DisclosureRequirementRow[] | null,
+  fallbackRows: DisclosureRequirementRow[] | null,
+  standardVersion: StandardVersion | null,
+): { requirements: DisclosureRequirementRow[]; resolution: DrResolution } {
+  // Defensive filtering on BOTH sets, for the reason resolveTopicLabels gives: the routes filter by
+  // version in SQL, but this function must be safe to call with an unfiltered set. Serving another
+  // version's requirements silently is the one outcome forbidden.
+  const byTopic = new Map<string, DisclosureRequirementRow[]>()
+  for (const r of rows ?? []) {
+    if (standardVersion && r.standard_version !== standardVersion) continue
+    const list = byTopic.get(r.topic_code) ?? []
+    list.push(r)
+    byTopic.set(r.topic_code, list)
+  }
+  const fallbackByTopic = new Map<string, DisclosureRequirementRow[]>()
+  for (const r of fallbackRows ?? []) {
+    if (r.standard_version !== DR_FALLBACK_VERSION) continue
+    const list = fallbackByTopic.get(r.topic_code) ?? []
+    list.push(r)
+    fallbackByTopic.set(r.topic_code, list)
+  }
+
+  const resolvedTopics: string[] = []
+  const fallbackTopics: string[] = []
+  const unservedTopics: string[] = []
+  const requirements: DisclosureRequirementRow[] = []
+
+  for (const code of topicCodes) {
+    const own = byTopic.get(code)
+    if (own && own.length) {
+      resolvedTopics.push(code)
+      requirements.push(...own)
+      continue
+    }
+    const fb = fallbackByTopic.get(code)
+    if (fb && fb.length) {
+      fallbackTopics.push(code)
+      requirements.push(...fb)
+      continue
+    }
+    // No rows in either version. Printed as nothing AND disclosed as nothing — an empty roadmap
+    // section with no explanation is the absence-as-finding failure in its purest form.
+    unservedTopics.push(code)
+  }
+
+  requirements.sort((a, b) =>
+    a.topic_code === b.topic_code ? a.sort_order - b.sort_order
+      : topicCodes.indexOf(a.topic_code) - topicCodes.indexOf(b.topic_code))
+
+  // ⚠️ THE SOURCE STATE IS ABOUT THE STATED VERSION'S LOOKUP, NOT ABOUT WHAT WAS SERVED. A record
+  // can be 'default_no_version' and still carry 61 requirements — those two facts are independent
+  // and the note has to say both. Collapsing them would let "we printed something" read as "the
+  // version resolved".
+  const source: ResolutionSource =
+    !standardVersion ? 'default_no_version'
+      : rows === null ? 'default_fetch_error'
+        : resolvedTopics.length === 0 ? 'default_none_resolved'
+          : fallbackTopics.length > 0 || unservedTopics.length > 0 ? 'versioned_partial'
+            : 'versioned'
+
+  return {
+    requirements,
+    resolution: {
+      standardVersion,
+      source,
+      resolvedTopics,
+      fallbackTopics,
+      unservedTopics,
+      fallbackVersion: fallbackTopics.length > 0 ? DR_FALLBACK_VERSION : null,
+      requirementCount: requirements.length,
+      datapointsMissing: requirements.filter(r => r.datapoints == null || r.datapoints.trim() === '').length,
+    },
+  }
 }
 
 // Overlay per-version topic names onto the reference topics, and report exactly what happened.

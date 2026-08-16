@@ -16,7 +16,8 @@ import { getAuthedClient, bearerFrom, AuthError } from '../../../lib/supabaseAut
 import {
   runAssessment, regionsWithNoHazardData, ReferenceData, AssessmentInput,
   resolveTopicLabels, isStandardVersion, STANDARD_VERSIONS,
-  type StandardVersion, type TopicLabelRow,
+  resolveDisclosureRequirements, DR_FALLBACK_VERSION,
+  type StandardVersion, type TopicLabelRow, type DisclosureRequirementRow,
 } from '../../../lib/materiality'
 
 export async function POST(req: NextRequest) {
@@ -153,6 +154,81 @@ export async function POST(req: NextRequest) {
       )
     }
 
+
+    // ── Disclosure requirements, resolved at WRITE and frozen into the record ──────────────
+    //
+    // THE SAME ARGUMENT AS THE LABELS, ONE LEVEL DOWN AND WITH MORE CONSEQUENCE. ESRS (2026)
+    // RENUMBERED the DRs: 49 codes exist under both versions with DIFFERENT titles, and about a
+    // dozen are outright substitutions. S1-14 is 'Health and safety' under 2023 and 'Work-life
+    // balance metrics' under 2026 — health and safety moved to S1-13. A roadmap that prints the
+    // wrong vintage does not error; it tells a preparer to gather work-life-balance data instead
+    // of injury and fatality data, and nothing anywhere goes red.
+    //
+    // So the rows are read here, at write, and stored. Resolving at READ would mean re-seeding the
+    // table silently re-points every historical roadmap at requirements the preparer never saw.
+    //
+    // TWO FETCHES, ALWAYS. The fallback set is loaded unconditionally rather than lazily, because
+    // deciding whether it is needed requires knowing which topics the stated version covers — and
+    // that is per topic, not per assessment. One extra read of a 61-row table beats a second round
+    // trip inside the resolve.
+    let drRows: DisclosureRequirementRow[] | null = []
+    if (standardVersion) {
+      const { data: drData, error: drErr } = await supabase
+        .from('mr_esrs_disclosure_requirements')
+        .select('dr_code,standard_version,topic_code,title,datapoints,sort_order')
+        .eq('standard_version', standardVersion)
+      if (drErr) {
+        console.error(
+          `Materiality: mr_esrs_disclosure_requirements fetch failed for ${standardVersion}; `
+          + `falling back to ${DR_FALLBACK_VERSION} requirements. Assessment proceeds.`, drErr,
+        )
+        drRows = null
+      } else {
+        drRows = drData ?? []
+      }
+    }
+    // null here means the FALLBACK read failed too. Kept distinct from [] for the same reason
+    // everywhere else in this file: an empty result with no error is also what a dropped RLS
+    // policy looks like.
+    let drFallbackRows: DisclosureRequirementRow[] | null = []
+    {
+      const { data: fbData, error: fbErr } = await supabase
+        .from('mr_esrs_disclosure_requirements')
+        .select('dr_code,standard_version,topic_code,title,datapoints,sort_order')
+        .eq('standard_version', DR_FALLBACK_VERSION)
+      if (fbErr) {
+        console.error(
+          `Materiality: mr_esrs_disclosure_requirements FALLBACK fetch failed; the roadmap may be empty.`,
+          fbErr,
+        )
+        drFallbackRows = null
+      } else {
+        drFallbackRows = fbData ?? []
+      }
+    }
+
+    const { requirements: disclosureRequirements, resolution: drResolution } =
+      resolveDisclosureRequirements(
+        labelledTopics.map(t => t.code), drRows, drFallbackRows, standardVersion,
+      )
+
+    // A MIXED ROADMAP IS THE LOUDEST OF THESE WARNINGS, and deliberately louder than the label
+    // equivalent: two standards' REQUIREMENTS under one stated version, with colliding codes, is
+    // not a cosmetic inconsistency.
+    if (drResolution.fallbackTopics.length > 0) {
+      console.warn(
+        `Materiality: DISCLOSURE REQUIREMENTS FELL BACK to ${drResolution.fallbackVersion} for `
+        + `${drResolution.fallbackTopics.join(', ')} under a stated ${standardVersion ?? 'none'}. `
+        + `These topics will print another standard's requirements — codes collide across versions.`,
+      )
+    }
+    if (drResolution.unservedTopics.length > 0) {
+      console.warn(
+        `Materiality: NO disclosure requirements in any version for: `
+        + `${drResolution.unservedTopics.join(', ')}. Their roadmap sections will be empty.`,
+      )
+    }
+
     const ref: ReferenceData = {
       config: configRes.data!,
       industries: industriesRes.data!,
@@ -210,6 +286,11 @@ export async function POST(req: NextRequest) {
           // standard version on its face — an unannounced default would read as that standard's
           // own wording. The report renders a disclosure whenever source !== 'versioned'.
           labelResolution,
+          // The requirements as they stood WHEN THIS ASSESSMENT RAN, frozen alongside the record
+          // that says how they were arrived at. Stored as rows rather than as a version pointer
+          // precisely so a later re-seed cannot change what this report prints.
+          disclosureRequirements,
+          drResolution,
         },
         model_version: result.modelVersion,
         status: 'complete',
