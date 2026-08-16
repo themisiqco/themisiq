@@ -125,7 +125,14 @@ const METHODOLOGIES = [
     sections: [
       {
         title: 'Scenario framework',
-        content: 'ThemisIQ supports climate risk assessment across recognised IPCC-aligned warming pathways and NGFS finance-oriented transition scenarios. Both IFRS S2 and CSRD ESRS E1 require testing resilience across a range of scenarios rather than against a single forecast. See the Climate Risk & Materiality methodology below for the full SSP/NGFS scenario set used by the integrated risk engine.',
+        // "available for single-scenario assessments", not "used by the integrated risk engine".
+        // Neither half of this section was false, but the adjacency was: a sentence about the
+        // frameworks requiring RESILIENCE TESTING ACROSS A RANGE sat immediately before one naming
+        // the full SSP/NGFS set, inviting the reading that the resilience run spans both sets. It
+        // does not. RESILIENCE_TRIO (lib/materiality.ts) is hardcoded ssp126/ssp245/ssp585 — all-SSP
+        // for a monotonic warming range — and every resilience surface already says so correctly.
+        // The six-scenario set is what a SINGLE assessment picks one from; the trio is fixed.
+        content: 'ThemisIQ supports climate risk assessment across recognised IPCC-aligned warming pathways and NGFS finance-oriented transition scenarios. Both IFRS S2 and CSRD ESRS E1 require testing resilience across a range of scenarios rather than against a single forecast. See the Climate Risk & Materiality methodology below for the full SSP/NGFS scenario set available for single-scenario assessments.',
       },
       {
         title: 'Physical risk data',
@@ -133,7 +140,48 @@ const METHODOLOGIES = [
       },
       {
         title: 'Transition risk data',
-        content: 'Transition risks are mapped to IEA Net Zero 2050 pathway milestones, EU taxonomy activity classifications, and published regulatory transition timelines. Sector-specific transition risks reflect NGFS scenario narratives and the four TCFD transition-risk categories: policy and legal, technology, market, and reputation.',
+        // ⚠️ REWRITTEN 19 Aug 2026. WHAT THIS SECTION SAID BEFORE, AND WHY IT WAS WRONG — because
+        // the shape of the error is more useful than the correction, and it will recur.
+        //
+        // It read: "Transition risks are mapped to IEA Net Zero 2050 pathway milestones, EU taxonomy
+        // activity classifications, and published regulatory transition timelines. Sector-specific
+        // transition risks reflect NGFS scenario narratives and the four TCFD transition-risk
+        // categories: policy and legal, technology, market, and reputation."
+        //
+        // FOUR NAMED SOURCES, THREE OF WHICH ENTER NO CALCULATION. computeTransition() reads exactly
+        // five inputs: mr_industries.carbon_exposure, mr_industry_transition_drivers.weight,
+        // mr_jurisdictions.policy_intensity (policy driver only), mr_scenarios.transition_mult, and
+        // the horizon multiplier. No IEA milestone, no EU taxonomy classification, no NGFS narrative
+        // is read anywhere. The only IEA reference in the repo is a unit-conversion constant; every
+        // EU Taxonomy reference is in the Deals module.
+        //
+        // AND "SECTOR-SPECIFIC ... REFLECT NGFS" INVERTED THE ONE THING THAT IS CHECKABLE.
+        // transition_mult is a SINGLE SCALAR applied uniformly to all four drivers and every sector,
+        // so scenario choice rescales the whole profile and cannot alter its sector shape at all.
+        // The sector differentiation comes entirely from the 52 ThemisIQ driver weights, which carry
+        // no scenario dimension. The sentence attributed to NGFS the one effect NGFS provably has no
+        // hand in, while omitting the real one — that transition_mult genuinely scales the output.
+        //
+        // ⚠️ THE PART WORTH REMEMBERING: THE DATABASE HAD ALREADY REFUSED THIS ATTRIBUTION.
+        // supabase/migrations/20260715_mr_scenarios_provenance.sql, five weeks earlier, upgraded the
+        // three SSP rows to 'primary_source' for their LABELS AND DESCRIPTORS ONLY and said so in
+        // terms: "What is NOT being sourced: physical_mult / transition_mult. Those are ThemisIQ
+        // METHODOLOGICAL choices ... Do not add them." It then left all three NGFS rows at 'starter'
+        // with the citation block commented out, reasoning that "asserting a specific citation we
+        // cannot verify would be half-right provenance — worse than an honest 'starter'."
+        //
+        // So the row said 'starter' and the public methodology page said NGFS narratives. A
+        // migration author declined to make a claim they could not verify, and it was made anyway,
+        // one layer up, where a verifier reads it and no test covers it. Copy is not exempt from
+        // provenance: BEFORE NAMING A SOURCE ON THIS PAGE, CHECK WHAT THE REFERENCE ROW CLAIMS FOR
+        // ITSELF. If it says 'starter', this page may not say otherwise.
+        //
+        // What survives is real and is kept deliberately: the engine IS scenario-agnostic, the three
+        // NGFS rows carry distinct non-neutral multipliers (orderly 0.8/1.25, disorderly 1.0/1.5,
+        // hothouse 1.5/0.5), and selecting one genuinely scales all four transition scores. NGFS
+        // supplies the scenario set, its names and its directional logic — not the numbers, and not
+        // the sector differentiation.
+        content: 'Transition risk is scored across the four TCFD transition-risk categories: policy and legal, technology, market, and reputation. Each category combines the sector\'s carbon exposure with a per-sector weighting for that category and the selected time horizon; policy and legal is additionally scaled by the policy intensity of the jurisdictions selected, since transition exposure follows which regulatory regimes apply rather than where assets sit. The selected scenario then scales all four — choosing an NGFS pathway (Orderly, Disorderly, Hot House) applies that pathway\'s transition multiplier, so transition pressure rises under rapid or abrupt-policy futures and falls under high-warming ones. The per-sector weightings and the scenario multipliers are ThemisIQ methodological defaults, not values published by NGFS or the IPCC; each report identifies them as platform reference values in its data-lineage and provenance sections.',
       },
       {
         title: 'Disclosure alignment',

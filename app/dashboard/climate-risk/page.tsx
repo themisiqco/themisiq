@@ -108,7 +108,22 @@ const SCENARIOS = [
   { code: 'ssp245', label: 'IPCC SSP2-4.5', descriptor: '~2.7°C', desc: "Middle-of-the-road: emissions stay near today's track and the world warms about 2.7°C by 2100. The common central case." },
   { code: 'ssp126', label: 'IPCC SSP1-2.6', descriptor: '~1.8°C', desc: 'A sustainable, cooperative, low-emissions world that keeps warming close to the Paris goal. The optimistic case.' },
   { code: 'ssp585', label: 'IPCC SSP5-8.5', descriptor: '~4.4°C', desc: 'Fossil-fuelled development where emissions keep rising, producing about 4.4°C of warming. The severe-physical-risk case.' },
-  { code: 'ngfs_orderly', label: 'NGFS Orderly', descriptor: 'Early policy', desc: 'Early, gradual policy action — moderate transition risk and the lowest physical-risk path.' },
+  // ⚠️ "one of the lowest", not "the lowest" — corrected 19 Aug 2026 against the LIVE mr_scenarios
+  // table, not the snapshot. ngfs_orderly's physical_mult is 0.80; ssp126's is 0.75, so Orderly is
+  // the SECOND-lowest of the six. The superlative was a small, checkable claim that happened to be
+  // false, in the copy a customer reads while choosing the scenario their whole assessment runs on.
+  //
+  // ⚠️ EVERY `desc` IN THIS ARRAY IS A CLAIM ABOUT TWO NUMBERS IT DOES NOT SHOW. These strings are
+  // hardcoded here while physical_mult and transition_mult live in mr_scenarios, so a multiplier
+  // edited in the SQL editor silently falsifies the sentence describing it — nothing imports, joins
+  // or tests the pair. Superlatives ("the lowest", "the highest", "the most severe") are the ones
+  // that break first, because they depend on all six rows rather than one. The other five were
+  // re-checked in the same pass and hold: disorderly 1.50 IS the highest transition_mult, hothouse
+  // 0.50 the lowest, hothouse 1.50 the highest physical_mult.
+  //
+  // If these are edited again, or a seventh scenario is added, re-read the live table first:
+  //   select code, framework, physical_mult, transition_mult from public.mr_scenarios order by sort_order;
+  { code: 'ngfs_orderly', label: 'NGFS Orderly', descriptor: 'Early policy', desc: 'Early, gradual policy action — moderate transition risk and one of the lowest physical-risk paths.' },
   { code: 'ngfs_disorderly', label: 'NGFS Disorderly', descriptor: 'Late, abrupt', desc: 'Late, sudden policy action — high transition risk from abrupt regulatory and market shifts.' },
   { code: 'ngfs_hothouse', label: 'NGFS Hot House', descriptor: 'Limited action', desc: 'Little further climate action — minimal transition risk but the most severe physical damage.' },
 ]
