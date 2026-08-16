@@ -126,6 +126,135 @@ function drResolutionNote(dr: any): string | null {
   return parts.length ? parts.join(' ') : null
 }
 
+// ── THE QUICK-FIX PHASE-IN, AND WHY IT IS SUPPRESSED UNDER ESRS (2026) ──────────────────────────
+//
+// WHAT THE BADGE CLAIMS. That a Wave 1 undertaking may DEFER a material topic's disclosures for
+// FY2025–2026 under Del. Reg. (EU) 2025/1416, subject to the ESRS 2.17 summary. It was rendering
+// UNCONDITIONALLY, so a roadmap stating ESRS (2026) printed it against E4, S2 and S3 — a
+// 2025/1416 concept under an instrument 2025/1416 does not amend.
+//
+// ⚠️ THE SUPPRESSION STANDS, BUT NOT FOR THE REASON IT ORIGINALLY DID — AND THE NEW REASON IS THE
+// STRONGER ONE. The first version of this note said the 2026 equivalent could not be established.
+// It has since been established, and it EXISTS. The badge is still suppressed, because what cannot
+// be established is now something else entirely: whether THIS UNDERTAKING QUALIFIES.
+//
+//   ESTABLISHED:
+//     · A topic-level phase-in DOES exist under ESRS (2026) — ESRS 1 §10.3, ¶125–127 of the
+//       adopted Annex I — and it carries forward THE SAME FOUR TOPICS: E4, S2, S3, S4.
+//     · It has THREE CATEGORIES with THREE DIFFERENT WINDOWS:
+//         · wave-one, >EUR 450m net turnover AND >1,000 employees
+//               -> may omit E4/S2/S3/S4 for financial years prior to FY2027
+//         · wave-one, NOT exceeding both
+//               -> may omit ALL topical standard DRs for financial years prior to FY2027
+//         · other undertakings
+//               -> may omit E4/S2/S3/S4 for their FIRST TWO financial years of reporting
+//     · The 2023-family phase-in is a separate creature: Del. Reg. (EU) 2025/1416, the quick fix,
+//       window FY2025–2026. docs/materiality-questionnaire-spec-v5.md §2 and
+//       20260815_mr_esrs_subtopics.sql both define 'esrs_2023' as "as last amended by" it, so both
+//       2023-family versions inherit it. Two instruments, two windows, four shared topics.
+//
+//   NOT ESTABLISHED — and this is now the operative gap:
+//     · WHETHER THIS UNDERTAKING QUALIFIES FOR ANY OF THE THREE CATEGORIES. Eligibility turns on
+//       WAVE-ONE STATUS, NET TURNOVER and AVERAGE EMPLOYEE COUNT. The materiality intake captures
+//       NONE of the three — not in the wizard, not on materiality_assessments, not in `workings`.
+//       The third category additionally turns on which financial year of reporting the undertaking
+//       is in, which is not captured either.
+//
+// SO THE MODULE CANNOT ASSERT A RELIEF WHOSE CONDITIONS IT CANNOT EVALUATE. That is a rule about
+// this module's evidence, not a doubt about the law, and it is why the 2026 badge stays off.
+//
+// ⚠️ FOR A RELIEF, THE FALSE POSITIVE IS THE DANGEROUS DIRECTION — the opposite of everywhere else
+// in this module. A materiality finding withheld in error makes a preparer do work they did not
+// have to; a RELIEF asserted in error tells them THEY MAY OMIT A DISCLOSURE. One costs effort, the
+// other creates a compliance gap in a filed statement, and only the second is discovered by an
+// auditor — after filing. Printing the badge on every 2026 roadmap would assert the first category
+// for every undertaking, including the two-thirds of them it does not describe.
+//
+//   WHAT WOULD CHANGE THIS: capturing wave-one status, net turnover and average employee count.
+//   With those three, the 2026 badge becomes assertable — per category, with its own window, and
+//   NOT by widening PHASE_IN_VERSIONS, because the 2026 windows differ from the 2025/1416 one and
+//   the second category is not topic-scoped at all. THAT IS A WIZARD INTAKE QUESTION, NOT A
+//   RENDERING ONE. It is logged below, deliberately unbuilt.
+//
+// ⚠️ PROVENANCE, AND A LIMIT ON HOW THIS MAY BE CITED. The annex's own footnote to §10.3 still
+// reads "[O.P.: please insert the number, the date, the OJ reference and ELI number of that
+// Delegated Regulation C(2026) 5010]" — the adopted text HAS NOT YET BEEN PUBLISHED IN THE
+// OFFICIAL JOURNAL. Every citation here is to the ADOPTED ACT, never to an OJ reference, and no
+// customer-facing string may imply otherwise until that footnote is resolved.
+const PHASE_IN_INSTRUMENT = 'Del. Reg. (EU) 2025/1416'
+const PHASE_IN_VERSIONS: readonly string[] = ['esrs_2023', 'esrs_2023_reliefs']
+
+// ── LOGGED, NOT BUILT: THE ESRS (2026) TRANSITIONAL OMISSIONS ───────────────────────────────────
+//
+// Recorded here so the next person starts from the reading rather than from the PDF. NONE of this
+// is implemented, NOTHING renders from it, and it must not be wired up piecemeal — the eligibility
+// facts above gate all of it, and a half-applied omission set is a relief asserted without its
+// conditions, which is the failure this whole block exists to prevent.
+//
+// TWO KINDS, and they are independent of each other:
+//
+//   1. TOPIC-LEVEL (ESRS 1 §10.3 ¶125–127) — the three categories above. Scoped to E4/S2/S3/S4
+//      except in the second category, which reaches ALL topical standard DRs.
+//
+//   2. DR-LEVEL, CUTTING ACROSS TOPICS — these do NOT follow the four-topic list and would need
+//      their own per-requirement model, keyed on dr_code and financial year:
+//         E1-11                            omissible until FY2028; quantitative until FY2030
+//         E2-5  substances of concern      until FY2030
+//               SVHC                       until FY2028
+//         S1-6                             until FY2027
+//         S1-7  non-EEA employees          until FY2027
+//         S1-10, S1-11, S1-12, S1-13       datapoints, until FY2027
+//         S1-14                            until FY2027
+//
+// ⚠️ THE DR CODES ABOVE ARE 2026 CODES. S1-14 here is 'Work-life balance metrics', NOT the 2023
+// 'Health and safety' — the renumbering applies to this list exactly as it applies to everything
+// else in this section, and reading it against the 2023 set would defer the wrong requirements.
+//
+// A model for (2) would live in the requirements table, not here: it is a property of a
+// (dr_code, standard_version) pair, which is precisely that table's primary key.
+
+/**
+ * Does the quick-fix phase-in badge apply to this assessment at all?
+ *
+ * Keyed on the version whose REQUIREMENTS WERE SERVED, not on the version the assessment states.
+ * Those differ on a fallback, and the badge sits beside the requirement rows — so it has to follow
+ * the rows. A 2026 assessment whose S2 fell back to 2023 rows shows 2023 requirements, and the
+ * phase-in genuinely does attach to those.
+ *
+ * A null/absent drResolution is a pre-Part-B record. Those roadmaps are ESRS (2023) throughout —
+ * that is what the module printed before requirements were versioned — so the badge stands.
+ */
+function phaseInApplies(dr: any, topicCode: string): boolean {
+  if (!dr || typeof dr !== 'object') return true            // pre-Part-B record: 2023 throughout
+  const fell: string[] = Array.isArray(dr.fallbackTopics) ? dr.fallbackTopics : []
+  if (fell.includes(topicCode)) return true                 // this topic IS showing 2023 rows
+  const resolved: string[] = Array.isArray(dr.resolvedTopics) ? dr.resolvedTopics : []
+  if (!resolved.includes(topicCode)) return false           // unserved — no rows, no relief claim
+  return PHASE_IN_VERSIONS.includes(dr.standardVersion)
+}
+
+// ── THE ROADMAP'S VINTAGE, FROM THE RESOLVED VERSION ────────────────────────────────────────────
+// The heading used to read 'Disclosure roadmap' with the vintage hardcoded into the prose beneath
+// it. It now names the version whose requirements are actually below it — which is NOT always the
+// version the assessment states, because a fallback serves the 2023 rows.
+const VERSION_SHORT: Record<string, string> = {
+  esrs_2023: 'ESRS (2023)',
+  esrs_2023_reliefs: 'ESRS (2023) with reliefs',
+  esrs_2026: 'ESRS (2026)',
+}
+function roadmapVintage(dr: any): string | null {
+  if (!dr || typeof dr !== 'object') return VERSION_SHORT.esrs_2023
+  const fell = Array.isArray(dr.fallbackTopics) ? dr.fallbackTopics.length : 0
+  const resolved = Array.isArray(dr.resolvedTopics) ? dr.resolvedTopics.length : 0
+  // MIXED IS NAMED, NOT ROUNDED TO THE MAJORITY. Picking whichever version served more topics
+  // would put one standard's name over another standard's rows — the exact substitution the
+  // versioning exists to end, moved into the heading.
+  if (resolved > 0 && fell > 0) return 'mixed standard versions'
+  if (resolved > 0) return VERSION_SHORT[dr.standardVersion] ?? null
+  if (fell > 0) return VERSION_SHORT.esrs_2023
+  return null                                                // nothing served — claim no vintage
+}
+
 const SECTOR_LABEL: Record<string, string> = {
   energy: 'Energy & Utilities', finance: 'Financial Services', realestate: 'Real Estate',
   tech: 'Technology', health: 'Healthcare & Pharma', manuf: 'Industrials & Manufacturing',
@@ -171,10 +300,26 @@ const OPPORTUNITY_DESC: Record<string, string> = {
 const OPP_LABEL: Record<string, string> = { high: 'STRONG', med: 'MODERATE', low: 'LIMITED' }
 
 // ── ESRS Set 1 disclosure-requirement map (Commission Delegated Regulation (EU) 2023/2772) ──
-// Translates a material topic into the specific disclosures it triggers. 'relief' marks the
-// topics (E4, S2, S3, S4) that Wave 1 undertakings may phase in for FY2025–2026 under the
-// quick-fix amendment, Del. Reg. (EU) 2025/1416.
-const ESRS_DR_MAP: Record<string, { name: string; relief?: boolean; drs: { code: string; title: string; data: string }[] }> = {
+// ⚠️ `relief` WAS RENAMED TO `quickFixPhaseIn`, AND THE RENAME IS THE POINT.
+//
+// TWO DIFFERENT INSTRUMENTS IN THIS CODEBASE ARE CALLED "RELIEFS", and a bare `relief` named
+// neither of them:
+//
+//   1. Del. Reg. (EU) 2025/1416 — the QUICK FIX. A TOPIC-LEVEL PHASE-IN letting Wave 1
+//      undertakings defer E4, S2, S3 and S4 for FY2025–2026. That is this flag.
+//   2. Del. Reg. C(2026) 5010 — EIGHT NAMED ESRS 1 PARAGRAPH RELIEFS (¶27, ¶32–33, ¶74–75, ¶90,
+//      ¶91, ¶92, ¶106, ¶110), which are what standard_version = 'esrs_2023_reliefs' SELECTS.
+//      Nothing on this object has ever had anything to do with those.
+//
+// A reader who met `relief: true` on E4 and `esrs_2023_reliefs` in the same file had no way to
+// know they were unrelated. The field now names its instrument; see PHASE_IN_INSTRUMENT below.
+//
+// `drs` IS NO LONGER RENDERED — the requirements come from the frozen
+// workings.disclosureRequirements (Part B). It is retained ONLY because it is the source the
+// esrs_2023 rows in mr_esrs_disclosure_requirements were migrated FROM, so deleting it would
+// discard the provenance of 61 seeded rows while that seed is still labelled as unverified. Do not
+// render from it; lib/materialityDrResolution.test.ts asserts that.
+const ESRS_DR_MAP: Record<string, { name: string; quickFixPhaseIn?: boolean; drs: { code: string; title: string; data: string }[] }> = {
   E1: { name: 'Climate change', drs: [
     { code: 'E1-1', title: 'Transition plan for climate change mitigation', data: 'Plan compatibility with limiting warming to 1.5°C; decarbonisation levers (disclosed only where a plan exists)' },
     { code: 'E1-2', title: 'Policies', data: 'Climate change mitigation and adaptation policies' },
@@ -201,7 +346,7 @@ const ESRS_DR_MAP: Record<string, { name: string; relief?: boolean; drs: { code:
     { code: 'E3-4', title: 'Water consumption', data: 'Total water consumption (m³); consumption in water-stressed areas; water intensity per net revenue' },
     { code: 'E3-5', title: 'Anticipated financial effects', data: 'Monetary exposure from water-related risks and opportunities' },
   ]},
-  E4: { name: 'Biodiversity and ecosystems', relief: true, drs: [
+  E4: { name: 'Biodiversity and ecosystems', quickFixPhaseIn: true, drs: [
     { code: 'E4-1', title: 'Transition plan and resilience', data: 'Biodiversity transition plan; resilience of the strategy' },
     { code: 'E4-2', title: 'Policies', data: 'Biodiversity and ecosystems policies' },
     { code: 'E4-3', title: 'Actions and resources', data: 'Actions taken and resources allocated' },
@@ -227,21 +372,21 @@ const ESRS_DR_MAP: Record<string, { name: string; relief?: boolean; drs: { code:
     { code: 'S1-16', title: 'Remuneration (pay gap)', data: 'Gender pay gap (%); total-remuneration ratio (highest-paid to median)' },
     { code: 'S1-17', title: 'Incidents and complaints', data: 'Discrimination / harassment incidents; severe human-rights incidents' },
   ]},
-  S2: { name: 'Workers in the value chain', relief: true, drs: [
+  S2: { name: 'Workers in the value chain', quickFixPhaseIn: true, drs: [
     { code: 'S2-1', title: 'Policies', data: 'Value-chain-worker policies' },
     { code: 'S2-2', title: 'Engagement', data: 'Processes to engage value-chain workers on impacts' },
     { code: 'S2-3', title: 'Channels to raise concerns', data: 'Grievance channels and remediation' },
     { code: 'S2-4', title: 'Actions', data: 'Actions on material impacts and their effectiveness' },
     { code: 'S2-5', title: 'Targets', data: 'Value-chain-worker targets' },
   ]},
-  S3: { name: 'Affected communities', relief: true, drs: [
+  S3: { name: 'Affected communities', quickFixPhaseIn: true, drs: [
     { code: 'S3-1', title: 'Policies', data: 'Affected-communities policies' },
     { code: 'S3-2', title: 'Engagement', data: 'Processes to engage affected communities on impacts' },
     { code: 'S3-3', title: 'Channels to raise concerns', data: 'Grievance channels and remediation' },
     { code: 'S3-4', title: 'Actions', data: 'Actions on material impacts and their effectiveness' },
     { code: 'S3-5', title: 'Targets', data: 'Community-related targets' },
   ]},
-  S4: { name: 'Consumers and end-users', relief: true, drs: [
+  S4: { name: 'Consumers and end-users', quickFixPhaseIn: true, drs: [
     { code: 'S4-1', title: 'Policies', data: 'Consumer / end-user policies' },
     { code: 'S4-2', title: 'Engagement', data: 'Processes to engage consumers and end-users on impacts' },
     { code: 'S4-3', title: 'Channels to raise concerns', data: 'Grievance channels and remediation' },
@@ -537,16 +682,80 @@ function ReportInner() {
         {isCsrd && matrix.length > 0 && (
           <>
             <section className="page" style={{ marginTop: 48 }}>
-              <H>Disclosure roadmap</H>
+              {/* ITEM 1 — THE VINTAGE IS IN THE HEADING, DRIVEN BY WHAT WAS SERVED.
+                  It used to be hardcoded into the prose below, which is how it came to contradict
+                  the tables. roadmapVintage reads the frozen drResolution, so the heading cannot
+                  name a version the rows beneath it do not come from. Null on an empty roadmap:
+                  a heading claims a vintage only when there are rows to have one. */}
+              <H>{roadmapVintage(a.workings?.drResolution)
+                ? `Disclosure roadmap — ${roadmapVintage(a.workings?.drResolution)}`
+                : 'Disclosure roadmap'}</H>
               <p style={p}>
                 Each topic determined material above triggers a defined set of ESRS disclosure requirements. This roadmap translates the materiality result into the specific disclosures <strong>{a.company_name || SECTOR_LABEL[a.industry_code] || 'the entity'}</strong> must prepare — turning <em>what is material</em> into <em>what to collect and report</em>. The key disclosure requirements are shown per topic; the full set within each topical standard applies.
               </p>
               <p style={p}>
                 Two cross-cutting elements always apply regardless of which topics are material: <strong>ESRS 2 General disclosures</strong> (governance, strategy, and the IRO-1 / IRO-2 / SBM-3 disclosures that document this materiality process), and the minimum disclosure requirements on policies, actions, targets and metrics (MDR-P / A / T / M) referenced within each topic below.
               </p>
+              {/* ITEM 2 — THE PROVENANCE PARAGRAPH, REWRITTEN.
+                  WHAT IT USED TO SAY, AND WHY IT HAD TO GO: "Mapped to ESRS Set 1 (Commission
+                  Delegated Regulation (EU) 2023/2772) … ThemisIQ tracks both." Printed directly
+                  above 2026 requirements it was simply false — one hardcoded sentence asserting a
+                  2023 mapping over rows resolved against whatever version the assessment stated.
+                  "ThemisIQ tracks both" was a product claim standing in for a provenance
+                  statement, and it was the only thing in the section that could not be checked
+                  against the record.
+                  WHAT REPLACES IT IS ONLY WHAT THE RECORD SUPPORTS: which version served the rows,
+                  that they were frozen at run time, and — for the 2023 rows specifically — that
+                  they are ThemisIQ's own curated set rather than the instrument's text. That last
+                  clause is not modesty; the migration header records the 2023 fidelity as
+                  UNVERIFIED, and a report that cites them as the regulation would launder that. */}
               <p style={{ ...p, fontSize: 11, color: '#888784' }}>
-                Mapped to ESRS Set 1 (Commission Delegated Regulation (EU) 2023/2772), the standards in force for FY2025–2026 reporting. The revised ESRS ("ESRS 2.0"), adopted mid-2026 and applying from FY2027 (early adoption permitted FY2026), reduce mandatory datapoints by approximately 60%; ThemisIQ tracks both. Topics marked "FY25–26 phase-in" (E4, S2, S3, S4) may be phased in for FY2025–2026 under the quick-fix amendment, Del. Reg. (EU) 2025/1416, subject to the ESRS 2.17 summary disclosure where the topic is material.
+                The requirements listed below are those held for{' '}
+                <strong>{roadmapVintage(a.workings?.drResolution) ?? 'the standard version stated above'}</strong>,
+                resolved when this assessment was run and stored with it — so this roadmap reprints the
+                requirements as they stood on that date rather than as they stand today. Disclosure-requirement
+                codes were renumbered between ESRS (2023) and ESRS (2026), so a code alone does not identify a
+                requirement across versions.
+                {' '}Requirements shown for ESRS (2023) are ThemisIQ&rsquo;s own summary set, not a transcription
+                of Commission Delegated Regulation (EU) 2023/2772, and do not cover every requirement in that
+                instrument. Requirements shown for ESRS (2026) are taken from the adopted text of Del. Reg.
+                C(2026) 5010, Annex I.
               </p>
+              {/* The phase-in sentence moved OUT of the paragraph above and is conditional on the
+                  same predicate as the badges. Printing it unconditionally described a relief that
+                  does not attach to the version served — see phaseInApplies. */}
+              {matrix.some((t: any) => ESRS_DR_MAP[t.code]?.quickFixPhaseIn && phaseInApplies(a.workings?.drResolution, t.code)) && (
+                <p style={{ ...p, fontSize: 11, color: '#888784' }}>
+                  Topics marked &ldquo;FY25&ndash;26 phase-in&rdquo; may be phased in for FY2025&ndash;2026 under
+                  the quick-fix amendment, {PHASE_IN_INSTRUMENT}, subject to the ESRS 2.17 summary disclosure
+                  where the topic is material.
+                </p>
+              )}
+              {/* ⚠️ SHOWN WHERE THE BADGE IS NOT, AND IT IS NOT THE SAME SENTENCE.
+                  The earlier version of this said an ESRS (2026) equivalent "is not established" —
+                  which was true when written and is now FALSE: it exists, at ESRS 1 §10.3
+                  ¶125–127, over the same four topics. What is not established is whether THIS
+                  undertaking qualifies, because eligibility turns on wave-one status, net turnover
+                  and average employee count and this assessment collects none of them.
+                  Saying so is materially different from silence: a preparer who may in fact be
+                  entitled to omit E4/S2/S3/S4 needs to know the relief exists and that this report
+                  is not the thing that decides it. Withholding that would be its own false
+                  negative — and the one place this module can afford neither direction is where it
+                  has no evidence at all, so it states the position instead of picking a side.
+                  Cited to the ADOPTED ACT: the annex's §10.3 footnote still carries an unresolved
+                  "[O.P.: please insert … the OJ reference …]", so there is no OJ citation to give. */}
+              {roadmapVintage(a.workings?.drResolution) === VERSION_SHORT.esrs_2026 && (
+                <p style={{ ...p, fontSize: 11, color: '#888784' }}>
+                  ESRS (2026) provides its own transitional omissions for biodiversity (E4), value-chain
+                  workers (S2), affected communities (S3) and consumers and end-users (S4), at ESRS 1
+                  §10.3 (paragraphs 125&ndash;127 of the adopted Annex I), together with further omissions
+                  for individual disclosure requirements. Eligibility and the length of the window depend
+                  on the undertaking&rsquo;s reporting wave, its net turnover, its average number of employees
+                  and how many years it has been reporting. This assessment does not collect those facts, so
+                  no transitional omission is applied or implied here &mdash; the requirements below are listed
+                  in full. Confirm your eligibility against the standard before omitting any of them.
+                </p>
+              )}
             </section>
             {/* Stated BEFORE the tables, because it governs every row in them. A reader who has
                 already worked through the roadmap has relied on it. */}
@@ -557,7 +766,7 @@ function ReportInner() {
                 </p>
               </section>
             )}
-            <DisclosureRoadmap matrix={matrix} requirements={a.workings?.disclosureRequirements} />
+            <DisclosureRoadmap matrix={matrix} requirements={a.workings?.disclosureRequirements} drResolution={a.workings?.drResolution} />
           </>
         )}
 
@@ -860,7 +1069,7 @@ function MatrixTable({ topics }: { topics: any[] }) {
 //
 // Each material topic renders as its own `.page` section so print pagination keeps
 // each topic's table whole without trying to hold the entire (tall) roadmap together.
-function DisclosureRoadmap({ matrix, requirements }: { matrix: any[]; requirements: any[] }) {
+function DisclosureRoadmap({ matrix, requirements, drResolution }: { matrix: any[]; requirements: any[]; drResolution: any }) {
   // Group the frozen rows by topic, preserving their stored order — sort_order is per topic and
   // was already applied at write.
   const byTopic = new Map<string, any[]>()
@@ -891,7 +1100,14 @@ function DisclosureRoadmap({ matrix, requirements }: { matrix: any[]; requiremen
                 ESRS_DR_MAP keeps `relief` and `drs`, which are its actual job. */}
             <h3 style={{ ...h3, marginTop: 0, marginBottom: 6 }}>
               <span style={{ color: '#aaa', fontSize: 12 }}>{t.code}</span> {t.label}
-              {m?.relief && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 600, color: '#854F0B', background: '#FAEEDA', border: '0.5px solid #EF9F27', borderRadius: 99, padding: '2px 8px', verticalAlign: 'middle' }}>FY25–26 phase-in</span>}
+              {/* Two conditions, and both are load-bearing. The topic must be one the quick fix
+                  names (E4/S2/S3/S4), AND the requirements shown for it must be from a version the
+                  quick fix amends. Before Part C only the first was checked, so a 2026 roadmap
+                  printed the badge — a relief asserted under an instrument that does not grant it.
+                  See phaseInApplies for why the false positive is the dangerous direction here. */}
+              {m?.quickFixPhaseIn && phaseInApplies(drResolution, t.code) && (
+                <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 600, color: '#854F0B', background: '#FAEEDA', border: '0.5px solid #EF9F27', borderRadius: 99, padding: '2px 8px', verticalAlign: 'middle' }}>FY25–26 phase-in</span>
+              )}
             </h3>
             <table style={tbl}>
               <thead><tr style={trh}><th style={{ ...th, width: '30%' }}>Disclosure requirement</th><th style={th}>Key datapoints to collect</th></tr></thead>

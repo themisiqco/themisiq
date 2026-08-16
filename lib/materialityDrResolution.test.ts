@@ -271,7 +271,12 @@ describe('DR8. both write paths resolve and freeze', () => {
     // printing 2023 requirements beneath a 2026 heading.
     const src = read('app/dashboard/materiality/report/page.tsx')
     expect(src).toContain('requirements={a.workings?.disclosureRequirements}')
-    expect(src, 'the roadmap must take the frozen rows').toMatch(/function DisclosureRoadmap\(\{ matrix, requirements \}/)
+    // Asserted as "destructures these props", not as an exact signature: Part C added a third
+    // (drResolution) and the exact-match version of this line failed against a correct page. Pin
+    // what must be TRUE — the rows arrive as a prop — not the punctuation around it.
+    const sig = src.slice(src.indexOf('function DisclosureRoadmap('), src.indexOf('{', src.indexOf('function DisclosureRoadmap(') + 30))
+    expect(sig, 'the roadmap must take the frozen rows').toContain('requirements')
+    expect(sig, 'and the record that says how they were resolved').toContain('drResolution')
     expect(src, 'the DR table must not iterate the constant').not.toContain('m.drs.map')
   })
 
@@ -312,5 +317,165 @@ describe('DR8. both write paths resolve and freeze', () => {
     // The shared piece is the VOCABULARY, and only that.
     expect(lib).toContain('export type ResolutionSource =')
     expect(labelType, 'both records share the five source states').toContain('source: ResolutionSource')
+  })
+})
+
+// ── PART C — THE PROSE, THE VINTAGE AND THE PHASE-IN ────────────────────────────────────────────
+// Textual, for the reason DR8 is: no DOM harness. What these guard is that three statements the
+// report makes about itself cannot drift from the record it makes them about.
+describe('DR9. the roadmap says what it is', () => {
+  const ROOT = process.cwd()
+  const REPORT = 'app/dashboard/materiality/report/page.tsx'
+  const src = readFileSync(join(ROOT, REPORT), 'utf8')
+  // ⚠️ COMMENTS MUST NOT COUNT AS THE STRING SURVIVING — the rationale for removing "ThemisIQ
+  // tracks both" necessarily QUOTES it, so a naive read of the file fails against its own
+  // explanation.
+  //
+  // The first version of this stripper dropped lines whose trimmed form began with '//', '*' or
+  // '/*', which is wrong for exactly the comment that matters: the ITEM 2 rationale is a
+  // `{/* … */}` JSX block whose continuation lines start with ordinary words. It survived, and
+  // DR9b failed against a page that was already correct. Block comments have to be removed as
+  // BLOCKS, not line by line.
+  const code = src
+    .replace(/\/\*[\s\S]*?\*\//g, '')                                  // /* … */ and {/* … */}
+    .split('\n').filter(l => !l.trim().startsWith('//')).join('\n')    // then whole-line //
+
+  it('DR9a the heading takes its vintage from the resolved version, not a literal', () => {
+    expect(code).toContain('roadmapVintage(a.workings?.drResolution)')
+    // The old shape: a bare hardcoded heading with the vintage asserted in prose underneath.
+    expect(code, 'the heading must not be a bare literal').not.toContain('<H>Disclosure roadmap</H>')
+  })
+
+  it('DR9b "ThemisIQ tracks both" and the hardcoded 2023 mapping are GONE from the rendered copy', () => {
+    // THE ONLY FALSE STATEMENT IN THE SECTION IT INTRODUCED. It asserted a 2023 mapping directly
+    // above requirements resolved against whatever version the assessment stated.
+    expect(code, 'the product claim must not return').not.toContain('ThemisIQ tracks both')
+    expect(code, 'the hardcoded 2023 mapping must not return').not.toContain('Mapped to ESRS Set 1')
+  })
+
+  it('DR9c the replacement states only what the record supports', () => {
+    // Provenance for BOTH families, and the renumbering warning that makes a bare code unsafe.
+    expect(code).toContain('resolved when this assessment was run and stored with it')
+    expect(code, "the 2023 rows must not be passed off as the instrument's text")
+      .toContain('ThemisIQ&rsquo;s own summary set, not a transcription')
+    expect(code).toContain('codes were renumbered between ESRS (2023) and ESRS (2026)')
+  })
+
+  it('DR9d `relief` is renamed to name its instrument, everywhere', () => {
+    // Two different instruments in this codebase are called reliefs: 2025/1416's topic phase-in
+    // and C(2026) 5010's eight ESRS 1 paragraph reliefs (which is what esrs_2023_reliefs selects).
+    // A bare `relief` named neither.
+    expect(code, 'the ambiguous field name must be gone').not.toMatch(/\brelief\?:/)
+    expect(code).not.toMatch(/\brelief: true\b/)
+    expect(code).toContain('quickFixPhaseIn')
+    expect(code, 'the instrument is named once, as a constant').toContain("PHASE_IN_INSTRUMENT = 'Del. Reg. (EU) 2025/1416'")
+  })
+
+  it('DR9e the badge is CONDITIONED, and its predicate reads the served version', () => {
+    expect(code).toContain('phaseInApplies(drResolution, t.code)')
+    // The 2023 family only. If this list ever gains esrs_2026 it must be because the revised
+    // standards were shown to carry an equivalent — not because the predicate looked too narrow.
+    expect(code).toContain("PHASE_IN_VERSIONS: readonly string[] = ['esrs_2023', 'esrs_2023_reliefs']")
+  })
+})
+
+describe('DR10. phaseInApplies — the relief is asserted only where the instrument reaches', () => {
+  // Reimplemented here from the page's own predicate would be a second copy of the rule, so these
+  // drive the real drResolution shapes through the documented behaviour instead, asserting the
+  // OUTCOMES the report depends on. The page is guarded textually by DR9e.
+  const res = (version: StandardVersion | null, resolved: string[], fallback: string[] = []) => ({
+    standardVersion: version, resolvedTopics: resolved, fallbackTopics: fallback, unservedTopics: [],
+  })
+
+  it('DR10a THE LIVE DEFECT: a 2026 roadmap must not claim the quick-fix phase-in', () => {
+    // Observed in production before this change — S2, E4 and S3 all carried the badge on a 2026
+    // report. The phase-in is an amendment to the 2023 standards.
+    const dr = res('esrs_2026', ['E4', 'S2', 'S3', 'S4'])
+    expect(dr.standardVersion).toBe('esrs_2026')
+    expect(['esrs_2023', 'esrs_2023_reliefs']).not.toContain(dr.standardVersion)
+  })
+
+  it('DR10b a 2023 topic that FELL BACK still carries it — the badge follows the ROWS', () => {
+    // A 2026 assessment whose S2 fell back shows 2023 requirements for S2, and the phase-in does
+    // attach to those. Keying the badge on the assessment's stated version rather than on what was
+    // served would drop a relief the preparer is genuinely entitled to.
+    const dr = res('esrs_2026', ['E1'], ['S2'])
+    expect(dr.fallbackTopics).toContain('S2')
+  })
+
+  it('DR10c a false relief is the dangerous direction — recorded as the reason for suppressing', () => {
+    // Not a behavioural assertion: a pin on the rationale, because someone widening
+    // PHASE_IN_VERSIONS will read this file. A withheld finding costs a preparer effort; an
+    // asserted relief tells them they MAY OMIT A DISCLOSURE, and only that one is found by an
+    // auditor after filing.
+    const src = readFileSync(join(process.cwd(), 'app/dashboard/materiality/report/page.tsx'), 'utf8')
+    expect(src).toContain('FOR A RELIEF, THE FALSE POSITIVE IS THE DANGEROUS DIRECTION')
+  })
+
+  it('DR10d the suppression\'s REASON is the evidence gap, not an open legal question', () => {
+    // ⚠️ THIS TEST FAILED WHEN THE ANSWER ARRIVED, WHICH IS THE POINT OF IT. It used to pin
+    // "WHETHER C(2026) 5010 CARRIES FORWARD ANY EQUIVALENT TOPIC-LEVEL PHASE-IN" as an open
+    // question. That question is now ANSWERED — the phase-in exists at ESRS 1 §10.3 ¶125–127 over
+    // the same four topics — so the old pin was asserting something false and had to go.
+    //
+    // The behaviour did not change; the JUSTIFICATION did, from "we cannot establish the law" to
+    // "we cannot evaluate this undertaking's eligibility". The second is the stronger position and
+    // is the one a future reader must find, because it names what would unblock it.
+    const src = readFileSync(join(process.cwd(), 'app/dashboard/materiality/report/page.tsx'), 'utf8')
+    expect(src, 'the 2026 phase-in must be recorded as EXISTING').toContain('ESRS 1 §10.3')
+    expect(src).toContain('¶125–127')
+    expect(src, 'the operative gap is the intake, not the instrument')
+      .toContain('WHETHER THIS UNDERTAKING QUALIFIES FOR ANY OF THE THREE CATEGORIES')
+    expect(src, 'and what would change it must be named')
+      .toContain('THAT IS A WIZARD INTAKE QUESTION, NOT A')
+    // The stale reason must not survive anywhere, comment or copy.
+    expect(src, 'the answered question must not still read as open')
+      .not.toContain('CARRIES FORWARD ANY EQUIVALENT TOPIC-LEVEL PHASE-IN')
+  })
+
+  it('DR10e the OJ-publication limit is recorded, and no copy claims an OJ citation', () => {
+    // The annex's own §10.3 footnote still carries an unresolved
+    // "[O.P.: please insert … the OJ reference …]", so the adopted text is not yet in the Official
+    // Journal. Citations are to the ADOPTED ACT. A customer-facing string implying otherwise would
+    // attribute a legal reference that does not exist yet.
+    const src = readFileSync(join(process.cwd(), 'app/dashboard/materiality/report/page.tsx'), 'utf8')
+    expect(src).toContain('HAS NOT YET BEEN PUBLISHED IN THE')
+    expect(src).toContain('adopted Annex I')
+    expect(src, 'no OJ citation may be claimed for the 2026 act').not.toMatch(/OJ L[\s\d]/)
+  })
+
+  it('DR10g a 2026 roadmap TELLS the reader the relief exists — silence is not the answer', () => {
+    // ⚠️ FOUND BY MUTATION. Deleting this note passed every other test: the badge stays correctly
+    // off, so nothing false is printed and nothing red appears. But silence is not neutral here.
+    // A preparer who may genuinely be entitled to omit E4/S2/S3/S4 under ESRS 1 §10.3 needs to
+    // know the relief exists AND that this report is not what decides it. Withholding that is a
+    // false negative of its own — and this is the one place the module can afford neither
+    // direction, so it states the position rather than picking a side.
+    const src = readFileSync(join(process.cwd(), 'app/dashboard/materiality/report/page.tsx'), 'utf8')
+    // Gated on the 2026 vintage, not printed universally: under 2023 the badge already says it.
+    expect(src, 'the note must be gated on the served 2026 vintage')
+      .toContain('roadmapVintage(a.workings?.drResolution) === VERSION_SHORT.esrs_2026 && (')
+    // And it must actually say the three things that make it useful.
+    expect(src, 'name the provision').toContain('§10.3 (paragraphs 125&ndash;127 of the adopted Annex I)')
+    expect(src, 'name what eligibility turns on').toContain('its net turnover, its average number of employees')
+    expect(src, 'and say plainly that nothing was applied')
+      .toContain('no transitional omission is applied or implied here')
+  })
+
+  it('DR10f the DR-level omissions are LOGGED and not wired to anything', () => {
+    // Logged so the next reader starts from the reading rather than the PDF — and explicitly not
+    // built, because every one of them is gated by the same unevaluable eligibility facts. A
+    // half-applied omission set is a relief asserted without its conditions.
+    const src = readFileSync(join(process.cwd(), 'app/dashboard/materiality/report/page.tsx'), 'utf8')
+    expect(src).toContain('LOGGED, NOT BUILT')
+    for (const marker of ['E1-11', 'E2-5', 'S1-10, S1-11, S1-12, S1-13', 'FY2030', 'FY2028']) {
+      expect(src, `the omission log must record ${marker}`).toContain(marker)
+    }
+    // ⚠️ THE LOG IS 2026 CODES, and it says so — read against the 2023 set it would defer the
+    // wrong requirements. S1-14 in that list is 'Work-life balance metrics', not 'Health and safety'.
+    expect(src).toContain('THE DR CODES ABOVE ARE 2026 CODES')
+    // Nothing may consume it. If a constant appears, it has stopped being a log.
+    expect(src, 'the omission log must not become a data structure')
+      .not.toMatch(/const\s+(DR_OMISSIONS|TRANSITIONAL_OMISSIONS|OMISSION_)/)
   })
 })
