@@ -28,6 +28,12 @@ Your answers are not shown individually. They are combined with everyone
 else's, so what {Company} sees is where the people who know it collectively
 think the priorities are.
 
+**Comment boxes are different.** Anything you type in your own words is
+passed on as you wrote it. Scores are combined; comments are not.
+Don't include anything you wouldn't want read as yours — and if a
+comment would identify you by what it describes, consider whether
+the score alone says enough.
+
 **Answer from where you sit.** There is nothing to look up. You are not
 expected to have a view on every topic — a warehouse manager and someone in
 finance will see different parts of this company, and that difference is
@@ -49,6 +55,14 @@ doing it properly means asking its suppliers directly rather than assuming.
 Your answers go to {Company}, not to your employer, and are combined with
 everyone else's before anyone sees them. No individual answer is shown on
 its own.
+
+That applies to comments too. {Company} sees them; your employer does not.
+
+**Comment boxes are different.** Anything you type in your own words is
+passed on as you wrote it. Scores are combined; comments are not.
+Don't include anything you wouldn't want read as yours — and if a
+comment would identify you by what it describes, consider whether
+the score alone says enough.
 
 **There is no right answer, and nothing here is a test of your employer.**
 Saying a topic needs attention is what this survey is for.
@@ -81,6 +95,12 @@ Your answers are not shown individually. They are combined with everyone
 else's, so what {Company} sees is where the people it asked collectively
 think the priorities are.
 
+**Comment boxes are different.** Anything you type in your own words is
+passed on as you wrote it. Scores are combined; comments are not.
+Don't include anything you wouldn't want read as yours — and if a
+comment would identify you by what it describes, consider whether
+the score alone says enough.
+
 **Answer from your own vantage point.** You are being asked precisely
 because you see this company from outside it. There is nothing to look up,
 and no expectation that you have a view on everything.
@@ -88,6 +108,10 @@ and no expectation that you have a view on everything.
 ---
 
 ## Shared blocks — identical in all three variants
+
+⚠️ The comment carve-out above is ALSO identical in all three, and is a
+single string in the page for the same reason as these blocks: a promise
+about what happens to a respondent's words must not differ by population.
 
 ⚠️ Do not vary these by track. §6.1's abstention rule and the
 save-and-return behaviour must read the same to everyone, or the counters
@@ -113,6 +137,15 @@ link whenever you like.
 ---
 
 ## Notes
+
+**⚠️ THE COMMENT CARVE-OUT IS NOT OPTIONAL COPY.** Added 16 Aug 2026 with
+free text. Every variant promises answers are "combined with everyone
+else's" and "not shown individually" — true of a score, false of a
+verbatim comment. A comment box shipped under that sentence without the
+carve-out makes the page's own promise false. The page also renders
+*"Passed on as written, not combined."* beneath every box, because the
+moment of typing is when it matters. If the carve-out is ever removed, the
+comment boxes go with it.
 
 **Two words that are deliberately absent, in all three variants.**
 

@@ -43,13 +43,18 @@
  *    the UI that creates a round, and every fallback here is a worse sentence than the real name.
  *    Same for respondent.display_name (invite_name is nullable) — handled, same way, less serious.
  *
- * 3. FREE TEXT CANNOT BE CAPTURED. §5.1 specifies optional free text per question AND a closing
- *    "Is there anything affecting people, the environment or the business that we have not asked
- *    about?" — an ESRS 2 IRO-1 emerging-topic expectation. survey_save_response takes four
- *    parameters and none of them is free_text, so there is no field on this page. See the note in
- *    20260820's header: the fifth parameter has to be added before the survey ships, and it has to
- *    carry a DEFAULT or existing call sites break — at which point a defaulted free_text silently
- *    overwrites a saved note with NULL on every autosave that omits it.
+ * 3. ✎ CLOSED 16 Aug 2026 — FREE TEXT IS NOW CAPTURED. §5.1's optional per-question comment and the
+ *    closing "Is there anything affecting people, the environment or the business that we have not
+ *    asked about?" both ship, via survey_save_free_text and survey_save_closing_comment (20260830).
+ *    NOT as a fifth parameter on survey_save_response: a defaulted p_free_text would have nulled a
+ *    saved note on every autosave that omitted it — a respondent types a comment, clicks a different
+ *    radio, and the comment is gone with no error.
+ * ───────────────────────────────────────────────────────────────────────────────────────────────
+ * ⚠️ AND THE THING THAT ARRIVED WITH IT. The intro paragraph promising answers are "combined with
+ * everyone else's" is TRUE OF A SCORE AND FALSE OF A COMMENT. COMMENT_CARVE_OUT is rendered directly
+ * beneath it for every variant, and COMMENT_BOX_NOTE sits under every box. If comment boxes are ever
+ * shown without those two, the page is making a promise the feature breaks — take the boxes off
+ * rather than the copy.
  * ───────────────────────────────────────────────────────────────────────────────────────────────
  */
 
@@ -117,13 +122,39 @@ const SCALE = [
 type IntroVariant = 'internal' | 'value_chain' | 'external'
 type IntroBlock = { lead?: string; body: string }
 
-const INTRO_VARIANTS: Record<IntroVariant, IntroBlock[]> = {
-  internal: [
+/**
+ * ⚠️ THE COMMENT CARVE-OUT. ONE STRING, RENDERED FOR EVERY VARIANT, between the variant paragraphs
+ * and the practical tips.
+ *
+ * It is a separate constant for the same structural reason SHARED_BLOCKS is: a promise about what
+ * happens to a respondent's words must read identically to everyone. Three copies that agree today
+ * would drift the first time one is edited, and the drift would mean the product promised different
+ * things to different populations about the same feature.
+ *
+ * It exists because the paragraph immediately above it says answers are "combined with everyone
+ * else's" and "not shown individually" — TRUE of a score, FALSE of a verbatim comment. Shipping a
+ * comment box under that sentence without this one makes the page's own promise false.
+ */
+const COMMENT_CARVE_OUT: IntroBlock = {
+  lead: 'Comment boxes are different.',
+  body: 'Anything you type in your own words is passed on as you wrote it. Scores are combined; comments are not. Don’t include anything you wouldn’t want read as yours — and if a comment would identify you by what it describes, consider whether the score alone says enough.',
+}
+
+/** Small print beside every comment box, for the same reason, at the moment of typing. */
+const COMMENT_BOX_NOTE = 'Passed on as written, not combined.'
+
+const INTRO_VARIANTS: Record<IntroVariant, { paragraphs: IntroBlock[]; tips: IntroBlock[] }> = {
+  internal: {
+    paragraphs: [
     { body: '{Company} is conducting a sustainability materiality assessment — working out which topics matter most to the business and to the people its work affects. That covers a wide range: from energy and waste to working conditions, health and safety, and how the company treats the communities around it. Some of it can be established from data. The rest depends on what people inside the organisation see day to day, which is why you have been asked.' },
-    { body: 'Your answers are not shown individually. They are combined with everyone else’s, so what {company} sees is where the people who know it collectively think the priorities are.' },
-    { lead: 'Answer from where you sit.', body: 'There is nothing to look up. You are not expected to have a view on every topic — a warehouse manager and someone in finance will see different parts of this company, and that difference is useful information rather than a problem.' },
-  ],
-  value_chain: [
+      { body: 'Your answers are not shown individually. They are combined with everyone else’s, so what {company} sees is where the people who know it collectively think the priorities are.' },
+    ],
+    tips: [
+      { lead: 'Answer from where you sit.', body: 'There is nothing to look up. You are not expected to have a view on every topic — a warehouse manager and someone in finance will see different parts of this company, and that difference is useful information rather than a problem.' },
+    ],
+  },
+  value_chain: {
+    paragraphs: [
     // The first paragraph is why this variant exists: a supplier contact has no relationship with the
     // company asking and may not know why they are being asked.
     // ⚠️ IT ADDRESSES AN ORGANISATION, NOT A WORKER. The respondent is a named representative
@@ -137,20 +168,31 @@ const INTRO_VARIANTS: Record<IntroVariant, IntroBlock[]> = {
     // to be, a promise about what the customer's own staff do with results informally — no software
     // prevents that. If materiality_survey_responses ever gains a policy or a grant that widens who
     // can read an individual answer, this sentence has to change in the same commit.
-    { body: 'Your answers go to {company}, not to your employer, and are combined with everyone else’s before anyone sees them. No individual answer is shown on its own.' },
+      { body: 'Your answers go to {company}, not to your employer, and are combined with everyone else’s before anyone sees them. No individual answer is shown on its own.' },
+      // Variant B only, and it sits HERE rather than after the carve-out so that "That applies to
+      // comments too" keeps the paragraph above as its antecedent. The reassurance is narrower than
+      // the one it qualifies — the routing is unchanged for comments, only the aggregation is.
+      { body: 'That applies to comments too. {Company} sees them; your employer does not.' },
+    ],
+    tips: [
     // ⚠️ REMOVED 16 Aug 2026: "Answer about your own workplace. Where a question asks about working
     // conditions, health and safety or similar, it means the conditions you and your colleagues work
     // in — not {company}'s own offices." It addressed an individual worker describing their own
     // conditions, which is not who answers S2. The question_framing badge now carries the same
     // instruction institutionally ("in your organisation's workforce"), on every question rather
     // than once at the top, so nothing is lost by dropping it.
-    { lead: 'There is no right answer, and nothing here is a test of your employer.', body: 'Saying a topic needs attention is what this survey is for.' },
-  ],
-  external: [
-    { body: '{Company} is conducting a sustainability materiality assessment — working out which topics matter most to the business and to the people and places its work affects. That covers environmental impact, working conditions in its own operations and its suppliers’, and its effect on surrounding communities. It is seeking views from a range of people outside the organisation, including those who see it from where you do.' },
-    { body: 'Your answers are not shown individually. They are combined with everyone else’s, so what {company} sees is where the people it asked collectively think the priorities are.' },
-    { lead: 'Answer from your own vantage point.', body: 'You are being asked precisely because you see this company from outside it. There is nothing to look up, and no expectation that you have a view on everything.' },
-  ],
+      { lead: 'There is no right answer, and nothing here is a test of your employer.', body: 'Saying a topic needs attention is what this survey is for.' },
+    ],
+  },
+  external: {
+    paragraphs: [
+      { body: '{Company} is conducting a sustainability materiality assessment — working out which topics matter most to the business and to the people and places its work affects. That covers environmental impact, working conditions in its own operations and its suppliers’, and its effect on surrounding communities. It is seeking views from a range of people outside the organisation, including those who see it from where you do.' },
+      { body: 'Your answers are not shown individually. They are combined with everyone else’s, so what {company} sees is where the people it asked collectively think the priorities are.' },
+    ],
+    tips: [
+      { lead: 'Answer from your own vantage point.', body: 'You are being asked precisely because you see this company from outside it. There is nothing to look up, and no expectation that you have a view on everything.' },
+    ],
+  },
 }
 
 /**
@@ -205,6 +247,19 @@ export default function StakeholderSurvey() {
   const [saved, setSaved] = useState<Record<string, Choice>>({})
   const [saveState, setSaveState] = useState<Record<string, SaveState>>({})
   const [saveError, setSaveError] = useState<Record<string, string>>({})
+
+  // Free text, kept in the same optimistic/persisted pair as the scores and for the same reason:
+  // `comments` is what the textarea shows, `commentSaved` is what the database confirmed, and only
+  // the second drives the tick and the submit gate.
+  const [comments, setComments] = useState<Record<string, string>>({})
+  const [commentSaved, setCommentSaved] = useState<Record<string, string>>({})
+  const [commentState, setCommentState] = useState<Record<string, SaveState>>({})
+  const [commentError, setCommentError] = useState<Record<string, string>>({})
+
+  const [closing, setClosing] = useState('')
+  const [closingSaved, setClosingSaved] = useState('')
+  const [closingState, setClosingState] = useState<SaveState | undefined>(undefined)
+  const [closingError, setClosingError] = useState<string | null>(null)
 
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -286,12 +341,24 @@ export default function StakeholderSurvey() {
      */
     const shown = new Set(qs.map(q => q.question_id))
     const initial: Record<string, Choice> = {}
-    for (const r of (data.responses || []) as { question_id: string; value: number | null; abstained: boolean }[]) {
+    const initialComments: Record<string, string> = {}
+    for (const r of (data.responses || []) as {
+      question_id: string; value: number | null; abstained: boolean; free_text: string | null
+    }[]) {
       if (!shown.has(r.question_id)) continue
       initial[r.question_id] = r.abstained ? 'abstain' : (r.value as 1 | 2 | 3)
+      // Save-and-return for comments, scoped to currently-shown questions for the same reason the
+      // answers are: a response for a since-deselected question has no box to go in.
+      if (r.free_text) initialComments[r.question_id] = r.free_text
     }
     setAnswers(initial)
     setSaved(initial)
+    setComments(initialComments)
+    setCommentSaved(initialComments)
+
+    const existingClosing = (data.closing_comment as string | null) ?? ''
+    setClosing(existingClosing)
+    setClosingSaved(existingClosing)
 
     setLoading(false)
   }
@@ -326,6 +393,72 @@ export default function StakeholderSurvey() {
 
     setSaved(prev => ({ ...prev, [questionId]: choice }))
     setSaveState(prev => ({ ...prev, [questionId]: 'saved' }))
+  }
+
+  /**
+   * Saved on blur rather than on every keystroke. Debouncing a textarea would mean a save in flight
+   * whenever someone pauses mid-sentence, and the submit gate blocks on saves in flight — which would
+   * make Submit flicker between enabled and disabled while a respondent is typing. Blur is a moment
+   * they chose, and the not-saved state is legible at exactly that moment.
+   *
+   * ⚠️ The server REFUSES a comment on an unanswered question (the XOR — see 20260830), so the box is
+   * disabled until an option is chosen. This function is not the guard; it must never be reachable
+   * with no answer, and if it ever is, the refusal message is what the respondent sees after typing.
+   */
+  const saveComment = async (questionId: string) => {
+    const text = comments[questionId] ?? ''
+    if (text === (commentSaved[questionId] ?? '')) return   // nothing changed; don't burn a call
+
+    setCommentState(prev => ({ ...prev, [questionId]: 'saving' }))
+    setCommentError(prev => { const next = { ...prev }; delete next[questionId]; return next })
+
+    const seqKey = `c:${questionId}`
+    const seq = (seqRef.current[seqKey] ?? 0) + 1
+    seqRef.current[seqKey] = seq
+
+    const { error } = await supabase.rpc('survey_save_free_text', {
+      p_token: token,
+      p_question_id: questionId,
+      p_free_text: text,
+    })
+
+    if (seqRef.current[seqKey] !== seq) return
+
+    if (error) {
+      setCommentState(prev => ({ ...prev, [questionId]: 'error' }))
+      setCommentError(prev => ({
+        ...prev,
+        [questionId]: error.message || 'The comment did not save, and no reason was given.',
+      }))
+      return   // commentSaved is NOT updated: an unsaved comment never shows as saved.
+    }
+    setCommentSaved(prev => ({ ...prev, [questionId]: text }))
+    setCommentState(prev => ({ ...prev, [questionId]: 'saved' }))
+  }
+
+  const saveClosing = async () => {
+    if (closing === closingSaved) return
+
+    setClosingState('saving')
+    setClosingError(null)
+
+    const seq = (seqRef.current['closing'] ?? 0) + 1
+    seqRef.current['closing'] = seq
+
+    const { error } = await supabase.rpc('survey_save_closing_comment', {
+      p_token: token,
+      p_comment: closing,
+    })
+
+    if (seqRef.current['closing'] !== seq) return
+
+    if (error) {
+      setClosingState('error')
+      setClosingError(error.message || 'The comment did not save, and no reason was given.')
+      return
+    }
+    setClosingSaved(closing)
+    setClosingState('saved')
   }
 
   const submit = async () => {
@@ -409,8 +542,16 @@ export default function StakeholderSurvey() {
 
   // Anything in flight or failed. Submit is blocked on this: survey_submit resolves what is IN THE
   // DATABASE, so submitting over an unsaved answer would silently drop it from the determination.
-  const unsaved = questions.filter(q => saveState[q.question_id] === 'saving' || saveState[q.question_id] === 'error')
-  const failed = questions.filter(q => saveState[q.question_id] === 'error')
+  // ⚠️ COMMENTS COUNT TOO, and the closing one most of all: it is the module's only emerging-topic
+  // catch, so submitting over an unsaved one loses the single thing no other field can carry.
+  const unsaved = questions.filter(q =>
+    saveState[q.question_id] === 'saving' || saveState[q.question_id] === 'error' ||
+    commentState[q.question_id] === 'saving' || commentState[q.question_id] === 'error')
+  const failed = questions.filter(q =>
+    saveState[q.question_id] === 'error' || commentState[q.question_id] === 'error')
+  const closingUnsaved = closingState === 'saving' || closingState === 'error'
+                         || closing !== closingSaved
+  const blockSubmit = unsaved.length > 0 || closingUnsaved
   const unanswered = questions.filter(q => saved[q.question_id] === undefined)
 
   // ── Screens ──────────────────────────────────────────────────────────────────
@@ -546,8 +687,22 @@ export default function StakeholderSurvey() {
           </div>
 
           {/* Varies by track. Absent — never guessed — if the server did not resolve a variant. */}
-          {introVariant && INTRO_VARIANTS[introVariant].map((block, i) => (
-            <div key={`variant-${i}`} style={{ fontSize: 13.5, color: '#555553', lineHeight: 1.75, marginTop: i === 0 ? 0 : 12 }}>
+          {introVariant && INTRO_VARIANTS[introVariant].paragraphs.map((block, i) => (
+            <div key={`para-${i}`} style={{ fontSize: 13.5, color: '#555553', lineHeight: 1.75, marginTop: i === 0 ? 0 : 12 }}>
+              {fill(block.body, companyInline, total)}
+            </div>
+          ))}
+
+          {/* ⚠️ THE CARVE-OUT. One string for every variant, rendered immediately after the
+              paragraph that says answers are combined — because that sentence is true of a score and
+              false of a comment, and a comment box under it would make the page's own promise false. */}
+          <div style={{ fontSize: 13.5, color: '#555553', lineHeight: 1.75, marginTop: 12 }}>
+            <strong style={{ color: '#0d0d0d' }}>{fill(COMMENT_CARVE_OUT.lead as string, companyInline, total)}</strong>{' '}
+            {fill(COMMENT_CARVE_OUT.body, companyInline, total)}
+          </div>
+
+          {introVariant && INTRO_VARIANTS[introVariant].tips.map((block, i) => (
+            <div key={`tip-${i}`} style={{ fontSize: 13.5, color: '#555553', lineHeight: 1.75, marginTop: 12 }}>
               {block.lead && <strong style={{ color: '#0d0d0d' }}>{fill(block.lead, companyInline, total)}</strong>}
               {block.lead && ' '}
               {fill(block.body, companyInline, total)}
@@ -665,6 +820,63 @@ export default function StakeholderSurvey() {
                             <span style={{ fontSize: 11.5, color: GREEN, fontWeight: 600 }}>✓ Saved</span>
                           )}
                         </div>
+
+                        {/* ⚠️ DISABLED UNTIL AN OPTION IS CHOSEN. materiality_survey_responses'
+                            XOR requires a value or an abstention on every row, so there is no row
+                            for a comment with no answer and survey_save_free_text refuses one. If
+                            this were enabled first, a respondent would type into it and meet the
+                            refusal after the fact. "Not enough visibility to assess" IS an answer,
+                            so anyone with something to say can always reach the box. */}
+                        {(() => {
+                          const answered = current !== undefined
+                          const cState = commentState[q.question_id]
+                          const cText = comments[q.question_id] ?? ''
+                          return (
+                            <div style={{ marginTop: 10 }}>
+                              <textarea
+                                value={cText}
+                                disabled={!answered}
+                                onChange={e => setComments(prev => ({ ...prev, [q.question_id]: e.target.value }))}
+                                onBlur={() => saveComment(q.question_id)}
+                                maxLength={4000}
+                                rows={2}
+                                placeholder={answered
+                                  ? 'Add a comment (optional)'
+                                  : 'Choose an answer above to add a comment'}
+                                style={{
+                                  width: '100%', boxSizing: 'border-box', padding: '9px 11px',
+                                  borderRadius: 9,
+                                  border: `1px solid ${cState === 'error' ? FAIL : '#e8e7e4'}`,
+                                  background: answered ? '#fff' : '#f8f7f5',
+                                  color: answered ? '#0d0d0d' : '#888784',
+                                  fontSize: 13, fontFamily: 'inherit', lineHeight: 1.6,
+                                  resize: 'vertical', outline: 'none',
+                                  cursor: answered ? 'text' : 'not-allowed',
+                                }}
+                              />
+                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 4, minHeight: 16 }}>
+                                {/* The carve-out again, at the moment of typing. */}
+                                <span style={{ fontSize: 11, color: '#888784' }}>{COMMENT_BOX_NOTE}</span>
+                                {cState === 'saving' && <span style={{ fontSize: 11, color: '#888784' }}>Saving…</span>}
+                                {cState === 'saved' && cText === (commentSaved[q.question_id] ?? '') && cText !== '' && (
+                                  <span style={{ fontSize: 11, color: GREEN, fontWeight: 600 }}>✓ Saved</span>
+                                )}
+                              </div>
+                              {cState === 'error' && (
+                                <div style={{ background: FAIL_BG, border: `0.5px solid ${FAIL}`, borderRadius: 8, padding: '8px 10px', marginTop: 4 }}>
+                                  <div style={{ fontSize: 11.5, fontWeight: 700, color: FAIL, marginBottom: 3 }}>COMMENT NOT SAVED</div>
+                                  <div style={{ fontSize: 11.5, color: '#555553', lineHeight: 1.6 }}>{commentError[q.question_id]}</div>
+                                  <button
+                                    onClick={() => saveComment(q.question_id)}
+                                    style={{ marginTop: 6, fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 6, border: `1px solid ${FAIL}`, background: '#fff', color: FAIL, cursor: 'pointer' }}
+                                  >
+                                    Try again
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -673,6 +885,60 @@ export default function StakeholderSurvey() {
             </div>
           </div>
         ))}
+
+        {/* ⚠️ THE CLOSING QUESTION — THE MODULE'S ENTIRE EMERGING-TOPIC CATCH.
+            Survey scope is fixed at round creation and there is no second scoping moment, so this
+            box is the ONLY route by which a matter nobody thought to ask about reaches the preparer.
+            ESRS 2 IRO-1 expects such a route and this is it. It is deliberately NOT a small field
+            at the foot of the page: it sits in its own card, immediately before Submit, at the same
+            visual weight as a question. */}
+        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '1.5rem 1.75rem', marginTop: 8, marginBottom: 16 }}>
+          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>
+            One last question
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 500, color: '#0d0d0d', lineHeight: 1.5, marginBottom: 4 }}>
+            Is there anything affecting people, the environment or the business that we have not
+            asked about?
+          </div>
+          <div style={{ fontSize: 13, color: '#888784', lineHeight: 1.7, marginBottom: 10 }}>
+            Optional. The questions above cover the topics {companyInline} chose to ask about — if
+            something matters and is not among them, this is the place to say so.
+          </div>
+
+          <textarea
+            value={closing}
+            onChange={e => setClosing(e.target.value)}
+            onBlur={saveClosing}
+            maxLength={4000}
+            rows={4}
+            placeholder="Anything else (optional)"
+            style={{
+              width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 9,
+              border: `1px solid ${closingState === 'error' ? FAIL : '#e8e7e4'}`,
+              background: '#fff', color: '#0d0d0d', fontSize: 13.5, fontFamily: 'inherit',
+              lineHeight: 1.7, resize: 'vertical', outline: 'none',
+            }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 4, minHeight: 16 }}>
+            <span style={{ fontSize: 11, color: '#888784' }}>{COMMENT_BOX_NOTE}</span>
+            {closingState === 'saving' && <span style={{ fontSize: 11, color: '#888784' }}>Saving…</span>}
+            {closingState === 'saved' && closing === closingSaved && closing !== '' && (
+              <span style={{ fontSize: 11, color: GREEN, fontWeight: 600 }}>✓ Saved</span>
+            )}
+          </div>
+          {closingState === 'error' && (
+            <div style={{ background: FAIL_BG, border: `0.5px solid ${FAIL}`, borderRadius: 8, padding: '8px 10px', marginTop: 4 }}>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: FAIL, marginBottom: 3 }}>NOT SAVED</div>
+              <div style={{ fontSize: 11.5, color: '#555553', lineHeight: 1.6 }}>{closingError}</div>
+              <button
+                onClick={saveClosing}
+                style={{ marginTop: 6, fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 6, border: `1px solid ${FAIL}`, background: '#fff', color: FAIL, cursor: 'pointer' }}
+              >
+                Try again
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Submit */}
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '1.5rem 1.75rem', marginTop: 8 }}>
@@ -705,15 +971,24 @@ export default function StakeholderSurvey() {
 
           {/* Blocked, not merely warned: survey_submit resolves what is in the database, so an
               unsaved answer submitted over would be silently absent from the determination. */}
-          {unsaved.length > 0 && (
+          {blockSubmit && (
             <div style={{ marginTop: 14, background: FAIL_BG, border: `0.5px solid ${FAIL}`, borderRadius: 10, padding: '12px 14px' }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: FAIL, marginBottom: 4 }}>
-                {failed.length > 0 ? 'SOME ANSWERS DID NOT SAVE' : 'STILL SAVING'}
+                {failed.length > 0 || closingState === 'error' ? 'SOMETHING DID NOT SAVE' : 'NOT SAVED YET'}
               </div>
               <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.7 }}>
-                {failed.length > 0
-                  ? `${failed.length} ${failed.length === 1 ? 'answer' : 'answers'} did not reach the survey: ${failed.map(q => q.short_name).join(' · ')}. Submitting now would leave ${failed.length === 1 ? 'it' : 'them'} out. Use “Try again” on ${failed.length === 1 ? 'that question' : 'those questions'} first.`
-                  : 'One or more answers are still being saved. This will clear in a moment.'}
+                {failed.length > 0 && (
+                  <>{failed.length} {failed.length === 1 ? 'answer or comment' : 'answers or comments'} did not reach the survey: {failed.map(q => q.short_name).join(' · ')}. Use “Try again” on {failed.length === 1 ? 'that question' : 'those questions'} first.{' '}</>
+                )}
+                {/* The closing comment gets its own sentence rather than being folded into a count.
+                    It is the only emerging-topic route the module has, so losing it is not one
+                    missing answer among many. */}
+                {closingUnsaved && (
+                  <>Your answer to the last question has not been saved — click outside the box, or
+                  use “Try again” if it failed. It is the only place to raise something the survey
+                  did not ask about, so submitting without it would lose it entirely.{' '}</>
+                )}
+                {!failed.length && !closingUnsaved && 'Something is still being saved. This will clear in a moment.'}
               </div>
             </div>
           )}
@@ -730,8 +1005,8 @@ export default function StakeholderSurvey() {
 
           <button
             onClick={submit}
-            disabled={submitting || unsaved.length > 0}
-            style={{ marginTop: 16, fontSize: 13.5, fontWeight: 600, padding: '12px 26px', borderRadius: 9, background: '#0d0d0d', color: '#fff', border: 'none', cursor: submitting || unsaved.length > 0 ? 'not-allowed' : 'pointer', opacity: submitting || unsaved.length > 0 ? 0.45 : 1 }}
+            disabled={submitting || blockSubmit}
+            style={{ marginTop: 16, fontSize: 13.5, fontWeight: 600, padding: '12px 26px', borderRadius: 9, background: '#0d0d0d', color: '#fff', border: 'none', cursor: submitting || blockSubmit ? 'not-allowed' : 'pointer', opacity: submitting || blockSubmit ? 0.45 : 1 }}
           >
             {submitting ? 'Submitting…' : `Submit ${savedCount} of ${total} answers — final`}
           </button>
