@@ -724,6 +724,24 @@ export default function StakeholderSurvey() {
           </div>
         </div>
 
+        {/* ⚠️ THE SCOPE LINE. ONCE, above the whole list — never a clause in each context string.
+            Every context string says "the company", meaning the company running this survey, and
+            this line says which parts of it are in scope. Repeating it 31 times would add a
+            sentence to every question that carries no per-question information.
+
+            ⚠️ IT DOES NOT GOVERN THE SIX LABOUR ROWS, AND MUST NOT BE READ AS DOING SO. Those carry
+            question_framing — "in your own workforce" / "in your organisation's workforce"
+            (20260828) — which is scope stated more specifically, for the population the routing
+            picked. This global line is for the other 25 (or all 31, for a respondent whose category
+            routes the labour rows to not_asked and who therefore never sees a framing badge).
+            The badge wins where both apply: it is narrower and it sits adjacent to the question,
+            which is how a reader resolves a general line against a specific one. No deference
+            clause is added here on purpose — a sentence explaining which line governs would draw
+            attention to a conflict a respondent does not otherwise perceive. */}
+        <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: 20, paddingBottom: 14, borderBottom: '0.5px solid #e8e7e4' }}>
+          Answer about the company’s own operations and its suppliers, where relevant to you.
+        </div>
+
         {groups.map((group, gi) => (
           <div key={`${group.label}-${gi}`} id={`survey-group-${gi}`} style={{ marginBottom: 28, scrollMarginTop: 130 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 12, paddingBottom: 8, borderBottom: '0.5px solid #e8e7e4' }}>
