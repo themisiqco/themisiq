@@ -690,6 +690,100 @@ formula — none exists — but to make the choice explicit, apply it uniformly
 across every topic in an assessment, and print it where an auditor reads it.
 That is precisely what a consultant's spreadsheet usually does not do.
 
+### 6.2.5 ⚠️ THE STATISTIC IS THE DISTRIBUTION, NOT THE MEAN
+
+Added v9. This supersedes the band comparison in §6.4 and every reference
+to a survey mean elsewhere in this spec.
+
+**Why not the mean.** The screening scale is **ordinal**, not interval —
+1, 2 and 3 are ordered, but the distance between "sufficient with
+continuous improvement" and "improvements would strengthen" is not
+demonstrably the distance between that and "needs significant strategic
+focus." A mean assumes equal spacing, and that assumption is unjustified
+here. It is the standard critique of treating rating-scale responses as
+interval data.
+
+**And the frameworks make defensibility the criterion, not elegance.** No
+framework and no Big 4 methodology prescribes a scoring rule (§10). What
+every source requires is that the method be stated and justified. On that
+test:
+
+| | |
+|---|---|
+| *"9 of 12 said this needs significant focus"* | one sentence, no method to defend, verifiable against the raw responses |
+| *"mean 2.4, band high"* | requires defending an interval reading of an ordinal scale, in a document written for an auditor |
+
+**What the aggregation produces per sub-topic, per round:**
+
+```
+distribution   n at each of 1, 2, 3          ← PRIMARY. Discards nothing.
+top_box        share choosing 3              ← the headline figure
+median         valid on ordinal data         ← central tendency, not the mean
+agreement      dispersion (see 6.2.6)        ← how concentrated the answers are
++ the five counters from §3.0.1
+```
+
+⚠️ **No mean is computed or stored anywhere.** Not as a convenience field,
+not "for the chart". A mean present in the payload will be used, and the
+first place it is used will be the place that needed a defensible number.
+
+---
+
+### 6.2.6 ⚠️ A SPLIT ROOM IS ITS OWN FINDING — the disagreement register
+
+Added v9, and it is the insight the mean actively destroys.
+
+Seven people answer 3, five answer 1. The mean is 2.2 — middling, and it
+says nothing. But that is a company whose own people **fundamentally
+disagree** about whether a topic needs attention, which is more
+interesting than either band and is arguably the most useful thing a
+screening survey can surface.
+
+Consider what it means in each direction:
+
+**Internal disagreement** — the topic is visible to some parts of the
+organisation and not others, or practice varies by site. Either is worth
+knowing before the topic is called immaterial.
+
+**Disagreement between tracks** — own workforce says one thing,
+value-chain workers say the opposite about the same sub-topic. That is
+the single most decision-relevant output the S1/S2 routing can produce,
+and it exists nowhere else in the market because nobody else records who
+answered.
+
+**Disagreement inside a track** is different again from disagreement
+*across* tracks, and the register reports them separately.
+
+**Measuring it.** On an ordinal three-point scale the appropriate measure
+is a coefficient of agreement rather than a variance — variance again
+assumes equal spacing. Van der Eijk's coefficient of agreement (A) is
+designed for exactly this case: ordered rating scales, measuring whether
+responses concentrate on one category or split across the scale. It runs
++1 (perfect agreement) to −1 (perfectly bimodal), with 0 at a uniform
+spread.
+
+⚠️ Whatever measure is used, it is **disclosed in the assumptions
+register with its definition**, per §10's rule. And a simpler fallback
+that needs no defending at all: report the raw split. *"7 of 12 said
+significant focus, 5 said sufficient"* is a finding a reader can check.
+
+**The register lists a sub-topic where:**
+
+- responses split across non-adjacent categories (1 and 3, few or no 2s)
+- or agreement falls below a disclosed threshold
+- or the top-box share differs by more than a disclosed margin **between
+  tracks**
+
+**and n is at or above the anonymity floor for every cell it names.**
+
+⚠️ **This is a separate register from the divergence one (§6.4).**
+Divergence is stakeholders versus the preparer. Disagreement is
+stakeholders versus each other. A topic can show both, one, or neither,
+and collapsing them would lose the distinction between *"your people
+disagree with you"* and *"your people disagree with each other."*
+
+---
+
 ### 6.3 Roll-up — sub-topic answers to a topic score
 
 ⚠️ New since v5, and it inherits `computeMatrix`'s existing discipline.
@@ -732,25 +826,30 @@ The survey does **not** set the impact axis directly. It produces:
 3. **Divergence flag** — stakeholder priority high, preparer severity low, or
    the reverse.
 
-   ⚠️ **The comparison is defined here because the scales differ.** The
-   screening survey is 1–3 (§5.1); the impact axis is 0–10. They are not
-   convertible, and mapping one onto the other would invent precision. So the
-   flag compares BANDS, not values:
+   ⚠️ **REVISED IN v9 — the comparison uses TOP-BOX, not a mean.** The
+   earlier version banded a survey mean against `topicBand()`. §6.2.5
+   retires the mean entirely, so the comparison is:
 
    ```
-   survey band:    1.0–1.6 low  ·  1.7–2.3 medium  ·  2.4–3.0 high
-   preparer band:  existing topicBand() — low / med / high
-   diverges when the two bands differ by more than one step
+   survey side:    top_box — the share of non-null answers choosing 3
+   preparer side:  the existing impact band from topicBand()
+   diverges when   top_box is high and the preparer band is low,
+                   or top_box is low and the preparer band is high
    ```
 
-   Bands, not values, because the survey mean is an ordinal average of a
-   three-point scale — 2.4 is not "2.4 units of materiality", it is closer to
-   high than to medium. And "more than one step" rather than any difference,
-   because adjacent bands on two different instruments are agreement, not
-   disagreement.
+   Thresholds for "high" and "low" on each side are **disclosed
+   constants**, stated in the assumptions register. They are not derived
+   and not tuned silently — §10's rule applies to them as hard as to
+   anything else.
 
-   A sub-topic with `n_answered` below the anonymity floor (§9) yields no
-   divergence flag at all, and the report says so rather than showing a blank.
+   Top-box rather than a band, because it needs no interval assumption and
+   it states itself: *"9 of 12 respondents said this needs significant
+   focus, and the assessment scored it low."* An auditor can check that
+   against the response rows.
+
+   A sub-topic with `n_answered` below the anonymity floor yields no
+   divergence flag at all, and the report says so rather than showing a
+   blank.
 
 The preparer sets the score. The survey is the evidence they set it against,
 and the report shows both.
@@ -816,9 +915,24 @@ likelihood where applicable, value chain position, time horizon, and the
 preparer's reasoning.
 
 **Divergence register** *(new)*
-Topics where stakeholder priority and preparer determination disagree, with
+Sub-topics where the stakeholder signal and the preparer's determination
+disagree — top-box high against a low determination, or the reverse — with
 the preparer's explanation. Expect this to be the most-read page in the
 document.
+
+**Disagreement register** *(new in v9 — §6.2.6)*
+Sub-topics where the respondents disagree with *each other*: responses
+split across non-adjacent categories, agreement below the disclosed
+threshold, or a top-box share differing materially **between tracks**.
+
+⚠️ Separate from the divergence register and never merged with it. One
+says *your people disagree with you*; the other says *your people disagree
+with each other*. A topic can appear on both.
+
+The between-track case is the one to lead with: own workforce and
+value-chain workers answering the same sub-topic differently is the
+sharpest output the S1/S2 routing produces, and no competing tool can
+produce it, because none records who answered.
 
 **Process description** *(new — satisfies ESRS 2 IRO-1)*
 How topics were identified, which were considered and excluded and why, how
