@@ -124,17 +124,26 @@ const INTRO_VARIANTS: Record<IntroVariant, IntroBlock[]> = {
     { lead: 'Answer from where you sit.', body: 'There is nothing to look up. You are not expected to have a view on every topic — a warehouse manager and someone in finance will see different parts of this company, and that difference is useful information rather than a problem.' },
   ],
   value_chain: [
-    // The first paragraph is why this variant exists: a supplier's employee has no relationship with
-    // the company asking and may not know why they are being asked. It also sets up the workplace
-    // instruction below, which is what makes the S2 framing land.
-    { body: '{Company} is conducting a sustainability materiality assessment across its own business and the companies it buys from. It is a customer of the organisation you work for. The assessment covers working conditions, health and safety, environmental impact and how suppliers are treated — and part of doing it properly means asking the people doing the work rather than assuming.' },
+    // The first paragraph is why this variant exists: a supplier contact has no relationship with the
+    // company asking and may not know why they are being asked.
+    // ⚠️ IT ADDRESSES AN ORGANISATION, NOT A WORKER. The respondent is a named representative
+    // answering institutionally about their own organisation's workforce — see
+    // 20260828_mr_esrs_subtopic_display_s2_framing_fix.sql. The earlier version ended "asking the
+    // people doing the work rather than assuming", which describes an instrument this is not: it
+    // promised a worker survey to someone who is not being asked as a worker.
+    { body: '{Company} is conducting a sustainability materiality assessment across its own business and the companies it buys from. It is a customer of the organisation you work for. The assessment covers working conditions, health and safety, environmental impact and how suppliers are treated — and part of doing it properly means asking its suppliers directly rather than assuming.' },
     // ⚠️ THE CLAIM IN THIS PARAGRAPH IS TRUE OF THE SCHEMA AND MUST STAY THAT WAY. Responses belong
     // to the round; the supplier organisation has no access to them. It is not, and does not claim
     // to be, a promise about what the customer's own staff do with results informally — no software
     // prevents that. If materiality_survey_responses ever gains a policy or a grant that widens who
     // can read an individual answer, this sentence has to change in the same commit.
     { body: 'Your answers go to {company}, not to your employer, and are combined with everyone else’s before anyone sees them. No individual answer is shown on its own.' },
-    { lead: 'Answer about your own workplace.', body: 'Where a question asks about working conditions, health and safety or similar, it means the conditions you and your colleagues work in — not {company}’s own offices.' },
+    // ⚠️ REMOVED 16 Aug 2026: "Answer about your own workplace. Where a question asks about working
+    // conditions, health and safety or similar, it means the conditions you and your colleagues work
+    // in — not {company}'s own offices." It addressed an individual worker describing their own
+    // conditions, which is not who answers S2. The question_framing badge now carries the same
+    // instruction institutionally ("in your organisation's workforce"), on every question rather
+    // than once at the top, so nothing is lost by dropping it.
     { lead: 'There is no right answer, and nothing here is a test of your employer.', body: 'Saying a topic needs attention is what this survey is for.' },
   ],
   external: [

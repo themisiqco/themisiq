@@ -44,19 +44,23 @@ useful information rather than a problem.
 own business and the companies it buys from. It is a customer of the
 organisation you work for. The assessment covers working conditions, health
 and safety, environmental impact and how suppliers are treated — and part of
-doing it properly means asking the people doing the work rather than
-assuming.
+doing it properly means asking its suppliers directly rather than assuming.
 
 Your answers go to {Company}, not to your employer, and are combined with
 everyone else's before anyone sees them. No individual answer is shown on
 its own.
 
-**Answer about your own workplace.** Where a question asks about working
-conditions, health and safety or similar, it means the conditions you and
-your colleagues work in — not {Company}'s own offices.
-
 **There is no right answer, and nothing here is a test of your employer.**
 Saying a topic needs attention is what this survey is for.
+
+> ✎ 16 Aug 2026 — a tip was removed here: *"Answer about your own workplace.
+> Where a question asks about working conditions, health and safety or
+> similar, it means the conditions you and your colleagues work in — not
+> {Company}'s own offices."* It addressed an individual worker describing
+> their own conditions, and S2 respondents are named representatives
+> answering for an organisation. The per-question framing badge now carries
+> the same instruction institutionally — *"in your organisation's
+> workforce"* — on every question rather than once at the top.
 
 ---
 
@@ -124,11 +128,18 @@ it as a company saying nothing carefully. It also softens what is in fact a
 formal assessment with a legal disclosure at the end, which is the opposite
 of what the opening should do.
 
+**⚠️ VARIANT B ADDRESSES AN ORGANISATION, NOT A WORKER.** Decided 16 Aug
+2026: supplier workers are not surveyed directly. S2 evidence comes from a
+named representative of a supplier organisation, answering institutionally
+about their own workforce. Two changes followed — the closing clause of B's
+first paragraph, and the removal of the workplace tip above. Reasoning, and
+the matching correction to the S2 question framing, are in
+`supabase/migrations/20260828_mr_esrs_subtopic_display_s2_framing_fix.sql`.
+
 **Why "{Company} is a customer of the organisation you work for" in B.** A
-supplier's employee has no relationship with {Company} and may not know why
+supplier contact has no relationship with {Company} and may not know why
 they are being asked. Saying it plainly is the difference between a survey
-and a cold email. It also sets up the workplace instruction that follows,
-which is what makes the S2 framing land.
+and a cold email.
 
 **Why B says where the answers go.** Someone asked about health and safety
 by their employer's customer will wonder who reads it. Not saying is worse

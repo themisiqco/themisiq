@@ -46,12 +46,32 @@
 -- ⚠️ THE TWO COLUMNS BEYOND short_name ARE DELIBERATE, AND BOTH WERE ARGUED FOR BEFORE BEING ADDED.
 --
 -- question_framing — §3.0.1 settles S1/S2 as "ask once per respondent, AUTHOR TWICE". A respondent
---   asked about health and safety needs to know whose: their own workplace, or workers in their
---   suppliers' operations. Because the taxonomy already duplicates the six labour sub-topics as
---   S1.1-6 and S2.1-6, each row can carry its own framing and the per-target wording costs nothing
---   structurally. The alternative is a framing string in application code, where it drifts from the
---   row it describes — the failure lib/supply-chain/templates.ts has already paid for once, with
---   68 of 75 labels disagreeing across two copies of the same question set.
+--   asked about health and safety needs to know whose workforce is meant. Because the taxonomy
+--   already duplicates the six labour sub-topics as S1.1-6 and S2.1-6, each row can carry its own
+--   framing and the per-target wording costs nothing structurally. The alternative is a framing
+--   string in application code, where it drifts from the row it describes — the failure
+--   lib/supply-chain/templates.ts has already paid for once, with 68 of 75 labels disagreeing across
+--   two copies of the same question set.
+--
+--   ✎ CORRECTED 16 AUGUST 2026 — THE S2 WORDING WAS WRONG, AND IT WAS WRONG SILENTLY. As first
+--   written, the six S2 rows read 'for workers in your suppliers'' and value-chain operations'. Read
+--   by the respondent S2 evidence actually comes from — A NAMED REPRESENTATIVE OF A SUPPLIER
+--   ORGANISATION, answering institutionally about their own workforce — that points ONE TIER FURTHER
+--   DOWN, at THEIR suppliers. They would have answered it in good faith about the wrong population,
+--   with no error and no flag, and the answer would have landed in S2 as though it described their
+--   own workforce.
+--   They now read 'in your organisation''s workforce'; S1 is unchanged at 'in your own workforce'.
+--   ⚠️ THE TWO SIDES DIFFER ON PURPOSE AND MUST NOT BE CONVERGED. short_name is identical across each
+--   pair (deliberately, see the seed note below) and mr_esrs_topic_labels.label is byte-identical for
+--   S1 and S2 (deliberately — 20260822 sends it to a respondent's browser precisely because it
+--   discloses nothing about their routing). So question_framing is THE ONLY HUMAN-READABLE FIELD that
+--   tells the twelve rows apart, and a preparer surface rendering short_name and framing alone would
+--   otherwise show six duplicated pairs. Full reasoning, the guarded corrective UPDATE, the
+--   consequences for already-generated question sets, and a known limitation for the two
+--   value-chain-WORKER categories are in 20260828_mr_esrs_subtopic_display_s2_framing_fix.sql, which
+--   remains the audit record of the defect. This file is now correct on its own, so running it first
+--   and 20260828 afterwards leaves the latter a passing no-op — the arrangement that stops a replay
+--   of this seed silently reverting the fix.
 --
 -- shared_with_subtopic_code — the S1.x <-> S2.x pairing, STATED AS DATA. Appendix A gives S1 and S2
 --   one shared sub-topic set, but §11.2's recommended duplication means this database holds TWELVE
@@ -193,9 +213,9 @@ create table if not exists public.mr_esrs_subtopic_display (
   short_name                text        not null
     check (length(btrim(short_name)) between 1 and 60),
 
-  -- Whose instance of this sub-topic the question is about. NULL on the 25 rows that need no
-  -- framing; set on the twelve S1/S2 rows, where it is the only thing distinguishing two
-  -- byte-identical short names.
+  -- Whose workforce the question is about, written from the RESPONDENT'S OWN POSITION. NULL on the
+  -- 25 rows that need no framing; set on the twelve S1/S2 rows, where it is the ONLY human-readable
+  -- field distinguishing two byte-identical short names. See the ✎ note above before changing it.
   question_framing          text,
 
   -- The S1.x <-> S2.x pairing, symmetric. NULL on the other 25.
@@ -232,7 +252,7 @@ comment on column public.mr_esrs_subtopic_display.short_name is
   'ThemisIQ-authored display name, <= 60 characters. The length CHECK is the point of the table, not house style: without it the first person to paste the annex text back in undoes the reason for the file with no error.';
 
 comment on column public.mr_esrs_subtopic_display.question_framing is
-  'Whose instance of this sub-topic the question asks about. NULL on the 25 rows needing no framing; set on the twelve S1/S2 rows, where two byte-identical short names are otherwise indistinguishable. Spec v8 §3.0.1: ask once per respondent, AUTHOR TWICE.';
+  'Whose workforce the question asks about, written from the RESPONDENT''S OWN POSITION. NULL on the 25 rows needing no framing; set on the twelve S1/S2 rows, where the two sides read DIFFERENTLY on purpose: S1 ''in your own workforce'' (an employee IS their own workforce), S2 ''in your organisation''''s workforce'' (a named representative of a supplier organisation ANSWERS FOR theirs). Corrected 16 Aug 2026 — the S2 rows previously read ''for workers in your suppliers'''' and value-chain operations'', which put to a supplier asks about THEIR suppliers, one tier too far down, and the answer would have landed in S2 as though it described the supplier''s own workforce, with no error and no flag. ⚠️ DO NOT CONVERGE THE TWO WORDINGS. short_name is identical across each pair by design and topic_label is byte-identical for S1 and S2 by design (20260822 depends on that identity), so question_framing is the ONLY human-readable field that tells the twelve rows apart; a preparer surface rendering short_name and framing alone would show six duplicated pairs. subtopic_code and topic_code do reach survey_aggregate''s payload, so a consumer can always disambiguate programmatically — it is survey_get, the respondent''s payload, that withholds subtopic_code. A distinct human label also exists in mr_esrs_topics.label (''Own workforce'' / ''Workers in the value chain''). See 20260828_mr_esrs_subtopic_display_s2_framing_fix.sql.';
 
 comment on column public.mr_esrs_subtopic_display.shared_with_subtopic_code is
   'The S1.x<->S2.x pairing, stated as DATA. Appendix A shares one sub-topic set between S1 and S2, but this database holds twelve independent rows (spec §11.2) with no relation between them, so the pairing must be authored. It must NEVER be derived at runtime by string manipulation — 20260815_mr_esrs_subtopics.sql''s verify block does exactly that, which is correct for a one-off check and a defect as a routing rule.';
@@ -367,6 +387,11 @@ end $$;
 -- THE TWELVE S1/S2 ROWS CARRY IDENTICAL short_name VALUES ON PURPOSE. They are the same sub-topic
 -- asked of two populations; question_framing is what distinguishes them, and shared_with_subtopic_code
 -- is what pairs them. Do not "fix" the duplication.
+-- ✎ AND SINCE 16 AUGUST 2026 THE S2 FRAMING IS INSTITUTIONAL — 'in your organisation''s workforce'
+-- against S1's 'in your own workforce' — because S2 evidence comes from a named representative of a
+-- supplier organisation, not from a worker. The two wordings must not be converged: with short_name
+-- identical and topic_label byte-identical, framing is the only human-readable field left that tells
+-- the pair apart. See the ✎ note in the header.
 --
 -- ON CONFLICT DO UPDATE, so this file stays the record and a replay reconciles the table back to
 -- it. The corollary, stated plainly: a row hand-edited in the SQL editor is silently reverted by
@@ -399,12 +424,18 @@ insert into public.mr_esrs_subtopic_display
   ('S1.6', 'esrs_2026', 'Other labour rights',                       'in your own workforce', 'S2.6'),
 
   -- S2 — workers in the value chain. Pairing is symmetric with S1 above.
-  ('S2.1', 'esrs_2026', 'Working conditions and social protection', 'for workers in your suppliers'' and value-chain operations', 'S1.1'),
-  ('S2.2', 'esrs_2026', 'Social dialogue and collective bargaining', 'for workers in your suppliers'' and value-chain operations', 'S1.2'),
-  ('S2.3', 'esrs_2026', 'Health and safety',                         'for workers in your suppliers'' and value-chain operations', 'S1.3'),
-  ('S2.4', 'esrs_2026', 'Training and skills development',           'for workers in your suppliers'' and value-chain operations', 'S1.4'),
-  ('S2.5', 'esrs_2026', 'Diversity and equal treatment',             'for workers in your suppliers'' and value-chain operations', 'S1.5'),
-  ('S2.6', 'esrs_2026', 'Other labour rights',                       'for workers in your suppliers'' and value-chain operations', 'S1.6'),
+  -- ✎ CORRECTED 16 AUGUST 2026 — see the ✎ note in this file's header and
+  -- 20260828_mr_esrs_subtopic_display_s2_framing_fix.sql. An S2 respondent is a NAMED REPRESENTATIVE
+  -- OF A SUPPLIER ORGANISATION answering about their own workforce, so the framing is institutional
+  -- rather than personal. ⚠️ DO NOT CONVERGE THIS WITH S1's WORDING: short_name is identical across
+  -- each pair and topic_label is byte-identical for S1 and S2, so this is the only human-readable
+  -- field that tells the twelve rows apart.
+  ('S2.1', 'esrs_2026', 'Working conditions and social protection', 'in your organisation''s workforce', 'S1.1'),
+  ('S2.2', 'esrs_2026', 'Social dialogue and collective bargaining', 'in your organisation''s workforce', 'S1.2'),
+  ('S2.3', 'esrs_2026', 'Health and safety',                         'in your organisation''s workforce', 'S1.3'),
+  ('S2.4', 'esrs_2026', 'Training and skills development',           'in your organisation''s workforce', 'S1.4'),
+  ('S2.5', 'esrs_2026', 'Diversity and equal treatment',             'in your organisation''s workforce', 'S1.5'),
+  ('S2.6', 'esrs_2026', 'Other labour rights',                       'in your organisation''s workforce', 'S1.6'),
 
   ('S3.1', 'esrs_2026', 'Communities'' economic, social and cultural rights', null, null),
   ('S3.2', 'esrs_2026', 'Communities'' civil and political rights',          null, null),
