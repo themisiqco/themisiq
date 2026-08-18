@@ -28,8 +28,16 @@ something rather than a blank box.
 
 **E1.1 Climate change mitigation**
 Whether the company is reducing the greenhouse gases its operations
-release, and how quickly. This covers energy use, transport, refrigerants
-and emissions from suppliers.
+release. This covers energy use, transport, refrigerants and emissions
+from suppliers.
+
+> ✎ 18 Aug 2026 — "and how quickly" removed. The four-point priority scale
+> has no way to express a rate, so a respondent who cannot judge pace
+> answers "not enough visibility to assess" on a topic they could have
+> answered about state. §6.1 then reads that abstention as the company
+> having no visibility of its own impact. Ask about state, not pace —
+> the same rule as the no-management-practice note below, reached by a
+> different route.
 
 **E1.2 Climate change adaptation**
 Whether the company is prepared for the physical effects of a changing

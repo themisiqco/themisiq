@@ -191,7 +191,12 @@ comment on column public.mr_esrs_subtopic_display.context is
 update public.mr_esrs_subtopic_display d
    set context = v.context
   from (values
-    ('E1.1', 'Whether the company is reducing the greenhouse gases its operations release, and how quickly. This covers energy use, transport, refrigerants and emissions from suppliers.'),
+    -- ✎ CORRECTED 18 AUGUST 2026 — "and how quickly" removed. The four-point priority scale cannot
+    -- express a rate, so asking about one invites an abstention from a respondent who could have
+    -- answered about state — and §6.1 reads that abstention as the company having no visibility of
+    -- its own impact. Audit record, reasoning and the guarded UPDATE:
+    -- 20260833_e1_1_context_drop_how_quickly.sql. Do not restore the phrase.
+    ('E1.1', 'Whether the company is reducing the greenhouse gases its operations release. This covers energy use, transport, refrigerants and emissions from suppliers.'),
     ('E1.2', 'Whether the company is prepared for the physical effects of a changing climate — flooding, heat, drought, storms — at its sites and across the places it depends on.'),
     ('E1.3', 'How much energy the company uses, where it comes from, and whether it is shifting toward lower-carbon sources.'),
 
