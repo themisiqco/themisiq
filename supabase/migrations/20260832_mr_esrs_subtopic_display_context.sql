@@ -7,7 +7,9 @@
 -- topic_label, 20260823's intro_variant and 20260830's closing_comment. Running any of those after
 -- this one silently reverts this change. Verify step 1 checks all four at once.
 --
--- ⚠️ ONE STRING IS NOT FROM THE DOC — S2.6. See the seed. Read that note before running.
+-- ✎ S2.6 was authored here against the annex footnote rather than transcribed, because the doc
+-- specified it in prose without supplying the text. Its final wording was signed off 18 Aug 2026
+-- and is now in both this seed and the doc — see 20260834_s2_6_context_final_wording.sql.
 --
 --
 -- =====================================================================
@@ -237,7 +239,13 @@ update public.mr_esrs_subtopic_display d
     -- string with the annex's own addition appended, mirroring how the labels differ and nothing
     -- more. IT NEEDS LISA'S WORD BEFORE IT IS TREATED AS FINAL, and when she gives it, the doc and
     -- this line change together.
-    ('S2.6', 'Whether basic rights are respected across the workforce: no child or forced labour, privacy respected, and decent living conditions where the company provides them, including access to water and sanitation.'),
+    -- ✎ FINAL WORDING 18 AUGUST 2026. The em-dashes are load-bearing: set between them, "where the
+    -- company provides them" governs housing, water AND sanitation together, which is the reading
+    -- the annex intends. Appended at the end it governed only the housing clause, leaving water and
+    -- sanitation asked unconditionally of respondents who provide none of the three. Audit record:
+    -- 20260834_s2_6_context_final_wording.sql. ⚠️ S1.6 must NOT gain this — the annex's footnote
+    -- confines water and sanitation to S2, and the pair differ on exactly this and nothing else.
+    ('S2.6', 'Whether basic rights are respected across the workforce: no child or forced labour, privacy respected, and decent living conditions — including water and sanitation — where the company provides them.'),
 
     ('S3.1', 'Whether the company''s operations affect the people who live nearby — their land, their housing, their access to water, their way of life.'),
     ('S3.2', 'Whether people can speak up about the company''s activities without fear, including anyone campaigning against them.'),

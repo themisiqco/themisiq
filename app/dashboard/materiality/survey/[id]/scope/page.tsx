@@ -352,6 +352,18 @@ export default function SurveyScope() {
             <strong style={{ color: '#fff' }}>{counts.internal}</strong> questions (own workforce) ·{' '}
             <strong style={{ color: '#fff' }}>{counts.valueChain}</strong> (value chain) ·{' '}
             <strong style={{ color: '#fff' }}>{counts.other}</strong> (everyone else)
+            {/* ⚠️ THE GAP NEEDS ATTRIBUTING OR IT READS AS AN ERROR. Three different totals on one
+                screen look like a miscount unless the difference is named — and the difference is the
+                whole point of the §3.0.1 routing, not a defect in it. Computed from the counts rather
+                than written as "6", because excluding a labour sub-topic moves it, and the two sides
+                can move independently. */}
+            {(counts.s1 > 0 || counts.s2 > 0) && (
+              <div style={{ marginTop: 4 }}>
+                {counts.s1 === counts.s2
+                  ? `The ${counts.s1}-question difference is the workforce topics — only people who can see a workforce are asked about one.`
+                  : `The difference is the workforce topics: ${counts.s1} asked of your own workforce, ${counts.s2} of value-chain contacts, and neither asked of anyone else.`}
+              </div>
+            )}
           </div>
         </div>
 

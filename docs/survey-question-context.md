@@ -148,13 +148,27 @@ Whether people are treated fairly regardless of who they are — in pay,
 promotion, hiring — and whether harassment and discrimination are dealt
 with.
 
-**S1.6 / S2.6 Other labour rights**
+**S1.6 Other labour rights**
 Whether basic rights are respected across the workforce: no child or
 forced labour, privacy respected, and decent living conditions where the
 company provides them.
 
-> ⚠️ S2.6 additionally covers **water and sanitation**, per the annex's own
-> footnote. Its context string should say so; S1.6's should not.
+**S2.6 Other labour rights**
+Whether basic rights are respected across the workforce: no child or
+forced labour, privacy respected, and decent living conditions —
+including water and sanitation — where the company provides them.
+
+> ⚠️ **The one pair that differs, and only on this.** The annex's own
+> footnote confines water and sanitation to S2, which the verbatim labels
+> already reflect. S1.6 must never gain it.
+>
+> ✎ 18 Aug 2026 — S2.6 was previously specified here in prose ("its
+> context string should say so") without the text, so the string was
+> authored in the migration and flagged as unsigned-off. Final wording
+> above. The em-dashes are deliberate: between them, "where the company
+> provides them" governs housing, water and sanitation together. Appended
+> at the end it governed only housing, leaving water and sanitation asked
+> unconditionally of a respondent who provides none of the three.
 
 ---
 

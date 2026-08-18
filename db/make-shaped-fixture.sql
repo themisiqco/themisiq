@@ -28,7 +28,41 @@
 \set ON_ERROR_STOP on
 \timing off
 
-select id as u_id from auth.users order by created_at limit 1 \gset
+-- ⚠️ WHICH ACCOUNT THIS FIXTURE BELONGS TO.
+--
+-- This used to read `order by created_at limit 1`, which resolves to whichever account was created
+-- first — not to whoever is running the fixture. Every round it made was therefore owned by someone
+-- else, and RLS made them invisible in the browser: the scope screen correctly refused a round it
+-- could not see, and the fixture looked like it had worked.
+--
+-- Named explicitly, overridable without editing this file:
+--     psql "$DBURL" -v app_user=someone@example.com -f <this file>
+\if :{?app_user}
+\else
+  \set app_user 'lisa.foster@themisiq.co'
+\endif
+
+-- ⚠️ FAIL HERE, NOT TWO STATEMENTS LATER. A missing account used to surface as a NOT NULL violation
+-- on materiality_survey_rounds.user_id — an error naming the wrong problem, in a file that had
+-- already started inserting. The sub-selects guarantee exactly one row, so \gset always sets both
+-- variables and the check below is reached with a message that names the address it looked for.
+select
+  (select id from auth.users where email = :'app_user')            as u_id,
+  ((select id from auth.users where email = :'app_user') is null)  as u_missing
+\gset
+
+\if :u_missing
+\echo ''
+\echo '  FIXTURE ABORTED — no auth.users row for :app_user'
+\echo ''
+\echo '  Nothing was inserted. Re-run naming the account you are signed in as:'
+\echo '    psql "$DBURL" -v app_user=you@example.com -f <this file>'
+\echo ''
+\quit
+\endif
+
+\echo 'Fixture owner: :app_user'
+
 
 insert into public.materiality_survey_rounds
   (user_id, name, company_name, standard_version, deadline, status)
