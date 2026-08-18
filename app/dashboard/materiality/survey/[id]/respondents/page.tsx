@@ -267,8 +267,10 @@ export default function SurveyRespondents() {
         </div>
 
         <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.7rem', color: '#0d0d0d' }}>Who is being asked</div>
+        {/* Company first, round name labelled — see the note on the import screen. */}
         <div style={{ fontSize: 13.5, color: '#555553', lineHeight: 1.7, marginTop: 6, maxWidth: 640 }}>
-          {round?.name}{round?.company_name ? ` · ${round.company_name}` : ''}
+          {round?.company_name || 'This survey'}
+          {round?.name ? <span style={{ color: '#888784' }}> · round: {round.name}</span> : null}
         </div>
 
         {/* ⚠️ THE OPERATIVE RULE, beside the selector rather than in a help page. The consequence —
@@ -296,7 +298,14 @@ export default function SurveyRespondents() {
 
         {/* Add */}
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '1.5rem 1.75rem', marginBottom: 20 }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 16 }}>Add a respondent</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d' }}>Add a respondent</div>
+            {/* The one-at-a-time form below is unchanged; this only points at the bulk paths. */}
+            <Link href={`/dashboard/materiality/survey/${roundId}/respondents/import`}
+              style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none' }}>
+              Import a list instead →
+            </Link>
+          </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 14 }}>
             <div>

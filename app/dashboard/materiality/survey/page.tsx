@@ -323,7 +323,7 @@ export default function SurveyRounds() {
               const s = STATUS[r.status] ?? STATUS.draft
               const sc = scope[r.id]
               return (
-                <Link key={r.id} href={`/dashboard/materiality/survey/${r.id}/scope`} style={{ textDecoration: 'none' }}>
+                <Link key={r.id} href={`/dashboard/materiality/survey/${r.id}`} style={{ textDecoration: 'none' }}>
                   <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
