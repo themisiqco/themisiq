@@ -65,6 +65,14 @@ export default function SurveyProgress() {
   const [sendResult, setSendResult] = useState<Record<string, { ok: boolean; msg: string }>>({})
   const [bulk, setBulk] = useState<{ running: boolean; done: number; total: number; failed: string[] } | null>(null)
 
+  const [confirmClose, setConfirmClose] = useState(false)
+  const [closing, setClosing] = useState(false)
+  const [closeError, setCloseError] = useState<string | null>(null)
+
+  const [confirmReopen, setConfirmReopen] = useState(false)
+  const [reopening, setReopening] = useState(false)
+  const [reopenError, setReopenError] = useState<string | null>(null)
+
   useEffect(() => { load() }, [roundId])
 
   const load = async () => {
@@ -168,6 +176,56 @@ export default function SurveyProgress() {
     setBulk({ running: false, done: targets.length, total: targets.length, failed })
     load()
   }
+
+  /**
+   * Closing writes status = 'closed', and since 20260836 that is no longer cosmetic: resolve_token
+   * refuses a closed round, so every respondent link stops working and the figures stop moving. That
+   * is what 20260827 requires before an assessment may consume the round.
+   */
+  const closeRound = async () => {
+    setClosing(true); setCloseError(null)
+    const { data, error } = await supabase
+      .from('materiality_survey_rounds')
+      .update({ status: 'closed' })
+      .eq('id', roundId)
+      .select('id, status')
+    setClosing(false)
+    if (error) { setCloseError(error.message); return }
+    if (!data || data.length === 0) {
+      // RLS non-match returns neither an error nor a row.
+      setCloseError('Nothing was updated. The round may belong to another account, or it may have been changed elsewhere. Reload before trying again.')
+      return
+    }
+    setConfirmClose(false)
+    load()
+  }
+
+  /**
+   * ⚠️ NO LINKED-ROUND CHECK HERE, DELIBERATELY. materiality_survey_round_guard already refuses to
+   * let a round leave 'closed' once an assessment has consumed it (20260827), and its message names
+   * both the reason and the remedy — unlink first. Re-implementing that test in the client would be
+   * a second copy of the rule, free to drift from the one that actually enforces it, and it would
+   * have to invent its own wording for a refusal the database already words well. So the attempt is
+   * made and the guard's refusal is surfaced verbatim.
+   */
+  const reopenRound = async () => {
+    setReopening(true); setReopenError(null)
+    const { data, error } = await supabase
+      .from('materiality_survey_rounds')
+      .update({ status: 'open' })
+      .eq('id', roundId)
+      .select('id, status')
+    setReopening(false)
+    if (error) { setReopenError(error.message); return }
+    if (!data || data.length === 0) {
+      setReopenError('Nothing was updated. The round may belong to another account, or it may have been changed elsewhere. Reload before trying again.')
+      return
+    }
+    setConfirmReopen(false)
+    load()
+  }
+
+  const openedNotSubmitted = active.filter(p => p.status === 'in_progress').length
 
   const fmt = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'
 
@@ -333,19 +391,138 @@ export default function SurveyProgress() {
           })}
         </div>
 
-        {/* ⚠️ CLOSING THE ROUND IS NOT BUILT, AND THIS IS WHERE THE BUTTON GOES.
-            What it needs, none of which exists yet:
-              * an UPDATE setting status='closed' — nothing moves a round off 'draft' today;
-              * a warning that it is close to one-way: 20260827 refuses to let a round leave 'closed'
-                once an assessment has consumed it, and unlinking is the only way back;
-              * a check that responses are worth closing on — closing a round nobody submitted to
-                produces an aggregate whose every breakdown is suppressed;
-              * and the results screen, since "is this ready to close?" is really "have I got enough
-                to read?", which this screen can only half answer. */}
-        <div style={{ marginTop: 26, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem 1.25rem', fontSize: 12.5, color: '#888784', lineHeight: 1.75 }}>
-          {counts.submitted > 0
-            ? <>{counts.submitted} of {counts.invited} have submitted. Reading the results, and closing the round so an assessment can use it, come next.</>
-            : <>Nobody has submitted yet. Reading the results, and closing the round so an assessment can use it, come next.</>}
+        {/* ⚠️ THE WARNING CARRIES FACTS, NOT "ARE YOU SURE". Every clause below is checked against
+            what closing actually does since 20260836 — before that migration two of them would have
+            been false, and a warning that overstates is how a buyer stops reading warnings. */}
+        <div style={{ marginTop: 26, background: '#fff', border: `0.5px solid ${confirmClose ? AMBER : '#e8e7e4'}`, borderRadius: 14, padding: '1.2rem 1.4rem' }}>
+          {round?.status === 'closed' ? (
+            !confirmReopen ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: 12.5, color: '#555553', lineHeight: 1.75, flex: 1, minWidth: 260 }}>
+                  <strong style={{ color: '#0d0d0d' }}>This round is closed.</strong> Its links no
+                  longer work and its figures are fixed, so an assessment can use it as evidence.
+                  {' '}Reopening is possible until an assessment does, and not afterwards.
+                </div>
+                <button onClick={() => { setConfirmReopen(true); setReopenError(null) }}
+                  style={{ flexShrink: 0, fontSize: 13, fontWeight: 600, padding: '9px 18px', borderRadius: 8, border: '1px solid #e8e7e4', background: '#fff', color: '#0d0d0d', cursor: 'pointer' }}>
+                  Reopen this round
+                </button>
+              </div>
+            ) : (
+              <div>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 10 }}>
+                  Reopen this round?
+                </div>
+                <div style={{ fontSize: 12.5, color: '#555553', lineHeight: 1.8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div>
+                    <strong style={{ color: '#0d0d0d' }}>Everyone's link works again.</strong> Anyone
+                    who had started picks up exactly where they left off — nothing they answered was
+                    lost when it closed.
+                  </div>
+                  <div>
+                    <strong style={{ color: '#0d0d0d' }}>The results start moving again.</strong> Every
+                    figure can change as new answers arrive.
+                  </div>
+                  <div>
+                    <strong style={{ color: '#0d0d0d' }}>No assessment can use it until you close it
+                    again.</strong> An assessment may only consume a round whose figures are fixed, so
+                    reopening withdraws it from that until it is closed once more.
+                  </div>
+                </div>
+
+                {reopenError && (
+                  <div style={{ background: FAIL_BG, border: `0.5px solid ${FAIL}`, borderRadius: 10, padding: '10px 12px', marginTop: 12, fontSize: 12, color: '#555553', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                    <strong style={{ color: FAIL, display: 'block', marginBottom: 2 }}>NOT REOPENED</strong>{reopenError}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+                  <button onClick={() => { setConfirmReopen(false); setReopenError(null) }} disabled={reopening}
+                    style={{ fontSize: 13, padding: '9px 18px', borderRadius: 8, border: '1px solid #e8e7e4', background: '#fff', color: '#555553', cursor: 'pointer' }}>
+                    Leave it closed
+                  </button>
+                  <button onClick={reopenRound} disabled={reopening}
+                    style={{ fontSize: 13, fontWeight: 600, padding: '9px 20px', borderRadius: 8, border: 'none', background: '#0d0d0d', color: '#fff', cursor: reopening ? 'not-allowed' : 'pointer', opacity: reopening ? 0.6 : 1 }}>
+                    {reopening ? 'Reopening…' : 'Reopen the round'}
+                  </button>
+                </div>
+              </div>
+            )
+          ) : !confirmClose ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 12.5, color: '#555553', lineHeight: 1.75, flex: 1, minWidth: 260 }}>
+                <strong style={{ color: '#0d0d0d' }}>Finished collecting?</strong> Closing the round
+                fixes its results so a materiality assessment can use them.
+                {counts.submitted > 0
+                  ? ` ${counts.submitted} of ${counts.invited} have submitted so far.`
+                  : ' Nobody has submitted yet.'}
+              </div>
+              <button onClick={() => { setConfirmClose(true); setCloseError(null) }}
+                style={{ flexShrink: 0, fontSize: 13, fontWeight: 600, padding: '9px 18px', borderRadius: 8, border: '1px solid #e8e7e4', background: '#fff', color: '#0d0d0d', cursor: 'pointer' }}>
+                Close this round
+              </button>
+            </div>
+          ) : (
+            <div>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 10 }}>
+                Close this round?
+              </div>
+              <div style={{ fontSize: 12.5, color: '#555553', lineHeight: 1.8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {counts.neverOpened > 0 && (
+                  <div>
+                    <strong style={{ color: '#0d0d0d' }}>{counts.neverOpened} {counts.neverOpened === 1 ? 'person has' : 'people have'} never opened the survey.</strong>{' '}
+                    Their links will stop working and they will not be able to take part.
+                  </div>
+                )}
+                {openedNotSubmitted > 0 && (
+                  <div>
+                    <strong style={{ color: '#0d0d0d' }}>{openedNotSubmitted} {openedNotSubmitted === 1 ? 'person has' : 'people have'} started but not submitted.</strong>{' '}
+                    {/* Counter-intuitive and worth stating: responses exist independently of
+                        submission, and the counters read in_progress rows. */}
+                    Whatever they have answered so far <em>is</em> already counted in the results —
+                    submitting is not what makes an answer count. They will not be able to add to it.
+                  </div>
+                )}
+                <div>
+                  <strong style={{ color: '#0d0d0d' }}>Every link stops working.</strong> Anyone who
+                  opens theirs afterwards is told the survey has closed, and anyone who had answered
+                  is told their answers were counted.
+                </div>
+                <div>
+                  <strong style={{ color: '#0d0d0d' }}>The results stop moving.</strong> That is the
+                  point of closing: a materiality assessment may only use a round whose figures are
+                  fixed, so this is what lets one consume it.
+                </div>
+                <div>
+                  {/* ⚠️ STATED AS IT IS, not as "permanent". The guard refuses to reopen a LINKED
+                      round only (20260827); unlinked, the transition is allowed. */}
+                  {/* ✎ The "there is no reopen button yet, so undoing it means asking" clause was
+                      removed when the button was built. A warning that describes a missing control
+                      after the control exists is the same defect one step removed. */}
+                  <strong style={{ color: '#0d0d0d' }}>This can be undone until an assessment uses
+                  the round — and not afterwards.</strong> You can reopen it from this page while
+                  that is still true. If people are still answering, waiting costs nothing.
+                </div>
+              </div>
+
+              {closeError && (
+                <div style={{ background: FAIL_BG, border: `0.5px solid ${FAIL}`, borderRadius: 10, padding: '10px 12px', marginTop: 12, fontSize: 12, color: '#555553', lineHeight: 1.7 }}>
+                  <strong style={{ color: FAIL, display: 'block', marginBottom: 2 }}>NOT CLOSED</strong>{closeError}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+                <button onClick={() => { setConfirmClose(false); setCloseError(null) }} disabled={closing}
+                  style={{ fontSize: 13, padding: '9px 18px', borderRadius: 8, border: '1px solid #e8e7e4', background: '#fff', color: '#555553', cursor: 'pointer' }}>
+                  Keep it open
+                </button>
+                <button onClick={closeRound} disabled={closing}
+                  style={{ fontSize: 13, fontWeight: 600, padding: '9px 20px', borderRadius: 8, border: 'none', background: '#0d0d0d', color: '#fff', cursor: closing ? 'not-allowed' : 'pointer', opacity: closing ? 0.6 : 1 }}>
+                  {closing ? 'Closing…' : 'Close the round'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

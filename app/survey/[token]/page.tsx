@@ -233,6 +233,15 @@ export default function StakeholderSurvey() {
   // Two distinct failure kinds, never merged — see loadSurvey.
   const [deadLink, setDeadLink] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  /**
+   * ⚠️ A CLOSED ROUND IS NOT AN ERROR, AND MUST NOT BORROW THE ERROR FRAME.
+   * survey_get raises PT410 when the round's status is 'closed' (20260836) — the link was valid, the
+   * survey ended on schedule, and for a half-finished respondent their answers are already in the
+   * results. Rendered through `loadError` it read "This survey could not be opened… this is what the
+   * server reported… please send this message to the company — it tells them exactly what went
+   * wrong." Nothing went wrong, and that footer invited a support message about a non-problem.
+   */
+  const [closedMessage, setClosedMessage] = useState<string | null>(null)
 
   const [round, setRound] = useState<{ name: string; company_name: string | null; deadline: string | null } | null>(null)
   const [displayName, setDisplayName] = useState<string | null>(null)
@@ -275,6 +284,7 @@ export default function StakeholderSurvey() {
     setLoading(true)
     setDeadLink(false)
     setLoadError(null)
+    setClosedMessage(null)
 
     const { data, error } = await supabase.rpc('survey_get', { p_token: token })
 
@@ -293,7 +303,10 @@ export default function StakeholderSurvey() {
        * instances). So P0002 gets the human dead-link screen, and anything else surfaces the actual
        * message it was given.
        */
-      if (error.code === 'P0002' || error.message === 'invalid token') setDeadLink(true)
+      // PT410 — the round closed. Its own screen: the server's sentence is the whole message, and
+      // it already differs by whether this person has answers, so nothing is added around it.
+      if (error.code === 'PT410') setClosedMessage(error.message || 'This survey has closed.')
+      else if (error.code === 'P0002' || error.message === 'invalid token') setDeadLink(true)
       else setLoadError(error.message || 'The survey did not load, and returned no reason.')
       setLoading(false)
       return
@@ -578,6 +591,21 @@ export default function StakeholderSurvey() {
    * be inventing a diagnosis out of an ambiguity — the same move as the portal's "your browser
    * blocked the pop-up", which named a cause that had never once occurred.
    */
+  /**
+   * ⚠️ THE FRAME CARRIES NOTHING THAT CONTRADICTS THE SENTENCE. No "could not be opened", no "what
+   * went wrong", no instruction to contact anyone. A muted marker, the server's own words, and the
+   * footer — because the message is already complete and already true for this particular reader.
+   */
+  if (closedMessage) return shell(
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#f8f7f5', color: '#888784', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', fontSize: 24 }}>✓</div>
+      <div style={{ fontSize: 15, color: '#0d0d0d', lineHeight: 1.75 }}>{closedMessage}</div>
+      <div style={{ marginTop: 24, paddingTop: 16, borderTop: '0.5px solid #e8e7e4', fontSize: 12, color: '#888784' }}>
+        Powered by <a href="https://www.themisiq.co" style={{ color: '#7425e3', textDecoration: 'none' }}>ThemisIQ</a>
+      </div>
+    </div>
+  )
+
   if (deadLink) return shell(
     <div style={{ textAlign: 'center' }}>
       <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 10 }}>This survey link is no longer active</div>
