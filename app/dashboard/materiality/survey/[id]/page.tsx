@@ -18,7 +18,8 @@
  * design — so the counts come from survey_respondent_progress (20260835), which returns counts and
  * never content.
  *
- * NOT HERE: the results screen, and closing the round. See the note at the foot of the file.
+ * NOT HERE: what the respondents SAID. That is the results screen, /results — its own route,
+ * because this screen answers "who do I chase" and that one answers "what did they say".
  */
 
 import { useState, useEffect, useMemo } from 'react'
@@ -269,6 +270,7 @@ export default function SurveyProgress() {
           <Link href="/dashboard/materiality/survey" style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none' }}>← All survey rounds</Link>
           <Link href={`/dashboard/materiality/survey/${roundId}/scope`} style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none' }}>Topics in scope</Link>
           <Link href={`/dashboard/materiality/survey/${roundId}/respondents`} style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none' }}>Respondents</Link>
+          <Link href={`/dashboard/materiality/survey/${roundId}/results`} style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none' }}>Results</Link>
         </div>
 
         <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.7rem', color: '#0d0d0d' }}>{round?.name}</div>
