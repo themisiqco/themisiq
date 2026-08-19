@@ -32,6 +32,10 @@ import PaywallCard from '../../../../components/PaywallCard'
 import { supabase } from '../../../../../lib/supabase'
 import { useEntitlement } from '../../../../../lib/useEntitlement'
 import { resolveTopicLabels, isStandardVersion, type EsrsTopic } from '../../../../../lib/materiality'
+// ⚠️ This screen reads names for sub-topics that are not yet assigned — which by definition have no
+// snapshot — and it also WRITES the snapshot when one is assigned. Both go through the same chain,
+// so what gets frozen onto an assignment is exactly what the lead saw when they assigned it.
+import { resolveSubtopicName, subtopicHeading } from '../../../../../lib/materiality/subtopicName'
 
 const PURPLE = '#7425e3'
 const GREEN = '#0F6E56'
@@ -97,6 +101,9 @@ export default function WorksheetAssign() {
   const [scopeSource, setScopeSource] = useState<'round' | 'reference' | 'none'>('none')
   const [scope, setScope] = useState<ScopeRow[]>([])
   const [dbTopics, setDbTopics] = useState<EsrsTopic[]>([])
+  const [roundNames, setRoundNames] = useState<Record<string, string>>({})
+  const [displayNames, setDisplayNames] = useState<Record<string, string>>({})
+  const [refNames, setRefNames] = useState<Record<string, string>>({})
   const [topicLabelRows, setTopicLabelRows] = useState<{ topic_code: string; standard_version: string; label: string }[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [assigned, setAssigned] = useState<AssignedSub[]>([])
@@ -170,6 +177,8 @@ export default function WorksheetAssign() {
       setScope(((qs || []) as { subtopic_code: string; short_name: string }[])
         .map(q => ({ subtopic_code: q.subtopic_code, short_name: q.short_name,
                      topic_code: topicOf[q.subtopic_code] || '' })))
+      setRoundNames(Object.fromEntries(((qs || []) as { subtopic_code: string; short_name: string }[])
+        .map(q => [q.subtopic_code, q.short_name])))
       setScopeSource('round')
     } else if (sv) {
       // No survey round is a supported case (20260838). Falls back to the full reference set for
@@ -186,7 +195,7 @@ export default function WorksheetAssign() {
       setScopeSource('none')
     }
 
-    const [tp, tl, gRes, sRes, dRes] = await Promise.all([
+    const [tp, tl, gRes, sRes, dRes, dispRes, refRes] = await Promise.all([
       supabase.from('mr_esrs_topics').select('code, label, category, sort_order').order('sort_order'),
       supabase.from('mr_esrs_topic_labels').select('topic_code, standard_version, label')
         .eq('standard_version', sv || ''),
@@ -198,8 +207,16 @@ export default function WorksheetAssign() {
       supabase.from('materiality_impact_determinations')
         .select('subtopic_code, direction, status, assignment_id, overridden_at')
         .eq('assessment_id', assessmentId),
+      supabase.from('mr_esrs_subtopic_display').select('subtopic_code, short_name')
+        .eq('standard_version', sv || ''),
+      supabase.from('mr_esrs_subtopics').select('code, label').eq('standard_version', sv || ''),
     ])
 
+    setDisplayNames(Object.fromEntries(
+      ((dispRes.data || []) as { subtopic_code: string; short_name: string }[])
+        .map(r => [r.subtopic_code, r.short_name])))
+    setRefNames(Object.fromEntries(
+      ((refRes.data || []) as { code: string; label: string }[]).map(r => [r.code, r.label])))
     setDbTopics((tp.data || []) as EsrsTopic[])
     setTopicLabelRows((tl.data || []) as { topic_code: string; standard_version: string; label: string }[])
     setAssignments((gRes.data || []) as Assignment[])
@@ -225,6 +242,11 @@ export default function WorksheetAssign() {
     return Object.fromEntries(
       resolved.map(t => [t.code, seen[t.label] > 1 ? `${t.label} (${t.code})` : t.label]))
   }, [dbTopics, topicLabelRows, assessment?.standard_version])
+
+  /** ⚠️ NO worksheet S1/S2 framing here — this screen divides work, it does not ask the question. */
+  const nameFor = (code: string) => subtopicHeading(code, '', {
+    roundSnapshot: roundNames, display: displayNames, reference: refNames,
+  })
 
   const topicSort = useMemo<Record<string, number>>(
     () => Object.fromEntries(dbTopics.map(t => [t.code, t.sort_order ?? 0])), [dbTopics])
@@ -360,7 +382,11 @@ export default function WorksheetAssign() {
         standard_version: sv,
         // ⚠️ SNAPSHOT, not a join. A later re-scope must not change what this contributor was
         // asked to determine (20260838).
-        short_name: scope.find(s => s.subtopic_code === code)?.short_name ?? null,
+        // ⚠️ FROZEN FROM THE SAME CHAIN THE SCREEN RENDERED. Snapshotting a different string from
+        // the one the lead saw when assigning would make the contributor's form disagree with the
+        // screen that created it.
+        short_name: resolveSubtopicName(code, {
+          roundSnapshot: roundNames, display: displayNames, reference: refNames }),
         source_round_id: scopeSource === 'round' ? round?.id ?? null : null,
       }))
       const { data, error } = await supabase.from('materiality_impact_assignment_subtopics')
@@ -704,8 +730,10 @@ export default function WorksheetAssign() {
                       <input type="checkbox" checked={isSel}
                              onChange={() => toggle(s.subtopic_code)} />
                       <span style={{ flex: 1, fontSize: 13, color: INK, minWidth: 0 }}>
-                        {s.short_name}
-                        <span style={{ fontSize: 11, color: MUTE }}> {s.subtopic_code}</span>
+                        {nameFor(s.subtopic_code).title}
+                        {nameFor(s.subtopic_code).code && (
+                          <span style={{ fontSize: 11, color: MUTE }}> {nameFor(s.subtopic_code).code}</span>
+                        )}
                       </span>
                       <span style={{ fontSize: 11.5, color: owner ? INK : MUTE, textAlign: 'right' }}>
                         {owner ? label(byId[owner]) : 'you'}

@@ -34,8 +34,11 @@ import { computeSeverity, type SeverityInput, type TopicCategory } from '../../.
 // as labels, which is the least obvious of the four places the direction-free scale broke: a
 // positive impact scored 4 rendered as "4 · Severe" in the summary AND on the override buttons,
 // describing a benefit as grave harm in the one view an auditor reads.
-import { dimensionScale, NO_VISIBILITY_LABEL, worksheetSubtopicHeading, type DimensionKey }
+import { dimensionScale, NO_VISIBILITY_LABEL, type DimensionKey }
   from '../../../../../../lib/materiality/severityScale'
+// ⚠️ ONE CHAIN. The assignment snapshot is written only when a sub-topic is ASSIGNED, so a
+// lead-only assessment has none — and the heading rendered "E1.1 E1.1". See the resolver's header.
+import { subtopicHeading } from '../../../../../../lib/materiality/subtopicName'
 
 const PURPLE = '#7425e3'
 const GREEN = '#0F6E56'
@@ -110,6 +113,8 @@ export default function Determinations() {
   const [topics, setTopics] = useState<EsrsTopic[]>([])
   const [labelRows, setLabelRows] = useState<{ topic_code: string; standard_version: string; label: string }[]>([])
   const [topicOf, setTopicOf] = useState<Record<string, string>>({})
+  const [displayName, setDisplayName] = useState<Record<string, string>>({})
+  const [refName, setRefName] = useState<Record<string, string>>({})
 
   const [override, setOverride] = useState<{ det: Det; patch: Partial<Det>; reason: string } | null>(null)
   const [saving, setSaving] = useState(false)
@@ -132,7 +137,7 @@ export default function Determinations() {
     setCompany(asmt.company_name); setVersion(asmt.standard_version)
     const sv = asmt.standard_version || ''
 
-    const [dRes, adRes, gRes, sRes, tRes, tlRes, stRes] = await Promise.all([
+    const [dRes, adRes, gRes, sRes, tRes, tlRes, stRes, dispRes] = await Promise.all([
       supabase.from('materiality_impact_determinations')
         .select('subtopic_code, direction, nature, scale, scope, irremediability, likelihood, abstained_dimensions, value_chain_position, time_horizon, rationale, status, assignment_id, evidence_in_view, override_reason, overridden_at')
         .eq('assessment_id', assessmentId),
@@ -148,9 +153,11 @@ export default function Determinations() {
       supabase.from('mr_esrs_topic_labels').select('topic_code, standard_version, label')
         .eq('standard_version', sv),
       supabase.from('mr_esrs_subtopics').select('code, topic_code, label').eq('standard_version', sv),
+      supabase.from('mr_esrs_subtopic_display').select('subtopic_code, short_name')
+        .eq('standard_version', sv),
     ])
 
-    const err = [dRes, adRes, gRes, sRes, tRes, tlRes, stRes].find(r => r.error)?.error
+    const err = [dRes, adRes, gRes, sRes, tRes, tlRes, stRes, dispRes].find(r => r.error)?.error
     if (err) { setLoadError(err.message); setLoading(false); return }
 
     setDets((dRes.data || []) as Det[])
@@ -159,8 +166,12 @@ export default function Determinations() {
     setScope((sRes.data || []) as ScopeRow[])
     setTopics((tRes.data || []) as EsrsTopic[])
     setLabelRows((tlRes.data || []) as { topic_code: string; standard_version: string; label: string }[])
-    setTopicOf(Object.fromEntries(((stRes.data || []) as { code: string; topic_code: string }[])
-      .map(r => [r.code, r.topic_code])))
+    const st = (stRes.data || []) as { code: string; topic_code: string; label: string }[]
+    setTopicOf(Object.fromEntries(st.map(r => [r.code, r.topic_code])))
+    setRefName(Object.fromEntries(st.map(r => [r.code, r.label])))
+    setDisplayName(Object.fromEntries(
+      ((dispRes.data || []) as { subtopic_code: string; short_name: string }[])
+        .map(r => [r.subtopic_code, r.short_name])))
     setLoading(false)
   }
 
@@ -185,11 +196,16 @@ export default function Determinations() {
       resolved.map(t => [t.code, seen[t.label] > 1 ? `${t.label} (${t.code})` : t.label]))
   }, [topics, labelRows, version])
 
-  const shortOf = useMemo<Record<string, string>>(() => {
+  /** The snapshot layer of the chain — present only for sub-topics assigned to a colleague. */
+  const snapshot = useMemo<Record<string, string>>(() => {
     const out: Record<string, string> = {}
     for (const s of scope) if (s.short_name) out[s.subtopic_code] = s.short_name
     return out
   }, [scope])
+
+  const headingFor = (code: string) => subtopicHeading(code, topicOf[code] || '', {
+    assignmentSnapshot: snapshot, display: displayName, reference: refName,
+  })
 
   /** Every sub-topic that has either an assignment or a determination, grouped by topic. */
   const groups = useMemo(() => {
@@ -287,9 +303,13 @@ export default function Determinations() {
               <div key={code} style={{ ...CARD, marginBottom: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12,
                               alignItems: 'baseline', flexWrap: 'wrap', marginBottom: 12 }}>
+                  {/* ⚠️ The code renders ONCE. Where no name is known it stands alone rather than
+                      being printed beside itself, which is what "E1.1 E1.1" was. */}
                   <div style={{ fontSize: 14, fontWeight: 600, color: INK }}>
-                    {worksheetSubtopicHeading(shortOf[code] || code, topicOf[code] || '')}
-                    <span style={{ fontSize: 11, color: MUTE, fontWeight: 400 }}> {code}</span>
+                    {headingFor(code).title}
+                    {headingFor(code).code && (
+                      <span style={{ fontSize: 11, color: MUTE, fontWeight: 400 }}> {headingFor(code).code}</span>
+                    )}
                   </div>
                   <AssigneeChip a={assignmentOf(ownerOf(code))} name={nameOf(ownerOf(code))} />
                 </div>

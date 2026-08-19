@@ -34,8 +34,11 @@ import { resolveTopicLabels, isStandardVersion, type EsrsTopic } from '../../../
 // scale's heading AND its point-4 label both differ between harm and benefit, so a form that
 // resolved the scale without saying which direction it was asking about used to render "Severe —
 // grave harm" under "As a benefit". See the module header.
-import { scaleFor, SCOPE, IRREMEDIABILITY, LIKELIHOOD, worksheetSubtopicHeading }
+import { scaleFor, SCOPE, IRREMEDIABILITY, LIKELIHOOD }
   from '../../../../../../lib/materiality/severityScale'
+// ⚠️ EVERY sub-topic on THIS screen is one the lead kept, so none of them has an assignment
+// snapshot — this screen would hit the missing-name case on every row, not occasionally.
+import { subtopicHeading } from '../../../../../../lib/materiality/subtopicName'
 import { ScaleField, Question, Options, Option } from '../../../../../components/severityFields'
 import { DistBar, Counters, pct, medianText, type Overall }
   from '../../../../../components/surveyEvidence'
@@ -114,7 +117,10 @@ export default function LeadDetermine() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [company, setCompany] = useState<string | null>(null)
   const [version, setVersion] = useState<string | null>(null)
-  const [mine, setMine] = useState<{ subtopic_code: string; short_name: string }[]>([])
+  const [mine, setMine] = useState<{ subtopic_code: string }[]>([])
+  const [roundName_, setRoundName_] = useState<Record<string, string>>({})
+  const [displayName, setDisplayName] = useState<Record<string, string>>({})
+  const [refName, setRefName] = useState<Record<string, string>>({})
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
   const [topics, setTopics] = useState<EsrsTopic[]>([])
   const [labelRows, setLabelRows] = useState<{ topic_code: string; standard_version: string; label: string }[]>([])
@@ -162,7 +168,7 @@ export default function LeadDetermine() {
       else setAggError('The survey aggregation returned nothing, and no reason.')
     }
 
-    const [qRes, sRes, dRes, tRes, tlRes, stRes] = await Promise.all([
+    const [qRes, sRes, dRes, tRes, tlRes, stRes, dispRes] = await Promise.all([
       roundId
         ? supabase.from('materiality_survey_questions')
             .select('subtopic_code, short_name, sort_order')
@@ -177,24 +183,34 @@ export default function LeadDetermine() {
       supabase.from('mr_esrs_topics').select('code, label, category, sort_order').order('sort_order'),
       supabase.from('mr_esrs_topic_labels').select('topic_code, standard_version, label').eq('standard_version', sv),
       supabase.from('mr_esrs_subtopics').select('code, topic_code, label').eq('standard_version', sv),
+      supabase.from('mr_esrs_subtopic_display').select('subtopic_code, short_name')
+        .eq('standard_version', sv),
     ])
 
-    const err = [sRes, dRes, tRes, tlRes, stRes].find(r => r.error)?.error
+    const err = [sRes, dRes, tRes, tlRes, stRes, dispRes].find(r => r.error)?.error
     if (err) { setLoadError(err.message); setLoading(false); return }
 
     const st = (stRes.data || []) as { code: string; topic_code: string; label: string }[]
     setTopicOf(Object.fromEntries(st.map(r => [r.code, r.topic_code])))
+    setRefName(Object.fromEntries(st.map(r => [r.code, r.label])))
+    setDisplayName(Object.fromEntries(
+      ((dispRes.data || []) as { subtopic_code: string; short_name: string }[])
+        .map(r => [r.subtopic_code, r.short_name])))
+    setRoundName_(Object.fromEntries(
+      ((qRes.data || []) as { subtopic_code: string; short_name: string }[])
+        .map(r => [r.subtopic_code, r.short_name])))
     setTopics((tRes.data || []) as EsrsTopic[])
     setLabelRows((tlRes.data || []) as { topic_code: string; standard_version: string; label: string }[])
 
     // Scope, minus whatever is somebody else's. Falls back to the reference set with no round —
     // 20260838 supports an assessment with no survey, and this is that case.
+    // ⚠️ CODES ONLY. The name is resolved at render through the shared chain, so this screen and
+    // the determinations screen cannot disagree about what a sub-topic is called.
     const taken = new Set(((sRes.data || []) as { subtopic_code: string }[]).map(r => r.subtopic_code))
-    const scope = roundId
-      ? ((qRes.data || []) as { subtopic_code: string; short_name: string }[])
-          .map(q => ({ subtopic_code: q.subtopic_code, short_name: q.short_name }))
-      : st.map(r => ({ subtopic_code: r.code, short_name: r.label }))
-    setMine(scope.filter(s => !taken.has(s.subtopic_code)))
+    const codes = roundId
+      ? ((qRes.data || []) as { subtopic_code: string }[]).map(q => ({ subtopic_code: q.subtopic_code }))
+      : st.map(r => ({ subtopic_code: r.code }))
+    setMine(codes.filter(s => !taken.has(s.subtopic_code)))
 
     const next: Record<string, Draft> = {}
     for (const d of (dRes.data || []) as Record<string, unknown>[]) {
@@ -327,6 +343,10 @@ export default function LeadDetermine() {
       : { nature })
   }
 
+  const headingFor = (code: string) => subtopicHeading(code, topicOf[code] || '', {
+    roundSnapshot: roundName_, display: displayName, reference: refName,
+  })
+
   const groups = useMemo(() => {
     const byTopic: Record<string, typeof mine> = {}
     const order: string[] = []
@@ -408,8 +428,10 @@ export default function LeadDetermine() {
             {g.rows.map(s => (
               <div key={s.subtopic_code} style={{ marginBottom: 22 }}>
                 <div style={{ fontSize: 15, fontWeight: 600, color: INK, marginBottom: 10 }}>
-                  {worksheetSubtopicHeading(s.short_name, topicOf[s.subtopic_code] || '')}
-                  <span style={{ fontSize: 11, color: MUTE, fontWeight: 400 }}> {s.subtopic_code}</span>
+                  {headingFor(s.subtopic_code).title}
+                  {headingFor(s.subtopic_code).code && (
+                    <span style={{ fontSize: 11, color: MUTE, fontWeight: 400 }}> {headingFor(s.subtopic_code).code}</span>
+                  )}
                 </div>
 
                 {/* ⚠️ ALWAYS RENDERED, NEVER COLLAPSED. An absent panel and an empty one are
