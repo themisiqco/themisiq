@@ -38,6 +38,11 @@ import Nav from '../../../../../components/Nav'
 import PaywallCard from '../../../../../components/PaywallCard'
 import { supabase } from '../../../../../../lib/supabase'
 import { useEntitlement } from '../../../../../../lib/useEntitlement'
+// ⚠️ ONE RENDERER. These used to be defined in this file; they were extracted so the
+// preparer's determination form draws the same evidence from the same code. See the
+// component file's header for why a second renderer is the defect and not the convenience.
+import { BANDS, DistBar, Counters, pct, medianText,
+         type Dist, type TopBox, type Overall } from '../../../../../components/surveyEvidence'
 
 const GREEN = '#0F6E56'
 const GREEN_BG = '#E1F5EE'
@@ -62,31 +67,7 @@ const H2: React.CSSProperties = {
   fontFamily: 'Georgia, serif', fontSize: '1.25rem', color: INK, marginBottom: 6,
 }
 
-/**
- * ⚠️ THE BAND LABELS ARE THE RESPONDENT'S OWN WORDS, ABBREVIATED ONLY FOR THE LEGEND.
- * The full §5.1 text is printed once at the head of section 4, because a reader looking at a
- * top_box of 1.00 has to be able to find out what "3" actually said. Paraphrasing it into
- * "high priority" would restate the question as importance-in-the-abstract, which is precisely
- * what the maturity framing was chosen to avoid.
- */
-const BANDS = [
-  { v: '1' as const, short: 'Sufficient',        bg: '#dbe8f4', fg: BLUE,
-    full: 'Existing programs are sufficient; continuous improvement is appropriate' },
-  { v: '2' as const, short: 'Improvements help', bg: '#fae3c0', fg: '#8a5510',
-    full: 'Existing programs are sufficient, but improvements would strengthen performance or reduce risk' },
-  { v: '3' as const, short: 'Significant focus', bg: PURPLE,    fg: '#fff',
-    full: 'Existing programs need significant strategic focus to close gaps, reduce risk or capture opportunity' },
-]
-
 // ── payload types. Mirrors survey_aggregate; every field is read, none is computed. ──────────────
-type Dist = { '1': number; '2': number; '3': number }
-type TopBox = { share: number | null; numerator: number; denominator: number }
-type Overall = {
-  n_asked: number; n_answered: number; n_abstained: number; n_skipped: number; n_not_asked?: number
-  distribution: Dist; top_box: TopBox
-  median_low: number | null; median_high: number | null
-  modal_share: number | null; polarised: boolean
-}
 type Cell = {
   value: string; suppressed: boolean
   n_asked: number | null; n_answered: number | null; n_abstained: number | null
@@ -158,20 +139,11 @@ type Agg = {
   }
 }
 
-const pct = (x: number | null | undefined) =>
-  x === null || x === undefined ? '—' : `${Math.round(x * 100)}%`
-
 const fmtDate = (d: string | null) =>
   d ? new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''
 
 const titleise = (s: string | null | undefined) =>
   !s ? '' : s.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase())
-
-/** The median as an INTERVAL. Never interpolated — the median of {1,3} is [1,3], not 2. */
-const medianText = (o: Overall) =>
-  o.median_low === null || o.median_high === null ? '—'
-    : o.median_low === o.median_high ? String(o.median_low)
-    : `${o.median_low}–${o.median_high}`
 
 // ── shared bits ──────────────────────────────────────────────────────────────────────────────────
 
@@ -180,37 +152,6 @@ function Chip({ text, fg, bg }: { text: string; fg: string; bg: string }) {
     <span style={{ display: 'inline-block', background: bg, color: fg, border: `0.5px solid ${fg}33`,
                    borderRadius: 999, padding: '2px 9px', fontSize: 10.5, fontWeight: 600,
                    letterSpacing: 0.2, whiteSpace: 'nowrap' }}>{text}</span>
-  )
-}
-
-/**
- * The distribution, as three bands — never as a single position on a line. A single marker is how a
- * mean gets back in through the picture even when no mean is computed, and it would erase exactly
- * the shape (5 at "1", 3 at "3") that the disagreement register exists to surface.
- * The counts are printed beside the bar as well as inside it, so a narrow band is never lost.
- */
-function DistBar({ d, height = 22 }: { d: Dist; height?: number }) {
-  const total = d['1'] + d['2'] + d['3']
-  if (total === 0) return <div style={{ fontSize: 11.5, color: MUTE }}>No scored answers</div>
-  return (
-    <div>
-      <div style={{ display: 'flex', height, borderRadius: 5, overflow: 'hidden', border: `0.5px solid ${LINE}` }}>
-        {BANDS.map(b => {
-          const n = d[b.v]
-          if (n === 0) return null
-          return (
-            <div key={b.v} title={`${n} × ${b.full}`}
-                 style={{ flex: n, background: b.bg, color: b.fg, fontSize: 11, fontWeight: 700,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {(n / total) > 0.12 ? n : ''}
-            </div>
-          )
-        })}
-      </div>
-      <div style={{ fontSize: 10.5, color: MUTE, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>
-        {BANDS.map(b => `${b.v}: ${d[b.v]}`).join('   ')}
-      </div>
-    </div>
   )
 }
 
@@ -750,44 +691,6 @@ function MethodItem({ label, body, tone }: { label: string; body: string; tone?:
     <div>
       <div style={{ fontSize: 11.5, fontWeight: 700, color: tone === 'amber' ? AMBER : INK, marginBottom: 4 }}>{label}</div>
       <ServerNote bg={tone === 'amber' ? AMBER_BG : PAPER}>{body}</ServerNote>
-    </div>
-  )
-}
-
-/**
- * The five counters, always together, with abstentions at the SAME visual weight as answers (§6.1).
- *
- * ⚠️ EQUAL WEIGHT IS ENFORCED BY THE LAYOUT, NOT BY GOODWILL. Every counter is the same block, the
- * same size and the same type — so "could not judge" cannot quietly become a footnote to
- * "answered" as this file is edited. The amber only ever marks a NON-ZERO abstention count; it
- * changes the colour, never the prominence.
- *
- * ⚠️ AND IT WRAPS RATHER THAN OVERFLOWS. These were once one right-aligned line of five
- * `white-space: nowrap` spans in a fixed 300px column, which is a run that cannot break: on a
- * laptop the numbers ran off the right edge of the card on every row of the table. auto-fit /
- * minmax reflows to three-up, then two-up, and the labels stay as the phrases they are — the whole
- * point of "0 could not judge" is that it reads as a sentence rather than a code.
- */
-function Counters({ o }: { o: Overall }) {
-  const items: { k: string; v: number | null | undefined; alert?: boolean }[] = [
-    { k: 'asked', v: o.n_asked },
-    { k: 'answered', v: o.n_answered },
-    { k: 'could not judge', v: o.n_abstained, alert: true },
-    { k: 'skipped', v: o.n_skipped },
-    { k: 'not asked', v: o.n_not_asked },
-  ]
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(104px, 1fr))',
-                  gap: 8, marginTop: 10 }}>
-      {items.filter(i => i.v !== null && i.v !== undefined).map(i => (
-        <div key={i.k} style={{ background: PAPER, border: `0.5px solid ${LINE}`, borderRadius: 8,
-                                padding: '7px 10px', minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2,
-                        fontVariantNumeric: 'tabular-nums',
-                        color: i.alert && (i.v as number) > 0 ? AMBER : INK }}>{i.v}</div>
-          <div style={{ fontSize: 10, color: MUTE, marginTop: 2, lineHeight: 1.35 }}>{i.k}</div>
-        </div>
-      ))}
     </div>
   )
 }
