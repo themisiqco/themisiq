@@ -1,6 +1,6 @@
 # ThemisIQ — backup record and restore procedure
 
-**First backup taken: 19 August 2026.** Before this date the database had no
+**First backup taken: 16 August 2026.** Before this date the database had no
 backup of any kind.
 
 ⚠️ **This document contains no passwords.** Credentials live in the password
@@ -19,7 +19,7 @@ Store as a single entry, "ThemisIQ Supabase database":
 | Port | `5432` |
 | Database | `postgres` |
 | Username | `postgres.lugnholqfstzefxrzjwe` |
-| Password | *(set 19 Aug 2026 — the value)* |
+| Password | *(set 16 Aug 2026 — the value)* |
 | Full connection string | *(assembled, with the password)* |
 
 ⚠️ **Supabase cannot show you this password again.** It is hashed on their
@@ -40,26 +40,29 @@ credential exists solely for `psql` and `pg_dump`.
 
 | What | Where | Size |
 |---|---|---|
-| Complete database — schema + all rows | `~/themisiq-backups/full_20260819.dump` | 809K |
-| Same, verified identical copy | iCloud Drive → `themisiq-backups/` | 809K |
-| Schema only — 68 tables | `db/dumps/schema_public_20260819.sql` (in git) | 6,256 lines |
-| `mr_*` reference data | `db/dumps/mr_reference_data_20260819.sql` (in git) | — |
+| Complete database — schema + all rows, 19 Aug | `~/themisiq-backups/full_20260819.dump` | 1.0M |
+| Same, verified identical copy | iCloud Drive → `themisiq-backups/` | 1.0M |
+| Complete database — schema + all rows, 16 Aug | iCloud Drive → `themisiq-backups/full_20260816.dump` — **iCloud only**, see §3 | 828K |
+| Schema only — 74 tables | `db/dumps/schema_public_20260819_0800.sql` (in git) | 8,512 lines |
+| Schema only — 68 tables | `db/dumps/schema_public_20260816.sql` (in git) | 6,256 lines |
+| `mr_*` reference data | `db/dumps/mr_reference_data_20260816.sql` (in git) | — |
 
-**Integrity hash of the full dump**, SHA-256:
-
-```
-776b34cf6ed80b375eddd9bde947bdd87da2b76920727d215bdc142779e8cf13
-```
-
-Verify any copy against it:
+**Integrity hashes of the full dumps**, SHA-256:
 
 ```
-shasum -a 256 /path/to/full_20260819.dump
+bb8ebcf48997d8a33536041e5ecc9d42785fc0476a1b90a138bdb83f029e04dd  full_20260819.dump
+776b34cf6ed80b375eddd9bde947bdd87da2b76920727d215bdc142779e8cf13  full_20260816.dump
+```
+
+Verify any copy against the line for its date:
+
+```
+shasum -a 256 /path/to/full_YYYYMMDD.dump
 ```
 
 ⚠️ **The full dump contains customer data and must never enter the git
 repo.** `~/themisiq-backups` is deliberately outside the working tree. The
-two files in `db/dumps/` were checked and carry no customer rows.
+files in `db/dumps/` were checked and carry no customer rows.
 
 ---
 
@@ -91,6 +94,13 @@ psql "$DBURL" -c "select now();"
 ```
 pg_dump "$DBURL" -Fc --no-owner -f ~/themisiq-backups/full_$(date +%Y%m%d).dump
 ```
+
+⚠️ **`pg_dump -f` overwrites silently.** No warning, no prompt: if the target
+filename already exists the previous dump is simply gone, and nothing in the
+output says so. Always write the date with `$(date +%Y%m%d)` as above — never a
+literal date — and check the target filename before running. This is how the
+local copy of `full_20260816.dump` was lost on 19 August; it survives only in
+iCloud, because that copy had already been made and hash-verified.
 
 **Schema, for the repo:**
 
@@ -131,27 +141,27 @@ restore into that, and confirm the result before trusting the procedure.
 
 ```
 pg_restore -d "CONNECTION_STRING_OF_TARGET" --no-owner --clean --if-exists \
-  ~/themisiq-backups/full_20260819.dump
+  ~/themisiq-backups/full_YYYYMMDD.dump
 ```
 
 **Inspect without restoring** — lists everything in the dump:
 
 ```
-pg_restore -l ~/themisiq-backups/full_20260819.dump | less
+pg_restore -l ~/themisiq-backups/full_YYYYMMDD.dump | less
 ```
 
 **Restore a single table:**
 
 ```
 pg_restore -d "TARGET" --no-owner --data-only --table=mr_esrs_subtopics \
-  ~/themisiq-backups/full_20260819.dump
+  ~/themisiq-backups/full_YYYYMMDD.dump
 ```
 
 **Restore schema only:**
 
 ```
 pg_restore -d "TARGET" --no-owner --schema-only \
-  ~/themisiq-backups/full_20260819.dump
+  ~/themisiq-backups/full_YYYYMMDD.dump
 ```
 
 ---
@@ -206,8 +216,9 @@ Worth proving into a scratch project before launch.
 
 | Date | What | Verified | Notes |
 |---|---|---|---|
-| 2026-07-14 | `db/snapshot_20260714.json` — `mr_*` values only, no schema | — | Predates the provenance columns. Row counts confirmed unchanged as of 19 Aug. |
-| 2026-08-19 | Full dump + schema + reference data | SHA-256 matched across both copies | First real backup. Five methodology matrices verified at 65 / 41 / 130 / 65 / 52 rows, matching July. |
+| 2026-07-14 | `db/snapshot_20260714.json` — `mr_*` values only, no schema | — | Predates the provenance columns. Row counts confirmed unchanged as of 16 Aug. |
+| 2026-08-16 | Full dump + schema + reference data | SHA-256 matched across both copies | First real backup. Five methodology matrices verified at 65 / 41 / 130 / 65 / 52 rows, matching July. |
+| 2026-08-19 | Refreshed full dump + schema dump | SHA-256 matched across two locations, both generations | 74 tables, up from 68. The 16 Aug dump renamed to `full_20260816.dump` and re-verified against its recorded hash. |
 
 *Add a row every time. A backup nobody recorded is a backup nobody will
 find.*
