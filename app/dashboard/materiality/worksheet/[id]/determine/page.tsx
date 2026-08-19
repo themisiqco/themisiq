@@ -30,7 +30,11 @@ import PaywallCard from '../../../../../components/PaywallCard'
 import { supabase } from '../../../../../../lib/supabase'
 import { useEntitlement } from '../../../../../../lib/useEntitlement'
 import { resolveTopicLabels, isStandardVersion, type EsrsTopic } from '../../../../../../lib/materiality'
-import { SCALE, SCOPE, IRREMEDIABILITY, LIKELIHOOD, worksheetSubtopicHeading }
+// ⚠️ scaleFor(direction), never a direction-free SCALE — there is no longer such an export. The
+// scale's heading AND its point-4 label both differ between harm and benefit, so a form that
+// resolved the scale without saying which direction it was asking about used to render "Severe —
+// grave harm" under "As a benefit". See the module header.
+import { scaleFor, SCOPE, IRREMEDIABILITY, LIKELIHOOD, worksheetSubtopicHeading }
   from '../../../../../../lib/materiality/severityScale'
 import { ScaleField, Question, Options, Option } from '../../../../../components/severityFields'
 import { DistBar, Counters, pct, medianText, type Overall }
@@ -616,10 +620,13 @@ function Block({ code, dir, d, saving, error, note, evidenced, onNature, onChang
 
       {d.nature && (
         <>
-          <ScaleField def={SCALE} value={d.scale} abstained={d.abstained.includes('scale')}
-                      onPick={v => onChange(code, dir, setDim(d, 'scale', v))}
-                      heading={harm ? SCALE.heading
-                                    : 'How much good it does for the people or the environment affected'} />
+          {/* ⚠️ NO heading OVERRIDE. The heading travels with the direction-keyed scale, so the
+              two halves of the question — "how much good it does" and "Transformative" — can no
+              longer come from different places. The positive heading used to be a string literal
+              in this file, duplicated in the contributor form: the direction-awareness lived in
+              the page and the copy lived half in the constant. */}
+          <ScaleField def={scaleFor(dir)} value={d.scale} abstained={d.abstained.includes('scale')}
+                      onPick={v => onChange(code, dir, setDim(d, 'scale', v))} />
           <ScaleField def={SCOPE} value={d.scope} abstained={d.abstained.includes('scope')}
                       onPick={v => onChange(code, dir, setDim(d, 'scope', v))} />
           {/* ¶41: no irremediability on a benefit, no likelihood on something already happening. */}

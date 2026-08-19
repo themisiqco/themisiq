@@ -27,7 +27,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 import {
-  SCALE, SCOPE, IRREMEDIABILITY, LIKELIHOOD, NO_VISIBILITY_LABEL,
+  scaleFor, SCOPE, IRREMEDIABILITY, LIKELIHOOD, NO_VISIBILITY_LABEL,
   worksheetSubtopicHeading,
 } from '../../../lib/materiality/severityScale'
 // ⚠️ ONE WIDGET. These were defined here; they were extracted so the preparer's own determination
@@ -525,10 +525,10 @@ function Block({ code, dir, draft, saving, error, note, onNature, onChange, onEd
 
       {draft.nature && (
         <>
-          <ScaleField def={SCALE} value={draft.scale} abstained={draft.abstained.includes('scale')}
-                 onPick={v => onChange(code, dir, setDim(draft, 'scale', v))}
-                 heading={harm ? SCALE.heading
-                               : 'How much good it does for the people or the environment affected'} />
+          {/* ⚠️ The heading comes with the scale. See severityScale.ts — a benefit is never
+              described in the language of harm. */}
+          <ScaleField def={scaleFor(dir)} value={draft.scale} abstained={draft.abstained.includes('scale')}
+                 onPick={v => onChange(code, dir, setDim(draft, 'scale', v))} />
 
           <ScaleField def={SCOPE} value={draft.scope} abstained={draft.abstained.includes('scope')}
                  onPick={v => onChange(code, dir, setDim(draft, 'scope', v))} />

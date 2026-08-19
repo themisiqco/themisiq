@@ -30,7 +30,11 @@ import { supabase } from '../../../../../../lib/supabase'
 import { useEntitlement } from '../../../../../../lib/useEntitlement'
 import { resolveTopicLabels, isStandardVersion, type EsrsTopic } from '../../../../../../lib/materiality'
 import { computeSeverity, type SeverityInput, type TopicCategory } from '../../../../../../lib/materiality/severity'
-import { SCALE, SCOPE, IRREMEDIABILITY, LIKELIHOOD, NO_VISIBILITY_LABEL, worksheetSubtopicHeading }
+// ⚠️ dimensionScale(dim, direction) — the single resolver. This screen renders STORED values back
+// as labels, which is the least obvious of the four places the direction-free scale broke: a
+// positive impact scored 4 rendered as "4 · Severe" in the summary AND on the override buttons,
+// describing a benefit as grave harm in the one view an auditor reads.
+import { dimensionScale, NO_VISIBILITY_LABEL, worksheetSubtopicHeading, type DimensionKey }
   from '../../../../../../lib/materiality/severityScale'
 
 const PURPLE = '#7425e3'
@@ -71,9 +75,7 @@ type Assignment = { id: string; contributor_name: string | null; contributor_ema
 type ScopeRow = { subtopic_code: string; short_name: string | null; assignment_id: string }
 
 const DIMS = ['scale', 'scope', 'irremediability', 'likelihood'] as const
-type Dim = (typeof DIMS)[number]
-
-const DEF = { scale: SCALE, scope: SCOPE, irremediability: IRREMEDIABILITY, likelihood: LIKELIHOOD }
+type Dim = DimensionKey
 
 const fmt = (d: string | null) =>
   d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''
@@ -465,6 +467,7 @@ function valueText(d: { [k: string]: unknown; abstained_dimensions?: string[] | 
 }
 
 function Dims({ d, basis }: { d: Det; basis: readonly string[] }) {
+  // Resolved against THIS determination's direction, so a benefit never borrows harm's words.
   const shown = DIMS.filter(k =>
     basis.includes(k) || (k === 'likelihood' && d.nature === 'potential'))
   return (
@@ -472,7 +475,8 @@ function Dims({ d, basis }: { d: Det; basis: readonly string[] }) {
       {shown.map(k => {
         const v = d[k] as number | null
         const abstained = (d.abstained_dimensions || []).includes(k)
-        const point = v !== null ? DEF[k].points.find(p => p.value === v) : null
+        const point = v !== null
+          ? dimensionScale(k, d.direction).points.find(p => p.value === v) : null
         return (
           <div key={k} style={{ background: PAPER, border: `0.5px solid ${LINE}`, borderRadius: 8,
                                 padding: '8px 11px' }}>
@@ -538,7 +542,7 @@ function OverridePanel({ state, setState, contributor, saving, error, onSave, on
               {contributor} said: {valueText(d, k)}
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {DEF[k].points.map(p => {
+              {dimensionScale(k, d.direction).points.map(p => {
                 const on = (merged[k] as number | null) === p.value
                 return (
                   <button key={p.value} onClick={() => set(k, p.value)} title={p.body}
