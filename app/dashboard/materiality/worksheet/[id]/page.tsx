@@ -57,10 +57,30 @@ const CARD: React.CSSProperties = {
   padding: '1.5rem', marginBottom: 18,
 }
 
+/**
+ * The customer wording for each standard version.
+ *
+ * ⚠️ THIS IS A SECOND COPY. app/dashboard/materiality/report/page.tsx holds the same three keys and
+ * the same three labels, and two copies of a reference table drift — the copy that drifts is always
+ * the one somebody forgot. It belongs in lib/ beside the other shared reference data, read by both;
+ * that is a separate change and this comment is here so it is not mistaken for the original.
+ *
+ * ⚠️ AN UNKNOWN KEY RENDERS NOTHING, never the raw value and never a guess. A code like esrs_2026
+ * shown to a customer is a system value leaking; a wrong label is worse, because it names the law
+ * the assessment was prepared under.
+ */
+const STANDARD_VERSION_LABEL: Record<string, string> = {
+  esrs_2023: 'ESRS (2023), as last amended by Del. Reg. (EU) 2025/1416',
+  esrs_2023_reliefs: 'ESRS (2023) with the reliefs permitted by Del. Reg. C(2026) 5010',
+  esrs_2026: 'ESRS (2026) — Del. Reg. C(2026) 5010, applied in full',
+}
+
 type Assessment = {
   id: string; company_name: string | null; standard_version: string | null; status: string
 }
 type Round = { id: string; name: string; status: string }
+/** Every round the signed-in user owns — the eligible ones and the rest. RLS does the scoping. */
+type PickerRound = { id: string; name: string; status: string; standard_version: string | null }
 type ScopeRow = { subtopic_code: string; topic_code: string; short_name: string }
 type Assignment = {
   id: string; contributor_name: string | null; contributor_email: string | null
@@ -98,6 +118,11 @@ export default function WorksheetAssign() {
 
   const [assessment, setAssessment] = useState<Assessment | null>(null)
   const [round, setRound] = useState<Round | null>(null)
+  const [linkedIds, setLinkedIds] = useState<string[]>([])
+  const [allRounds, setAllRounds] = useState<PickerRound[]>([])
+  const [linkWorking, setLinkWorking] = useState<string | null>(null)
+  const [linkError, setLinkError] = useState<string | null>(null)
+  const [linkNote, setLinkNote] = useState<string | null>(null)
   const [scopeSource, setScopeSource] = useState<'round' | 'reference' | 'none'>('none')
   const [scope, setScope] = useState<ScopeRow[]>([])
   const [dbTopics, setDbTopics] = useState<EsrsTopic[]>([])
@@ -156,6 +181,10 @@ export default function WorksheetAssign() {
       .from('materiality_assessment_survey_rounds')
       .select('round_id').eq('assessment_id', assessmentId).order('linked_at')
 
+    // ⚠️ IN LINK ORDER, and the order is load-bearing. The picker names links[0] as the round scope
+    // is read from, and says so BEFORE a second link can be made — the union is still unmade.
+    setLinkedIds(((links || []) as { round_id: string }[]).map(l => l.round_id))
+
     let roundId: string | null = null
     if (links && links.length > 0) {
       roundId = (links[0] as { round_id: string }).round_id
@@ -195,7 +224,7 @@ export default function WorksheetAssign() {
       setScopeSource('none')
     }
 
-    const [tp, tl, gRes, sRes, dRes, dispRes, refRes] = await Promise.all([
+    const [tp, tl, gRes, sRes, dRes, dispRes, refRes, rRes] = await Promise.all([
       supabase.from('mr_esrs_topics').select('code, label, category, sort_order').order('sort_order'),
       supabase.from('mr_esrs_topic_labels').select('topic_code, standard_version, label')
         .eq('standard_version', sv || ''),
@@ -210,6 +239,10 @@ export default function WorksheetAssign() {
       supabase.from('mr_esrs_subtopic_display').select('subtopic_code, short_name')
         .eq('standard_version', sv || ''),
       supabase.from('mr_esrs_subtopics').select('code, label').eq('standard_version', sv || ''),
+      // ⚠️ EVERY round, not only the usable ones. A list filtered down to the eligible ones is
+      // empty exactly when the user most needs to know why, and an empty list explains nothing.
+      supabase.from('materiality_survey_rounds')
+        .select('id, name, status, standard_version').order('created_at', { ascending: false }),
     ])
 
     setDisplayNames(Object.fromEntries(
@@ -222,6 +255,7 @@ export default function WorksheetAssign() {
     setAssignments((gRes.data || []) as Assignment[])
     setAssigned((sRes.data || []) as AssignedSub[])
     setDeterminations((dRes.data || []) as Determination[])
+    setAllRounds((rRes.data || []) as PickerRound[])
     setLoading(false)
   }
 
@@ -434,6 +468,58 @@ export default function WorksheetAssign() {
     await load()
   }
 
+  /**
+   * Link a round to this assessment.
+   *
+   * ⚠️ THE TWO RULES ARE THE DATABASE'S, NOT THIS FILE'S. materiality_assessment_survey_round_link_guard
+   * refuses an unclosed round and a version that does not match, and refuses a not-stated assessment
+   * version outright. The picker mirrors those rules so nobody meets a raise by surprise; it does not
+   * re-implement them, and when one arrives anyway it is printed as given. Same argument as the
+   * header makes for every other refusal on this screen.
+   *
+   * ⚠️ user_id IS NOT SENT. It defaults to auth.uid(); setting it here would be this client
+   * asserting an identity the database already knows, and the composite keys check against.
+   */
+  const linkRound = async (roundId: string) => {
+    setLinkWorking(roundId); setLinkError(null); setLinkNote(null)
+    const { data, error } = await supabase.from('materiality_assessment_survey_rounds')
+      .insert({ assessment_id: assessmentId, round_id: roundId })
+      .select('round_id')
+    setLinkWorking(null)
+    if (error) { setLinkError(error.message); return }
+    if (!data || data.length === 0) {
+      setLinkError('Nothing was linked, and the server gave no reason. Treat this round as not linked.')
+      return
+    }
+    setLinkNote(linkedIds.length === 0
+      ? 'Linked. The sub-topics below are now the ones that round asked about.'
+      : 'Linked, and recorded alongside the round already there. Scope still comes from the '
+        + 'earliest one — the two have not been merged.')
+    // ⚠️ THE EXISTING FETCH, RE-RUN. Scope, names, assignments and determinations all derive from
+    // the link, so re-reading in one place is what keeps them consistent with each other.
+    await load()
+  }
+
+  /**
+   * ⚠️ A HARD DELETE. There is no soft-delete column on the join row, and removing it is the
+   * deliberate act that lets the round reopen again (20260827). Offered only where nothing was
+   * drawn from the round — see canUnlink at the render.
+   */
+  const unlinkRound = async (roundId: string) => {
+    setLinkWorking(roundId); setLinkError(null); setLinkNote(null)
+    const { data, error } = await supabase.from('materiality_assessment_survey_rounds')
+      .delete().eq('assessment_id', assessmentId).eq('round_id', roundId)
+      .select('round_id')
+    setLinkWorking(null)
+    if (error) { setLinkError(error.message); return }
+    if (!data || data.length === 0) {
+      setLinkError('Nothing was unlinked, and the server gave no reason. The link may still be in place.')
+      return
+    }
+    setLinkNote('Unlinked. That round can be reopened again.')
+    await load()
+  }
+
   const undoAssign = async () => {
     if (!lastAssign) return
     setWorking(true)
@@ -473,6 +559,25 @@ export default function WorksheetAssign() {
   )
 
   const noVersion = !assessment.standard_version
+
+  // ── what the picker needs to know, derived from what is already loaded ──────────────────────
+  const statusWord = (st: string) =>
+    st === 'closed' ? 'closed' : st === 'open' ? 'still collecting answers' : 'not sent out yet'
+
+  /** null for a version with no entry and for a missing one — the caller renders nothing. */
+  const versionLabel = (v: string | null | undefined): string | null =>
+    (v && STANDARD_VERSION_LABEL[v]) || null
+
+  const earliestLinked = linkedIds[0] ?? null
+  const scopeCodes = new Set(scope.map(sc => sc.subtopic_code))
+  /**
+   * ⚠️ ONLY THE EARLIEST LINKED ROUND CAN HAVE BEEN DRAWN FROM, because only links[0] is read for
+   * scope. A later link has never put a sub-topic in front of anyone, so nothing can rest on it and
+   * removing it is always safe. That is a fact about this page's own fetch, not an assumption about
+   * the data — and it is the reason the refusal below is narrow rather than blanket.
+   */
+  const submittedFromScope = determinations.filter(
+    d => d.status === 'submitted' && scopeCodes.has(d.subtopic_code)).length
 
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -522,6 +627,174 @@ export default function WorksheetAssign() {
             you actually asked about.
           </div>
         )}
+
+        {/* ── survey round ──────────────────────────────────────────────────────────────────
+            The link this table has never had written to it. Three screens have been sitting in
+            their "no round linked" branch for want of this control. */}
+        <div style={CARD}>
+          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.25rem', color: INK, marginBottom: 6 }}>
+            Survey round
+          </div>
+
+          {noVersion ? (
+            /* ⚠️ NO PICKER AT ALL — not an empty list and not a disabled button. There is nothing
+               to choose between, and the fix is on the assessment. The guard's own reasoning. */
+            <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.8 }}>
+              This assessment does not state which ESRS version it was prepared under, so no survey
+              round can inform it. Not stated is a real state here, never an assumed version:
+              Article 2(2) of Del. Reg. C(2026) 5010 requires the undertaking to state the version,
+              and assuming one would be a false statement about which law was applied. State the
+              version on the assessment first.
+            </div>
+          ) : (
+            <>
+              {/* ⚠️ THE REASONING LIVES HERE, ONCE. It used to sit on every unclosed row, so
+                  three unclosed rounds meant three copies of a paragraph already read — and it
+                  buried the only part that differed, which is the status and the link. */}
+              <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.8, marginBottom: 14 }}>
+                Linking a closed round narrows the list below to the sub-topics you actually asked
+                about, and brings what respondents said alongside your own determinations. Only a
+                closed round can be used: an assessment has to consume a survey whose figures cannot
+                change afterwards, or a report saying “9 of 12” one day and “9 of 19” the next
+                cannot say which it was, and both were true when printed. Closing stays reversible
+                until an assessment consumes the round.
+              </div>
+
+              {linkedIds.length > 0 && (
+                <div style={{ background: BLUE_BG, border: `0.5px solid ${BLUE}`, borderRadius: 10,
+                              padding: '10px 14px', marginBottom: 14, fontSize: 12, color: INK,
+                              lineHeight: 1.75 }}>
+                  <strong>Scope comes from the first round linked here</strong>
+                  {round?.name ? ` — “${round.name}”.` : '.'} Linking another records it alongside;
+                  the two are not merged, and the sub-topics below stay the first round’s.
+                  {linkedIds.length > 1 && ` ${linkedIds.length} rounds are linked.`}
+                </div>
+              )}
+
+              {linkError && (
+                <div style={{ background: FAIL_BG, border: `0.5px solid ${FAIL}`, borderRadius: 10,
+                              padding: '10px 14px', marginBottom: 14, fontSize: 12, color: INK,
+                              lineHeight: 1.75 }}>
+                  {linkError}
+                </div>
+              )}
+              {linkNote && (
+                <div style={{ background: GREEN_BG, border: `0.5px solid ${GREEN}`, borderRadius: 10,
+                              padding: '10px 14px', marginBottom: 14, fontSize: 12, color: INK,
+                              lineHeight: 1.75 }}>
+                  {linkNote}
+                </div>
+              )}
+
+              {allRounds.length === 0 ? (
+                <div style={{ fontSize: 12.5, color: MUTE, lineHeight: 1.8 }}>
+                  You have not created a survey round yet. An assessment does not need one — the
+                  list below is then every sub-topic for this standard version — but a round is what
+                  brings stakeholder answers into it.{' '}
+                  <Link href="/dashboard/materiality/survey" style={{ color: PURPLE }}>Surveys</Link>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {allRounds.map(r => {
+                    const isLinked = linkedIds.includes(r.id)
+                    const isEarliest = earliestLinked === r.id
+                    const closed = r.status === 'closed'
+                    const versionMatches = r.standard_version === assessment.standard_version
+                    // Only the earliest link can have informed anything. See submittedFromScope.
+                    const blockedBy = isEarliest ? submittedFromScope : 0
+                    const busy = linkWorking === r.id
+
+                    return (
+                      <div key={r.id} style={{ border: `0.5px solid ${LINE}`, borderRadius: 10,
+                                               padding: '12px 14px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12,
+                                      flexWrap: 'wrap', alignItems: 'center' }}>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: INK }}>
+                              {r.name}
+                              {isLinked && (
+                                <span style={{ fontSize: 11, color: BLUE, fontWeight: 600,
+                                               background: BLUE_BG, borderRadius: 999,
+                                               padding: '2px 9px', marginLeft: 8 }}>Linked</span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: 11, color: MUTE, marginTop: 3 }}>
+                              {statusWord(r.status)}
+                              {versionLabel(r.standard_version) && ` · ${versionLabel(r.standard_version)}`}
+                            </div>
+                          </div>
+
+                          {/* The one action this row offers, or none. */}
+                          {isLinked ? (
+                            /* ⚠️ SHOWN AND DISABLED WHEN REFUSED, never removed. A control that
+                               vanishes reads as a feature that does not exist; one that is
+                               visibly unavailable sends the reader to the sentence below it. */
+                            <button onClick={() => void unlinkRound(r.id)}
+                                    disabled={busy || blockedBy > 0}
+                                    style={{ ...btn, opacity: busy || blockedBy > 0 ? 0.45 : 1,
+                                             cursor: blockedBy > 0 ? 'not-allowed' : 'pointer' }}>
+                              {busy ? 'Unlinking…' : 'Unlink'}
+                            </button>
+                          ) : closed && versionMatches ? (
+                            <button onClick={() => void linkRound(r.id)} disabled={busy}
+                                    style={{ ...btnPrimary, opacity: busy ? 0.5 : 1 }}>
+                              {busy ? 'Linking…' : 'Use this round'}
+                            </button>
+                          ) : null}
+                        </div>
+
+                        {/* Why this row is as it is. One sentence, always present. */}
+                        <div style={{ fontSize: 11.5, color: MID, lineHeight: 1.75, marginTop: 8 }}>
+                          {isLinked ? (
+                            isEarliest ? (
+                              blockedBy > 0 ? (
+                                <>The sub-topics below come from this round, and {blockedBy}{' '}
+                                {blockedBy === 1 ? 'determination has' : 'determinations have'} been
+                                submitted against them. Unlinking is not offered: those
+                                determinations were made about questions this round asked, and
+                                removing the link would leave them citing evidence the assessment no
+                                longer holds.</>
+                              ) : (
+                                <>The sub-topics below come from this round. Nothing has been
+                                submitted against them yet, so it can still be unlinked.</>
+                              )
+                            ) : (
+                              <>Recorded on this assessment, but not where the sub-topics below come
+                              from — that is the first round linked. Nothing has been drawn from
+                              this one.</>
+                            )
+                          ) : !closed ? (
+                            /* Only what is specific to this row. The why is in the intro. */
+                            <>This round is {statusWord(r.status)}.{' '}
+                            <Link href={`/dashboard/materiality/survey/${r.id}`}
+                                  style={{ color: PURPLE }}>Open this round</Link></>
+                          ) : !versionMatches ? (
+                            versionLabel(r.standard_version) && versionLabel(assessment.standard_version) ? (
+                              <>This round was built against {versionLabel(r.standard_version)}, and
+                              this assessment is prepared under{' '}
+                              {versionLabel(assessment.standard_version)}. The two taxonomies differ
+                              in name, in count and in structure, so this round’s answers are keyed
+                              to sub-topics that do not exist in this assessment.</>
+                            ) : (
+                              /* One of the two has no customer wording. The difference is still
+                                 stated; neither code is shown to stand in for it. */
+                              <>This round was built against a different version of the standard
+                              from this assessment. The two taxonomies differ in name, in count and
+                              in structure, so this round’s answers are keyed to sub-topics that do
+                              not exist in this assessment.</>
+                            )
+                          ) : (
+                            <>Closed, and built against the same version as this assessment.</>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </div>
 
         {/* ── contributors ──────────────────────────────────────────────────────────────────── */}
         <div style={CARD}>
