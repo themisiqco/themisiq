@@ -130,6 +130,11 @@ export default function LeadDetermine() {
   const [roundName, setRoundName] = useState<string | null>(null)
   const [aggError, setAggError] = useState<string | null>(null)
 
+  const [confirmSubmit, setConfirmSubmit] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submittedCount, setSubmittedCount] = useState<number | null>(null)
+
   const [saving, setSaving] = useState<Record<string, boolean>>({})
   const [blockError, setBlockError] = useState<Record<string, string>>({})
   const [blockNote, setBlockNote] = useState<Record<string, string>>({})
@@ -315,6 +320,38 @@ export default function LeadDetermine() {
     setDrafts(cur => ({ ...cur, [k]: d }))
   }
 
+  /**
+   * ⚠️ ALL OF IT, AT ONCE. materiality_lead_submit takes the assessment, not a sub-topic: a
+   * submission is one considered act covering everything the person is responsible for, which is
+   * exactly how a contributor submits through impact_submit. There is deliberately no per-row
+   * submit, because a worksheet half-submitted row by row is a state nothing downstream can read.
+   *
+   * ⚠️ THE REFUSAL IS THE PAYLOAD. When a held sub-topic has no stated nature the function names
+   * every one of them, with directions, in one sentence written for the reader. It is rendered
+   * whole — never truncated, never summarised to "some are incomplete" — because the list IS the
+   * instruction telling them where to go. A lead with 37 sub-topics part-done needs all of it.
+   */
+  const submitAll = async () => {
+    setSubmitting(true); setSubmitError(null)
+    const { data, error } = await supabase.rpc('materiality_lead_submit', {
+      p_assessment_id: assessmentId,
+    })
+    setSubmitting(false)
+    if (error) { setSubmitError(error.message); return }
+    // ⚠️ THREE STATES, AND THIS IS THE THIRD. A call that returns neither an error nor a count is
+    // not a success with nothing in it — it is a call whose outcome is unknown, and saying so is
+    // the only honest thing available.
+    const count = (data as { submitted?: number } | null)?.submitted
+    if (typeof count !== 'number') {
+      setSubmitError('The submission returned neither a result nor a reason, so it is not known '
+                   + 'whether anything was recorded. Reload this page and check before trying again.')
+      return
+    }
+    setSubmittedCount(count)
+    setConfirmSubmit(false)
+    await load()
+  }
+
   const update = (code: string, dir: Direction, patch: Partial<Draft>) => {
     const k = key(code, dir)
     const next = { ...(drafts[k] || empty()), ...patch }
@@ -472,6 +509,109 @@ export default function LeadDetermine() {
               <Link href={`/dashboard/materiality/worksheet/${assessmentId}/determinations`}
                     style={{ color: PURPLE }}>the determinations screen</Link>.
             </div>
+          </div>
+        )}
+
+        {/* ── submit ────────────────────────────────────────────────────────────────────────
+            ⚠️ AT THE FOOT, AFTER THE LAST SUB-TOPIC. Not a sticky bar and not at the top: a
+            person reaches this having worked down the form, and a submit button in view from the
+            first question invites submitting before the work is done. */}
+        {mine.length > 0 && (
+          <div style={{ marginTop: 26, background: '#fff',
+                        border: `0.5px solid ${confirmSubmit ? AMBER : LINE}`,
+                        borderRadius: 14, padding: '1.2rem 1.4rem' }}>
+
+            {submittedCount !== null ? (
+              <div style={{ background: PAPER, border: `0.5px solid ${GREEN}`, borderRadius: 10,
+                            padding: '12px 14px', fontSize: 12.5, color: INK, lineHeight: 1.8 }}>
+                <strong>
+                  {submittedCount} {submittedCount === 1 ? 'determination' : 'determinations'} submitted.
+                </strong>{' '}
+                {submittedCount === 0
+                  ? 'Everything you hold had already been submitted, so nothing changed.'
+                  : 'They are now this assessment’s recorded judgements rather than drafts, and '
+                    + 'they appear in the comparison against what your respondents said.'}
+              </div>
+            ) : !confirmSubmit ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            gap: 16, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.75, flex: 1, minWidth: 260 }}>
+                  <strong style={{ color: INK }}>Finished?</strong> Submitting records all{' '}
+                  {mine.length} {mine.length === 1 ? 'sub-topic' : 'sub-topics'} you hold together,
+                  in one go. Anything still missing an answer will be named rather than skipped.
+                </div>
+                <button onClick={() => { setConfirmSubmit(true); setSubmitError(null) }}
+                        style={{ flexShrink: 0, fontSize: 13, fontWeight: 600, padding: '9px 18px',
+                                 borderRadius: 8, border: `1px solid ${LINE}`, background: '#fff',
+                                 color: INK, cursor: 'pointer' }}>
+                  Submit your determinations
+                </button>
+              </div>
+            ) : (
+              <div>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', color: INK,
+                              marginBottom: 10 }}>
+                  Submit your determinations?
+                </div>
+                <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.8, display: 'flex',
+                              flexDirection: 'column', gap: 8 }}>
+                  <div>
+                    <strong style={{ color: INK }}>They stop being drafts.</strong> Each becomes
+                    this assessment’s recorded judgement about that sub-topic — the answer the
+                    report is built from.
+                  </div>
+                  <div>
+                    <strong style={{ color: INK }}>They become part of the comparison.</strong>{' '}
+                    What you concluded is set beside what your respondents said, and the two are
+                    shown wherever they point in different directions.
+                  </div>
+                  <div>
+                    {/* ⚠️ WHAT IS OBSERVABLE, AND NOTHING MORE. There is no unsubmit control on
+                        this screen, and that is all this may claim: whether the database permits a
+                        later edit is materiality_impact_determination_lock's business and its
+                        behaviour has not been read. "This is permanent" would be a guess, and
+                        "you can undo it" would be a guess the customer acts on. */}
+                    <strong style={{ color: INK }}>There is no undo here.</strong> Nothing on this
+                    screen will turn them back into drafts. If you are still weighing one of them,
+                    that is a reason to wait.
+                  </div>
+                  <div>
+                    <strong style={{ color: INK }}>All of them, together.</strong> This covers every
+                    sub-topic you hold rather than one at a time. If any is missing an answer, you
+                    will be told exactly which — and nothing will be submitted until they are done.
+                  </div>
+                </div>
+
+                {/* ⚠️ THE FUNCTION'S OWN SENTENCE, WHOLE. The incomplete list can run to dozens of
+                    codes; it wraps and it is never cut short, because a truncated list sends the
+                    reader looking for sub-topics it did not name. */}
+                {submitError && (
+                  <div style={{ background: FAIL_BG, border: `0.5px solid ${FAIL}`, borderRadius: 10,
+                                padding: '10px 12px', marginTop: 12, fontSize: 12, color: MID,
+                                lineHeight: 1.7, overflowWrap: 'anywhere' }}>
+                    <strong style={{ color: FAIL, display: 'block', marginBottom: 2 }}>NOT SUBMITTED</strong>
+                    {submitError}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+                  <button onClick={() => { setConfirmSubmit(false); setSubmitError(null) }}
+                          disabled={submitting}
+                          style={{ fontSize: 13, padding: '9px 18px', borderRadius: 8,
+                                   border: `1px solid ${LINE}`, background: '#fff', color: MID,
+                                   cursor: 'pointer' }}>
+                    Not yet
+                  </button>
+                  <button onClick={submitAll} disabled={submitting}
+                          style={{ fontSize: 13, fontWeight: 600, padding: '9px 20px',
+                                   borderRadius: 8, border: 'none', background: INK, color: '#fff',
+                                   cursor: submitting ? 'not-allowed' : 'pointer',
+                                   opacity: submitting ? 0.6 : 1 }}>
+                    {submitting ? 'Submitting…' : 'Submit them'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
