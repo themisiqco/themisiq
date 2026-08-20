@@ -269,7 +269,13 @@ export const THRESHOLD_NOTE =
   'it is printed beside every figure. This is the value snapshotted by the survey round, so a ' +
   'later change to the threshold does not alter a round already run.'
 
-const SUBMITTED_STATUS = 'submitted'
+/**
+ * The one status that counts as a determination. EXPORTED because a second consumer applies the
+ * same filter: lib/materiality/boardReport.ts reports the register and the assessment's own
+ * conclusions in one document, and a private copy of this string there could drift into a report
+ * that contradicts itself page to page.
+ */
+export const SUBMITTED_STATUS = 'submitted'
 const INCLUDED_STATUS = 'included'
 const DIRECTIONS: Direction[] = ['negative', 'positive']
 
