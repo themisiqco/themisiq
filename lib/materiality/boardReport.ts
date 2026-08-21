@@ -1,5 +1,5 @@
 /**
- * The board information paper — the content of it, assembled from work already done.
+ * The impact materiality report — the content of it, assembled from work already done.
  *
  * PURE. No React, no Supabase, no I/O, no dates generated here. The lib/materiality/register.ts and
  * lib/materiality/severity.ts pattern: the module assembles, the caller fetches and renders.
@@ -9,11 +9,17 @@
  * compares a severity against a threshold, re-derives a mean, or re-implements the social max rule.
  * Every figure below is either passed through from the caller's fetch or read off one of those two.
  *
- * ⚠️ AN INFORMATION PAPER, NOT A DECISION PAPER. It opens with findings and asks the board to
+ * ⚠️ AN INFORMATION PAPER, NOT A DECISION PAPER. It opens with findings and asks the reader to
  * approve nothing. There is deliberately no recommendation field, no options list and no
- * approve/reject shape anywhere in this module: a paper that asks a board to ratify a materiality
- * determination invites the board to change one, and the determination is the preparer's, made
- * under a method that is disclosed. The board is being INFORMED of a duty that has already arisen.
+ * approve/reject shape anywhere in this module: a report that asks its reader to ratify a
+ * materiality determination invites them to change one, and the determination is the preparer's,
+ * made under a method that is disclosed. The reader is being INFORMED of a duty that has already
+ * arisen.
+ *
+ * ⚠️ AND IT IS TITLED FOR WHAT IT IS, NOT FOR WHO RECEIVES IT. The same document goes to a board,
+ * an audit committee, an executive team and an assurance provider. A title naming one of them has
+ * to be changed for the others, and a document that gets re-titled in transit is a document nobody
+ * can cite. "Impact materiality report" is what it is to all four.
  *
  * ⚠️ NO MEAN. ANYWHERE. app/components/surveyEvidence.tsx carries this rule for the screens and it
  * holds here: spec v10/v11 §6.2.5, the screening scale is ORDINAL. StakeholderRow has no field a
@@ -96,6 +102,32 @@ export type CategoryParticipation = ParticipationCounts & {
   category: string
 }
 
+/** One side of a labour pair. distribution is null where that side was never asked. */
+export type ContrastSide = {
+  n_answered: number
+  top_box: number | null
+  distribution: Dist | null
+}
+
+/** survey_aggregate's s1_s2_contrast entries, carried through unchanged. */
+export type ContrastEntry = {
+  s1_subtopic_code: string
+  s2_subtopic_code: string
+  short_name: string
+  s1: ContrastSide
+  s2: ContrastSide
+  comparable: boolean
+  not_comparable_reason: string | null
+  gap: number | null
+  flagged: boolean
+}
+
+export type ContrastInput = {
+  what_this_is: string
+  what_this_is_not: string
+  entries: ContrastEntry[]
+}
+
 export type BoardReportInput = {
   company_name: string | null
   assessment_name: string | null
@@ -115,6 +147,28 @@ export type BoardReportInput = {
   /** The round's SNAPSHOTTED top_box_high_min_share. Not the current reference row. */
   topBoxHighMinShare: number
   thresholds: ThresholdRow[]
+
+  /**
+   * The round's SNAPSHOTTED polarisation levels, so section 5b can say what a split room is in the
+   * reader's own terms.
+   *
+   * ⚠️ NUMBERS, NOT THE AGGREGATE'S SENTENCE. survey_aggregate's method.dispersion.definition names
+   * its own columns — "at least polarised_extreme_min_n answers at BOTH 1 and 3, and fewer than
+   * polarised_middle_max_share of answers at 2" — which is written for a developer reading the
+   * payload and puts three identifiers and a system value in front of a board. The definition is
+   * not lost: the same thresholds are printed in full, with the reasoning recorded when they were
+   * set, in section 8, which is where a verifier looks for exactly that.
+   *
+   * OPTIONAL: absent means the section describes the split without quoting levels.
+   */
+  polarisation_levels?: { extreme_min_n: number; middle_max_share: number } | null
+
+  /**
+   * survey_aggregate's s1_s2_contrast. OPTIONAL for the same reason — a report built without it is
+   * missing a section, and saying that is better than printing an empty one that reads as "no
+   * pairs exist".
+   */
+  contrast?: ContrastInput | null
 }
 
 // ── sections ─────────────────────────────────────────────────────────────────────────────────────
@@ -147,9 +201,12 @@ export type FindingsSection = {
   topics_assessed: number
   topics_material: number
   topics_differing: number
+  /** ⚠️ COVERAGE, ON THE SAME PAGE AS THE FIGURES. See COVERAGE_HEADLINE. */
+  topics_asked: number
+  topics_with_ratings: number
   material_topics: MaterialTopic[]
   /** What each figure counts. A number a director remembers must be a number they can define. */
-  definitions: { assessed: string; material: string; differing: string }
+  definitions: { assessed: string; material: string; differing: string; coverage: string }
 }
 
 export type ParticipationSection = {
@@ -157,6 +214,8 @@ export type ParticipationSection = {
   totals: ParticipationCounts
   by_category: CategoryParticipation[]
   note: string
+  /** Printed directly beneath the table. See PARTICIPATION_COMPLETION_NOTE. */
+  completion_note: string
 }
 
 export type StakeholderRow = {
@@ -209,6 +268,30 @@ export type AssessmentViewSection = {
   abstention_note: string
 }
 
+export type PolarisationSection = {
+  heading: string
+  what_this_is: string
+  /** survey_aggregate's own definition of spread. null when the caller did not supply it. */
+  method_note: string | null
+  /** Sub-topics the aggregate marked polarised, with their distributions. */
+  rows: StakeholderRow[]
+  /** Printed when there are none — a result, not an empty state. */
+  none_note: string
+}
+
+export type ContrastSection = {
+  heading: string
+  /** The aggregate's own framing. null when the contrast was not supplied. */
+  what_this_is: string | null
+  /** ⚠️ FULL WEIGHT, NEVER A FOOTNOTE. See the constant below. */
+  what_this_is_not: string | null
+  /** Flagged first, then widest gap first — the order the results screen uses. */
+  entries: ContrastEntry[]
+  none_note: string
+  /** Printed instead of everything else when the caller passed no contrast at all. */
+  unavailable_note: string | null
+}
+
 export type DifferencesSection = { heading: string; register: DivergenceRegister }
 
 export type Provision = {
@@ -238,6 +321,8 @@ export type BoardReport = {
   findings: FindingsSection
   participation: ParticipationSection
   stakeholderView: StakeholderViewSection
+  polarisation: PolarisationSection
+  contrast: ContrastSection
   assessmentView: AssessmentViewSection
   differences: DifferencesSection
   methodology: MethodologySection
@@ -247,9 +332,9 @@ export type BoardReport = {
 
 // ── prose. ONE copy, exported as data, as register.ts does. ──────────────────────────────────────
 
-export const TITLE = 'Impact materiality — information paper'
+export const TITLE = 'Impact materiality report'
 export const KIND =
-  'For information. This paper reports what was found. It asks the board to approve nothing.'
+  'For information. This paper reports what was found. It asks the reader to approve nothing.'
 
 export const WHAT_THIS_IS_HEADING = 'What this exercise was'
 
@@ -266,12 +351,25 @@ export const WHAT_THIS_IS_PARAGRAPHS: string[] = [
 
   'This paper sets the two side by side. Where they point the same way, that is a topic on which '
   + 'the organisation and the people it affects agree. Where they point differently, that is worth '
-  + 'the board seeing before anything is published — not because either side is wrong, but because '
-  + 'a difference between them is exactly what an assurance provider will ask about.',
+  + 'seeing before anything is published — not because either side is wrong, but because a '
+  + 'difference between them is exactly what an assurance provider will ask about.',
 
   'A topic assessed as material becomes a disclosure obligation. That is the link between this '
   + 'exercise and the report the organisation will publish.',
 ]
+
+/**
+ * ⚠️ COVERAGE BELONGS ON THE FINDINGS PAGE, NOT ON A LATER ONE. "32 of 37 sub-topics received no
+ * rating" changes how every other figure on this page should be read, and a reader who meets it
+ * eight pages later has already formed a view. It is not a caveat; on a thin response it is the
+ * single most important sentence in the document.
+ */
+export const COVERAGE_HEADLINE = 'Coverage'
+
+export const COVERAGE_DEFINITION =
+  'Sub-topics put to respondents, and how many of those came back with at least one rating. A '
+  + 'sub-topic nobody rated carries no stakeholder view at all, so the comparison in this report '
+  + 'cannot be drawn for it. That is a finding about what can currently be seen, not a low score.'
 
 export const FINDINGS_HEADING = 'What we found'
 
@@ -287,7 +385,52 @@ export const FINDINGS_DEFINITIONS = {
     'Topics where what respondents said and what the assessment concluded point in different '
     + 'directions. Both are normal outcomes; they are listed so they can be considered before '
     + 'anything is published.',
+  coverage: COVERAGE_DEFINITION,
 } as const
+
+export const POLARISATION_HEADING = 'Where your own people disagree'
+
+export const POLARISATION_WHAT_THIS_IS =
+  'On these sub-topics respondents are at BOTH ends of the scale and few are in the middle. There '
+  + 'is no single figure that would describe the room, which is exactly why they are listed '
+  + 'separately rather than summarised. A split is not a low score and not a high one: it is two '
+  + 'groups of people who see the same topic differently, and finding out why is usually more '
+  + 'useful than any average of them would have been.'
+
+/**
+ * What a split room is, in the reader's terms, with this round's own numbers substituted.
+ *
+ * ⚠️ THE NUMBERS ARE THE ROUND'S, NOT TODAY'S. They were fixed onto the survey round when it was
+ * created, so a later change to the reference values cannot restate what this round found — the
+ * same guarantee section 8's threshold note makes.
+ */
+export const polarisationLevels = (
+  levels: { extreme_min_n: number; middle_max_share: number } | null | undefined,
+): string | null => {
+  if (!levels) return null
+  const people = levels.extreme_min_n === 1 ? 'person' : 'people'
+  const middle = Math.round(levels.middle_max_share * 100)
+  return `A sub-topic is listed here when at least ${levels.extreme_min_n} ${people} chose the `
+       + `lowest answer AND at least ${levels.extreme_min_n} chose the highest, while fewer than `
+       + `${middle}% of answers landed in the middle. Those levels were fixed onto this survey `
+       + `round when it was created, and are printed with the reasoning behind them in the `
+       + `methodology section.`
+}
+
+export const POLARISATION_NONE =
+  'No sub-topic came back split. That is a result rather than a blank page: on every topic with '
+  + 'enough answers to judge, respondents landed in the same part of the scale as each other.'
+
+export const CONTRAST_HEADING = 'Inside and outside'
+
+export const CONTRAST_NONE =
+  'No labour pairs could be drawn. Both sides of a pair have to be in scope for the same survey '
+  + 'round before the two can be set beside each other.'
+
+export const CONTRAST_UNAVAILABLE =
+  'The paired labour comparison was not available when this report was produced, so this section '
+  + 'is empty for a reason that is about the report and not about your organisation. It is not a '
+  + 'finding that no difference exists — the comparison was not drawn.'
 
 export const PARTICIPATION_HEADING = 'Who took part'
 
@@ -297,6 +440,20 @@ export const PARTICIPATION_NOTE =
   + 'paper rests: a finding drawn from four people in one department is a different thing from the '
   + 'same finding drawn from sixty across five. The counts are given as they are, including where '
   + 'they are low.'
+
+/**
+ * ⚠️ WITHOUT THIS SENTENCE THE TABLE READS AS A CONTRADICTION. "Completed: 0" sits in the same
+ * document as fifty-odd ratings, and a reader reconciles the two by deciding one of them is wrong.
+ * Both are true: a respondent who rated some sub-topics and never pressed submit is counted as
+ * having opened the survey and not as having completed it, and every rating they gave is in the
+ * figures. Submitting is not what makes an answer count.
+ */
+export const PARTICIPATION_COMPLETION_NOTE =
+  'A respondent who answered some questions and did not finish is counted here as having opened '
+  + 'the survey, not as having completed it. Their ratings are still included in every figure in '
+  + 'this report: submitting is what closes a response, not what makes an answer count. A '
+  + 'completion figure of zero beside ratings elsewhere in this document is those two facts, not a '
+  + 'contradiction between them.'
 
 export const STAKEHOLDER_HEADING = 'What stakeholders told us'
 
@@ -332,7 +489,7 @@ export const DIFFERENCES_HEADING = 'Where the two views differ'
 export const METHODOLOGY_HEADING = 'How this was done'
 
 /**
- * The provisions applied, NAMED. A board paper that says "in line with the standard" gives a
+ * The provisions applied, NAMED. A report that says "in line with the standard" gives a
  * director nothing to hold; a named paragraph can be looked up, and an assurance provider will.
  */
 export const PROVISIONS: Provision[] = [
@@ -434,7 +591,7 @@ export const NOT_CLAIMED: string[] = [
   + 'standard sets them out, and nothing here orders them by importance to the organisation.',
 ]
 
-export const WHY_HEADING = 'What this tells the board, beyond compliance'
+export const WHY_HEADING = 'What this tells you, beyond compliance'
 
 export const WHY_THIS_MATTERS: { title: string; body: string }[] = [
   {
@@ -457,8 +614,8 @@ export const WHY_THIS_MATTERS: { title: string; body: string }[] = [
     body:
       'Our own workforce and the workers in our value chain answer separate questions about '
       + 'separate workplaces. A difference between those two answers is not disagreement — it is '
-      + 'two populations reporting different conditions, and it is one of the few early signals a '
-      + 'board gets about conditions in its supply chain.',
+      + 'two populations reporting different conditions, and it is one of the few early signals '
+      + 'you get about conditions in your supply chain.',
   },
   {
     title: 'What follows from a material topic',
@@ -466,7 +623,7 @@ export const WHY_THIS_MATTERS: { title: string; body: string }[] = [
       'A topic determined material becomes a disclosure obligation. Each obligation becomes data '
       + 'that has to be collected, at a quality that can be assured, by people whose time is '
       + 'budgeted. The list of material topics in section 3 is therefore also the earliest view '
-      + 'the board has of next year’s reporting workload.',
+      + 'you have of next year’s reporting workload.',
   },
 ]
 
@@ -598,6 +755,19 @@ export function buildBoardReport(input: BoardReportInput): BoardReport {
 
   const materialTopics = judged.filter(j => j.material)
 
+  // ⚠️ ASKED means the sub-topic reached respondents at all — it is in scope and the aggregate has
+  // a result row for it. RATED means at least one person gave it a rating. The gap between the two
+  // is the coverage finding, and it is computed from the same rows every other figure comes from.
+  const inScope = input.subtopics.filter(s => s.status === 'included')
+  const asked = inScope.filter(s => s.overall !== null)
+  const withRatings = asked.filter(s => (s.overall as NonNullable<typeof s.overall>).top_box.denominator > 0)
+
+  // ⚠️ THE AGGREGATE'S OWN FLAG, never re-derived here. Whether a room is split is survey_aggregate's
+  // determination under its own disclosed thresholds; recomputing it from three band counts would be
+  // a second definition of "polarised" free to disagree with the one the survey screen shows.
+  const polarised = new Set(
+    input.subtopics.filter(s => s.overall?.polarised === true).map(s => s.subtopic_code))
+
   const stakeholderRows: StakeholderRow[] = input.subtopics
     .filter(s => s.status === 'included' && s.overall !== null)
     .map(s => {
@@ -641,6 +811,8 @@ export function buildBoardReport(input: BoardReportInput): BoardReport {
       topics_assessed: assessed.length,
       topics_material: materialTopics.length,
       topics_differing: register.entries.length,
+      topics_asked: asked.length,
+      topics_with_ratings: withRatings.length,
       material_topics: materialTopics.map(j => ({
         subtopic_code: j.subtopic.subtopic_code,
         name: nameOf(j.subtopic),
@@ -651,6 +823,7 @@ export function buildBoardReport(input: BoardReportInput): BoardReport {
         assessed: FINDINGS_DEFINITIONS.assessed,
         material: FINDINGS_DEFINITIONS.material,
         differing: FINDINGS_DEFINITIONS.differing,
+        coverage: FINDINGS_DEFINITIONS.coverage,
       },
     },
 
@@ -659,6 +832,7 @@ export function buildBoardReport(input: BoardReportInput): BoardReport {
       totals: input.participation,
       by_category: input.by_category,
       note: PARTICIPATION_NOTE,
+      completion_note: PARTICIPATION_COMPLETION_NOTE,
     },
 
     stakeholderView: {
@@ -679,6 +853,36 @@ export function buildBoardReport(input: BoardReportInput): BoardReport {
         directions: j.directions,
       })),
       abstention_note: ABSTENTION_NOTE,
+    },
+
+    /**
+     * ⚠️ A SPLIT ROOM IS A FINDING, NOT A FOOTNOTE. The aggregate already marks these; until now
+     * they appeared only as a sentence under a chart, where a reader scanning for findings scrolls
+     * past them. They are the rows where an average would have been most misleading and where the
+     * organisation most likely does not yet know why two groups see a topic differently.
+     */
+    polarisation: {
+      heading: POLARISATION_HEADING,
+      what_this_is: POLARISATION_WHAT_THIS_IS,
+      method_note: polarisationLevels(input.polarisation_levels),
+      // Reuses the rows section 5 built, so the two cannot describe the same sub-topic differently.
+      rows: stakeholderRows.filter(r => polarised.has(r.subtopic_code)),
+      none_note: POLARISATION_NONE,
+    },
+
+    /**
+     * ⚠️ ORDERED HERE, NOT IN THE RENDERER. Flagged first, then widest gap first — the order the
+     * results screen uses, so a reader who has seen both meets the same pairs in the same sequence.
+     * Which findings come first is a claim about what matters, and that is content.
+     */
+    contrast: {
+      heading: CONTRAST_HEADING,
+      what_this_is: input.contrast?.what_this_is ?? null,
+      what_this_is_not: input.contrast?.what_this_is_not ?? null,
+      entries: [...(input.contrast?.entries ?? [])].sort((a, b) =>
+        (b.flagged ? 1 : 0) - (a.flagged ? 1 : 0) || (b.gap ?? -1) - (a.gap ?? -1)),
+      none_note: CONTRAST_NONE,
+      unavailable_note: input.contrast ? null : CONTRAST_UNAVAILABLE,
     },
 
     differences: { heading: DIFFERENCES_HEADING, register },

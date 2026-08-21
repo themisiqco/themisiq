@@ -11,13 +11,14 @@
 //   app/dashboard/climate-risk/report/page.tsx       (resilience report, Important Notice section)
 //   app/dashboard/materiality/report/page.tsx        (CSRD / IFRS S2 report, Important Notice section)
 //   app/api/assessment/submit/route.ts               (lead email, footer fine print)
+//   lib/materiality/boardReportPdf.ts                (impact materiality report, back cover)
 //
 // NOT YET WIRED — three surfaces still hold this text as inline JSX, which is a different shape
 // (paragraph elements with their own styling, not an array). Folding them in is a separate change:
 //   app/methodology/page.tsx                         (public methodology page)
 //   app/dashboard/ghg/page.tsx                       (GHG inline report)
 //   app/dashboard/climate-risk/page.tsx              (TWO copies — one per mode's acknowledgment block)
-// Until those are wired, an edit here reaches four of seven surfaces. Change all of them together.
+// Until those are wired, an edit here reaches five of eight surfaces. Change all of them together.
 //
 // `readonly` is deliberate: a consumer must not be able to splice or reorder shared legal text.
 // Every current consumer only reads it (.map / .forEach), so this costs nothing.

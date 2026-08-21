@@ -1,0 +1,825 @@
+/**
+ * The impact materiality report, rendered.
+ *
+ * ⚠️ THIS FILE RENDERS. IT DOES NOT DECIDE. Every figure and every sentence below comes from
+ * buildBoardReport's output. Nothing here counts a topic, derives a materiality verdict, rewords a
+ * definition, shortens a limitation or summarises a threshold. If a number is wanted that this
+ * module would have to compute, the computation belongs in boardReport.ts and the answer comes back
+ * through the payload — the lib/ghg/engine.ts rule CLAUDE.md carries as an invariant: ONE renderer,
+ * and the renderer is not where the methodology lives.
+ *
+ * ⚠️ NO MEAN, AND NOT EVEN THE MATERIALS FOR ONE. StakeholderRow carries a distribution and a top
+ * box and deliberately has no field an average could come from. Do not compute one here from the
+ * three band counts: the screening scale is ORDINAL (spec v10/v11 §6.2.5), the distance between
+ * band 1 and band 2 is not the same quantity as between 2 and 3, and an average of them would be a
+ * number with no meaning that nonetheless looks precise. There is no midpoint marker anywhere in
+ * this file and none may be added.
+ *
+ * ⚠️ IT RETURNS THE DOCUMENT, IT DOES NOT SAVE IT — a deliberate divergence from
+ * lib/assurancePdf.ts, which calls doc.save() itself at the end of generateAssurancePDF. That
+ * forces a download and makes the function unusable for attaching a paper to an email or opening it
+ * in a viewer. The caller decides:
+ *
+ *   const doc = generateBoardReportPDF(report)
+ *   doc.save(`ThemisIQ_ImpactMaterialityReport_${(report.cover.company_name || 'Company').replace(/\s+/g, '_')}.pdf`)
+ *
+ * which keeps assurancePdf.ts's naming shape without keeping its side effect.
+ */
+
+import type jsPDF from 'jspdf'
+import {
+  createLayout, MARGIN, INK, PAPER, SECONDARY, MUTED,
+  type Layout,
+} from '../pdf/layout'
+import { CHARIS_FAMILY } from '../fonts/charis'
+// ⚠️ THE SAME ASSET THE COVER USES. Never recreated, never traced, never set as type — see the
+// header of lib/pdf/logo.ts.
+import { THEMISIQ_WORDMARK_DATA_URI, WORDMARK_ASPECT } from '../pdf/logo'
+/**
+ * ⚠️ IMPORTED, NEVER COPIED. lib/disclaimer.ts is the single source of truth for this text and
+ * CLAUDE.md requires it to stay in sync across every Category-A surface. It is rendered in full and
+ * in order: not summarised, not reordered, not abridged, and never rewritten to fit a page. The
+ * array is `readonly` precisely so a consumer cannot splice or reorder shared legal text, and this
+ * file only reads it.
+ */
+import { DISCLAIMER_PARAS } from '../disclaimer'
+import type { AssessmentRow, BoardReport, ContrastEntry, StakeholderRow } from './boardReport'
+// The register's own entry shape, reached through DifferencesSection.register.entries.
+import type { RegisterEntry } from './register'
+
+// ── measuring and placing ────────────────────────────────────────────────────────────────────────
+
+const SIZE = {
+  body: 10.5,
+  small: 9.5,
+  label: 8,
+  figure: 44,
+  figureLabel: 11,
+} as const
+
+const LEAD = {
+  body: 10.5 * 1.65,
+  small: 9.5 * 1.55,
+  label: 8 * 1.4,
+} as const
+
+const setType = (doc: jsPDF, size: number, style: 'normal' | 'bold' | 'italic', colour: string) => {
+  doc.setFont(CHARIS_FAMILY, style)
+  doc.setFontSize(size)
+  doc.setTextColor(colour)
+}
+
+const wrap = (doc: jsPDF, text: string, width: number, size: number,
+              style: 'normal' | 'bold' | 'italic' = 'normal'): string[] => {
+  setType(doc, size, style, INK)
+  return doc.splitTextToSize(text, width) as string[]
+}
+
+/**
+ * Reserve a block of known height, breaking the page first if it will not fit, then draw into it.
+ *
+ * ⚠️ THE RESERVED HEIGHT AND THE DRAWN HEIGHT ARE THE SAME NUMBER. The cursor is advanced by
+ * exactly what was reserved, so a block can never draw past what keepTogether checked and overlap
+ * whatever follows. Measure first, then reserve, then draw — never the other way round.
+ */
+const block = (l: Layout, height: number, draw: (top: number) => void): void => {
+  l.keepTogether(height, () => {
+    draw(l.y())
+    l.spacer(height)
+  })
+}
+
+/** Wrapped text drawn at an arbitrary x and width — layout.body() is always full measure. */
+const textAt = (doc: jsPDF, lines: string[], x: number, top: number,
+                size: number, lead: number, style: 'normal' | 'bold' | 'italic',
+                colour: string): void => {
+  setType(doc, size, style, colour)
+  lines.forEach((line, i) => doc.text(line, x, top + size + i * lead))
+}
+
+/**
+ * Start a section on its own page.
+ *
+ * ⚠️ CONTINUATION IS ALLOWED FOR EXACTLY ONE PAIR. Sections 9 and 10 are the closing argument and
+ * read as one thought — what this does not cover, then what it tells you anyway. Everywhere else a
+ * section owns its page, because this report is read in fragments and a section that begins
+ * halfway down a page is a section somebody misses.
+ */
+const sectionPage = (l: Layout, opts: { continueIfRoom?: number } = {}): void => {
+  const room = l.pageHeight - MARGIN.bottom - l.y()
+  if (opts.continueIfRoom && room >= opts.continueIfRoom) {
+    l.spacer(18)
+    return
+  }
+  l.newPage()
+}
+
+// ── section 5: the distributions ─────────────────────────────────────────────────────────────────
+
+const BAND_ROW_HEIGHT = 15
+const BAR_TRACK = 190
+const BAR_HEIGHT = 7
+
+/**
+ * The three band bars for ONE set of counts, drawn from `top` and returning the height used.
+ * Shared by section 5 and the labour contrast so the two cannot draw the same data differently.
+ */
+const bandBars = (l: Layout, dist: { '1': number; '2': number; '3': number },
+                  top: number, x: number, track: number): number => {
+  const doc = l.doc
+  const counts: [('1' | '2' | '3'), number][] = [['1', dist['1']], ['2', dist['2']], ['3', dist['3']]]
+  const total = counts.reduce((a, [, n]) => a + n, 0)
+  const scale = total > 0 ? track / total : 0
+  let cursor = top
+  for (const [band, n] of counts) {
+    const baseline = cursor + BAR_HEIGHT
+    setType(doc, SIZE.label, 'normal', MUTED)
+    doc.text(band, x, baseline)
+    const barX = x + 14
+    doc.setFillColor(232, 231, 228)
+    doc.rect(barX, cursor, track, BAR_HEIGHT, 'F')
+    if (n > 0) {
+      doc.setFillColor(85, 94, 83)
+      doc.rect(barX, cursor, Math.max(n * scale, 1.2), BAR_HEIGHT, 'F')
+    }
+    setType(doc, SIZE.small, 'normal', INK)
+    doc.text(String(n), barX + track + 10, baseline)
+    cursor += BAND_ROW_HEIGHT
+  }
+  return cursor - top
+}
+
+/**
+ * Three horizontal bars, one per band, sharing a baseline and a scale.
+ *
+ * ⚠️ NOT A STACKED BAR, AND NOT A GRADIENT ONE. The bands are ordered CATEGORIES and the question a
+ * reader has is "how many chose each" — which is a comparison of lengths from a common origin, the
+ * one thing a bar chart does well. Stacking them turns three comparable quantities into three
+ * segments of one length, which answers a question nobody asked and hides the shape of a split room.
+ *
+ * ⚠️ ALL THREE BARS ARE THE SAME COLOUR, DELIBERATELY. Colouring band 3 differently would encode a
+ * verdict about an answer — that choosing "needs significant strategic focus" is the alarming one —
+ * and this paper reports what respondents said without grading it. The band number and the count
+ * carry the meaning; the section's own scale note, printed above, says what each number means.
+ *
+ * ⚠️ THE SCALE IS PER ROW. Bar lengths are comparable between the three bands of ONE sub-topic. They
+ * are not comparable between sub-topics, whose denominators differ — which is why every count is
+ * printed as a number beside its bar rather than left to be read off a length.
+ */
+const distributionBlock = (l: Layout, row: StakeholderRow): void => {
+  const doc = l.doc
+  const nameLines = wrap(doc, `${row.name} · ${row.subtopic_code}`, l.contentWidth, SIZE.body, 'bold')
+  const topBoxLine = row.top_box.share === null
+    ? `${row.top_box.numerator} of ${row.top_box.denominator} gave a rating`
+    // ⚠️ THE DENOMINATOR TRAVELS WITH THE SHARE, always — the module's own strings do the same.
+    : `${row.top_box.numerator} of ${row.top_box.denominator} chose band 3`
+  const splitLines = row.split_note ? wrap(doc, row.split_note, l.contentWidth, SIZE.small) : []
+
+  const height =
+    nameLines.length * (SIZE.body * 1.35) + 6
+    + 3 * BAND_ROW_HEIGHT + 8
+    + LEAD.small
+    + (splitLines.length ? splitLines.length * LEAD.small + 6 : 0)
+    + 16
+
+  block(l, height, top => {
+    let cursor = top
+    textAt(doc, nameLines, MARGIN.left, cursor, SIZE.body, SIZE.body * 1.35, 'bold', INK)
+    cursor += nameLines.length * (SIZE.body * 1.35) + 6
+
+    const counts: [('1' | '2' | '3'), number][] = [
+      ['1', row.distribution['1']],
+      ['2', row.distribution['2']],
+      ['3', row.distribution['3']],
+    ]
+    const total = counts.reduce((a, [, n]) => a + n, 0)
+    // A row where nobody scored draws no bars — a zero-length bar and a missing bar look identical,
+    // and the counts printed beside them say which this is.
+    const scale = total > 0 ? BAR_TRACK / total : 0
+
+    for (const [band, n] of counts) {
+      const baseline = cursor + BAR_HEIGHT
+      setType(doc, SIZE.label, 'normal', MUTED)
+      doc.text(band, MARGIN.left, baseline)
+
+      const x = MARGIN.left + 14
+      // The track, so an empty band still shows its place on the shared scale.
+      doc.setFillColor(232, 231, 228)
+      doc.rect(x, cursor, BAR_TRACK, BAR_HEIGHT, 'F')
+      if (n > 0) {
+        doc.setFillColor(85, 94, 83)
+        doc.rect(x, cursor, Math.max(n * scale, 1.2), BAR_HEIGHT, 'F')
+      }
+
+      setType(doc, SIZE.small, 'normal', INK)
+      doc.text(String(n), x + BAR_TRACK + 10, baseline)
+      cursor += BAND_ROW_HEIGHT
+    }
+
+    cursor += 4
+    setType(doc, SIZE.small, 'normal', SECONDARY)
+    doc.text(
+      `${topBoxLine} · ${row.counts.answered} answered · ${row.counts.abstained} did not judge · `
+      + `${row.counts.skipped} skipped`,
+      MARGIN.left, cursor + SIZE.small)
+    cursor += LEAD.small
+
+    if (splitLines.length) {
+      cursor += 6
+      textAt(doc, splitLines, MARGIN.left, cursor, SIZE.small, LEAD.small, 'italic', SECONDARY)
+    }
+  })
+}
+
+/** A plain comma-separated list of names, indented under whatever introduced it. */
+const nameList = (l: Layout, names: string[]): void => {
+  const doc = l.doc
+  const lines = wrap(doc, names.join(', '), l.contentWidth - 12, SIZE.small)
+  block(l, lines.length * LEAD.small + 10, top => {
+    textAt(doc, lines, MARGIN.left + 12, top, SIZE.small, LEAD.small, 'normal', SECONDARY)
+  })
+}
+
+// ── section 6: the assessment ────────────────────────────────────────────────────────────────────
+
+const DIRECTION_WORD: Record<string, string> = { negative: 'Harm', positive: 'Benefit' }
+
+/**
+ * ⚠️ DISPLAY ONLY. The mean of 3, 3, 2 is 2.6666666666666665, which is what a float is and not what
+ * a reader should be handed. Rounded to one decimal HERE, at the point of printing.
+ *
+ * ⚠️ AND NOWHERE ELSE. Nothing downstream of this function reads the rounded value, and no
+ * comparison anywhere is made against it. Materiality is decided in lib/materiality/severity.ts by
+ * an exact integer comparison — deliberately, because the two-dimension positive case lands exactly
+ * on the threshold and materiality would otherwise rest on the representation of a division. A
+ * severity that displays as 2.5 was tested as the exact value, not as 2.5.
+ */
+const showSeverity = (v: number): string => v.toFixed(1)
+
+/**
+ * The sentence that keeps the rounding honest, printed once in section 6.
+ *
+ * ⚠️ IT LIVES BESIDE showSeverity, NOT IN boardReport.ts. The module holds exact values and makes
+ * no rounding decision, so a note about rounding kept there could drift from the renderer that
+ * actually rounds. Here the claim and the code that makes it true are eight lines apart.
+ */
+const ROUNDING_NOTE =
+  'Severity figures below are shown to one decimal place. The materiality test that produced each '
+  + 'verdict was made on the exact value, not on the rounded one, so a figure printed as 2.5 was '
+  + 'tested as what it actually was.'
+
+const assessmentBlock = (l: Layout, row: AssessmentRow): void => {
+  const doc = l.doc
+  const nameLines = wrap(doc, `${row.name} · ${row.subtopic_code}`, l.contentWidth, SIZE.body, 'bold')
+
+  const lines: string[] = []
+  for (const d of row.directions) {
+    const label = DIRECTION_WORD[d.direction] ?? d.direction
+    if (!d.complete) {
+      // ⚠️ AN ABSTENTION, SAID AS ONE. Never a zero, never a low, never an empty cell that reads
+      // like a score of nothing.
+      lines.push(`${label}: not enough visibility to judge ${d.abstained.join(', ')} — no severity`)
+      continue
+    }
+    const drivers = d.drivers.length ? ` · carried by ${d.drivers.join(', ')}` : ''
+    lines.push(`${label}: severity ${showSeverity(d.severity as number)}${drivers}`
+             + ` · ${d.material === true ? 'material' : 'not material'}`)
+  }
+
+  const wrapped = lines.flatMap(x => wrap(doc, x, l.contentWidth - 12, SIZE.small))
+  const height = nameLines.length * (SIZE.body * 1.35) + 6 + wrapped.length * LEAD.small + 16
+
+  block(l, height, top => {
+    let cursor = top
+    textAt(doc, nameLines, MARGIN.left, cursor, SIZE.body, SIZE.body * 1.35, 'bold', INK)
+    cursor += nameLines.length * (SIZE.body * 1.35) + 6
+    textAt(doc, wrapped, MARGIN.left + 12, cursor, SIZE.small, LEAD.small, 'normal', SECONDARY)
+  })
+}
+
+// ── section 7: the two facts ─────────────────────────────────────────────────────────────────────
+
+const COLUMN_GAP = 22
+
+/**
+ * One entry, as TWO COLUMNS OF EQUAL WIDTH AND EQUAL WEIGHT.
+ *
+ * ⚠️ NEITHER COLUMN IS STYLED AS THE CORRECTION OF THE OTHER. Same width, same size, same weight,
+ * same colour, same rule above. No red, no amber, no arrow between them, no ordering that puts the
+ * "right" answer second. A difference between what respondents said and what the assessment
+ * concluded is not an error either side made, and a layout that shades one of them has made a
+ * finding the module explicitly declines to make.
+ */
+const entryBlock = (l: Layout, entry: RegisterEntry): void => {
+  const doc = l.doc
+  const colWidth = (l.contentWidth - COLUMN_GAP) / 2
+  const rightX = MARGIN.left + colWidth + COLUMN_GAP
+
+  const nameLines = wrap(doc, `${entry.short_name ?? entry.subtopic_code} · ${entry.topic_label}`,
+                         l.contentWidth, SIZE.body, 'bold')
+  const left = wrap(doc, entry.stakeholder.statement, colWidth, SIZE.small)
+  const right = wrap(doc, entry.assessment.statement, colWidth, SIZE.small)
+
+  const bodyLines = Math.max(left.length, right.length)
+  const height = nameLines.length * (SIZE.body * 1.35) + 8
+               + LEAD.label + 4 + bodyLines * LEAD.small + 18
+
+  block(l, height, top => {
+    let cursor = top
+    textAt(doc, nameLines, MARGIN.left, cursor, SIZE.body, SIZE.body * 1.35, 'bold', INK)
+    cursor += nameLines.length * (SIZE.body * 1.35) + 8
+
+    // Column labels. These are the only invented strings in this file: the payload carries the two
+    // statements but no headings for them, and a two-column layout needs to say which is which.
+    setType(doc, SIZE.label, 'normal', MUTED)
+    doc.text('WHAT RESPONDENTS SAID', MARGIN.left, cursor + SIZE.label)
+    doc.text('WHAT YOUR ASSESSMENT CONCLUDED', rightX, cursor + SIZE.label)
+    cursor += LEAD.label + 4
+
+    textAt(doc, left, MARGIN.left, cursor, SIZE.small, LEAD.small, 'normal', INK)
+    textAt(doc, right, rightX, cursor, SIZE.small, LEAD.small, 'normal', INK)
+  })
+}
+
+// ── the labour contrast ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * One labour pair: own workforce above, value-chain workers below, both full measure.
+ *
+ * ⚠️ ONE ABOVE THE OTHER, BOTH THE SAME WIDTH. Side by side in two columns the two charts end up on
+ * different residual widths once the labels differ, and two bar groups that are not on the same
+ * scale cannot be compared by eye — which is the only thing this block exists to allow. The results
+ * screen made the same choice for the same reason.
+ *
+ * ⚠️ A PAIR THAT CANNOT BE DRAWN IS PRINTED, NOT DROPPED. not_comparable_reason IS the finding —
+ * usually that nobody in the value chain answered — and a blank or a zero in its place would report
+ * agreement where there is silence.
+ */
+const contrastBlock = (l: Layout, e: ContrastEntry): void => {
+  const doc = l.doc
+  const nameLines = wrap(doc, `${e.short_name} · ${e.s1_subtopic_code} / ${e.s2_subtopic_code}`,
+                         l.contentWidth, SIZE.body, 'bold')
+
+  if (!e.comparable || !e.s1.distribution || !e.s2.distribution) {
+    const why = wrap(doc, e.not_comparable_reason ?? 'No reason was recorded.',
+                     l.contentWidth - 12, SIZE.small)
+    const height = nameLines.length * (SIZE.body * 1.35) + 6 + why.length * LEAD.small + 16
+    block(l, height, top => {
+      textAt(doc, nameLines, MARGIN.left, top, SIZE.body, SIZE.body * 1.35, 'bold', INK)
+      textAt(doc, why, MARGIN.left + 12,
+             top + nameLines.length * (SIZE.body * 1.35) + 6, SIZE.small, LEAD.small, 'normal', SECONDARY)
+    })
+    return
+  }
+
+  const sides: [string, typeof e.s1][] = [
+    ['Your own workforce', e.s1],
+    ['Workers in your value chain', e.s2],
+  ]
+  const height = nameLines.length * (SIZE.body * 1.35) + 8
+               + sides.length * (LEAD.small + 3 * BAND_ROW_HEIGHT + 10) + 12
+
+  block(l, height, top => {
+    let cursor = top
+    textAt(doc, nameLines, MARGIN.left, cursor, SIZE.body, SIZE.body * 1.35, 'bold', INK)
+    cursor += nameLines.length * (SIZE.body * 1.35) + 8
+
+    for (const [who, side] of sides) {
+      setType(doc, SIZE.small, 'normal', SECONDARY)
+      // ⚠️ THE COUNT, NOT A DERIVED SHARE. n_answered is the denominator and it is printed here.
+      doc.text(`${who} · ${side.n_answered} answered`, MARGIN.left, cursor + SIZE.small)
+      cursor += LEAD.small
+      cursor += bandBars(l, side.distribution as { '1': number; '2': number; '3': number },
+                         cursor, MARGIN.left, BAR_TRACK) + 10
+    }
+  })
+}
+
+// ── the document ─────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Render the report. Returns the jsPDF instance; the caller saves, opens or attaches it.
+ */
+export function generateBoardReportPDF(report: BoardReport): jsPDF {
+  const l = createLayout()
+  const doc = l.doc
+
+  // ── 1 · COVER ────────────────────────────────────────────────────────────────────────────────
+  l.coverPage({
+    company: report.cover.company_name,
+    assessmentName: report.cover.assessment_name,
+    period: report.cover.reporting_period,
+    standardVersionLabel: report.cover.standard_version_label,
+    roundName: report.cover.round_name,
+    closedOn: report.cover.round_closed_at,
+  })
+
+  // The cover carries the title and the "for information" line; repeating them here would be the
+  // second copy. Printed once, at the head of the paper proper.
+  l.heading(report.cover.title, 1)
+  l.lead(report.cover.kind)
+  l.rule()
+
+  // ── 2 · WHAT THIS IS ─────────────────────────────────────────────────────────────────────────
+  l.heading(report.whatThisIs.heading, 2)
+  report.whatThisIs.paragraphs.forEach((p, i) => (i === 0 ? l.lead(p) : l.body(p)))
+
+  // ── 3 · FINDINGS ─────────────────────────────────────────────────────────────────────────────
+  // ⚠️ THE MOST SPACIOUS PAGE IN THE DOCUMENT, ON PURPOSE. These three numbers are what a director
+  // carries out of the room. A dense page of them reads as a table to be checked later; three
+  // figures with air around them read as the finding they are.
+  sectionPage(l)
+  l.heading(report.findings.heading, 1)
+  l.spacer(10)
+
+  const figures: [number, string, string][] = [
+    [report.findings.topics_assessed, 'Topics assessed', report.findings.definitions.assessed],
+    [report.findings.topics_material, 'Topics material', report.findings.definitions.material],
+    [report.findings.topics_differing, 'Topics where the two views differ',
+     report.findings.definitions.differing],
+  ]
+
+  for (const [value, label, definition] of figures) {
+    // ⚠️ THE DEFINITION IS PRINTED VERBATIM, BENEATH ITS OWN FIGURE. A number a director remembers
+    // has to be a number they can define, and the definition beside it is what stops the figure
+    // being repeated later with a different meaning attached.
+    const defLines = wrap(doc, definition, l.contentWidth - 8, SIZE.small)
+    const height = SIZE.figure + 10 + LEAD.body + 6 + defLines.length * LEAD.small + 34
+
+    block(l, height, top => {
+      let cursor = top
+      setType(doc, SIZE.figure, 'normal', INK)
+      doc.text(String(value), MARGIN.left, cursor + SIZE.figure)
+      cursor += SIZE.figure + 10
+
+      setType(doc, SIZE.figureLabel, 'normal', INK)
+      doc.text(label, MARGIN.left, cursor + SIZE.figureLabel)
+      cursor += LEAD.body + 6
+
+      textAt(doc, defLines, MARGIN.left + 8, cursor, SIZE.small, LEAD.small, 'normal', SECONDARY)
+    })
+  }
+
+  // ⚠️ COVERAGE, ON THE SAME PAGE AS THE THREE FIGURES. It changes how all three should be read,
+  // so it is set beside them rather than eight pages later where a reader has already formed a view.
+  {
+    const f = report.findings
+    const headline =
+      `${f.topics_with_ratings} of the ${f.topics_asked} sub-topics put to respondents came back `
+      + `with at least one rating.`
+    const gap = f.topics_asked - f.topics_with_ratings
+    const second = gap > 0
+      ? `${gap} received none, so no stakeholder view exists for them and this report cannot set `
+        + `one beside your assessment.`
+      : `Every sub-topic asked about received at least one rating.`
+    const defLines = wrap(doc, f.definitions.coverage, l.contentWidth - 8, SIZE.small)
+    const headLines = wrap(doc, `${headline} ${second}`, l.contentWidth, SIZE.body)
+    const height = LEAD.body + 4 + headLines.length * LEAD.body + 6
+                 + defLines.length * LEAD.small + 26
+
+    block(l, height, top => {
+      let cursor = top
+      setType(doc, SIZE.figureLabel, 'normal', INK)
+      doc.text('Coverage', MARGIN.left, cursor + SIZE.figureLabel)
+      cursor += LEAD.body + 4
+      textAt(doc, headLines, MARGIN.left, cursor, SIZE.body, LEAD.body, 'normal', INK)
+      cursor += headLines.length * LEAD.body + 6
+      textAt(doc, defLines, MARGIN.left + 8, cursor, SIZE.small, LEAD.small, 'normal', SECONDARY)
+    })
+  }
+
+  if (report.findings.material_topics.length > 0) {
+    l.rule()
+    l.heading('The material topics', 3)
+    for (const t of report.findings.material_topics) {
+      // carried_by is printed as the module holds it — both directions where both carried, because
+      // ¶44 forbids netting them into one finding.
+      l.body(`${t.name} · ${t.topic_label} — ${t.carried_by.join(' and ')}`)
+    }
+  }
+
+  // ── 4 · PARTICIPATION ────────────────────────────────────────────────────────────────────────
+  sectionPage(l)
+  l.heading(report.participation.heading, 1)
+  l.spacer(6)
+
+  const rows: [string, number, number, number][] = [
+    ['All respondents', report.participation.totals.invited,
+     report.participation.totals.opened, report.participation.totals.answered],
+    ...report.participation.by_category.map(c =>
+      [c.category, c.invited, c.opened, c.answered] as [string, number, number, number]),
+  ]
+
+  block(l, LEAD.label + 6, top => {
+    setType(doc, SIZE.label, 'normal', MUTED)
+    // ⚠️ THE COLUMNS NAME WHAT THEY COUNT. "Answered" was a lie of omission: the column counts
+    // respondents who FINISHED, and a reader comparing a zero here against the ratings later in the
+    // document has to decide which one is wrong. "Completed" makes the two reconcilable, and the
+    // note beneath the table finishes the job.
+    doc.text('GROUP', MARGIN.left, top + SIZE.label)
+    doc.text('INVITED', MARGIN.left + 290, top + SIZE.label)
+    doc.text('OPENED IT', MARGIN.left + 360, top + SIZE.label)
+    doc.text('COMPLETED', MARGIN.left + 440, top + SIZE.label)
+  })
+
+  for (const [name, invited, opened, answered] of rows) {
+    block(l, LEAD.body, top => {
+      setType(doc, SIZE.body, 'normal', INK)
+      doc.text(name, MARGIN.left, top + SIZE.body)
+      setType(doc, SIZE.body, 'normal', SECONDARY)
+      doc.text(String(invited), MARGIN.left + 290, top + SIZE.body)
+      doc.text(String(opened), MARGIN.left + 360, top + SIZE.body)
+      doc.text(String(answered), MARGIN.left + 440, top + SIZE.body)
+    })
+  }
+
+  // The counts first; what they mean and why they matter beneath them.
+  l.spacer(8)
+  l.body(report.participation.completion_note)
+  l.rule()
+  l.body(report.participation.note)
+
+  // ── 5 · WHAT STAKEHOLDERS SAID ───────────────────────────────────────────────────────────────
+  sectionPage(l)
+  l.heading(report.stakeholderView.heading, 1)
+  // ⚠️ THE LEGEND STAYS ABOVE; THE JUSTIFICATION MOVES BELOW. scale_note says what bands 1, 2 and 3
+  // MEAN — without it the first chart is unreadable, so it is not method, it is the key. The
+  // no-average explanation is an argument for a choice already made, and it now sits in section 8
+  // where a verifier looks for exactly that. It is moved, never cut.
+  l.body(report.stakeholderView.scale_note)
+  l.rule()
+
+  // ⚠️ A CHART OF NOTHING IS WORSE THAN NO CHART. Three bars of zero beside a line saying nobody
+  // rated the topic occupies the full height of a finding and carries none of one — and repeated
+  // across twenty-odd sub-topics it buries the rows that DO have answers. The absence is still
+  // reported, once, as the single fact it is.
+  const scored = (r: StakeholderRow) =>
+    r.distribution['1'] + r.distribution['2'] + r.distribution['3'] > 0
+  const rated = report.stakeholderView.rows.filter(scored)
+  const unrated = report.stakeholderView.rows.filter(r => !scored(r))
+
+  for (const row of rated) distributionBlock(l, row)
+
+  if (unrated.length > 0) {
+    l.heading('Topics nobody rated', 3)
+    l.body(`${unrated.length} sub-topics were put to respondents and received no ratings at all. `
+         + `An absence of answers is not a low score: it means nobody who was asked judged the `
+         + `topic, which is a finding about what can currently be seen rather than about the topic.`)
+    nameList(l, unrated.map(r => r.name))
+  }
+
+  // ── 5b · WHERE YOUR OWN PEOPLE DISAGREE ──────────────────────────────────────────────────────
+  sectionPage(l)
+  l.heading(report.polarisation.heading, 1)
+  if (report.polarisation.rows.length === 0) {
+    // A result, not an empty state.
+    l.body(report.polarisation.none_note)
+  } else {
+    for (const row of report.polarisation.rows) distributionBlock(l, row)
+  }
+  l.rule()
+  l.body(report.polarisation.what_this_is)
+  if (report.polarisation.method_note) l.body(report.polarisation.method_note)
+
+  // ── 5c · INSIDE AND OUTSIDE ──────────────────────────────────────────────────────────────────
+  sectionPage(l)
+  l.heading(report.contrast.heading, 1)
+
+  if (report.contrast.unavailable_note) {
+    l.body(report.contrast.unavailable_note)
+  } else {
+    // ⚠️ what_this_is_not IS PRINTED AT FULL WEIGHT, ABOVE THE ENTRIES, NOT AS A FOOTNOTE.
+    // This is the one page in the document where a reader is most likely to draw a wrong
+    // conclusion — that own workforce and value-chain workers answering differently means one of
+    // them is wrong. They answer different questions about different workplaces. The aggregate's
+    // own sentence says so and is used as given; a reader who meets it after the charts has
+    // already drawn the inference it exists to prevent.
+    if (report.contrast.what_this_is) l.body(report.contrast.what_this_is)
+    if (report.contrast.what_this_is_not) l.body(report.contrast.what_this_is_not)
+    l.rule()
+
+    // ⚠️ A PAIR NOBODY ANSWERED IS NOT A COMPARISON. Five entries reading "neither side was
+    // answered" after the one real finding is the empty-distribution problem again: each occupies
+    // the height of a finding and carries none, and together they bury the pair that does. The
+    // absence is still reported, once, with the pairs named — it is a coverage fact, not a
+    // difference between two populations.
+    const answered = (e: typeof report.contrast.entries[number]) =>
+      e.s1.n_answered > 0 || e.s2.n_answered > 0
+    const drawable = report.contrast.entries.filter(answered)
+    const silent = report.contrast.entries.filter(e => !answered(e))
+
+    if (report.contrast.entries.length === 0) {
+      l.body(report.contrast.none_note)
+    } else {
+      for (const e of drawable) contrastBlock(l, e)
+
+      if (silent.length > 0) {
+        l.heading('Pairs nobody answered', 3)
+        l.body(`${silent.length} labour ${silent.length === 1 ? 'pair' : 'pairs'} had no answers on `
+             + `either side, so there is nothing to set beside anything. That is a fact about who `
+             + `responded, not a finding that the two populations agree.`)
+        nameList(l, silent.map(e => e.short_name))
+      }
+    }
+  }
+
+  // ── 6 · WHAT THE ASSESSMENT CONCLUDED ────────────────────────────────────────────────────────
+  sectionPage(l)
+  l.heading(report.assessmentView.heading, 1)
+  for (const row of report.assessmentView.rows) assessmentBlock(l, row)
+  // The two notes are about how the figures above were made and printed. Beneath them, where a
+  // reader who wants the finding meets it first and a reader who wants the method still finds it.
+  l.rule()
+  l.body(report.assessmentView.abstention_note)
+  l.body(ROUNDING_NOTE)
+
+  // ── 7 · WHERE THE TWO VIEWS DIFFER ───────────────────────────────────────────────────────────
+  sectionPage(l)
+  l.heading(report.differences.heading, 1)
+
+  // ⚠️ what_this_is_not IS NOT RENDERED. It is written for a developer deciding what to merge and
+  // it uses the word "divergence", which reads to a customer as a finding against them. The same
+  // decision the worksheet register screen makes.
+  if (report.differences.register.entries.length === 0) {
+    l.body('Everywhere both sides could be judged, they pointed the same way.')
+  } else {
+    for (const entry of report.differences.register.entries) entryBlock(l, entry)
+  }
+
+  if (report.differences.register.omitted.length > 0) {
+    l.heading('Topics not compared', 3)
+
+    /**
+     * ⚠️ GROUPED BY THE SENTENCE, NOT LISTED BY TOPIC. Thirty sub-topics awaiting a determination
+     * share one reason, and printing that reason thirty times turns ONE finding into two pages that
+     * read like thirty. The same sentence repeated is not more information.
+     *
+     * ⚠️ GROUPED ON THE DETAIL ITSELF, NOT ON THE REASON CODE, and that distinction is what keeps
+     * the per-topic ones intact. "negative: scale, scope, irremediability not scored" is genuinely
+     * about ONE topic and differs from every other incomplete row, so it forms a group of one and
+     * keeps its own line. An exclusion reason recorded per topic behaves the same way. Only rows
+     * whose sentence is word-for-word identical collapse — which is exactly the rows for which the
+     * sentence carries nothing topic-specific.
+     *
+     * The reason code itself is never printed: it is an enum, and a system value has no place in
+     * front of a reader.
+     */
+    const groups = new Map<string, { detail: string; names: string[] }>()
+    for (const o of report.differences.register.omitted) {
+      const detail = o.detail ?? 'No further detail was recorded.'
+      const key = `${o.reason}\u0000${detail}`
+      const g = groups.get(key) ?? { detail, names: [] }
+      g.names.push(o.short_name ?? o.subtopic_code)
+      groups.set(key, g)
+    }
+
+    for (const g of groups.values()) {
+      if (g.names.length === 1) {
+        l.body(`${g.names[0]} — ${g.detail}`)
+      } else {
+        l.body(g.detail)
+        l.body(`${g.names.length} topics:`)
+        nameList(l, g.names)
+      }
+    }
+  }
+
+  // The framing and the inactive trigger, beneath the entries they describe.
+  l.rule()
+  l.body(report.differences.register.what_this_is)
+  for (const t of report.differences.register.triggers_inactive) l.body(t.reason)
+
+  // ── 8 · METHODOLOGY ──────────────────────────────────────────────────────────────────────────
+  sectionPage(l)
+  l.heading(report.methodology.heading, 1)
+
+  for (const p of report.methodology.provisions) {
+    // ⚠️ NOT SUMMARISED. These were written for a verifier, who will look the reference up and
+    // compare. A paraphrase that drifts from the provision is worse than no paraphrase.
+    l.keepTogether(90, () => {
+      l.heading(p.reference, 3)
+      l.body(p.requirement)
+      l.body(p.how_applied)
+    })
+  }
+
+  l.rule()
+  // ⚠️ MOVED HERE FROM SECTION 5, NOT CUT. The scale is ordinal and no average is computed
+  // anywhere; that argument is exactly what a verifier opens the methodology to check, and in
+  // section 5 it stood between the reader and the first chart.
+  l.heading('Why no average is shown', 2)
+  l.body(report.stakeholderView.no_mean_note)
+
+  l.rule()
+  l.heading('Thresholds', 2)
+  l.body(report.methodology.thresholds_note)
+
+  for (const t of report.methodology.thresholds) {
+    l.keepTogether(80, () => {
+      l.heading(`${t.key} — ${t.value}`, 3)
+      l.body(t.definition)
+      l.body(t.source)
+    })
+  }
+
+  // ── 9 · LIMITATIONS ──────────────────────────────────────────────────────────────────────────
+  // ⚠️ FULL WEIGHT, NOT SMALL PRINT, AND THE POSTURE IS THE POINT. The climate-risk report states
+  // its limits on the face of the document rather than in an appendix, because a paper that is
+  // frank about what it does not cover is the reason a reader can trust what it does. Set at body
+  // size in ink — the same size as the findings.
+  sectionPage(l)
+  l.heading(report.limitations.heading, 1)
+  for (const item of report.limitations.items) l.body(item)
+
+  l.rule()
+  l.heading('What this paper does not claim', 2)
+  for (const item of report.limitations.not_claimed) l.body(item)
+
+  // ── 10 · WHY THIS MATTERS ────────────────────────────────────────────────────────────────────
+  sectionPage(l, { continueIfRoom: 320 })
+  l.heading(report.whyThisMatters.heading, 1)
+  for (const item of report.whyThisMatters.items) {
+    l.keepTogether(96, () => {
+      l.heading(item.title, 3)
+      l.body(item.body)
+    })
+  }
+
+  // ── BACK COVER ───────────────────────────────────────────────────────────────────────────────
+  // ⚠️ A LIGHT PAGE, LIKE THE FRONT. No reversed type anywhere in this document — see the header of
+  // lib/pdf/layout.ts. The notice is the densest block in the report and that is appropriate; the
+  // attribution above it is not, and is given room so the two do not read as one paragraph.
+  //
+  // ⚠️ BUILT FROM THE LAYOUT LAYER'S OWN PRIMITIVES, not from hand-computed coordinates. block()
+  // reserves and advances the same cursor everything else uses, and l.rule() is the one place the
+  // gradient hairline is defined — reimplementing either here would be a second copy free to drift
+  // from the one that was checked.
+  l.newPage()
+  doc.setFillColor(PAPER)
+  doc.rect(0, 0, l.pageWidth, l.pageHeight, 'F')
+
+  {
+    // ⚠️ ONE dimension set, the other derived. A stretched wordmark is the most visible way to look
+    // careless on a formal document — see lib/pdf/logo.ts.
+    const logoWidth = 128
+    const logoHeight = logoWidth / WORDMARK_ASPECT
+    block(l, logoHeight + 46, top => {
+      doc.addImage(THEMISIQ_WORDMARK_DATA_URI, 'PNG', MARGIN.left, top, logoWidth, logoHeight)
+    })
+
+    const attribution: [string, number, 'normal' | 'bold', string][] = [
+      ['Prepared by ThemisIQ.', SIZE.body, 'normal', INK],
+      ['Methodology reviewed by Lisa Foster', SIZE.body, 'bold', INK],
+      ['FSA Credential Holder, IFRS Foundation · Founder, ThemisIQ Compliance Inc.',
+       SIZE.small, 'normal', SECONDARY],
+    ]
+    for (const [text, size, style, colour] of attribution) {
+      const lines = wrap(doc, text, l.contentWidth, size, style)
+      block(l, lines.length * size * 1.55 + 6, top => {
+        textAt(doc, lines, MARGIN.left, top, size, size * 1.55, style, colour)
+      })
+    }
+
+    l.spacer(12)
+    block(l, LEAD.small + 8, top => {
+      setType(doc, SIZE.small, 'normal', SECONDARY)
+      doc.text('lisa.foster@themisiq.co · themisiq.co', MARGIN.left, top + SIZE.small)
+    })
+
+    l.spacer(14)
+    l.rule()
+    l.spacer(10)
+
+    l.heading('Important notice', 2)
+
+    // ⚠️ ALL SIX, IN ORDER, WHOLE. Dense is correct for this block; illegible is not — SECONDARY is
+    // 6.98:1 on paper and the text is set at 9.5pt, not at the smallest size available and not in
+    // the lightest grey. Legal text a reader cannot read is legal text that was not given.
+    for (const para of DISCLAIMER_PARAS) {
+      const lines = wrap(doc, para, l.contentWidth, SIZE.small)
+      block(l, lines.length * LEAD.small + 7, top => {
+        textAt(doc, lines, MARGIN.left, top, SIZE.small, LEAD.small, 'normal', SECONDARY)
+      })
+    }
+  }
+
+  // ── FOOTERS ──────────────────────────────────────────────────────────────────────────────────
+  // ⚠️ NOT layout.footer(): that helper prints "ThemisIQ" on the left, and this document needs the
+  // company and the assessment on every page — this report circulates detached from its cover,
+  // and a page found on its own has to say what it belongs to. Same position, same muted grey
+  // (4.83:1 on paper), same size.
+  const total = doc.getNumberOfPages()
+  const stamp = [report.cover.company_name, report.cover.assessment_name]
+    .filter(Boolean).join(' · ')
+
+  for (let p = 2; p <= total; p++) {
+    doc.setPage(p)
+    setType(doc, 8, 'normal', MUTED)
+    const baseline = l.pageHeight - MARGIN.bottom + 22
+    if (stamp) doc.text(stamp, MARGIN.left, baseline)
+    const n = `${p} of ${total}`
+    doc.text(n, l.pageWidth - MARGIN.right - doc.getTextWidth(n), baseline)
+  }
+
+  return doc
+}

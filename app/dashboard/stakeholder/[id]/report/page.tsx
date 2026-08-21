@@ -1,0 +1,578 @@
+'use client'
+
+/**
+ * The board paper — assemble it, and hand it over as a PDF.
+ *
+ * ⚠️ NOT A PREVIEW. This page does not render the report. A preview is a second renderer of the
+ * same content, free to drift from the one that produces the artefact, and the artefact is what a
+ * board actually reads — the lib/ghg/engine.ts rule CLAUDE.md carries, one document along. What is
+ * on screen is a short statement of what the paper contains and what it drew on, so somebody can
+ * see whether it is worth generating before they generate it.
+ *
+ * ⚠️ THE FETCH IS THE REGISTER SCREEN'S, DELIBERATELY.
+ * app/dashboard/materiality/worksheet/[id]/register/page.tsx already reads exactly this data and
+ * already handles its absence states correctly. This follows it closely rather than opening a
+ * second path to the same rows: two fetches of one dataset is two chances to disagree about scope,
+ * and the register and the report must never describe different work.
+ *
+ * ⚠️ THE ENTITLEMENT GATE IS INHERITED AND IS EXPECTED TO CHANGE.
+ * useEntitlement('climate-risk') is what the worksheet routes use, and this route sits under
+ * /dashboard/stakeholder — the first page of a module being split out with its own entitlement.
+ * When that split lands, this gate changes with it. It is written the same way as its siblings so
+ * that change is one edit in an obvious place, not an archaeology exercise.
+ *
+ * ⚠️ WHICH STATUS COUNTS AS "OPENED" IS DECIDED HERE, ONCE.
+ * lib/materiality/boardReport.ts takes invited / opened / answered from the caller on purpose: it
+ * is a reading of the instrument, not a fact about the data, and it must not be made differently
+ * in two places. The reading is the survey screen's own — see the note above participationOf().
+ */
+
+import { useState, useEffect, useMemo } from 'react'
+import { useParams } from 'next/navigation'
+import Link from 'next/link'
+import Nav from '../../../../components/Nav'
+import PaywallCard from '../../../../components/PaywallCard'
+import { supabase } from '../../../../../lib/supabase'
+import { useEntitlement } from '../../../../../lib/useEntitlement'
+import { resolveSubtopicName } from '../../../../../lib/materiality/subtopicName'
+import type { TopicCategory } from '../../../../../lib/materiality/severity'
+import { buildBoardReport, standardVersionLabel,
+         type BoardReportInput, type CategoryParticipation, type ContrastEntry,
+         type ThresholdRow }
+  from '../../../../../lib/materiality/boardReport'
+/**
+ * ⚠️ generateBoardReportPDF IS NOT IMPORTED HERE. It is loaded on demand inside download().
+ *
+ * Its import graph reaches lib/pdf/layout.ts, and through that lib/fonts/charis.ts (163.8 KB) and
+ * lib/pdf/logo.ts (68.7 KB) — around 232 KB of base64 before jsPDF itself. A static import puts
+ * every byte of that in the bundle for everyone who opens this page, and most people who open it
+ * open it to find out whether the paper is READY. That question is answered entirely by
+ * buildBoardReport's input and needs no font, no wordmark and no PDF engine.
+ *
+ * buildBoardReport stays static, and that was checked rather than assumed: boardReport.ts imports
+ * only ./severity and ./register, and severity.ts imports nothing at all. Nothing in that graph
+ * carries a payload, and this page uses its output to describe what the paper contains.
+ */
+import type { Determination, Overall, RegisterSubTopic }
+  from '../../../../../lib/materiality/register'
+
+const PURPLE = '#7425e3'
+const AMBER = '#ba7517'
+const AMBER_BG = '#FEF3E2'
+const BLUE = '#0C447C'
+const BLUE_BG = '#E6F1FB'
+const FAIL = '#b42318'
+const FAIL_BG = '#fef3f2'
+const INK = '#0d0d0d'
+const MID = '#555553'
+const MUTE = '#888784'
+const LINE = '#e8e7e4'
+const PAPER = '#f8f7f5'
+
+const CARD: React.CSSProperties = {
+  background: '#fff', border: `0.5px solid ${LINE}`, borderRadius: 16,
+  padding: '1.5rem', marginBottom: 18,
+}
+const H2: React.CSSProperties = {
+  fontFamily: 'Georgia, serif', fontSize: '1.25rem', color: INK, marginBottom: 6,
+}
+
+const Shell = ({ children }: { children: React.ReactNode }) => (
+  <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
+    <Nav />
+    <div style={{ maxWidth: 760, margin: '0 auto', padding: '2rem' }}>{children}</div>
+  </div>
+)
+
+type AggSub = {
+  subtopic_code: string; topic_code: string; topic_label: string
+  short_name: string | null
+  status: string; exclusion_reason: string | null
+  overall: Overall | null
+}
+/**
+ * Only the parts of survey_aggregate this page reads. The shapes are
+ * app/dashboard/materiality/survey/[id]/results/page.tsx's, which declares the whole payload and is
+ * the authority for it — copied, not recalled.
+ *
+ * ⚠️ ContrastEntry IS IMPORTED FROM THE MODULE, NOT REDECLARED. The results screen declares its own
+ * because it renders the payload directly; a third declaration here would be the drift problem this
+ * codebase has spent the day closing. The two shapes are identical but for one field: the results
+ * screen types `distribution` as always present, while the module allows null — which is what
+ * survey_aggregate can actually emit for a side nobody answered, and what the renderer guards on.
+ * The more permissive type is the safer one to cast untyped RPC data into.
+ */
+type Agg = {
+  method: {
+    dispersion: { method: string; definition: string
+                  agreement_coefficient: number | null; agreement_coefficient_note: string }
+    /** Snapshotted onto the round at creation. Values are unknown-typed in the payload. */
+    thresholds: Record<string, unknown> & { source: string }
+  }
+  subtopics: AggSub[]
+  s1_s2_contrast: { what_this_is: string; what_this_is_not: string; entries: ContrastEntry[] }
+}
+
+type Det = {
+  subtopic_code: string; direction: 'negative' | 'positive'
+  nature: 'actual' | 'potential' | null
+  scale: number | null; scope: number | null
+  irremediability: number | null; likelihood: number | null
+  status: string
+}
+
+type Person = {
+  stakeholder_category: string
+  status: 'invited' | 'in_progress' | 'completed' | 'revoked' | 'expired'
+}
+
+const isCategory = (v: unknown): v is TopicCategory =>
+  v === 'env' || v === 'soc' || v === 'gov'
+
+/**
+ * Invited / opened / answered, from respondent status.
+ *
+ * ⚠️ THE SAME READING THE SURVEY SCREEN USES, AND THAT IS THE POINT OF PUTTING IT HERE.
+ *   invited  — everyone still on the list. Revoked and expired invitations are excluded: they are
+ *              people who were never able to take part, and counting them makes the response rate
+ *              look worse than the exercise was.
+ *   opened   — started or finished. "in_progress" means the link was opened.
+ *   answered — finished and submitted.
+ *
+ * Someone who opened the survey and answered nothing counts as opened and not as answered, which is
+ * exactly what those two numbers are for.
+ */
+const participationOf = (people: Person[], label: (code: string) => string) => {
+  const active = people.filter(p => p.status !== 'revoked' && p.status !== 'expired')
+  const count = (rows: Person[]) => ({
+    invited: rows.length,
+    opened: rows.filter(p => p.status === 'in_progress' || p.status === 'completed').length,
+    answered: rows.filter(p => p.status === 'completed').length,
+  })
+
+  const byCategory: Record<string, Person[]> = {}
+  for (const p of active) (byCategory[p.stakeholder_category] ||= []).push(p)
+
+  const by_category: CategoryParticipation[] = Object.entries(byCategory)
+    // ⚠️ RESOLVED HERE, because CategoryParticipation.category is documented as already-resolved
+    // display text. An unlabelled code prints AS the code — never blank, and never a label this
+    // page invented for it.
+    .map(([code, rows]) => ({ category: label(code), ...count(rows) }))
+    .sort((a, b) => b.invited - a.invited)
+
+  return { totals: count(active), by_category }
+}
+
+export default function StakeholderBoardReport() {
+  // See the header: inherited from the worksheet routes, expected to change when this module gets
+  // its own entitlement.
+  const isPaid = useEntitlement('climate-risk')
+  const params = useParams()
+  const assessmentId = params.id as string
+
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  // 'loading' is the chunk arriving; 'building' is the document being assembled. They are separate
+  // because they fail differently and a reader waiting deserves to know which one they are in.
+  const [phase, setPhase] = useState<'idle' | 'loading' | 'building'>('idle')
+  const [buildError, setBuildError] = useState<string | null>(null)
+  const busy = phase !== 'idle'
+
+  const [company, setCompany] = useState<string | null>(null)
+  const [standardVersion, setStandardVersion] = useState<string | null>(null)
+
+  const [roundId, setRoundId] = useState<string | null>(null)
+  const [roundName, setRoundName] = useState<string | null>(null)
+  // ⚠️ frozen_at, NOT closed_at — see the select below.
+  const [roundFrozenAt, setRoundFrozenAt] = useState<string | null>(null)
+  const [roundCount, setRoundCount] = useState(0)
+  const [threshold, setThreshold] = useState<number | null>(null)
+
+  const [agg, setAgg] = useState<Agg | null>(null)
+  const [aggError, setAggError] = useState<string | null>(null)
+
+  const [dets, setDets] = useState<Det[]>([])
+  const [people, setPeople] = useState<Person[]>([])
+  const [thresholdRows, setThresholdRows] = useState<ThresholdRow[]>([])
+  const [categoryLabel, setCategoryLabel] = useState<Record<string, string>>({})
+  const [topicOf, setTopicOf] = useState<Record<string, string>>({})
+  const [categoryOf, setCategoryOf] = useState<Record<string, string>>({})
+  const [refName, setRefName] = useState<Record<string, string>>({})
+  const [displayName, setDisplayName] = useState<Record<string, string>>({})
+  const [roundSnapshot, setRoundSnapshot] = useState<Record<string, string>>({})
+  const [snapshot, setSnapshot] = useState<Record<string, string>>({})
+
+  useEffect(() => { load() }, [assessmentId])
+
+  const load = async () => {
+    setLoading(true); setLoadError(null); setAggError(null)
+
+    const { data: a, error: aErr } = await supabase.from('materiality_assessments')
+      .select('id, company_name, standard_version').eq('id', assessmentId).maybeSingle()
+    if (aErr) { setLoadError(aErr.message); setLoading(false); return }
+    if (!a) {
+      setLoadError('This assessment was not found, or it belongs to another account. Those two '
+                 + 'cannot be told apart from here.')
+      setLoading(false); return
+    }
+    const asmt = a as { company_name: string | null; standard_version: string | null }
+    setCompany(asmt.company_name)
+    setStandardVersion(asmt.standard_version)
+    const sv = asmt.standard_version || ''
+
+    const { data: links } = await supabase.from('materiality_assessment_survey_rounds')
+      .select('round_id').eq('assessment_id', assessmentId).order('linked_at')
+    // ⚠️ THE EARLIEST LINK, and the count is kept so the page can SAY so.
+    const rid = links && links.length ? (links[0] as { round_id: string }).round_id : null
+    setRoundId(rid)
+    setRoundCount(links ? links.length : 0)
+
+    if (rid) {
+      const [{ data: rd, error: rdErr }, { data: ag, error: agErr }] = await Promise.all([
+        supabase.from('materiality_survey_rounds')
+          // ⚠️ frozen_at, and the name is the more accurate one. There is no closed_at column:
+          // what the timestamp records is the round's FIGURES BEING FIXED, which is what closing
+          // does and what the board paper's cover is actually stating — "the survey this drew on,
+          // and the moment its numbers stopped moving". A column called closed_at would describe
+          // the button somebody pressed; frozen_at describes the fact the reader needs.
+          .select('name, status, frozen_at, top_box_high_min_share').eq('id', rid).maybeSingle(),
+        supabase.rpc('survey_aggregate', { p_round_id: rid }),
+      ])
+      const round = rd as {
+        name: string; status: string; frozen_at: string | null
+        top_box_high_min_share: number | null
+      } | null
+      setRoundName(round?.name ?? null)
+      setRoundFrozenAt(round?.frozen_at ?? null)
+      // The round's OWN snapshotted value, never the current reference row.
+      setThreshold(round?.top_box_high_min_share ?? null)
+      if (rdErr) setLoadError(rdErr.message)
+
+      // ⚠️ THREE STATES, KEPT APART. An error is not an absent survey, and a call that returns
+      // nothing with no reason is neither of those.
+      if (agErr) setAggError(agErr.message)
+      else if (ag) setAgg(ag as Agg)
+      else setAggError('The survey results came back empty, and no reason was given.')
+    }
+
+    const [dRes, stRes, tRes, dispRes, qRes, snapRes, pRes, thRes, catRes] = await Promise.all([
+      supabase.from('materiality_impact_determinations')
+        .select('subtopic_code, direction, nature, scale, scope, irremediability, likelihood, abstained_dimensions, value_chain_position, time_horizon, rationale, status, assignment_id, evidence_in_view, override_reason, overridden_at')
+        .eq('assessment_id', assessmentId),
+      supabase.from('mr_esrs_subtopics').select('code, topic_code, label').eq('standard_version', sv),
+      // ⚠️ NOT versioned — mr_esrs_topics is keyed on code alone and has no standard_version column.
+      supabase.from('mr_esrs_topics').select('code, label, category'),
+      supabase.from('mr_esrs_subtopic_display').select('subtopic_code, short_name')
+        .eq('standard_version', sv),
+      rid
+        ? supabase.from('materiality_survey_questions')
+            .select('subtopic_code, short_name')
+            .eq('round_id', rid).eq('status', 'included').not('subtopic_code', 'is', null)
+        : Promise.resolve({ data: [], error: null }),
+      supabase.from('materiality_impact_assignment_subtopics')
+        .select('subtopic_code, short_name').eq('assessment_id', assessmentId),
+      rid
+        ? supabase.from('materiality_survey_respondents')
+            .select('stakeholder_category, status').eq('round_id', rid)
+        : Promise.resolve({ data: [], error: null }),
+      // Section 8 prints the definition and the source as written — that prose is the disclosure.
+      supabase.from('mr_survey_thresholds').select('key, value, definition, source').order('key'),
+      // ⚠️ THE LABELS, because the codes are enum values. The results screen renders these same
+      // rows; without them the report prints own_workforce and value_chain_worker at a board.
+      supabase.from('mr_stakeholder_categories').select('code, label'),
+    ])
+
+    const err = [dRes, stRes, tRes, dispRes, qRes, snapRes, pRes, thRes, catRes]
+      .find(r => r.error)?.error
+    if (err) { setLoadError(err.message); setLoading(false); return }
+
+    const st = (stRes.data || []) as { code: string; topic_code: string; label: string }[]
+    setTopicOf(Object.fromEntries(st.map(r => [r.code, r.topic_code])))
+    setRefName(Object.fromEntries(st.map(r => [r.code, r.label])))
+    setCategoryOf(Object.fromEntries(
+      ((tRes.data || []) as { code: string; category: string }[]).map(r => [r.code, r.category])))
+    setDisplayName(Object.fromEntries(
+      ((dispRes.data || []) as { subtopic_code: string; short_name: string }[])
+        .map(r => [r.subtopic_code, r.short_name])))
+    setRoundSnapshot(Object.fromEntries(
+      ((qRes.data || []) as { subtopic_code: string; short_name: string }[])
+        .map(r => [r.subtopic_code, r.short_name])))
+    setSnapshot(Object.fromEntries(
+      ((snapRes.data || []) as { subtopic_code: string; short_name: string | null }[])
+        .filter(r => r.short_name).map(r => [r.subtopic_code, r.short_name as string])))
+    setDets((dRes.data || []) as Det[])
+    setPeople((pRes.data || []) as Person[])
+    setThresholdRows((thRes.data || []) as ThresholdRow[])
+    setCategoryLabel(Object.fromEntries(
+      ((catRes.data || []) as { code: string; label: string | null }[])
+        .filter(r => r.label).map(r => [r.code, r.label as string])))
+    setLoading(false)
+  }
+
+  const sources = useMemo(() => ({
+    assignmentSnapshot: snapshot, roundSnapshot, display: displayName, reference: refName,
+  }), [snapshot, roundSnapshot, displayName, refName])
+
+  /** The input the module takes, assembled once and used both to report readiness and to build. */
+  const input = useMemo<BoardReportInput | null>(() => {
+    if (!agg || threshold === null) return null
+
+    const byCode: Record<string, Determination[]> = {}
+    for (const d of dets) {
+      (byCode[d.subtopic_code] ||= []).push({
+        direction: d.direction,
+        nature: (d.nature ?? 'actual') as Determination['nature'],
+        status: d.status,
+        scale: d.scale, scope: d.scope,
+        irremediability: d.irremediability, likelihood: d.likelihood,
+      })
+    }
+
+    const subtopics: RegisterSubTopic[] = []
+    for (const s of agg.subtopics || []) {
+      const topicCode = s.topic_code || topicOf[s.subtopic_code] || ''
+      const category = categoryOf[topicCode]
+      // ⚠️ Held back rather than defaulted — category decides mean-versus-max inside computeSeverity,
+      // so a guess would change a materiality conclusion rather than mislabel a row.
+      if (!isCategory(category)) continue
+      subtopics.push({
+        subtopic_code: s.subtopic_code,
+        topic_code: topicCode,
+        topic_label: s.topic_label,
+        short_name: resolveSubtopicName(s.subtopic_code, sources) ?? s.short_name ?? null,
+        category,
+        status: s.status,
+        exclusion_reason: s.exclusion_reason,
+        overall: s.overall,
+        determinations: byCode[s.subtopic_code] || [],
+      })
+    }
+
+    const participation = participationOf(people, code => categoryLabel[code] || code)
+
+    return {
+      company_name: company,
+      assessment_name: roundName ? `Impact materiality · ${roundName}` : 'Impact materiality',
+      standard_version: standardVersion,
+      // Not recorded on the assessment today. Stated as absent rather than invented — the cover
+      // prints "Not stated" and that is the truth.
+      reporting_period: null,
+      round_name: roundName,
+      // The module's field is round_closed_at; the value is frozen_at, which is the same event.
+      round_closed_at: roundFrozenAt,
+      participation: participation.totals,
+      by_category: participation.by_category,
+      subtopics,
+      topBoxHighMinShare: threshold,
+      thresholds: thresholdRows,
+      // ⚠️ THE ROUND'S SNAPSHOTTED NUMBERS, NOT THE AGGREGATE'S SENTENCE. method.dispersion.definition
+      // names its own columns — polarised_extreme_min_n, polarised_middle_max_share — and that is
+      // developer prose. The module turns these two numbers into a sentence a board can read; the
+      // full definitions still reach a verifier through section 8's threshold rows.
+      polarisation_levels: (() => {
+        const t = agg.method?.thresholds as Record<string, unknown> | undefined
+        const n = Number(t?.polarised_extreme_min_n)
+        const share = Number(t?.polarised_middle_max_share)
+        return Number.isFinite(n) && Number.isFinite(share)
+          ? { extreme_min_n: n, middle_max_share: share }
+          : null
+      })(),
+      // Section 5c. Absent means the section says the comparison was not drawn — never that no
+      // difference exists. ?? null rather than a bare pass so an older round whose payload predates
+      // s1_s2_contrast degrades to that honest state instead of throwing.
+      contrast: agg.s1_s2_contrast ?? null,
+    }
+  }, [agg, threshold, dets, topicOf, categoryOf, sources, people, company, standardVersion,
+      roundName, roundFrozenAt, thresholdRows, categoryLabel])
+
+  const submittedCount = useMemo(
+    () => dets.filter(d => d.status === 'submitted').length, [dets])
+
+  const download = async () => {
+    if (!input) return
+    setBuildError(null)
+
+    // ── the chunk ────────────────────────────────────────────────────────────────────────────
+    // ⚠️ ITS OWN try, AND ITS OWN SENTENCE. A dynamic import fails for reasons that have nothing to
+    // do with the report — an offline tab, a stale build whose chunk no longer exists on the CDN,
+    // a blocked request. Folded into the build's catch it would surface as though the paper itself
+    // were at fault, and swallowed entirely it would present as a click that did nothing, which is
+    // the worst of the three: the reader clicks again, and again, and has no idea why.
+    setPhase('loading')
+    let generate: typeof import('../../../../../lib/materiality/boardReportPdf')['generateBoardReportPDF']
+    try {
+      const mod = await import('../../../../../lib/materiality/boardReportPdf')
+      generate = mod.generateBoardReportPDF
+    } catch (e) {
+      setPhase('idle')
+      setBuildError('The document generator could not be loaded, so nothing was produced. This is '
+                  + 'usually a connection that dropped, or a browser tab left open across a new '
+                  + 'release. Reload the page and try again. '
+                  + (e instanceof Error ? e.message : String(e)))
+      return
+    }
+
+    // ── the document ─────────────────────────────────────────────────────────────────────────
+    setPhase('building')
+    try {
+      const report = buildBoardReport(input)
+      const doc = generate(report)
+      // The naming shape lib/assurancePdf.ts uses.
+      doc.save(`ThemisIQ_ImpactMaterialityReport_${(company || 'Company').replace(/\s+/g, '_')}.pdf`)
+    } catch (e) {
+      // Said as what it is. No half-written PDF exists: the failure happens before save.
+      setBuildError('The paper could not be assembled, and nothing was downloaded. '
+                  + (e instanceof Error ? e.message : String(e)))
+    } finally {
+      setPhase('idle')
+    }
+  }
+
+  if (isPaid === false) return (
+    <Shell><PaywallCard title="Unlock the Climate Risk module"
+      body="The stakeholder board paper is part of the Climate Risk &amp; Materiality module."
+      href="/pricing?modules=risk" /></Shell>
+  )
+  if (loading) return (
+    <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
+      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: MUTE }}>Loading…</div>
+    </div>
+  )
+  if (loadError) return (
+    <Shell><div style={CARD}>
+      <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: INK, marginBottom: 10 }}>
+        This could not be shown</div>
+      <div style={{ fontSize: 13.5, color: MID, lineHeight: 1.75 }}>{loadError}</div>
+    </div></Shell>
+  )
+
+  // What stops a paper being worth producing, in the order a reader can act on.
+  const blockers: string[] = []
+  if (roundId === null) {
+    blockers.push('No stakeholder survey is linked to this assessment, so there is nothing to set '
+                + 'beside your own determinations. Link a closed round on the worksheet first.')
+  }
+  if (roundId !== null && aggError) {
+    blockers.push(`The survey results could not be read, so the paper would be missing the half of `
+                + `it that reports what people told you. ${aggError}`)
+  }
+  if (roundId !== null && !aggError && threshold === null) {
+    blockers.push('This round did not record the level at which respondents count as having '
+                + 'flagged a topic, so the comparison cannot be drawn for it.')
+  }
+  if (submittedCount === 0) {
+    blockers.push('No determinations have been submitted yet. Until they are, the paper would '
+                + 'report an assessment that has not concluded anything.')
+  }
+
+  const ready = blockers.length === 0 && input !== null
+
+  return (
+    <Shell>
+      <div style={{ marginBottom: 16, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <Link href={`/dashboard/materiality/worksheet/${assessmentId}`}
+              style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>← Worksheet</Link>
+        <Link href={`/dashboard/materiality/worksheet/${assessmentId}/register`}
+              style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>Where views differ</Link>
+      </div>
+
+      <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.7rem', color: INK }}>
+        {company || 'Board paper'}
+      </div>
+      <div style={{ fontSize: 13, color: MUTE, marginTop: 4, marginBottom: 20 }}>
+        A paper for your board, about what this assessment found
+      </div>
+
+      <div style={CARD}>
+        <div style={H2}>What the paper contains</div>
+        <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.9 }}>
+          It opens with what we asked and what your own assessment did, then gives three figures —
+          topics assessed, topics found material, and topics where the two views point differently.
+          After that: who took part, what respondents said on each topic, what your assessment
+          concluded and why, where the two differ, the rules and thresholds applied, what the paper
+          does not cover, and what it tells a board beyond compliance.
+        </div>
+        <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.9, marginTop: 10 }}>
+          It is written for directors rather than for specialists, and it asks the board to approve
+          nothing — it reports what was found.
+        </div>
+      </div>
+
+      <div style={CARD}>
+        <div style={H2}>What it draws on</div>
+        <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.9 }}>
+          {roundName
+            ? <>The stakeholder survey <strong style={{ color: INK }}>{roundName}</strong>
+                {roundCount > 1 && <>, the earliest of the {roundCount} linked to this assessment.
+                  {' '}Figures will not match a later round&apos;s results.</>}
+              </>
+            : <>No stakeholder survey is linked yet.</>}
+        </div>
+        <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.9, marginTop: 8 }}>
+          {submittedCount > 0
+            ? <>{submittedCount} submitted {submittedCount === 1 ? 'determination' : 'determinations'} from your own assessment.</>
+            : <>No submitted determinations yet.</>}
+        </div>
+        <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.9, marginTop: 8 }}>
+          Prepared under{' '}
+          <strong style={{ color: INK }}>
+            {standardVersionLabel(standardVersion) ?? 'a standard version that has not been stated'}
+          </strong>.
+        </div>
+      </div>
+
+      {blockers.length > 0 && (
+        <div style={{ ...CARD, background: AMBER_BG, borderColor: AMBER }}>
+          <div style={H2}>Not ready yet</div>
+          <div style={{ fontSize: 12.5, color: INK, lineHeight: 1.9 }}>
+            {/* ⚠️ NO DOWNLOAD IS OFFERED HERE. A paper generated from this state would open, look
+                finished, and report nothing — which is worse than no paper, because somebody would
+                send it. */}
+            The paper is not offered yet, because it would be produced without the things that make
+            it worth reading:
+          </div>
+          <ul style={{ margin: '10px 0 0 18px', padding: 0 }}>
+            {blockers.map((b, i) => (
+              <li key={i} style={{ fontSize: 12.5, color: INK, lineHeight: 1.9, marginBottom: 6 }}>{b}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {buildError && (
+        <div style={{ ...CARD, background: FAIL_BG, borderColor: FAIL }}>
+          <div style={{ fontSize: 12.5, color: INK, lineHeight: 1.8 }}>
+            <strong>The paper was not produced.</strong> {buildError} Nothing was downloaded.
+          </div>
+        </div>
+      )}
+
+      {ready && (
+        <div style={{ ...CARD, background: BLUE_BG, borderColor: BLUE }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 12.5, color: INK, lineHeight: 1.8, flex: 1, minWidth: 260 }}>
+              <strong>Ready.</strong> The paper is generated here in your browser and downloaded —
+              it is not stored on our servers, and nothing is sent anywhere.
+            </div>
+            <button onClick={() => void download()} disabled={busy}
+                    style={{ flexShrink: 0, fontSize: 13, fontWeight: 600, padding: '9px 20px',
+                             borderRadius: 8, border: 'none', background: INK, color: '#fff',
+                             cursor: busy ? 'not-allowed' : 'pointer',
+                             opacity: busy ? 0.6 : 1 }}>
+              {phase === 'loading' ? 'Loading the generator…'
+                : phase === 'building' ? 'Preparing the paper…'
+                : 'Download the paper'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ fontSize: 11.5, color: MUTE, lineHeight: 1.8 }}>
+        The paper reports the impact half of double materiality — the effect your organisation has
+        on people and the environment. It does not assess how sustainability matters affect your
+        own finances, and it says so on its own limitations page.
+      </div>
+    </Shell>
+  )
+}
