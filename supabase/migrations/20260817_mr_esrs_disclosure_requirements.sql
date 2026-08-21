@@ -57,6 +57,38 @@
 --
 --
 -- =====================================================================
+-- VERIFIED AGAINST THE ADOPTED TEXT — 21 AUGUST 2026, AFTER THIS FILE RAN
+-- =====================================================================
+-- When this migration was written, "pattern-extracted" was the whole claim: no
+-- human had read these 64 titles against the annex, and docs/materiality-questionnaire-spec-v12.md
+-- §10 records the topical standards as NOT READ. That has now been done.
+--
+-- The extraction pipeline is recorded at scripts/extract-annex.sh, which pins the source PDF to
+--   sha256 2319a0bb65c0acf0f818f012f5ac8127ee3bd4e397037846373d8ce69f00c377
+-- and refuses to run against any other document. It reproduces
+-- docs/reference/source/annex-i.txt byte for byte. (The TSV-to-INSERT generator is still
+-- unrecorded — see the warning below.)
+--
+-- All 64 rows were compared character for character against the BODY headings in that text:
+--   63 exact — 3 of them (S1-2, S1-5, S1-6) after the apostrophe normalisation recorded above
+--    1 corrected — E1-11, see below
+--    0 missing — every TSV code has a body heading
+--   per-topic counts agree with the annex on all ten topics
+--   11 annex body headings are not in the TSV: BP-1/2, GOV-1..4, SBM-1..3, IRO-1/2 — ESRS 2
+--   General Disclosures, out of the TSV's topical scope. No topical requirement is missing.
+--
+-- ⚠️ THE E1-11 ROW SEEDED BELOW IS SUPERSEDED. It reads "...and potential climate-related
+-- opportunities", which is the ADOPTED ACT'S CONTENTS LISTING (annex-i.txt:3465). The body heading
+-- (annex-i.txt:4420) reads "...and material climate-related opportunities". The act contradicts
+-- itself at this row; the body governs. The TSV was corrected on 21 Aug 2026 and the live row is
+-- reconciled by 20260845_mr_esrs_dr_e1_11_body_text.sql.
+--   THE ROW BELOW IS LEFT AS IT RAN. This file is the record of what was applied on 17 Aug, not a
+-- description of the table today. Editing the row here would make the file describe an insert that
+-- never happened, and would leave nothing to signal that a live row needs reconciling.
+--   Full context, including both annex lines quoted: docs/reference/README.md.
+--
+--
+-- =====================================================================
 -- datapoints IS NULL FOR EVERY 2026 ROW, AND THAT IS THE HONEST STATE
 -- =====================================================================
 -- The 2023 map's `data` strings are THEMISIQ-AUTHORED SUMMARY PROSE — 'Total energy consumption
@@ -226,6 +258,9 @@ end $$;
 -- GENERATED FROM docs/reference/drs2026.tsv. Do not hand-edit a row here: fix the TSV, regenerate,
 -- and re-run. ON CONFLICT DO UPDATE, so a replay RECONCILES the table back to this file — the
 -- corollary being that a row edited in the SQL editor is silently reverted by the next run.
+--
+-- ⚠️ E1-11 BELOW IS SUPERSEDED — see the verification block in the header. Re-running THIS file
+-- would revert the corrected row. Run 20260845 after it, or run 20260845 alone.
 --
 -- datapoints is null on every row. That is the seed's actual state, not an oversight; see header.
 insert into public.mr_esrs_disclosure_requirements
