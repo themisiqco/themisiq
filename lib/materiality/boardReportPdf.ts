@@ -42,7 +42,7 @@ import { THEMISIQ_WORDMARK_DATA_URI, WORDMARK_ASPECT } from '../pdf/logo'
  * array is `readonly` precisely so a consumer cannot splice or reorder shared legal text, and this
  * file only reads it.
  */
-import { DISCLAIMER_PARAS } from '../disclaimer'
+import { disclaimerParas } from '../disclaimer'
 import type { AssessmentRow, BoardReport, ContrastEntry, StakeholderRow } from './boardReport'
 // The register's own entry shape, reached through DifferencesSection.register.entries.
 import type { RegisterEntry } from './register'
@@ -767,10 +767,51 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
       doc.addImage(THEMISIQ_WORDMARK_DATA_URI, 'PNG', MARGIN.left, top, logoWidth, logoHeight)
     })
 
+    // ── ATTRIBUTION — WHAT THIS PAGE MAY AND MAY NOT CLAIM ─────────────────────────────────
+    // Rewritten 22 Aug 2026. Until then this block read:
+    //
+    //     Prepared by ThemisIQ.                                                       body, normal
+    //     Methodology reviewed by Lisa Foster                                         body, BOLD
+    //     FSA Credential Holder, IFRS Foundation · Founder, ThemisIQ Compliance Inc.    small
+    //
+    // Three separate problems, three deliberate fixes. Do not restore any of them piecemeal — the
+    // name, the weight and the verb were mutually reinforcing.
+    //
+    // ⚠️ 1. NO PERSONAL NAME, AND THE CREDENTIAL COMES OFF WITH IT. Counsel advised 22 Aug 2026
+    // that the IFRS Foundation's published FSA FAQ expressly permits a holder to display credential
+    // status on a resume, digital profile, email signature and other PERSONAL BRAND material — and
+    // does not address use on commercial client deliverables. The Foundation's general trade mark
+    // guidance separately prohibits unlicensed use of its marks to promote a business, product or
+    // service. Those two do not answer the customer-deliverable question between them, so this use
+    // is PERMISSION-UNCERTAIN rather than permitted or refused. It stays off until the Foundation
+    // confirms it in writing. If that confirmation arrives, it belongs in this comment beside
+    // whatever is restored.
+    //
+    // ⚠️ 2. NO BOLD, AND THE WEIGHT WAS HALF THE PROBLEM. The old second line was the most
+    // prominent text on the page — heavier than the corporate line above it, with a professional
+    // designation set directly beneath. That is the layout of a signature block, and a reader who
+    // knows the convention reads it as a signed opinion whatever the words say. The replacement is
+    // SIZE.small and normal: subordinate to 'Prepared by ThemisIQ.', which is the claim this
+    // document can actually support.
+    //
+    // ⚠️ 3. "developed by", NOT "reviewed by". "Reviewed" asserts a discrete act by a named
+    // individual, and nothing in this repo can evidence such an act against a report version — no
+    // review record, no date, no version pin. "Developed by ThemisIQ Compliance Inc." is a claim
+    // about authorship that the repository itself is the evidence for.
+    //
+    // ⚠️ AND THIS BRINGS THE BOARD REPORT INTO LINE, NOT OUT OF IT. Every VERIFIER-facing surface
+    // already carries no personal attribution at all — lib/assurancePdf.ts, app/verify/[token],
+    // app/verify-cbam/[token] and app/methodology/page.tsx contain no name and no credential
+    // between them. The board report was the outlier: the one document built for a board rather
+    // than an auditor was the only one making a credentialed review claim.
+    //
+    // The contact line below is untouched. An address is how someone reaches us; it makes no claim
+    // about who reviewed anything.
     const attribution: [string, number, 'normal' | 'bold', string][] = [
       ['Prepared by ThemisIQ.', SIZE.body, 'normal', INK],
-      ['Methodology reviewed by Lisa Foster', SIZE.body, 'bold', INK],
-      ['FSA Credential Holder, IFRS Foundation · Founder, ThemisIQ Compliance Inc.',
+      ['Methodology developed by ThemisIQ Compliance Inc. This report is not an assurance '
+       + 'engagement, audit, certification, professional opinion, or endorsement of the '
+       + "customer's disclosure.",
        SIZE.small, 'normal', SECONDARY],
     ]
     for (const [text, size, style, colour] of attribution) {
@@ -795,7 +836,7 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
     // ⚠️ ALL SIX, IN ORDER, WHOLE. Dense is correct for this block; illegible is not — SECONDARY is
     // 6.98:1 on paper and the text is set at 9.5pt, not at the smallest size available and not in
     // the lightest grey. Legal text a reader cannot read is legal text that was not given.
-    for (const para of DISCLAIMER_PARAS) {
+    for (const para of disclaimerParas('disclosure_preparation')) {
       const lines = wrap(doc, para, l.contentWidth, SIZE.small)
       block(l, lines.length * LEAD.small + 7, top => {
         textAt(doc, lines, MARGIN.left, top, SIZE.small, LEAD.small, 'normal', SECONDARY)

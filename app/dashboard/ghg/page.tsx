@@ -33,6 +33,7 @@ import {
   validateElectricity, validateNaturalGas, validateCompleteness,
   parseLocalDate, periodFromYearAndEnd, analyzeCoverage,
 } from '../../../lib/ghg/engine'
+import { disclaimerParas } from '../../../lib/disclaimer'
 import type {
   GwpVersion, Location, Inventory, SourceDoc, ExtractedProposal,
   ConciergeStatus, CoveragePeriod, CoverageResolution, DeclarableStream, UnpriceableLocation,
@@ -2400,12 +2401,14 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   </div>
                   <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem', fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
                     <strong>Disclaimer:</strong>
-                    <p style={{ margin: '0 0 8px' }}>This document and all outputs generated through the ThemisIQ platform are provided for informational, screening, planning, and prioritization purposes only. They do not constitute legal, regulatory, accounting, financial, assurance, investment, or other professional advice and do not, by themselves, satisfy any reporting, disclosure, filing, compliance, assurance, or certification obligation under IFRS, ISSB, CSRD, ESRS, SEC, California climate disclosure regulations, or any other framework or jurisdiction.</p>
-                    <p style={{ margin: '0 0 8px' }}>Platform outputs are dependent upon information provided by users and other third-party sources. ThemisIQ Compliance Inc. does not independently verify such information and makes no representation or warranty, express or implied, regarding the completeness, accuracy, reliability, suitability, or fitness for a particular purpose of any output.</p>
-                    <p style={{ margin: '0 0 8px' }}>Sustainability-related laws, regulations, standards, guidance, and interpretations continue to evolve. Users remain solely responsible for determining the applicability of regulatory requirements and for obtaining independent legal, accounting, assurance, and other professional advice where appropriate.</p>
-                    <p style={{ margin: '0 0 8px' }}>Use of the platform does not create a professional-client, advisory, assurance, accounting, consulting, fiduciary, or legal relationship with ThemisIQ Compliance Inc.</p>
-                    <p style={{ margin: '0 0 8px' }}>To the maximum extent permitted by law, ThemisIQ Compliance Inc., its directors, officers, employees, contractors, and affiliates shall not be liable for any direct, indirect, incidental, consequential, special, punitive, or economic damages arising from the use of, or reliance upon, any platform output.</p>
-                    <p style={{ margin: '0' }}>ThemisIQ is a software platform and is not an accredited assurance provider, certification body, or regulatory authority.</p>
+                    {/* ⚠️ WIRED 22 Aug 2026, and the purpose is NOT 'screening'. This is a computed
+                        inventory against published emission factors, destined for SB 253 / CSRD
+                        submission — see the note on DisclaimerPurpose in lib/disclaimer.ts. The margin
+                        ternary reproduces the styling the six inline paragraphs carried: '0' on the last,
+                        '0 0 8px' on the rest. */}
+                    {disclaimerParas('disclosure_preparation').map((para, i, all) => (
+                      <p key={'disc' + i} style={{ margin: i === all.length - 1 ? '0' : '0 0 8px' }}>{para}</p>
+                    ))}
                   </div>
                 </div>
               )

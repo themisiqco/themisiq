@@ -40,7 +40,7 @@ import { resolveReportGate, type SessionState, type ReportUpsell } from '../../.
 import { useReportTitle, reportTitle } from '../../../../lib/useReportTitle'
 import { filenameDate } from '../../../../lib/filename'
 import PaywallCard from '../../../components/PaywallCard'
-import { DISCLAIMER_PARAS } from '../../../../lib/disclaimer'
+import { disclaimerParas } from '../../../../lib/disclaimer'
 import { FLAT_MODULE_PRICES } from '../../../../lib/pricing'
 import {
   getFrameworkApplicability, getObligations, getComplianceCost, sectorRisks,
@@ -814,7 +814,7 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
         {/* 9 ── IMPORTANT NOTICE */}
         <section className="page" style={{ marginTop: 48 }}>
           <H>Important Notice</H>
-          {DISCLAIMER_PARAS.map((para, i) => (
+          {disclaimerParas('screening').map((para, i) => (
             <p key={'disc' + i} style={{ ...p, fontSize: 11, color: '#888784' }}>{para}</p>
           ))}
         </section>

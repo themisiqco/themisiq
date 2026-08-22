@@ -16,7 +16,7 @@ import { useEntitlement } from '../../../../lib/useEntitlement'
 import { useReportTitle, reportTitle } from '../../../../lib/useReportTitle'
 import PaywallCard from '../../../components/PaywallCard'
 import { REGION_LABEL } from '../../../../lib/climate/regions'
-import { DISCLAIMER_PARAS } from '../../../../lib/disclaimer'
+import { disclaimerParas } from '../../../../lib/disclaimer'
 import { reportingPeriodText } from '../../../../lib/reportDates'
 
 // ─── Lookup helpers (labels we don't store on the assessment row) ─────────────
@@ -909,7 +909,7 @@ function ReportInner() {
             attached to it, so the document carries its own notice. */}
         <section className="page" style={{ marginTop: 48 }}>
           <H>Important Notice</H>
-          {DISCLAIMER_PARAS.map((para, i) => (
+          {disclaimerParas('screening').map((para, i) => (
             <p key={'disc' + i} style={{ ...p, fontSize: 11, color: '#888784' }}>{para}</p>
           ))}
         </section>

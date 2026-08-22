@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { DISCLAIMER_PARAS } from './disclaimer'
+import { disclaimerParas } from './disclaimer'
 import { combustionSourcesFor, gridSourcesFor } from './ghg/engine'
 
 // ── Types (mirror the wizard's shapes) ──
@@ -260,7 +260,7 @@ export function generateAssurancePDF(
     const paraGap = 9
     let ny = 100
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor('#333333')
-    DISCLAIMER_PARAS.forEach(par => {
+    disclaimerParas('verification_support').forEach(par => {
       const lines = doc.splitTextToSize(par, W - 2 * M) as string[]
       lines.forEach(ln => {
         if (ny > H - 60) { doc.addPage(); ny = 100 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { DISCLAIMER_PARAS } from '../../../../lib/disclaimer'
+import { disclaimerParas } from '../../../../lib/disclaimer'
 // Derived here, NOT posted by the client. The client already sends `obligationId` on each entry, and
 // an id is a small stable token; a ready-made href would put the /order-vs-/pricing branch in two
 // places and let a cached page email a link nothing could audit. The route resolves label, href and
@@ -22,7 +22,7 @@ const MONITOR_EMAIL    = process.env.RESEND_MONITOR_EMAIL!
 // Pre-rendered HTML for the email footer: an "Important Notice" heading followed
 // by each paragraph as fine print.
 const DISCLAIMER_HTML = `<p style="font-size:10px;font-weight:700;color:#888;letter-spacing:0.06em;text-transform:uppercase;line-height:1.6;margin:0 0 6px;">Important Notice</p>`
-  + DISCLAIMER_PARAS.map(par => `<p style="font-size:10px;color:#aaa;line-height:1.6;margin:0 0 6px;">${par}</p>`).join('')
+  + disclaimerParas('screening').map(par => `<p style="font-size:10px;color:#aaa;line-height:1.6;margin:0 0 6px;">${par}</p>`).join('')
 
 const URGENCY_COLOR: Record<string, string> = {
   critical: '#B91C1C', high: '#ba7517', medium: '#0C447C', monitor: '#888784'
