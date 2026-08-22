@@ -36,6 +36,8 @@ import { resolveTopicLabels, isStandardVersion, type EsrsTopic } from '../../../
 // snapshot — and it also WRITES the snapshot when one is assigned. Both go through the same chain,
 // so what gets frozen onto an assignment is exactly what the lead saw when they assigned it.
 import { resolveSubtopicName, subtopicHeading } from '../../../../../lib/materiality/subtopicName'
+import { finalisationStamp, type Readiness }
+  from '../../../../../lib/materiality/finalisation'
 
 const PURPLE = '#7425e3'
 const GREEN = '#0F6E56'
@@ -133,6 +135,15 @@ export default function WorksheetAssign() {
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [assigned, setAssigned] = useState<AssignedSub[]>([])
   const [determinations, setDeterminations] = useState<Determination[]>([])
+  // ⚠️ THE ONLY MODEL OF READINESS ON THIS SCREEN. Everything the finalise card renders comes from
+  // this one object — see the note on Readiness in lib/materiality/finalisation.ts for why nothing
+  // here may recompute `ready` from the counts beside it.
+  const [readiness, setReadiness] = useState<Readiness | null>(null)
+  // A readiness call that FAILED is a fifth thing the card can be, and it must not look like
+  // "not ready" — that would show a preparer an outstanding-work card for a network error.
+  const [readinessError, setReadinessError] = useState<string | null>(null)
+  const [finalising, setFinalising] = useState(false)
+  const [finaliseError, setFinaliseError] = useState<string | null>(null)
 
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [target, setTarget] = useState<string>('')
@@ -256,6 +267,15 @@ export default function WorksheetAssign() {
     setAssigned((sRes.data || []) as AssignedSub[])
     setDeterminations((dRes.data || []) as Determination[])
     setAllRounds((rRes.data || []) as PickerRound[])
+    // ⚠️ ONE CALL, AND IT ANSWERS EVERYTHING THE FINALISE CARD NEEDS. Not a fetch of
+    // determinations plus a count plus a rule: migration 20260850 exists so this screen asks the
+    // question once and renders the answer. materiality_finalise_readiness and materiality_finalise
+    // call the same two helpers, so the card and the refusal cannot disagree.
+    const { data: rd, error: rdErr } = await supabase
+      .rpc('materiality_finalise_readiness', { p_assessment_id: assessmentId })
+    if (rdErr) { setReadinessError(rdErr.message); setReadiness(null) }
+    else { setReadinessError(null); setReadiness(rd as Readiness) }
+
     setLoading(false)
   }
 
@@ -576,6 +596,103 @@ export default function WorksheetAssign() {
    * removing it is always safe. That is a fact about this page's own fetch, not an assumption about
    * the data — and it is the reason the refusal below is narrow rather than blanket.
    */
+  /**
+   * ⚠️ THE DATABASE'S OWN SENTENCE ON FAILURE. materiality_finalise's five refusals each name what
+   * to do about them — the version must be stated, the requirements are not seeded for it, these
+   * sub-topics are outstanding — and no wrapper here would put any of them better. Same posture as
+   * the reassign call above.
+   */
+  async function finalise() {
+    setFinalising(true); setFinaliseError(null)
+    const { error } = await supabase.rpc('materiality_finalise', { p_assessment_id: assessmentId })
+    setFinalising(false)
+    if (error) { setFinaliseError(error.message); return }
+
+    // ⚠️ RE-READ, DO NOT PATCH. The RPC returns version and finalised_at and it is tempting to set
+    // them locally. But `ready` and `latest` BOTH move on a successful finalise, and the outstanding
+    // and scope counts are computed server-side — patching two of five fields would leave this
+    // screen holding a second, partial model of a fact the RPC already owns. One question, asked
+    // again.
+    await load()
+  }
+
+  const finaliseButton = (label: string, quiet = false) => (
+    <button onClick={() => void finalise()} disabled={finalising}
+            style={{ ...(quiet ? btn : btnPrimary), marginTop: 12,
+                     opacity: finalising ? 0.5 : 1,
+                     cursor: finalising ? 'wait' : 'pointer' }}>
+      {finalising ? 'Finalising…' : label}
+    </button>
+  )
+
+  /**
+   * ⚠️ `reason` IS RENDERED, NEVER INFERRED. Four reasons need four different sentences and, for one
+   * of them, a different kind of help entirely. Deducing which from outstanding_count and
+   * scope_count would put the RPC's precedence — version, then requirements, then scope, then
+   * outstanding — in a second place, which is what migration 20260850 exists to prevent.
+   *
+   * ⚠️ THE DEFAULT BRANCH IS NOT DEAD CODE. If a later migration adds a fifth reason this screen
+   * must not render nothing. It prints the message the RPC sent and says the reason was not
+   * recognised: a worse card than a tailored one, and a far better one than a blank.
+   */
+  const notReadyBody = (r: Readiness) => {
+    const p: React.CSSProperties = { fontSize: 12.5, color: INK, lineHeight: 1.8, margin: 0 }
+    switch (r.reason) {
+      case 'version_not_stated':
+        return (
+          <>
+            <p style={p}>{r.message}</p>
+            {/* ⚠️ NO LINK, DELIBERATELY. Nothing in this application sets standard_version after an
+                assessment is created — it is written once by /api/materiality from the wizard and
+                no screen updates it. A link here would go nowhere, and "set it on the assessment"
+                pointing at a page with no control is worse than saying plainly that we cannot help
+                from here. The noVersion block higher up this same page has the same gap and the
+                same silence; closing it needs an edit surface, not a link. */}
+            <p style={{ ...p, color: MUTE, marginTop: 8 }}>
+              There is no way to change this from the application yet. Contact us and we will set it.
+            </p>
+          </>
+        )
+      case 'no_requirements_for_version':
+      case 'no_scope':
+        return <p style={p}>{r.message}</p>
+      case 'outstanding_determinations':
+        return (
+          <>
+            <p style={p}>{r.message}</p>
+            {/* The named pairs, listed rather than only counted — the same reasoning as
+                materiality_lead_submit's named-missing list (20260844:117-136): a preparer told
+                "4 outstanding" must go and find them. The DIRECTION is shown because a sub-topic
+                submitted for harm and not for benefit is not finished, and the pair is what says
+                so. */}
+            <ul style={{ margin: '10px 0 0', paddingLeft: 18, fontSize: 12.5, color: MID,
+                         lineHeight: 1.9 }}>
+              {r.outstanding.map(o => (
+                <li key={`${o.subtopic_code}:${o.direction}`}>
+                  {nameFor(o.subtopic_code).title}
+                  <span style={{ color: MUTE }}>
+                    {' '}— {o.direction === 'negative' ? 'as a harm' : 'as a benefit'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )
+      default:
+        return (
+          <>
+            <p style={p}>
+              {r.message ?? 'This assessment cannot be finalised yet, and no reason was given.'}
+            </p>
+            <p style={{ ...p, color: MUTE, marginTop: 8 }}>
+              This reason was not recognised by the screen, so it is shown as the server sent it.
+              That is a gap here, not in your work.
+            </p>
+          </>
+        )
+    }
+  }
+
   const submittedFromScope = determinations.filter(
     d => d.status === 'submitted' && scopeCodes.has(d.subtopic_code)).length
 
@@ -1022,7 +1139,119 @@ export default function WorksheetAssign() {
             ))}
           </div>
         )}
+        {/* ── FINALISE ──────────────────────────────────────────────────────────────────────────
+            LAST, because it concludes the three cards above it: the round sets scope, contributors
+            take sub-topics, assignment distributes them, and this records the result. Higher up it
+            would ask a preparer to conclude before seeing what is outstanding.
+
+            A CARD, NOT A ROUTE, unlike IRO-1. That screen is five fields with three states each and a
+            submit of its own; this is one control and one status line, and it belongs beside the work
+            it concludes.
+
+            ⚠️ WHAT FINALISING DOES, AND WHY IT IS NOT JUST A FLAG. materiality_finalise (20260849)
+            copies every disclosure requirement row in force for the assessment's stated ESRS version
+            into materiality_finalisation_requirements. THE COPY IS THE POINT: that reference table
+            changes — 20260845 rewrote E1-11's title on 21 Aug 2026 — and without a frozen copy the
+            same report generated twice can print different requirement text.
+
+            ⚠️ RE-FINALISATION PROMPTING IS NOT HERE, AND CANNOT BE YET. A card saying "this has
+            changed since you finalised" would need to know the DETERMINATIONS moved. Nothing records
+            that: materiality_finalisations freezes the requirement ROWS only, and the RPC's
+            requirements_changed is about those rows, not about the assessment. Finalising again is
+            offered where it is possible, with NO claim that it is needed — because we cannot know.
+            Making that claim requires snapshotting determinations too, which is its own design. */}
+        <div style={CARD}>
+          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.25rem', color: INK, marginBottom: 6 }}>
+            Finalise this assessment
+          </div>
+
+          {readinessError ? (
+            <div style={{ background: FAIL_BG, border: `0.5px solid ${FAIL}33`, borderRadius: 10,
+                          padding: '12px 14px', fontSize: 12.5, color: INK, lineHeight: 1.8 }}>
+              The finalisation status could not be read, so this card cannot say whether the assessment
+              is ready. Nothing has changed. {readinessError}
+            </div>
+          ) : !readiness ? (
+            <div style={{ fontSize: 12.5, color: MUTE }}>Checking…</div>
+          ) : (() => {
+            const r = readiness
+            // ⚠️ TWO FIELDS DECIDE WHICH OF FOUR CARDS: `latest` (has it ever been finalised) and
+            // `ready` (can it be finalised now). BOTH COME FROM THE RPC. Neither is computed here,
+            // and `ready` in particular must never be derived from outstanding_count — see the note
+            // on Readiness in lib/materiality/finalisation.ts.
+            const stamp = finalisationStamp(r.latest)
+            return (
+              <>
+                {stamp && (
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap',
+                                marginBottom: 10 }}>
+                    {/* Inlined rather than imported: Chip is defined on the determinations and
+                        register pages, and pulling one route module's component into another to
+                        avoid nine lines would couple two screens that have no other relationship.
+                        Same styling, deliberately, so the three read as one badge. */}
+                    <span style={{ background: GREEN_BG, color: GREEN, border: `0.5px solid ${GREEN}33`,
+                                   borderRadius: 999, padding: '2px 9px', fontSize: 10.5,
+                                   fontWeight: 600 }}>{stamp.toUpperCase()}</span>
+                    <span style={{ fontSize: 11.5, color: MUTE }}>
+                      {r.requirements_available} disclosure requirements frozen
+                    </span>
+                  </div>
+                )}
+
+                {!r.ready && (
+                  <div style={{ background: AMBER_BG, border: `0.5px solid ${AMBER}`, borderRadius: 10,
+                                padding: '12px 14px' }}>
+                    {/* State 4 when a stamp is present: finalised, and since then something moved
+                        back to draft. BOTH HALVES ARE SHOWN — the chip above, this below — because
+                        either alone would be a half-truth. */}
+                    {stamp && (
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: AMBER, marginBottom: 6 }}>
+                        Something has changed since this was finalised
+                      </div>
+                    )}
+                    {notReadyBody(r)}
+                  </div>
+                )}
+
+                {/* ⚠️ NO BUTTON AT ALL WHEN NOT READY — not a disabled one. wizardSteps.ts's lesson is
+                    that a control which cannot act must say what it is waiting for; here the card
+                    already IS that sentence, and a greyed button beneath a paragraph naming four
+                    outstanding pairs adds nothing but something to click at. */}
+                {r.ready && !stamp && (
+                  <>
+                    <p style={{ fontSize: 12.5, color: INK, lineHeight: 1.8, margin: 0 }}>
+                      Finalising records the assessment as it stands and takes a copy of the disclosure
+                      requirements in force today, so the report does not change afterwards if the
+                      standard text is later corrected.
+                    </p>
+                    {finaliseButton('Finalise this assessment')}
+                  </>
+                )}
+
+                {r.ready && stamp && (
+                  <>
+                    <p style={{ fontSize: 12.5, color: MUTE, lineHeight: 1.8, margin: 0 }}>
+                      Nothing is outstanding. Finalising again takes a fresh copy of the requirements
+                      and records a new version; the existing one is kept.
+                    </p>
+                    {finaliseButton('Finalise again', true)}
+                  </>
+                )}
+
+                {finaliseError && (
+                  <div style={{ background: FAIL_BG, border: `0.5px solid ${FAIL}33`, borderRadius: 8,
+                                padding: '10px 13px', marginTop: 12, fontSize: 12, color: INK,
+                                lineHeight: 1.75 }}>
+                    {finaliseError}
+                  </div>
+                )}
+              </>
+            )
+          })()}
+        </div>
+
       </div>
+
 
       {/* ── the move confirmation ─────────────────────────────────────────────────────────────
           ⚠️ A NUMBER, BEFORE THE FACT. "This may clear some answers" is the warning that gets
