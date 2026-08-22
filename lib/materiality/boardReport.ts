@@ -260,6 +260,13 @@ export type ParticipationSection = {
 
 export type StakeholderRow = {
   subtopic_code: string
+  /**
+   * ⚠️ READ FROM THE ROW, NEVER PARSED FROM subtopic_code. RegisterSubTopic carries it, and the
+   * field beside it there states the rule for its neighbour: "mr_esrs_topics.category. Never
+   * derived from subtopic_code." Present so the renderer can apply the S1/S2 worksheet framing —
+   * topic_label cannot disambiguate, because S1 and S2 share a merged label by design.
+   */
+  topic_code: string
   name: string
   topic_label: string
   /** Three bands with printed counts. ⚠️ There is no field here a mean could occupy. */
@@ -277,9 +284,22 @@ export type StakeholderViewSection = {
   no_mean_note: string
 }
 
+/**
+ * ⚠️ THREE STATES PER DIRECTION, AND ALL THREE ARE EMITTED. `determined` false means no submitted
+ * determination exists for that direction at all; true with complete false is a §6.1 abstention
+ * naming its dimensions; true and complete is a severity. Until 22 Aug 2026 the first state was
+ * dropped by a `continue` in judge(), so `directions` silently meant "submitted directions" — a
+ * filter no field name carried, and the reason section 9 could render a topic as a bold name with
+ * nothing under it.
+ */
 export type AssessmentDirectionRow = {
   direction: Direction
-  nature: Nature
+  /** False when nothing was submitted for this direction. The other fields are then null/empty. */
+  determined: boolean
+  /** ⚠️ NULL EXACTLY WHEN determined IS FALSE. A submitted determination always states its nature —
+   *  materiality_impact_determinations_submitted_is_complete guarantees it — so a null here is the
+   *  absence of a determination, never an unanswered question within one. */
+  nature: Nature | null
   /** null when the determination is incomplete. Never false, never zero. */
   material: boolean | null
   complete: boolean
@@ -827,7 +847,16 @@ function judge(subtopics: RegisterSubTopic[]): Judged[] {
     for (const direction of DIRECTIONS) {
       const det: Determination | undefined = s.determinations.find(
         d => d.status === SUBMITTED_STATUS && d.direction === direction)
-      if (!det) continue
+      if (!det) {
+        // ⚠️ EMITTED, NOT SKIPPED. "Nothing was determined here" is a finding this section promises
+        // to report — ABSTENTION_NOTE says a topic missing any dimension "is reported as
+        // unfinished, naming what is absent" — and dropping the row made it unrepresentable.
+        rows.push({
+          direction, determined: false, nature: null, material: null, complete: false,
+          severity: null, rule: null, basis: [], values: null, abstained: [], drivers: [],
+        })
+        continue
+      }
       submittedCount += 1
 
       const r = computeSeverity({
@@ -842,6 +871,7 @@ function judge(subtopics: RegisterSubTopic[]): Judged[] {
 
       rows.push({
         direction: det.direction,
+        determined: true,
         nature: det.nature,
         material: r.complete ? r.material : null,
         complete: r.complete,
@@ -979,6 +1009,7 @@ export function buildBoardReport(input: BoardReportInput): BoardReport {
       const o = s.overall as NonNullable<RegisterSubTopic['overall']>
       return {
         subtopic_code: s.subtopic_code,
+        topic_code: s.topic_code,
         name: nameOf(s),
         topic_label: s.topic_label,
         distribution: o.distribution,
@@ -1070,7 +1101,16 @@ export function buildBoardReport(input: BoardReportInput): BoardReport {
 
     assessmentView: {
       heading: ASSESSMENT_HEADING,
-      rows: materialTopics.map(j => ({
+      // ⚠️ EVERY SUB-TOPIC IN SCOPE, NOT THE MATERIAL ONES. Until 22 Aug 2026 this rendered
+      // materialTopics while section 3 counted `assessed` — in scope AND (material or fully
+      // judged) — so a topic judged complete in both directions and material in NEITHER counted
+      // toward "topics assessed" and appeared nowhere. On the fixture that was Air pollution, the
+      // subject of the register's only entry: page 3 said three assessed, section 9 showed two.
+      //
+      // ⚠️ AND THE SECTION'S OWN PROSE ALREADY PROMISED THIS. ABSTENTION_NOTE says a topic missing
+      // any dimension "is reported as unfinished, naming what is absent". That described behaviour
+      // the section did not have. Rendering all of scope is what makes the sentence true.
+      rows: judged.filter(j => j.subtopic.status === 'included').map(j => ({
         subtopic_code: j.subtopic.subtopic_code,
         name: nameOf(j.subtopic),
         topic_label: j.subtopic.topic_label,

@@ -338,7 +338,14 @@ describe('sections 6 and 7 agree about the same sub-topic', () => {
                          determinations: [negDet(3, 3, 3, { status: 'in_review' }),
                                           posDet(4, 4, { status: 'in_review' })] })]
     const r = report(other)
-    expect(r.assessmentView.rows).toHaveLength(0)
+    // ⚠️ UPDATED 22 Aug 2026, AND THE INTENT IS UNCHANGED. Section 9 now renders every sub-topic in
+    // SCOPE rather than only the material ones, so this row APPEARS — as it must, since it is in
+    // scope. What must still be absent is any CONCLUSION drawn from a non-submitted determination,
+    // and that is what is asserted: both directions undetermined, nothing material, no register
+    // entry. Asserting length 0 encoded the old feed, not the rule.
+    expect(r.assessmentView.rows).toHaveLength(1)
+    expect(r.assessmentView.rows[0].material).toBe(false)
+    expect(r.assessmentView.rows[0].directions.every(d => d.determined === false)).toBe(true)
     expect(r.differences.register.entries).toHaveLength(0)
     expect(r.findings.topics_material).toBe(0)
   })
@@ -360,7 +367,13 @@ describe('a draft is absent from every section, and is not a low score', () => {
     const r = report(DRAFTS)
     expect(r.findings.topics_material).toBe(0)
     expect(r.findings.material_topics).toEqual([])
-    expect(r.assessmentView.rows).toHaveLength(0)
+    // Same update, same reasoning as the in_review case above: in scope, so it is shown — and shown
+    // as undetermined, which is the honest rendering of a draft. A draft is not a low score and it
+    // is not a conclusion; it is work not yet submitted, and section 9 now says so rather than
+    // omitting the topic entirely.
+    expect(r.assessmentView.rows).toHaveLength(1)
+    expect(r.assessmentView.rows[0].material).toBe(false)
+    expect(r.assessmentView.rows[0].directions.every(d => d.determined === false)).toBe(true)
   })
 
   it('and is not counted as assessed either', () => {
@@ -422,8 +435,12 @@ describe('no section exposes a field an average could be rendered from', () => {
 
   it('a stakeholder row carries the distribution and the top box, and nothing else numeric', () => {
     const row = R.stakeholderView.rows[0]
+    // topic_code added 22 Aug 2026 for the S1/S2 worksheet framing. It is a STRING identifier, so
+    // this test's actual claim — that no field here could be rendered as an average — is untouched;
+    // the key list is pinned so a numeric field cannot arrive unnoticed.
     expect(Object.keys(row).sort()).toEqual(
-      ['counts', 'distribution', 'name', 'split_note', 'subtopic_code', 'top_box', 'topic_label'])
+      ['counts', 'distribution', 'name', 'split_note', 'subtopic_code', 'top_box', 'topic_code',
+       'topic_label'])
   })
 
   it('the distribution is three counted bands, not a position', () => {
@@ -613,5 +630,112 @@ describe('roadmap — grouping and the ¶30 rollup', () => {
     expect(report([sub()]).roadmap.resolved_note).toBeNull()
     expect(report([sub()], { requirements_resolved_note: 'read at generation' })
       .roadmap.resolved_note).toBe('read at generation')
+  })
+})
+
+// ================================================================================================
+// THE THREE DEFECTS FOUND BY READING A GENERATED PDF, 21 Aug 2026
+//
+// All three were invisible to every test that existed, because every one of them asserted the
+// payload was self-consistent and none asserted it was COMPLETE. A count and a list that disagree
+// are each individually correct.
+// ================================================================================================
+describe('section 9 renders everything section 3 counts', () => {
+  it('D1 a topic complete in BOTH directions and material in NEITHER still appears', () => {
+    // ⚠️ THE REGRESSION. assessmentView rendered materialTopics while findings counted `assessed` —
+    // in scope AND (material or fully judged). On the fixture the gap was Air pollution: page 3
+    // said three topics assessed, section 9 showed two, and the missing one was the subject of the
+    // register's only entry.
+    const r = report([
+      sub({ subtopic_code: 'E1.1', determinations: [MATERIAL_NEG()] }),
+      sub({ subtopic_code: 'E2.1', short_name: 'Air pollution',
+            determinations: [IMMATERIAL_NEG(), IMMATERIAL_POS()] }),
+    ])
+    const codes = r.assessmentView.rows.map(x => x.subtopic_code)
+    expect(codes).toContain('E2.1')
+    expect(r.assessmentView.rows.find(x => x.subtopic_code === 'E2.1')!.material).toBe(false)
+  })
+
+  it('D2 the section can never show fewer topics than section 3 counts assessed', () => {
+    // The invariant that broke. assessmentView is now all of scope, which is a superset of
+    // `assessed` by construction — so this holds whatever the fixture.
+    const r = report([
+      sub({ subtopic_code: 'A.1', determinations: [MATERIAL_NEG()] }),
+      sub({ subtopic_code: 'A.2', determinations: [IMMATERIAL_NEG(), IMMATERIAL_POS()] }),
+      sub({ subtopic_code: 'A.3', determinations: [] }),
+    ])
+    expect(r.assessmentView.rows.length).toBeGreaterThanOrEqual(r.findings.topics_assessed)
+  })
+
+  it('D3 every sub-topic IN SCOPE appears, determined or not', () => {
+    const r = report([
+      sub({ subtopic_code: 'A.1', determinations: [MATERIAL_NEG()] }),
+      sub({ subtopic_code: 'A.2', determinations: [] }),
+      sub({ subtopic_code: 'A.3', determinations: [] }),
+    ])
+    expect(r.assessmentView.rows.map(x => x.subtopic_code)).toEqual(['A.1', 'A.2', 'A.3'])
+  })
+
+  it('D4 an EXCLUDED sub-topic does not appear — in scope is the bar, not merely present', () => {
+    const r = report([
+      sub({ subtopic_code: 'A.1', determinations: [MATERIAL_NEG()] }),
+      sub({ subtopic_code: 'A.2', status: 'excluded', exclusion_reason: 'Out of scope.',
+            determinations: [] }),
+    ])
+    expect(r.assessmentView.rows.map(x => x.subtopic_code)).toEqual(['A.1'])
+  })
+})
+
+describe('judge() emits a row for a direction nobody determined', () => {
+  it('D5 no determinations at all yields TWO rows, both determined:false', () => {
+    // Until 22 Aug 2026 judge() did `if (!det) continue`, so this sub-topic produced ZERO direction
+    // rows — and the renderer drew a bold name with nothing under it, which in a section headed
+    // "What our own assessment concluded" reads as a conclusion nobody reached.
+    const r = report([sub({ subtopic_code: 'A.1', determinations: [] })])
+    const row = r.assessmentView.rows[0]
+    expect(row.directions).toHaveLength(2)
+    expect(row.directions.every(d => d.determined === false)).toBe(true)
+    expect(row.directions.map(d => d.direction).sort()).toEqual(['negative', 'positive'])
+  })
+
+  it('D6 one direction submitted yields one determined and one not', () => {
+    const r = report([sub({ subtopic_code: 'A.1', determinations: [MATERIAL_NEG()] })])
+    const ds = r.assessmentView.rows[0].directions
+    expect(ds.find(d => d.direction === 'negative')!.determined).toBe(true)
+    expect(ds.find(d => d.direction === 'positive')!.determined).toBe(false)
+  })
+
+  it('D7 nature is null EXACTLY when determined is false — never within a determination', () => {
+    // materiality_impact_determinations_submitted_is_complete guarantees a submitted row states its
+    // nature, so a null here is the absence of a determination and never an unanswered question.
+    const r = report([sub({ subtopic_code: 'A.1', determinations: [MATERIAL_NEG()] })])
+    for (const d of r.assessmentView.rows[0].directions) {
+      expect(d.nature === null).toBe(d.determined === false)
+    }
+  })
+
+  it('D8 the new rows change NO arithmetic — material, carried_by and fully_judged are untouched', () => {
+    // The guard on the fix. fully_judged requires submittedCount === 2 BEFORE every(complete), so an
+    // undetermined row cannot make a topic look finished; carried_by filters material === true, so
+    // it cannot pick one up.
+    const r = report([
+      sub({ subtopic_code: 'A.1', determinations: [MATERIAL_NEG()] }),                    // one only
+      sub({ subtopic_code: 'A.2', determinations: [IMMATERIAL_NEG(), IMMATERIAL_POS()] }), // both
+    ])
+    expect(r.findings.topics_material).toBe(1)
+    expect(r.findings.material_topics[0].carried_by).toEqual(['negative'])
+    expect(r.assessmentView.rows[0].carried_by).not.toContain('positive')
+  })
+})
+
+describe('sub-topic codes reach the surfaces that print them', () => {
+  it('D9 StakeholderRow carries topic_code READ FROM THE ROW, never parsed from subtopic_code', () => {
+    // The S1/S2 framing needs it, and topic_label cannot disambiguate: S1 and S2 share a merged
+    // label by design, which is why "Health and safety" appears twice with nothing telling them
+    // apart. Parsing "S1.3" on the dot would give the same answer here and a wrong one the moment a
+    // sub-topic code stops mirroring its topic — the reason register.ts stores both.
+    const r = report([sub({ subtopic_code: 'S1.3', topic_code: 'ZZ', overall: overall(BELOW) })])
+    expect(r.stakeholderView.rows[0].topic_code).toBe('ZZ')
+    expect(r.stakeholderView.rows[0].subtopic_code).toBe('S1.3')
   })
 })

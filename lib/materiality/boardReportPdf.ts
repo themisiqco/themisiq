@@ -44,6 +44,13 @@ import { THEMISIQ_WORDMARK_DATA_URI, WORDMARK_ASPECT } from '../pdf/logo'
  */
 import { disclaimerParas } from '../disclaimer'
 import { ROADMAP_NO_REQUIREMENTS_NOTE, type RoadmapTopic } from './boardReport'
+// ⚠️ THE S1/S2 FRAMING, AND WHY A CODE IS NOT ENOUGH ON ITS OWN. 'Health and safety' appears twice
+// in this paper — S1.3 and S2.3 — and topic_label cannot tell them apart, because S1 and S2 share a
+// merged label by design. The CODE disambiguates for a verifier; the FRAMING ('on your own
+// workforce' / 'on workers in your value chain') says WHY they differ, in words a director reads.
+// Neither substitutes for the other, so reader-facing lists carry both. worksheetSubtopicHeading
+// returns the bare name for every topic that has no framing, so it is safe everywhere.
+import { worksheetSubtopicHeading } from './severityScale'
 import type { AssessmentRow, BoardReport, ContrastEntry, StakeholderRow } from './boardReport'
 // The register's own entry shape, reached through DifferencesSection.register.entries.
 import type { RegisterEntry } from './register'
@@ -276,6 +283,15 @@ const assessmentBlock = (l: Layout, row: AssessmentRow): void => {
   const lines: string[] = []
   for (const d of row.directions) {
     const label = DIRECTION_WORD[d.direction] ?? d.direction
+    if (!d.determined) {
+      // ⚠️ NOT AN ABSTENTION, AND THE DISTINCTION IS THE POINT. "Nobody judged this" and "the judge
+      // could not see it" are different facts: an abstention is a recorded answer under §6.1, and
+      // this is the absence of one. Section 9 renders every sub-topic in scope as of 22 Aug 2026,
+      // so most rows on most reports take this branch — a bold name with nothing under it would
+      // read as "we concluded nothing is material here", which is a conclusion nobody reached.
+      lines.push(`${label}: not yet determined`)
+      continue
+    }
     if (!d.complete) {
       // ⚠️ AN ABSTENTION, SAID AS ONE. Never a zero, never a low, never an empty cell that reads
       // like a score of nothing.
@@ -378,6 +394,36 @@ const roadmapBlock = (l: Layout, t: RoadmapTopic): void => {
   })
 }
 
+/**
+ * One omission group: the topics, then the reason beneath them.
+ *
+ * ⚠️ NAMES FIRST, ALWAYS, SINGLETON OR NOT. Until 22 Aug 2026 the singleton branch read
+ * "name — detail" and the multi branch read detail, then a count, then the names — two orders, with
+ * l.body flowing them together and no separator. So a group's reason sat directly beneath the
+ * PREVIOUS group's last name: on the fixture, "Nobody who was asked gave a rating" rendered under
+ * Climate change mitigation, which received eight ratings. A reader attaches the wrong cause to a
+ * named topic, and nothing on the page says otherwise.
+ *
+ * One order fixes it structurally rather than typographically: every group now ENDS with its
+ * reason, so a reason cannot bleed upward into names that are not its own. The singleton case is
+ * the plural's degenerate form rather than a different layout.
+ *
+ * The count is gone with the second order. "3 topics:" above a list of three is a number to
+ * reconcile rather than read; the names are the count.
+ */
+const omissionBlock = (l: Layout, names: string[], detail: string): void => {
+  const doc = l.doc
+  const nameLines = wrap(doc, names.join(', '), l.contentWidth, SIZE.body, 'bold')
+  const why = wrap(doc, detail, l.contentWidth - 12, SIZE.small)
+  const height = nameLines.length * (SIZE.body * 1.35) + 6 + why.length * LEAD.small + 16
+  block(l, height, top => {
+    let cursor = top
+    textAt(doc, nameLines, MARGIN.left, cursor, SIZE.body, SIZE.body * 1.35, 'bold', INK)
+    cursor += nameLines.length * (SIZE.body * 1.35) + 6
+    textAt(doc, why, MARGIN.left + 12, cursor, SIZE.small, LEAD.small, 'normal', SECONDARY)
+  })
+}
+
 // ── section 7: the two facts ─────────────────────────────────────────────────────────────────────
 
 const COLUMN_GAP = 22
@@ -396,8 +442,11 @@ const entryBlock = (l: Layout, entry: RegisterEntry): void => {
   const colWidth = (l.contentWidth - COLUMN_GAP) / 2
   const rightX = MARGIN.left + colWidth + COLUMN_GAP
 
-  const nameLines = wrap(doc, `${entry.short_name ?? entry.subtopic_code} · ${entry.topic_label}`,
-                         l.contentWidth, SIZE.body, 'bold')
+  // ⚠️ THE CODE IS NO LONGER A FALLBACK. `short_name ?? subtopic_code` printed the code only when
+  // the name was missing — so where a name existed, nothing distinguished S1.3 from S2.3.
+  const nameLines = wrap(doc,
+    `${entry.short_name ?? entry.subtopic_code} · ${entry.subtopic_code} · ${entry.topic_label}`,
+    l.contentWidth, SIZE.body, 'bold')
   const left = wrap(doc, entry.stakeholder.statement, colWidth, SIZE.small)
   const right = wrap(doc, entry.assessment.statement, colWidth, SIZE.small)
 
@@ -577,7 +626,8 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
     for (const t of report.findings.material_topics) {
       // carried_by is printed as the module holds it — both directions where both carried, because
       // ¶44 forbids netting them into one finding.
-      l.body(`${t.name} · ${t.topic_label} — ${t.carried_by.join(' and ')}`)
+      l.body(`${worksheetSubtopicHeading(t.name, t.topic_code)} · ${t.subtopic_code}`
+           + ` · ${t.topic_label} — ${t.carried_by.join(' and ')}`)
     }
   }
 
@@ -648,7 +698,7 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
     l.body(`${unrated.length} sub-topics were put to respondents and received no ratings at all. `
          + `An absence of answers is not a low score: it means nobody who was asked judged the `
          + `topic, which is a finding about what can currently be seen rather than about the topic.`)
-    nameList(l, unrated.map(r => r.name))
+    nameList(l, unrated.map(r => `${worksheetSubtopicHeading(r.name, r.topic_code)} · ${r.subtopic_code}`))
   }
 
   // ── 5b · WHERE YOUR OWN PEOPLE DISAGREE ──────────────────────────────────────────────────────
@@ -701,7 +751,9 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
         l.body(`${silent.length} labour ${silent.length === 1 ? 'pair' : 'pairs'} had no answers on `
              + `either side, so there is nothing to set beside anything. That is a fact about who `
              + `responded, not a finding that the two populations agree.`)
-        nameList(l, silent.map(e => e.short_name))
+        // No framing here: a labour PAIR is the S1/S2 contrast, so 'on your own workforce' would
+        // name one half of the thing being listed. Both codes instead.
+        nameList(l, silent.map(e => `${e.short_name} · ${e.s1_subtopic_code} / ${e.s2_subtopic_code}`))
       }
     }
   }
@@ -761,19 +813,12 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
       const detail = o.detail ?? 'No further detail was recorded.'
       const key = `${o.reason}\u0000${detail}`
       const g = groups.get(key) ?? { detail, names: [] }
-      g.names.push(o.short_name ?? o.subtopic_code)
+      // Same fix as entryBlock: the code was a fallback, so a named topic carried no code at all.
+      g.names.push(o.short_name ? `${o.short_name} · ${o.subtopic_code}` : o.subtopic_code)
       groups.set(key, g)
     }
 
-    for (const g of groups.values()) {
-      if (g.names.length === 1) {
-        l.body(`${g.names[0]} — ${g.detail}`)
-      } else {
-        l.body(g.detail)
-        l.body(`${g.names.length} topics:`)
-        nameList(l, g.names)
-      }
-    }
+    for (const g of groups.values()) omissionBlock(l, g.names, g.detail)
   }
 
   // The framing and the inactive trigger, beneath the entries they describe.
