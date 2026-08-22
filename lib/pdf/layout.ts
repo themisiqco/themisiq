@@ -135,6 +135,24 @@ export type CoverFields = {
   standardVersionLabel: string | null
   roundName: string | null
   closedOn: string | null
+  /**
+   * OPTIONAL fifth row — "Finalised 22 August 2026", or "Version 2 · finalised 5 September 2026".
+   *
+   * ⚠️ OPTIONAL SO EXISTING CALLERS ARE UNTOUCHED. Only lib/materiality/boardReportPdf.ts calls
+   * coverPage today, but this array is the shared cover of every report that ever will, and a
+   * required field would make each of them declare a fact most have no notion of.
+   *
+   * ⚠️ THE CALLER FORMATS IT. lib/materiality/finalisation.ts finalisationStamp decides that
+   * version 1 reads "Finalised …" and version 2 reads "Version 2 · finalised …", and it is tested.
+   * A second rule here would be free to drift from the one with the tests.
+   */
+  finalisedStamp?: string | null
+  /**
+   * OPTIONAL note printed BELOW the table, not in it. Two sentences is more than a cover row can
+   * hold — the value column wraps at contentWidth and would push the rule off the page — and it is
+   * a caveat about the whole paper rather than a field of it.
+   */
+  coverNote?: string | null
 }
 
 export type Layout = {
@@ -348,6 +366,12 @@ export function createLayout(): Layout {
       ['Stakeholder survey', fields.roundName ?? 'None linked'],
       ['Survey closed', fields.closedOn ?? '—'],
     ]
+    // ⚠️ APPENDED, NEVER PLACED WITH A PLACEHOLDER. An absent stamp means the paper was not
+    // finalised, and that is said by fields.coverNote beneath the table in two sentences — not by a
+    // fifth row reading "Not finalised", which would sit in a column of stated facts and look like
+    // one. The other four rows print "Not stated" because the question WAS asked of them; this one
+    // is a different kind of absence.
+    if (fields.finalisedStamp) rows.push(['Finalised', fields.finalisedStamp])
 
     for (const [label, value] of rows) {
       setType(8.5, 'normal', MUTED)
@@ -359,6 +383,16 @@ export function createLayout(): Layout {
         y += 15
       }
       y += 9
+    }
+
+    // Below the table and above the page break: a caveat about the paper, not a field of it.
+    if (fields.coverNote) {
+      y += 4
+      setType(9, 'normal', MUTED)
+      for (const line of doc.splitTextToSize(fields.coverNote, contentWidth) as string[]) {
+        doc.text(line, MARGIN.left, y)
+        y += 13
+      }
     }
 
     newPage()

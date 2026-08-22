@@ -181,14 +181,26 @@ export type BoardReportInput = {
    * prints the no-requirements line, which is honest; the roadmap section is built either way and
    * is not currently rendered.
    */
+  /**
+   * The finalisation status line, already formatted by lib/materiality/finalisation.ts
+   * finalisationStamp. Null or absent means never finalised, and the cover then carries
+   * NOT_FINALISED_NOTE instead. This module formats nothing, exactly as it generates no dates.
+   */
+  finalised_stamp?: string | null
+
   disclosure_requirements?: readonly RoadmapRequirementRow[]
 
   /**
    * What to say on the document about where the requirements came from. Null when nothing needs
    * saying - which is what a frozen source looks like.
    *
-   * KEPT DELIBERATELY THOUGH NO CALLER SETS IT. It becomes correct the moment a caller resolves at
-   * read, and removing it now would only mean adding it back.
+   * ⚠️ NO CALLER SETS THIS, AND AS OF 22 AUG 2026 NONE CAN TRUTHFULLY. It was kept when the roadmap
+   * was built, on the grounds that it would become correct the moment a caller resolved at read.
+   * Finalisation removed that possibility in BOTH directions: a finalised paper's rows come frozen
+   * from materiality_finalisation_requirements, so the note would be false; an unfinalised paper's
+   * caller passes NO rows and resolves nothing at read, so it would be false there too — the
+   * roadmap is simply empty and NOT_FINALISED_NOTE on the cover is what explains it.
+   * The field survives for a caller that genuinely resolves at read. There is none today.
    */
   requirements_resolved_note?: string | null
 }
@@ -202,6 +214,10 @@ export type CoverSection = {
   /** False when the assessment states no version — Article 2(2). Never rendered as a default. */
   standard_version_stated: boolean
   reporting_period: string | null
+  /** Formatted by the caller via finalisationStamp. Null when the paper was never finalised. */
+  finalised_stamp: string | null
+  /** ⚠️ Printed only when the paper is NOT finalised — see NOT_FINALISED_NOTE. */
+  cover_note: string | null
   round_name: string | null
   round_closed_at: string | null
   title: string
@@ -401,6 +417,18 @@ export type BoardReport = {
 }
 
 // ── prose. ONE copy, exported as data, as register.ts does. ──────────────────────────────────────
+
+/**
+ * ⚠️ PRINTED ONLY WHEN THERE IS NO FINALISATION, and it is the honest counterpart to the frozen
+ * roadmap. An unfinalised paper's requirements are read from nothing at all — the caller passes no
+ * frozen rows — so every material topic prints ROADMAP_NO_REQUIREMENTS_NOTE, and what the paper
+ * reports can still move as determinations are edited. Saying so is not a warning about a defect;
+ * it is the difference between this document and a finalised one.
+ */
+export const NOT_FINALISED_NOTE =
+  'This paper has not been finalised. What it reports may change as determinations are edited, and '
+  + 'the disclosure requirements it lists are read from the current reference set rather than a '
+  + 'fixed copy.'
 
 export const ROADMAP_HEADING = 'What becomes disclosable'
 
@@ -972,6 +1000,11 @@ export function buildBoardReport(input: BoardReportInput): BoardReport {
       standard_version_label: standardVersionLabel(input.standard_version),
       standard_version_stated: standardVersionLabel(input.standard_version) !== null,
       reporting_period: input.reporting_period,
+      finalised_stamp: input.finalised_stamp ?? null,
+      // ⚠️ THE NOTE IS THE ABSENCE OF THE STAMP, and the two are mutually exclusive by construction
+      // rather than by a caller remembering. A paper cannot be both finalised and warning that it
+      // is not.
+      cover_note: input.finalised_stamp ? null : NOT_FINALISED_NOTE,
       round_name: input.round_name,
       round_closed_at: input.round_closed_at,
       title: TITLE,

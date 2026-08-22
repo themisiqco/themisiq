@@ -36,6 +36,10 @@ import { supabase } from '../../../../../lib/supabase'
 import { useEntitlement } from '../../../../../lib/useEntitlement'
 import { resolveSubtopicName } from '../../../../../lib/materiality/subtopicName'
 import { formatPeriodSpan, formatReportDate } from '../../../../../lib/reportDates'
+import { finalisationStamp, type FinalisationLatest }
+  from '../../../../../lib/materiality/finalisation'
+import { NOT_FINALISED_NOTE, type RoadmapRequirementRow }
+  from '../../../../../lib/materiality/boardReport'
 import type { TopicCategory } from '../../../../../lib/materiality/severity'
 import { buildBoardReport, standardVersionLabel,
          type BoardReportInput, type CategoryParticipation, type ContrastEntry,
@@ -183,6 +187,8 @@ export default function StakeholderBoardReport() {
   const [standardVersion, setStandardVersion] = useState<string | null>(null)
   const [periodStart, setPeriodStart] = useState<string | null>(null)
   const [periodEnd, setPeriodEnd] = useState<string | null>(null)
+  const [finalisation, setFinalisation] = useState<FinalisationLatest | null>(null)
+  const [frozenRequirements, setFrozenRequirements] = useState<RoadmapRequirementRow[]>([])
 
   const [roundId, setRoundId] = useState<string | null>(null)
   const [roundName, setRoundName] = useState<string | null>(null)
@@ -227,6 +233,34 @@ export default function StakeholderBoardReport() {
     setStandardVersion(asmt.standard_version)
     setPeriodStart(asmt.reporting_period_start ?? null)
     setPeriodEnd(asmt.reporting_period_end ?? null)
+
+    // ⚠️ THE TABLES DIRECTLY, NOT materiality_finalise_readiness. Three reasons, in order of weight:
+    // the RPC does not return the frozen ROWS — only `latest` — so it would be a first call BEFORE
+    // this one rather than instead of it; ownership was established by the maybeSingle above and
+    // re-checking it would be a second copy of a refusal this screen already made; and the RPC
+    // answers "can this be finalised?", a question about the FUTURE, while a report asks "what was
+    // frozen?", a question about the PAST. An assessment finalised and since edited returns
+    // ready:false — true, and entirely irrelevant to printing version 1.
+    const { data: fin } = await supabase.from('materiality_finalisations')
+      .select('version, finalised_at, standard_version')
+      .eq('assessment_id', assessmentId)
+      .order('version', { ascending: false }).limit(1).maybeSingle()
+    const latest = (fin as FinalisationLatest | null) ?? null
+    setFinalisation(latest)
+
+    if (latest) {
+      // Ordered by the same (topic_code, sort_order) the roadmap prints in —
+      // materiality_finalisation_requirements_order_idx exists for exactly this read.
+      const { data: fr } = await supabase.from('materiality_finalisation_requirements')
+        .select('dr_code, topic_code, title, datapoints, sort_order')
+        .eq('assessment_id', assessmentId)
+        .eq('version', latest.version)
+        .order('topic_code').order('sort_order')
+      setFrozenRequirements((fr ?? []) as RoadmapRequirementRow[])
+    } else {
+      setFrozenRequirements([])
+    }
+
     const sv = asmt.standard_version || ''
 
     const { data: links } = await supabase.from('materiality_assessment_survey_rounds')
@@ -371,6 +405,20 @@ export default function StakeholderBoardReport() {
       // pre-21-Aug-2026 label lives in workings.disclosure on the climate-risk and materiality
       // assessments, which this screen does not load.
       reporting_period: formatPeriodSpan(periodStart, periodEnd),
+      finalised_stamp: finalisationStamp(finalisation),
+      // ⚠️ THE ROWS AND THE STAMP COME FROM THE SAME FINALISATION, so a paper cannot print
+      // "Finalised 22 August 2026" over a roadmap built from nothing, or vice versa. Both are null
+      // or both are populated, because both derive from `finalisation`.
+      disclosure_requirements: frozenRequirements,
+      // ⚠️ NULL IN BOTH CASES, AND FOR TWO DIFFERENT REASONS.
+      //   FINALISED   — the rows came frozen from materiality_finalisation_requirements, so a note
+      //                 saying they were read at generation and may differ later would be false.
+      //   UNFINALISED — this screen resolves NOTHING at read either: it passes no rows at all, the
+      //                 roadmap is empty, every material topic prints the no-requirements line, and
+      //                 NOT_FINALISED_NOTE on the cover is what explains it. False there too.
+      // The field would only ever be true for a caller that genuinely resolves at read, and after
+      // finalisation there is none. See its declaration in lib/materiality/boardReport.ts.
+      requirements_resolved_note: null,
       round_name: roundName,
       // The module's field is round_closed_at; the value is frozen_at.
       //
@@ -408,7 +456,7 @@ export default function StakeholderBoardReport() {
       contrast: agg.s1_s2_contrast ?? null,
     }
   }, [agg, threshold, dets, topicOf, categoryOf, sources, people, company, standardVersion,
-      roundName, roundFrozenAt, periodStart, periodEnd, thresholdRows, categoryLabel])
+      roundName, roundFrozenAt, periodStart, periodEnd, finalisation, frozenRequirements, thresholdRows, categoryLabel])
 
   const submittedCount = useMemo(
     () => dets.filter(d => d.status === 'submitted').length, [dets])

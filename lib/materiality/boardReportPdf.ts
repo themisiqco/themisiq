@@ -320,18 +320,16 @@ const assessmentBlock = (l: Layout, row: AssessmentRow): void => {
 // re-seed cannot change what this report prints". This report has no equivalent, because it has no
 // stored artefact at all: buildBoardReport runs in a useMemo and the PDF is saved client-side.
 //
-// TURNING IT ON. materiality_lead_submit (20260844) is the natural freeze point - it is where the
-// lead's judgements become final. Write the resolved rows there, pass them as
-// BoardReportInput.disclosure_requirements, and add two lines here:
+// TURNED ON 22 Aug 2026, and the freeze point was NOT materiality_lead_submit as guessed above.
+// That RPC refuses when the lead holds nothing, so a fully delegated assessment could never reach
+// it — which is why finalisation became its own explicit event: materiality_finalise (20260849),
+// writing materiality_finalisations and materiality_finalisation_requirements (20260848). The
+// caller reads the frozen rows for the latest version and passes them as
+// BoardReportInput.disclosure_requirements. boardReport.ts needed no change, as predicted.
 //
-//     l.heading(report.roadmap.heading, 1)
-//     l.body(report.roadmap.what_this_is); l.body(report.roadmap.what_this_is_not)
-//     if (report.roadmap.resolved_note) l.body(report.roadmap.resolved_note)
-//     if (report.roadmap.topics.length === 0) l.body(report.roadmap.none_note)
-//     else for (const t of report.roadmap.topics) roadmapBlock(l, t)
-//
-// NO CHANGE TO boardReport.ts IS REQUIRED. The section is already in the payload and already
-// correct; only the source of the rows and the call site change.
+// ⚠️ AN UNFINALISED ASSESSMENT STILL GENERATES. Its caller passes NO rows, so every material topic
+// prints ROADMAP_NO_REQUIREMENTS_NOTE and the cover carries NOT_FINALISED_NOTE saying why.
+// Refusing to generate would withhold a paper that is entirely correct about everything else in it.
 
 const roadmapBlock = (l: Layout, t: RoadmapTopic): void => {
   const doc = l.doc
@@ -495,6 +493,8 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
     standardVersionLabel: report.cover.standard_version_label,
     roundName: report.cover.round_name,
     closedOn: report.cover.round_closed_at,
+    finalisedStamp: report.cover.finalised_stamp,
+    coverNote: report.cover.cover_note,
   })
 
   // The cover carries the title and the "for information" line; repeating them here would be the
@@ -715,6 +715,15 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
   l.rule()
   l.body(report.assessmentView.abstention_note)
   l.body(ROUNDING_NOTE)
+
+  // ── 6b · WHAT BECOMES DISCLOSABLE ────────────────────────────────────────────────────────────
+  sectionPage(l)
+  l.heading(report.roadmap.heading, 1)
+  l.body(report.roadmap.what_this_is)
+  l.body(report.roadmap.what_this_is_not)
+  if (report.roadmap.resolved_note) l.body(report.roadmap.resolved_note)
+  if (report.roadmap.topics.length === 0) l.body(report.roadmap.none_note)
+  else for (const t of report.roadmap.topics) roadmapBlock(l, t)
 
   // ── 7 · WHERE THE TWO VIEWS DIFFER ───────────────────────────────────────────────────────────
   sectionPage(l)
