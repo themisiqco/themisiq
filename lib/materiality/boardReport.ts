@@ -169,6 +169,28 @@ export type BoardReportInput = {
    * pairs exist".
    */
   contrast?: ContrastInput | null
+
+  /**
+   * The ESRS disclosure requirements for the assessment's standard version.
+   *
+   * ⚠️ AN INPUT, NOT A LOOKUP. This module resolves nothing, exactly as it generates no dates: the
+   * caller decides whether these were read at generation or taken from a frozen record. See the
+   * note above section 6b in boardReportPdf.ts for why no caller supplies them yet.
+   *
+   * OPTIONAL, and unsupplied today because NOTHING FREEZES THEM. Absent means every material topic
+   * prints the no-requirements line, which is honest; the roadmap section is built either way and
+   * is not currently rendered.
+   */
+  disclosure_requirements?: readonly RoadmapRequirementRow[]
+
+  /**
+   * What to say on the document about where the requirements came from. Null when nothing needs
+   * saying - which is what a frozen source looks like.
+   *
+   * KEPT DELIBERATELY THOUGH NO CALLER SETS IT. It becomes correct the moment a caller resolves at
+   * read, and removing it now would only mean adding it back.
+   */
+  requirements_resolved_note?: string | null
 }
 
 // ── sections ─────────────────────────────────────────────────────────────────────────────────────
@@ -190,6 +212,8 @@ export type WhatThisIsSection = { heading: string; paragraphs: string[] }
 
 export type MaterialTopic = {
   subtopic_code: string
+  /** From the row, NEVER parsed from subtopic_code. See the note at the projection. */
+  topic_code: string
   name: string
   topic_label: string
   /** Which direction(s) carried it. Both is two findings, never netted into one (¶44). */
@@ -315,6 +339,50 @@ export type WhyThisMattersSection = {
   items: { title: string; body: string }[]
 }
 
+// ── the disclosure roadmap ───────────────────────────────────────────────────────────────────────
+
+/** One row as the caller supplies it. Mirrors mr_esrs_disclosure_requirements' shape. */
+export type RoadmapRequirementRow = {
+  dr_code: string
+  topic_code: string
+  title: string
+  datapoints: string | null
+}
+
+export type RoadmapRequirement = {
+  dr_code: string
+  title: string
+  /** NULL = not yet written. NEVER rendered as blank - the renderer says so in words. */
+  datapoints: string | null
+}
+
+export type RoadmapTopic = {
+  topic_code: string
+  topic_label: string
+  /**
+   * ⚠️ THE SUB-TOPICS THAT MADE THIS TOPIC MATERIAL, AND THEY ARE NOT DECORATION.
+   * ESRS 1 ¶30 lets an undertaking report the material sub-topic's information rather than all of
+   * the topic's. A preparer handed "E1 - here are eleven requirements" cannot tell which of them
+   * ¶30 lets them scope down; a preparer handed "E1, material through Climate change adaptation
+   * and Energy" can. Several material sub-topics roll up to one topic, so the topic's requirements
+   * appear ONCE and this names what drove it.
+   */
+  driven_by: { subtopic_code: string; name: string }[]
+  requirements: RoadmapRequirement[]
+}
+
+export type RoadmapSection = {
+  heading: string
+  what_this_is: string
+  /** ⚠️ THE CLAIM THIS ROADMAP MAKES, AND THE ONE IT DOES NOT. See ROADMAP_WHAT_THIS_IS_NOT. */
+  what_this_is_not: string
+  /** Where the requirements came from, when that needs saying. Null when it does not. */
+  resolved_note: string | null
+  topics: RoadmapTopic[]
+  /** Printed when there are none: a result, not an empty state. */
+  none_note: string
+}
+
 export type BoardReport = {
   cover: CoverSection
   whatThisIs: WhatThisIsSection
@@ -324,6 +392,8 @@ export type BoardReport = {
   polarisation: PolarisationSection
   contrast: ContrastSection
   assessmentView: AssessmentViewSection
+  /** Built always; NOT RENDERED YET - see the block above section 6b in boardReportPdf.ts. */
+  roadmap: RoadmapSection
   differences: DifferencesSection
   methodology: MethodologySection
   limitations: LimitationsSection
@@ -331,6 +401,60 @@ export type BoardReport = {
 }
 
 // ── prose. ONE copy, exported as data, as register.ts does. ──────────────────────────────────────
+
+export const ROADMAP_HEADING = 'What becomes disclosable'
+
+export const ROADMAP_WHAT_THIS_IS =
+  'A topic assessed as material carries disclosure requirements. These are the requirements that '
+  + 'attach to the topics this assessment found material, grouped by topic, with the sub-topics '
+  + 'that made each one material named beneath it.'
+
+/**
+ * ⚠️ TWO ROADMAPS EXIST IN THIS PLATFORM AND THEY MAKE DIFFERENT CLAIMS. This sentence is what
+ * keeps them apart on the page, so a reader holding both does not take them for one document
+ * disagreeing with itself.
+ *
+ *   The CLIMATE RISK screening roadmap (app/dashboard/materiality/report/page.tsx DisclosureRoadmap)
+ *   is driven by ten topics scored against industry baselines with no stakeholder input, filtered
+ *   at max(financial, impact) >= 5. That report's own prose calls itself "a structured first pass
+ *   to scope a formal assessment, not a disclosure". Its roadmap says: what you would owe IF those
+ *   screening scores hold.
+ *
+ *   THIS roadmap is driven by determinations - 37 sub-topics, four ESRS 1 §6.2 dimensions per
+ *   direction, a stakeholder survey behind it, each judgement attributable to a named contributor.
+ *   It says: what you owe on what was actually assessed.
+ *
+ * The two can legitimately disagree, and merging them would have one document assert the other's
+ * conclusions. Neither supersedes the other; they answer different questions.
+ */
+export const ROADMAP_WHAT_THIS_IS_NOT =
+  'This is not the screening roadmap in the Climate Risk report. That one is built from ten topics '
+  + 'scored against industry baselines, and states what would be disclosable if those scores hold. '
+  + 'This one is built from the determinations made in this assessment. The two are different '
+  + 'questions and may not list the same topics.'
+
+export const ROADMAP_NONE_NOTE =
+  'No topic was assessed as material, so no disclosure requirements attach. That is a result of the '
+  + 'assessment, not an absence of one.'
+
+/**
+ * Printed for a material topic with no stored requirements.
+ *
+ * ⚠️ THE TOPIC STILL APPEARS. Dropping it would silently shorten the roadmap and read as "nothing
+ * attaches to this topic" - the same absence-rendered-as-a-finding failure the datapoints column
+ * guards against.
+ *
+ * ⚠️ THE COMMON CAUSE IS A NULL standard_version, AND THAT IS DELIBERATE. There is no fallback to
+ * DR_FALLBACK_VERSION here, unlike api/materiality/route.ts. That path can fall back because
+ * drResolutionNote discloses it on the face of the report; this section has no equivalent
+ * disclosure, and an undisclosed fallback would print one standard's requirements under another
+ * standard's name. ESRS (2026) renumbered the DRs and 49 codes exist under both versions with
+ * different titles, so that is not a stale-label problem. Printing nothing, and saying so, is the
+ * weaker claim and the true one.
+ */
+export const ROADMAP_NO_REQUIREMENTS_NOTE =
+  'No disclosure requirements are held for this topic in the standard version stated for this '
+  + 'assessment. That is an absence of stored requirements, not a finding that none apply.'
 
 export const TITLE = 'Impact materiality report'
 export const KIND =
@@ -714,6 +838,59 @@ function judge(subtopics: RegisterSubTopic[]): Judged[] {
   })
 }
 
+/**
+ * Group the requirements under the topics this assessment found material.
+ *
+ * ⚠️ REQUIREMENTS ARE AN INPUT, NOT A LOOKUP. This module resolves nothing, exactly as it generates
+ * no dates. The caller decides whether they were resolved at generation or read from a frozen
+ * record, and `resolved_note` is where that is stated on the document. When a freeze point exists,
+ * the caller passes frozen rows and nothing here changes.
+ */
+function buildRoadmap(
+  materialTopics: Judged[],
+  requirements: readonly RoadmapRequirementRow[],
+  resolvedNote: string | null,
+): RoadmapSection {
+  // Grouped by topic, preserving the caller's order - sort_order is per topic and was applied by
+  // whoever fetched them.
+  const byTopic = new Map<string, RoadmapRequirement[]>()
+  for (const r of requirements) {
+    if (!r || typeof r.topic_code !== 'string') continue
+    const list = byTopic.get(r.topic_code) ?? []
+    list.push({ dr_code: r.dr_code, title: r.title, datapoints: r.datapoints ?? null })
+    byTopic.set(r.topic_code, list)
+  }
+
+  // ⚠️ ONE ENTRY PER TOPIC, FIRST-APPEARANCE ORDER. E1.2 and E1.3 both material is ONE E1 section
+  // with two names under it, not E1's eleven requirements printed twice.
+  const topics: RoadmapTopic[] = []
+  const seen = new Map<string, RoadmapTopic>()
+  for (const j of materialTopics) {
+    const code = j.subtopic.topic_code
+    let entry = seen.get(code)
+    if (!entry) {
+      entry = {
+        topic_code: code,
+        topic_label: j.subtopic.topic_label,
+        driven_by: [],
+        requirements: byTopic.get(code) ?? [],
+      }
+      seen.set(code, entry)
+      topics.push(entry)
+    }
+    entry.driven_by.push({ subtopic_code: j.subtopic.subtopic_code, name: nameOf(j.subtopic) })
+  }
+
+  return {
+    heading: ROADMAP_HEADING,
+    what_this_is: ROADMAP_WHAT_THIS_IS,
+    what_this_is_not: ROADMAP_WHAT_THIS_IS_NOT,
+    resolved_note: resolvedNote,
+    topics,
+    none_note: ROADMAP_NONE_NOTE,
+  }
+}
+
 export function buildBoardReport(input: BoardReportInput): BoardReport {
   const register = buildRegister({
     subtopics: input.subtopics,
@@ -815,6 +992,12 @@ export function buildBoardReport(input: BoardReportInput): BoardReport {
       topics_with_ratings: withRatings.length,
       material_topics: materialTopics.map(j => ({
         subtopic_code: j.subtopic.subtopic_code,
+        // ⚠️ READ FROM THE ROW, NEVER PARSED OUT OF subtopic_code. RegisterSubTopic carries
+        // topic_code (register.ts:119) and the field directly below it already states the rule for
+        // its neighbour: "mr_esrs_topics.category. Never derived from subtopic_code." Splitting
+        // "E1.2" on the dot is what 20260820's header rejects by name - correct for a one-off check
+        // against a seed you can read, and a latent defect the moment it becomes a routing rule.
+        topic_code: j.subtopic.topic_code,
         name: nameOf(j.subtopic),
         topic_label: j.subtopic.topic_label,
         carried_by: j.carried_by,
@@ -841,6 +1024,16 @@ export function buildBoardReport(input: BoardReportInput): BoardReport {
       scale_note: STAKEHOLDER_SCALE_NOTE,
       no_mean_note: NO_MEAN_NOTE,
     },
+
+    /**
+     * ⚠️ BUILT ALWAYS, RENDERED NEVER (yet). generateBoardReportPDF does not read this section -
+     * see the block above section 6b there for why, and for what turning it on requires.
+     */
+    roadmap: buildRoadmap(
+      materialTopics,
+      input.disclosure_requirements ?? [],
+      input.requirements_resolved_note ?? null,
+    ),
 
     assessmentView: {
       heading: ASSESSMENT_HEADING,

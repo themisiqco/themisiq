@@ -533,3 +533,85 @@ describe('the cover and the methodology carry what was given, not what was infer
     expect(refs.join(' ')).toMatch(/Article 2\(2\)/)
   })
 })
+
+// ================================================================================================
+// THE DISCLOSURE ROADMAP — BUILT, AND NOT RENDERED
+//
+// ⚠️ THESE TEST A SECTION generateBoardReportPDF DOES NOT CALL, ON PURPOSE. Nothing freezes the
+// requirement rows for this report, so the section is complete and unwired until a freeze point
+// exists — see the block above section 6b in boardReportPdf.ts. Testing it now is what makes
+// turning it on a two-line change rather than a rewrite.
+// ================================================================================================
+describe('roadmap — grouping and the ¶30 rollup', () => {
+  const REQS = [
+    { dr_code: 'E1-1', topic_code: 'E1', title: 'Transition plan', datapoints: 'Plan, targets' },
+    { dr_code: 'E1-2', topic_code: 'E1', title: 'Policies', datapoints: null },
+    { dr_code: 'S1-1', topic_code: 'S1', title: 'Workforce policies', datapoints: null },
+  ]
+
+  it('material_topics carries topic_code READ FROM THE ROW, never parsed from subtopic_code', () => {
+    // The guard. "E1.2".split(".")[0] would give the same answer here and a wrong one the moment a
+    // sub-topic code stops mirroring its topic — which is exactly why register.ts stores both.
+    const r = report([sub({ subtopic_code: 'E1.2', topic_code: 'ZZ',
+                            determinations: [MATERIAL_NEG()] })])
+    expect(r.findings.material_topics[0].topic_code).toBe('ZZ')
+    expect(r.findings.material_topics[0].subtopic_code).toBe('E1.2')
+  })
+
+  it('two material sub-topics of one topic produce ONE roadmap entry, naming both', () => {
+    // ESRS 1 ¶30: which sub-topics carried the topic decides how far the disclosure may be scoped.
+    // E1's requirements appear once; the two names appear under them.
+    const r = report([
+      sub({ subtopic_code: 'E1.2', short_name: 'Adaptation', determinations: [MATERIAL_NEG()] }),
+      sub({ subtopic_code: 'E1.3', short_name: 'Energy', determinations: [MATERIAL_NEG()] }),
+    ], { disclosure_requirements: REQS })
+    expect(r.roadmap.topics).toHaveLength(1)
+    expect(r.roadmap.topics[0].topic_code).toBe('E1')
+    expect(r.roadmap.topics[0].driven_by.map(d => d.name)).toEqual(['Adaptation', 'Energy'])
+    expect(r.roadmap.topics[0].requirements.map(q => q.dr_code)).toEqual(['E1-1', 'E1-2'])
+  })
+
+  it('topics appear in first-appearance order, and requirements keep the caller’s order', () => {
+    const r = report([
+      sub({ subtopic_code: 'S1.1', topic_code: 'S1', topic_label: 'Own workforce',
+            category: 'soc', determinations: [MATERIAL_NEG()] }),
+      sub({ subtopic_code: 'E1.2', determinations: [MATERIAL_NEG()] }),
+    ], { disclosure_requirements: REQS })
+    expect(r.roadmap.topics.map(t => t.topic_code)).toEqual(['S1', 'E1'])
+  })
+
+  it('a material topic with NO stored requirements still appears', () => {
+    // Dropping it would silently shorten the roadmap and read as "nothing attaches to this topic".
+    const r = report([sub({ subtopic_code: 'E1.2', determinations: [MATERIAL_NEG()] })],
+                     { disclosure_requirements: [] })
+    expect(r.roadmap.topics).toHaveLength(1)
+    expect(r.roadmap.topics[0].requirements).toEqual([])
+  })
+
+  it('a null datapoints reaches the payload AS NULL — the builder chooses no words', () => {
+    // The renderer decides what an absent summary says. A builder that substituted prose here would
+    // put the same sentence in two places, free to drift.
+    const r = report([sub({ subtopic_code: 'E1.2', determinations: [MATERIAL_NEG()] })],
+                     { disclosure_requirements: REQS })
+    expect(r.roadmap.topics[0].requirements[1].datapoints).toBeNull()
+  })
+
+  it('no material topics → empty topics, and the none_note survives', () => {
+    const r = report([sub({ determinations: [IMMATERIAL_NEG()] })], { disclosure_requirements: REQS })
+    expect(r.roadmap.topics).toEqual([])
+    expect(r.roadmap.none_note.length).toBeGreaterThan(0)
+  })
+
+  it('what_this_is_not names the OTHER roadmap, so the two claims cannot be conflated', () => {
+    const r = report([sub({ determinations: [MATERIAL_NEG()] })])
+    expect(r.roadmap.what_this_is_not).toContain('Climate Risk')
+    expect(r.roadmap.what_this_is_not).toContain('screening')
+  })
+
+  it('resolved_note passes through, and defaults to null when the caller says nothing', () => {
+    // Kept though no caller sets it: it becomes correct the moment one resolves at read.
+    expect(report([sub()]).roadmap.resolved_note).toBeNull()
+    expect(report([sub()], { requirements_resolved_note: 'read at generation' })
+      .roadmap.resolved_note).toBe('read at generation')
+  })
+})

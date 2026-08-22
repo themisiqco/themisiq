@@ -43,6 +43,7 @@ import { THEMISIQ_WORDMARK_DATA_URI, WORDMARK_ASPECT } from '../pdf/logo'
  * file only reads it.
  */
 import { disclaimerParas } from '../disclaimer'
+import { ROADMAP_NO_REQUIREMENTS_NOTE, type RoadmapTopic } from './boardReport'
 import type { AssessmentRow, BoardReport, ContrastEntry, StakeholderRow } from './boardReport'
 // The register's own entry shape, reached through DifferencesSection.register.entries.
 import type { RegisterEntry } from './register'
@@ -294,6 +295,88 @@ const assessmentBlock = (l: Layout, row: AssessmentRow): void => {
     textAt(doc, nameLines, MARGIN.left, cursor, SIZE.body, SIZE.body * 1.35, 'bold', INK)
     cursor += nameLines.length * (SIZE.body * 1.35) + 6
     textAt(doc, wrapped, MARGIN.left + 12, cursor, SIZE.small, LEAD.small, 'normal', SECONDARY)
+  })
+}
+
+// ── section 6b: WHAT BECOMES DISCLOSABLE — BUILT, AND DELIBERATELY NOT RENDERED ──────────────────
+//
+// ⚠️ generateBoardReportPDF DOES NOT CALL roadmapBlock, AND THAT IS THE COMMIT, NOT AN OVERSIGHT.
+// The payload section exists (boardReport.ts buildRoadmap), the prose exists, this renderer exists
+// and is tested. Nothing invokes it, so the PDF this file produces is unchanged.
+//
+// WHY. Nothing freezes the requirement rows for this report. Every OTHER input to this paper is
+// stabilised by its own mechanism:
+//     determinations      status = 'submitted', and an override leaves a companion row (20260839)
+//     the threshold       the round's snapshotted top_box_high_min_share (20260843)
+//     the round           frozen_at
+//     sub-topic names     resolved per standard_version
+// The requirement table is the only one with no such mechanism, and it demonstrably changes:
+// migration 20260845 rewrote E1-11's title on 21 Aug 2026. So two downloads of the same paper a
+// month apart would carry different requirement text, with nothing on the document explaining it.
+//
+// RESOLVING AT READ AND DISCLOSING IT IN A NOTE PUTS A SENTENCE WHERE A MECHANISM BELONGS, on a
+// document a customer hands a verifier. The climate-risk assessment does not do this - it freezes
+// the resolved rows into workings at write (api/materiality/route.ts:337) precisely "so a later
+// re-seed cannot change what this report prints". This report has no equivalent, because it has no
+// stored artefact at all: buildBoardReport runs in a useMemo and the PDF is saved client-side.
+//
+// TURNING IT ON. materiality_lead_submit (20260844) is the natural freeze point - it is where the
+// lead's judgements become final. Write the resolved rows there, pass them as
+// BoardReportInput.disclosure_requirements, and add two lines here:
+//
+//     l.heading(report.roadmap.heading, 1)
+//     l.body(report.roadmap.what_this_is); l.body(report.roadmap.what_this_is_not)
+//     if (report.roadmap.resolved_note) l.body(report.roadmap.resolved_note)
+//     if (report.roadmap.topics.length === 0) l.body(report.roadmap.none_note)
+//     else for (const t of report.roadmap.topics) roadmapBlock(l, t)
+//
+// NO CHANGE TO boardReport.ts IS REQUIRED. The section is already in the payload and already
+// correct; only the source of the rows and the call site change.
+
+const roadmapBlock = (l: Layout, t: RoadmapTopic): void => {
+  const doc = l.doc
+  const nameLines = wrap(doc, `${t.topic_code} · ${t.topic_label}`, l.contentWidth, SIZE.body, 'bold')
+
+  // ESRS 1 ¶30 — which sub-topics carried the topic decides how far the disclosure may be scoped,
+  // so this is stated before the requirements rather than after them.
+  const drivenLines = wrap(doc, `Material through: ${t.driven_by.map(d => d.name).join(' · ')}`,
+                           l.contentWidth - 12, SIZE.small, 'italic')
+
+  type Line = { text: string; stated: boolean }
+  const lines: Line[] = []
+  if (t.requirements.length === 0) {
+    lines.push({ text: ROADMAP_NO_REQUIREMENTS_NOTE, stated: false })
+  } else {
+    for (const r of t.requirements) {
+      lines.push({ text: `${r.dr_code}  ${r.title}`, stated: true })
+      // ⚠️ A NULL datapoints IS SAID, NEVER LEFT BLANK. Every esrs_2026 row is null today. A blank
+      // line under a requirement reads as "nothing to collect" - a finding this payload cannot
+      // support. The sentence is word-for-word the one the climate-risk roadmap prints: two
+      // surfaces, one claim about the same absence.
+      lines.push({
+        text: r.datapoints ?? 'Not yet summarised — see the standard text for this requirement.',
+        stated: r.datapoints != null,
+      })
+    }
+  }
+
+  const wrapped = lines.flatMap(x =>
+    wrap(doc, x.text, l.contentWidth - 12, SIZE.small).map(text => ({ text, stated: x.stated })))
+  const height = nameLines.length * (SIZE.body * 1.35) + 6
+               + drivenLines.length * LEAD.small + 6
+               + wrapped.length * LEAD.small + 16
+
+  block(l, height, top => {
+    let cursor = top
+    textAt(doc, nameLines, MARGIN.left, cursor, SIZE.body, SIZE.body * 1.35, 'bold', INK)
+    cursor += nameLines.length * (SIZE.body * 1.35) + 6
+    textAt(doc, drivenLines, MARGIN.left + 12, cursor, SIZE.small, LEAD.small, 'italic', SECONDARY)
+    cursor += drivenLines.length * LEAD.small + 6
+    // Drawn line by line so an unstated datapoint can carry its own colour without a second block.
+    wrapped.forEach((ln, i) => {
+      textAt(doc, [ln.text], MARGIN.left + 12, cursor + i * LEAD.small,
+             SIZE.small, LEAD.small, 'normal', ln.stated ? SECONDARY : MUTED)
+    })
   })
 }
 
