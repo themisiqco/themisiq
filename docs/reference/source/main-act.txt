@@ -1,0 +1,505 @@
+                             EUROPEAN
+                             COMMISSION
+
+
+
+
+                                                        Brussels, 3.7.2026
+                                                        C(2026) 5010 final
+
+
+
+
+                  COMMISSION DELEGATED REGULATION (EU) …/...
+
+                                          of 3.7.2026
+
+     amending Delegated Regulation (EU) 2023/2772 as regards the simplification of certain
+                            sustainability reporting standards
+
+                                    {SWD(2026) 500 final}
+
+                                   (Text with EEA relevance)
+
+
+
+
+EN                                                                                           EN
+                                    EXPLANATORY MEMORANDUM
+
+     1.       CONTEXT OF THE DELEGATED ACT
+     Articles 19a and 29a of the Accounting Directive (2013/34/EU)1 as amended by the Corporate
+     Sustainability Reporting Directive (“CSRD” – (EU) 2022/2464)2 require certain undertakings
+     to publicly disclose information concerning the undertaking’s impacts, risks and opportunities
+     in relation to sustainability matters. This information must be reported in accordance with the
+     European Sustainability Reporting Standards (ESRS) set out in Commission Delegated
+     Regulation (EU) 2023/27723 and included in a dedicated section of the undertaking’s
+     individual or consolidated management report, as appropriate.
+     The Omnibus I simplification package (Directive (EU) 2026/4704), which entered into force
+     on 18 March 2026, and which will have to be transposed by Member States by 19 March
+     2027, amended the Accounting Directive by reducing the number of undertakings in scope
+     and by simplifying the sustainability reporting framework.
+     To deliver swiftly on the simplification and streamlining of sustainability reporting without
+     undermining the objectives of the CSRD, Recital (18) of the Omnibus I simplification
+     package recognises that the Commission, within six months of the entry into force of the
+     Omnibus I, will adopt a delegated act amending the existing ESRS by: (i) removing
+     datapoints deemed least important for general purpose sustainability reporting; (ii)
+     prioritising, to the extent possible, quantitative datapoints over narrative text; (iii) further
+     distinguishing between mandatory and voluntary datapoints; (iv) providing clear instructions
+     on how to apply the materiality principle in order to ensure that undertakings are only
+     required to report material information and to reduce the risk that assurance service providers
+     inadvertently encourage undertakings to report information that is not necessary or dedicate
+     excessive resources to the materiality assessment process; (v) improving consistency with
+     other pieces of Union legislation, including financial services legislation; and (vi) taking
+     account, to the greatest extent possible, of interoperability with global sustainability reporting
+     standards. The revision of the existing ESRS should clarify provisions that are deemed
+     unclear and simplify the structure and presentation of the standards. It should also make any
+     other modifications that might be considered necessary considering the experience gained in
+     the application of the existing ESRS. Sustainability reporting standards should also take
+     account of the difficulties that undertakings might encounter in gathering information from
+     actors throughout their value chain, especially from those which are not subject to the
+     sustainability reporting requirements and from suppliers in emerging markets and economies.
+
+
+     1
+            Directive 2013/34/EU of the European Parliament and of the Council of 26 June 2013 on the annual
+            financial statements, consolidated financial statements and related reports of certain types of
+            undertakings, amending Directive 2006/43/EC of the European Parliament and of the Council and
+            repealing Council Directives 78/660/EEC and 83/349/EEC (OJ L 182, 29.6.2013, p. 19, ELI:
+            http://data.europa.eu/eli/dir/2013/34/oj).
+     2
+            Directive (EU) 2022/2464 of the European Parliament and of the Council of 14 December 2022
+            amending Regulation (EU) No 537/2014, Directive 2004/109/EC, Directive 2006/43/EC and Directive
+            2013/34/EU, as regards corporate sustainability reporting (OJ L 322, 16.12.2022, p. 15, ELI:
+            http://data.europa.eu/eli/dir/2022/2464/oj).
+     3
+            Commission Delegated Regulation (EU) 2023/2772 of 31 July 2023 supplementing Directive
+            2013/34/EU of the European Parliament and of the Council as regards sustainability reporting standards
+            (OJ L, 2023/2772, 22.12.2023, ELI: http://data.europa.eu/eli/reg_del/2023/2772/oj).
+     4
+            Directive (EU) 2026/470 of the European Parliament and of the Council of 24 February 2026 amending
+            Directives 2006/43/EC, 2013/34/EU, (EU) 2022/2464 and (EU) 2024/1760 as regards certain corporate
+            sustainability reporting requirements and certain corporate sustainability due diligence requirements (OJ
+            L, 2026/470, 26.2.2026, ELI: http://data.europa.eu/eli/dir/2026/470/oj).
+
+
+
+EN                                                         1                                                            EN
+     As required by the Accounting Directive5, the Commission must adopt these revised standards
+     taking into consideration the technical advice provided by EFRAG, a multistakeholder non-
+     profit association established under Belgian law that advises the Commission on financial and
+     sustainability reporting standards.
+     EFRAG submitted to the Commission its technical advice on the revised ESRS on 2
+     December 2025. This technical advice was developed based on a work programme on which
+     the Commission was consulted on in April 2025. The accompanying cost-benefit analysis,
+     together with the basis for conclusions, the log of amendments, the comparative table of texts,
+     and the explanatory note on Article 29b(5) of the Accounting Directive6 were submitted to the
+     Commission on 23 December 2025.
+     This delegated act amends the European Sustainability Reporting Standards (ESRS) that
+     undertakings must use to carry out their sustainability reporting in accordance with Articles
+     19a and 29a of the Accounting Directive. Undertakings must use the revised ESRS from
+     financial year 2027. In addition, they may choose to use the revised ESRS also for financial
+     year 2026.
+     The Commission will monitor the implementation of the standards contained in this delegated
+     act to ensure that they lead to the disclosure of relevant, reliable and comparable sustainability
+     information.
+
+     2.       CONSULTATIONS PRIOR TO THE ADOPTION OF THE ACT
+     Prior to the submission of its technical advice to the Commission, EFRAG issued a call for
+     input in April 2025, held several one-on-one interviews with undertakings of different sizes,
+     sectors and Member States, carried out a benchmarking exercise of sustainability statements
+     issued on reporting year 2024 and a detailed analysis of the questions received through the
+     ESRS Q&A Platform. It also organised multiple outreach events with various stakeholder
+     groups in September 2025, two targeted field tests, and ran a public consultation on the
+     simplified ESRS Exposure Drafts from 29 July 2025 until 29 September 2025.
+     EFRAG’s revised draft ESRS modified the existing ESRS by:
+     –        Shortening and clarifying the text of the standards, to facilitate their application and a
+              clearer presentation of sustainability information by undertakings;
+     –        Introducing additional flexibility measures to alleviate the burden on undertakings,
+              such as new reliefs and phase-ins;
+     –        Reducing the mandatory datapoints by 61% while retaining the core objectives of the
+              European Green Deal;
+     –        Enhancing the interoperability with international standards and other Union
+              legislation to the maximum extent compatible with the simplification objective; and
+     –        Simplifying the materiality assessment, by introducing a substantially clarified and
+              more proportionate approach with principle-based guidance and the possibility to
+              include clearly identified non-material information without obscuring material
+              disclosures. The reference to a fair presentation framework was also made explicit
+              through enhanced emphasis on qualitative characteristics and entity-specific
+
+
+
+     5
+            Article 49(3b) of the Accounting Directive.
+     6
+            This note explains how the draft revised ESRS take account of the initiatives and legislation listed in
+            Article 29(b)5 of the Accounting Directive.
+
+
+
+EN                                                        2                                                           EN
+              disclosures and the clarification that the undertaking is not required to disclose
+              information prescribed by ESRS that is not material.
+     EFRAG’s cost-benefit analysis on the revised draft ESRS presents an assessment of the
+     impact of the revised standards across different stakeholder groups, i.e. mainly EU
+     undertakings (under the scope of the Omnibus proposal as per 26 February 2025 or that form
+     part of their value chain) and users of ESG data (investors, civil society, and society at large).
+     The analysis considers the cost savings for undertaking as well as the potential loss of
+     information for users of ESG data resulting from the revision of the ESRS, assessing both
+     positive and negative impacts, and distinguishing between direct and indirect effects. The
+     analysis, compared to the first set of ESRS adopted in 2023, identifies an overall cost
+     reduction trend and benefits for undertakings without significantly affecting the costs and
+     benefits for the users of sustainability statements. With respect to the costs for individual
+     undertakings, EFRAG notes that costs savings are economically significant. Over the five-
+     year period, reporting cost savings correspond on average to 34% of baseline costs for
+     undertakings in scope. The savings rate is estimated at 28% in 2027, increases to 38% in
+     2028, and then stabilises at around 33-36% from 2029 onwards, once all undertakings are
+     subject to the revised framework. With the inclusion of the value chain effects, cumulative
+     savings raise from EUR 3.7 billion to around EUR 4.7 billion over 2027-2031, corresponding
+     to approximately 44% of baseline costs. With respect to the benefits for users of sustainability
+     statements, EFRAG underlines that, given their nature, they are difficult to quantify and are
+     assessed in the report mainly in qualitative terms. These estimated costs and benefits are
+     based on the proposed standards submitted by EFRAG and not the final delegated act adopted
+     by the Commission.
+     Following EFRAG’s submission of its technical advice to the Commission and prior to the
+     adoption of this delegated act, the Commission has carried out the following consultations, as
+     required by the Accounting Directive7:
+     –        Joint consultation of the Member State Expert Group on Sustainable Finance and the
+              Accounting Regulatory Committee;
+     –        Consultation of the European Securities and Markets Authority (ESMA), the
+              European Banking Authority (EBA), the European Insurance and Occupational
+              Pensions Authority (EIOPA), the European Environment Agency (EEA), the
+              European Union Agency for Fundamental Rights (FRA), the European Central Bank
+              (ECB), the Committee of European Auditing Oversight Bodies (CEAOB) and the
+              Platform on Sustainable Finance.
+     In addition, a number of stakeholders have shared their views with the Commission on
+     EFRAG’s technical advice for the revised ESRS.
+     In light of these consultations the Commission has made a number of targeted modifications
+     to EFRAG’s technical advice, with the primary aim of facilitating the application of the
+     standards by clarifying certain provisions and granting certain additional flexibilities to
+     undertakings. The principal modifications made in this regard address the following issues:
+     •        Materiality and materiality assessment. The text clearly states that the undertaking is
+              not expected to meet the specific information needs of each individual user and
+              stresses that the objective of the standards is to ensure the reporting of information
+              that is decision-useful for users. It specifies that undertakings “shall not” report
+              information that is not material, except in certain clearly defined circumstances,
+              rather than stating that the undertaking “is not required to” report information that is
+     7
+            Article 49(3b) of the Accounting Directive.
+
+
+
+EN                                                        3                                               EN
+          not material. Lastly, a new provision emphasises that the “top-down” approach to
+          materiality assessment allows the undertaking to avoid unnecessary work and in
+          general to avoid assessing the materiality of each individual impact, risk or
+          opportunity.
+     •    Fair presentation: The text clarifies that fair presentation applies to the overall
+          sustainability statement and does not apply to each datapoint. It also states more
+          clearly that the application of ESRS results in fair presentation. The modifications
+          made regarding materiality and materiality assessment will also facilitate the
+          application of the principle of fair presentation.
+     •    Level of aggregation and disaggregation: The text introduces greater discretion to the
+          undertaking regarding the need to consider specific geographical contexts when
+          carrying out the materiality assessment. It also clarifies that the level of
+          disaggregation for materiality assessment does not imply that information must be
+          reported at that same level of disaggregation.
+     •    Omission of information: The text integrates new provisions derived from the
+          Omnibus I Directive that allow undertakings to omit certain information in certain
+          circumstances, including information that could be seriously prejudicial to the
+          commercial position of the undertaking.8
+     •    Anticipated financial effects: The text states that reporting anticipated financial
+          effects is likely to involve estimates and that these can be updated in the future in
+          light of new information without this constituting a reporting “error”. It also clarifies
+          that the provisions that allow undertakings to omit certain information in certain
+          circumstances, including information that could be seriously prejudicial to the
+          commercial position of the undertaking, also apply to reporting on anticipated
+          financial effects. An additional year of phasing-in is introduced for both qualitative
+          and quantitative information.
+     •    Green house gas emissions: the text aligns more closely with global sustainability
+          reporting standards by giving undertakings the flexibility to use either the financial
+          control approach or the operational control approach when defining the reporting
+          boundary to be applied.
+     •    Climate transition plans: The text requires undertakings that report transition plans
+          with targets that are not compatible with 1.5C target to be transparent about this.
+     •    Microplastics: The text limits the disclosure requirement to primary microplastics.
+          For reasons of feasibility and proportionality it does not require undertakings to
+          report metrics on secondary microplastics.
+     •    Emission of pollutants: the text specifies that the decision on which pollutants are
+          material for reporting purposes should be taken following a managerial assessment
+          that considers the undertaking’s activities and sector of operation.
+     •    Substances of very high concern: the text introduces a new phase-in provision of
+          one-year for reporting on substances of very high concern for undertakings that are
+          users of articles containing such substances.
+
+
+
+
+     8
+         Text derived from Articles 19a(3) and 29a(3) of the Accounting Directive as amended by the Omnibus I
+         Directive.
+
+
+
+EN                                                   4                                                          EN
+     •       Coherence with Corporate Sustainability Due Diligence Directive (“CSDDD” –
+             Directive (EU) 2024/1760)9: the text includes a number of technical modifications
+             regarding due diligence to ensure better alignment with the CSDDD.
+     •       Human rights incidents and incidents of discrimination: the text clarifies that only
+             “substantiated verified” instances are to be reported, and that not all instances are
+             necessarily substantiated instances. It also deletes the reference to “initiated” for the
+             judicial and non-judicial proceedings.
+     •       Asset management activities: The text includes new provisions to allow financial
+             institutions that manage investments subject to a fiduciary duty on behalf of clients
+             pursuant to a mandate agreed with those clients to not disclose information in
+             relation to those investments in their sustainability statement. Those investments are
+             primarily relevant to the activities of the clients and not to the activities of the
+             undertaking acting on their behalf. Additionally, the sustainability matters relevant
+             for those investments are governed at EU level by Regulation (EU) 2019/2088 and
+             by Delegated Regulations 2017/565 and (EU) 2017/593. These new provisions aim
+             to avoid disproportionate administrative burden and the duplication of sustainability
+             reporting requirements.
+     This delegated act was also subject to a four-week “Have Your Say” consultation on the
+     Better Regulation portal10.
+     The Commission has also assessed the consistency of this delegated act with the climate
+     neutrality objective set out in Article 2(1) of the European Climate Law (Regulation (EU)
+     2021/1119), and with the objective of ensuring progress on adaptation as referred to in Article
+     5 of that Regulation.
+
+     3.      LEGAL ELEMENTS OF THE DELEGATED ACT
+     This delegated act is based on Article 29b(1), first subparagraph, of the Accounting Directive.
+     It is accompanied by the following Annexes:
+     –       Annex I, which amends Annex I to Delegated Regulation (EU) 2023/2772 on the
+             first set of ESRS by reducing the number of datapoints, prioritising quantitative
+             datapoints over narrative text, further distinguishing between mandatory and
+             voluntary datapoints, providing clear instructions on how to apply the materiality
+             principle, improving consistency with other pieces of Union legislation, and taking
+             account, to the greatest extent possible, of interoperability with global sustainability
+             reporting standards. Annex I also clarifies certain requirements and simplifies the
+             structure and presentation of the standards.
+     –       Annex II, which amends Annex II to Delegated Regulation (EU) 2023/2772 as
+             regards the acronyms and glossary of terms by updating certain definitions to be used
+             for the purposes of carrying out sustainability reporting in accordance with ESRS.
+     Delegated Regulation (EU) 2023/2772 as amended by this delegated act applies for financial
+     years beginning on or after 1 January 2027 to all undertakings subject to sustainability
+
+
+     9
+            Directive (EU) 2024/1760 of the European Parliament and of the Council of 13 June 2024 on corporate
+            sustainability due diligence and amending Directive (EU) 2019/1937 and Regulation (EU) 2023/2859
+            (OJ L, 2024/1760, 5.7.2024, ELI: http://data.europa.eu/eli/dir/2024/1760/oj).
+     10
+            The “Have Your Say” Consultation was conducted from 6 May to 3 June 2026 and generated 453
+            responses.
+
+
+
+EN                                                      5                                                         EN
+     reporting requirements under Articles 19a and 29a of the Accounting Directive as amended by
+     Directive (EU) 2026/470 (Omnibus I Directive).
+     For financial years beginning between 1 January 2026 and 31 December 2026, undertakings
+     subject to sustainability reporting requirements may choose to apply the standards set out in
+     Delegated Regulation (EU) 2023/2772 as amended by this delegated act instead of the
+     standards set out in the existing version of Delegated Regulation (EU) 2023/2772. In addition,
+     undertakings that for those financial years choose to apply the existing version of Delegated
+     Regulation (EU) 2023/2772 should be able to apply certain reliefs introduced by this
+     delegated act.
+
+
+
+
+EN                                                 6                                                  EN
+                         COMMISSION DELEGATED REGULATION (EU) …/...
+
+                                                        of 3.7.2026
+
+         amending Delegated Regulation (EU) 2023/2772 as regards the simplification of certain
+                                 sustainability reporting standards
+
+                                              (Text with EEA relevance)
+
+
+     THE EUROPEAN COMMISSION,
+     Having regard to the Treaty on the Functioning of the European Union,
+     Having regard to Directive 2013/34/EU of the European Parliament and of the Council of 26
+     June 2013 on the annual financial statements, consolidated financial statements and related
+     reports of certain types of undertakings, amending Directive 2006/43/EC of the European
+     Parliament and of the Council and repealing Council Directives 78/660/EEC and
+     83/349/EEC1, and in particular Article 29b(1), first subparagraph, thereof,
+     Whereas:
+     (1)      Commission Delegated Regulation (EU) 2023/27722 specifies the sustainability
+              reporting standards that undertakings are to use for carrying out their sustainability
+              reporting in accordance with Articles 19a and 29a of Directive 2013/34/EU, starting
+              from the financial year indicated in Article 5(2) of Directive (EU) 2022/2464 of the
+              European Parliament and of the Council3 for each category of undertakings.
+     (2)      Directive (EU) 2026/470 of the European Parliament and of the Council4 has amended
+              Directive 2013/34/EU by, inter alia, reducing the number of undertakings that fall
+              within the scope of Articles 19a and 29a of that Directive and by simplifying the
+              sustainability reporting requirements from financial years beginning on or after
+              1 January 2027. In line with Directive (EU) 2026/470, and based on the experience
+              gained with the application of the existing sustainability standards, it is necessary to
+              amend the existing sustainability reporting standards by: (i) reducing the number of
+              datapoints; (ii) prioritising quantitative datapoints over narrative text; (iii) further
+              distinguishing between mandatory and voluntary datapoints; (iv) providing clear
+              instructions on how to apply the materiality principle; (v) improving consistency with
+              other Union legislation; and (vi) taking account, to the greatest extent possible, of
+              interoperability with global sustainability reporting standards. Furthermore, it is
+
+     1
+               OJ L 182, 29.6.2013, p.19, ELI: http://data.europa.eu/eli/dir/2013/34/oj.
+     2
+               Commission Delegated Regulation (EU) 2023/2772 of 31 July 2023 supplementing Directive
+               2013/34/EU of the European Parliament and of the Council as regards sustainability reporting standards
+               (OJ L, 2023/2772, 22.12.2023, ELI: http://data.europa.eu/eli/reg_del/2023/2772/oj).
+     3
+               Directive (EU) 2022/2464 of the European Parliament and of the Council of 14 December 2022
+               amending Regulation (EU) No 537/2014, Directive 2004/109/EC, Directive 2006/43/EC and Directive
+               2013/34/EU, as regards corporate sustainability reporting (OJ L 322, 16.12.2022, p. 15, ELI:
+               http://data.europa.eu/eli/dir/2022/2464/oj).
+     4
+               Directive (EU) 2026/470 of the European Parliament and of the Council of 24 February 2026 amending
+               Directives 2006/43/EC, 2013/34/EU, (EU) 2022/2464 and (EU) 2024/1760 as regards certain corporate
+               sustainability reporting requirements and certain corporate sustainability due diligence requirements (OJ
+               L, 2026/470, 26.2.2026, ELI: http://data.europa.eu/eli/dir/2026/470/oj).
+
+
+
+EN                                                            7                                                            EN
+            necessary to simplify certain provisions of Delegated Regulation (EU) 2023/2772 and
+            simplify the structure and presentation of the reporting standards.
+     (3)    The Commission has taken into account the technical advice provided by EFRAG,
+            which meets the criteria set out in Article 49(3b), first, second and third
+            subparagraphs, of Directive 2013/34/EU. However, to ensure proportionality and to
+            facilitate the correct application of the sustainability reporting standards by the
+            undertakings concerned, the Commission has made changes in relation to EFRAG’s
+            technical advice as regards: (i) materiality and materiality assessment; (ii) fair
+            presentation; (iii) the level of aggregation and disaggregation; (iv) the ability to omit
+            certain information; (v) anticipated financial effects; (vi) greenhouse gas emissions;
+            (vii) climate transition plans; (viii) microplastics; ix) emission of pollutants; (x)
+            substances of very high concern; (xi) specific provisions for asset management
+            activities; (xii) human rights incidents and incidents of discrimination; and (xiii)
+            coherence with Directive (EU) 2024/1760 of the European Parliament and of the
+            Council5 regarding due diligence.
+     (4)    These sustainability reporting standards meet the requirements set out in Article 29b of
+            Directive 2013/34/EU.
+     (5)    It is thus necessary to replace the sustainability reporting standards set out in Annex I
+            to Delegated Regulation (EU) 2023/2772.
+     (6)    Delegated Regulation (EU) 2023/2772 should therefore be amended accordingly.
+     (7)    In accordance with Article 29b(1), third subparagraph, of Directive 2013/34/EU, this
+            Regulation should enter into force not earlier than four months after its adoption.
+     (8)    To provide undertakings with appropriate time to prepare for the application of the
+            new requirements, and to minimise compliance costs, this Regulation should apply to
+            the financial years beginning on or after 1 January 2027.
+     (9)    To reduce the reporting burden for undertakings already subject to sustainability
+            reporting standards under the version of Commission Delegated Regulation (EU)
+            2023/2772 currently in force, those undertakings should, for the financial years
+            beginning between 1 January 2026 and 31 December 2026, be allowed to apply either
+            the standards as applicable pursuant to Commission Delegated Regulation (EU)
+            2023/2772 as last amended by Commission Delegated Regulation (EU) 2025/1416 or
+            pursuant to this Regulation. In addition, undertakings that choose to apply
+            Commission Delegated Regulation (EU) 2023/2772 as last amended by Commission
+            Delegated Regulation (EU) 2025/1416 for those financial years should be able to
+            apply certain reliefs introduced by this Regulation. To ensure transparency and
+            comparability, undertakings should clearly state in their sustainability statement which
+            version they apply for those financial years.
+     (10)   In accordance with Article 49(3b), fourth subparagraph, of Directive 2013/34/EU, the
+            Commission has consulted jointly the Member State Expert Group on Sustainable
+            Finance, referred to in Article 24 of Regulation (EU) 2020/852 of the European
+            Parliament and of the Council6, and the Accounting Regulatory Committee, referred to
+
+     5
+            Directive (EU) 2024/1760 of the European Parliament and of the Council of 13 June 2024 on corporate
+            sustainability due diligence and amending Directive (EU) 2019/1937 and Regulation (EU) 2023/2859
+            (OJ L, 2024/1760, 5.7.2024, ELI: http://data.europa.eu/eli/dir/2024/1760/oj).
+     6
+            Regulation (EU) 2020/852 of the European Parliament and of the Council of 18 June 2020 on the
+            establishment of a framework to facilitate sustainable investment, and amending Regulation (EU)
+            2019/2088 (OJ L 198, 22.6.2020, p. 13, ELI: http://data.europa.eu/eli/reg/2020/852/oj).
+
+
+
+EN                                                      8                                                         EN
+            in Article 6 of Regulation (EC) No 1606/2002 of the European Parliament and of the
+            Council7.
+     (11)   In accordance with Article 49(3b), fifth subparagraph, of Directive 2013/34/EU, the
+            Commission has requested the opinion of the European Securities and Markets
+            Authority, the European Banking Authority and the European Insurance and
+            Occupational Pensions Authority.
+     (12)   In accordance with Article 49(3b), sixth subparagraph, of Directive 2013/34/EU, the
+            Commission has also consulted the European Environment Agency, the European
+            Union Agency for Fundamental Rights, the European Central Bank, the Committee of
+            European Auditing Oversight Bodies and the Platform on Sustainable Finance
+            established pursuant to Article 20 of Regulation (EU) 2020/852,
+     HAS ADOPTED THIS REGULATION:
+
+                                                    Article 1
+                           Amendments to Delegated Regulation (EU) 2023/2772
+     Delegated Regulation (EU) 2023/2772 is amended as follows:
+     (1)     Annex I is replaced by the text set out in Annex I to this Regulation;
+     (2)     Annex II is replaced by the text set out in Annex II to this Regulation.
+
+                                                    Article 2
+                                           Transitional provisions
+               for financial years starting between 1 January and 31 December 2026
+     1.      For the financial years starting between 1 January 2026 and 31 December 2026,
+             undertakings falling within the scope of Delegated Regulation (EU) 2023/2772 may
+             apply either of the following:
+             (a)    the sustainability reporting standards set out in Annex I to Delegated
+                    Regulation (EU) 2023/2772 as last amended by Commission Delegated
+                    Regulation (EU) 2025/14168 or the sustainability reporting standards set out in
+                    Annex I to this Regulation;
+             (b)    the sustainability reporting standards set out in Annex I to Delegated
+                    Regulation (EU) 2023/2772 as last amended by Commission Delegated
+                    Regulation (EU) 2025/1416 with the following reliefs as set out in Annex I to
+                    this Regulation:
+                    (i)     ESRS 1, paragraph 27 on the top down approach for the double
+                            materiality assessment;
+                    (ii)    ESRS 1 paragraphs 32-33 on undue cost and efforts and value chain
+                            limitation in the double materiality assessment;
+
+     7
+            Regulation (EC) No 1606/2002 of the European Parliament and of the Council of 19 July 2002 on the
+            application of international accounting standards (OJ L 243, 11.9.2002, p 1,
+            ELI: http://data.europa.eu/eli/reg/2002/1606/oj).
+     8
+            Commission Delegated Regulation (EU) 2025/1416 of 11 July 2025 amending Delegated Regulation
+            (EU) 2023/2772 as regards the postponement of the date of application of the disclosure requirements
+            for        certain       undertakings      (OJ    L,       2025/1416,         10.11.2025,       ELI:
+            http://data.europa.eu/eli/reg_del/2025/1416/oj).
+
+
+
+EN                                                      9                                                          EN
+                    (iii) ESRS 1 paragraphs 74-75 on new acquisitions and disposals;
+                    (iv) ESRS 1 paragraph 90 on metrics for non-significant activities;
+                    (v)   ESRS 1 paragraph 91 on partial reporting scope of the value chain;
+                    (vi) ESRS 1 paragraph 92 on joint operations;
+                    (vii) ESRS 1 paragraph 106 on the presentation of Taxonomy disclosures in a
+                          separate appendix;
+                    (viii) ESRS 1 paragraph 110 on the executive summary.
+     2.       Undertakings that choose to apply the sustainability reporting standards in the
+              version referred to in either point (a) or (b) of paragraph 1 shall clearly state in their
+              sustainability statement which version they apply for financial years beginning
+              between 1 January 2026 and 31 December 2026.
+
+                                                 Article 3
+                                    Entry into force and application
+     This Regulation shall enter into force on [O.P.: please insert the date = date of adoption plus
+     4 months plus 1 week].
+     It shall apply to the financial years beginning on or after 1 January 2027.
+
+
+     This Regulation shall be binding in its entirety and directly applicable in all Member States.
+     Done at Brussels, 3.7.2026
+
+
+
+                                                   For the Commission
+                                                   The President
+                                                   Ursula VON DER LEYEN
+
+
+
+
+EN                                                   10                                                    EN
+
