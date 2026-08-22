@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useEntitlement } from '../../../lib/useEntitlement'
+import { stepBlockers, canAdvanceStep, outstandingText, type BlockerField }
+  from '../../../lib/climate/wizardSteps'
 import Nav from '../../components/Nav'
 // resolveTopicLabels is the SAME pure function /api/materiality uses at write time. Importing it
 // here rather than reimplementing the overlay is the point: the wizard and the write path cannot
@@ -359,21 +361,28 @@ export default function MaterialityWizard() {
   const toggle = (arr: string[], v: string, set: (a: string[]) => void) =>
     set(arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v])
 
-  // ⚠️ BOTH OR NEITHER, ENFORCED HERE so the CHECK constraint never has to.
+  // ⚠️ BOTH OR NEITHER, ENFORCED so the CHECK constraint never has to.
   // materiality_assessments_reporting_period_both_or_neither and ..._order (migration 20260846)
   // are the authority, but a constraint violation surfaces to the customer as a raw Postgres
   // string. This is not a second opinion on the rule — it is the same rule, stated early enough
-  // to be actionable. String comparison is safe: ISO dates sort lexicographically and both values
-  // come from <input type="date">.
-  const periodHalfFilled = (!!periodStart) !== (!!periodEnd)
-  const periodOutOfOrder = !!periodStart && !!periodEnd && periodEnd <= periodStart
-  const periodInvalid = periodHalfFilled || periodOutOfOrder
+  // to be actionable.
+  //
+  // ⚠️ THE RULE AND ITS EXPLANATION ARE ONE THING NOW, in lib/climate/wizardSteps.ts. They were two
+  // until 21 Aug 2026, and a user who had fixed the dates sat in front of a grey Next button with
+  // nothing saying no sector had been chosen. stepBlockers() and canAdvanceStep() are written side
+  // by side there and a test pins that a step has zero blockers exactly when it can advance.
+  const stepInput = { industryCode, regionCodes, periodStart, periodEnd }
+  const blockers = stepBlockers(step, stepInput)
+  const canAdvance = () => canAdvanceStep(step, stepInput)
 
-  const canAdvance = () => {
-    if (step === 0) return !!industryCode && !periodInvalid
-    if (step === 1) return regionCodes.length > 0
-    return true
-  }
+  // ⚠️ NUDGED, NOT ALWAYS. Field messages appear only once the user has TRIED to continue and
+  // could not. On arrival at step 0 no sector is chosen, so an always-on message would greet a
+  // user who has done nothing with an amber warning about a field they have not reached — an error
+  // where a hint belongs. The line under the button carries that case instead: attached to the
+  // control, it reads as what Next is waiting for.
+  const [nudged, setNudged] = useState(false)
+  useEffect(() => { setNudged(false) }, [step])
+  const blockerAt = (f: BlockerField) => nudged ? blockers.find(b => b.field === f) : undefined
 
   async function submit() {
     setSubmitting(true); setError(null)
@@ -534,14 +543,12 @@ export default function MaterialityWizard() {
             Optional. If your financial year is not the calendar year &mdash; 1 April 2026 to 31 March 2027,
             say &mdash; enter it as it actually runs. Which ESRS version applies depends on the day it begins.
           </div>
-          {periodHalfFilled && (
+          {/* ⚠️ NOT nudge-gated, unlike sector and regions. A half-filled or reversed pair is
+              something the user just DID; the sector prompt is something they have not yet done.
+              One is feedback, the other would be a reprimand for inaction. */}
+          {blockers.find(b => b.field === 'period') && (
             <div style={{ fontSize: 11.5, color: '#ba7517', marginTop: 6, lineHeight: 1.6 }}>
-              Enter both dates, or leave both blank. A period with only one end is not recorded.
-            </div>
-          )}
-          {periodOutOfOrder && (
-            <div style={{ fontSize: 11.5, color: '#ba7517', marginTop: 6, lineHeight: 1.6 }}>
-              The last day must fall after the first day.
+              {blockers.find(b => b.field === 'period')!.atField}
             </div>
           )}
         </div>
@@ -559,8 +566,38 @@ export default function MaterialityWizard() {
 
           LIVE AGAIN as of 21 Aug 2026. It was inert from 35e16c6, when checkReportingPeriod moved
           to deciding on the day the financial year BEGINS while this screen still captured an FY
-          label and had to pass null. The date inputs above are what restore it. */}
+          label and had to pass null. The date inputs above are what restore it.
+
+          ⚠️ SUPPRESSED WHILE THE PERIOD IS MID-ENTRY, AND THE VERDICT IS UNCHANGED.
+          Observed 22 Aug 2026: with periodStart 2025-01-01 and periodEnd blank, this screen showed
+          the incompleteness warning and this banner stacked — one saying the period is not
+          recorded, the other reasoning about it as though it were. Both were correct and together
+          they were incoherent.
+
+          checkReportingPeriod decides on periodStart ALONE; periodEnd is carried and never
+          consulted (lib/materialityReportingPeriod.test.ts K4 pins that), so a year beginning
+          2025-01-01 conflicts with the Article 2(1) window whatever the end date is. Nothing about
+          that conclusion changes here. This is WHEN the banner is shown to someone still typing,
+          not WHAT the function concludes.
+
+          ⚠️ THE WRITE PATH IS UNAFFECTED — do not read this as the check being weakened. This is a
+          preview suppression on one screen and it touches nothing that is stored:
+            * app/api/materiality/route.ts computes its OWN periodVersionCheck at write and freezes
+              it into workings.disclosure. It does not consult this render;
+            * both routes 400 on a half-filled or out-of-order pair BEFORE reaching that check, so
+              the state suppressed here cannot reach the write path at all;
+            * the frozen verdict is what the report reprints (materiality/report/page.tsx), and a
+              conflict recorded at write still prints whether or not this banner ever appeared.
+
+          ⚠️ THE PERIOD BLOCKER, NOT A RECOMPUTED PREDICATE. `blockers` comes from stepBlockers(),
+          which is the single place the period rule is written — see the invariant in
+          lib/climate/wizardSteps.ts. Recomputing periodHalfFilled/periodOutOfOrder at this render
+          site would put a second copy of that rule next to the one it is meant to agree with, and
+          the two would be free to drift. */}
       {(() => {
+        // Asked BEFORE the check runs, deliberately: while the period is mid-entry there is no
+        // question to put to it yet.
+        if (blockers.some(b => b.field === 'period')) return null
         const chk = checkReportingPeriod(periodStart || null, periodEnd || null, standardVersion)
         if (chk.status !== 'conflict') return null
         return (
@@ -588,6 +625,11 @@ export default function MaterialityWizard() {
           return <div key={s.code} onClick={() => setIndustryCode(s.code)} style={{ border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, borderRadius: 10, padding: '10px 14px', cursor: 'pointer', background: sel ? '#EDE9FE' : '#f8f7f5', fontSize: 13, fontWeight: sel ? 600 : 400, color: sel ? '#7425e3' : '#555553' }}>{s.label}</div>
         })}
       </div>
+      {blockerAt('sector') && (
+        <div style={{ fontSize: 11.5, color: '#ba7517', marginTop: 6, lineHeight: 1.6 }}>
+          {blockerAt('sector')!.atField}
+        </div>
+      )}
     </div>
   )
 
@@ -626,6 +668,11 @@ export default function MaterialityWizard() {
           </div>
         </div>
       ))}
+      {blockerAt('regions') && (
+        <div style={{ fontSize: 11.5, color: '#ba7517', marginTop: 6, lineHeight: 1.6 }}>
+          {blockerAt('regions')!.atField}
+        </div>
+      )}
       <div style={{ marginTop: 16 }}>
         <label style={labelStyle}>Asset profile</label>
         {/* UX fix #1: prompt line explaining what asset profile is for */}
@@ -1246,7 +1293,31 @@ export default function MaterialityWizard() {
                   </div>
                 )
               ) : (
-                <button onClick={() => canAdvance() && setStep(s => s + 1)} disabled={!canAdvance()} style={{ fontSize: 13, fontWeight: 500, padding: '9px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: canAdvance() ? 'pointer' : 'not-allowed', opacity: canAdvance() ? 1 : 0.5 }}>Next →</button>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                  {/* ⚠️ aria-disabled, NOT disabled, AND THAT IS THE FIX. A `disabled` button
+                      receives no click, so there was no event on which to know the user had tried
+                      to continue — which is why the silence could not be broken from inside the
+                      component. The guard that actually prevents advancing is the one already in
+                      this handler and it is unchanged; canAdvanceStep() decides, exactly as
+                      canAdvance() did before. What changes is DOM semantics: the button stays
+                      focusable and announces itself as disabled, which is the recommended pattern
+                      precisely because a `disabled` control cannot say why it is off. */}
+                  <button
+                    onClick={() => { if (canAdvance()) setStep(s => s + 1); else setNudged(true) }}
+                    aria-disabled={!canAdvance()}
+                    style={{ fontSize: 13, fontWeight: 500, padding: '9px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: canAdvance() ? 'pointer' : 'not-allowed', opacity: canAdvance() ? 1 : 0.5 }}>Next →</button>
+                  {/* ⚠️ ONE LINE NAMING EVERYTHING OUTSTANDING, not a stack and not the first
+                      problem only — a message that reports one requirement at a time sends the
+                      user round the loop once per requirement, which is a slower version of the
+                      silence it replaces. Shown whenever Next cannot advance, INCLUDING on
+                      arrival: it is attached to the button and describes the button, so it reads
+                      as guidance about a control rather than as a fault in the user's work. */}
+                  {outstandingText(blockers) && (
+                    <div style={{ fontSize: 11, color: '#888784', textAlign: 'right', maxWidth: 400, lineHeight: 1.5 }}>
+                      Next needs {outstandingText(blockers)}.
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           ) : (
