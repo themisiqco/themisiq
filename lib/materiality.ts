@@ -60,127 +60,208 @@ export const STANDARD_VERSIONS = ['esrs_2023', 'esrs_2023_reliefs', 'esrs_2026']
 export function isStandardVersion(v: unknown): v is StandardVersion {
   return typeof v === 'string' && (STANDARD_VERSIONS as readonly string[]).includes(v)
 }
-
 // ── REPORTING PERIOD vs STANDARD VERSION — A WARNING THAT NEVER BLOCKS ───────────────────────────
 //
 // A test report read "Reporting period FY2025" beside "ESRS standard version: ESRS (2026)". That
-// combination cannot occur. Article 2 of Commission Delegated Regulation C(2026) 5010 applies the
-// revised standards to financial years beginning on or after 1 January 2027, with early adoption
-// permitted for FY2026 only.
+// combination cannot occur. Article 3 of Commission Delegated Regulation C(2026) 5010 applies the
+// revised standards to financial years beginning on or after 1 January 2027, with a transitional
+// option under Article 2 for a financial year beginning in calendar 2026.
 //
-// ⚠️ WHY THIS WARNS AND NEVER 400s, AND IT IS NOT BECAUSE THE PARSE IS WEAK.
-// Article 2(2) requires the UNDERTAKING to state which version it applied. A statement we refuse to
-// record is a statement we have made on their behalf. Their disclosure is theirs to get wrong; our
-// job is to show them the disagreement on the page a verifier reads.
+// ⚠️ THE INSTRUMENT IS NOW IN THE REPO — docs/reference/source/main-act.txt, added by commit
+// 6dc9740. Every rule below cites it by line. UNTIL THAT COMMIT THIS FILE CITED ARTICLES 2 AND 3
+// WITHOUT EITHER BEING PRESENT: the only source on disk was the ANNEX (the standards text), which
+// contains neither, and the only corroboration was ThemisIQ's own prose in
+// docs/materiality-questionnaire-spec-v5..v12 — six copies of one uncited sentence. The rules
+// turned out to be right. That was not knowable at the time, and a verifier could not have checked
+// it. Regenerate the extraction with scripts/extract-sources.sh; docs/reference/README.md records
+// what each source document is and what is still missing.
 //
-// Two further reasons, either of which is on its own sufficient:
-//   * THE RULE NEEDS A DATE THIS FIELD DOES NOT HOLD. Article 2 keys on the day the financial year
-//     BEGINS. The field stores a label — "FY2026" for a year beginning 1 April 2026 and one
-//     beginning 1 December 2026 are different cases, and nothing here can tell them apart. A hard
-//     refusal would assert a certainty the data cannot support: the same failure as naming a
-//     pop-up blocker that never fired.
-//   * IT COULD ONLY FIRE ON A CONFIDENT PARSE. Wizard traffic (a fixed FY#### select) would be
-//     refused while an unparseable free-text string from an API caller sailed through. Asymmetric
-//     enforcement on a compliance field is worse than none.
+// ⚠️ WHY THIS WARNS AND NEVER 400s.
+// Article 2(2) requires the UNDERTAKING to state which version it applied — "shall clearly state in
+// their sustainability statement which version they apply" (main-act.txt:480-483). A statement we
+// refuse to record is a statement we have made on their behalf. Their disclosure is theirs to get
+// wrong; our job is to show them the disagreement on the page a verifier reads. That is the whole
+// reason, and it is unaffected by everything below.
 //
-// ⚠️ UNPARSEABLE IS REPORTED AS UNPARSEABLE, NEVER FOLDED INTO 'ok'. "We could not read the period"
-// and "the period agrees with the version" are different facts about the record, and only one of
-// them is a finding. An empty result is a result.
+// ⚠️ THIS TOOK A DATE ONLY FROM 21 AUG 2026. Until then the input was a free-text label — "FY2026" —
+// and two further arguments stood here, BOTH ABOUT THE LABEL BEING THE WRONG SHAPE: that Article 2
+// keys on the day the financial year BEGINS and a label cannot express it, and that enforcement
+// could only ever fire on a confident parse. Both are now spent. They are recorded as spent rather
+// than deleted, because the defect they describe is the one that motivated the change and is worth
+// being able to find again:
+//
+//     A UK undertaking whose financial year runs 1 April 2026 to 31 March 2027 calls that year
+//     "FY2027", by the commonest UK convention. The label parse read 2027, and the Article 2(1)
+//     transitional option — offered for years BEGINNING in calendar 2026 — was reported as
+//     CONFLICTING when it in fact applied. A wrong verdict, on the report's face, with nothing
+//     erroring anywhere. 2026-04-01 is not ambiguous about which calendar year the year begins in.
+//     A label is.
+//
+// ⚠️ ALL THREE RULES FALL ON 1 JANUARY, so the CALENDAR YEAR of periodStart decides every one of
+// them and no month/day arithmetic appears below. That is a property of these three rules, NOT a
+// licence to go back to storing a year: the year is DERIVED from a date here, and the derivation is
+// the part that was broken. A future rule keying on any other day has the date to key on.
+//
+// ⚠️ periodEnd IS CARRIED, NOT CONSULTED. No rule in Articles 2 or 3 reads it. It is in the record
+// so the frozen check states the period it was checking, and so a rule needing the year's length
+// does not need a new signature. It is deliberately NOT validated against periodStart: the
+// both-or-neither and end > start CHECK constraints on materiality_assessments (migration
+// 20260846) are the authority, and a second, weaker opinion inside a function that must never block
+// would only be able to disagree with them.
+//
+// ⚠️ UNPARSEABLE IS REPORTED AS UNPARSEABLE — NEVER FOLDED INTO 'ok', AND NEVER INTO 'conflict'.
+// "We could not read the period" and "the period disagrees with the version" are different facts,
+// and a function reporting the second while knowing only the first would assert a finding it cannot
+// support. An empty result is a result. Note what this does NOT cover: a date that is merely
+// IMPLAUSIBLE is not unreadable. 1989-04-01 is a real day, so the rule decides it and it conflicts.
+// The old parser refused it via a 1990..2100 plausibility window and reported the weaker finding;
+// that window is gone.
 //
 // The record this produces is FROZEN INTO workings.disclosure AT WRITE, alongside labelResolution
 // and drResolution and for the same reason: a report must reprint the conflict as it stood when the
 // assessment ran, not re-derive it against a rule that has since moved. Historical rows are never
-// rewritten — an assessment that stated an impossible combination stated it.
+// rewritten — an assessment that stated an impossible combination stated it. That INCLUDES the rows
+// written before this took a date: they hold `reportingPeriod` and `fiscalYear` where this now
+// writes `periodStart`/`periodEnd`/`startYear`, and they are not migrated. They stated what they
+// stated, and the report reads only status/message/certainty, which are unchanged.
 
 export type PeriodVersionStatus =
-  | 'ok'           // parsed, and the period is inside the stated version's window
-  | 'conflict'     // parsed, and it is not
-  | 'unparseable'  // both stated, but no four-digit year could be read from the period
-  | 'not_stated'   // one or both absent — nothing to compare, and no claim is made
+  | 'ok'           // the financial year begins inside the stated version's window
+  | 'conflict'     // it begins outside it
+  | 'unparseable'  // both stated, but periodStart is not a calendar date
+  | 'not_stated'   // version or start absent — nothing to compare, and no claim is made
 
 export type PeriodVersionCheck = {
   standardVersion: StandardVersion | null
-  reportingPeriod: string | null
-  /** The year read from reportingPeriod, or null when none could be. */
-  fiscalYear: number | null
+  /** VERBATIM as supplied — never trimmed, never reformatted. A verifier may cross-check it. */
+  periodStart: string | null
+  /** VERBATIM as supplied. Carried for the record; no rule below reads it. */
+  periodEnd: string | null
+  /** The calendar year periodStart falls in; null when it is absent or not a date. */
+  startYear: number | null
   status: PeriodVersionStatus
-  // The register of the conflict, because the three are not equally firm and the copy must not
-  // pretend they are:
-  //   'explicit' — the act states the limit in terms (early adoption for FY2026 only; from FY2027
-  //                only the revised standards apply).
-  //   'inferred' — read off the SCOPE of Article 2(1) (financial years beginning between 1 January
-  //                and 31 December 2026) rather than from a prohibition in terms.
+  // ── THE REGISTER OF THE CONFLICT, AND WHY THE THREE RULES ARE NOT EQUALLY FIRM ────────────────
+  // The copy printed on the report's face distinguishes these, so the distinction has to be real.
+  //
+  //   'explicit' — the act states the limit IN TERMS, about the instrument itself:
+  //                "It shall apply to the financial years beginning on or after 1 January 2027."
+  //                (Article 3, main-act.txt:489.) Both the esrs_2026 and esrs_2023 branches rest
+  //                on that sentence, which is why both are 'explicit'.
+  //
+  //   'inferred' — Article 2(1) does something different. It CONFERS A PERMISSION over a stated
+  //                range — "For the financial years starting between 1 January 2026 and
+  //                31 December 2026, undertakings ... may apply either of the following"
+  //                (main-act.txt:444-446) — and says NOTHING AT ALL about a year outside it. The
+  //                exclusion follows from the grant not reaching that year, not from a prohibition.
+  //                That is a weaker kind of finding than Article 3's, and the report says so.
+  //
   // null unless status === 'conflict'.
   certainty: 'explicit' | 'inferred' | null
   /** What was OBSERVED. Never a cause, never advice — each surface adds its own framing. */
   message: string | null
 }
 
-// Two exact shapes, both unambiguous: "FY2026" (what the wizard emits) and a bare "2026". Anything
-// else is unparseable and says so. Deliberately NOT permissive — "2025/26", "H1 2026" and
-// "Year ended 31 March 2026" each have a defensible reading and a wrong one, and guessing on this
-// field is how the report ends up asserting a period the customer never stated.
-const FISCAL_YEAR_RE = /^(?:FY[ ]?)?(\d{4})$/i
+// ONE form: the form a Postgres `date` renders and an ISO caller sends. Deliberately not permissive
+// — "01/04/2026" has two readings across two continents, and guessing on this field is how a report
+// ends up asserting a period the customer never stated.
+const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/
 
-export function parseFiscalYear(v: string | null | undefined): number | null {
+/**
+ * The calendar year in which the financial year BEGINS, or null when `v` is not a calendar date.
+ *
+ * ⚠️ `new Date(v)` IS NOT USED, and that is deliberate. It accepts "2026-02-30" by rolling it
+ * forward to 2 March, and applies a local timezone to a bare date — so a year beginning 1 January
+ * becomes 31 December west of UTC, which is the one arithmetic error every rule here would notice.
+ * The round-trip through Date.UTC below REFUSES an impossible day rather than moving it, and every
+ * read is getUTC*, so no timezone is ever consulted.
+ *
+ * No plausibility window. A date validates itself; the old 1990..2100 clamp reported an implausible
+ * but real day as unreadable, which is a weaker finding than the rule can actually make.
+ */
+export function periodStartYear(v: string | null | undefined): number | null {
   if (typeof v !== 'string') return null
-  const m = FISCAL_YEAR_RE.exec(v.trim())
+  const m = ISO_DATE_RE.exec(v.trim())
   if (!m) return null
-  const y = Number(m[1])
-  return y >= 1990 && y <= 2100 ? y : null
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3])
+  const dt = new Date(Date.UTC(y, mo - 1, d))
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return null
+  return y
 }
 
 export function checkReportingPeriod(
-  reportingPeriod: string | null,
+  periodStart: string | null,
+  periodEnd: string | null,
   standardVersion: StandardVersion | null,
 ): PeriodVersionCheck {
-  const base = { standardVersion, reportingPeriod, fiscalYear: null as number | null }
+  // Whatever the verdict, the record echoes what was supplied, verbatim.
+  const base = { standardVersion, periodStart, periodEnd, startYear: null as number | null }
+
+  // ⚠️ ONE BLANK, ONE MEANING. The old guard was bare truthiness, so "" exited here as not_stated
+  // while "  " passed, reached the parser and came back unparseable — two visually identical blanks
+  // reported as two different facts, one of them a finding on the report. Normalising BEFORE the
+  // guard closes that seam. Callers should still pass an explicit null; this is the floor, not the
+  // contract, and it is what stops a half-filled date form reading as a deliberate abstention.
+  const startGiven = typeof periodStart === 'string' && periodStart.trim() !== ''
 
   // No claim is possible without both. A null standardVersion is a legitimate "not stated"
   // (Art. 2(2) permits the statement to be absent; an assumed one would be false), and a null
-  // period is simply a field the user left alone. Neither is a finding.
-  if (!standardVersion || !reportingPeriod) {
+  // start is simply a field the user left alone. Neither is a finding.
+  if (!standardVersion || !startGiven) {
     return { ...base, status: 'not_stated', certainty: null, message: null }
   }
 
-  const fiscalYear = parseFiscalYear(reportingPeriod)
-  if (fiscalYear == null) {
+  const startYear = periodStartYear(periodStart)
+  if (startYear == null) {
     return {
       ...base,
       status: 'unparseable',
       certainty: null,
-      message: `The reporting period "${reportingPeriod}" does not carry a four-digit year, `
+      message: `The reporting period start "${periodStart}" is not a calendar date, `
         + 'so it could not be checked against the ESRS version stated.',
     }
   }
 
-  const stated = { ...base, fiscalYear }
+  const stated = { ...base, startYear }
 
-  // ESRS (2026): financial years beginning on or after 1 January 2027, early adoption for FY2026.
-  if (standardVersion === 'esrs_2026' && fiscalYear < 2026) {
+  // ESRS (2026) applies to financial years beginning on or after 1 January 2027 (Article 3,
+  // main-act.txt:489), and Article 2(1)(a) offers it for a year beginning in calendar 2026
+  // (main-act.txt:444-449). So a year beginning before 1 January 2026 conflicts, and the limit
+  // is stated in terms — hence 'explicit'.
+  if (standardVersion === 'esrs_2026' && startYear < 2026) {
     return {
       ...stated, status: 'conflict', certainty: 'explicit',
       message: `ESRS (2026) applies to financial years beginning on or after 1 January 2027, with `
-        + `early adoption permitted for FY2026 only. The reporting period stated is FY${fiscalYear}.`,
+        + `early adoption permitted for a financial year beginning in 2026. The financial year `
+        + `stated begins ${periodStart}.`,
     }
   }
 
-  // The reliefs are an Article 2(1) option for financial years beginning in calendar 2026. Read off
-  // that article's SCOPE rather than from a prohibition in terms, hence 'inferred'.
-  if (standardVersion === 'esrs_2023_reliefs' && fiscalYear !== 2026) {
+  // The reliefs are Article 2(1)(b) — one limb of a PERMISSION granted "For the financial years
+  // starting between 1 January 2026 and 31 December 2026" (main-act.txt:444-446, and the article's
+  // own title at main-act.txt:442-443). Outside that range the act says nothing; the option simply
+  // does not reach the year. An exclusion that follows from the grant's scope rather than from a
+  // prohibition in terms is the weaker finding, hence 'inferred' — contrast Article 3 above, which
+  // states its limit about the instrument directly.
+  if (standardVersion === 'esrs_2023_reliefs' && startYear !== 2026) {
     return {
       ...stated, status: 'conflict', certainty: 'inferred',
       message: `The reliefs in Article 2(1) are offered for financial years beginning between `
-        + `1 January and 31 December 2026. The reporting period stated is FY${fiscalYear}.`,
+        + `1 January and 31 December 2026. The financial year stated begins ${periodStart}.`,
     }
   }
 
-  // From FY2027 only the revised standards apply.
-  if (standardVersion === 'esrs_2023' && fiscalYear > 2026) {
+  // From 1 January 2027 only the revised standards apply: Article 1 replaces Annex I of
+  // Del. Reg. (EU) 2023/2772 outright, and Article 3 applies that replacement to financial years
+  // beginning on or after that date (main-act.txt:489). Stated in terms — 'explicit'.
+  //
+  // ⚠️ NO LOWER BOUND, AND THAT IS NOT THE SAME AS THERE BEING NONE IN LAW. This instrument does
+  // not address when the 2023 standards FIRST applied; it amends 2023/2772 and never states that
+  // regulation's own application date. See test L3 and docs/reference/README.md.
+  if (standardVersion === 'esrs_2023' && startYear > 2026) {
     return {
       ...stated, status: 'conflict', certainty: 'explicit',
       message: `ESRS (2023) applies to financial years beginning before 1 January 2027. `
-        + `The reporting period stated is FY${fiscalYear}.`,
+        + `The financial year stated begins ${periodStart}.`,
     }
   }
 

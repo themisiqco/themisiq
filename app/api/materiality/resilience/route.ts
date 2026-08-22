@@ -52,7 +52,14 @@ export async function POST(req: NextRequest) {
     // and says nothing, which is the correct outcome, not a suppressed one.
     const reportingPeriod = typeof body.reportingPeriod === 'string' && body.reportingPeriod.trim()
       ? body.reportingPeriod.trim() : null
-    const periodVersionCheck = checkReportingPeriod(reportingPeriod, standardVersion)
+    //
+    // ⚠️ BOTH DATES ARE null, so this is 'not_stated' on every new record until reporting-period
+    // capture ships. Passing the FY label instead would report 'unparseable' about the customer's
+    // disclosure when the defect is in our capture, and deriving a date from the label is the
+    // inference this change exists to remove. Full reasoning, and what is suspended meanwhile, in
+    // the matching comment in app/api/materiality/route.ts. The label itself is still stored
+    // verbatim in workings.disclosure.reportingPeriod below.
+    const periodVersionCheck = checkReportingPeriod(null, null, standardVersion)
     if (periodVersionCheck.status === 'conflict') {
       console.warn(
         `Resilience: REPORTING PERIOD / STANDARD VERSION CONFLICT (${periodVersionCheck.certainty}) — `

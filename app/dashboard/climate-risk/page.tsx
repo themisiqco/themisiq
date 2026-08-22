@@ -514,9 +514,23 @@ export default function MaterialityWizard() {
 
           Only reachable in csrd mode, because the version chooser is CSRD-only and an s2 run
           clears it. Renders for 'conflict' alone: 'unparseable' cannot arise from a <select>, and
-          reporting it here would describe a state this screen cannot produce. */}
+          reporting it here would describe a state this screen cannot produce.
+
+          ⚠️ THIS BANNER CANNOT CURRENTLY FIRE, and that is a known suspension rather than dead
+          code. checkReportingPeriod now decides on the DAY THE FINANCIAL YEAR BEGINS (C(2026) 5010
+          Art. 2 and Art. 3 both key on it), and this screen captures an FY label, which cannot say
+          which calendar year a year beginning 1 April falls in. Passing the label would report
+          'unparseable' about the customer's own entry; deriving a date from it would reinstate the
+          exact wrong verdict the change removed — a UK April-year undertaking selecting FY2027
+          being told it conflicts when it does not. So null is passed, the status is 'not_stated',
+          and this renders nothing.
+
+          The banner comes back when this screen captures reporting_period_start / _end (columns
+          added by migration 20260846, written by nothing yet) and passes them here instead of
+          null. Left in place because it is correct code awaiting its input, not because it works.
+          The two write paths carry the same suspension — see app/api/materiality/route.ts. */}
       {(() => {
-        const chk = checkReportingPeriod(reportingPeriod, standardVersion)
+        const chk = checkReportingPeriod(null, null, standardVersion)
         if (chk.status !== 'conflict') return null
         return (
           <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.3)', borderRadius: 10, padding: '10px 14px', marginBottom: 16 }}>

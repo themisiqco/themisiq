@@ -72,7 +72,31 @@ export async function POST(req: NextRequest) {
 
     // Art. 2(2) is the undertaking's statement to make, so this WARNS and never blocks — see the
     // long note on checkReportingPeriod. Computed here, at write, and frozen into workings below.
-    const periodVersionCheck = checkReportingPeriod(reportingPeriod, standardVersion)
+    //
+    // ⚠️ BOTH DATES ARE null, AND THE CHECK IS THEREFORE DORMANT — 'not_stated' on every record
+    // written from 21 Aug 2026 until reporting-period capture ships. This is deliberate, and the
+    // alternatives were worse:
+    //   * PASSING reportingPeriod (the FY label) would return 'unparseable' on every CSRD
+    //     assessment, printing "…is not a calendar date" about the CUSTOMER's disclosure when the
+    //     defect is in our own capture. A manufactured finding is worse than silence.
+    //   * DERIVING a date from the label — "FY2026" → 2026-01-01 — is the exact inference this
+    //     change removes. A UK April-year undertaking selecting FY2027 would yield 2027-01-01 and
+    //     be told it conflicts when it does not. See test L1.
+    // null is the only honest input: no start date was supplied, because nothing can supply one
+    // yet. materiality_assessments.reporting_period_start / _end exist (migration 20260846) and
+    // are written by nothing.
+    //
+    // ⚠️ WHAT IS SUSPENDED, so this is not discovered as a mystery later: the wizard banner at
+    // app/dashboard/climate-risk/page.tsx, the console.warn below, and the report's conflict
+    // paragraph all gate on status === 'conflict' and none of them can now fire for a NEW record.
+    // Records written before this keep their frozen verdicts and still render. Nothing is lost
+    // from the record either way — the FY label the customer chose is still stored verbatim in
+    // workings.disclosure.reportingPeriod below; it is simply a different field from the one this
+    // check now reads, which is why the two do not contradict each other.
+    //
+    // WHEN CAPTURE SHIPS: pass the two date columns here and at the other two call sites, and this
+    // comment goes with them.
+    const periodVersionCheck = checkReportingPeriod(null, null, standardVersion)
     if (periodVersionCheck.status === 'conflict') {
       console.warn(
         `Materiality: REPORTING PERIOD / STANDARD VERSION CONFLICT (${periodVersionCheck.certainty}) — `
