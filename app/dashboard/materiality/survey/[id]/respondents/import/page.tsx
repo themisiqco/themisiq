@@ -49,7 +49,7 @@ const FAIL_BG = '#fef3f2'
 type Round = { id: string; name: string; company_name: string | null; status: string; questionnaire_version: number; standard_version: string }
 
 export default function RespondentImport() {
-  const isPaid = useEntitlement('climate-risk')
+  const isPaid = useEntitlement('impact-materiality')
   const params = useParams()
   const roundId = params.id as string
   const fileRef = useRef<HTMLInputElement>(null)
@@ -293,9 +293,9 @@ export default function RespondentImport() {
   if (isPaid === false) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav /><div style={{ maxWidth: 760, margin: '0 auto', padding: '2rem' }}>
-        <PaywallCard title="Unlock the Climate Risk module"
-          body="Stakeholder surveys are part of the Climate Risk &amp; Materiality module."
-          href="/pricing?modules=risk" />
+        <PaywallCard title="Unlock Impact Materiality"
+          body="Stakeholder surveys are part of the Impact Materiality Assessment."
+          href="/pricing?modules=impact" />
       </div>
     </div>
   )

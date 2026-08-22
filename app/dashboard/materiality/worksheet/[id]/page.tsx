@@ -111,7 +111,7 @@ const input: React.CSSProperties = {
 }
 
 export default function WorksheetAssign() {
-  const isPaid = useEntitlement('climate-risk')
+  const isPaid = useEntitlement('impact-materiality')
   const params = useParams()
   const assessmentId = params.id as string
 
@@ -556,9 +556,9 @@ export default function WorksheetAssign() {
 
   // ── render ─────────────────────────────────────────────────────────────────────────────────
   if (isPaid === false) return (
-    <Shell><PaywallCard title="Unlock the Climate Risk module"
-      body="The impact worksheet is part of the Climate Risk &amp; Materiality module."
-      href="/pricing?modules=risk" /></Shell>
+    <Shell><PaywallCard title="Unlock Impact Materiality"
+      body="The impact worksheet is part of the Impact Materiality Assessment."
+      href="/pricing?modules=impact" /></Shell>
   )
 
   if (loading) return (

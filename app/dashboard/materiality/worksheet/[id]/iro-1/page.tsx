@@ -88,7 +88,7 @@ const Shell = ({ children }: { children: React.ReactNode }) => (
 export default function Iro1Page() {
   const params = useParams()
   const assessmentId = String(params?.id ?? '')
-  const isPaid = useEntitlement('climate-risk')
+  const isPaid = useEntitlement('impact-materiality')
 
   const [company, setCompany] = useState<string | null>(null)
   const [row, setRow] = useState<(Iro1Row & { status?: string }) | null>(null)
@@ -201,9 +201,9 @@ export default function Iro1Page() {
   }
 
   if (isPaid === false) return (
-    <Shell><PaywallCard title="Unlock the Climate Risk module"
-      body="The impact worksheet is part of the Climate Risk &amp; Materiality module."
-      href="/pricing?modules=risk" /></Shell>
+    <Shell><PaywallCard title="Unlock Impact Materiality"
+      body="The impact worksheet is part of the Impact Materiality Assessment."
+      href="/pricing?modules=impact" /></Shell>
   )
   if (loading) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>

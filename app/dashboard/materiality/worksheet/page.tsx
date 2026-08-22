@@ -57,7 +57,7 @@ const versionLabel = (v: string | null) =>
     : 'No standard version stated'
 
 export default function WorksheetIndex() {
-  const isPaid = useEntitlement('climate-risk')
+  const isPaid = useEntitlement('impact-materiality')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [rows, setRows] = useState<Row[]>([])
@@ -100,9 +100,9 @@ export default function WorksheetIndex() {
     <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
       <Nav />
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '2rem' }}>
-        <PaywallCard title="Unlock the Climate Risk module"
-          body="The impact worksheet is part of the Climate Risk &amp; Materiality module. Unlock it to record ESRS severity determinations and share the work with colleagues."
-          href="/pricing?modules=risk" />
+        <PaywallCard title="Unlock Impact Materiality"
+          body="The impact worksheet is part of the Impact Materiality Assessment. Unlock it to record ESRS severity determinations and share the work with colleagues."
+          href="/pricing?modules=impact" />
       </div>
     </div>
   )
@@ -146,9 +146,17 @@ export default function WorksheetIndex() {
               No assessments yet
             </div>
             <div style={{ fontSize: 13, color: MID, lineHeight: 1.8, maxWidth: 520, margin: '0 auto' }}>
-              An impact worksheet hangs off a materiality assessment. Run one in the{' '}
-              <Link href="/dashboard/climate-risk" style={{ color: PURPLE }}>Climate Risk &amp; Materiality</Link>{' '}
-              module first, then come back to divide the severity work among colleagues.
+              {/* ⚠️ NAMES A DEPENDENCY ON ANOTHER MODULE, and says so plainly. An impact worksheet
+                  hangs off an assessment row, and today the only thing that creates one is the
+                  Climate Risk wizard — so a customer holding Impact Materiality alone lands here
+                  with nothing to open. The label used to read "Climate Risk & Materiality", naming
+                  a combined module that stopped existing on 22 Aug 2026 when the two were split.
+                  The dependency itself is real and unresolved: creating an assessment without the
+                  screening is its own piece of work. */}
+              An impact worksheet hangs off a materiality assessment, and the{' '}
+              <Link href="/dashboard/climate-risk" style={{ color: PURPLE }}>Climate Risk</Link>{' '}
+              module is currently the only place one can be created. Run an assessment there first,
+              then come back to divide the severity work among colleagues.
             </div>
           </div>
         ) : (

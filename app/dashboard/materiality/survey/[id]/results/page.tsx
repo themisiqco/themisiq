@@ -180,7 +180,7 @@ function ServerNote({ children, bg = PAPER, fg = MID }:
 // ── page ─────────────────────────────────────────────────────────────────────────────────────────
 
 export default function SurveyResults() {
-  const isPaid = useEntitlement('climate-risk')
+  const isPaid = useEntitlement('impact-materiality')
   const params = useParams()
   const roundId = params.id as string
 
@@ -251,9 +251,9 @@ export default function SurveyResults() {
     <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
       <Nav />
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '2rem' }}>
-        <PaywallCard title="Unlock the Climate Risk module"
-          body="Stakeholder survey results are part of the Climate Risk &amp; Materiality module. Unlock it to run a survey round and read what your stakeholders said."
-          href="/pricing?modules=risk" />
+        <PaywallCard title="Unlock Impact Materiality"
+          body="Stakeholder survey results are part of the Impact Materiality Assessment. Unlock it to run a survey round and read what your stakeholders said."
+          href="/pricing?modules=impact" />
       </div>
     </div>
   )

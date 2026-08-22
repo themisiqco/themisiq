@@ -16,7 +16,7 @@
  * and the register and the report must never describe different work.
  *
  * ⚠️ THE ENTITLEMENT GATE IS INHERITED AND IS EXPECTED TO CHANGE.
- * useEntitlement('climate-risk') is what the worksheet routes use, and this route sits under
+ * useEntitlement('impact-materiality') is what the worksheet routes use, and this route sits under
  * /dashboard/stakeholder — the first page of a module being split out with its own entitlement.
  * When that split lands, this gate changes with it. It is written the same way as its siblings so
  * that change is one edit in an obvious place, not an archaeology exercise.
@@ -171,7 +171,7 @@ const participationOf = (people: Person[], label: (code: string) => string) => {
 export default function StakeholderBoardReport() {
   // See the header: inherited from the worksheet routes, expected to change when this module gets
   // its own entitlement.
-  const isPaid = useEntitlement('climate-risk')
+  const isPaid = useEntitlement('impact-materiality')
   const params = useParams()
   const assessmentId = params.id as string
 
@@ -502,9 +502,9 @@ export default function StakeholderBoardReport() {
   }
 
   if (isPaid === false) return (
-    <Shell><PaywallCard title="Unlock the Climate Risk module"
-      body="The stakeholder board paper is part of the Climate Risk &amp; Materiality module."
-      href="/pricing?modules=risk" /></Shell>
+    <Shell><PaywallCard title="Unlock Impact Materiality"
+      body="The stakeholder board paper is part of the Impact Materiality Assessment."
+      href="/pricing?modules=impact" /></Shell>
   )
   if (loading) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>

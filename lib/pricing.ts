@@ -27,6 +27,19 @@ export type ModuleKey =
   | 'ghg'
   | 'cbam'           // CBAM exporter-side SEE module (standalone, sibling to ghg)
   | 'climate-risk'   // includes the materiality wizard + report
+  // ⚠️ SOLD SEPARATELY FROM climate-risk, AND THE TWO ARE NOT THE SAME WORK. climate-risk SCREENS:
+  // a wizard scoring ten ESRS topics from industry baselines and scenario multipliers, producing a
+  // matrix. This module ASSESSES: a stakeholder survey with tokens and an anonymity floor,
+  // delegation to named contributors, 37 sub-topics x 2 directions x 4 ESRS 1 §6.2 dimensions of
+  // recorded judgement, a divergence register, versioned finalisation and a frozen disclosure
+  // roadmap. Pricing them alike would assert they are comparable work.
+  //
+  // ⚠️ NO MIGRATION PATH WAS NEEDED, AND THAT IS A FACT ABOUT 22 AUG 2026, NOT A DESIGN CLAIM.
+  // Nobody held any entitlement when this split happened — no customer had 'climate-risk', so no
+  // customer lost worksheet access by it moving. Had one existed, this would have required a
+  // backfill granting 'impact-materiality' to every 'climate-risk' holder. It did not, and the
+  // absence of that migration is recorded here so a future reader does not go looking for one.
+  | 'impact-materiality'
   | 'supply-chain'   // Supplier Portal (data collection)
   | 'people'
   | 'deals'
@@ -37,6 +50,7 @@ export const MODULES: { key: ModuleKey; name: string }[] = [
   { key: 'ghg',           name: 'GHG Inventory (Scope 1, 2 & 3)' },
   { key: 'cbam',          name: 'CBAM (Carbon Border Adjustment Mechanism)' },
   { key: 'climate-risk',  name: 'Climate Risk' },
+  { key: 'impact-materiality', name: 'Impact Materiality Assessment' },
   { key: 'supply-chain',  name: 'Supply Chain' },
   { key: 'people',        name: 'People & Workforce' },
   { key: 'deals',         name: 'Deals & Investment' },
@@ -55,6 +69,12 @@ export const LEGACY_PRICING_PAGE_ID: Record<string, ModuleKey> = {
   ghg: 'ghg',
   cbam: 'cbam',
   risk: 'climate-risk',
+  // ⚠️ REQUIRED, NOT OPTIONAL, AND NOT TYPE-CHECKED. This map is Record<string, ModuleKey>, so a
+  // missing entry compiles cleanly — and consumers .filter(Boolean) the lookup, so an unmapped
+  // shorthand is SILENTLY DROPPED from the cart. A customer could select this module, pay, and not
+  // receive it. pricing.test.ts derives both sides from MODULES, so omitting this fails a test
+  // rather than a customer; removing it and watching that test go red is how it was checked.
+  impact: 'impact-materiality',
   supply: 'supply-chain',
   people: 'people',
   deals: 'deals',
@@ -138,6 +158,39 @@ export const GHG_TIERS: Record<GhgTier, { priceUSD: number | null; locationAllow
 export const FLAT_MODULE_PRICES: Record<Exclude<ModuleKey, 'ghg'>, number> = {
   'cbam':          1499,
   'climate-risk':  4900,
+  // ⚠️ $4,900 — DELIBERATE PARITY WITH climate-risk, AND PARITY IS NOT A CLAIM OF EQUIVALENCE.
+  //
+  // THE TWO ARE NOT COMPARABLE WORK, AND THAT IS THE POINT OF SAYING SO HERE. climate-risk screens:
+  // a wizard scoring ten ESRS topics from industry baselines and scenario multipliers, producing a
+  // matrix. This module runs a stakeholder survey with per-respondent tokens and an anonymity
+  // floor, delegates sub-topics to named contributors, and records 296 judgements — 37 sub-topics
+  // x 2 directions x 4 ESRS 1 §6.2 dimensions — with abstentions kept as abstentions, plus a
+  // divergence register, an audited override path, versioned finalisation and a frozen disclosure
+  // roadmap. A LATER PRICE RISE IS DEFENSIBLE ON EXACTLY THAT BASIS, and this paragraph is the
+  // record of the argument for whoever makes it.
+  //
+  // SO WHY PARITY. Because this is a decision about ADOPTION, not about value. The first buyer
+  // conversation is worth more than the margin on a sale that may not happen, and nothing in this
+  // file has ever been tested against a buyer. A price set above the module a customer already
+  // knows, for work that customer has not yet seen, buys nothing except a reason not to start.
+  //
+  // AND BOTH MODULES TOGETHER STAY SELF-SERVE, WHICH 9,900 DID NOT.
+  //   4900 + 4900 = 9800 gross, less the 2-module volume discount (10%) = $8,820 — under
+  //   CARD_THRESHOLD_USD (10000), so requiresInvoice() is false and screen-then-assess checks out
+  //   by card.
+  //   At 9900 the same pair was 14800 gross, 13320 net — over the threshold, so the natural
+  //   two-module path would have routed every customer to request-an-invoice. That is a sales
+  //   decision, and it was not one anybody had made.
+  // (Arithmetic verified against cartQuote, not computed by hand. Recompute rather than trusting
+  // these figures if FLAT_MODULE_PRICES or volumeDiscount moves.)
+  //
+  // ⚠️ WHAT THIS PRICE IS NOT. It is not calibrated. The repo records no transaction, no price test
+  // and no customer — the only pricing rationale written anywhere is CLAUDE.md's note that the Full
+  // Platform headline caused sticker shock. This is a starting position, not a finding.
+  // RAISING IT IS EXPECTED once a buyer has seen what the module actually does; the parity above is
+  // an entry price for a module nobody has bought yet, not a statement that a stakeholder survey
+  // and a wizard are worth the same.
+  'impact-materiality': 4900,
   'deals':         4900,
   'supply-chain':  2900,
   'cyber':         2900,

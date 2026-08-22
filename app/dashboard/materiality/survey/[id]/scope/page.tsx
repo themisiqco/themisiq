@@ -79,7 +79,7 @@ type Round = {
 type Group = { code: string; label: string; questions: Question[] }
 
 export default function SurveyScope() {
-  const isPaid = useEntitlement('climate-risk')
+  const isPaid = useEntitlement('impact-materiality')
   const params = useParams()
   const roundId = params.id as string
 
@@ -297,9 +297,9 @@ export default function SurveyScope() {
       <Nav />
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '2rem' }}>
         <PaywallCard
-          title="Unlock the Climate Risk module"
-          body="Stakeholder surveys are part of the Climate Risk &amp; Materiality module. Unlock it to run a survey round, choose which ESRS sub-topics are in scope, and gather stakeholder views as evidence for your materiality assessment."
-          href="/pricing?modules=risk"
+          title="Unlock Impact Materiality"
+          body="Stakeholder surveys are part of the Impact Materiality Assessment. Unlock it to run a survey round, choose which ESRS sub-topics are in scope, and gather stakeholder views as evidence for your materiality assessment."
+          href="/pricing?modules=impact"
         />
       </div>
     </div>

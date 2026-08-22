@@ -50,7 +50,7 @@ type Respondent = {
 type Progress = { n_asked: number; n_answered: number; n_abstained: number; n_skipped: number; last_activity: string | null }
 
 export default function SurveyProgress() {
-  const isPaid = useEntitlement('climate-risk')
+  const isPaid = useEntitlement('impact-materiality')
   const params = useParams()
   const roundId = params.id as string
 
@@ -234,9 +234,9 @@ export default function SurveyProgress() {
     <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '2rem' }}>
-        <PaywallCard title="Unlock the Climate Risk module"
-          body="Stakeholder surveys are part of the Climate Risk &amp; Materiality module. Unlock it to run a survey round, invite stakeholders, and gather their views as evidence for your materiality assessment."
-          href="/pricing?modules=risk" />
+        <PaywallCard title="Unlock Impact Materiality"
+          body="Stakeholder surveys are part of the Impact Materiality Assessment. Unlock it to run a survey round, invite stakeholders, and gather their views as evidence for your materiality assessment."
+          href="/pricing?modules=impact" />
       </div>
     </div>
   )
