@@ -39,6 +39,8 @@ import { scaleFor, SCOPE, IRREMEDIABILITY, LIKELIHOOD }
 // ⚠️ EVERY sub-topic on THIS screen is one the lead kept, so none of them has an assignment
 // snapshot — this screen would hit the missing-name case on every row, not occasionally.
 import { subtopicHeading } from '../../../../../../lib/materiality/subtopicName'
+import { VALUE_CHAIN_POSITIONS as VCP, TIME_HORIZONS as HORIZONS }
+  from '../../../../../../lib/materiality/impactContext'
 import { ScaleField, Question, Options, Option } from '../../../../../components/severityFields'
 import { DistBar, Counters, pct, medianText, type Overall }
   from '../../../../../components/surveyEvidence'
@@ -85,16 +87,6 @@ type Agg = {
   s1_s2_contrast: { what_this_is_not: string; entries: ContrastEntry[] }
 }
 
-const VCP = [
-  { code: 'own_operations', label: 'Our own operations' },
-  { code: 'upstream', label: 'Upstream — our suppliers' },
-  { code: 'downstream', label: 'Downstream — our customers and products' },
-]
-const HORIZONS = [
-  { code: 'short', label: 'Short — within a year' },
-  { code: 'medium', label: 'Medium — one to five years' },
-  { code: 'long', label: 'Long — more than five years' },
-]
 
 const key = (c: string, d: Direction) => `${c}::${d}`
 const empty = (): Draft => ({
@@ -834,8 +826,14 @@ function Block({ code, dir, d, saving, error, note, evidenced, onNature, onChang
   )
 }
 
+// `readonly` because this component only maps over items and never mutates them, and the shared
+// vocabularies in lib/materiality/impactContext.ts are exported readonly so a caller cannot push
+// an option that the DB CHECK constraint would then reject. Widening the prop is the right side of
+// that trade — dropping readonly from the export to satisfy a component that does not mutate would
+// have removed the guarantee to suit the consumer.
 const Pills = ({ items, on, onClick }: {
-  items: { code: string; label: string }[]; on: (c: string) => boolean; onClick: (c: string) => void
+  items: readonly { code: string; label: string }[]
+  on: (c: string) => boolean; onClick: (c: string) => void
 }) => (
   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
     {items.map(i => (

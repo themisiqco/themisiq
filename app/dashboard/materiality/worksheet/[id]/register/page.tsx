@@ -223,7 +223,12 @@ export default function WorksheetRegister() {
 
     const [dRes, stRes, tRes, dispRes, qRes, snapRes] = await Promise.all([
       supabase.from('materiality_impact_determinations')
-        .select('subtopic_code, direction, nature, scale, scope, irremediability, likelihood, abstained_dimensions, value_chain_position, time_horizon, rationale, status, assignment_id, evidence_in_view, override_reason, overridden_at')
+        // ⚠️ value_chain_position and time_horizon are NOT selected here, deliberately. They were,
+        // until 21 Aug 2026, and this screen referenced neither — buildRegister() is the single
+        // authority for everything it shows, and its payload has no slot for them. A select is a
+        // claim that something is read; leaving them in is how the next reader concludes the
+        // register uses them. They are displayed on worksheet/[id]/determinations instead.
+        .select('subtopic_code, direction, nature, scale, scope, irremediability, likelihood, abstained_dimensions, rationale, status, assignment_id, evidence_in_view, override_reason, overridden_at')
         .eq('assessment_id', assessmentId),
       supabase.from('mr_esrs_subtopics').select('code, topic_code, label').eq('standard_version', sv),
       // ⚠️ NOT versioned — mr_esrs_topics is keyed on code alone and has no standard_version column.

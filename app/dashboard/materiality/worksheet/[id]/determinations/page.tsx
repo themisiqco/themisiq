@@ -36,6 +36,8 @@ import { computeSeverity, type SeverityInput, type TopicCategory } from '../../.
 // describing a benefit as grave harm in the one view an auditor reads.
 import { dimensionScale, NO_VISIBILITY_LABEL, type DimensionKey }
   from '../../../../../../lib/materiality/severityScale'
+import { valueChainLabel, timeHorizonLabel }
+  from '../../../../../../lib/materiality/impactContext'
 // ⚠️ ONE CHAIN. The assignment snapshot is written only when a sub-topic is ASSIGNED, so a
 // lead-only assessment has none — and the heading rendered "E1.1 E1.1". See the resolver's header.
 import { subtopicHeading } from '../../../../../../lib/materiality/subtopicName'
@@ -290,6 +292,12 @@ export default function Determinations() {
           <strong>Severity is calculated here, not stored.</strong> It is derived from the three
           judgements each time this page is drawn, so the figure and the rule behind it cannot come
           apart. Each one below says which rule decided it.
+          <div style={{ marginTop: 8 }}>
+            <strong>Where an impact happens and over what period are recorded, not required.</strong>{' '}
+            Neither is part of the severity calculation and neither is checked when a determination
+            is submitted, so a determination can be complete and material with neither answered. A
+            blank below is a blank, not a gap in the work.
+          </div>
         </div>
 
         {groups.map(g => (
@@ -426,6 +434,40 @@ function DeterminationRow({ dir, d, prior, category, contributor, onOverride }: 
           weighting has not been set, so nothing is applied rather than a number being invented.
         </div>
       )}
+
+      {/* ── WHERE IT HAPPENS, AND OVER WHAT PERIOD ────────────────────────────────────────────
+          Recorded on every determination since 20260838 and displayed nowhere until 21 Aug 2026.
+          This is the audit surface, so both are stated whether or not they were answered.
+
+          ⚠️ AN ABSENCE HERE IS NOT A DEFICIENCY, and the note under the heading above says so once
+          rather than this block hedging on every row. The submit RPC validates direction, nature,
+          the four dimension ranges, the ¶41 rules and the assignment — and NOT these two. A
+          determination can be complete, material and carry neither.
+
+          ⚠️ TWO DIFFERENT ABSENT VALUES, ONE MEANING. value_chain_position is `{}` (text[] NOT NULL
+          DEFAULT '{}') and time_horizon is NULL, so the code must test them differently — but both
+          denote the same fact, that nothing was recorded, and both forms clear back to the empty
+          value when a contributor deselects. Wording them differently would assert a distinction
+          that does not exist. Same string, deliberately, and it is valueText's own string for the
+          same meaning a few lines below.
+
+          ⚠️ LABELS, NEVER CODES. valueChainLabel/timeHorizonLabel return null for an unrecognised
+          code rather than falling back to it, so a stale code cannot reach a reader as "upstream". */}
+      <div style={{ fontSize: 11.5, color: MUTE, marginTop: 10, lineHeight: 1.8 }}>
+        <div>
+          <span style={{ color: MID }}>Where it happens:</span>{' '}
+          {(d.value_chain_position || []).length > 0
+            ? (d.value_chain_position || [])
+                .map(c => valueChainLabel(c))
+                .filter((l): l is string => l !== null)
+                .join(' · ')
+            : '— not answered'}
+        </div>
+        <div>
+          <span style={{ color: MID }}>Over what period:</span>{' '}
+          {timeHorizonLabel(d.time_horizon) ?? '— not answered'}
+        </div>
+      </div>
 
       {d.rationale && (
         <div style={{ background: PAPER, borderRadius: 8, padding: '10px 13px', marginTop: 10,

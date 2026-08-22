@@ -26,6 +26,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
+import { VALUE_CHAIN_POSITIONS as VCP, TIME_HORIZONS as HORIZONS }
+  from '../../../lib/materiality/impactContext'
 import {
   scaleFor, SCOPE, IRREMEDIABILITY, LIKELIHOOD, NO_VISIBILITY_LABEL,
   worksheetSubtopicHeading,
@@ -95,16 +97,6 @@ type Draft = {
   started: boolean
 }
 
-const VCP = [
-  { code: 'own_operations', label: 'Our own operations' },
-  { code: 'upstream', label: 'Upstream — our suppliers' },
-  { code: 'downstream', label: 'Downstream — our customers and products' },
-]
-const HORIZONS = [
-  { code: 'short', label: 'Short — within a year' },
-  { code: 'medium', label: 'Medium — one to five years' },
-  { code: 'long', label: 'Long — more than five years' },
-]
 
 const key = (code: string, dir: Direction) => `${code}::${dir}`
 
