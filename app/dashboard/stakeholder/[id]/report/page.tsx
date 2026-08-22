@@ -35,6 +35,7 @@ import PaywallCard from '../../../../components/PaywallCard'
 import { supabase } from '../../../../../lib/supabase'
 import { useEntitlement } from '../../../../../lib/useEntitlement'
 import { resolveSubtopicName } from '../../../../../lib/materiality/subtopicName'
+import { formatPeriodSpan, formatReportDate } from '../../../../../lib/reportDates'
 import type { TopicCategory } from '../../../../../lib/materiality/severity'
 import { buildBoardReport, standardVersionLabel,
          type BoardReportInput, type CategoryParticipation, type ContrastEntry,
@@ -180,6 +181,8 @@ export default function StakeholderBoardReport() {
 
   const [company, setCompany] = useState<string | null>(null)
   const [standardVersion, setStandardVersion] = useState<string | null>(null)
+  const [periodStart, setPeriodStart] = useState<string | null>(null)
+  const [periodEnd, setPeriodEnd] = useState<string | null>(null)
 
   const [roundId, setRoundId] = useState<string | null>(null)
   const [roundName, setRoundName] = useState<string | null>(null)
@@ -208,16 +211,22 @@ export default function StakeholderBoardReport() {
     setLoading(true); setLoadError(null); setAggError(null)
 
     const { data: a, error: aErr } = await supabase.from('materiality_assessments')
-      .select('id, company_name, standard_version').eq('id', assessmentId).maybeSingle()
+      .select('id, company_name, standard_version, reporting_period_start, reporting_period_end')
+      .eq('id', assessmentId).maybeSingle()
     if (aErr) { setLoadError(aErr.message); setLoading(false); return }
     if (!a) {
       setLoadError('This assessment was not found, or it belongs to another account. Those two '
                  + 'cannot be told apart from here.')
       setLoading(false); return
     }
-    const asmt = a as { company_name: string | null; standard_version: string | null }
+    const asmt = a as {
+      company_name: string | null; standard_version: string | null
+      reporting_period_start: string | null; reporting_period_end: string | null
+    }
     setCompany(asmt.company_name)
     setStandardVersion(asmt.standard_version)
+    setPeriodStart(asmt.reporting_period_start ?? null)
+    setPeriodEnd(asmt.reporting_period_end ?? null)
     const sv = asmt.standard_version || ''
 
     const { data: links } = await supabase.from('materiality_assessment_survey_rounds')
@@ -354,12 +363,28 @@ export default function StakeholderBoardReport() {
       company_name: company,
       assessment_name: roundName ? `Impact materiality · ${roundName}` : 'Impact materiality',
       standard_version: standardVersion,
-      // Not recorded on the assessment today. Stated as absent rather than invented — the cover
-      // prints "Not stated" and that is the truth.
-      reporting_period: null,
+      // BoardReportInput documents `e.g. "1 January – 31 December 2026"` and formatPeriodSpan is
+      // what produces it. Null when the assessment records no period — the cover still prints
+      // "Not stated", which remains the truth; it is simply no longer the only possible answer.
+      //
+      // No legacy FY-label fallback here, deliberately: this screen reads the COLUMNS, and the
+      // pre-21-Aug-2026 label lives in workings.disclosure on the climate-risk and materiality
+      // assessments, which this screen does not load.
+      reporting_period: formatPeriodSpan(periodStart, periodEnd),
       round_name: roundName,
-      // The module's field is round_closed_at; the value is frozen_at, which is the same event.
-      round_closed_at: roundFrozenAt,
+      // The module's field is round_closed_at; the value is frozen_at.
+      //
+      // ⚠️ FORMATTED HERE, BECAUSE THE TYPE SAYS SO — "ISO string from the round. Formatted by the
+      // caller; this module generates no dates." It was NOT formatted until 21 Aug 2026: the raw
+      // value went straight through boardReportPdf.ts to lib/pdf/layout.ts, so the PDF cover would
+      // have printed "2026-08-20T14:33:12.123Z" under SURVEY CLOSED the moment a round had a
+      // frozen_at. Nothing errored — it had simply never been exercised with a frozen round.
+      //
+      // ⚠️ SEPARATE OPEN ISSUE, NOT SOLVED HERE: frozen_at records when the FIRST RESPONSE ARRIVED,
+      // not when the round closed — see the note on the select above. So this row is labelled
+      // "Survey closed" and carries a different event. Formatting it makes it legible, not correct.
+      // Either the label or the column has to change, and that is its own decision.
+      round_closed_at: formatReportDate(roundFrozenAt),
       participation: participation.totals,
       by_category: participation.by_category,
       subtopics,
@@ -383,7 +408,7 @@ export default function StakeholderBoardReport() {
       contrast: agg.s1_s2_contrast ?? null,
     }
   }, [agg, threshold, dets, topicOf, categoryOf, sources, people, company, standardVersion,
-      roundName, roundFrozenAt, thresholdRows, categoryLabel])
+      roundName, roundFrozenAt, periodStart, periodEnd, thresholdRows, categoryLabel])
 
   const submittedCount = useMemo(
     () => dets.filter(d => d.status === 'submitted').length, [dets])

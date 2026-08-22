@@ -19,6 +19,8 @@
 // a disclosed expert-set value. Optional on the row types below: rows loaded from the DB always
 // carry provenance (NOT NULL default 'starter'), but synthetic/legacy rows may omit it — in which
 // case the summary treats them as the LEAST-firm category ('starter'), never over-stating firmness.
+import { parseIsoDateUTC } from './reportDates'
+
 export type Provenance = 'starter' | 'primary_source' | 'expert_judgment'
 type ProvenanceFields = { provenance?: Provenance; source_ref?: string | null }
 
@@ -161,31 +163,22 @@ export type PeriodVersionCheck = {
   message: string | null
 }
 
-// ONE form: the form a Postgres `date` renders and an ISO caller sends. Deliberately not permissive
-// — "01/04/2026" has two readings across two continents, and guessing on this field is how a report
-// ends up asserting a period the customer never stated.
-const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/
-
 /**
  * The calendar year in which the financial year BEGINS, or null when `v` is not a calendar date.
  *
- * ⚠️ `new Date(v)` IS NOT USED, and that is deliberate. It accepts "2026-02-30" by rolling it
- * forward to 2 March, and applies a local timezone to a bare date — so a year beginning 1 January
- * becomes 31 December west of UTC, which is the one arithmetic error every rule here would notice.
- * The round-trip through Date.UTC below REFUSES an impossible day rather than moving it, and every
- * read is getUTC*, so no timezone is ever consulted.
+ * ⚠️ THE PARSE LIVES IN lib/reportDates.ts, NOT HERE. It carried its own copy until 21 Aug 2026;
+ * the two had the same contract — one strict ISO form, a Date.UTC round-trip that REFUSES an
+ * impossible day rather than rolling it forward, no timezone ever consulted — and CLAUDE.md's rule
+ * for exclusiveEnd() applies: same contract, one definition. `new Date(v)` is still not used
+ * anywhere in that chain, because it accepts "2026-02-30" as 2 March and reads a local timezone
+ * into a bare date, which would turn a year beginning 1 January into one beginning 31 December
+ * west of UTC.
  *
  * No plausibility window. A date validates itself; the old 1990..2100 clamp reported an implausible
  * but real day as unreadable, which is a weaker finding than the rule can actually make.
  */
 export function periodStartYear(v: string | null | undefined): number | null {
-  if (typeof v !== 'string') return null
-  const m = ISO_DATE_RE.exec(v.trim())
-  if (!m) return null
-  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3])
-  const dt = new Date(Date.UTC(y, mo - 1, d))
-  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return null
-  return y
+  return parseIsoDateUTC(v)?.y ?? null
 }
 
 export function checkReportingPeriod(

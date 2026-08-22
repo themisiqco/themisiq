@@ -64,39 +64,32 @@ export async function POST(req: NextRequest) {
       standardVersion = rawStandardVersion
     }
 
-    // Hoisted out of the insert below so the period/version check can see it. Same normalisation
-    // as before — type check, trim, empty-becomes-null — and nothing else parses it: the field is
-    // report-only context, and checkReportingPeriod reads it without changing what is stored.
-    const reportingPeriod = typeof body.reportingPeriod === 'string' && body.reportingPeriod.trim()
-      ? body.reportingPeriod.trim() : null
+    // Hoisted out of the insert below so the period/version check can see them. Written to their
+    // own columns (migration 20260846), not just to workings — the period is a fact about the
+    // assessment, not report-only context, and Articles 2 and 3 key on the start date.
+    const periodStart = typeof body.reportingPeriodStart === 'string' && body.reportingPeriodStart.trim()
+      ? body.reportingPeriodStart.trim() : null
+    const periodEnd = typeof body.reportingPeriodEnd === 'string' && body.reportingPeriodEnd.trim()
+      ? body.reportingPeriodEnd.trim() : null
+
+    // ⚠️ THIS 400s, AND IT IS NOT A BREACH OF THE NEVER-400 RULE ON checkReportingPeriod. That rule
+    // is about the VERSION STATEMENT: Art. 2(2) makes it the undertaking's to get wrong, so we
+    // record it and warn. An incoherent DATE PAIR is different — it is malformed input, the DB
+    // refuses it outright via materiality_assessments_reporting_period_both_or_neither and
+    // ..._order, and silently nulling both would discard a date the caller did send.
+    if ((periodStart === null) !== (periodEnd === null)) {
+      return NextResponse.json({ error: 'Provide both reportingPeriodStart and reportingPeriodEnd, or neither.' }, { status: 400 })
+    }
+    if (periodStart !== null && periodEnd !== null && periodEnd <= periodStart) {
+      return NextResponse.json({ error: 'reportingPeriodEnd must fall after reportingPeriodStart.' }, { status: 400 })
+    }
 
     // Art. 2(2) is the undertaking's statement to make, so this WARNS and never blocks — see the
     // long note on checkReportingPeriod. Computed here, at write, and frozen into workings below.
     //
-    // ⚠️ BOTH DATES ARE null, AND THE CHECK IS THEREFORE DORMANT — 'not_stated' on every record
-    // written from 21 Aug 2026 until reporting-period capture ships. This is deliberate, and the
-    // alternatives were worse:
-    //   * PASSING reportingPeriod (the FY label) would return 'unparseable' on every CSRD
-    //     assessment, printing "…is not a calendar date" about the CUSTOMER's disclosure when the
-    //     defect is in our own capture. A manufactured finding is worse than silence.
-    //   * DERIVING a date from the label — "FY2026" → 2026-01-01 — is the exact inference this
-    //     change removes. A UK April-year undertaking selecting FY2027 would yield 2027-01-01 and
-    //     be told it conflicts when it does not. See test L1.
-    // null is the only honest input: no start date was supplied, because nothing can supply one
-    // yet. materiality_assessments.reporting_period_start / _end exist (migration 20260846) and
-    // are written by nothing.
-    //
-    // ⚠️ WHAT IS SUSPENDED, so this is not discovered as a mystery later: the wizard banner at
-    // app/dashboard/climate-risk/page.tsx, the console.warn below, and the report's conflict
-    // paragraph all gate on status === 'conflict' and none of them can now fire for a NEW record.
-    // Records written before this keep their frozen verdicts and still render. Nothing is lost
-    // from the record either way — the FY label the customer chose is still stored verbatim in
-    // workings.disclosure.reportingPeriod below; it is simply a different field from the one this
-    // check now reads, which is why the two do not contradict each other.
-    //
-    // WHEN CAPTURE SHIPS: pass the two date columns here and at the other two call sites, and this
-    // comment goes with them.
-    const periodVersionCheck = checkReportingPeriod(null, null, standardVersion)
+    // LIVE AGAIN as of 21 Aug 2026. This was 'not_stated' on every record from 35e16c6, when the
+    // check moved to deciding on the day the financial year begins and nothing yet captured it.
+    const periodVersionCheck = checkReportingPeriod(periodStart, periodEnd, standardVersion)
     if (periodVersionCheck.status === 'conflict') {
       console.warn(
         `Materiality: REPORTING PERIOD / STANDARD VERSION CONFLICT (${periodVersionCheck.certainty}) — `
@@ -300,6 +293,8 @@ export async function POST(req: NextRequest) {
       .insert({
         user_id: userId,
         company_name: typeof body.companyName === 'string' ? body.companyName : null,
+        reporting_period_start: periodStart,
+        reporting_period_end: periodEnd,
         mode: input.mode,
         industry_code: input.industryCode,
         region_codes: input.regionCodes,
@@ -318,7 +313,11 @@ export async function POST(req: NextRequest) {
         workings: {
           input, modelVersion: result.modelVersion,
           disclosure: {
-            reportingPeriod,
+            // ⚠️ NULL FOR EVERY NEW RECORD, AND THE KEY STAYS. The period now lives in its own two
+            // columns; this key is the pre-21-Aug-2026 FY label, and the report surfaces fall back
+            // to it for those records (lib/reportDates.ts reportingPeriodText). Keeping the key
+            // present-but-null means one shape across both cohorts rather than two.
+            reportingPeriod: null,
             legalEntity: typeof body.legalEntity === 'string' && body.legalEntity.trim() ? body.legalEntity.trim() : null,
             // Whether the period and the stated ESRS version can both be true, AS ASSESSED WHEN
             // THIS RECORD WAS WRITTEN. Frozen rather than re-derived at read for the same reason

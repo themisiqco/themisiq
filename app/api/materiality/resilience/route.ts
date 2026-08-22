@@ -50,16 +50,24 @@ export async function POST(req: NextRequest) {
     // still send both, and a check that exists on one of two writers is a check that will be missed.
     // With standardVersion null (every wizard-created resilience record) it returns 'not_stated'
     // and says nothing, which is the correct outcome, not a suppressed one.
-    const reportingPeriod = typeof body.reportingPeriod === 'string' && body.reportingPeriod.trim()
-      ? body.reportingPeriod.trim() : null
-    //
-    // ⚠️ BOTH DATES ARE null, so this is 'not_stated' on every new record until reporting-period
-    // capture ships. Passing the FY label instead would report 'unparseable' about the customer's
-    // disclosure when the defect is in our capture, and deriving a date from the label is the
-    // inference this change exists to remove. Full reasoning, and what is suspended meanwhile, in
-    // the matching comment in app/api/materiality/route.ts. The label itself is still stored
-    // verbatim in workings.disclosure.reportingPeriod below.
-    const periodVersionCheck = checkReportingPeriod(null, null, standardVersion)
+    const periodStart = typeof body.reportingPeriodStart === 'string' && body.reportingPeriodStart.trim()
+      ? body.reportingPeriodStart.trim() : null
+    const periodEnd = typeof body.reportingPeriodEnd === 'string' && body.reportingPeriodEnd.trim()
+      ? body.reportingPeriodEnd.trim() : null
+
+    // ⚠️ THIS 400s, AND IT IS NOT A BREACH OF THE NEVER-400 RULE ON checkReportingPeriod. That rule
+    // is about the VERSION STATEMENT: Art. 2(2) makes it the undertaking's to get wrong, so we
+    // record it and warn. An incoherent DATE PAIR is different — it is malformed input, the DB
+    // refuses it outright via materiality_assessments_reporting_period_both_or_neither and
+    // ..._order, and silently nulling both would discard a date the caller did send.
+    if ((periodStart === null) !== (periodEnd === null)) {
+      return NextResponse.json({ error: 'Provide both reportingPeriodStart and reportingPeriodEnd, or neither.' }, { status: 400 })
+    }
+    if (periodStart !== null && periodEnd !== null && periodEnd <= periodStart) {
+      return NextResponse.json({ error: 'reportingPeriodEnd must fall after reportingPeriodStart.' }, { status: 400 })
+    }
+    // LIVE AGAIN as of 21 Aug 2026 — see the note in app/api/materiality/route.ts.
+    const periodVersionCheck = checkReportingPeriod(periodStart, periodEnd, standardVersion)
     if (periodVersionCheck.status === 'conflict') {
       console.warn(
         `Resilience: REPORTING PERIOD / STANDARD VERSION CONFLICT (${periodVersionCheck.certainty}) — `
@@ -257,6 +265,8 @@ export async function POST(req: NextRequest) {
       .insert({
         user_id: userId,
         company_name: typeof body.companyName === 'string' ? body.companyName : null,
+        reporting_period_start: periodStart,
+        reporting_period_end: periodEnd,
         mode: input.mode,
         industry_code: input.industryCode,
         region_codes: input.regionCodes,
@@ -274,7 +284,9 @@ export async function POST(req: NextRequest) {
         workings: {
           input, modelVersion: resilience.modelVersion, analysisType: 'resilience',
           disclosure: {
-            reportingPeriod,
+            // Null for every new record; the key stays for shape parity with pre-21-Aug-2026 rows.
+            // See the note in app/api/materiality/route.ts.
+            reportingPeriod: null,
             legalEntity: typeof body.legalEntity === 'string' && body.legalEntity.trim() ? body.legalEntity.trim() : null,
             // Frozen at write. See /api/materiality for why it is not re-derived at read.
             periodVersionCheck,

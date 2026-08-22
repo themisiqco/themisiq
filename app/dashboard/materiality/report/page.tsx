@@ -17,6 +17,7 @@ import { useReportTitle, reportTitle } from '../../../../lib/useReportTitle'
 import PaywallCard from '../../../components/PaywallCard'
 import { REGION_LABEL } from '../../../../lib/climate/regions'
 import { DISCLAIMER_PARAS } from '../../../../lib/disclaimer'
+import { reportingPeriodText } from '../../../../lib/reportDates'
 
 // ─── Lookup helpers (labels we don't store on the assessment row) ─────────────
 
@@ -524,7 +525,7 @@ function ReportInner() {
           </p>
           <div style={{ borderTop: '1px solid #e8e7e4', borderBottom: '1px solid #e8e7e4', padding: '20px 0', marginBottom: 24 }}>
             <Row k="Legal entity" v={a.workings?.disclosure?.legalEntity || 'Not specified'} />
-            <Row k="Reporting period" v={a.workings?.disclosure?.reportingPeriod || 'Not specified'} />
+            <Row k="Reporting period" v={reportingPeriodText(a.reporting_period_start, a.reporting_period_end, a.workings?.disclosure?.reportingPeriod)} />
             <Row k="Primary sector" v={SECTOR_LABEL[a.industry_code] || a.industry_code} />
             <Row k="Operating regions (IPCC AR6)" v={(a.region_codes || []).map((c: string) => `${REGION_LABEL[c] || c} (${c})`).join(', ') || '—'} />
             <Row k="Policy jurisdictions" v={(a.jurisdiction_codes || []).map((c: string) => JURISDICTION_LABEL[c] || c).join(', ') || '—'} />
@@ -615,7 +616,7 @@ function ReportInner() {
             This screening combines four public, independently-sourced frameworks. No proprietary or licensed third-party classification is reproduced.
           </p>
           <h3 style={h3}>Timing of the analysis</h3>
-          <p style={p}><strong>Scenario analysis carried out:</strong> {reportDate}.<br /><strong>Reporting period covered:</strong> {a.workings?.disclosure?.reportingPeriod || 'Not specified'}.</p>
+          <p style={p}><strong>Scenario analysis carried out:</strong> {reportDate}.<br /><strong>Reporting period covered:</strong> {reportingPeriodText(a.reporting_period_start, a.reporting_period_end, a.workings?.disclosure?.reportingPeriod)}.</p>
           <p style={p}>IFRS S2 permits climate-related scenario analysis to be refreshed on the entity&rsquo;s strategic planning cycle rather than annually. The materiality conclusions drawn from it must be reassessed and disclosed in every annual reporting period. ESRS E1 likewise requires the materiality assessment to be current for the reporting period.</p>
           <h3 style={h3}>Frameworks</h3>
           <ul style={ul}>

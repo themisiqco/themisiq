@@ -283,7 +283,12 @@ export default function MaterialityWizard() {
   const [topicLabels, setTopicLabels] = useState<TopicLabelRow[]>([])
   const [companyName, setCompanyName] = useState('')
   const [legalEntity, setLegalEntity] = useState('')
-  const [reportingPeriod, setReportingPeriod] = useState('FY2025')
+  // Two dates, not an FY label. Article 2 and Article 3 of C(2026) 5010 both key on the DAY the
+  // financial year begins (docs/reference/source/main-act.txt:444, :489), and "FY2027" cannot say
+  // whether that day fell in 2026 or 2027 — see lib/materiality.ts checkReportingPeriod.
+  // Empty string is the <input type="date"> empty state; it becomes null at the payload.
+  const [periodStart, setPeriodStart] = useState('')
+  const [periodEnd, setPeriodEnd] = useState('')
   const [openCoverage, setOpenCoverage] = useState<string | null>(null)
   // Region dropdown, sourced from mr_regions (via /api/materiality/reference), grouped by continent
   // in sort_order. Was a hardcoded const; the DB is now the single source of truth for the geography.
@@ -354,8 +359,18 @@ export default function MaterialityWizard() {
   const toggle = (arr: string[], v: string, set: (a: string[]) => void) =>
     set(arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v])
 
+  // ⚠️ BOTH OR NEITHER, ENFORCED HERE so the CHECK constraint never has to.
+  // materiality_assessments_reporting_period_both_or_neither and ..._order (migration 20260846)
+  // are the authority, but a constraint violation surfaces to the customer as a raw Postgres
+  // string. This is not a second opinion on the rule — it is the same rule, stated early enough
+  // to be actionable. String comparison is safe: ISO dates sort lexicographically and both values
+  // come from <input type="date">.
+  const periodHalfFilled = (!!periodStart) !== (!!periodEnd)
+  const periodOutOfOrder = !!periodStart && !!periodEnd && periodEnd <= periodStart
+  const periodInvalid = periodHalfFilled || periodOutOfOrder
+
   const canAdvance = () => {
-    if (step === 0) return !!industryCode
+    if (step === 0) return !!industryCode && !periodInvalid
     if (step === 1) return regionCodes.length > 0
     return true
   }
@@ -369,8 +384,12 @@ export default function MaterialityWizard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
         body: JSON.stringify({
-          mode, companyName, legalEntity, reportingPeriod, industryCode, regionCodes, jurisdictionCodes,
+          mode, companyName, legalEntity, industryCode, regionCodes, jurisdictionCodes,
           assetProfile, scenarioCode, horizon, impactOverrides,
+          // Explicit nulls, not omitted — same reasoning as standardVersion below: an absent field
+          // and a field the user declined to fill must be distinguishable in the request.
+          reportingPeriodStart: periodStart || null,
+          reportingPeriodEnd: periodEnd || null,
           // null is sent deliberately, not omitted: the route treats absent and null identically,
           // and sending it makes "the user was asked and declined to state" visible in the request
           // rather than indistinguishable from an old client that never knew about the field.
@@ -398,8 +417,11 @@ export default function MaterialityWizard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
         body: JSON.stringify({
-          mode, companyName, legalEntity, reportingPeriod, industryCode, regionCodes, jurisdictionCodes,
+          mode, companyName, legalEntity, industryCode, regionCodes, jurisdictionCodes,
           assetProfile, horizon,
+          // Explicit nulls, not omitted — see the note in submit().
+          reportingPeriodStart: periodStart || null,
+          reportingPeriodEnd: periodEnd || null,
         }),
       })
       const data = await res.json()
@@ -492,17 +514,36 @@ export default function MaterialityWizard() {
         </div>
         <div>
           <label style={labelStyle}>Reporting period</label>
-          {/* FY2027 added 18 Aug 2026. It was missing, and it is the ONE period for which ESRS
-              (2026) is not merely permitted but required — so the only unambiguously correct
-              pairing of period and version could not be expressed. This list goes stale annually;
-              if it is edited again, extend it rather than shifting the window, because a period a
-              past assessment stated must remain selectable for a re-run. */}
-          <select style={inputStyle} value={reportingPeriod} onChange={e => setReportingPeriod(e.target.value)}>
-            <option value="FY2024">FY2024</option>
-            <option value="FY2025">FY2025</option>
-            <option value="FY2026">FY2026</option>
-            <option value="FY2027">FY2027</option>
-          </select>
+          {/* Was a fixed FY#### select until 21 Aug 2026, with a comment noting the list went stale
+              annually. The list was not the problem. A label cannot say which calendar year a
+              financial year BEGINS in — a UK year running 1 Apr 2026 to 31 Mar 2027 is called
+              "FY2027" by convention, and reading 2027 from it produced a wrong version verdict on
+              the report's face for every April-year undertaking. Articles 2 and 3 of C(2026) 5010
+              key on the start day, so the start day is what is captured. */}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: '#888784', marginBottom: 4 }}>First day of the financial year</div>
+              <input style={inputStyle} type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: '#888784', marginBottom: 4 }}>Last day</div>
+              <input style={inputStyle} type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} />
+            </div>
+          </div>
+          <div style={{ fontSize: 11, color: '#888784', marginTop: 5, lineHeight: 1.6 }}>
+            Optional. If your financial year is not the calendar year &mdash; 1 April 2026 to 31 March 2027,
+            say &mdash; enter it as it actually runs. Which ESRS version applies depends on the day it begins.
+          </div>
+          {periodHalfFilled && (
+            <div style={{ fontSize: 11.5, color: '#ba7517', marginTop: 6, lineHeight: 1.6 }}>
+              Enter both dates, or leave both blank. A period with only one end is not recorded.
+            </div>
+          )}
+          {periodOutOfOrder && (
+            <div style={{ fontSize: 11.5, color: '#ba7517', marginTop: 6, lineHeight: 1.6 }}>
+              The last day must fall after the first day.
+            </div>
+          )}
         </div>
       </div>
 
@@ -516,21 +557,11 @@ export default function MaterialityWizard() {
           clears it. Renders for 'conflict' alone: 'unparseable' cannot arise from a <select>, and
           reporting it here would describe a state this screen cannot produce.
 
-          ⚠️ THIS BANNER CANNOT CURRENTLY FIRE, and that is a known suspension rather than dead
-          code. checkReportingPeriod now decides on the DAY THE FINANCIAL YEAR BEGINS (C(2026) 5010
-          Art. 2 and Art. 3 both key on it), and this screen captures an FY label, which cannot say
-          which calendar year a year beginning 1 April falls in. Passing the label would report
-          'unparseable' about the customer's own entry; deriving a date from it would reinstate the
-          exact wrong verdict the change removed — a UK April-year undertaking selecting FY2027
-          being told it conflicts when it does not. So null is passed, the status is 'not_stated',
-          and this renders nothing.
-
-          The banner comes back when this screen captures reporting_period_start / _end (columns
-          added by migration 20260846, written by nothing yet) and passes them here instead of
-          null. Left in place because it is correct code awaiting its input, not because it works.
-          The two write paths carry the same suspension — see app/api/materiality/route.ts. */}
+          LIVE AGAIN as of 21 Aug 2026. It was inert from 35e16c6, when checkReportingPeriod moved
+          to deciding on the day the financial year BEGINS while this screen still captured an FY
+          label and had to pass null. The date inputs above are what restore it. */}
       {(() => {
-        const chk = checkReportingPeriod(null, null, standardVersion)
+        const chk = checkReportingPeriod(periodStart || null, periodEnd || null, standardVersion)
         if (chk.status !== 'conflict') return null
         return (
           <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.3)', borderRadius: 10, padding: '10px 14px', marginBottom: 16 }}>
