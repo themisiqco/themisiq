@@ -147,7 +147,15 @@ export default function ImpactWorksheet() {
 
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const [done, setDone] = useState<number | null>(null)
+  /**
+   * ⚠️ THE PAIR, NOT THE COUNT. impact_submit returns {submitted, assigned} since 20260853, because
+   * a bare zero cannot say WHICH zero it is and this page must not guess: nothing-was-assigned and
+   * already-submitted are different facts owed different sentences. `assigned: null` means the
+   * installed function did not say — an older definition — and the page falls back to printing the
+   * count exactly as it did before.
+   */
+  const [done, setDone] =
+    useState<{ submitted: number; assigned: number | null } | null>(null)
   const [confirmSubmit, setConfirmSubmit] = useState(false)
 
   useEffect(() => { load() }, [token])
@@ -278,7 +286,13 @@ export default function ImpactWorksheet() {
     const { data, error } = await supabase.rpc('impact_submit', { p_token: token })
     setSubmitting(false); setConfirmSubmit(false)
     if (error) { setSubmitError(error.message); return }
-    setDone((data as { submitted?: number } | null)?.submitted ?? 0)
+    const res = data as { submitted?: number; assigned?: number } | null
+    setDone({
+      submitted: res?.submitted ?? 0,
+      // Absent and zero are different answers, so absent is not coerced to zero here — that
+      // coercion is what would make an old server's silence read as "nothing is assigned to you".
+      assigned: typeof res?.assigned === 'number' ? res.assigned : null,
+    })
   }
 
   /**
@@ -331,17 +345,65 @@ export default function ImpactWorksheet() {
     </Frame>
   )
 
-  if (done !== null) return (
-    <Frame>
-      <Card>
-        <H>Thank you — that is submitted</H>
-        <P>{done} {done === 1 ? 'determination' : 'determinations'} recorded against your name.
-          Your colleague can see them now.</P>
-        <P>This link no longer opens the form. If something needs changing, ask them — they can
-          record a change, and what you determined is kept alongside it.</P>
-      </Card>
-    </Frame>
-  )
+  /**
+   * ⚠️ THREE OUTCOMES WEARING ONE SCREEN UNTIL 20260853, AND THE WRONG ONE WAS THE DEFAULT. This
+   * used to print "{n} determinations recorded against your name" unconditionally, so a submission
+   * that recorded NOTHING was headed "Thank you — that is submitted" and read "0 determinations
+   * recorded against your name". Reproduced in production 23 Aug 2026, assignment ba169d39.
+   * The count alone could not tell the three apart; the pair can.
+   */
+  if (done !== null) {
+    /**
+     * ⚠️ SHOULD BE UNREACHABLE, AND SAYS SO RATHER THAN BEING OMITTED. impact_submit refuses an
+     * assignment holding no sub-topics with its own message (20260853), so a current server raises
+     * here and this component shows submitError instead. It stands for a server still on 20260840,
+     * and because a guard whose only proof of correctness is another file is one edit from being
+     * wrong. Note it does NOT say "thank you": nothing was received.
+     */
+    if (done.assigned === 0) return (
+      <Frame>
+        <Card>
+          <H>Nothing was submitted</H>
+          <P>No sub-topics are assigned to you, so there was nothing to record. They may not have
+            been assigned yet, or they may have been moved to someone else since this link was
+            sent.</P>
+          <P>Whoever sent you the link can see which it is and put it right. Nothing you have done
+            is lost.</P>
+        </Card>
+      </Frame>
+    )
+
+    /**
+     * ⚠️ SUBMITTED, BUT THIS CALL RECORDED NOTHING — and the honest reading is that they were
+     * already recorded, not that something failed. The reachable cause is a double submit: two
+     * concurrent impact_submit calls both pass resolve_token, the second re-evaluates
+     * `status = 'draft'` after the first commits and matches zero rows. See the comment on the
+     * second UPDATE in 20260853. Their work IS submitted, so this must not read as a fault.
+     */
+    if (done.assigned !== null && done.assigned > 0 && done.submitted === 0) return (
+      <Frame>
+        <Card>
+          <H>Your part is submitted</H>
+          <P>Your determinations were already recorded — this submission found nothing further to
+            add. Nothing is missing and nothing is lost.</P>
+          <P>This link no longer opens the form. If something needs changing, ask the person who
+            sent it — they can record a change, and what you determined is kept alongside it.</P>
+        </Card>
+      </Frame>
+    )
+
+    return (
+      <Frame>
+        <Card>
+          <H>Thank you — that is submitted</H>
+          <P>{done.submitted} {done.submitted === 1 ? 'determination' : 'determinations'} recorded
+            against your name. Your colleague can see them now.</P>
+          <P>This link no longer opens the form. If something needs changing, ask them — they can
+            record a change, and what you determined is kept alongside it.</P>
+        </Card>
+      </Frame>
+    )
+  }
 
   if (deadLink) return (
     <Frame>
@@ -445,11 +507,24 @@ export default function ImpactWorksheet() {
             {submitError}
           </div>
         )}
-        <button onClick={() => setConfirmSubmit(true)} disabled={submitting}
+        {/* ⚠️ AN EMPTY ASSIGNMENT MUST NOT REACH SUBMIT AT ALL. This was `disabled={submitting}`
+            alone, so a contributor holding no sub-topics — which materiality_impact_reassign_subtopic
+            can produce after the link was sent — could press it, and before 20260853 the RPC
+            accepted them. The server refusal is the authority; this is what stops them being
+            offered a button whose only outcome is a refusal. */}
+        <button onClick={() => setConfirmSubmit(true)}
+                disabled={submitting || payload.subtopics.length === 0}
                 style={{ fontSize: 13.5, fontWeight: 600, padding: '11px 24px', borderRadius: 8,
-                         border: 'none', background: INK, color: '#fff', cursor: 'pointer', marginTop: 8 }}>
+                         border: 'none', background: INK, color: '#fff', marginTop: 8,
+                         opacity: payload.subtopics.length === 0 ? 0.4 : 1,
+                         cursor: payload.subtopics.length === 0 ? 'not-allowed' : 'pointer' }}>
           Submit my determinations
         </button>
+        {payload.subtopics.length === 0 && (
+          <P>Nothing is assigned to you at the moment, so there is nothing to submit. Ask whoever
+            sent you this link — they can see whether it has yet to be assigned or has been moved
+            to someone else.</P>
+        )}
       </Card>
 
       {confirmSubmit && (
