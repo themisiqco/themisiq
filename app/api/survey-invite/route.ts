@@ -21,6 +21,25 @@
 // ADDED and calls it "Invited". materiality_survey_respondents.invited_at has the same default; this
 // route overwrites it on a successful first send, so the buyer's screen shows when the email
 // actually went. ESRS 2 SBM-2 asks for field dates, and "when I typed their name in" is not one.
+//
+// ⚠️ THREE TABLES NOW, NOT TWO. materiality_impact_assignments.invited_at (20260838:313) was copied
+// out of materiality_survey_respondents and inherited the same `not null default now()` — the THIRD
+// occurrence of one defect, and the worst of the three, because that table had no send route at all
+// until 23 Aug 2026: every row in it claimed an invitation the product had never issued. 20260852
+// removes the default, makes the column nullable, and adds an 'added' status so the row can start
+// somewhere true; app/api/impact-invite/route.ts is the stamp. THE PATTERN IS THE POINT — a
+// timestamp named for an event, defaulted at INSERT, records the wrong event by construction. The
+// next table forked from any of these three must not carry it a fourth time.
+//
+// ⚠️ AND THE FOURTH OCCURRENCE IS ALREADY HERE, one line below the two above: THIS table's own
+// `status` has the matching defect. materiality_survey_respondents.status is `not null default
+// 'invited'`, so a respondent added and never emailed reads as invited — and unlike invited_at,
+// this route never corrects it. It is read as a literal in five places
+// (app/dashboard/materiality/survey/[id]/page.tsx:118,168,371,379,381), one of which chooses who a
+// bulk reminder targets, so someone who was never sent an invitation can be sent a reminder about
+// it. 20260852 fixes the shape on materiality_impact_assignments only; the same change has NOT been
+// made here. Left named rather than silently fixed: this table's 'invited' is load-bearing in those
+// five call sites and moving it needs its own pass.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthedClient, bearerFrom, AuthError } from '../../../lib/supabaseAuthed'

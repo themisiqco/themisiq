@@ -87,7 +87,13 @@ type ScopeRow = { subtopic_code: string; topic_code: string; short_name: string 
 type Assignment = {
   id: string; contributor_name: string | null; contributor_email: string | null
   contributor_role: string | null; status: string
-  expires_at: string; revoked_at: string | null; invited_at: string; submitted_at: string | null
+  // ⚠️ invited_at IS NULLABLE SINCE 20260852, and the null is the whole point: it means nobody has
+  // been emailed. It was `not null default now()` — the campaign_suppliers defect in its third
+  // table — so it read as an invitation date for every colleague ever added. created_at is the
+  // creation timestamp and always was; this column is now written only by /api/impact-invite,
+  // after Resend has confirmed the send.
+  expires_at: string; revoked_at: string | null; invited_at: string | null
+  reminder_sent_at: string | null; submitted_at: string | null; created_at: string
 }
 type AssignedSub = { assignment_id: string; subtopic_code: string }
 type Determination = {
@@ -163,6 +169,9 @@ export default function WorksheetAssign() {
   const [addError, setAddError] = useState<string | null>(null)
 
   const [confirmRevoke, setConfirmRevoke] = useState<Assignment | null>(null)
+  const [sending, setSending] = useState<string | null>(null)
+  const [sendResult, setSendResult] =
+    useState<Record<string, { ok: boolean; msg: string }>>({})
 
   useEffect(() => { load() }, [assessmentId])
 
@@ -240,8 +249,13 @@ export default function WorksheetAssign() {
       supabase.from('mr_esrs_topic_labels').select('topic_code, standard_version, label')
         .eq('standard_version', sv || ''),
       supabase.from('materiality_impact_assignments')
-        .select('id, contributor_name, contributor_email, contributor_role, status, expires_at, revoked_at, invited_at, submitted_at')
-        .eq('assessment_id', assessmentId).order('invited_at'),
+        .select('id, contributor_name, contributor_email, contributor_role, status, expires_at, revoked_at, invited_at, reminder_sent_at, submitted_at, created_at')
+        // ⚠️ ORDERED BY created_at, NOT invited_at. This list is "the colleagues on this
+        // assessment, in the order they were added", which is what invited_at USED to mean by
+        // accident — both columns were `default now()` in the same INSERT, so they were equal on
+        // every row. Since 20260852 invited_at is null until a send, and ordering on it would sort
+        // everyone who has not been invited into one undifferentiated block.
+        .eq('assessment_id', assessmentId).order('created_at'),
       supabase.from('materiality_impact_assignment_subtopics')
         .select('assignment_id, subtopic_code').eq('assessment_id', assessmentId),
       supabase.from('materiality_impact_determinations')
@@ -370,6 +384,46 @@ export default function WorksheetAssign() {
     if (!data) { setAddError('The contributor was not created, and the server gave no reason. Nothing was saved.'); return }
 
     setNewName(''); setNewEmail(''); setNewRole('')
+    await load()
+  }
+
+  /**
+   * ⚠️ THE STAMP IS THE ROUTE'S, NOT THIS SCREEN'S, and that is deliberate. This page could write
+   * status and invited_at itself — authenticated holds UPDATE on the table (20260838:576) and the
+   * revoke button below does exactly that. It must not: a client-side stamp records an intention to
+   * send, and the only thing worth recording is a send Resend has confirmed. /api/impact-invite is
+   * where the email and the timestamp are the same transaction.
+   *
+   * `type` chooses the WORDS only. Which columns move is decided by the row's own status inside the
+   * route, so a stale tab asking for an "invite" on someone already invited cannot overwrite the
+   * date their real invitation went.
+   */
+  const sendInvite = async (a: Assignment, type: 'invite' | 'reminder') => {
+    setSending(a.id)
+    setSendResult(prev => { const n = { ...prev }; delete n[a.id]; return n })
+
+    const { data: { session } } = await supabase.auth.getSession()
+    try {
+      const res = await fetch('/api/impact-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token ?? ''}` },
+        body: JSON.stringify({ assignment_id: a.id, type }),
+      })
+      const data = await res.json().catch(() => ({}))
+      // ⚠️ EVERY FAILURE MODE SHOWS ITS MESSAGE AND PERSISTS — the same rule as the survey screen.
+      // A badge that clears itself is how a preparer comes to believe a colleague was emailed.
+      if (!res.ok || data.error) {
+        setSendResult(prev => ({ ...prev, [a.id]: { ok: false, msg: data.error || `The send failed (HTTP ${res.status}).` } }))
+      } else if (data.warning) {
+        // Sent, but the record of it did not save. Both facts, or the preparer sends twice.
+        setSendResult(prev => ({ ...prev, [a.id]: { ok: true, msg: data.warning } }))
+      } else {
+        setSendResult(prev => ({ ...prev, [a.id]: { ok: true, msg: data.first_send ? 'Invitation sent.' : 'Reminder sent.' } }))
+      }
+    } catch (e: any) {
+      setSendResult(prev => ({ ...prev, [a.id]: { ok: false, msg: `The request did not reach the server (${e?.message || 'network error'}). Nothing was sent.` } }))
+    }
+    setSending(null)
     await load()
   }
 
@@ -958,10 +1012,46 @@ export default function WorksheetAssign() {
                       {a.contributor_email || 'no email'} · {mine} {mine === 1 ? 'sub-topic' : 'sub-topics'}
                       {' · '}{submittedBy[a.id] ?? 0} determinations submitted
                     </div>
+                    {/* ⚠️ THE SEND STATE, SAID OUT LOUD. Until 20260852 this row carried
+                        status 'invited' and an invited_at from the moment it was created, so a
+                        colleague nobody had emailed was indistinguishable from one who had been —
+                        and the screen simply did not mention it, which is why nobody noticed. Now
+                        the row can only say "invited" if /api/impact-invite confirmed a send, and
+                        this line prints whichever is true. */}
+                    <div style={{ fontSize: 11, color: a.invited_at ? MID : AMBER, marginTop: 3 }}>
+                      {a.invited_at
+                        ? <>Invited {fmt(a.invited_at)}
+                            {a.reminder_sent_at && <> · reminded {fmt(a.reminder_sent_at)}</>}</>
+                        : <>Added {fmt(a.created_at)} — <strong>not yet invited</strong></>}
+                    </div>
                   </div>
-                  <button onClick={() => setConfirmRevoke(a)} disabled={working} style={btn}>
-                    Withdraw access
-                  </button>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {/* No email, no send — and the button says which of the two states it is in
+                        rather than being disabled with no reason given. */}
+                    <button
+                      onClick={() => void sendInvite(a, a.invited_at ? 'reminder' : 'invite')}
+                      disabled={working || sending === a.id || !a.contributor_email || mine === 0}
+                      title={!a.contributor_email ? 'This contributor has no email address.'
+                             : mine === 0 ? 'Assign them some sub-topics first.' : undefined}
+                      style={{ ...btnPrimary,
+                               opacity: (!a.contributor_email || mine === 0) ? 0.4 : 1,
+                               cursor: (!a.contributor_email || mine === 0) ? 'not-allowed' : 'pointer' }}>
+                      {sending === a.id ? 'Sending…' : a.invited_at ? 'Send reminder' : 'Send invitation'}
+                    </button>
+                    <button onClick={() => setConfirmRevoke(a)} disabled={working} style={btn}>
+                      Withdraw access
+                    </button>
+                  </div>
+                  {/* ⚠️ PERSISTS, and shows the reason. Every refusal the route can return names
+                      something actionable — no email, no sub-topics assigned, access withdrawn,
+                      already submitted, or Resend's own words verbatim. A three-second badge would
+                      hide all of them behind "✗". */}
+                  {sendResult[a.id] && (
+                    <div style={{ flexBasis: '100%', fontSize: 11.5, lineHeight: 1.7,
+                                  color: sendResult[a.id].ok ? GREEN : FAIL }}>
+                      {sendResult[a.id].msg}
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -1016,15 +1106,20 @@ export default function WorksheetAssign() {
             )}
           </div>
 
-          {/* ⚠️ STATED, NOT HIDDEN. There is no contributor form and no token path yet — 20260838
-              grants anon nothing and no resolve-token RPC exists. A working Send button would mail a
-              link to a page that does not exist, which is the "looks like it worked" failure this
-              module keeps designing against. */}
-          <div style={{ marginTop: 16, background: AMBER_BG, border: `0.5px solid ${AMBER}`,
-                        borderRadius: 10, padding: '12px 14px', fontSize: 12, color: INK, lineHeight: 1.75 }}>
-            <strong>Invitations cannot be sent yet.</strong> The contributor form and its token
-            path are the next piece of work. You can add colleagues and divide the sub-topics now —
-            that is the part worth doing first, and it is what the invitation will carry.
+          {/* ⚠️ THIS BANNER USED TO STATE A REASON THAT HAD STOPPED BEING TRUE, which is the defect
+              this module names most often: it said "there is no contributor form and no token path
+              yet — 20260838 grants anon nothing and no resolve-token RPC exists". Both clauses were
+              false by 20260840, which grants impact_get / impact_save_determination / impact_submit
+              to anon (:523-525), and app/impact/[token]/page.tsx has existed alongside them. The
+              only true part was that nothing could send, and that was the part the sentence buried.
+              Sending now exists, so what remains is the one honest instruction: assign first. */}
+          <div style={{ marginTop: 16, background: PAPER, border: `0.5px solid ${LINE}`,
+                        borderRadius: 10, padding: '12px 14px', fontSize: 12, color: MID, lineHeight: 1.75 }}>
+            <strong style={{ color: INK }}>Divide the sub-topics before you invite anyone.</strong>{' '}
+            An invitation names how many topics the colleague has been asked to judge, and their
+            screen shows exactly those — so Send stays closed until they have some. Nothing is sent
+            when you add a colleague; the invitation goes only when you send it, and this list says
+            who has had one.
           </div>
         </div>
 
