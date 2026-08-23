@@ -83,6 +83,53 @@ export const STANDARD_VERSION_ORDER: StandardVersion[] = ['esrs_2026', 'esrs_202
 export function isStandardVersion(v: unknown): v is StandardVersion {
   return typeof v === 'string' && (STANDARD_VERSIONS as readonly string[]).includes(v)
 }
+
+// ── WHICH VERSIONS THE PRODUCT ACTUALLY HAS SCOPE FOR ────────────────────────────────────────────
+// mr_esrs_subtopics is seeded for esrs_2026 ALONE — 37 rows — and holds ZERO rows for either 2023
+// version. 20260815:48 records the omission ("The 2023 rows are a separate transcription job") and
+// 20260819:34 repeats it. A sub-topic is identified by (code, standard_version), so an assessment
+// stating a version with no rows has an EMPTY SCOPE, and nothing on the way there fails: the create
+// form saves cleanly, the row is valid, the CHECK constraint admits all three versions, and the
+// worksheet opens on "0 sub-topics in scope" beside a sentence promising "every ESRS sub-topic for
+// this standard version". Both statements are true, together they are useless, and no error is
+// raised anywhere. THIS CONSTANT IS WHAT MAKES THAT STATE UNREACHABLE.
+//
+// ⚠️ WHY THIS GATES AND DOES NOT SEED — DECIDED 23 AUG 2026, NOT OVERLOOKED. The only cohort that
+// may still apply the 2023 standards is Wave 1, for FY2026 only, and they are UPDATING an
+// assessment they already hold rather than starting one. Wave 2 is in a preparation year now and
+// can only ever report under ESRS (2026). Transcribing a taxonomy nobody in the funnel needs, so
+// that a chooser can keep an option nobody will take, is the expensive way round. The option is
+// withdrawn instead — VISIBLY, not hidden, so a buyer can still see the product knows 2023 exists.
+//
+// ⚠️ STATIC, NOT READ FROM THE DATABASE, AND THAT IS THE POINT. "Is there scope for this version?"
+// would otherwise become a network call with its own failure mode, on a form that already carries
+// four lock kinds and already has to decide what to say when a read fails. Seeding a taxonomy is a
+// deliberate act that ships with a migration; it can ship with the line below in the same commit.
+//
+// ⚠️ THIS CONSTANT AND THE SEED STATE ARE BOUND BY NOTHING BUT THIS COMMENT — the same limit
+// versionAgreement.ts records for its two errcodes. vitest has no database, so no test can prove
+// these row counts. IF ROWS ARE EVER ADDED FOR A VERSION, THIS CHANGES IN THE SAME COMMIT.
+//
+// Typed Record<StandardVersion, boolean> for the reason STANDARD_VERSION_COPY is: it is EXHAUSTIVE
+// BY CONSTRUCTION, so a fourth version stops this object typechecking until someone states whether
+// its scope exists. An availability question answered by omission is exactly the defect this
+// closes.
+export const STANDARD_VERSION_SCOPE_SEEDED: Record<StandardVersion, boolean> = {
+  esrs_2026: true,           // 37 sub-topics (20260815; capitalisation corrected by 20260816)
+  esrs_2023_reliefs: false,  // zero rows
+  esrs_2023: false,          // zero rows
+}
+
+export function isStandardVersionAvailable(v: StandardVersion): boolean {
+  return STANDARD_VERSION_SCOPE_SEEDED[v]
+}
+
+/**
+ * The one line printed under an unavailable option. Factual: it does not apologise, and it does not
+ * imply a date — none has been committed to, and a date on a compliance product reads as a promise
+ * about somebody's filing deadline.
+ */
+export const STANDARD_VERSION_UNAVAILABLE_NOTE = 'Not yet available in ThemisIQ.'
 // ── REPORTING PERIOD vs STANDARD VERSION — A WARNING THAT NEVER BLOCKS ───────────────────────────
 //
 // A test report read "Reporting period FY2025" beside "ESRS standard version: ESRS (2026)". That

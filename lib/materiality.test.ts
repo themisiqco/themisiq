@@ -21,6 +21,12 @@ import {
   runResilience,
   computeProvenance,
   resolveTopicLabels,
+  isStandardVersionAvailable,
+  STANDARD_VERSION_SCOPE_SEEDED,
+  STANDARD_VERSION_COPY,
+  STANDARD_VERSION_ORDER,
+  STANDARD_VERSIONS,
+  STANDARD_VERSION_UNAVAILABLE_NOTE,
   type ReferenceData,
   type AssessmentInput,
   type ModelConfig,
@@ -549,5 +555,60 @@ describe('GROUP H — resolveTopicLabels: every state succeeds, so only a test c
     })
     // …and the inputs are not mutated in place: the caller's reference set is untouched.
     expect(TOPICS.map(t => t.label)).toEqual(DEFAULTS)
+  })
+})
+
+// ── GROUP I — which ESRS versions the product actually has scope for ─────────────────────────────
+// STANDARD_VERSION_SCOPE_SEEDED is a hand-maintained mirror of what mr_esrs_subtopics holds, and
+// NOTHING BUT ITS COMMENT BINDS THE TWO — vitest has no database, so nothing below can prove a row
+// count. What these tests CAN do is exactly what the type does one level up: make the constant
+// unable to go quiet. A fourth StandardVersion fails to compile; a version dropped from the
+// constant, or an availability answer that stops agreeing with the accessor, fails here.
+describe('GROUP I — standard-version availability is stated for every version, never by omission', () => {
+  it('I1: every StandardVersion has an availability answer, and no extra key invents one', () => {
+    expect(Object.keys(STANDARD_VERSION_SCOPE_SEEDED).sort())
+      .toEqual([...STANDARD_VERSIONS].sort())
+  })
+
+  /**
+   * I2 is the fact the gate exists for, written down where a reader looking for it will find it:
+   * mr_esrs_subtopics is seeded for esrs_2026 alone (20260815:48, 20260819:34). If a 2023 taxonomy
+   * is ever transcribed, this test is the line that must change in the same commit as the seed —
+   * and it failing is the reminder.
+   */
+  it('I2: esrs_2026 is the only version with scope seeded today', () => {
+    expect(STANDARD_VERSION_SCOPE_SEEDED).toEqual({
+      esrs_2026: true, esrs_2023_reliefs: false, esrs_2023: false,
+    })
+  })
+
+  it('I3: the accessor reports the constant, for every version, with no special cases', () => {
+    for (const v of STANDARD_VERSIONS) {
+      expect(isStandardVersionAvailable(v)).toBe(STANDARD_VERSION_SCOPE_SEEDED[v])
+    }
+  })
+
+  /**
+   * I4 pins the pairing the form depends on: the chooser renders STANDARD_VERSION_ORDER, and every
+   * option it renders must have BOTH customer-facing copy and an availability answer. A version
+   * present in one and missing from the other renders either a blank option or an option whose
+   * state is `undefined` — which is falsy, so it would silently read as unavailable.
+   */
+  it('I4: every version the chooser renders has both copy and an availability answer', () => {
+    expect([...STANDARD_VERSION_ORDER].sort()).toEqual([...STANDARD_VERSIONS].sort())
+    for (const v of STANDARD_VERSION_ORDER) {
+      expect(typeof STANDARD_VERSION_COPY[v]?.l).toBe('string')
+      expect(typeof STANDARD_VERSION_SCOPE_SEEDED[v]).toBe('boolean')
+    }
+  })
+
+  /**
+   * I5 guards the copy itself, because the wording was the decision. "Not yet available" states a
+   * fact about today. A date, or an apology, states something we have not committed to — and on a
+   * compliance product a date reads as a promise about somebody's filing deadline.
+   */
+  it('I5: the unavailable note names no date and offers no apology', () => {
+    expect(STANDARD_VERSION_UNAVAILABLE_NOTE).toBe('Not yet available in ThemisIQ.')
+    expect(STANDARD_VERSION_UNAVAILABLE_NOTE).not.toMatch(/soon|shortly|20\d\d|Q[1-4]|sorry|apolog/i)
   })
 })

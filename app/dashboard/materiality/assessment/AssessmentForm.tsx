@@ -26,7 +26,9 @@ import { useState } from 'react'
 import {
   STANDARD_VERSION_COPY, STANDARD_VERSION_ORDER, isStandardVersion, type StandardVersion,
 } from '../../../../lib/materiality'
-import type { VersionLock } from '../../../../lib/materiality/versionAgreement'
+import {
+  standardVersionOffer, type VersionLock,
+} from '../../../../lib/materiality/versionAgreement'
 
 /** The address on the board report's back cover (boardReportPdf.ts:964). One address, both places. */
 const CONTACT = 'lisa.foster@themisiq.co'
@@ -90,16 +92,35 @@ export function AssessmentForm({
   if (!values.companyName.trim()) missing.push('the reporting entity')
   if (!values.version) missing.push('the ESRS version')
   if (!values.periodStart || !values.periodEnd) missing.push('the reporting period')
-  const blocked = missing.length > 0 || halfFilled || outOfOrder
+
+  /**
+   * ⚠️ A HELD VERSION CAN BE UNOFFERABLE WITHOUT ANYONE HAVING CLICKED ANYTHING: a form open across
+   * the deploy that withdrew one, or — the case that actually happens — the edit screen loading an
+   * assessment created earlier that STATES esrs_2023 and has no determinations yet. Its worksheet
+   * is already empty; blocking the whole save is right, because the one edit it needs is the one
+   * this refuses to skip. THE `free` TEST IS LOAD-BEARING: it is the only lock kind that writes the
+   * form's version, so it is the only one that can write an unavailable one. Under `agrees` the
+   * stated version may well be esrs_2023 — a Wave 1 assessment with recorded work — and blocking
+   * there would stop that customer editing their own company name over a version nobody is moving.
+   */
+  const versionUnavailable = versionLock.kind === 'free' && !!values.version
+    && !standardVersionOffer(values.version, versionLock).pick
+  const blocked = missing.length > 0 || halfFilled || outOfOrder || versionUnavailable
 
   /**
    * ⚠️ THE ONLY THING THAT MAY EVER BE OFFERED WHEN THE RECORDED WORK DISAGREES IS THE VERSION THAT
    * WORK CARRIES. A free choice here would let a customer resolve a disagreement by picking a THIRD
    * version, orphaning every determination a second time — and 20260851 §3 would refuse the save
    * anyway, so it would be a choice that cannot be taken, presented as one that can.
+   *
+   * ⚠️ THAT RULE IS NOW ONE OF TWO. The lock says whether THIS assessment's version may move;
+   * availability says whether ThemisIQ holds any sub-topics under a version at all
+   * (STANDARD_VERSION_SCOPE_SEEDED — esrs_2026 alone today). Both must pass, they refuse for
+   * unrelated reasons, and the offer is computed in ONE place so the chooser, the submit button and
+   * both pages' payload guards cannot come to different conclusions. `repairable` deliberately does
+   * not consult availability: see standardVersionOffer, where the foreign key is the argument.
    */
-  const canPick = (v: StandardVersion) =>
-    versionLock.kind === 'free' || (versionLock.kind === 'repairable' && v === versionLock.to)
+  const offer = (v: StandardVersion) => standardVersionOffer(v, versionLock)
 
   /** Falls back to the raw string: a value outside StandardVersion is still what is stored. */
   const versionLabel = (v: string | null) =>
@@ -132,7 +153,7 @@ export function AssessmentForm({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {STANDARD_VERSION_ORDER.map(v => {
             const sel = values.version === v
-            const pick = canPick(v)
+            const { pick, note } = offer(v)
             const copy = STANDARD_VERSION_COPY[v]
             return (
               <div key={v}
@@ -145,10 +166,30 @@ export function AssessmentForm({
                   {copy.l}
                 </div>
                 <div style={{ fontSize: 10.5, color: MUTE, marginTop: 1, lineHeight: 1.4 }}>{copy.d}</div>
+                {/* ⚠️ SHOWN AND CLOSED, NEVER REMOVED. A buyer evaluating a compliance product
+                    should be able to see that it knows ESRS (2023) exists and has taken a position
+                    on it; an option quietly filtered out answers no question and reads as a product
+                    that has not heard of the 2023 standards. One line, factual, no date — a date
+                    here is a promise about somebody's filing deadline. */}
+                {note && (
+                  <div style={{ fontSize: 10.5, fontWeight: 600, color: MID, marginTop: 4,
+                                lineHeight: 1.4 }}>{note}</div>
+                )}
               </div>
             )
           })}
         </div>
+
+        {/* Not on the option — on the selection. This fires when a version already HELD stops being
+            offerable, which no click can produce and a stale form or an older assessment can. */}
+        {versionUnavailable && values.version && (
+          <div style={warn}>
+            This assessment states {STANDARD_VERSION_COPY[values.version].l}, which is not yet
+            available in ThemisIQ — no sub-topics are held under it, which is why its worksheet
+            opens with nothing in it. Choose a version that is available; nothing else on this form
+            can be saved until you do.
+          </div>
+        )}
 
         {versionLock.kind === 'agrees' && (
           <div style={{ background: AMBER_BG, border: `0.5px solid ${AMBER}`, borderRadius: 10,

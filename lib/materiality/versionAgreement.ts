@@ -25,7 +25,11 @@
  * change are what make that sentence honest. If either is ever removed, this message is a lie again.
  */
 
-import { isStandardVersion, type StandardVersion } from '../materiality'
+import {
+  isStandardVersion, isStandardVersionAvailable,
+  STANDARD_VERSION_COPY, STANDARD_VERSION_UNAVAILABLE_NOTE,
+  type StandardVersion,
+} from '../materiality'
 
 /**
  * ⚠️ THESE CONSTANTS AND THE MIGRATION'S `using errcode` ARE BOUND BY NOTHING BUT THIS COMMENT.
@@ -160,4 +164,62 @@ export function classifyVersionLock(d: CarriedVersions): VersionLock {
     return { kind: 'repairable', determinations: d.determinations, to: only, stated: d.stated }
   }
   return { kind: 'unrepairable', determinations: d.determinations, carried: d.carried }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The offer — the lock AND availability, which are two independent gates
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** What the chooser needs for ONE version: whether it can be taken, and the line under it. */
+export type VersionOffer = {
+  pick: boolean
+  /** A one-line reason the option is shown but closed, or null. Never a substitute for showing it. */
+  note: string | null
+}
+
+/**
+ * ⚠️ TWO GATES, BOTH MUST PASS, AND THEY REFUSE FOR UNRELATED REASONS. The lock is about THIS
+ * assessment's recorded work — may the version move at all. Availability is about the product —
+ * does ThemisIQ hold a taxonomy for that version (STANDARD_VERSION_SCOPE_SEEDED). Neither implies
+ * the other, so neither may be folded into the other: `free` says nothing about whether esrs_2023
+ * has sub-topics, and 37 seeded rows say nothing about whether 74 determinations are already keyed
+ * to something else.
+ *
+ * ⚠️ AND AN UNAVAILABLE VERSION IS REFUSED, NOT HIDDEN. `note` exists so the option can be rendered
+ * and closed rather than removed — a buyer evaluating a compliance product should be able to see
+ * that it knows ESRS (2023) exists. A missing option answers no question; a closed one with a line
+ * under it answers exactly the question the buyer had.
+ *
+ * ⚠️ `repairable` DOES NOT CONSULT AVAILABILITY, AND THE DATABASE IS THE REASON — not convenience.
+ * materiality_impact_determinations.standard_version is NOT NULL with an FK to mr_esrs_subtopics
+ * (code, standard_version) (20260838:418). A determination carrying esrs_2023 therefore CANNOT
+ * EXIST unless esrs_2023 sub-topic rows exist — the foreign key has already proved the scope, and
+ * where the two disagree it is this file's static constant that is out of date, not the database.
+ * So the repair is offered, and it carries NO note: "Not yet available" would be a claim the FK
+ * contradicts. Refusing it instead would strand recorded work in the one state with no other exit —
+ * determinations cannot be deleted (20260838:593) and the assessment cannot be deleted either
+ * (20260827:153-157). The version the work already carries is the one thing that is always safe to
+ * offer; that was true before availability existed as a concept here and is unchanged by it.
+ */
+export function standardVersionOffer(v: StandardVersion, lock: VersionLock): VersionOffer {
+  if (lock.kind === 'repairable' && v === lock.to) return { pick: true, note: null }
+  const available = isStandardVersionAvailable(v)
+  return {
+    pick: lock.kind === 'free' && available,
+    note: available ? null : STANDARD_VERSION_UNAVAILABLE_NOTE,
+  }
+}
+
+/**
+ * The sentence a SUBMIT guard shows when an unavailable version reaches it anyway — a form left
+ * open across the deploy that withdrew one, or any path that did not go through the chooser. It
+ * names the version in the customer's own words, says what the consequence would have been, and
+ * states the outcome: nothing was written. No apology, and no date.
+ */
+export function unavailableVersionMessage(
+  v: StandardVersion, outcome: 'created' | 'saved',
+): string {
+  return `${STANDARD_VERSION_COPY[v].l} is not yet available in ThemisIQ: no sub-topics are held `
+    + `under it, so the worksheet would open with nothing in it. Nothing was ${outcome}. `
+    + `Choose a version that is available.`
 }

@@ -17,6 +17,9 @@ import PaywallCard from '../../../../components/PaywallCard'
 import { supabase } from '../../../../../lib/supabase'
 import { useEntitlement } from '../../../../../lib/useEntitlement'
 import { AssessmentForm, type AssessmentFormValues } from '../AssessmentForm'
+import {
+  standardVersionOffer, unavailableVersionMessage,
+} from '../../../../../lib/materiality/versionAgreement'
 
 const PURPLE = '#7425e3'
 const INK = '#0d0d0d'
@@ -43,6 +46,24 @@ export default function NewAssessmentPage() {
   const [error, setError] = useState<string | null>(null)
 
   async function create() {
+    /**
+     * ⚠️ AT SUBMIT, NOT ONLY IN THE CHOOSER. The option is closed and the button is disabled while
+     * an unavailable version is held — but neither of those is where the payload is built, and a
+     * form left open across the deploy that withdrew a version still holds it in state. This is the
+     * last point before an INSERT that would produce a perfectly valid row whose worksheet opens
+     * empty: the CHECK constraint admits all three versions, so the database will not catch it.
+     *
+     * `{ kind: 'free' }` is not a shortcut — it is what this screen passes the form, and it is the
+     * only lock a row that does not exist yet can have: no assessment, no determinations.
+     */
+    if (!values.version) {
+      setError('Choose the ESRS version this assessment is prepared under. Nothing was created.')
+      return
+    }
+    if (!standardVersionOffer(values.version, { kind: 'free' }).pick) {
+      setError(unavailableVersionMessage(values.version, 'created'))
+      return
+    }
     setSaving(true); setError(null)
     const { data, error: err } = await supabase.from('materiality_assessments')
       .insert({

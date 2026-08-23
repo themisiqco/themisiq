@@ -18,6 +18,14 @@ import {
   type StandardVersion, type EsrsTopic, type TopicLabelRow,
   STANDARD_VERSION_COPY, STANDARD_VERSION_ORDER,
 } from '../../../lib/materiality'
+// ⚠️ THE SAME OFFER FUNCTION THE ASSESSMENT FORM USES, FOR THE SAME REASON THE COPY IS SHARED. This
+// chooser and app/dashboard/materiality/assessment/AssessmentForm.tsx write standard_version to the
+// SAME materiality_assessments row, and the impact worksheet reads it from there — so a version one
+// chooser refuses and the other offers is not two opinions, it is one product contradicting itself
+// on a value a customer can carry from here to a worksheet with nothing in it.
+import {
+  standardVersionOffer, unavailableVersionMessage,
+} from '../../../lib/materiality/versionAgreement'
 
 // ─── Design tokens (matching the live climate page) ───────────────────────────
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
@@ -375,7 +383,31 @@ export default function MaterialityWizard() {
   useEffect(() => { setNudged(false) }, [step])
   const blockerAt = (f: BlockerField) => nudged ? blockers.find(b => b.field === f) : undefined
 
+  /**
+   * ⚠️ THE PAYLOAD GUARD, SHARED BY BOTH SUBMIT PATHS. The chooser closes an unavailable option, but
+   * the chooser is not where the request body is built, and the state survives everything that is
+   * not a reload: a wizard left open across the deploy that withdrew a version still holds it. Both
+   * routes accept standardVersion and both write it to materiality_assessments.standard_version
+   * (route.ts:310, resilience/route.ts:281) — the same column the impact worksheet reads to find its
+   * sub-topics. Neither route can catch this: the CHECK constraint admits all three versions and
+   * isStandardVersion() says yes, because the value is well-formed. It is unSEEDED, not invalid.
+   *
+   * ⚠️ 'created' FOR BOTH, and it is accurate for both: each route INSERTS the assessment row.
+   *
+   * ⚠️ WHY IT RETURNS THE SENTENCE RATHER THAN SETTING IT. Both callers own their own submitting
+   * flag and both must return before touching it; a helper that set state would leave the caller
+   * looking like it had started work it never started.
+   */
+  function unavailableVersionBlock(): string | null {
+    if (standardVersion && !standardVersionOffer(standardVersion, { kind: 'free' }).pick) {
+      return unavailableVersionMessage(standardVersion, 'created')
+    }
+    return null
+  }
+
   async function submit() {
+    const versionBlock = unavailableVersionBlock()
+    if (versionBlock) { setError(versionBlock); return }
     setSubmitting(true); setError(null)
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -409,6 +441,20 @@ export default function MaterialityWizard() {
   }
 
   async function submitResilience() {
+    /**
+     * ⚠️ THIS ONE CANNOT FIRE TODAY, AND IT SAYS SO RATHER THAN BEING LEFT OUT. Two independent
+     * facts stop it: the body below OMITS standardVersion entirely, and choosing IFRS S2 on the
+     * mode gate clears the state to null. So the row this route writes always carries "not stated",
+     * which is a legitimate state for an S2 screening — it produces no ESRS matrix.
+     *
+     * It is here because the route does NOT ignore the field — resilience/route.ts:36-45 parses it
+     * and :281 writes it — so the day someone adds standardVersion to the body below, the defect
+     * returns silently unless a guard is already standing here. That is one line of diff away, and
+     * it is exactly how this chooser came to be unguarded in the first place while the assessment
+     * form's was not. If either of the two facts above changes, this stops being unreachable.
+     */
+    const versionBlock = unavailableVersionBlock()
+    if (versionBlock) { setError(versionBlock); return }
     setSubmitting(true); setError(null)
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -463,7 +509,7 @@ export default function MaterialityWizard() {
                   <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
                     <div style={{ fontSize: 11, fontWeight: 600, color: '#0d0d0d', marginBottom: 3 }}>Which version of ESRS do you report under?</div>
                     <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.5, marginBottom: 10 }}>
-                      All three apply to FY2026 and you must state which you used. It sets the topic names in your report. You can leave this until later.
+                      All three apply to FY2026 and you must state which you used — but only ESRS (2026) can be selected here; see the note under the others. It sets the topic names in your report. You can leave this until later.
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {[
@@ -474,10 +520,30 @@ export default function MaterialityWizard() {
                         { v: null, l: 'Prefer not to state yet', d: 'Recorded as "not stated". Topic names fall back to the platform defaults.' },
                       ].map(opt => {
                         const sel = standardVersion === opt.v
+                        /* ⚠️ NULL IS ALWAYS PICKABLE, AND THAT ASYMMETRY IS THE POINT — it is not an
+                           availability question at all. An UNSTATED version is permitted by Art.
+                           2(2) and produces a screening whose report prints "Not stated" and carries
+                           on. An UNAVAILABLE version produces an impact worksheet with nothing in it
+                           (mr_esrs_subtopics holds rows for esrs_2026 alone). Different things, and
+                           only the second is being closed here. AssessmentForm.tsx documents the
+                           other half of the same asymmetry: it offers no null, because the path it
+                           starts leads to determinations, which a null version cannot carry.
+                           ⚠️ `{ kind: 'free' }` IS THE ONLY LOCK THIS SCREEN CAN HAVE. The wizard
+                           CREATES the materiality_assessments row on submit; a row that does not
+                           exist yet has no determinations, so nothing can constrain what its version
+                           may become. This is not a stand-in for a lock we failed to compute. */
+                        const { pick, note } = opt.v === null
+                          ? { pick: true, note: null as string | null }
+                          : standardVersionOffer(opt.v, { kind: 'free' })
                         return (
-                          <div key={String(opt.v)} onClick={() => setStandardVersion(opt.v)} style={{ border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, borderRadius: 8, padding: '7px 10px', cursor: 'pointer', background: sel ? '#EDE9FE' : '#fff' }}>
+                          <div key={String(opt.v)} onClick={() => { if (pick) setStandardVersion(opt.v) }} style={{ border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, borderRadius: 8, padding: '7px 10px', cursor: pick ? 'pointer' : 'not-allowed', opacity: pick ? 1 : 0.5, background: sel ? '#EDE9FE' : '#fff' }}>
                             <div style={{ fontSize: 12, fontWeight: sel ? 600 : 500, color: sel ? '#7425e3' : '#0d0d0d' }}>{opt.l}</div>
                             <div style={{ fontSize: 10.5, color: '#888784', marginTop: 1, lineHeight: 1.4 }}>{opt.d}</div>
+                            {/* Shown and closed, never removed — the same decision as the assessment
+                                form. A buyer should be able to see the product knows 2023 exists. */}
+                            {note && (
+                              <div style={{ fontSize: 10.5, fontWeight: 600, color: '#555553', marginTop: 3, lineHeight: 1.4 }}>{note}</div>
+                            )}
                           </div>
                         )
                       })}

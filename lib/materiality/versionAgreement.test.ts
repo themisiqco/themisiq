@@ -3,10 +3,17 @@ import {
   determinationSaveMessage,
   assessmentSaveMessage,
   classifyVersionLock,
+  standardVersionOffer,
+  unavailableVersionMessage,
   DETERMINATION_VERSION_ERRCODE,
   ASSESSMENT_VERSION_ERRCODE,
   type SaveError,
+  type VersionLock,
 } from './versionAgreement'
+import {
+  STANDARD_VERSION_ORDER, STANDARD_VERSION_UNAVAILABLE_NOTE, isStandardVersionAvailable,
+  type StandardVersion,
+} from '../materiality'
 
 /**
  * ⚠️ WHAT THESE TESTS CANNOT DO. vitest has no database, so nothing here can prove that 20260851
@@ -223,5 +230,152 @@ describe('classifyVersionLock', () => {
     expect(kinds.map(k => k.kind))
       .toEqual(['free', 'agrees', 'repairable', 'unrepairable', 'unknown'])
     expect(kinds.filter(k => k.kind === 'free')).toHaveLength(1)
+  })
+})
+
+// ── GROUP V — the offer: the lock and availability are two gates, and both must pass ─────────────
+// classifyVersionLock answers "may THIS assessment's version move?". STANDARD_VERSION_SCOPE_SEEDED
+// answers "does the product hold a taxonomy for that version at all?". They are unrelated
+// questions, and the whole risk here is one quietly standing in for the other.
+describe('standardVersionOffer', () => {
+  const FREE: VersionLock = { kind: 'free' }
+  const AGREES: VersionLock = { kind: 'agrees', determinations: 74 }
+  const UNREPAIRABLE: VersionLock =
+    { kind: 'unrepairable', determinations: 2, carried: ['esrs_2026', 'esrs_2023'] }
+  const UNKNOWN: VersionLock = { kind: 'unknown' }
+  const repairableTo = (to: StandardVersion, stated: string | null = 'esrs_2026'): VersionLock =>
+    ({ kind: 'repairable', determinations: 74, to, stated })
+
+  it('V1: the seeded version is offered under a free lock, with nothing under it', () => {
+    expect(standardVersionOffer('esrs_2026', FREE)).toEqual({ pick: true, note: null })
+  })
+
+  it('V2: an unseeded version is refused under a free lock — the lock permitted it, scope did not', () => {
+    expect(standardVersionOffer('esrs_2023', FREE)).toEqual({
+      pick: false, note: STANDARD_VERSION_UNAVAILABLE_NOTE,
+    })
+    expect(standardVersionOffer('esrs_2023_reliefs', FREE)).toEqual({
+      pick: false, note: STANDARD_VERSION_UNAVAILABLE_NOTE,
+    })
+  })
+
+  /**
+   * V3 is the decision that could most easily be undone by someone tidying the chooser: an
+   * unavailable version is CLOSED, not REMOVED. Every version the chooser renders must come back
+   * with an offer — a refusal is a note, never an omission — so that a buyer can see the product
+   * knows ESRS (2023) exists. A filter in the component would pass every other test here.
+   */
+  it('V3: every version still yields an offer — refusal is a note, never an omission', () => {
+    const offers = STANDARD_VERSION_ORDER.map(v => standardVersionOffer(v, FREE))
+    expect(offers).toHaveLength(STANDARD_VERSION_ORDER.length)
+    offers.forEach((o, i) => {
+      expect(typeof o.pick).toBe('boolean')
+      // Closed options say why; open ones say nothing, because there is nothing to say.
+      expect(o.note === null).toBe(isStandardVersionAvailable(STANDARD_VERSION_ORDER[i]))
+    })
+  })
+
+  it('V4: availability never widens the lock — agrees, unrepairable and unknown pick nothing', () => {
+    for (const lock of [AGREES, UNREPAIRABLE, UNKNOWN]) {
+      for (const v of STANDARD_VERSION_ORDER) {
+        expect(standardVersionOffer(v, lock).pick).toBe(false)
+      }
+    }
+  })
+
+  it('V5: a locked-but-available version is refused without a note — the lock is not an availability claim', () => {
+    // esrs_2026 IS seeded. It is closed here because the recorded work forbids the move, and the
+    // panel above the chooser says so at length. Printing "Not yet available" on it would be false.
+    expect(standardVersionOffer('esrs_2026', AGREES)).toEqual({ pick: false, note: null })
+  })
+
+  it('V6: repairable offers exactly its target and nothing else', () => {
+    const lock = repairableTo('esrs_2026', 'esrs_2023')
+    expect(standardVersionOffer('esrs_2026', lock).pick).toBe(true)
+    expect(standardVersionOffer('esrs_2023', lock).pick).toBe(false)
+    expect(standardVersionOffer('esrs_2023_reliefs', lock).pick).toBe(false)
+  })
+
+  /**
+   * V7 IS THE ONE THAT WOULD HAVE BEEN GOT WRONG, and the FK is the argument. Determinations
+   * carrying esrs_2023 cannot exist unless esrs_2023 sub-topic rows exist — 20260838:418 keys the
+   * FK on (code, standard_version). So where the static constant and a repairable lock disagree,
+   * the DATABASE is right and the constant is stale. Applying availability here would refuse the
+   * only exit from a disagreement, on an assessment that can neither be deleted nor have its
+   * determinations deleted: the work would be stranded permanently by a constant that was wrong.
+   */
+  it('V7: repairable offers an UNAVAILABLE target anyway — the determinations\' FK already proved its scope', () => {
+    expect(isStandardVersionAvailable('esrs_2023')).toBe(false)
+    expect(standardVersionOffer('esrs_2023', repairableTo('esrs_2023'))).toEqual({
+      pick: true, note: null,
+    })
+  })
+
+  /**
+   * V8: and it says nothing about the OTHER unavailable version, which really is unavailable. The
+   * FK proves scope for the version the work carries, not for its neighbour.
+   */
+  it('V8: repairable still notes the unavailability of versions it is not offering', () => {
+    expect(standardVersionOffer('esrs_2023_reliefs', repairableTo('esrs_2023'))).toEqual({
+      pick: false, note: STANDARD_VERSION_UNAVAILABLE_NOTE,
+    })
+  })
+
+  /**
+   * V9 pins the two gates as genuinely independent: each refuses something the other permits.
+   * Collapse them into one boolean and one of these two rows becomes wrong.
+   */
+  it('V9: each gate refuses something the other permits', () => {
+    expect(standardVersionOffer('esrs_2023', FREE).pick).toBe(false)   // lock says yes, scope says no
+    expect(standardVersionOffer('esrs_2026', AGREES).pick).toBe(false) // scope says yes, lock says no
+  })
+
+  it('V10: exactly one version is selectable on a new assessment today', () => {
+    const pickable = STANDARD_VERSION_ORDER.filter(v => standardVersionOffer(v, FREE).pick)
+    expect(pickable).toEqual(['esrs_2026'])
+  })
+
+  /**
+   * V14 pins the DOMAIN, and the Climate Risk wizard is why it matters. That chooser offers a
+   * FOURTH option — "Prefer not to state yet" — carrying null, and it must stay pickable: an
+   * UNSTATED version is permitted by Art. 2(2) and produces a screening whose report prints "Not
+   * stated" and carries on. An UNAVAILABLE version produces an impact worksheet with nothing in it.
+   * Different things, and only the second is closed. null is decided in the component, BEFORE this
+   * function is reached, precisely so availability can never close it — and widening this signature
+   * to accept null is the change that would close it.
+   */
+  it('V14: "not stated" is outside this function\'s domain, so availability cannot close it', () => {
+    expect(STANDARD_VERSION_ORDER.every(v => typeof v === 'string')).toBe(true)
+    // @ts-expect-error — null is not a StandardVersion. If this stops erroring, the signature was
+    // widened and the wizard's "Prefer not to state yet" has become an availability question.
+    standardVersionOffer(null, { kind: 'free' })
+  })
+})
+
+// ── The submit guard's sentence ──────────────────────────────────────────────────────────────────
+describe('unavailableVersionMessage', () => {
+  it('V11: it names the version in the customer\'s words, not the stored value', () => {
+    const out = unavailableVersionMessage('esrs_2023', 'created')
+    expect(out).toContain('ESRS (2023)')
+    expect(out).not.toContain('esrs_2023')
+  })
+
+  /**
+   * V12: an empty result is a result. The guard runs BEFORE the insert or the update, so the honest
+   * thing to say is that nothing was written — and which of the two it would have been.
+   */
+  it('V12: it states the outcome, and the two callers state different ones', () => {
+    expect(unavailableVersionMessage('esrs_2023', 'created')).toContain('Nothing was created.')
+    expect(unavailableVersionMessage('esrs_2023', 'saved')).toContain('Nothing was saved.')
+    expect(unavailableVersionMessage('esrs_2023', 'created'))
+      .not.toBe(unavailableVersionMessage('esrs_2023', 'saved'))
+  })
+
+  it('V13: it promises no date and does not apologise, and it says what to do instead', () => {
+    for (const v of ['esrs_2023', 'esrs_2023_reliefs', 'esrs_2026'] as StandardVersion[]) {
+      const out = unavailableVersionMessage(v, 'saved')
+      expect(out).not.toMatch(/soon|shortly|Q[1-4]|sorry|apolog/i)
+      expect(out).toContain('Choose a version that is available.')
+    }
   })
 })

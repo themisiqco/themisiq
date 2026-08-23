@@ -18,7 +18,8 @@ import { useEntitlement } from '../../../../../../lib/useEntitlement'
 import { isStandardVersion, type StandardVersion } from '../../../../../../lib/materiality'
 import { AssessmentForm, type AssessmentFormValues } from '../../AssessmentForm'
 import {
-  classifyVersionLock, assessmentSaveMessage, type VersionLock,
+  classifyVersionLock, assessmentSaveMessage, standardVersionOffer, unavailableVersionMessage,
+  type VersionLock,
 } from '../../../../../../lib/materiality/versionAgreement'
 
 const PURPLE = '#7425e3'
@@ -105,6 +106,24 @@ export default function EditAssessmentPage() {
 
   async function save() {
     if (!values) return
+    /**
+     * ⚠️ THE SAME GUARD AS new/page.tsx, IN THE SAME PLACE — the payload, not the control. This
+     * screen reaches it by a route that one does not: an assessment created BEFORE the version was
+     * withdrawn loads with esrs_2023 already in `values`, no determinations, and therefore a `free`
+     * lock. Its worksheet is already empty; letting the save through would write the same value
+     * back and keep it that way.
+     *
+     * ⚠️ `free` ONLY, and the other kinds are not oversights. `repairable` writes versionLock.to,
+     * which the determinations' foreign key has already proved is in scope (see
+     * standardVersionOffer); `agrees`, `unrepairable` and `unknown` omit the column entirely, and
+     * refusing the save on those would stop a customer editing their company name over a version
+     * this screen is not touching.
+     */
+    if (versionLock.kind === 'free' && values.version
+        && !standardVersionOffer(values.version, versionLock).pick) {
+      setError(unavailableVersionMessage(values.version, 'saved'))
+      return
+    }
     setSaving(true); setError(null)
     // ⚠️ standard_version IS SENT ONLY WHERE IT MAY LEGALLY LAND, and the omission is the guard —
     // not the disabled control, so a stale tab cannot write an old value back over a corrected one.
