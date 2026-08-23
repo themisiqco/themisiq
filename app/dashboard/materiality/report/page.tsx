@@ -723,7 +723,7 @@ function ReportInner() {
                 ? `Disclosure roadmap — ${roadmapVintage(a.workings?.drResolution)}`
                 : 'Disclosure roadmap'}</H>
               <p style={p}>
-                Each topic determined material above triggers a defined set of ESRS disclosure requirements. This roadmap translates the materiality result into the specific disclosures <strong>{a.company_name || SECTOR_LABEL[a.industry_code] || 'the entity'}</strong> must prepare — turning <em>what is material</em> into <em>what to collect and report</em>. The key disclosure requirements are shown per topic; the full set within each topical standard applies.
+                Each topic determined material above triggers a defined set of ESRS disclosure requirements. This roadmap maps those topics to the requirements ESRS Set 1 attaches to them, so <strong>{a.company_name || SECTOR_LABEL[a.industry_code] || 'the entity'}</strong> can see what these screening conclusions point to — turning <em>what is material</em> into <em>what to scope for collection and reporting</em>. It does not determine what the entity must file; applicability is the entity's own determination, made on its own facts. The key disclosure requirements are shown per topic; the full set within each topical standard applies.
               </p>
               <p style={p}>
                 Two cross-cutting elements always apply regardless of which topics are material: <strong>ESRS 2 General disclosures</strong> (governance, strategy, and the IRO-1 / IRO-2 / SBM-3 disclosures that document this materiality process), and the minimum disclosure requirements on policies, actions, targets and metrics (MDR-P / A / T / M) referenced within each topic below.

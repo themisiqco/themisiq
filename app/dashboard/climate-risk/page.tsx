@@ -489,7 +489,7 @@ export default function MaterialityWizard() {
           <p style={{ ...sectionSub, marginBottom: 24 }}>Assess your climate-related physical and transition risk, and determine what's material under your reporting standard. Double materiality adds impact materiality to single (financial) materiality. Choose the standard you report under.</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'stretch' }}>
             {[
-              { m: 's2' as Mode, t: 'IFRS S2', sub: 'Single (financial) materiality · resilience', d: 'How climate-related risks affect your enterprise value. Produces the multi-scenario climate resilience report — the resilience analysis IFRS S2 (and CSRD) call for.', feat: false },
+              { m: 's2' as Mode, t: 'IFRS S2', sub: 'Single (financial) materiality · resilience', d: 'How climate-related risks affect your enterprise value. Produces the multi-scenario climate resilience report — screening-level support for the resilience analysis IFRS S2 (and CSRD) call for.', feat: false },
               { m: 'csrd' as Mode, t: 'CSRD / ESRS', sub: 'Double materiality', d: 'Financial materiality plus impact materiality across all ten ESRS topics, plotted on the double-materiality matrix.', feat: true },
             ].map(o => (
               <div key={o.m} style={{ background: '#fff', border: o.feat ? '2px solid #7425e3' : '0.5px solid #e8e7e4', borderRadius: 16, padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
@@ -555,7 +555,7 @@ export default function MaterialityWizard() {
                     user reading both cards may well select a version and then choose s2; without
                     this, that choice would ride along into a run it has no meaning for. Explicit
                     at the point of divergence rather than trusting the radio to be untouched. */}
-                <button onClick={() => { setMode(o.m); setStep(0); if (o.m === 's2') setStandardVersion(null) }} style={{ fontSize: 13, fontWeight: 500, padding: '10px 20px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>Start {o.t} assessment</button>
+                <button onClick={() => { setMode(o.m); setStep(0); if (o.m === 's2') setStandardVersion(null) }} style={{ fontSize: 13, fontWeight: 500, padding: '10px 20px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>Start {o.t} screening</button>
               </div>
             ))}
           </div>
@@ -1190,7 +1190,7 @@ export default function MaterialityWizard() {
     return (
       <div>
         <h2 style={sectionHead}>Climate resilience analysis</h2>
-        <p style={sectionSub}>Your risk and opportunity profile tested across a diverse range of climate futures — the multi-scenario resilience assessment IFRS S2 and CSRD/ESRS ask for.</p>
+        <p style={sectionSub}>Your risk and opportunity profile tested across a diverse range of climate futures — screening-level support for the multi-scenario resilience assessment IFRS S2 and CSRD/ESRS ask for.</p>
 
         {/* trio header — provenance inline */}
         <div style={{ background: '#f8f7f5', borderRadius: 14, padding: '1.25rem', marginBottom: 12 }}>
@@ -1339,14 +1339,14 @@ export default function MaterialityWizard() {
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                       <button onClick={submitResilience} disabled={submitting || !canAdvance()} style={{ fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: '#fff', color: '#0d0d0d', border: '1px solid #e8e7e4', cursor: submitting ? 'wait' : 'pointer', opacity: (submitting || !canAdvance()) ? 0.5 : 1 }}>{submitting ? 'Running…' : 'Run resilience analysis →'}</button>
-                      <button onClick={submit} disabled={submitting || !canAdvance()} style={{ fontSize: 13, fontWeight: 600, padding: '9px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: submitting ? 'wait' : 'pointer', opacity: (submitting || !canAdvance()) ? 0.5 : 1 }}>{submitting ? 'Running…' : 'Run double materiality assessment →'}</button>
+                      <button onClick={submit} disabled={submitting || !canAdvance()} style={{ fontSize: 13, fontWeight: 600, padding: '9px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: submitting ? 'wait' : 'pointer', opacity: (submitting || !canAdvance()) ? 0.5 : 1 }}>{submitting ? 'Running…' : 'Run double materiality screening →'}</button>
                     </div>
-                    <div style={{ fontSize: 11, color: '#888784', textAlign: 'right', maxWidth: 400, lineHeight: 1.5 }}>Double materiality plots all ten ESRS topics on the financial × impact matrix using your inputs above. Resilience tests three diverse climate futures (Paris-aligned, current trajectory, high warming). Both are disclosable under CSRD/ESRS — each is saved as its own report.</div>
+                    <div style={{ fontSize: 11, color: '#888784', textAlign: 'right', maxWidth: 400, lineHeight: 1.5 }}>Double materiality plots all ten ESRS topics on the financial × impact matrix using your inputs above. Resilience tests three diverse climate futures (Paris-aligned, current trajectory, high warming). Both are pre-mapped to CSRD/ESRS disclosure requirements and support that reporting — neither, by itself, satisfies it. Each is saved as its own report.</div>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
                     <button onClick={submitResilience} disabled={submitting || !canAdvance()} style={{ fontSize: 13, fontWeight: 600, padding: '9px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: submitting ? 'wait' : 'pointer', opacity: (submitting || !canAdvance()) ? 0.5 : 1 }}>{submitting ? 'Running…' : 'Run resilience analysis →'}</button>
-                    <div style={{ fontSize: 11, color: '#888784', textAlign: 'right', maxWidth: 320, lineHeight: 1.5 }}>Recommended. Tests three diverse climate futures (Paris-aligned, current trajectory, high warming) — what IFRS S2 and CSRD ask for.</div>
+                    <div style={{ fontSize: 11, color: '#888784', textAlign: 'right', maxWidth: 320, lineHeight: 1.5 }}>Recommended. Tests three diverse climate futures (Paris-aligned, current trajectory, high warming) — screening-level support for the scenario analysis IFRS S2 and CSRD ask for.</div>
                   </div>
                 )
               ) : (
