@@ -129,9 +129,9 @@ export default function Home() {
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f8f7f5' }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff' }}>
             <div style={{ flex: '1 1 420px' }}>
-              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 6 }}>Built into climate reporting · not a separate module</div>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 6 }}>Single or double · which one applies to you</div>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.2, marginBottom: 6 }}>The Materiality Assessment</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 300 }}>Single materiality for IFRS S2, double materiality for CSRD — one engine, the methodology your auditor expects. See two sample reports for the same entity.</div>
+              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 300 }}>Single materiality for IFRS S2, double materiality for CSRD — the methodology your auditor expects. See two sample reports for the same entity.</div>
             </div>
             <span style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', padding: '11px 22px', borderRadius: 8, whiteSpace: 'nowrap' }}>See sample reports →</span>
           </a>
