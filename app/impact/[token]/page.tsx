@@ -26,6 +26,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
+import { determinationSaveMessage } from '../../../lib/materiality/versionAgreement'
 import { VALUE_CHAIN_POSITIONS as VCP, TIME_HORIZONS as HORIZONS }
   from '../../../lib/materiality/impactContext'
 import {
@@ -221,9 +222,17 @@ export default function ImpactWorksheet() {
     })
 
     setSaving(s => ({ ...s, [k]: false }))
-    // The server's own sentence, verbatim. A ¶41 refusal already explains that the answer was not
-    // saved rather than quietly dropped, and no wrapper here could say it better.
-    if (error) setBlockError(e => ({ ...e, [k]: error.message }))
+    // The server's own sentence, verbatim, with ONE exception. A ¶41 refusal already explains that
+    // the answer was not saved rather than quietly dropped, and no wrapper could say it better.
+    //
+    // ⚠️ THIS PATH SENDS NO VERSION AND CAN STILL BE REFUSED, which is why it does not get the
+    // preparer's message. impact_save_determination derives the version per call (20260840:332), so
+    // nothing stale is ever sent from here — but its ON CONFLICT DO UPDATE omits standard_version
+    // (20260840:409-418), so a row already started keeps the version it was first written under, and
+    // 20260851 §2 checks the row's STATE rather than the delta. Reloading cannot clear it: only the
+    // lead can, on the edit screen, which offers exactly the version these rows carry. That remedy
+    // exists as of the same commit as 20260851 §3 and did not before it.
+    if (error) setBlockError(e => ({ ...e, [k]: determinationSaveMessage(error, 'contributor') }))
     else setDrafts(cur => ({ ...cur, [k]: { ...d, started: true } }))
   }
 

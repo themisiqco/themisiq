@@ -16,6 +16,7 @@ import Nav from '../../components/Nav'
 import {
   resolveTopicLabels, checkReportingPeriod,
   type StandardVersion, type EsrsTopic, type TopicLabelRow,
+  STANDARD_VERSION_COPY, STANDARD_VERSION_ORDER,
 } from '../../../lib/materiality'
 
 // ─── Design tokens (matching the live climate page) ───────────────────────────
@@ -152,19 +153,9 @@ const SCENARIOS = [
 // ("employ directly" / "not by you"). Do not shorten them into symmetry.
 // Copy for the ESRS-version chooser on the mode gate.
 //
-// Typed as Record<StandardVersion, …>, which makes it EXHAUSTIVE BY CONSTRUCTION: if a fourth
-// version is ever added to the StandardVersion union, this object stops typechecking until the
-// chooser offers it. That is worth more than a comment — a version the customer cannot select is
-// a version they cannot state, on a field Art. 2(2) requires them to state.
-const STANDARD_VERSION_COPY: Record<StandardVersion, { l: string; d: string }> = {
-  esrs_2026: { l: 'ESRS (2026)', d: 'The revised standards in full. Required from FY2027.' },
-  esrs_2023_reliefs: { l: 'ESRS (2023) with reliefs', d: 'The 2023 standards plus the reliefs the new act permits.' },
-  esrs_2023: { l: 'ESRS (2023)', d: 'As last amended by Del. Reg. (EU) 2025/1416.' },
-}
-// Display order, most-forward-looking first — deliberately NOT the union's declaration order,
-// which is chronological. Listed separately so ordering is a UI decision and exhaustiveness stays
-// a type decision; the two should not constrain each other.
-const STANDARD_VERSION_ORDER: StandardVersion[] = ['esrs_2026', 'esrs_2023_reliefs', 'esrs_2023']
+// STANDARD_VERSION_COPY and STANDARD_VERSION_ORDER moved to lib/materiality.ts on 22 Aug 2026 —
+// the assessment create/edit screen needs the same chooser, and a second copy would break the
+// exhaustiveness guarantee the moment the two disagreed. Imported above.
 
 const ESRS_TOPIC_DESC: Record<string, string> = {
   E1: 'Your greenhouse gas emissions and exposure to a changing climate.',

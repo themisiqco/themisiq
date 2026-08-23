@@ -139,6 +139,15 @@ export default function WorksheetIndex() {
           </div>
         )}
 
+        {rows.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <Link href="/dashboard/materiality/assessment/new"
+                  style={{ fontSize: 12.5, fontWeight: 600, color: PURPLE, textDecoration: 'none' }}>
+              + New assessment
+            </Link>
+          </div>
+        )}
+
         {rows.length === 0 && !loadError ? (
           <div style={{ background: '#fff', border: `0.5px solid ${LINE}`, borderRadius: 16,
                         padding: '2.5rem', textAlign: 'center' }}>
@@ -146,17 +155,25 @@ export default function WorksheetIndex() {
               No assessments yet
             </div>
             <div style={{ fontSize: 13, color: MID, lineHeight: 1.8, maxWidth: 520, margin: '0 auto' }}>
-              {/* ⚠️ NAMES A DEPENDENCY ON ANOTHER MODULE, and says so plainly. An impact worksheet
-                  hangs off an assessment row, and today the only thing that creates one is the
-                  Climate Risk wizard — so a customer holding Impact Materiality alone lands here
-                  with nothing to open. The label used to read "Climate Risk & Materiality", naming
-                  a combined module that stopped existing on 22 Aug 2026 when the two were split.
-                  The dependency itself is real and unresolved: creating an assessment without the
-                  screening is its own piece of work. */}
-              An impact worksheet hangs off a materiality assessment, and the{' '}
-              <Link href="/dashboard/climate-risk" style={{ color: PURPLE }}>Climate Risk</Link>{' '}
-              module is currently the only place one can be created. Run an assessment there first,
-              then come back to divide the severity work among colleagues.
+              {/* The dependency this used to name is resolved: until 22 Aug 2026 the Climate Risk
+                  wizard was the only thing that inserted an assessment row, so a customer holding
+                  Impact Materiality alone landed here with nothing to open and a link to a module
+                  they had not bought. */}
+              An impact worksheet hangs off a materiality assessment. Create one to begin — three
+              questions: who you are reporting as, which ESRS version you report under, and the
+              period it covers.
+            </div>
+            <Link href="/dashboard/materiality/assessment/new"
+                  style={{ display: 'inline-block', marginTop: 18, fontSize: 13, fontWeight: 600,
+                           padding: '10px 22px', borderRadius: 8, background: INK, color: '#fff',
+                           textDecoration: 'none' }}>
+              Create an assessment
+            </Link>
+            <div style={{ fontSize: 11.5, color: MUTE, marginTop: 14, lineHeight: 1.7 }}>
+              {/* The other path still exists and still works — a Climate Risk customer's screening
+                  run creates an assessment too and lands them on this same list. Naming it keeps a
+                  customer who holds both modules from creating a second row for the same year. */}
+              If you also hold Climate Risk, running a screening there creates one as well.
             </div>
           </div>
         ) : (
@@ -172,6 +189,11 @@ export default function WorksheetIndex() {
                     </div>
                     <div style={{ fontSize: 11, color: MUTE }}>
                       {versionLabel(r.standard_version)} · started {fmt(r.created_at)}
+                      {' · '}
+                      {/* Beside the version label deliberately: this is where a customer notices it
+                          is wrong, and until 22 Aug 2026 there was nowhere to go from here. */}
+                      <Link href={`/dashboard/materiality/assessment/${r.id}/edit`}
+                            style={{ color: PURPLE, textDecoration: 'none' }}>Edit</Link>
                     </div>
                   </div>
 

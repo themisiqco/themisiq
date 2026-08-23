@@ -59,6 +59,27 @@ export type EsrsTopic = { code: string; label: string; category: string; sort_or
 // default: absent is an honest "not stated", wrong means the client believes it stated something.
 export type StandardVersion = 'esrs_2023' | 'esrs_2023_reliefs' | 'esrs_2026'
 export const STANDARD_VERSIONS = ['esrs_2023', 'esrs_2023_reliefs', 'esrs_2026'] as const
+
+// ── The customer-facing chooser copy ─────────────────────────────────────────────────────────────
+// Moved here from app/dashboard/climate-risk/page.tsx on 22 Aug 2026, when a second surface needed
+// it: app/dashboard/materiality/assessment/ creates and edits assessments outside the wizard. A
+// second copy would have broken the guarantee the comment below describes the moment the two
+// disagreed about a version.
+//
+// Typed as Record<StandardVersion, …>, which makes it EXHAUSTIVE BY CONSTRUCTION: if a fourth
+// version is ever added to the StandardVersion union, this object stops typechecking until the
+// chooser offers it. That is worth more than a comment — a version the customer cannot select is
+// a version they cannot state, on a field Art. 2(2) requires them to state.
+export const STANDARD_VERSION_COPY: Record<StandardVersion, { l: string; d: string }> = {
+  esrs_2026: { l: 'ESRS (2026)', d: 'The revised standards in full. Required from FY2027.' },
+  esrs_2023_reliefs: { l: 'ESRS (2023) with reliefs', d: 'The 2023 standards plus the reliefs the new act permits.' },
+  esrs_2023: { l: 'ESRS (2023)', d: 'As last amended by Del. Reg. (EU) 2025/1416.' },
+}
+
+// Display order, most-forward-looking first — deliberately NOT the union's declaration order,
+// which is chronological. Listed separately so ordering is a UI decision and exhaustiveness stays
+// a type decision; the two should not constrain each other.
+export const STANDARD_VERSION_ORDER: StandardVersion[] = ['esrs_2026', 'esrs_2023_reliefs', 'esrs_2023']
 export function isStandardVersion(v: unknown): v is StandardVersion {
   return typeof v === 'string' && (STANDARD_VERSIONS as readonly string[]).includes(v)
 }

@@ -648,8 +648,11 @@ export default function WorksheetAssign() {
                 pointing at a page with no control is worse than saying plainly that we cannot help
                 from here. The noVersion block higher up this same page has the same gap and the
                 same silence; closing it needs an edit surface, not a link. */}
-            <p style={{ ...p, color: MUTE, marginTop: 8 }}>
-              There is no way to change this from the application yet. Contact us and we will set it.
+            <p style={{ ...p, marginTop: 8 }}>
+              {/* This read "There is no way to change this from the application yet. Contact us and
+                  we will set it." until 22 Aug 2026, when the edit screen made it false. */}
+              <Link href={`/dashboard/materiality/assessment/${assessmentId}/edit`}
+                    style={{ color: PURPLE }}>State it on this assessment</Link>, then finalise.
             </p>
           </>
         )
@@ -725,7 +728,12 @@ export default function WorksheetAssign() {
               <strong>This assessment states no ESRS standard version, so nothing can be assigned.</strong>{' '}
               Every sub-topic is identified by its code <em>and</em> its standard version — the two
               together are what the database stores — so without a version there is no sub-topic to
-              point at. Set a standard version on the assessment first.
+              point at.{' '}
+              {/* Until 22 Aug 2026 this sentence ended here, telling a customer to do something the
+                  application gave them no way to do. */}
+              <Link href={`/dashboard/materiality/assessment/${assessmentId}/edit`}
+                    style={{ color: PURPLE }}>State the version on this assessment</Link>{' '}
+              and the sub-topics appear.
             </div>
           </div>
         ) : scopeSource === 'round' ? (

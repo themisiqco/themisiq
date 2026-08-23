@@ -39,6 +39,7 @@ import { scaleFor, SCOPE, IRREMEDIABILITY, LIKELIHOOD }
 // ⚠️ EVERY sub-topic on THIS screen is one the lead kept, so none of them has an assignment
 // snapshot — this screen would hit the missing-name case on every row, not occasionally.
 import { subtopicHeading } from '../../../../../../lib/materiality/subtopicName'
+import { determinationSaveMessage } from '../../../../../../lib/materiality/versionAgreement'
 import { VALUE_CHAIN_POSITIONS as VCP, TIME_HORIZONS as HORIZONS }
   from '../../../../../../lib/materiality/impactContext'
 import { ScaleField, Question, Options, Option } from '../../../../../components/severityFields'
@@ -301,9 +302,15 @@ export default function LeadDetermine() {
       .select('subtopic_code')
 
     setSaving(s => ({ ...s, [k]: false }))
-    // The database's own sentence. A ¶41 refusal already explains that nothing was saved rather
-    // than quietly dropped, and no wrapper here could put it better.
-    if (error) { setBlockError(e => ({ ...e, [k]: error.message })); return }
+    // The database's own sentence, with ONE exception. A ¶41 refusal already explains that nothing
+    // was saved rather than quietly dropped, and no wrapper here could put it better — but PT409's
+    // text names two version strings for a developer, and what the person at this screen needs to
+    // know is that `version` (read at :148 and held in state ever since) is stale and that a reload
+    // clears it. See lib/materiality/versionAgreement.ts.
+    if (error) {
+      setBlockError(e => ({ ...e, [k]: determinationSaveMessage(error, 'preparer') }))
+      return
+    }
     if (!data || data.length === 0) {
       setBlockError(e => ({ ...e, [k]:
         'Nothing was saved, and the server gave no reason. Your answer is not recorded.' }))
