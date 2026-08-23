@@ -163,3 +163,115 @@ customer exceeds that in year one. Storage cost itself is negligible (a
 100k t/yr mill generates roughly 0.3-1.4 GB/yr of evidence; Pro includes
 100GB and overage is ~$0.021/GB/month), but the plan limit is binding. This
 now blocks shipping the feature, not just prudence about backups.
+
+---
+
+## Verified 23 Aug 2026
+
+Both items below were found while making the Impact Materiality module
+discoverable. Reported, not actioned — recorded here at Lisa's instruction.
+
+### Nothing proves a module is discoverable — only that its cart resolves
+
+`impact-materiality` shipped priced (`FLAT_MODULE_PRICES`, $4,900), entitled
+(`useEntitlement('impact-materiality')` on seven worksheet/survey routes) and
+purchasable, while appearing on **no** marketing surface: absent from the Nav
+Solutions dropdown, from `HomePricing.tsx` and from `/pricing`. The full suite
+was green throughout.
+
+The reason the suite was green is precise and worth keeping: `pricing.test.ts:88`
+asserts every `ModuleKey` is reachable through `LEGACY_PRICING_PAGE_ID`, and
+`impact` **was** mapped. That test guards **cart reachability** — that a module
+selected in a cart is not silently dropped by the `.filter(Boolean)` at
+`app/order/page.tsx:75`. It says nothing about whether a customer can ever find
+the module to select it. Those are different properties and only the first is
+covered.
+
+**Proposed test — do not write yet, decide the shape first.**
+
+Where it should live: `lib/pricing.test.ts` is the wrong home. It is a pure-logic
+suite that imports only `./pricing`; a discoverability test has to read three
+React modules under `app/`, which drags JSX and the Next module graph into a
+suite that currently runs in 161 ms. Put it in a new
+`app/components/moduleSurfaces.test.ts` (or `lib/moduleSurfaces.test.ts`)
+alongside a small exported manifest — see below.
+
+What it would have to import, and why that is the hard part:
+
+- `MODULES` and `LEGACY_PRICING_PAGE_ID` from `lib/pricing.ts` — the authority for
+  what modules exist. Straightforward.
+- `HomePricing.tsx`'s `MODULES` / `MODULE_CTA` — **not currently exported.** Both
+  are module-private consts.
+- `/pricing/page.tsx`'s `MODULES` — **also not exported**, and the file is a
+  client component whose import pulls in the whole page.
+- `Nav.tsx`'s `MODULES_NAV` — **not exported**, and worse, it has **no id at all**.
+  It keys on `href`, so there is nothing to join against `ModuleKey` except a
+  by-hand path convention (`climate-ghg` for `ghg`, `climate-risk` for
+  `climate-risk`, `supply-chain` for `supply-chain`). A test would have to encode
+  that mapping, which makes the test a fourth independent copy of the same
+  knowledge — the very problem it is meant to catch.
+
+That last point is the real finding: **the test is cheap only if the data moves
+first.** The honest sequence is (a) give Nav an `id: ModuleKey`, (b) export the
+three lists, (c) then a ~15-line test asserting
+`MODULES.map(m => m.key)` appears in all three. Written before (a) and (b), the
+test hardcodes the href convention and will pass while lying.
+
+Deliberately out of scope for that test: `/advisory` is not a module and would
+fail any such assertion. See the separate note below.
+
+### `ModuleId` is declared twice and derives from nothing
+
+`app/components/HomePricing.tsx:6` and `app/pricing/page.tsx:22` each declare
+
+```ts
+type ModuleId = 'ghg' | 'cbam' | 'risk' | 'impact' | 'supply' | 'people' | 'deals' | 'ai' | 'cyber'
+```
+
+Identical, independent, no shared import, and neither derived from
+`lib/pricing.ts`. Adding a module means editing the same union in two files;
+nothing fails if you do one and forget the other. Both unions are *also* an
+untyped restatement of the keys of `LEGACY_PRICING_PAGE_ID`, which already
+enumerates exactly these nine shorthands.
+
+**What one source would take.** `lib/pricing.ts` is the right home — it already
+owns `ModuleKey`, `MODULES` and `LEGACY_PRICING_PAGE_ID`, and CLAUDE.md names it
+the single source of truth for pricing. The change is one line there:
+
+```ts
+export type ModulePageId = keyof typeof LEGACY_PRICING_PAGE_ID
+```
+
+then both files import `ModulePageId` and delete their local union. That derives
+the type from the map rather than restating it, so an id added to
+`LEGACY_PRICING_PAGE_ID` is immediately legal in both surfaces and an id removed
+from it fails both at compile time.
+
+Two caveats before doing it:
+
+- `LEGACY_PRICING_PAGE_ID` is typed `Record<string, ModuleKey>`, so
+  `keyof typeof` widens to `string` and the derived type would be useless. It has
+  to be narrowed first — drop the annotation and let the literal infer, or use
+  `satisfies Record<string, ModuleKey>`. That is a real edit to a load-bearing
+  constant, not a rename, and `pricing.test.ts:88` should be run against it.
+- The name matters. `ModuleId` inside `lib/pricing.ts` would sit confusingly
+  beside `ModuleKey`; `ModulePageId` or `ModuleShorthand` says which of the two
+  identifier spaces it belongs to. The distinction is exactly the one that
+  `?modules=impact-materiality` gets wrong.
+
+### `/advisory` has no navigation entry
+
+Not a backlog item yet — recorded so it is not rediscovered. `/advisory` is a
+live page linked from the Footer (`Footer.tsx:37`), from `app/page.tsx` three
+times, and from `/assess`, `/cyber`, `/deals` and `/climate-risk` as "Talk to a
+specialist" / "Book a demo". It appears **nowhere in `Nav.tsx`** — not in
+`MODULES_NAV`, not as a top-level item, not in the mobile menu. Whether it
+belongs in the Solutions dropdown (it is not a module) or as a sibling of
+Pricing is an open question, deliberately left for a separate conversation.
+
+### `labelShort` in `Nav.tsx` is dead data
+
+`MODULES_NAV` requires `labelShort` on every entry and nothing reads it —
+zero consumers repo-wide, only the type and the nine literals. The comment at
+`Nav.tsx:8` says it is "retained for any short-label surface". Either find the
+surface or drop the field; today it is nine strings maintained for nobody.

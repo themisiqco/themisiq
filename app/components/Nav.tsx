@@ -10,6 +10,9 @@ import { supabase } from '../../lib/supabase'
 const MODULES_NAV: { href: string; label: string; labelShort: string; sub: string }[] = [
   { href: '/climate-ghg', label: 'GHG Emissions', labelShort: 'GHG Emissions', sub: 'SB 253 · CDP · ESRS E1 · GHG Protocol · Scope 3' },
   { href: '/climate-risk', label: 'Climate Risk', labelShort: 'Climate Risk', sub: 'TCFD · IFRS S2 · ESRS E1 · scenario analysis' },
+  // Directly after Climate Risk on purpose: the two are the halves of double materiality, and
+  // the pairing should be readable in the menu without opening either page.
+  { href: '/impact-materiality', label: 'Impact Materiality', labelShort: 'Impact Materiality', sub: 'CSRD · ESRS 1 · ESRS 2 · stakeholder engagement' },
   { href: '/supply-chain', label: 'Supply Chain', labelShort: 'Supply Chain', sub: 'Supplier Portal · CS3D · EcoVadis · ESRS S2' },
   { href: '/deals', label: 'Deals & Investment', labelShort: 'Deals', sub: 'M&A diligence · PE · IFRS S2 · SB 253' },
   { href: '/people', label: 'People & Workforce', labelShort: 'People', sub: 'ESRS S1 · EU Pay Transparency · CA Pay Data' },

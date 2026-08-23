@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { tierPrice, tierStrikethrough, volumeDiscount, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, FLAT_MODULE_PRICES, LEGACY_PRICING_PAGE_ID, type Tier, type GhgTier, type ModuleKey } from '@/lib/pricing'
 
-type ModuleId = 'ghg' | 'cbam' | 'risk' | 'supply' | 'people' | 'deals' | 'ai' | 'cyber'
+type ModuleId = 'ghg' | 'cbam' | 'risk' | 'impact' | 'supply' | 'people' | 'deals' | 'ai' | 'cyber'
 
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
 
@@ -11,6 +11,11 @@ const MODULES: { id: ModuleId; name: string; frameworks: string; href: string }[
   { id: 'ghg', name: 'Climate — GHG Inventory · Scope 1, 2 & 3', frameworks: 'SB 253 · CDP · ESRS E1 · GRI 305 · IFRS S2', href: '/climate-ghg' },
   { id: 'cbam', name: 'CBAM — Carbon Border Adjustment Mechanism', frameworks: 'Regulation (EU) 2023/956 · specific embedded emissions (SEE) · direct & indirect split · precursor tracing · installation-level actuals · verification-ready summary for your EU importer', href: '/pricing?modules=cbam' },
   { id: 'risk', name: 'Climate Risk', frameworks: 'SB 261 · TCFD · IFRS S2 · scenario analysis', href: '/climate-risk' },
+  // ⚠️ id 'impact', NOT 'impact-materiality' — this id IS the LEGACY_PRICING_PAGE_ID shorthand
+  // (lib/pricing.ts:77) and is what the cart resolves through. The ModuleKey itself is not a key
+  // in that map, so it would be dropped by the .filter(Boolean) at order/page.tsx:75 and the
+  // customer would reach an empty order.
+  { id: 'impact', name: 'Impact Materiality Assessment', frameworks: 'CSRD · ESRS 1 · ESRS 2 · stakeholder engagement · double materiality', href: '/impact-materiality' },
   { id: 'supply', name: 'Supply Chain', frameworks: 'CS3D · EcoVadis · CDP supplier engagement · Modern Slavery Act', href: '/supply-chain' },
   { id: 'people', name: 'People & Workforce', frameworks: 'EU Pay Transparency · ESRS S1 · GRI 401–410', href: '/people' },
   { id: 'deals', name: 'Deals & Investment', frameworks: 'TCFD · SFDR · ILPA · IFC Performance Standards', href: '/deals' },
@@ -22,6 +27,10 @@ const MODULE_CTA: Record<ModuleId, { headline: string; btn: string; href: string
   ghg:    { headline: 'Ready to see your emissions?', btn: 'See your emissions instantly →', href: '/dashboard/ghg' },
   cbam:   { headline: 'Is your EU customer asking for your actual emissions?', btn: 'Calculate your embedded emissions →', href: '/dashboard/cbam' },
   risk:   { headline: 'Ready to assess your climate risk?', btn: 'Assess your climate risk →', href: '/dashboard/climate-risk' },
+  // ⚠️ NOT /dashboard/materiality — that path is a server redirect INTO the climate-risk wizard
+  // (app/dashboard/materiality/page.tsx:20). The worksheet index is this module's own entry
+  // point and the one gated on useEntitlement('impact-materiality').
+  impact: { headline: 'Ready to run your impact materiality assessment?', btn: 'Start your assessment →', href: '/dashboard/materiality/worksheet' },
   supply: { headline: 'Ready to map your supply chain?', btn: 'Map your supply chain →', href: '/supply-chain' },
   people: { headline: 'Do you know your gender pay gap?', btn: 'Calculate your pay gap →', href: '/people' },
   deals:  { headline: 'Ready to screen your next target?', btn: 'Screen a target →', href: '/deals' },
