@@ -348,7 +348,9 @@ export default function Page() {
           that is not in that render path: a contents list promising a section a customer may
           not receive is the defect class this page exists to avoid.
           ⚠️ NO SAMPLE IS PROMISED. Same constraint as the rest of the page. */}
-      <section style={{ padding: '5rem 2.5rem', maxWidth: 1100, margin: '0 auto', borderTop: '0.5px solid #e8e7e4' }}>
+      {/* id + scrollMarginTop: /materiality's third deliverable card links here rather than
+          restating the twelve section names, which would be a third copy of those strings. */}
+      <section id="what-you-get" style={{ padding: '5rem 2.5rem', maxWidth: 1100, margin: '0 auto', borderTop: '0.5px solid #e8e7e4', scrollMarginTop: 80 }}>
         <div style={{ maxWidth: 760 }}>
           <h2 style={sectionTitle}>What you get</h2>
           <p style={bodyPara}>

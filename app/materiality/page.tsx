@@ -1,28 +1,43 @@
 'use client'
 
 // app/materiality/page.tsx
-// ThemisIQ — Materiality Assessment marketing landing page.
+// ThemisIQ — Materiality: the EXPLAINER AND ROUTER between /climate-risk and /impact-materiality.
 //
-// Cold-visitor target. Conversion mechanic: download the two sample PDFs
-// (Model 3 — see samples, then login or talk to a specialist).
-// Tone: restrained-and-credible, matching the existing site voice.
-// Audience: anyone holding sustainability-disclosure responsibility —
-// compliance, legal, finance, or sustainability — since not every company
-// has a dedicated sustainability lead.
+// ⚠️ THIS PAGE SELLS NOTHING, AND THAT IS THE DESIGN. It carries no price, no /order link and no
+// cart. Until 23 August 2026 it sold Climate Risk at Climate Risk's price under a header comment
+// reading "THERE IS NO MATERIALITY MODULE TO BUY" — true when written, false from 22 August, when
+// impact-materiality became its own $4,900 module (lib/pricing.ts:193). A page named after a
+// concept that TWO priced modules deliver cannot name one price without misleading whoever came
+// for the other, and a buyer can act on that with a card.
+//
+// WHAT ITS JOB IS NOW. It owns the generic search term — "materiality assessment" — which neither
+// module name is, and which the homepage capability strip promises ("Single or double · which one
+// applies to you" → "See sample reports →"). It answers that question, shows the two samples, and
+// hands off. Its success measure is the CORRECT MODULE REACHED, not an order placed.
+//
+// ⚠️ THE TWO SAMPLES ARE BOTH CLIMATE-RISK OUTPUTS and belong here, not on /impact-materiality.
+// The CSRD one is emitted by app/dashboard/materiality/report/page.tsx:528, which gates on
+// useEntitlement('climate-risk') and whose own comment records that nothing in it reads a
+// determination, a survey response or a finalisation. "The difference is the standard, not the
+// engine" is therefore TRUE of these two documents, and it stays. What was removed is the hero's
+// broader "through one engine", which claimed the same thing about materiality at ThemisIQ as a
+// whole — where it is no longer true. Same words, different scope, different verdict.
 
 import Link from 'next/link'
-// PACKS and NEW_PRICING_ACTIVE were imported for a dead branch and are gone from this file only.
-// PACKS remains LIVE in app/api/checkout, app/api/admin/create-invoice, app/page.tsx and
-// app/get-started/_pack/PackFlow.tsx — do not read its removal here as a signal it is retired.
-import { cartQuote, FLAT_MODULE_PRICES, type ModuleKey } from '@/lib/pricing'
+import Nav from '@/app/components/Nav'
+import Footer from '@/app/components/Footer'
 import { IFRS_S2_STATUS_SENTENCE, IFRS_S2_SHORT } from '@/lib/ifrsS2'
+import {
+  CSRD_SHORT, CSRD_EU_SCOPE_SENTENCE, CSRD_FIRST_REPORT_SENTENCE, CSRD_LISTED_SME_SENTENCE,
+  CSRD_NON_EU_SENTENCE, CSRD_DOUBLE_MATERIALITY_SENTENCE, ESRS_TEN_TOPICS_SENTENCE,
+  CSRD_AS_OF, CSRD_REVISION_NOTE,
+} from '@/lib/csrd'
 
 const GRAD = 'linear-gradient(135deg, #7425e3, #1fb1ff, #64fe3e)'
 
 // ─── Page-level shared styles ────────────────────────────────────────────────
 const s: Record<string, React.CSSProperties> = {
   page: { fontFamily: 'system-ui, sans-serif', background: '#f8f7f5', minHeight: '100vh' },
-  nav: { background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2rem', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky' as const, top: 0, zIndex: 100 },
   wrap: { maxWidth: 860, margin: '0 auto', padding: '0 2rem' },
   section: { padding: '3rem 0', borderBottom: '0.5px solid #e8e7e4' },
   sectionTitle: { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.6rem, 3vw, 2rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 10 },
@@ -31,133 +46,58 @@ const s: Record<string, React.CSSProperties> = {
 }
 
 const gradText: React.CSSProperties = {
-  background: GRAD,
-  WebkitBackgroundClip: 'text',
-  WebkitTextFillColor: 'transparent',
-  backgroundClip: 'text',
+  background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
 }
 
-const primaryBtn: React.CSSProperties = {
-  padding: '11px 22px', borderRadius: 8, fontSize: 13, fontWeight: 600,
-  color: '#0d0d0d', background: GRAD, border: 'none', cursor: 'pointer',
-  whiteSpace: 'nowrap', textDecoration: 'none', display: 'inline-block',
-}
 const ghostBtn: React.CSSProperties = {
   padding: '11px 22px', borderRadius: 8, fontSize: 13, fontWeight: 500,
   color: '#0d0d0d', background: '#fff', border: '1px solid #e8e7e4',
   cursor: 'pointer', whiteSpace: 'nowrap', textDecoration: 'none', display: 'inline-block',
 }
 
-export default function MaterialityMarketingPage() {
-  // THERE IS NO MATERIALITY MODULE TO BUY, and the buy path has to say so. Materiality is delivered
-  // by the Climate Risk module — lib/pricing.ts states it on the ModuleKey itself ('climate-risk' //
-  // includes the materiality wizard + report), /dashboard/materiality is a redirect to
-  // /dashboard/climate-risk, and the gate there reads useEntitlement('climate-risk'). So the price
-  // is Climate Risk's, the order shorthand is 'risk', and the line beside each button tells the
-  // customer what they are actually buying. Same shape as app/supply-chain/page.tsx:9 — a bare
-  // FLAT_MODULE_PRICES lookup, a plain <a> to /order, and the price as the label.
-  const riskPrice = FLAT_MODULE_PRICES['climate-risk'].toLocaleString('en-US')
+export default function MaterialityRouterPage() {
   return (
     <div style={s.page}>
-
-      {/* Nav */}
-      <nav style={s.nav}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <Link href="/">
-            <img src="/logo.png" alt="ThemisIQ" style={{ height: 24, width: 'auto', display: 'block' }} />
-          </Link>
-          <span style={{ fontSize: 12, color: '#888784' }}>/ Materiality</span>
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <Link href="/pricing" style={ghostBtn}>Pricing</Link>
-          <Link href="/advisory" style={primaryBtn}>Talk to a specialist →</Link>
-        </div>
-      </nav>
+      <Nav />
 
       <div style={s.wrap}>
 
-        {/* ── HERO ───────────────────────────────────────────────────────── */}
+        {/* ═══ 1 · HERO ═══════════════════════════════════════════════════════
+            ONE LINK, and it is the anchor. The homepage capability strip's CTA is literally
+            "See sample reports →", so a visitor arriving on that promise reaches them in one
+            click. The price button, the /order link and the "Talk to a specialist" button that
+            used to sit here are gone — routing happens at §7, not in the hero. */}
         <section style={{ ...s.section, paddingTop: '4rem', textAlign: 'center', borderBottom: 'none' }}>
           <div style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#7425e3', border: '1px solid rgba(116,37,227,0.2)', borderRadius: 99, padding: '4px 14px', marginBottom: 16 }}>
-            IFRS S2 · CSRD ESRS · TCFD-aligned
+            IFRS S2 · CSRD · ESRS · single and double materiality
           </div>
           <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.2, marginBottom: 16 }}>
             The Materiality Assessment<br />
-            <span style={gradText}>Knowing what matters for your organization.</span>
+            <span style={gradText}>Which one applies to you.</span>
           </h1>
           <p style={{ fontSize: 15, color: '#555553', fontWeight: 300, lineHeight: 1.8, maxWidth: 620, margin: '0 auto 28px' }}>
-            Both IFRS S2 and CSRD ESRS require you to determine which sustainability topics are material, and to document how you reached that judgment. What differs is what obliges you: CSRD applies as EU law, while IFRS S2 binds only where a jurisdiction has adopted it. ThemisIQ&apos;s Materiality Assessment delivers single materiality for IFRS S2 and double materiality for CSRD — through one engine, with the methodology your auditor expects.
+            A materiality assessment determines which sustainability topics matter enough to report on, and documents how you reached that judgment. IFRS S2 asks one question and CSRD asks two &mdash; and which half you need is what decides which ThemisIQ module you need.
           </p>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <a href="#samples" style={primaryBtn}>See a sample report ↓</a>
-            <a href="/order?modules=risk" style={ghostBtn}>${riskPrice}/yr</a>
-            <Link href="/advisory" style={ghostBtn}>Talk to a specialist</Link>
-          </div>
-          <p style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 14 }}>
-            Materiality comes with Climate Risk — there is no separate module to buy.
-          </p>
+          <a href="#samples" style={ghostBtn}>See the sample reports &darr;</a>
         </section>
 
-        {/* ── REGULATORY URGENCY ─────────────────────────────────────────── */}
+        {/* ═══ 2 · WHAT IS IT — PROMOTED ABOVE THE URGENCY BLOCK ═══════════════
+            The homepage strip now asks "Single or double · which one applies to you", so a
+            visitor arriving on that promise meets the difference immediately. Urgency-first was
+            right when this page was selling — establish the deadline, then the product. A router
+            explains first and says when it bites second. */}
         <section style={s.section}>
-          <div style={s.eyebrow}>Why now</div>
-          <h2 style={s.sectionTitle}>Both frameworks make you determine it — and show your working.</h2>
+          <div style={s.eyebrow}>What is a materiality assessment?</div>
+          <h2 style={s.sectionTitle}>Single materiality, double materiality &mdash; what&apos;s the difference?</h2>
           <p style={s.sectionLead}>
-            Both major global frameworks now require entities to formally determine which sustainability topics are material — and to document the methodology behind that judgment. Auditors and assurance providers expect to see this work, not just its conclusions.
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginTop: 8 }}>
-            <div style={{ background: '#E6F1FB', border: '1px solid rgba(12,68,124,0.15)', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0C447C', marginBottom: 6 }}>IFRS S2 / ISSB</div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>{IFRS_S2_SHORT}</div>
-              <p style={{ fontSize: 13, color: '#374151', lineHeight: 1.7, margin: 0 }}>
-                {IFRS_S2_STATUS_SENTENCE} S2 requires identifying climate-related risks and opportunities that could reasonably be expected to affect enterprise value — a single (financial) materiality judgment.
-              </p>
-            </div>
-            <div style={{ background: '#FEF3E2', border: '1px solid rgba(186,117,23,0.15)', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#ba7517', marginBottom: 6 }}>CSRD / ESRS</div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>Wave 2 · 2026</div>
-              <p style={{ fontSize: 13, color: '#374151', lineHeight: 1.7, margin: 0 }}>
-                Large EU companies and EU-listed entities file their first ESRS reports starting in 2026 for FY2025 data; Wave 2 listed SMEs follow for FY2026. CSRD requires <em>double materiality</em> — the topics that affect the entity (financial) and those the entity affects (impact), across all ten ESRS topical standards.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* ── WHO IN YOUR ORG ────────────────────────────────────────────── */}
-        <section style={s.section}>
-          <div style={s.eyebrow}>Who needs this in your organization</div>
-          <h2 style={s.sectionTitle}>Compliance, Legal, Finance, or Sustainability — whoever is holding the question.</h2>
-          <p style={s.sectionLead}>
-            Sustainability disclosure obligations are landing across functions. Many organizations don't yet have a dedicated sustainability lead — the responsibility falls to whoever is closest to the regulatory exposure. The Materiality Assessment is designed to be useful regardless of where you sit.
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginTop: 8 }}>
-            {[
-              { who: 'Compliance', what: 'Documented methodology, audit trail, and defensible scoping for regulatory submissions.' },
-              { who: 'Legal', what: 'Framework alignment (IPCC AR6, TCFD, ESRS) — no licensed third-party classification reproduced. Clear limitations stated.' },
-              { who: 'Finance', what: 'Financial materiality scoring across topics, with the scenario rationale required by S2 and ESRS.' },
-              { who: 'Sustainability', what: 'Double materiality matrix, full ESRS topic coverage, methodology built on public frameworks.' },
-            ].map(role => (
-              <div key={role.who} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem 1.25rem' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 6 }}>{role.who}</div>
-                <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.65 }}>{role.what}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ── WHAT IS MATERIALITY ─────────────────────────────────────────── */}
-        <section style={s.section}>
-          <div style={s.eyebrow}>What is materiality assessment?</div>
-          <h2 style={s.sectionTitle}>Single materiality, double materiality — what's the difference?</h2>
-          <p style={s.sectionLead}>
-            Both frameworks ask you to identify which sustainability topics are material. They differ on what counts as material — and that distinction is what separates an S2 disclosure from a CSRD disclosure.
+            Both frameworks ask you to identify which sustainability topics are material. They differ on what counts as material &mdash; and that distinction is what separates an S2 disclosure from a CSRD disclosure.
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
             <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0C447C', marginBottom: 6 }}>Single (financial) materiality</div>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 8 }}>IFRS S2 / ISSB</div>
               <p style={{ fontSize: 13, color: '#374151', lineHeight: 1.7, margin: 0 }}>
-                The <strong>outside-in</strong> view: how do climate-related (and broader sustainability) risks affect the entity's enterprise value? One axis: financial impact.
+                The <strong>outside-in</strong> view: how do climate-related (and broader sustainability) risks affect the entity&apos;s enterprise value? One axis: financial impact.
               </p>
             </div>
             <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
@@ -169,27 +109,23 @@ export default function MaterialityMarketingPage() {
             </div>
           </div>
 
-          {/* Small visual: the two-axis matrix concept */}
+          {/* The two-axis matrix concept. Unchanged — it audited as true, it is the only
+              illustration of the concept on the site, and it is what the samples show. */}
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.5rem', marginTop: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#888784', marginBottom: 12, textAlign: 'center' }}>The double materiality matrix</div>
             <svg viewBox="0 0 500 280" style={{ width: '100%', height: 'auto', display: 'block' }} role="img" aria-label="Double materiality matrix illustration">
-              {/* axes */}
               <line x1={60} y1={20} x2={60} y2={240} stroke="#888784" />
               <line x1={60} y1={240} x2={460} y2={240} stroke="#888784" />
-              {/* midlines */}
               <line x1={60} y1={130} x2={460} y2={130} stroke="#e8e7e4" strokeDasharray="4 4" />
               <line x1={260} y1={20} x2={260} y2={240} stroke="#e8e7e4" strokeDasharray="4 4" />
-              {/* axis labels */}
               <text x={20} y={130} textAnchor="middle" fontSize={11} fill="#555553" transform="rotate(-90 20 130)">Financial materiality →</text>
               <text x={260} y={268} textAnchor="middle" fontSize={11} fill="#555553">Impact materiality →</text>
               <text x={52} y={26} textAnchor="end" fontSize={10} fill="#888784">High</text>
               <text x={52} y={240} textAnchor="end" fontSize={10} fill="#888784">Low</text>
-              {/* quadrant labels (faint) */}
               <text x={160} y={80} textAnchor="middle" fontSize={11} fill="#bbb">Financial only</text>
               <text x={360} y={80} textAnchor="middle" fontSize={11} fontWeight={600} fill="#A32D2D">Material on both</text>
               <text x={160} y={195} textAnchor="middle" fontSize={11} fill="#bbb">Lower priority</text>
               <text x={360} y={195} textAnchor="middle" fontSize={11} fill="#bbb">Impact only</text>
-              {/* example dots */}
               <circle cx={350} cy={70} r={14} fill="#A32D2D" opacity={0.88} />
               <text x={350} y={74} textAnchor="middle" fontSize={11} fontWeight={700} fill="#fff">E1</text>
               <circle cx={390} cy={95} r={14} fill="#A32D2D" opacity={0.88} />
@@ -200,174 +136,240 @@ export default function MaterialityMarketingPage() {
               <text x={130} y={214} textAnchor="middle" fontSize={11} fontWeight={700} fill="#fff">S4</text>
             </svg>
             <p style={{ fontSize: 12, color: '#888784', textAlign: 'center', margin: '12px 0 0', lineHeight: 1.6 }}>
-              Each ESRS topic is plotted on both axes. Topics in the top-right are material on both — your highest reporting and management priority.
+              Each ESRS topic is plotted on both axes. Topics in the top-right are material on both &mdash; your highest reporting and management priority.
             </p>
           </div>
         </section>
 
-        {/* ── HOW IT WORKS ────────────────────────────────────────────────── */}
+        {/* ═══ 3 · WHY NOW — BOTH SIDES NOW CONSTANT-BACKED ════════════════════
+            ⚠️ EVERY DATE AND THRESHOLD BELOW IS IMPORTED. The CSRD card used to be hand-typed
+            and said "Wave 2 · 2026 … first ESRS reports starting in 2026 for FY2025 data;
+            Wave 2 listed SMEs follow for FY2026" — the pre-Omnibus position, contradicted by
+            /impact-materiality on the same site. The IFRS S2 card beside it never drifted,
+            because it reads IFRS_S2_STATUS_SENTENCE. Both sides now read from a constant. Do not
+            retype a figure into this JSX; add it to lib/csrd.ts. */}
         <section style={s.section}>
-          <div style={s.eyebrow}>How it works</div>
-          <h2 style={s.sectionTitle}>From inputs to defensible output — in less time than you think.</h2>
+          <div style={s.eyebrow}>Why now</div>
+          <h2 style={s.sectionTitle}>Both frameworks make you determine it &mdash; and show your working.</h2>
           <p style={s.sectionLead}>
-            A guided wizard captures the entity's profile and produces a complete materiality determination, risk register, and methodology-rich report ready for review.
+            Both major global frameworks now require entities to formally determine which sustainability topics are material &mdash; and to document the methodology behind that judgment. Auditors and assurance providers expect to see this work, not just its conclusions.
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginTop: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginTop: 8 }}>
+            <div style={{ background: '#E6F1FB', border: '1px solid rgba(12,68,124,0.15)', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0C447C', marginBottom: 6 }}>IFRS S2 / ISSB</div>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>{IFRS_S2_SHORT}</div>
+              <p style={{ fontSize: 13, color: '#374151', lineHeight: 1.7, margin: 0 }}>
+                {IFRS_S2_STATUS_SENTENCE} S2 requires identifying climate-related risks and opportunities that could reasonably be expected to affect enterprise value &mdash; a single (financial) materiality judgment.
+              </p>
+            </div>
+            <div style={{ background: '#FEF3E2', border: '1px solid rgba(186,117,23,0.15)', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#ba7517', marginBottom: 6 }}>CSRD / ESRS</div>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>{CSRD_SHORT}</div>
+              <p style={{ fontSize: 13, color: '#374151', lineHeight: 1.7, margin: 0 }}>
+                {CSRD_EU_SCOPE_SENTENCE} {CSRD_FIRST_REPORT_SENTENCE} {CSRD_LISTED_SME_SENTENCE} {CSRD_DOUBLE_MATERIALITY_SENTENCE} {ESRS_TEN_TOPICS_SENTENCE}
+              </p>
+            </div>
+          </div>
+          <p style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.7, marginTop: 14 }}>
+            {CSRD_NON_EU_SENTENCE} Scope thresholds and reporting dates {CSRD_AS_OF}. {CSRD_REVISION_NOTE} If you are close to a threshold, check your position rather than relying on a summary.
+          </p>
+        </section>
+
+        {/* ═══ 4 · WHO IN YOUR ORG ═════════════════════════════════════════════
+            ⚠️ REWRITTEN TO BE MODULE-NEUTRAL. The four cards used to describe one module's
+            OUTPUT — the Sustainability card promised "double materiality matrix, full ESRS topic
+            coverage", which is the climate-risk screening. On a page that stands above both
+            modules the cards have to describe what the QUESTION means for each role. The
+            Sustainability card now names the stakeholder engagement ESRS requires, which is the
+            impact half, and is the first place on this page that the handoff is visible. */}
+        <section style={s.section}>
+          <div style={s.eyebrow}>Who needs this in your organization</div>
+          <h2 style={s.sectionTitle}>Compliance, Legal, Finance, or Sustainability &mdash; whoever is holding the question.</h2>
+          <p style={s.sectionLead}>
+            Sustainability disclosure obligations are landing across functions. Many organizations don&apos;t yet have a dedicated sustainability lead &mdash; the responsibility falls to whoever is closest to the regulatory exposure. This page is written to be useful regardless of where you sit.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginTop: 8 }}>
             {[
-              { n: '1', t: 'Profile', d: 'Entity, sector, IPCC AR6 regions of operation, asset profile, policy jurisdictions, reporting period.' },
-              { n: '2', t: 'Scenario', d: 'Sensible defaults pre-selected (SSP2-4.5, medium horizon) with rationale — change them if you have a reason to.' },
-              { n: '3', t: 'Impact (CSRD only)', d: 'Self-assessment across the ten ESRS topics, pre-filled from industry baseline — adjust to your reality.' },
-              { n: '4', t: 'Determine', d: 'Materiality determination, double materiality matrix, physical and transition risk register, and a downloadable CSRD- or S2-shaped report.' },
-            ].map(step => (
-              <div key={step.n} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem 1.1rem' }}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: 22, fontWeight: 400, color: '#7425e3', marginBottom: 4 }}>{step.n}</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', marginBottom: 6 }}>{step.t}</div>
-                <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{step.d}</div>
+              { who: 'Compliance', what: 'A documented methodology and an audit trail — the working, not just the conclusion. It is the working an assurance provider asks for first.' },
+              { who: 'Legal', what: 'Framework alignment stated, limitations stated, and no licensed third-party classification reproduced. What is claimed, and what is not.' },
+              { who: 'Finance', what: 'The financial-materiality axis, and the scenario rationale IFRS S2 and ESRS both require you to state rather than assume.' },
+              { who: 'Sustainability', what: 'Both axes across the ten ESRS topics — including the stakeholder engagement ESRS requires on the impact side, which is a separate exercise from scoring.' },
+            ].map(role => (
+              <div key={role.who} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem 1.25rem' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 6 }}>{role.who}</div>
+                <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.65 }}>{role.what}</div>
               </div>
             ))}
           </div>
         </section>
 
-        {/* ── SAMPLES (THE CONVERSION ANCHOR) ─────────────────────────────── */}
+        {/* ═══ 5 · THE DELIVERABLES ════════════════════════════════════════════
+            The destination of the homepage strip's "See sample reports →".
+            ⚠️ THE HEADING CARRIES NO COUNT, ON PURPOSE. "Three documents, two you can download"
+            would be accurate today and stale the day a board-report sample ships — the one
+            change we know is coming. "What each module produces" survives it.
+            ⚠️ "BETWEEN THOSE TWO" IN THE LEAD IS LOAD-BEARING. "The difference is the standard,
+            not the engine" is true of the two climate-risk documents and false across all three,
+            because the board report comes from a different engine. The scope lives INSIDE the
+            sentence rather than in the surrounding paragraph, so a reader scanning three cards
+            cannot carry the claim across them.
+            ⚠️ THE THIRD CARD PROMISES NOTHING. No "coming soon", no date, no "shortly". It
+            describes the document and states that no sample is published. That is the whole of it.
+            ⚠️ IT LISTS NO SECTION NAMES. lib/materiality/boardReport.ts is the source, and
+            /impact-materiality's contents list is already a second copy of those twelve strings
+            and says so in its own comment. A third copy here — on a page that is not even the
+            module's own — would drift somewhere nobody would look. "Twelve sections" is a count,
+            not one of the strings. The card's title IS TITLE from boardReport.ts: one string, and
+            a card naming a document has to name it. The link carries the rest. */}
         <section id="samples" style={{ ...s.section, scrollMarginTop: 80 }}>
-          <div style={s.eyebrow}>See the deliverable</div>
-          <h2 style={s.sectionTitle}>Two sample reports — same entity, two standards.</h2>
+          <div style={s.eyebrow}>See the deliverables</div>
+          <h2 style={s.sectionTitle}>What each module produces.</h2>
           <p style={s.sectionLead}>
-            Both samples below were generated by the live ThemisIQ Materiality Assessment for a fictional industrial-manufacturing entity (Magnetic Industrial Components Ltd., FY2025) operating in Eastern North America and Northern Europe. Same entity, two standards — the difference is the standard, not the engine.
+            Each module produces its own document. The two you can download were both generated by the Climate Risk &amp; Materiality module, for a fictional industrial-manufacturing entity (Magnetic Industrial Components Ltd., FY2025) operating in Eastern North America and Northern Europe &mdash; one the multi-scenario resilience report, the other the double materiality screening, because that is what each standard asks for. Between those two, the difference is the standard, not the engine. The third comes from the other module.
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginTop: 8 }}>
-            {/* IFRS S2 sample */}
             <div style={{ background: '#fff', border: '2px solid #0C447C', borderRadius: 14, overflow: 'hidden' }}>
               <div style={{ background: '#E6F1FB', padding: '1.25rem 1.5rem', borderBottom: '1px solid rgba(12,68,124,0.2)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0C447C', marginBottom: 4 }}>IFRS S2 / ISSB sample</div>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.25rem', color: '#0d0d0d' }}>Climate Resilience Analysis Report</div>
                 <div style={{ fontSize: 12, color: '#555553', marginTop: 4 }}>Multi-scenario resilience · IFRS S2 · 8 pages</div>
+                <div style={{ fontSize: 11, color: '#0C447C', fontWeight: 600, marginTop: 6 }}>From Climate Risk &amp; Materiality</div>
               </div>
               <div style={{ padding: '1.25rem 1.5rem' }}>
                 <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.7, marginBottom: 14 }}>
                   Cover · executive summary · methodology · scenario rationale · physical &amp; transition risk register.
                 </div>
-                <a href="/samples/magnetic-industrial-s2-climate-resilience.pdf" target="_blank" rel="noopener noreferrer" style={{ ...primaryBtn, background: '#0C447C', color: '#fff' }}>
-                  ⬇ Download IFRS S2 sample (PDF)
+                <a href="/samples/magnetic-industrial-s2-climate-resilience.pdf" target="_blank" rel="noopener noreferrer" style={{ ...ghostBtn, background: '#0C447C', color: '#fff', border: 'none' }}>
+                  &darr; Download IFRS S2 sample (PDF)
                 </a>
               </div>
             </div>
-            {/* CSRD sample */}
             <div style={{ background: '#fff', border: '2px solid #1e1b4b', borderRadius: 14, overflow: 'hidden' }}>
               <div style={{ background: '#eef2ff', padding: '1.25rem 1.5rem', borderBottom: '1px solid rgba(30,27,75,0.2)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1e1b4b', marginBottom: 4 }}>CSRD / ESRS sample</div>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.25rem', color: '#0d0d0d' }}>Double Materiality Screening Report</div>
                 <div style={{ fontSize: 12, color: '#555553', marginTop: 4 }}>Double materiality · 15 pages · with matrix</div>
+                <div style={{ fontSize: 11, color: '#1e1b4b', fontWeight: 600, marginTop: 6 }}>From Climate Risk &amp; Materiality</div>
               </div>
               <div style={{ padding: '1.25rem 1.5rem' }}>
                 <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.7, marginBottom: 14 }}>
-                  Everything in the S2 report, plus the double materiality matrix and full materiality determination across all ten ESRS topics.
+                  {/* ⚠️ THE SECOND SENTENCE IS THE POINT OF THIS CARD. Without it, a card titled
+                      "Double Materiality Screening Report" on a site that sells a separate Impact
+                      Materiality module invites the reader to conclude the screening already
+                      covers CSRD — which the report's own cover denies. Do not trim it for
+                      length. */}
+                  Everything in the S2 report, plus the double materiality matrix and a first-pass score for all ten ESRS topics on both axes. It does not include the stakeholder engagement ESRS requires on the impact side &mdash; its own cover says so.
                 </div>
-                <a href="/samples/magnetic-industrial-csrd-double-materiality.pdf" target="_blank" rel="noopener noreferrer" style={{ ...primaryBtn, background: '#1e1b4b', color: '#fff' }}>
-                  ⬇ Download CSRD sample (PDF)
+                <a href="/samples/magnetic-industrial-csrd-double-materiality.pdf" target="_blank" rel="noopener noreferrer" style={{ ...ghostBtn, background: '#1e1b4b', color: '#fff', border: 'none' }}>
+                  &darr; Download CSRD sample (PDF)
                 </a>
               </div>
             </div>
+            {/* Visually subordinate: hairline border not 2px, neutral header not a tint, a text
+                link not a button — because there is nothing to download. Spans the row so the two
+                live cards keep their width; three columns at ~796px would wrap their titles to
+                four lines to accommodate the card with no file behind it. */}
+            <div style={{ gridColumn: '1 / -1', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 14, overflow: 'hidden' }}>
+              <div style={{ background: '#f8f7f5', padding: '1.25rem 1.5rem', borderBottom: '0.5px solid #e8e7e4' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>CSRD / ESRS &mdash; the impact side</div>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.25rem', color: '#0d0d0d' }}>Impact materiality report</div>
+                <div style={{ fontSize: 12, color: '#555553', marginTop: 4 }}>Board paper · twelve sections</div>
+                <div style={{ fontSize: 11, color: '#555553', fontWeight: 600, marginTop: 6 }}>From Impact Materiality Assessment</div>
+              </div>
+              <div style={{ padding: '1.25rem 1.5rem' }}>
+                <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.7, marginBottom: 14 }}>
+                  Built from stakeholder responses and the determinations recorded against them, written for directors rather than specialists. <strong>No sample is published.</strong>
+                </div>
+                <Link href="/impact-materiality#what-you-get" style={{ fontSize: 13, fontWeight: 600, color: '#7425e3', textDecoration: 'none' }}>See what is in it &rarr;</Link>
+              </div>
+            </div>
           </div>
-          <p style={{ fontSize: 12, color: '#888784', lineHeight: 1.7, marginTop: 16, fontStyle: 'italic', textAlign: 'center' }}>
+          <p style={{ fontSize: 12, color: '#888784', lineHeight: 1.7, marginTop: 16, fontStyle: 'italic' }}>
             Samples are illustrative outputs from the live tool, generated for a fictional entity. Your own report would be specific to your inputs and saved to your private account.
           </p>
         </section>
 
-        {/* ── WHY THEMISIQ ────────────────────────────────────────────────── */}
+        {/* ═══ 6 · THE HONESTY BOX, TURNED INTO THE HANDOFF ════════════════════
+            This box is the best thing on the old page and the only survivor of its "Why ThemisIQ"
+            section — the four methodology cards that surrounded it (IPCC AR6 regions, TCFD
+            categories, ESRS topics, SSP/NGFS scenarios) were climate-risk's methodology argued on
+            a page that stands above both modules, and they went with it. So did the
+            dangerouslySetInnerHTML they were rendered through, which existed to emit one &amp;.
+            WHAT CHANGED IN THE BOX ITSELF: it lists three things a fully compliant ESRS
+            assessment additionally requires. When it was written, all three were the reader's
+            problem and the box left them at a dead end. One of the three is now a ThemisIQ
+            module. Naming which is the difference between honesty and a lost customer — and the
+            honesty is unchanged either way, because the requirement was always real.
+            ⚠️ THE TWO CLAIMS ARE DELIBERATELY ASYMMETRIC, AND THAT IS NOT AN INCONSISTENCY.
+            Climate Risk's resilience analysis SUPPORTS the resilience requirement — it is a
+            screening across three scenarios, not the assessment the standards ask for, which is
+            why five strings on /climate-risk were changed from "the resilience analysis IFRS S2
+            and CSRD call for" to "screening-level support for" it on 23 Aug 2026. The Impact
+            Materiality Assessment DOES the stakeholder engagement: it runs the survey, holds the
+            responses and records determinations against them. One is a screening standing in for
+            an exercise; the other is the exercise. Do not level the two verbs. */}
         <section style={s.section}>
-          <div style={s.eyebrow}>Why ThemisIQ</div>
-          <h2 style={s.sectionTitle}>Built on public frameworks. Defensible by design.</h2>
-          <p style={s.sectionLead}>
-            The Materiality Assessment is grounded in independent, public methodology — no licensed third-party classification is reproduced. Every weighting and topic mapping is traceable to its source framework.
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginTop: 8 }}>
-            {[
-              { t: 'IPCC AR6 reference regions', d: 'The 20 land regions used for physical-risk geography are drawn from the IPCC Sixth Assessment Report Working Group I reference-region set.' },
-              { t: 'TCFD risk categories', d: 'Transition risks follow the Task Force on Climate-related Financial Disclosures classification: policy, technology, market, and reputation.' },
-              { t: 'ESRS topical standards', d: 'The impact-materiality axis assesses the ten ESRS topical standards (E1–E5 environmental, S1–S4 social, G1 governance).' },
-              { t: 'IPCC SSP &amp; NGFS scenarios', d: 'Both IPCC Shared Socioeconomic Pathways (SSP1-2.6, SSP2-4.5, SSP5-8.5) and NGFS scenarios (Orderly, Disorderly, Hot House) are available.' },
-            ].map(item => (
-              <div key={item.t} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem 1.25rem' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', marginBottom: 6 }}>{item.t}</div>
-                <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.7 }} dangerouslySetInnerHTML={{ __html: item.d }} />
-              </div>
-            ))}
-          </div>
-
-          <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.5rem 1.75rem', marginTop: 18 }}>
+          <div style={s.eyebrow}>What a screening is, and is not</div>
+          <h2 style={s.sectionTitle}>What a full ESRS assessment also needs.</h2>
+          <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.5rem 1.75rem' }}>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>Intellectual honesty</div>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', lineHeight: 1.7, margin: '0 0 12px' }}>
+              The reports above are a <strong style={{ color: '#fff' }}>structured screening</strong>, intended to scope and support a formal IFRS S2 disclosure or CSRD double materiality assessment. Every report says so on its cover, not in fine print.
+            </p>
             <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', lineHeight: 1.7, margin: 0 }}>
-              The ThemisIQ Materiality Assessment is a <strong style={{ color: '#fff' }}>structured screening</strong> intended to scope and support a formal IFRS S2 disclosure or CSRD double materiality assessment. A fully compliant ESRS assessment additionally requires a defined materiality threshold agreed by governance, stakeholder engagement informing the impact axis, and resilience testing across a range of scenarios. We tell you this on the cover of every report, not in fine print.
+              A fully compliant ESRS assessment additionally requires a materiality threshold agreed and documented by your governance body, resilience testing across a range of scenarios, and stakeholder engagement informing the impact axis. The first is yours to set. Climate Risk&apos;s resilience analysis is screening-level support for the second, not the second itself. The third is what the{' '}
+              <Link href="/impact-materiality" style={{ color: '#fff', textDecoration: 'underline' }}>Impact Materiality Assessment</Link>
+              {' '}does &mdash; and it is a separate module because it is a separate exercise: a stakeholder survey, named contributors, and determinations recorded against what they told you.
             </p>
           </div>
         </section>
 
-        {/* ── PRICING TEASER ──────────────────────────────────────────────── */}
-        <section style={s.section}>
-          {/* THIS SECTION USED TO BE THE ONLY BUY PATH ON THE PAGE, AND IT SOLD SOMETHING THAT DOES
-              NOT EXIST. The eyebrow read 'Two paths to the deliverable' and the lede said materiality
-              was 'included in our reporting-obligation packs and in three of our driver-based starter
-              packs' — naming two pack products, 'IFRS S2 Compliance Pack' and 'CSRD Compliance Pack',
-              that the cart cannot sell. Meanwhile the ACTUAL path was absent from the page entirely:
-              materiality is delivered by the Climate Risk module, and nothing said so or priced it.
-              A visitor wanting to buy had two dead product names and no live one.
-              WHAT CHANGED. The hero and final CTA now carry Climate Risk at its own price, so this
-              section stops being a 'path' and becomes what it always described — the combinations
-              people buy for a given obligation. The FIGURES ARE UNCHANGED and were never wrong: both
-              come from cartQuote, the same function /api/checkout charges from, so a price shown here
-              and a price charged cannot disagree. Only the framing was false.
-              The dead `!NEW_PRICING_ACTIVE` arms are deleted rather than left: NEW_PRICING_ACTIVE has
-              been true since the June 2026 rescope, so they could not render, and a branch that
-              cannot run is a second price nobody is checking. */}
-          <div style={s.eyebrow}>What people usually buy alongside it</div>
-          <h2 style={s.sectionTitle}>Two combinations — chosen by what you have to report.</h2>
-          <p style={s.sectionLead}>
-            Climate Risk covers the materiality assessment on its own. Most buyers add the modules their reporting obligation also asks for — these are the two most common combinations, priced as they would be at checkout.
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginTop: 8 }}>
-            <div style={{ background: '#E6F1FB', border: '1.5px solid #0C447C', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0C447C', marginBottom: 4 }}>IFRS S2 / ISSB</div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 4 }}>For an IFRS S2 disclosure</div>
-              <div style={{ fontSize: 13, color: '#555553', marginBottom: 12 }}>From <strong>${cartQuote({ modules: ['ghg', 'climate-risk'] as ModuleKey[], ghgTier: 'starter' }).totalUSD.toLocaleString()}</strong> /year</div>
-              <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.7, marginBottom: 12 }}>
-                IFRS S2 single materiality · climate risk · scenario analysis · GHG inventory · TCFD-aligned narrative.
-              </div>
-              <a href="/order?modules=risk,ghg" style={{ ...ghostBtn, padding: '8px 16px', fontSize: 12 }}>Add GHG and continue →</a>
-            </div>
-            <div style={{ background: '#eef2ff', border: '1.5px solid #1e1b4b', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1e1b4b', marginBottom: 4 }}>CSRD / ESRS</div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 4 }}>For CSRD reporting</div>
-              <div style={{ fontSize: 13, color: '#555553', marginBottom: 12 }}>From <strong>${cartQuote({ modules: ['ghg', 'climate-risk', 'supply-chain', 'people'] as ModuleKey[], ghgTier: 'starter' }).totalUSD.toLocaleString()}</strong> /year</div>
-              <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.7, marginBottom: 12 }}>
-                CSRD double materiality · climate risk · supply chain · people &amp; workforce · governance · GHG.
-              </div>
-              <a href="/order?modules=risk,ghg,supply,people" style={{ ...ghostBtn, padding: '8px 16px', fontSize: 12 }}>Add all four and continue →</a>
-            </div>
-          </div>
-        </section>
-
-        {/* ── FINAL CTA ───────────────────────────────────────────────────── */}
+        {/* ═══ 7 · ROUTE ═══════════════════════════════════════════════════════
+            ⚠️ THIS IS WHERE THE PRICING TEASER USED TO BE, AND IT IS NOT COMING BACK.
+            That section offered two priced combinations. The CSRD one ran
+            cartQuote(['ghg','climate-risk','supply-chain','people']) under a card headed "For
+            CSRD reporting" — and the fix is NOT to add 'impact-materiality' to that array.
+            lib/obligations.ts:78-82 records why CSRD MAPS TO NO MODULE BUNDLE AT ALL: CSRD
+            requires ESRS G1 business conduct and NO MODULE COVERS G1, so any "For CSRD
+            reporting" bundle sells a partial answer as a whole one on the surface a buyer uses
+            to decide what to buy. That entry "lands when G1 ships, not before" — and the same
+            rule binds this page. Do not complete this card. Route instead.
+            Checked 23 Aug 2026: those two arrays were the ONLY hardcoded module lists passed to
+            cartQuote anywhere in the codebase; every other call site passes a user-selected set.
+            ⚠️ NO PRICE AND NO /order LINK BELOW, deliberately. Both modules carry their own price
+            on their own page and on /pricing. /advisory is a link, not a sale. */}
         <section style={{ ...s.section, borderBottom: 'none', paddingBottom: '5rem' }}>
-          <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '2rem 2.25rem', textAlign: 'center' }}>
-            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>
-              Talk to us about your materiality assessment.
-            </h2>
-            <p style={{ fontSize: 13, color: '#555553', lineHeight: 1.8, maxWidth: 540, margin: '0 auto 18px' }}>
-              Whether you're scoping an IFRS S2 climate disclosure or preparing for CSRD ESRS, we can walk you through the methodology and the deliverable. Most conversations take 30 minutes.
-            </p>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <Link href="/advisory" style={primaryBtn}>Talk to a specialist →</Link>
-              <a href="/order?modules=risk" style={ghostBtn}>${riskPrice}/yr</a>
-              <Link href="/pricing" style={ghostBtn}>See pricing</Link>
-            </div>
-            <p style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 14 }}>
-              Materiality comes with Climate Risk — there is no separate module to buy.
-            </p>
+          <div style={s.eyebrow}>Which one you need</div>
+          <h2 style={s.sectionTitle}>Two halves. Two modules. Take the one your obligation asks for.</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginTop: 8 }}>
+            <Link href="/climate-risk" style={{ display: 'block', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '1.5rem 1.75rem', textDecoration: 'none' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0C447C', marginBottom: 6 }}>The financial half</div>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: '#0d0d0d', marginBottom: 8 }}>Climate Risk &amp; Materiality</div>
+              <p style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, margin: '0 0 12px' }}>
+                How sustainability issues affect the entity. IFRS S2 single materiality, physical and transition risk, multi-scenario resilience, and the ten-topic screening the samples above came from.
+              </p>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#7425e3' }}>Climate Risk &amp; Materiality &rarr;</span>
+            </Link>
+            <Link href="/impact-materiality" style={{ display: 'block', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '1.5rem 1.75rem', textDecoration: 'none' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1e1b4b', marginBottom: 6 }}>The impact half</div>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: '#0d0d0d', marginBottom: 8 }}>Impact Materiality Assessment</div>
+              <p style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, margin: '0 0 12px' }}>
+                How the entity affects people and the environment. Stakeholder engagement, all ten ESRS topics determined by named people, a divergence register and a disclosure roadmap.
+              </p>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#7425e3' }}>Impact Materiality Assessment &rarr;</span>
+            </Link>
           </div>
+          <p style={{ fontSize: 14, color: '#0d0d0d', fontWeight: 400, lineHeight: 1.8, marginTop: 18 }}>
+            Reporting under CSRD? You need both. Reporting under IFRS S2? Climate Risk on its own.
+          </p>
+          <p style={{ fontSize: 13, color: '#888784', fontWeight: 300, lineHeight: 1.8, marginTop: 6 }}>
+            Still not sure which half you are being asked for? <Link href="/advisory" style={{ color: '#555553', textDecoration: 'underline' }}>Talk to a specialist</Link>.
+          </p>
         </section>
 
       </div>
+
+      <Footer />
     </div>
   )
 }
