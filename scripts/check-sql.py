@@ -19,10 +19,11 @@ That is what this replaces.
   exit 1  a file failed - do not run it
   exit 2  the checker could not run (see REQUIREMENTS); nothing was checked
 
-Validated against every migration in supabase/migrations/ (125 files, 24 Aug 2026):
-all pass, no false positives. That sweep is the acceptance test for any change to
-this file - a checker that cries wolf on a correct migration gets ignored, and then
-the next 42601 reaches the SQL editor exactly as this one did. Re-run it:
+Validated against every migration in supabase/migrations/ (126 files, 24 Aug 2026):
+no failures, one UNVERIFIED (20260855, see LIMIT (3)), no false positives. That
+sweep is the acceptance test for any change to this file - a checker that cries
+wolf on a correct migration gets ignored, and then the next 42601 reaches the SQL
+editor exactly as this one did. Re-run it:
 
     .venv-sql/bin/python scripts/check-sql.py supabase/migrations/*.sql
 
@@ -89,6 +90,30 @@ TWO LIMITS. BOTH ARE LOAD-BEARING. READ THEM BEFORE TRUSTING A PASS.
 
     check_plpgsql() below encodes exactly that, and nothing else should be added
     to the ValueError arm - widening it would start swallowing real failures.
+
+(3) A VARIABLE DECLARED AS AN ARRAY OF A TYPE THIS FILE CREATES CANNOT BE FULLY
+    CHECKED, AND REPORTS AS `UNVERIFIED` RATHER THAN AS PASS OR FAIL.
+
+    libpg_query carries a snapshot of the SYSTEM catalogue and nothing else, so
+    `pg_catalog.pg_class[]` resolves but `public.my_composite[]` does not. An
+    unresolvable element type falls back to `record`, and `record[]` is a
+    pseudo-type, so the body is rejected with:
+
+        variable "v_scope" has pseudo-type _record
+
+    A GENUINELY ILLEGAL `declare v record[]` produces THE SAME MESSAGE, so the
+    two cannot be told apart from the error alone. Reporting either as PASS would
+    hide a real defect; reporting both as FAIL makes every migration that defines
+    a composite type cry wolf, and a checker that cries wolf gets ignored — which
+    is the failure this whole file exists to avoid.
+
+    So the rule is narrow and is spelled out in unresolved_local_type() below: the
+    error is downgraded to UNVERIFIED only when THIS FILE creates a composite type
+    whose name appears, with `[]`, in that function's own declare section. A bare
+    `record[]` has no matching CREATE TYPE and still FAILS. UNVERIFIED does not
+    fail the run, is printed on its own line, and is repeated in the summary so it
+    cannot be skimmed past — the function is parsed, but its declarations are
+    taken on trust and something else must cover them.
 
 One more reading note: ParseError's reported index points at the START OF THE
 STATEMENT being parsed, which in these heavily-commented migrations is the
@@ -249,23 +274,55 @@ def body_tags(stmt):
     return tag, stmt.find(tag, m.end()) != -1
 
 
-def check_plpgsql(stmt):
-    """(ok, note). See LIMIT (2) in the module docstring - do not widen the
-    ValueError arm."""
+PSEUDO_RECORD = re.compile(r'variable "(\w+)" has pseudo-type _record')
+
+
+def unresolved_local_type(stmt, src, message):
+    """True when a pseudo-type _record error is this checker's catalogue blindness
+    rather than a real defect. See LIMIT (3).
+
+    Narrow on purpose. Requires ALL of:
+      * the error is exactly the pseudo-type _record one;
+      * this FILE creates a composite type (create type X as ( ... ));
+      * that type's name appears with [] inside THIS function's declare section.
+    A bare `declare v record[]` satisfies none of the last two and still fails.
+    """
+    if not PSEUDO_RECORD.search(message or ''):
+        return None
+    created = re.findall(r'(?is)\bcreate\s+type\s+(?:(\w+)\.)?(\w+)\s+as\s*\(', src)
+    if not created:
+        return None
+    decl = re.search(r'(?is)\bas\s+\$(?:\w*)\$\s*declare\b(.*?)\bbegin\b', stmt)
+    if not decl:
+        return None
+    for _schema, name in created:
+        if re.search(r'(?i)\b' + re.escape(name) + r'\s*\[\s*\]', decl.group(1)):
+            return name
+    return None
+
+
+def check_plpgsql(stmt, src=''):
+    """(status, note) where status is 'PASS', 'FAIL' or 'UNVERIFIED'.
+    See LIMIT (2) and LIMIT (3) - do not widen either arm."""
     try:
         parse_plpgsql_json(stmt)
-        return True, ''
+        return 'PASS', ''
     except ParseError as e:
-        return False, str(e)
+        local = unresolved_local_type(stmt, src, str(e))
+        if local:
+            return 'UNVERIFIED', (f'declares an array of {local}, a composite type created by this '
+                                  f'file; libpg_query has no catalogue for it. Declarations taken '
+                                  f'on trust - LIMIT (3)')
+        return 'FAIL', str(e)
     except ValueError:
         # pglast AST-to-JSON serializer bug on trigger-function TG_ datums.
         # The parse succeeded; only the decode failed.
-        return True, 'parse accepted; pglast serializer bug on trigger datums'
+        return 'PASS', 'parse accepted; pglast serializer bug on trigger datums'
 
 
 def check_file(path):
     src = io.open(path, encoding='utf-8').read()
-    failures = []
+    failures, unverified = [], []
     print(f'\n=== {path} ({src.count(chr(10)) + 1} lines) ===')
 
     # -- statement-level: the 42601 layer, the one that aborts an install ------
@@ -283,11 +340,13 @@ def check_file(path):
     # -- PL/pgSQL bodies -------------------------------------------------------
     fns = list(function_statements(src))
     for name, stmt, sl, el in fns:
-        ok, note = check_plpgsql(stmt)
-        tail = f'   [{note}]' if (ok and note) else (f': {note}' if note else '')
-        print(f'  [plpgsql]    {"PASS" if ok else "FAIL"}  {name}()  lines {sl}-{el}{tail}')
-        if not ok:
+        status, note = check_plpgsql(stmt, src)
+        tail = f': {note}' if note else ''
+        print(f'  [plpgsql]    {status}  {name}()  lines {sl}-{el}{tail}')
+        if status == 'FAIL':
             failures.append(name)
+        elif status == 'UNVERIFIED':
+            unverified.append(name)
 
     # -- structural: complete CREATE, body opens and closes on the same tag ---
     for name, stmt, sl, el in fns:
@@ -329,6 +388,9 @@ def check_file(path):
         print(f'  [dangling]   PASS  no orphaned function bodies '
               f'({len(fns)} CREATE FUNCTION statements seen)')
 
+    if unverified:
+        print(f'  [note]       {len(unverified)} function(s) UNVERIFIED - parsed, declarations not '
+              f'resolvable: {", ".join(unverified)}')
     return failures
 
 
