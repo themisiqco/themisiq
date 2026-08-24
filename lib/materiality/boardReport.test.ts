@@ -23,7 +23,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildBoardReport,
-  FINDINGS_DEFINITIONS, KIND, LIMITATIONS, NOT_CLAIMED, NO_MEAN_NOTE, TITLE,
+  FINDINGS_DEFINITIONS, KIND, LIMITATIONS, NEVER_ASKED_NOTE, NOT_CLAIMED, NO_MEAN_NOTE, TITLE,
   standardVersionLabel,
   type BoardReport, type BoardReportInput, type ThresholdRow,
 } from './boardReport'
@@ -737,5 +737,67 @@ describe('sub-topic codes reach the surfaces that print them', () => {
     const r = report([sub({ subtopic_code: 'S1.3', topic_code: 'ZZ', overall: overall(BELOW) })])
     expect(r.stakeholderView.rows[0].topic_code).toBe('ZZ')
     expect(r.stakeholderView.rows[0].subtopic_code).toBe('S1.3')
+  })
+})
+
+
+/**
+ * ⚠️ THE PAPER MUST NOT EXPLAIN AN ABSENCE IT DID NOT HAVE, AND MUST EXPLAIN THE ONE IT DID.
+ *
+ * boardReport.ts:963-974 already settles the hard half — survey coverage is NOT a condition of
+ * being assessed, and "a topic with no survey answers still appears in the register's `omitted`,
+ * SAID AS WHAT IT IS". These bind the second half of that sentence: what it is said AS.
+ *
+ * The note is derived from the register rather than from the input, so these also pin that the
+ * note and the rows it explains cannot disagree.
+ */
+describe('the note about topics nobody was asked about', () => {
+  const IRO = sub({ subtopic_code: 'E3.1', iro_key: 'valencia-water',
+                    short_name: 'Water scarcity at the Valencia plant',
+                    overall: null, determinations: [MATERIAL_NEG(), IMMATERIAL_POS()] })
+
+  it('appears when a company-defined IRO could not be compared', () => {
+    const r = report([IRO])
+    expect(r.differences.register.omitted.map(o => o.reason)).toEqual(['never_in_survey_scope'])
+    expect(r.differences.never_asked_note).toBe(NEVER_ASKED_NOTE)
+  })
+
+  /**
+   * ⚠️ THE ONE THAT MATTERS MOST. An ordinary assessment must not carry a paragraph about IROs
+   * nobody was asked about — a note explaining an absence that did not occur is the same class of
+   * defect as a message naming a cause that never happened.
+   */
+  it('is null on an assessment with no custom IROs at all', () => {
+    const r = report([sub({ subtopic_code: 'E1.1', overall: overall(ABOVE),
+                            determinations: [IMMATERIAL_NEG(), IMMATERIAL_POS()] })])
+    expect(r.differences.never_asked_note).toBeNull()
+  })
+
+  it('is null when topics were omitted for OTHER reasons — it is not a generic omission note', () => {
+    const r = report([
+      sub({ subtopic_code: 'E1.1', overall: null }),                       // no_substantive_answers
+      sub({ subtopic_code: 'E1.2', determinations: [] }),                  // no_submitted_determination
+    ])
+    expect(r.differences.register.omitted).toHaveLength(2)
+    expect(r.differences.register.omitted.map(o => o.reason))
+      .not.toContain('never_in_survey_scope')
+    expect(r.differences.never_asked_note).toBeNull()
+  })
+
+  it('says the question was never asked, and does not say a comparison came back empty', () => {
+    expect(NEVER_ASKED_NOTE).toMatch(/never (put to anyone|asked)/i)
+    expect(NEVER_ASKED_NOTE).not.toMatch(/no difference (was )?found\b(?! to be absent)/i)
+  })
+
+  /**
+   * ⚠️ SURVEY COVERAGE IS NOT A CONDITION OF BEING ASSESSED — boardReport.ts:963-974. A custom IRO
+   * determined material still counts as assessed and still counts as material, whether or not
+   * anybody was surveyed on it. If this ever fails, the roll-up has been quietly made conditional
+   * on stakeholder input, which would let an unasked IRO drop out of the paper entirely.
+   */
+  it('a material custom IRO is still counted assessed and material', () => {
+    const r = report([IRO])
+    expect(r.findings.topics_assessed).toBe(1)
+    expect(r.findings.topics_material).toBe(1)
   })
 })

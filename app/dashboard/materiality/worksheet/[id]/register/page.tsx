@@ -122,9 +122,12 @@ const TRIGGER_LABEL: Record<string, string> = {
   respondent_group_breakdown: 'Splitting a topic by respondent group',
 }
 
+// ⚠️ A TOTAL Record, AND THAT IS THE POINT. Adding a member to OmissionReason breaks the build here
+// until it is given a label, so a new reason cannot reach a customer as a blank chip.
 const REASON_LABEL: Record<OmissionReason, string> = {
   excluded_at_scope: 'Left out of this assessment',
   no_substantive_answers: 'Nobody who was asked gave a rating',
+  never_in_survey_scope: 'Never put to anyone',
   no_submitted_determination: 'No determination has been submitted yet',
   direction_never_scored: 'Only one side of this topic has been assessed',
   determination_incomplete: 'A determination is unfinished',
@@ -516,7 +519,9 @@ export default function WorksheetRegister() {
                   {register.omitted.map(o => {
                     const h = headingFor(o.subtopic_code)
                     return (
-                      <div key={o.subtopic_code} style={{ border: `0.5px solid ${LINE}`,
+                      // ⚠️ THE PAIR, NOT THE CODE. A sub-topic and every IRO named under it share
+                      // a subtopic_code, so keying on it alone collapses them into one row.
+                      <div key={`${o.subtopic_code}|${o.iro_key}`} style={{ border: `0.5px solid ${LINE}`,
                                                           borderRadius: 10, padding: '10px 14px' }}>
                         <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
                           <div style={{ fontSize: 12.5, fontWeight: 600, color: INK }}>{h.title}</div>

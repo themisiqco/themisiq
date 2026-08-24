@@ -116,6 +116,17 @@ export type Determination = {
 /** Mirrors the results page's SubTopic, plus the category and the determinations. */
 export type RegisterSubTopic = {
   subtopic_code: string
+  /**
+   * Which IRO under the sub-topic this row is. '' — the default, and what every pre-20260855 row
+   * holds — is the sub-topic taken as a whole. A non-empty value names a company-defined IRO.
+   *
+   * ⚠️ OPTIONAL, AND ABSENT MEANS '' RATHER THAN "UNKNOWN". The two possible mistakes are not
+   * symmetrical. Treating a custom IRO as a sub-topic prints today's sentence, which is already
+   * what this code does; treating a sub-topic as a custom IRO would print "never put to anyone"
+   * about a topic real people really answered, discounting stakeholder input that exists. The
+   * default is chosen to fail in the first direction, never the second.
+   */
+  iro_key?: string
   topic_code: string
   topic_label: string
   /** Resolved by lib/materiality/subtopicName.ts before it gets here. null when no name is known. */
@@ -145,6 +156,17 @@ export type DivergenceKind = 'stakeholder_high' | 'assessment_high'
 export type OmissionReason =
   | 'excluded_at_scope'
   | 'no_substantive_answers'
+  /**
+   * ⚠️ NOT THE SAME FACT AS no_substantive_answers, AND THE DIFFERENCE IS THE WHOLE REASON THIS
+   * MEMBER EXISTS. "Nobody who was asked gave a rating" is a statement about the respondents: they
+   * were asked, and they abstained or skipped. Said about a unit nobody was ever asked about, it is
+   * FALSE — and it is false in a board paper, about the customer's own people.
+   *
+   * A custom IRO is never in survey scope, and that is structural rather than circumstantial:
+   * materiality_survey_questions references mr_esrs_subtopics and has no iro_key column, so no
+   * survey question can name an IRO the company added. There is no timing under which one could.
+   */
+  | 'never_in_survey_scope'
   | 'no_submitted_determination'
   | 'direction_never_scored'
   | 'determination_incomplete'
@@ -200,6 +222,13 @@ export type RegisterEntry = {
 
 export type OmittedSubTopic = {
   subtopic_code: string
+  /**
+   * ⚠️ CARRIED SO TWO OMITTED ROWS UNDER ONE SUB-TOPIC ARE DISTINGUISHABLE. Without it a consumer
+   * keying on subtopic_code alone silently collapses a sub-topic and every IRO named under it into
+   * one row — the React-key form of the same duplicate-label problem materiality_finalise_outstanding
+   * solves in SQL by composing a label.
+   */
+  iro_key: string
   short_name: string | null
   topic_label: string
   reason: OmissionReason
@@ -249,6 +278,21 @@ export const WHAT_THIS_IS_NOT =
   'assessment. Each sub-topic here is compared only against its own determinations.'
 
 export const TRIGGERS_ACTIVE: DivergenceKind[] = ['stakeholder_high', 'assessment_high']
+
+/**
+ * ⚠️ TERSE AND FACTUAL, because this is a `detail` and details are grouped verbatim by the PDF
+ * (boardReportPdf.ts:793-818 keys its grouping on the sentence itself, so every custom IRO on an
+ * assessment collapses into one line rather than repeating). The reader-facing PARAGRAPH is
+ * NEVER_ASKED_NOTE in boardReport.ts, beside CONTRAST_UNAVAILABLE, which is where prose written for
+ * a board lives. Two registers of language for two places, as the existing code already does.
+ *
+ * States what is true of the mechanism, not what probably happened: "added after the survey closed"
+ * would be a guess about timing this module cannot check, and no timing would change the answer.
+ */
+export const NEVER_IN_SURVEY_SCOPE_DETAIL =
+  'This was never put to anyone. A survey question names an ESRS sub-topic, so an IRO the company '
+  + 'defined cannot appear in one — there is no stakeholder view to set beside the determination, '
+  + 'and none was withheld.'
 
 export const TRIGGERS_INACTIVE: { name: string; reason: string }[] = [
   {
@@ -336,6 +380,7 @@ export function buildRegister(input: RegisterInput): DivergenceRegister {
     const omit = (reason: OmissionReason, detail: string | null): void => {
       omitted.push({
         subtopic_code: st.subtopic_code,
+        iro_key: st.iro_key ?? '',
         short_name: st.short_name,
         topic_label: st.topic_label,
         reason,
@@ -354,12 +399,28 @@ export function buildRegister(input: RegisterInput): DivergenceRegister {
     const tb = overall === null ? null : overall.top_box
     const share = tb === null ? null : tb.share
     if (overall === null || tb === null || share === null || tb.denominator === 0) {
-      omit(
-        'no_substantive_answers',
-        overall === null
-          ? 'No survey result for this sub-topic.'
-          : 'Nobody who was asked gave a rating; abstentions and skips are not a rating.',
-      )
+      /**
+       * ⚠️ WHICH ABSENCE IT IS, NOT MERELY THAT THERE WAS ONE. Both branches produce an omission;
+       * they make different statements about the customer's respondents, and only one of them can
+       * be true of a given row. §6.1's rule is that absence is not a low — this is the same rule
+       * one level down: an absence must be reported as the absence it actually is.
+       *
+       * ⚠️ THE CUSTOM-IRO TEST IS INSIDE THIS BLOCK, NOT IN FRONT OF IT, AND THAT IS DELIBERATE.
+       * A custom IRO that somehow arrives WITH a usable stakeholder side falls straight through to
+       * ordinary handling and is compared like anything else. Nothing can produce that today, and
+       * the day something can, this code needs no edit — it will already be using the answers
+       * rather than asserting there are none.
+       */
+      if ((st.iro_key ?? '') !== '') {
+        omit('never_in_survey_scope', NEVER_IN_SURVEY_SCOPE_DETAIL)
+      } else {
+        omit(
+          'no_substantive_answers',
+          overall === null
+            ? 'No survey result for this sub-topic.'
+            : 'Nobody who was asked gave a rating; abstentions and skips are not a rating.',
+        )
+      }
       continue
     }
 

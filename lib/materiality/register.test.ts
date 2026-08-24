@@ -24,7 +24,7 @@
 
 import { describe, it, expect } from 'vitest'
 import {
-  buildRegister, RegisterInputError,
+  buildRegister, RegisterInputError, NEVER_IN_SURVEY_SCOPE_DETAIL,
   HEADING, WHAT_THIS_IS, WHAT_THIS_IS_NOT, TRIGGERS_ACTIVE, TRIGGERS_INACTIVE,
   type Determination, type DivergenceRegister, type OmissionReason,
   type Overall, type RegisterSubTopic, type TopBox,
@@ -251,14 +251,17 @@ describe('every omission reason is reachable, and the partition holds', () => {
     // judged, and they differ — an entry
     sub({ subtopic_code: 'X.7', overall: overall(ABOVE),
           determinations: [IMMATERIAL_NEG(), IMMATERIAL_POS()] }),
+    // a company-defined IRO: no survey question can name one, so there is no stakeholder side
+    sub({ subtopic_code: 'X.8', iro_key: 'valencia-water', overall: null,
+          determinations: [MATERIAL_NEG(), IMMATERIAL_POS()] }),
   ]
 
   const r = build(FIXTURE)
 
-  it('all five reasons occur', () => {
+  it('all six reasons occur', () => {
     const expected: OmissionReason[] = [
-      'excluded_at_scope', 'no_substantive_answers', 'no_submitted_determination',
-      'direction_never_scored', 'determination_incomplete',
+      'excluded_at_scope', 'no_substantive_answers', 'never_in_survey_scope',
+      'no_submitted_determination', 'direction_never_scored', 'determination_incomplete',
     ]
     expect(new Set(r.omitted.map(o => o.reason))).toEqual(new Set(expected))
   })
@@ -271,6 +274,7 @@ describe('every omission reason is reachable, and the partition holds', () => {
     expect(byCode['X.4']).toBe('no_submitted_determination')
     expect(byCode['X.5']).toBe('direction_never_scored')
     expect(byCode['X.6']).toBe('determination_incomplete')
+    expect(byCode['X.8']).toBe('never_in_survey_scope')
   })
 
   it('the exclusion reason is carried through verbatim, not restated', () => {
@@ -493,5 +497,78 @@ describe('the snapshotted threshold must be a share', () => {
   it('0 and 1 are both admissible, matching the CHECK constraint', () => {
     expect(() => build([], 0)).not.toThrow()
     expect(() => build([], 1)).not.toThrow()
+  })
+})
+
+
+/**
+ * ⚠️ WHAT THESE PROTECT IS A SENTENCE, NOT A CODE PATH.
+ *
+ * Before 20260855 every row in this register was an ESRS sub-topic, and every sub-topic with no
+ * usable stakeholder side got 'no_substantive_answers' — whose detail says NOBODY WHO WAS ASKED
+ * GAVE A RATING. That is a claim about the customer's respondents. Said about a company-defined IRO
+ * it is simply false: no survey question can name one, because materiality_survey_questions
+ * references mr_esrs_subtopics and has no iro_key column. There is no timing, no round and no
+ * configuration under which the old sentence becomes true of a custom IRO.
+ *
+ * X.8 in the fixture above covers the happy path. These cover the two ways this could go wrong
+ * in the other direction — a real one, and the forward-compatible one.
+ */
+describe('an IRO nobody was asked about is reported as not asked, never as no divergence', () => {
+  const IRO = (over: Partial<RegisterSubTopic> = {}) =>
+    sub({ subtopic_code: 'E3.1', iro_key: 'valencia-water',
+          short_name: 'Water scarcity at the Valencia plant',
+          overall: null, determinations: [MATERIAL_NEG(), IMMATERIAL_POS()], ...over })
+
+  it('a custom IRO with no stakeholder side is never_in_survey_scope', () => {
+    const r = build([IRO()])
+    expect(r.omitted.map(o => o.reason)).toEqual(['never_in_survey_scope'])
+  })
+
+  it('its detail claims nobody was asked, and does NOT claim anyone declined to answer', () => {
+    const detail = build([IRO()]).omitted[0].detail ?? ''
+    expect(detail).toBe(NEVER_IN_SURVEY_SCOPE_DETAIL)
+    // The exact failure this member exists to prevent: the old sentence, on the new row.
+    expect(detail).not.toMatch(/who was asked/i)
+    expect(detail).not.toMatch(/abstention|skip/i)
+  })
+
+  /**
+   * ⚠️ THE REGRESSION GUARD, AND THE MORE IMPORTANT OF THE TWO DIRECTIONS. An ordinary sub-topic
+   * with no answers must keep its old reason. Saying "never put to anyone" about a topic real
+   * people really answered would discount stakeholder input that exists — a worse error than the
+   * one being fixed, and the reason iro_key defaults to '' rather than to unknown.
+   */
+  it('a sub-topic with no answers keeps no_substantive_answers — the default fails safe', () => {
+    expect(build([sub({ subtopic_code: 'E3.1', overall: null })]).omitted[0].reason)
+      .toBe('no_substantive_answers')
+    // and the same when the field is present but empty, which is what the database stores
+    expect(build([sub({ subtopic_code: 'E3.1', iro_key: '', overall: null })]).omitted[0].reason)
+      .toBe('no_substantive_answers')
+  })
+
+  /**
+   * ⚠️ FORWARD-COMPATIBLE BY CONSTRUCTION, NOT BY PROMISE. The custom-IRO test sits INSIDE the
+   * no-stakeholder-side block, so an IRO that ever does acquire survey answers is compared like
+   * anything else with no edit here. This test is what stops someone "simplifying" that by hoisting
+   * the check in front of the block, which would start discarding real answers.
+   */
+  it('a custom IRO WITH answers is compared, not omitted', () => {
+    const r = build([IRO({ overall: overall(ABOVE), determinations: [IMMATERIAL_NEG(), IMMATERIAL_POS()] })])
+    expect(r.omitted).toHaveLength(0)
+    expect(r.entries.map(e => e.subtopic_code)).toEqual(['E3.1'])
+  })
+
+  it('omitted rows carry iro_key, so a sub-topic and its IROs are distinguishable', () => {
+    const r = build([
+      sub({ subtopic_code: 'E3.1', overall: null }),
+      IRO(),
+      IRO({ iro_key: 'seville-water', short_name: 'Water scarcity at Seville' }),
+    ])
+    // Three omissions, ONE subtopic_code. Keyed on the code alone they collapse to one row.
+    expect(r.omitted).toHaveLength(3)
+    expect(new Set(r.omitted.map(o => o.subtopic_code))).toEqual(new Set(['E3.1']))
+    expect(r.omitted.map(o => o.iro_key).sort())
+      .toEqual(['', 'seville-water', 'valencia-water'])
   })
 })

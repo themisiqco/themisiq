@@ -793,6 +793,11 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
   if (report.differences.register.omitted.length > 0) {
     l.heading('Topics not compared', 3)
 
+    // ⚠️ ABOVE THE GROUPS, NOT INSIDE ONE. The grouping below collapses rows that share a sentence,
+    // so a note attached to a group would print beside some items and not others. This is a
+    // statement about the section, and it is placed where the contrast section places its own.
+    if (report.differences.never_asked_note) l.body(report.differences.never_asked_note)
+
     /**
      * ⚠️ GROUPED BY THE SENTENCE, NOT LISTED BY TOPIC. Thirty sub-topics awaiting a determination
      * share one reason, and printing that reason thirty times turns ONE finding into two pages that

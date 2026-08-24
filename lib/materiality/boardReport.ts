@@ -352,7 +352,16 @@ export type ContrastSection = {
   unavailable_note: string | null
 }
 
-export type DifferencesSection = { heading: string; register: DivergenceRegister }
+export type DifferencesSection = {
+  heading: string
+  register: DivergenceRegister
+  /**
+   * Present only when at least one omitted row was never in survey scope; null otherwise. Mirrors
+   * ContrastSection.unavailable_note exactly — a section-level note that appears when the condition
+   * holds and is absent when it does not, rather than a sentence a renderer decides to show.
+   */
+  never_asked_note: string | null
+}
 
 export type Provision = {
   reference: string
@@ -603,6 +612,26 @@ export const CONTRAST_UNAVAILABLE =
   'The paired labour comparison was not available when this report was produced, so this section '
   + 'is empty for a reason that is about the report and not about your organisation. It is not a '
   + 'finding that no difference exists — the comparison was not drawn.'
+
+/**
+ * ⚠️ THE SAME MOVE AS CONTRAST_UNAVAILABLE, FOR A DIFFERENT ABSENCE, AND IT IS NOT A REUSE OF IT.
+ * That constant is specific to the paired labour comparison. This one says the thing both have in
+ * common: a section is thin for a reason ABOUT THE REPORT rather than about the organisation, and
+ * the reader must not close the gap by assuming a finding.
+ *
+ * Without it the paper says "Nobody who was asked gave a rating" about IROs nobody was ever asked
+ * about — a false statement, in front of a board, about that board's own people. Shipping custom
+ * IROs without this sentence does not leave a gap; it leaves a wrong sentence.
+ *
+ * ⚠️ IT NAMES NO NUMBER AND DRAWS NO CONCLUSION. The register's own rule — no verdict, no adjective
+ * — applies here too: "there is no stakeholder view" is a fact, "the assessment is weaker for it"
+ * would be this module deciding something that belongs to the reader.
+ */
+export const NEVER_ASKED_NOTE =
+  'Some items below are IROs your organisation defined rather than ESRS sub-topics, and a survey '
+  + 'question names a sub-topic — so these were never put to anyone. They appear here because they '
+  + 'could not be compared, not because a comparison came back empty. Nothing was withheld and no '
+  + 'difference was found to be absent; the question was never asked.'
 
 export const PARTICIPATION_HEADING = 'Who took part'
 
@@ -1151,7 +1180,19 @@ export function buildBoardReport(input: BoardReportInput): BoardReport {
       unavailable_note: input.contrast ? null : CONTRAST_UNAVAILABLE,
     },
 
-    differences: { heading: DIFFERENCES_HEADING, register },
+    /**
+     * ⚠️ DERIVED FROM THE REGISTER, NOT FROM THE INPUT. buildRegister is the only authority on why
+     * a topic was not compared, so asking it — rather than re-testing iro_key here — is what keeps
+     * the note and the rows it explains from ever disagreeing. The same reason this module reads
+     * `material` from computeSeverity instead of recomputing it.
+     */
+    differences: {
+      heading: DIFFERENCES_HEADING,
+      register,
+      never_asked_note: register.omitted.some(o => o.reason === 'never_in_survey_scope')
+        ? NEVER_ASKED_NOTE
+        : null,
+    },
 
     methodology: {
       heading: METHODOLOGY_HEADING,
