@@ -281,6 +281,23 @@ const assessmentBlock = (l: Layout, row: AssessmentRow): void => {
   const nameLines = wrap(doc, `${row.name} · ${row.subtopic_code}`, l.contentWidth, SIZE.body, 'bold')
 
   const lines: string[] = []
+
+  /**
+   * ⚠️ THE ATTRIBUTION GOES FIRST, ABOVE THE ROW'S OWN DIRECTIONS. A reader who meets
+   * "material" and then a list of the sub-topic's own undetermined directions has already formed
+   * the wrong belief by the time an explanation arrives. Named IROs only — a row carried by its own
+   * determinations needs no "via", and printing one would make the ordinary case look qualified.
+   */
+  const viaIros = row.carriers.filter(c => c.iro_key !== '')
+  if (row.material && viaIros.length > 0) {
+    const via = viaIros
+      .map(c => `${c.name ?? c.iro_key} (${c.carried_by.map(d => DIRECTION_WORD[d] ?? d).join(', ')})`)
+      .join('; ')
+    lines.push(row.material_on_own_row
+      ? `Material on this topic's own determinations, and via ${via}`
+      : `Material via ${via} — not on this topic's own determinations`)
+  }
+
   for (const d of row.directions) {
     const label = DIRECTION_WORD[d.direction] ?? d.direction
     if (!d.determined) {
@@ -761,6 +778,8 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
   // ── 6 · WHAT THE ASSESSMENT CONCLUDED ────────────────────────────────────────────────────────
   sectionPage(l)
   l.heading(report.assessmentView.heading, 1)
+  // Above the rows, so it is read before the first marked one rather than after the last.
+  if (report.assessmentView.attribution_note) l.body(report.assessmentView.attribution_note)
   for (const row of report.assessmentView.rows) assessmentBlock(l, row)
   // The two notes are about how the figures above were made and printed. Beneath them, where a
   // reader who wants the finding meets it first and a reader who wants the method still finds it.
@@ -880,6 +899,12 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
   // ── 10 · WHY THIS MATTERS ────────────────────────────────────────────────────────────────────
   sectionPage(l, { continueIfRoom: 320 })
   l.heading(report.whyThisMatters.heading, 1)
+  // ⚠️ AHEAD OF THE ITEMS AND OUTSIDE THE keepTogether LOOP — see MATERIAL_VIA_IRO_NOTE. The items
+  // are four fixed reflections; this is a statement about THIS paper, and rendering it as a fifth
+  // title-and-body would make the two indistinguishable.
+  if (report.whyThisMatters.material_via_iro_note) {
+    l.body(report.whyThisMatters.material_via_iro_note)
+  }
   for (const item of report.whyThisMatters.items) {
     l.keepTogether(96, () => {
       l.heading(item.title, 3)

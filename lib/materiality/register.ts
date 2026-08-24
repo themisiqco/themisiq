@@ -114,6 +114,47 @@ export type Determination = {
 }
 
 /** Mirrors the results page's SubTopic, plus the category and the determinations. */
+/**
+ * =====================================================================
+ * ⚠️ ONE ENTRY PER DETERMINATION UNIT — (subtopic_code, iro_key) — NOT PER SUB-TOPIC.
+ * =====================================================================
+ * THE SHAPE OF THIS TYPE IS WHAT CARRIES THE DISJUNCTION ROLL-UP, so read this before changing it.
+ *
+ * SEVERAL ENTRIES MAY SHARE A subtopic_code: the sub-topic taken as a whole (iro_key '') and one
+ * per company-defined IRO under it. Nothing collapses them before they arrive — the caller maps
+ * materiality_impact_determinations in row for row, and the grouping happens HERE, in
+ * rollUpDeterminations below, which keys on subtopic_code alone.
+ *
+ * ⚠️ WHAT THAT MEANS FOR ANYONE COUNTING. An array of these is NOT a list of sub-topics. Counting
+ * it, or counting anything derived one-for-one from it, DOUBLE-COUNTS every sub-topic that has a
+ * named IRO under it. That is not hypothetical: the first version of boardReport.ts's counts did
+ * exactly this, and the fix is the `units` array there, built from the roll-up map rather than by
+ * filtering rows. Anything that needs "per sub-topic" must go through rollUpDeterminations.
+ *
+ * ⚠️ WHAT BREAKS IF THIS TYPE IS EVER KEYED PER SUB-TOPIC INSTEAD — that is, if iro_key is removed
+ * and callers are asked to hand in one pre-collapsed entry per code. It would look like a
+ * simplification and every test would still pass, because the OUTPUT would be identical. What
+ * changes is WHERE THE DISJUNCTION LIVES: it moves out of rollUpDeterminations and into whatever
+ * the caller does to collapse its rows — a mapping in a route or a page, with no test binding it,
+ * in a place nobody reviewing "the roll-up" would think to look. The rule would still be applied
+ * and would no longer be anywhere it can be checked. Same failure in the other direction as
+ * lead_submit's scope: the logic survives the move and its verification does not.
+ *
+ * WHERE THE DISJUNCTION IS TESTED: lib/materiality/boardReport.test.ts,
+ * describe('the disjunction roll-up') — 13 tests, mutation-checked. They assert through the BOARD
+ * REPORT's outputs (topics_material, material_only_via_iro, assessmentView rows and carriers, the
+ * roadmap's driven_by, and the two notes) rather than on rollUpDeterminations' Map directly, which
+ * is deliberate: asserting on the Map would prove the function works while leaving every consumer
+ * free to re-derive. Note the cost, so it is not a surprise — register.test.ts asserts NOTHING
+ * about the roll-up, so buildRegister's adoption of the rolled-up verdict rests on one test in the
+ * other file ('section 7 and section 9 state the SAME verdict for the same sub-topic').
+ *
+ * ⚠️ judge() IN boardReport.ts ALREADY SEES IRO ROWS — it is handed this array whole. It judges
+ * each row on its own determinations, which is correct and is why its `material` is per-row and
+ * NOT the rolled-up verdict. Do not "fix" judge() to do the roll-up: buildRegister needs the same
+ * answer, judge() is private to boardReport.ts, and two implementations is the thing this shape
+ * exists to prevent.
+ */
 export type RegisterSubTopic = {
   subtopic_code: string
   /**
@@ -172,6 +213,238 @@ export type OmissionReason =
   | 'determination_incomplete'
 
 /**
+ * =====================================================================
+ * THE DISJUNCTION ROLL-UP
+ * =====================================================================
+ * A sub-topic is material if its OWN row (iro_key = '') is material OR any company-defined IRO
+ * under it is. One place, read by buildRegister below and by boardReport.ts's judge(), assessed
+ * count, material count, section 6 rows and roadmap — none of which re-derives it.
+ *
+ * ⚠️ A DISJUNCTION OVER FLAGS, NEVER A MAXIMUM OVER SEVERITIES. max(severity) would invent a
+ * number nobody determined and stand as a second authority beside computeSeverity. This publishes
+ * no severity at all: it reads `.material`, ORs, and stops. Every reason the header gives for
+ * asking computeSeverity rather than comparing against a threshold is a reason not to aggregate
+ * severities here.
+ *
+ * ⚠️ MONOTONE, AND THAT IS THE PROPERTY TO PRESERVE. Adding an IRO can only ADD materiality, never
+ * remove it — the floor-not-balance stance register.ts takes at its own gate and boardReport.ts
+ * restates at :963. Nothing in here may AND, subtract, or require agreement between carriers.
+ * fully_judged is deliberately NOT rolled up; see its field comment.
+ *
+ * ⚠️ `=== true`, NOT TRUTHINESS. DirectionOutcome.material is null on an incomplete direction, and
+ * null must count as "did not carry" rather than as either verdict. `!== false` would let an
+ * unfinished IRO carry a topic on no evidence at all.
+ *
+ * ⚠️ SUBMITTED ONLY, inherited from submittedFor and not bypassed. A draft is somebody's work in
+ * progress; a draft IRO must not carry a topic to a conclusion nobody has stood behind.
+ */
+export type Carrier = {
+  /** '' is the sub-topic taken as a whole. A non-empty value names a company-defined IRO. */
+  iro_key: string
+  /** The IRO's name where there is one; null for the sub-topic's own row. */
+  name: string | null
+  /** Which direction(s) this carrier was material on. Never netted — ¶44. */
+  carried_by: Direction[]
+}
+
+export type RolledUp = {
+  subtopic_code: string
+  /** The disjunction: own row OR any IRO. */
+  material: boolean
+  /** UNION of every carrier's directions. Two directions material is two findings, not a bigger one. */
+  carried_by: Direction[]
+  /** Every carrier, own row first then IROs by name. Empty when nothing carried it. */
+  carriers: Carrier[]
+  /**
+   * True only when the sub-topic's OWN row is material. Exists so a consumer can say "material
+   * ONLY via <IRO>" without inferring it from carriers, which is the sentence that stops a bare
+   * material sub-topic reading as a judgement nobody made.
+   */
+  material_on_own_row: boolean
+  /**
+   * ⚠️ THE OWN ROW'S, DELIBERATELY NOT ROLLED UP.
+   *
+   * `assessed` is `in scope && (material || fully_judged)`. The `material ||`short-circuits, so a
+   * MATERIAL sub-topic is assessed whatever fully_judged says — this is NOT the "0 topics assessed,
+   * 1 material" contradiction of boardReport.ts:963-974, and saying it was would be naming a cause
+   * that cannot occur. The real regression is narrower and still real:
+   *
+   *   A sub-topic that is NOT material and IS fully judged counts as assessed today. Roll
+   *   fully_judged up — require every named IRO complete too — and adding one unfinished IRO under
+   *   it REMOVES it from `topics_assessed`. Non-monotone: work went up, the count went down, and
+   *   nothing on the page says why. That is the floor-not-balance stance broken from the other end.
+   *
+   * Verified by mutation, not by argument: rolling fully_judged up is caught by "an unfinished IRO
+   * does not remove a not-material sub-topic from topics_assessed".
+   *
+   * The consequence is accepted, not overlooked: an unfinished IRO is invisible to section 3. It is
+   * surfaced instead by the divergence register's `omitted`, and both SQL gates —
+   * materiality_lead_submit and materiality_finalise — refuse while it is unscored, so it cannot
+   * reach a finalised paper.
+   */
+  fully_judged: boolean
+}
+
+/** Own row first, then IROs by NAME. See the note on carrierOrder below. */
+const OWN_ROW_FIRST = ''
+
+/**
+ * ⚠️ NAME ORDER, NOT SLUG ORDER, AND THE TIE-BREAK IS WHAT MAKES IT TOTAL.
+ * (subtopic_code, iro_key) is stable and cheap, and it orders "Water scarcity at Valencia" against
+ * "Air quality at Seville" by their slugs — invisible strings the reader never sees. In a printed
+ * paper that reads as an accident, and a reader who cannot see the ordering principle assumes there
+ * isn't one. Name order is self-evidently intentional on the page.
+ *
+ * The cost is that renaming an IRO reorders the list. That is the right trade here: the paper is
+ * regenerated from current data every time, so there is no stored ordering for a rename to
+ * contradict, and a name is what the reader is scanning for.
+ *
+ * iro_key breaks ties, so the sort is TOTAL and the tests are deterministic. In practice a tie
+ * cannot arise from the database — 20260855 §3 carries a unique index on
+ * (assessment_id, subtopic_code, lower(btrim(name))) — but this function is pure and can be handed
+ * anything, and a comparator that returns 0 for distinct rows leaves their order to the engine.
+ *
+ * localeCompare is pinned to 'en' rather than left to the host: an unpinned locale makes accented
+ * names sort differently on a developer's machine and in production, which is a test that passes
+ * everywhere except where it matters.
+ */
+const carrierOrder = (a: Carrier, b: Carrier): number => {
+  // ⚠️ THIS PIN IS CURRENTLY REDUNDANT AND IS NOT DEAD CODE. The own row's `name` is null, so the
+  // `?? a.iro_key` fallback below compares '' — which localeCompare sorts first anyway. Removing
+  // these two lines therefore changes nothing TODAY and is caught by no test, which is exactly why
+  // this note exists. Give the own row a display name ("The sub-topic as a whole") and the pin
+  // becomes the only thing keeping the parent above its children. Verified as an equivalent mutant
+  // on 24 Aug 2026, deliberately kept.
+  if (a.iro_key === OWN_ROW_FIRST) return b.iro_key === OWN_ROW_FIRST ? 0 : -1
+  if (b.iro_key === OWN_ROW_FIRST) return 1
+  const byName = (a.name ?? a.iro_key).localeCompare(b.name ?? b.iro_key, 'en')
+  return byName !== 0 ? byName : a.iro_key.localeCompare(b.iro_key, 'en')
+}
+
+/**
+ * One RolledUp per distinct subtopic_code in `subtopics`.
+ *
+ * ⚠️ KEYED ON subtopic_code, WHICH IS WHY THE ROADMAP CANNOT DOUBLE-PRINT A TOPIC. Three material
+ * IROs under E1.3 collapse into one entry here, so every downstream count and list is per
+ * sub-topic by construction rather than by a dedupe step someone can later remove.
+ *
+ * ⚠️ EMITS AN ENTRY EVEN WHERE THE OWN ROW IS ABSENT. 20260855 makes the iro_key = '' row
+ * mandatory, but this module is pure and its caller supplies the rows. A sub-topic present only as
+ * a named IRO still gets an entry, material on its children, rather than vanishing from every
+ * count — an absent parent must not be able to hide a material IRO.
+ */
+export function rollUpDeterminations(subtopics: RegisterSubTopic[]): Map<string, RolledUp> {
+  const out = new Map<string, RolledUp>()
+
+  for (const st of subtopics) {
+    /**
+     * =================================================================
+     * ⚠️ THE KEY IS subtopic_code ALONE. THAT IS THE DISJUNCTION.
+     * =================================================================
+     * Every IRO under a code collapses into ONE entry here, BEFORE materiality is decided. The
+     * collapse is not a preliminary step to the roll-up — it IS the roll-up. `carriers` accumulates
+     * one item per unit that was material, from every row sharing this key, and the entry's verdict
+     * is `carriers.length > 0`: any material IRO makes the sub-topic material.
+     *
+     * ⚠️ NO SEVERITY IS INVENTED, AND NOTHING IS COMPARED AGAINST A THRESHOLD. Each unit's
+     * materiality comes from computeSeverity and is READ; this loop ORs flags. There is no max, no
+     * mean and no number of its own — which is what keeps computeSeverity the sole authority on
+     * severity rather than one of two.
+     *
+     * ⚠️ A KEY IS NOT A TYPE ANNOTATION. Nothing here fails to compile if this line is widened, and
+     * no signature changes. It is enforced by this expression and by the tests below and by nothing
+     * else, which is why it is written down at the line itself rather than at the declaration.
+     *
+     * WHAT BREAKS IF THIS IS EVER WIDENED — say to `st.subtopic_code + '|' + iroKey`:
+     *   1. Each IRO becomes its own entry and is judged on its own determinations alone. The
+     *      sub-topic's entry reverts to its OWN row's verdict, so a sub-topic material ONLY through
+     *      a named IRO is reported NOT material — in the counts, in section 6 and in section 7.
+     *      The rows would all still be present and every number would look plausible.
+     *   2. The per-sub-topic collapse disappears, so anything counting these entries counts one per
+     *      IRO again. "Topics material" can then exceed the number of sub-topics in scope.
+     *   3. buildRoadmap in boardReport.ts groups by topic and lists `driven_by` per entry, so one
+     *      sub-topic's disclosure requirements would be attributed once per IRO instead of once.
+     *      (That is the determination-driven roadmap, which is built on every run and not yet
+     *      rendered. The screening roadmap a customer sees today is a different one, built from the
+     *      scoring matrix, and is not connected to these rows at all — do not expect a change here
+     *      to show up there.)
+     *
+     * PINNED BY, in lib/materiality/boardReport.test.ts, describe('the disjunction roll-up'):
+     *   'an IRO carries a sub-topic its own row did NOT carry'
+     *       — the disjunction itself. Its fixture's own row is judged IMMATERIAL in both
+     *         directions, so it fails the moment the collapse stops happening.
+     *   'counts SUB-TOPICS, not rows — three IROs under one sub-topic is one material topic'
+     *       — the key's arity, asserted through the counts, the section 6 rows AND the roadmap's
+     *         driven_by, which is (3) above.
+     *   'publishes no severity of its own — the roll-up is over flags, never a max'
+     *   'says WHY, on page 3 and in section 9 and at the end — never a bare material'
+     *       — a collapse that decides materiality must also carry WHAT decided it.
+     */
+    const key = st.subtopic_code
+    const iroKey = st.iro_key ?? ''
+    const isOwnRow = iroKey === ''
+
+    const carriedHere: Direction[] = []
+    for (const direction of DIRECTIONS) {
+      const row = submittedFor(st, direction)
+      if (row === null) continue
+      const result = computeSeverity({
+        direction: row.direction,
+        nature: row.nature,
+        category: st.category,
+        scale: row.scale,
+        scope: row.scope,
+        irremediability: row.irremediability ?? null,
+        likelihood: row.likelihood ?? null,
+      })
+      // ⚠️ `result.complete &&` IS THE LOAD-BEARING HALF; `=== true` IS BELT AND BRACES.
+      // severity.ts returns { complete: false, material: null } together, so the guard already
+      // excludes every null. Mutating `=== true` to `!== false` changes nothing and no test catches
+      // it — an equivalent mutant, verified 24 Aug 2026. DELETING `result.complete &&` is caught
+      // immediately, by five tests. Kept in this form because it matches the idiom at the register's
+      // own gate below and states the intent where the guard only implies it.
+      if (result.complete && result.material === true) carriedHere.push(direction)
+    }
+
+    const prior = out.get(key)
+    const carriers = prior ? [...prior.carriers] : []
+    if (carriedHere.length > 0) {
+      carriers.push({ iro_key: iroKey, name: isOwnRow ? null : st.short_name, carried_by: carriedHere })
+    }
+
+    // The own row's completeness, and only the own row's. See the field comment.
+    const ownFullyJudged = isOwnRow
+      ? DIRECTIONS.every(d => {
+        const row = submittedFor(st, d)
+        if (row === null) return false
+        return computeSeverity({
+          direction: row.direction, nature: row.nature, category: st.category,
+          scale: row.scale, scope: row.scope,
+          irremediability: row.irremediability ?? null, likelihood: row.likelihood ?? null,
+        }).complete
+      })
+      : (prior?.fully_judged ?? false)
+
+    carriers.sort(carrierOrder)
+
+    // Union, not concatenation: both a sub-topic and an IRO under it can carry the same direction.
+    const carriedBy = DIRECTIONS.filter(d => carriers.some(c => c.carried_by.includes(d)))
+
+    out.set(key, {
+      subtopic_code: key,
+      material: carriers.length > 0,
+      carried_by: carriedBy,
+      carriers,
+      material_on_own_row: carriers.some(c => c.iro_key === OWN_ROW_FIRST),
+      fully_judged: ownFullyJudged,
+    })
+  }
+
+  return out
+}
+
+
+/**
  * One direction's determination, carried so the register can show its working without re-deriving.
  *
  * ⚠️ EVERY SUBMITTED DIRECTION APPEARS HERE, INCLUDING AN INCOMPLETE ONE. Under the asymmetric rule
@@ -215,6 +488,16 @@ export type RegisterEntry = {
      * ⚠️ Never netted — ¶44. Two directions material is two findings, not a bigger one.
      */
     carried_by: Direction[]
+    /**
+     * ⚠️ WHAT CARRIED IT, AND WHY `material` CAN BE TRUE WHILE `directions` SHOWS NEITHER.
+     * `material` is the ROLLED-UP verdict — this sub-topic's own row OR any named IRO under it —
+     * so section 7 and section 9 of the board report cannot state different conclusions about the
+     * same sub-topic. `directions` remains this row's OWN working. A consumer that renders
+     * `material` without rendering this turns a real finding into a judgement nobody made.
+     */
+    carriers: Carrier[]
+    /** True only when this sub-topic's own determinations carried it. */
+    material_on_own_row: boolean
     directions: DirectionOutcome[]
     statement: string
   }
@@ -376,6 +659,11 @@ export function buildRegister(input: RegisterInput): DivergenceRegister {
   const entries: RegisterEntry[] = []
   const omitted: OmittedSubTopic[] = []
 
+  // ⚠️ ONCE, OUTSIDE THE LOOP. Per-iteration it would be O(n²) and, worse, would tempt a future
+  // edit into passing only the current row — which would silently turn the roll-up back into the
+  // own-row verdict while still looking like a roll-up.
+  const rolled = rollUpDeterminations(subtopics)
+
   for (const st of subtopics) {
     const omit = (reason: OmissionReason, detail: string | null): void => {
       omitted.push({
@@ -455,8 +743,22 @@ export function buildRegister(input: RegisterInput): DivergenceRegister {
     }))
 
     // ⚠️ material === true, not a truthiness test: `material` is null on an incomplete direction.
-    const carriedBy = directions.filter(d => d.material === true).map(d => d.direction)
-    const assessmentMaterial = carriedBy.length > 0
+    // ownCarriedBy is THIS ROW's, and is what the asymmetric gate below reasons about.
+    const ownCarriedBy = directions.filter(d => d.material === true).map(d => d.direction)
+
+    /**
+     * ⚠️ THE ROLLED-UP VERDICT, READ AND NOT RECOMPUTED. rollUpDeterminations is the one authority
+     * on whether a sub-topic is material once named IROs are counted, and boardReport.ts reads the
+     * same map for its counts, its section 6 rows and its roadmap. If this line went back to
+     * ownCarriedBy, section 7 would call a sub-topic not material while section 9 called it
+     * material — one paper, two verdicts, on the same rows.
+     *
+     * The fallback exists for the sub-topic's own absence from the map, which cannot happen for a
+     * row that is IN the map's input; it keeps the expression total rather than asserting.
+     */
+    const rolledHere = rolled.get(st.subtopic_code)
+    const carriedBy = rolledHere?.carried_by ?? ownCarriedBy
+    const assessmentMaterial = rolledHere?.material ?? ownCarriedBy.length > 0
 
     // ── 5 ── THE GATE IS ASYMMETRIC, AND THAT IS DELIBERATE. DO NOT MAKE IT SYMMETRIC. ───────────
     // Materiality is a FLOOR, not a balance: one submitted direction that computeSeverity reports
@@ -516,6 +818,8 @@ export function buildRegister(input: RegisterInput): DivergenceRegister {
       },
       assessment: {
         material: assessmentMaterial,
+        carriers: rolledHere?.carriers ?? [],
+        material_on_own_row: rolledHere?.material_on_own_row ?? assessmentMaterial,
         carried_by: carriedBy,
         directions,
         statement: assessmentStatement(assessmentMaterial, carriedBy),

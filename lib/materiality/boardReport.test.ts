@@ -23,7 +23,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildBoardReport,
-  FINDINGS_DEFINITIONS, KIND, LIMITATIONS, NEVER_ASKED_NOTE, NOT_CLAIMED, NO_MEAN_NOTE, TITLE,
+  ATTRIBUTION_NOTE, FINDINGS_DEFINITIONS, KIND, LIMITATIONS, MATERIAL_VIA_IRO_NOTE,
+  NEVER_ASKED_NOTE, NOT_CLAIMED, NO_MEAN_NOTE, TITLE,
   standardVersionLabel,
   type BoardReport, type BoardReportInput, type ThresholdRow,
 } from './boardReport'
@@ -799,5 +800,195 @@ describe('the note about topics nobody was asked about', () => {
     const r = report([IRO])
     expect(r.findings.topics_assessed).toBe(1)
     expect(r.findings.topics_material).toBe(1)
+  })
+})
+
+
+/**
+ * =====================================================================
+ * THE DISJUNCTION ROLL-UP
+ * =====================================================================
+ * A sub-topic is material if its own row is material OR any named IRO under it is. Every test here
+ * is written to FAIL if the roll-up is removed or weakened — a roll-up test that passes without the
+ * roll-up is worthless, and the way to get one by accident is to assert on a fixture whose own row
+ * is already material.
+ *
+ * So the fixture is deliberately hostile: E1.1's own row is judged IMMATERIAL in both directions,
+ * and a named IRO under it is material. Without the roll-up every assertion below reads the own
+ * row's `false`.
+ */
+describe('the disjunction roll-up', () => {
+  const OWN_IMMATERIAL = () =>
+    sub({ subtopic_code: 'E1.1', overall: overall(BELOW),
+          determinations: [IMMATERIAL_NEG(), IMMATERIAL_POS()] })
+
+  const IRO = (over: Partial<RegisterSubTopic> = {}) =>
+    sub({ subtopic_code: 'E1.1', iro_key: 'valencia-water',
+          short_name: 'Water scarcity at the Valencia plant',
+          overall: null, determinations: [MATERIAL_NEG(), IMMATERIAL_POS()], ...over })
+
+  it('an IRO carries a sub-topic its own row did NOT carry', () => {
+    const alone = report([OWN_IMMATERIAL()])
+    expect(alone.findings.topics_material).toBe(0)          // the control: own row is not material
+
+    const r = report([OWN_IMMATERIAL(), IRO()])
+    expect(r.findings.topics_material).toBe(1)
+    expect(r.findings.material_topics[0].subtopic_code).toBe('E1.1')
+  })
+
+  /**
+   * ⚠️ THE ONE THAT MATTERS MOST. A sub-topic the lead judged NOT material, promoted by an IRO,
+   * with nothing on the page saying why, is a judgement nobody made presented as one somebody did.
+   */
+  it('says WHY, on page 3 and in section 9 and at the end — never a bare material', () => {
+    const r = report([OWN_IMMATERIAL(), IRO()])
+    expect(r.findings.material_only_via_iro).toEqual(['E1.1'])
+
+    const row = r.assessmentView.rows.find(x => x.subtopic_code === 'E1.1')!
+    expect(row.material).toBe(true)
+    expect(row.material_on_own_row).toBe(false)
+    expect(row.carriers.map(c => c.name)).toEqual(['Water scarcity at the Valencia plant'])
+
+    expect(r.assessmentView.attribution_note).toBe(ATTRIBUTION_NOTE)
+    expect(r.whyThisMatters.material_via_iro_note).toBe(MATERIAL_VIA_IRO_NOTE)
+  })
+
+  it('none of those markers appears when the own row carried it itself', () => {
+    const r = report([sub({ subtopic_code: 'E1.1', overall: overall(ABOVE),
+                            determinations: [MATERIAL_NEG(), IMMATERIAL_POS()] })])
+    expect(r.findings.topics_material).toBe(1)
+    expect(r.findings.material_only_via_iro).toEqual([])
+    expect(r.assessmentView.attribution_note).toBeNull()
+    expect(r.whyThisMatters.material_via_iro_note).toBeNull()
+  })
+
+  it('publishes no severity of its own — the roll-up is over flags, never a max', () => {
+    const r = report([OWN_IMMATERIAL(), IRO()])
+    const row = r.assessmentView.rows.find(x => x.subtopic_code === 'E1.1')!
+    // The row's directions are still ITS OWN working, untouched by the IRO's severity.
+    expect(row.directions.every(d => d.material !== true)).toBe(true)
+    expect(Object.keys(row)).not.toContain('severity')
+  })
+
+  it('a DRAFT IRO carries nothing', () => {
+    const draft = IRO({ determinations: [{ ...MATERIAL_NEG(), status: 'draft' }] })
+    expect(report([OWN_IMMATERIAL(), draft]).findings.topics_material).toBe(0)
+  })
+
+  it('an INCOMPLETE IRO direction carries nothing — null is not true', () => {
+    // scale only: computeSeverity cannot complete, so material is null rather than false.
+    const partial = IRO({ determinations: [{ ...MATERIAL_NEG(), scope: null, irremediability: null }] })
+    expect(report([OWN_IMMATERIAL(), partial]).findings.topics_material).toBe(0)
+  })
+
+  it('counts SUB-TOPICS, not rows — three IROs under one sub-topic is one material topic', () => {
+    const r = report([
+      OWN_IMMATERIAL(),
+      IRO(),
+      IRO({ iro_key: 'seville-water', short_name: 'Water scarcity at Seville' }),
+      IRO({ iro_key: 'almeria-water', short_name: 'Water scarcity at Almeria' }),
+    ])
+    expect(r.findings.topics_material).toBe(1)
+    expect(r.assessmentView.rows.filter(x => x.subtopic_code === 'E1.1')).toHaveLength(1)
+    expect(r.roadmap.topics.flatMap(t => t.driven_by)
+      .filter(d => d.subtopic_code === 'E1.1')).toHaveLength(1)
+  })
+
+  /**
+   * ⚠️ THE INVARIANT THAT BREAKS PAGE 3. fully_judged is the OWN ROW's. Roll it up and one
+   * unfinished IRO drops a material sub-topic out of `assessed` while it stays in `material` —
+   * "0 topics assessed, 1 material", the contradiction boardReport.ts:963-974 records.
+   */
+  /**
+   * ⚠️ NOT-MATERIAL IS THE CASE THAT BITES, AND THE MATERIAL ONE CANNOT.
+   * `assessed` is `material || fully_judged`, so a material sub-topic is assessed whatever
+   * fully_judged says — a mutation rolling fully_judged up is INVISIBLE on a material fixture.
+   * E1.2 below is fully judged and NOT material, so `assessed` rests on fully_judged alone and the
+   * mutation shows up immediately. Adding work must never subtract from a count.
+   */
+  it('an unfinished IRO does not remove a NOT-material sub-topic from topics_assessed', () => {
+    const parent = sub({ subtopic_code: 'E1.2', overall: overall(BELOW),
+                         determinations: [IMMATERIAL_NEG(), IMMATERIAL_POS()] })
+    const before = report([parent]).findings.topics_assessed
+    expect(before).toBe(1)                                   // control: assessed via fully_judged
+
+    const unfinishedChild = sub({
+      subtopic_code: 'E1.2', iro_key: 'seville-water', short_name: 'Water scarcity at Seville',
+      overall: null, determinations: [{ ...MATERIAL_NEG(), scope: null, irremediability: null }],
+    })
+    expect(report([parent, unfinishedChild]).findings.topics_assessed).toBe(before)
+  })
+
+  it('an unfinished IRO does not drop its parent out of topics_assessed', () => {
+    const unfinished = IRO({ iro_key: 'seville-water', short_name: 'Water scarcity at Seville',
+                             determinations: [{ ...MATERIAL_NEG(), scope: null, irremediability: null }] })
+    const r = report([OWN_IMMATERIAL(), IRO(), unfinished])
+    expect(r.findings.topics_material).toBe(1)
+    expect(r.findings.topics_assessed).toBeGreaterThanOrEqual(r.findings.topics_material)
+  })
+
+  /**
+   * ⚠️ THE SLUGS ARE DELIBERATELY IN THE OPPOSITE ORDER TO THE NAMES. An earlier version of this
+   * test used almeria/seville/valencia against Almeria/Seville/Valencia — the two orders agreed, so
+   * it passed whichever key the comparator used and proved nothing. A sort test whose fixture
+   * cannot distinguish the two orders is worse than no sort test: it reports coverage it has not got.
+   */
+  it('carriers are ordered own-row-first then by NAME, not by slug', () => {
+    const r = report([
+      sub({ subtopic_code: 'E1.1', overall: overall(ABOVE),
+            determinations: [MATERIAL_NEG(), IMMATERIAL_POS()] }),         // own row, material
+      IRO({ iro_key: 'aaa-plant', short_name: 'Water scarcity at Zaragoza' }),
+      IRO({ iro_key: 'mmm-plant', short_name: 'Water scarcity at Seville' }),
+      IRO({ iro_key: 'zzz-plant', short_name: 'Water scarcity at Almeria' }),
+    ])
+    const row = r.assessmentView.rows.find(x => x.subtopic_code === 'E1.1')!
+    expect(row.carriers.map(c => c.iro_key)[0]).toBe('')            // own row pinned first
+    // by NAME: Almeria, Seville, Zaragoza — which is zzz, mmm, aaa by slug. Exactly reversed.
+    expect(row.carriers.slice(1).map(c => c.name)).toEqual([
+      'Water scarcity at Almeria', 'Water scarcity at Seville', 'Water scarcity at Zaragoza',
+    ])
+    expect(row.carriers.slice(1).map(c => c.iro_key))
+      .toEqual(['zzz-plant', 'mmm-plant', 'aaa-plant'])
+  })
+
+  it('carried_by is a UNION across carriers and is never netted', () => {
+    const posOnlyIro = IRO({ iro_key: 'seville-water', short_name: 'Water scarcity at Seville',
+                             determinations: [IMMATERIAL_NEG(), ON_THRESHOLD_POS()] })
+    const r = report([OWN_IMMATERIAL(), IRO(), posOnlyIro])
+    const row = r.assessmentView.rows.find(x => x.subtopic_code === 'E1.1')!
+    expect(new Set(row.carried_by)).toEqual(new Set(['negative', 'positive']))
+  })
+
+  it('section 7 and section 9 state the SAME verdict for the same sub-topic', () => {
+    const r = report([OWN_IMMATERIAL(), IRO()])
+    const entry = r.differences.register.entries.find(e => e.subtopic_code === 'E1.1')
+    const row = r.assessmentView.rows.find(x => x.subtopic_code === 'E1.1')!
+    if (entry) expect(entry.assessment.material).toBe(row.material)
+  })
+
+  /**
+   * ⚠️ MONOTONICITY, AS A PROPERTY RATHER THAN AN ASSERTION. Floor, not balance: adding a named IRO
+   * may only ADD materiality. If this ever fails, something in the roll-up has started to AND.
+   */
+  it('adding an IRO never reduces topics_material and never removes a topic from assessed', () => {
+    const base = [
+      sub({ subtopic_code: 'E1.1', overall: overall(ABOVE),
+            determinations: [MATERIAL_NEG(), IMMATERIAL_POS()] }),
+      sub({ subtopic_code: 'E1.2', overall: overall(BELOW),
+            determinations: [IMMATERIAL_NEG(), IMMATERIAL_POS()] }),
+    ]
+    const before = report(base).findings
+
+    for (const extra of [
+      IRO(),                                                                    // material child
+      IRO({ determinations: [IMMATERIAL_NEG(), IMMATERIAL_POS()] }),            // immaterial child
+      IRO({ determinations: [{ ...MATERIAL_NEG(), status: 'draft' }] }),        // draft child
+      IRO({ determinations: [{ ...MATERIAL_NEG(), scope: null, irremediability: null }] }),
+      IRO({ subtopic_code: 'E1.2' }),
+    ]) {
+      const after = report([...base, extra]).findings
+      expect(after.topics_material).toBeGreaterThanOrEqual(before.topics_material)
+      expect(after.topics_assessed).toBeGreaterThanOrEqual(before.topics_assessed)
+    }
   })
 })

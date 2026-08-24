@@ -40,7 +40,8 @@ import {
   type SeverityRule,
 } from './severity'
 import {
-  buildRegister,
+  buildRegister, rollUpDeterminations,
+  type Carrier, type RolledUp,
   /**
    * ⚠️ IMPORTED, NEVER RE-DECLARED. Sections 6 and 7 answer the same question about the same rows —
    * which determinations count as the assessment's conclusions — and they answer it in ONE
@@ -143,6 +144,12 @@ export type BoardReportInput = {
   by_category: CategoryParticipation[]
 
   /** The same shape buildRegister consumes, so the two sections cannot describe different scope. */
+  /**
+   * ⚠️ ONE ENTRY PER DETERMINATION UNIT, NOT PER SUB-TOPIC — several may share a subtopic_code.
+   * The full argument, and what breaks if that ever changes, is on RegisterSubTopic in register.ts.
+   * Anything in this module that needs a per-sub-topic figure goes through the `units` array in
+   * buildBoardReport, never through `judged` or `input.subtopics` directly.
+   */
   subtopics: RegisterSubTopic[]
   /** The round's SNAPSHOTTED top_box_high_min_share. Not the current reference row. */
   topBoxHighMinShare: number
@@ -234,6 +241,8 @@ export type MaterialTopic = {
   topic_label: string
   /** Which direction(s) carried it. Both is two findings, never netted into one (¶44). */
   carried_by: Direction[]
+  /** Own row first, then IROs by name. See AssessmentRow.carriers. */
+  carriers: Carrier[]
 }
 
 export type FindingsSection = {
@@ -245,6 +254,12 @@ export type FindingsSection = {
   topics_asked: number
   topics_with_ratings: number
   material_topics: MaterialTopic[]
+  /**
+   * ⚠️ PAGE 3 IS THE PAGE A BOARD REMEMBERS, so the marker belongs here and not only in section 9.
+   * Sub-topic codes that reached material ONLY through a named IRO. The count above is unaffected —
+   * this says WHICH of them a reader should not read as a direct judgement.
+   */
+  material_only_via_iro: string[]
   /** What each figure counts. A number a director remembers must be a number they can define. */
   definitions: { assessed: string; material: string; differing: string; coverage: string }
 }
@@ -317,8 +332,20 @@ export type AssessmentRow = {
   subtopic_code: string
   name: string
   topic_label: string
+  /** ⚠️ THE ROLLED-UP VERDICT, not this row's own. Read `carriers` to see what carried it. */
   material: boolean
   carried_by: Direction[]
+  /**
+   * What carried it: the sub-topic's own row, named IROs, or both. Own row first, then IROs by
+   * name. EMPTY WHEN material IS FALSE.
+   *
+   * ⚠️ A ROW CAN BE material WITH NO MATERIAL DIRECTION OF ITS OWN, and that is not a defect — it
+   * is a sub-topic carried by a named IRO under it. Rendering `material` without rendering this is
+   * what turns a real finding into a judgement nobody made.
+   */
+  carriers: Carrier[]
+  /** True only when this row's OWN determinations carried it. */
+  material_on_own_row: boolean
   directions: AssessmentDirectionRow[]
 }
 
@@ -326,6 +353,12 @@ export type AssessmentViewSection = {
   heading: string
   rows: AssessmentRow[]
   abstention_note: string
+  /**
+   * Printed above the rows when at least one is material ONLY via a named IRO; null otherwise.
+   * Mirrors ContrastSection.unavailable_note: a section-level note present exactly when its
+   * condition holds, never a sentence a renderer decides to show.
+   */
+  attribution_note: string | null
 }
 
 export type PolarisationSection = {
@@ -380,6 +413,8 @@ export type MethodologySection = {
 export type LimitationsSection = { heading: string; items: string[]; not_claimed: string[] }
 
 export type WhyThisMattersSection = {
+  /** Printed BEFORE `items`, and only when some topic is material solely via a named IRO. */
+  material_via_iro_note: string | null
   heading: string
   items: { title: string; body: string }[]
 }
@@ -792,6 +827,44 @@ export const NOT_CLAIMED: string[] = [
   + 'standard sets them out, and nothing here orders them by importance to the organisation.',
 ]
 
+/**
+ * ⚠️ WHY THIS IS A BLOCK AHEAD OF SECTION 12 AND NOT AN ITEM INSIDE IT.
+ *
+ * WHY_THIS_MATTERS is a STATIC constant — the same four reflections in every paper, carrying no
+ * per-assessment data at all, rendered by boardReportPdf.ts:882-883 as a uniform run of
+ * title-and-body essays. Three reasons not to put this among them:
+ *
+ *   1. It would make a static constant conditional on the assessment. Every item in that array is
+ *      true of every paper; this one is true of some. Mixing the two means a reader can no longer
+ *      tell which parts of the section are general reflection and which are findings about them.
+ *   2. The items are REFLECTIVE — "where attention is", "what the organisation cannot yet see".
+ *      This is EVIDENTIARY: it qualifies a claim made forty pages earlier. Printed in the same
+ *      voice and the same shape, it reads as another thing to think about rather than as a
+ *      correction to something already stated.
+ *   3. An honesty note that arrives only in the reflection at the end has already let the reader
+ *      form the wrong belief. The full attribution therefore stays in SECTION 6, beside the claim
+ *      it qualifies, and section 3 carries the marker. This block is the general statement, placed
+ *      where a reader who skipped to the end still meets it.
+ *
+ * So: a small block of its own, ahead of the heading, present only when it is true. The per-topic
+ * list is NOT here — putting it here would be the third place agreeing about the same fact.
+ */
+export const MATERIAL_VIA_IRO_NOTE =
+  'Some topics in this paper are material because of a specific issue named under them rather than '
+  + 'because the topic was judged material in general. Those are marked where they appear, with the '
+  + 'issue that carried them. The distinction is worth keeping: it is the difference between a view '
+  + 'taken about a whole topic and a view taken about one named thing, and only the second was '
+  + 'actually determined.'
+
+/**
+ * Section 6's own note, in the register's voice: what carried it, no verdict and no adjective.
+ * Printed above the rows so a reader meets it before the first marked row rather than after.
+ */
+export const ATTRIBUTION_NOTE =
+  'Where a topic below is marked "via", it reached material through the named issue under it. The '
+  + 'topic itself was not separately judged material, and its own determinations are shown beneath '
+  + 'the marking exactly as they were recorded.'
+
 export const WHY_HEADING = 'What this tells you, beyond compliance'
 
 export const WHY_THIS_MATTERS: { title: string; body: string }[] = [
@@ -855,10 +928,44 @@ const driversFor = (rule: SeverityRule, basis: Dimension[], values: number[]): D
 type Judged = {
   subtopic: RegisterSubTopic
   directions: AssessmentDirectionRow[]
+  /** THIS ROW's own verdict. The rolled-up one is in the RolledUp map — see buildBoardReport. */
   material: boolean
   carried_by: Direction[]
-  /** True when both directions were submitted and complete — the same bar section 3 counts on. */
+  /**
+   * True when both directions of THIS ROW were submitted and complete — the same bar section 3
+   * counts on.
+   *
+   * ⚠️ THIS ROW'S, AND IT MUST NEVER BECOME THE GROUP'S. `assessed` is
+   * `in scope && (material || fully_judged)`. Because `material ||` short-circuits, a MATERIAL
+   * sub-topic is assessed regardless — so this is NOT the ":963-974" contradiction, and claiming it
+   * was would name a cause that cannot occur. What rolling fully_judged up would actually do is
+   * remove a NOT-material, fully-judged sub-topic from `topics_assessed` the moment somebody adds
+   * an unfinished IRO under it: the count goes DOWN as work goes UP, non-monotone, with nothing on
+   * the page explaining it. RolledUp.fully_judged carries the same pin and the fuller argument, and
+   * assertFullyJudgedIsOwnRow below stops the two drifting apart.
+   */
   fully_judged: boolean
+}
+
+/**
+ * ⚠️ AN INVARIANT, ASSERTED RATHER THAN COMMENTED. The roll-up must never report a group as
+ * fully judged when the sub-topic's own row is not — that is the single change that would break
+ * page 3, and it is invisible in a diff because both fields are called fully_judged and both are
+ * booleans. Cheap: one comparison per sub-topic, on data already in hand.
+ */
+function assertFullyJudgedIsOwnRow(judged: Judged[], rolled: Map<string, RolledUp>): void {
+  for (const j of judged) {
+    if ((j.subtopic.iro_key ?? '') !== '') continue
+    const r = rolled.get(j.subtopic.subtopic_code)
+    if (r && r.fully_judged !== j.fully_judged) {
+      throw new Error(
+        `Roll-up invariant broken for ${j.subtopic.subtopic_code}: RolledUp.fully_judged is `
+        + `${r.fully_judged} but the sub-topic's own row is ${j.fully_judged}. fully_judged must be `
+        + `the OWN ROW's, never the group's — see the note on Judged.fully_judged. Rolling it up `
+        + `makes topics_assessed fall when an unfinished IRO is added, which is a count going down `
+        + `as work goes up.`)
+    }
+  }
 }
 
 /**
@@ -933,8 +1040,17 @@ function judge(subtopics: RegisterSubTopic[]): Judged[] {
  * record, and `resolved_note` is where that is stated on the document. When a freeze point exists,
  * the caller passes frozen rows and nothing here changes.
  */
+/**
+ * ⚠️ TAKES THE ROLLED-UP UNITS, ONE PER SUB-TOPIC, WHICH IS WHY A TOPIC CANNOT BE DOUBLE-PRINTED.
+ * Handed the raw `judged` array instead, a sub-topic with three material IROs would push its
+ * disclosure requirements into `driven_by` four times — the same bundle, listed four times, in a
+ * paper whose whole claim is that it says what is owed. The one-per-sub-topic shape makes that
+ * impossible by construction rather than by a dedupe inside this function.
+ */
+type RoadmapUnit = { rep: Judged; rolled: RolledUp }
+
 function buildRoadmap(
-  materialTopics: Judged[],
+  materialTopics: readonly RoadmapUnit[],
   requirements: readonly RoadmapRequirementRow[],
   resolvedNote: string | null,
 ): RoadmapSection {
@@ -952,7 +1068,7 @@ function buildRoadmap(
   // with two names under it, not E1's eleven requirements printed twice.
   const topics: RoadmapTopic[] = []
   const seen = new Map<string, RoadmapTopic>()
-  for (const j of materialTopics) {
+  for (const { rep: j } of materialTopics) {
     const code = j.subtopic.topic_code
     let entry = seen.get(code)
     if (!entry) {
@@ -986,6 +1102,51 @@ export function buildBoardReport(input: BoardReportInput): BoardReport {
 
   const judged = judge(input.subtopics)
 
+  /**
+   * ⚠️ ONE PLACE, READ FOUR TIMES. `assessed`, `materialTopics`, section 6's rows and the roadmap
+   * all take materiality from THIS map and none of them recomputes it — the same discipline as this
+   * module importing buildRegister instead of re-deriving the comparison. buildRegister reads it
+   * too, so section 7 cannot state a different verdict from section 9 about the same sub-topic.
+   */
+  // ⚠️ THE MAP IS KEYED ON subtopic_code ALONE, and that collapse IS the disjunction — every IRO
+  // under a code is already folded in by the time this returns. The full argument, and what breaks
+  // if the key is ever widened, is at the key itself in register.ts. Nothing in this module may
+  // re-derive a per-sub-topic verdict; read it from here.
+  const rolled = rollUpDeterminations(input.subtopics)
+  assertFullyJudgedIsOwnRow(judged, rolled)
+
+  /**
+   * ⚠️ PER SUB-TOPIC, NOT PER ROW, AND THAT IS WHAT KEEPS THE FIGURES HONEST. `judged` holds one
+   * entry per determination unit, so a sub-topic with three named IROs appears four times. Counting
+   * those would let "topics material" exceed the number of sub-topics in scope — on page 3 — and
+   * would print the same topic's disclosure requirements four times in the roadmap. Filtering to
+   * own rows makes both impossible by construction rather than by a dedupe step someone can remove.
+   */
+  const ownByCode = new Map<string, Judged>()
+  const firstByCode = new Map<string, Judged>()
+  for (const j of judged) {
+    const code = j.subtopic.subtopic_code
+    if (!firstByCode.has(code)) firstByCode.set(code, j)
+    if ((j.subtopic.iro_key ?? '') === '') ownByCode.set(code, j)
+  }
+
+  /**
+   * ⚠️ BUILT FROM THE ROLL-UP MAP, NOT BY FILTERING `judged` TO OWN ROWS. The obvious version —
+   * `judged.filter(j => j.subtopic.iro_key === '')` — silently DROPS a sub-topic that appears only
+   * as a named IRO, so a material IRO whose parent row was not supplied vanishes from every count
+   * and from section 9 while the roll-up still reports it material. An absent parent must not be
+   * able to hide a material IRO. 20260855 makes the parent row mandatory in the database, but this
+   * module is pure and its caller assembles the input.
+   *
+   * `own` is undefined in exactly that case, and every read of it below is optional for that reason
+   * rather than defensively.
+   */
+  const units = [...rolled.values()].map(r => ({
+    rolled: r,
+    own: ownByCode.get(r.subtopic_code),
+    rep: (ownByCode.get(r.subtopic_code) ?? firstByCode.get(r.subtopic_code))!,
+  })).filter(u => u.rep !== undefined)
+
   // ⚠️ "Assessed" means carried through to a judgement, not merely in scope. Counting every row in
   // scope would report work as done that has not been done.
   //
@@ -1013,11 +1174,12 @@ export function buildBoardReport(input: BoardReportInput): BoardReport {
   // With both conditions as they now stand the invariant is STRUCTURAL rather than incidental:
   // every material topic is judged, so every material topic in scope is counted assessed, and
   // `material` cannot exceed `assessed` for any input whose determinations are in scope.
-  const assessed = judged.filter(j =>
-    j.subtopic.status === 'included'
-    && (j.material || j.fully_judged))
+  // material from the ROLL-UP; fully_judged from the OWN ROW. The asymmetry IS the invariant.
+  const assessed = units.filter(u =>
+    u.rep.subtopic.status === 'included'
+    && (u.rolled.material || (u.own?.fully_judged ?? false)))
 
-  const materialTopics = judged.filter(j => j.material)
+  const materialTopics = units.filter(u => u.rolled.material)
 
   // ⚠️ ASKED means the sub-topic reached respondents at all — it is in scope and the aggregate has
   // a result row for it. RATED means at least one person gave it a rating. The gap between the two
@@ -1083,7 +1245,10 @@ export function buildBoardReport(input: BoardReportInput): BoardReport {
       topics_differing: register.entries.length,
       topics_asked: asked.length,
       topics_with_ratings: withRatings.length,
-      material_topics: materialTopics.map(j => ({
+      material_only_via_iro: materialTopics
+        .filter(u => !u.rolled.material_on_own_row)
+        .map(u => u.rolled.subtopic_code),
+      material_topics: materialTopics.map(({ rep: j, rolled: r }) => ({
         subtopic_code: j.subtopic.subtopic_code,
         // ⚠️ READ FROM THE ROW, NEVER PARSED OUT OF subtopic_code. RegisterSubTopic carries
         // topic_code (register.ts:119) and the field directly below it already states the rule for
@@ -1093,7 +1258,8 @@ export function buildBoardReport(input: BoardReportInput): BoardReport {
         topic_code: j.subtopic.topic_code,
         name: nameOf(j.subtopic),
         topic_label: j.subtopic.topic_label,
-        carried_by: j.carried_by,
+        carried_by: r.carried_by,
+        carriers: r.carriers,
       })),
       definitions: {
         assessed: FINDINGS_DEFINITIONS.assessed,
@@ -1139,15 +1305,29 @@ export function buildBoardReport(input: BoardReportInput): BoardReport {
       // ⚠️ AND THE SECTION'S OWN PROSE ALREADY PROMISED THIS. ABSTENTION_NOTE says a topic missing
       // any dimension "is reported as unfinished, naming what is absent". That described behaviour
       // the section did not have. Rendering all of scope is what makes the sentence true.
-      rows: judged.filter(j => j.subtopic.status === 'included').map(j => ({
-        subtopic_code: j.subtopic.subtopic_code,
-        name: nameOf(j.subtopic),
-        topic_label: j.subtopic.topic_label,
-        material: j.material,
-        carried_by: j.carried_by,
-        directions: j.directions,
-      })),
+      //
+      // ⚠️ OWN ROWS ONLY, AND THE NAMED IROs APPEAR AS `carriers` INSIDE THEM RATHER THAN AS ROWS
+      // OF THEIR OWN. Listing them as siblings would put section 9 back at a different granularity
+      // from section 3's counts — five rows against three topics — which is the exact mismatch the
+      // note above records being fixed on 22 Aug 2026. One row per sub-topic, with what carried it
+      // named inside it, keeps the two readable against each other.
+      rows: units.filter(u => u.rep.subtopic.status === 'included')
+        .map(({ rep: j, own, rolled: r }) => ({
+          subtopic_code: j.subtopic.subtopic_code,
+          name: nameOf(j.subtopic),
+          topic_label: j.subtopic.topic_label,
+          material: r.material,
+          carried_by: r.carried_by,
+          carriers: r.carriers,
+          material_on_own_row: r.material_on_own_row,
+          // The OWN row's working. Empty when no parent row was supplied — honest, not a blank.
+          directions: own?.directions ?? [],
+        })),
       abstention_note: ABSTENTION_NOTE,
+      // Present exactly when a row is material and NOT on its own determinations.
+      attribution_note: materialTopics.some(u => !u.rolled.material_on_own_row)
+        ? ATTRIBUTION_NOTE
+        : null,
     },
 
     /**
@@ -1208,6 +1388,17 @@ export function buildBoardReport(input: BoardReportInput): BoardReport {
       not_claimed: NOT_CLAIMED,
     },
 
-    whyThisMatters: { heading: WHY_HEADING, items: WHY_THIS_MATTERS },
+    whyThisMatters: {
+      heading: WHY_HEADING,
+      items: WHY_THIS_MATTERS,
+      /**
+       * ⚠️ A BLOCK AHEAD OF THE ITEMS, NOT ONE OF THEM. See MATERIAL_VIA_IRO_NOTE for the argument.
+       * `items` stays the static constant it has always been; this is a separate, conditional field
+       * so a reader — and a renderer — can tell general reflection from a finding about this paper.
+       */
+      material_via_iro_note: materialTopics.some(u => !u.rolled.material_on_own_row)
+        ? MATERIAL_VIA_IRO_NOTE
+        : null,
+    },
   }
 }
