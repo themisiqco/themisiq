@@ -4,6 +4,19 @@
 --
 -- ⚠️ RUN AFTER 20260840.
 --
+-- ⚠️ TWO OF THIS FILE'S FUNCTIONS ARE SUPERSEDED BY 20260854:
+--     materiality_impact_determination_lock()   (§2 below)
+--     impact_save_determination(), 12 arguments (§4 below) — THE LIVE CONTRIBUTOR PATH
+-- What is installed is 20260854's copy of each. Both differ from the bodies below by ONE LINE: the
+-- ON CONFLICT target names four columns, because 20260854 added `axis` and moved the primary keys
+-- of materiality_impact_determinations AND materiality_impact_assignee_determinations to
+-- (assessment_id, subtopic_code, axis, direction). The lock trigger's snapshot insert targets the
+-- second of those tables, which is why it moved too.
+-- EDITING THE BODIES BELOW CHANGES NOTHING, and a CREATE OR REPLACE from this file would REGRESS
+-- the database: PL/pgSQL does not plan a function body at CREATE time, so the stale three-column
+-- target installs silently and raises SQLSTATE 42P10 at the first save — the contributor path, in
+-- the 12-argument case. Edit 20260854, or supersede it in turn and record that here.
+--
 --
 -- =====================================================================
 -- 1. THE NULL THAT MEANS TWO THINGS — FOR THE THIRD TIME

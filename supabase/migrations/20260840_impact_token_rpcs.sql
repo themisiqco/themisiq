@@ -5,6 +5,19 @@
 --
 -- ⚠️ RUN AFTER 20260839.
 --
+-- ⚠️ impact_save_determination (THE 10-ARGUMENT OVERLOAD) IS SUPERSEDED BY 20260854.
+-- What is installed in the database is 20260854's copy, not the body below. The two differ by ONE
+-- LINE: the ON CONFLICT target names four columns, because 20260854 added `axis` to
+-- materiality_impact_determinations and made the primary key
+-- (assessment_id, subtopic_code, axis, direction).
+-- EDITING THE BODY BELOW CHANGES NOTHING. A CREATE OR REPLACE from this file would in fact
+-- REGRESS the database — reinstalling the three-column target, which PL/pgSQL accepts at CREATE
+-- time and which then raises SQLSTATE 42P10 at the first call. Edit 20260854, or supersede it in
+-- turn and record that here.
+-- (This overload has no caller: the client sends p_abstained_dimensions and p_rationale and so
+-- resolves to 20260841's 12-argument version. It is kept current anyway — an installed, callable
+-- function that raises 42P10 is a trap for the next caller, not dead weight.)
+--
 --
 -- =====================================================================
 -- ⚠️ THE PROJECTION IS THE FIREWALL, NOT THE PAGE
