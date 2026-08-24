@@ -204,6 +204,18 @@ CC's own steps are complete. When the file edits are done: report and stop.
 Never stage. Never commit. Leave changes in the working tree for Lisa to
 review.
 
+The rule exists because a human reads `git status` before every stage, and that
+reading is what has repeatedly kept `docs/workplan-ghg-dashboard-sbti.md` and
+`docs/terms-part-a.md` out of unrelated commits. An automated stage would have
+swept them in.
+
+**Breached once, 24 Aug 2026, by explicit instruction** — Lisa asked in a single
+message for one named change-set (`1fae2db`, the 20260854 axis migration, its two
+reciprocal notes and `scripts/check-sql.py`) to be staged and committed, push
+withheld. Scoped to that request; the rule above stands unchanged. Recorded so the
+next reader sees a rule with one documented exception rather than a rule that looks
+ignored.
+
 ## Reporting
 
 Report what is true when the report is written, not what the task asked for.
