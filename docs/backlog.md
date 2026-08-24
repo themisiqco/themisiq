@@ -275,3 +275,82 @@ Pricing is an open question, deliberately left for a separate conversation.
 zero consumers repo-wide, only the type and the nine literals. The comment at
 `Nav.tsx:8` says it is "retained for any short-label surface". Either find the
 surface or drop the field; today it is nine strings maintained for nobody.
+
+---
+
+## Verified 24 Aug 2026
+
+### The contributor's empty-scope message names two causes it cannot verify
+
+`app/impact/[token]/page.tsx:363` — shown when `impact_submit` returns
+`assigned = 0`:
+
+> No sub-topics are assigned to you, so there was nothing to record. They may not
+> have been assigned yet, or they may have been moved to someone else since this
+> link was sent.
+> Whoever sent you the link can see which it is and put it right.
+
+Both offered causes are wrong when a lead **deliberately** emptied the
+assignment: nothing was "not assigned yet", nothing "moved to someone else", and
+"put it right" sends the contributor to chase a person who did it on purpose.
+Same class as the four instances CLAUDE.md records — a message naming a cause it
+cannot observe.
+
+**Reachable today, independently of custom IROs.** `assigned` counts
+`materiality_impact_assignment_subtopics` rows for the assignment, and
+20260838:582 grants `delete` on that table to `authenticated` so a lead can edit
+assignment coverage. Removing every row produces `assigned = 0`. Not caused by
+20260855/20260856 and not fixed by them — PT414 (20260856 §4) stops an IRO
+emptying a scope, but the lead's own edit still can.
+
+**IT NEEDS SCHEMA, WHICH IS WHY IT IS HERE AND NOT IN 20260856.** Telling *never
+assigned* from *assigned then withdrawn* requires history, and
+`materiality_impact_assignment_subtopics` has neither soft-delete nor audit. Two
+options:
+
+- **`removed_at` soft-delete column** — cheapest to write and the worse choice.
+  Every read of that table must then say `where removed_at is null`; there are
+  eight-plus call sites and no view to hide the predicate behind. That is the
+  `iro_key` hazard again and the `mr_jurisdictions.active` hazard before it: a
+  filter everyone must remember, silent when omitted.
+- **Audit table** — additive, read only by the message that needs it, no existing
+  query changes. **Recommended.**
+
+Until then the honest fix is to stop guessing: say what is observed ("no
+sub-topics are assigned to you") and drop both speculative causes, which is a
+copy change and could ship on its own.
+
+### Overload-count assertions in 20260854 §6.4 and 20260855 §10.6
+
+Both carry, identically:
+
+```sql
+if (select count(*) from pg_proc p ...
+     where n.nspname='public' and p.proname='impact_save_determination') <> 2 then
+  raise exception 'Expected exactly two impact_save_determination overloads (10 args and 12). ...'
+```
+
+**Latent, narrow, and not worth a migration to fix an assertion.** It uses an
+exact name rather than a prefix, so it cannot be broadened by an unrelated
+function — it would NOT have failed the way 20260856 §9 did, where
+`like 'materiality_custom_iro_%'` silently gained a fourth member.
+
+The weakness it does share: **it counts overloads rather than naming their
+signatures.** A signature change that PRESERVES THE TOTAL passes it. Replace the
+10-argument overload with a differently-shaped one while the 12-argument survives
+and the count is still 2, the assertion is still green, and the live contributor
+path is broken. Naming the two argument lists —
+`pg_get_function_identity_arguments` against the expected pair — would catch that;
+counting cannot.
+
+Both migrations are applied and green, so this is latent rather than live, and the
+exposure needs a deliberate signature change. Fix it opportunistically the next
+time either function is forked, not on its own.
+
+**The general lesson, which is the reusable part:** an assertion that counts tests
+arithmetic; an assertion that names tests identity. 20260856 §9 asserted
+`count(*) <> 3` over a prefix, a correctly-written file grew a fourth matching
+function, and the migration aborted at install on a file with nothing wrong with
+it. Both of its assertions now list names. Prefer a name list wherever the
+population is knowable at write time.
+
