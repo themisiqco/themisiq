@@ -98,7 +98,11 @@ type Assignment = {
 type AssignedSub = { assignment_id: string; subtopic_code: string }
 type Determination = {
   subtopic_code: string; direction: string; status: string
-  assignment_id: string | null; overridden_at: string | null
+  // overridden_at was selected and typed here and never read — this screen answers "who is doing
+  // what", and whether a determination was later overridden is /determinations' question. It is
+  // also not a column of the view below. Dropped rather than carried: a select is a claim that
+  // something is read (the register screen's own rule, 21 Aug 2026).
+  assignment_id: string | null
 }
 
 const fmt = (d: string | null) =>
@@ -258,8 +262,20 @@ export default function WorksheetAssign() {
         .eq('assessment_id', assessmentId).order('created_at'),
       supabase.from('materiality_impact_assignment_subtopics')
         .select('assignment_id, subtopic_code').eq('assessment_id', assessmentId),
-      supabase.from('materiality_impact_determinations')
-        .select('subtopic_code, direction, status, assignment_id, overridden_at')
+      // ⚠️ THE VIEW, NOT THE TABLE. Every figure this screen derives from these rows is keyed on a
+      // SUB-TOPIC — the per-row "submitted" badge, and submittedFromScope, which gates whether a
+      // survey round can still be unlinked. After 20260855 a bare select returns a company's named
+      // IROs alongside the sub-topic rows, so one IRO submitted under E3.1 would badge E3.1 itself
+      // as submitted and would count as a determination made about a question the round asked.
+      // Neither is true. materiality_impact_subtopic_determinations pins iro_key = '' so the
+      // predicate cannot be forgotten here or at the next reader.
+      //
+      // ⚠️ THE VIEW PINS iro_key AND NOTHING ELSE — it exposes axis without filtering it. Nothing
+      // writes axis = 'financial' today, so these counts are impact-axis by accident of what does
+      // not exist yet. When the financial axis lands, this site needs .eq('axis','impact') as well,
+      // and the view will not supply it.
+      supabase.from('materiality_impact_subtopic_determinations')
+        .select('subtopic_code, direction, status, assignment_id')
         .eq('assessment_id', assessmentId),
       supabase.from('mr_esrs_subtopic_display').select('subtopic_code, short_name')
         .eq('standard_version', sv || ''),
