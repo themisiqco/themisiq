@@ -147,12 +147,47 @@ type AggSub = {
 type Agg = { subtopics: AggSub[] }
 
 type Det = {
-  subtopic_code: string; direction: 'negative' | 'positive'
+  subtopic_code: string
+  /**
+   * Which unit under the sub-topic this row is. '' is the sub-topic taken as a whole; a non-empty
+   * value names a company-defined IRO (20260855). SELECTED, not defaulted: until 25 Aug 2026 the
+   * query omitted it, so every IRO determination arrived indistinguishable from its parent's own
+   * row — see the assembly note below for what that cost.
+   */
+  iro_key: string
+  direction: 'negative' | 'positive'
   nature: 'actual' | 'potential' | null
   scale: number | null; scope: number | null
   irremediability: number | null; likelihood: number | null
   status: string
 }
+
+/**
+ * A row of materiality_custom_iros — the ONLY place a named IRO's name exists.
+ * materiality_impact_determinations carries iro_key and no name, deliberately: 20260855 keeps the
+ * name off the key so renaming an IRO mid-assessment does not move its determinations.
+ */
+type IroRow = { subtopic_code: string; iro_key: string; name: string }
+
+/**
+ * The unit a determination belongs to: a sub-topic AND which IRO under it. '' is the sub-topic
+ * taken as a whole. `|` is unambiguous as a separator — iro_key is checked `^[a-z0-9][a-z0-9-]*$`
+ * by 20260855 and cannot contain one.
+ */
+const unitKey = (subtopicCode: string, iroKey: string) => `${subtopicCode}|${iroKey}`
+
+/**
+ * The name shown for a determination whose iro_key has no row in materiality_custom_iros.
+ *
+ * ⚠️ AN EXPLICIT STRING, NEVER null. lib/materiality/register.ts:412 sets Carrier.name from
+ * short_name and boardReportPdf.ts:294 renders `c.name ?? c.iro_key`, so null would put the raw
+ * machine slug in front of a reader. The entry and its determinations are KEPT either way —
+ * dropping an orphan would silently remove a carrier that may be what made the topic material.
+ *
+ * Says what was observed, not why. The name row may have been deleted mid-assessment (20260856
+ * carries a delete path) or be invisible under RLS; this cannot tell those apart and does not guess.
+ */
+const orphanIroName = (iroKey: string) => `Unnamed issue (${iroKey})`
 
 const isCategory = (v: unknown): v is TopicCategory =>
   v === 'env' || v === 'soc' || v === 'gov'
@@ -174,6 +209,7 @@ export default function WorksheetRegister() {
   const [aggError, setAggError] = useState<string | null>(null)
 
   const [dets, setDets] = useState<Det[]>([])
+  const [iros, setIros] = useState<IroRow[]>([])
   const [topicOf, setTopicOf] = useState<Record<string, string>>({})
   const [categoryOf, setCategoryOf] = useState<Record<string, string>>({})
   const [refName, setRefName] = useState<Record<string, string>>({})
@@ -224,15 +260,22 @@ export default function WorksheetRegister() {
       else setAggError('The survey results came back empty, and no reason was given.')
     }
 
-    const [dRes, stRes, tRes, dispRes, qRes, snapRes] = await Promise.all([
+    const [dRes, stRes, tRes, dispRes, qRes, snapRes, iroRes] = await Promise.all([
       supabase.from('materiality_impact_determinations')
         // ⚠️ value_chain_position and time_horizon are NOT selected here, deliberately. They were,
         // until 21 Aug 2026, and this screen referenced neither — buildRegister() is the single
         // authority for everything it shows, and its payload has no slot for them. A select is a
         // claim that something is read; leaving them in is how the next reader concludes the
         // register uses them. They are displayed on worksheet/[id]/determinations instead.
-        .select('subtopic_code, direction, nature, scale, scope, irremediability, likelihood, abstained_dimensions, rationale, status, assignment_id, evidence_in_view, override_reason, overridden_at')
-        .eq('assessment_id', assessmentId),
+        //
+        // ⚠️ iro_key IS SELECTED AND axis IS PINNED. Both were absent until 25 Aug 2026. Without
+        // iro_key an IRO's determination is read as its parent's own row; without the axis pin a
+        // financial-axis row lands in an impact register. Those are the two predicates
+        // materiality_impact_subtopic_determinations exists to hold — not read through here only
+        // because this screen also needs iro_key, which that view deliberately withholds.
+        .select('subtopic_code, iro_key, direction, nature, scale, scope, irremediability, likelihood, abstained_dimensions, rationale, status, assignment_id, evidence_in_view, override_reason, overridden_at')
+        .eq('assessment_id', assessmentId)
+        .eq('axis', 'impact'),
       supabase.from('mr_esrs_subtopics').select('code, topic_code, label').eq('standard_version', sv),
       // ⚠️ NOT versioned — mr_esrs_topics is keyed on code alone and has no standard_version column.
       supabase.from('mr_esrs_topics').select('code, label, category'),
@@ -245,9 +288,14 @@ export default function WorksheetRegister() {
         : Promise.resolve({ data: [], error: null }),
       supabase.from('materiality_impact_assignment_subtopics')
         .select('subtopic_code, short_name').eq('assessment_id', assessmentId),
+      // ⚠️ THE NAMES, AND THE ONLY SOURCE OF THEM. Without this the assembly below can key IRO
+      // entries correctly and still print them unnamed, which is the one thing the register's
+      // "via" marking promises it will not do.
+      supabase.from('materiality_custom_iros')
+        .select('subtopic_code, iro_key, name').eq('assessment_id', assessmentId),
     ])
 
-    const err = [dRes, stRes, tRes, dispRes, qRes, snapRes].find(r => r.error)?.error
+    const err = [dRes, stRes, tRes, dispRes, qRes, snapRes, iroRes].find(r => r.error)?.error
     if (err) { setLoadError(err.message); setLoading(false); return }
 
     const st = (stRes.data || []) as { code: string; topic_code: string; label: string }[]
@@ -265,6 +313,7 @@ export default function WorksheetRegister() {
       ((snapRes.data || []) as { subtopic_code: string; short_name: string | null }[])
         .filter(r => r.short_name).map(r => [r.subtopic_code, r.short_name as string])))
     setDets((dRes.data || []) as Det[])
+    setIros((iroRes.data || []) as IroRow[])
     setLoading(false)
   }
 
@@ -285,9 +334,22 @@ export default function WorksheetRegister() {
   }>(() => {
     if (!agg || threshold === null) return { register: null, buildError: null, noCategory: [] }
 
-    const byCode: Record<string, Determination[]> = {}
+    /**
+     * ⚠️ THIS ASSEMBLY IS NOT COVERED BY ANY TEST, AND THAT IS A KNOWN GAP, NOT AN OVERSIGHT.
+     *
+     * lib/materiality/register.test.ts and lib/materiality/boardReport.test.ts both hand the
+     * library hand-built RegisterSubTopic[]. Neither exercises a payload assembled from query
+     * rows — which is exactly why a query missing iro_key passed 81 green tests while every IRO
+     * determination arrived claiming to be its sub-topic's own row.
+     *
+     * Left open because both ways of closing it are worse than the gap: a test that rebuilds this
+     * loop tests the copy, and the loop is inline in a .tsx and not exported, so covering the real
+     * one means extracting it to lib/materiality/ — a real refactor with its own commit. Extract
+     * it and the test follows for free.
+     */
+    const byUnit: Record<string, Determination[]> = {}
     for (const d of dets) {
-      (byCode[d.subtopic_code] ||= []).push({
+      (byUnit[unitKey(d.subtopic_code, d.iro_key)] ||= []).push({
         direction: d.direction,
         // ⚠️ nature does NOT enter the severity figure or the materiality conclusion — it selects
         // which likelihood suppression is named, and likelihood is never folded in. A row saved
@@ -299,14 +361,41 @@ export default function WorksheetRegister() {
       })
     }
 
+    /**
+     * Every named IRO per sub-topic, as the UNION of two sources — neither alone is complete:
+     *   materiality_custom_iros  an IRO created but not yet scored. It carries nothing, and belongs
+     *                            here so buildRegister reports it unjudged rather than let it vanish.
+     *   the determinations       an IRO whose name row is gone. Its determinations must be kept —
+     *                            they may be what made the topic material.
+     * Sorted, so the entry order is deterministic rather than the database's.
+     */
+    const iroKeysOf: Record<string, Set<string>> = {}
+    const iroNameOf: Record<string, string> = {}
+    for (const i of iros) {
+      (iroKeysOf[i.subtopic_code] ||= new Set()).add(i.iro_key)
+      iroNameOf[unitKey(i.subtopic_code, i.iro_key)] = i.name
+    }
+    for (const d of dets) {
+      if (d.iro_key !== '') (iroKeysOf[d.subtopic_code] ||= new Set()).add(d.iro_key)
+    }
+
     const held: string[] = []
     const subtopics: RegisterSubTopic[] = []
     for (const s of agg.subtopics || []) {
       const topicCode = s.topic_code || topicOf[s.subtopic_code] || ''
       const category = categoryOf[topicCode]
       if (!isCategory(category)) { held.push(s.subtopic_code); continue }
+      /**
+       * ⚠️ ONE ENTRY PER (subtopic_code, iro_key) — NOT ONE PER SUB-TOPIC. This is the shape
+       * lib/materiality/register.ts takes: rollUpDeterminations collapses the units back to one
+       * entry per code, and that collapse IS the disjunction. Flatten them here instead and
+       * submittedFor() sees two submitted rows for one direction and throws — or, when the
+       * directions happen not to collide, silently reads a named IRO's judgement as the
+       * sub-topic's own, so material_on_own_row reads true and nothing is marked "via".
+       */
       subtopics.push({
         subtopic_code: s.subtopic_code,
+        iro_key: '',
         topic_code: topicCode,
         topic_label: s.topic_label,
         short_name: resolveSubtopicName(s.subtopic_code, sources) ?? s.short_name ?? null,
@@ -314,8 +403,29 @@ export default function WorksheetRegister() {
         status: s.status,
         exclusion_reason: s.exclusion_reason,
         overall: s.overall,
-        determinations: byCode[s.subtopic_code] || [],
+        determinations: byUnit[unitKey(s.subtopic_code, '')] || [],
       })
+
+      for (const iroKey of [...(iroKeysOf[s.subtopic_code] ?? [])].sort()) {
+        subtopics.push({
+          subtopic_code: s.subtopic_code,
+          iro_key: iroKey,
+          topic_code: topicCode,
+          topic_label: s.topic_label,
+          // The IRO's OWN name. Never the parent's — that would print the sub-topic's label where
+          // the register promises the named issue that carried it.
+          short_name: iroNameOf[unitKey(s.subtopic_code, iroKey)] ?? orphanIroName(iroKey),
+          category,
+          // Scope is the parent's: an IRO under an excluded sub-topic is out of scope with it.
+          status: s.status,
+          exclusion_reason: null,
+          // ⚠️ null, ALWAYS. `overall` is the STAKEHOLDER aggregate, and no stakeholder was ever
+          // asked about a company-defined IRO. Copying the parent's would attribute a survey
+          // answer to a question nobody was put.
+          overall: null,
+          determinations: byUnit[unitKey(s.subtopic_code, iroKey)] || [],
+        })
+      }
     }
 
     try {
