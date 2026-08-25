@@ -65,6 +65,13 @@ const CARD: React.CSSProperties = {
 type Direction = 'negative' | 'positive'
 type Det = {
   subtopic_code: string; direction: Direction
+  // ⚠️ PART OF THE KEY, AND CARRIED SO THE OVERRIDE CAN NAME THE ROW IT IS LOOKING AT. '' is the
+  // sub-topic taken as a whole; a non-empty key is a company-named IRO beneath it (20260855). Every
+  // row this screen reads today carries '' — a contributor cannot determine an IRO, because
+  // impact_save_determination does not name iro_key and impact_get cannot show one — so this is
+  // the same value on every row until 1c lands. It is read from the row rather than assumed so
+  // that when 1c does land, saveOverride is already correct.
+  iro_key: string
   nature: 'actual' | 'potential' | null
   scale: number | null; scope: number | null
   irremediability: number | null; likelihood: number | null
@@ -74,7 +81,12 @@ type Det = {
   assignment_id: string | null; evidence_in_view: boolean
   override_reason: string | null; overridden_at: string | null
 }
-type AssigneeDet = Omit<Det, 'status' | 'evidence_in_view' | 'override_reason' | 'overridden_at'>
+// ⚠️ iro_key IS OMITTED HERE BECAUSE THE QUERY BELOW DOES NOT SELECT IT. The snapshot table has
+// the column (20260855 §2 added it to both tables), but this screen reads the snapshot only to
+// print what the contributor originally said beside the override — `prior`, never a write target.
+// Leaving it in the type without selecting it would have the type assert a field that arrives
+// undefined at runtime.
+type AssigneeDet = Omit<Det, 'status' | 'evidence_in_view' | 'override_reason' | 'overridden_at' | 'iro_key'>
 type Assignment = { id: string; contributor_name: string | null; contributor_email: string | null
                     contributor_role: string | null; status: string; revoked_at: string | null }
 type ScopeRow = { subtopic_code: string; short_name: string | null; assignment_id: string }
@@ -141,7 +153,8 @@ export default function Determinations() {
 
     const [dRes, adRes, gRes, sRes, tRes, tlRes, stRes, dispRes] = await Promise.all([
       supabase.from('materiality_impact_determinations')
-        .select('subtopic_code, direction, nature, scale, scope, irremediability, likelihood, abstained_dimensions, value_chain_position, time_horizon, rationale, status, assignment_id, evidence_in_view, override_reason, overridden_at')
+        // iro_key is selected because saveOverride keys on it — see the note on Det.
+        .select('subtopic_code, iro_key, direction, nature, scale, scope, irremediability, likelihood, abstained_dimensions, value_chain_position, time_horizon, rationale, status, assignment_id, evidence_in_view, override_reason, overridden_at')
         .eq('assessment_id', assessmentId),
       supabase.from('materiality_impact_assignee_determinations')
         .select('subtopic_code, direction, nature, scale, scope, irremediability, likelihood, abstained_dimensions, value_chain_position, time_horizon, rationale, assignment_id')
@@ -231,9 +244,30 @@ export default function Determinations() {
     setSaving(true); setSaveError(null)
     const { data, error } = await supabase.from('materiality_impact_determinations')
       .update({ ...override.patch, override_reason: override.reason })
+      // ⚠️ ALL FIVE KEY COLUMNS. This predicate named three, and the primary key has been five
+      // since 20260855 — so it matched the sub-topic's own row AND every named IRO beneath it,
+      // writing the lead's values and the lead's override reason across all of them, snapshotting
+      // each one on the way past. `.select('subtopic_code')` would come back with several rows and
+      // the length check below would pass. An UPDATE, so it never raised 42P10 the way the upsert
+      // on the determine screen did: it was silently correct only while no IRO existed.
+      //
+      // iro_key COMES FROM THE ROW BEING EDITED, never a literal ''. Every row reachable here
+      // carries '' today — the override button needs `assignment_id`, and a contributor cannot
+      // determine an IRO — but 20260856 §7 already tells a lead to override rather than delete an
+      // IRO's submitted determination, and 1c makes that ordinary. A literal would send the
+      // override to the parent row instead, and report success.
+      //
+      // ⚠️ axis IS A LITERAL, DELIBERATELY, AND WILL NEED THE SAME TREATMENT AS iro_key WHEN THE
+      // FINANCIAL AXIS LANDS. This screen is the impact worksheet and nothing writes
+      // axis = 'financial' yet, so a wrong literal here fails loudly and immediately — the update
+      // matches nothing and the no-rows branch below says so. Once a financial-axis determination
+      // exists, key this on the row too; leaving it a literal at that point makes it the same
+      // silent cross-axis write this comment describes.
       .eq('assessment_id', assessmentId)
       .eq('subtopic_code', override.det.subtopic_code)
+      .eq('axis', 'impact')
       .eq('direction', override.det.direction)
+      .eq('iro_key', override.det.iro_key)
       .select('subtopic_code')
     setSaving(false)
     // The trigger's own sentence, printed as given. It already explains the reason requirement and
