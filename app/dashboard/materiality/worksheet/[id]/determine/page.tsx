@@ -278,6 +278,17 @@ export default function LeadDetermine() {
       assessment_id: assessmentId,
       subtopic_code: code,
       standard_version: version,
+      // ⚠️ BOTH KEY COLUMNS NAMED, NEVER LEFT TO THEIR DEFAULTS. They are two of the five columns
+      // the primary key is made of — 20260854 added axis, 20260855 added iro_key — and a write
+      // that lets a key column default is a write whose identity is decided somewhere else.
+      // 20260855 §11: a write "has to name iro_key or take its default deliberately, in plain
+      // sight". This is that, said out loud.
+      //   axis 'impact'  — this screen is the impact worksheet; the financial axis has no writer.
+      //   iro_key ''     — the sub-topic taken AS A WHOLE, which is a value with a meaning and not
+      //                    a sentinel for "missing" (20260855's header). A named IRO under this
+      //                    sub-topic is a different row with a different key, never this one.
+      axis: 'impact',
+      iro_key: '',
       direction: dir,
       nature: d.nature,
       scale: d.scale,
@@ -298,7 +309,15 @@ export default function LeadDetermine() {
     }
 
     const { data, error } = await supabase.from('materiality_impact_determinations')
-      .upsert(row, { onConflict: 'assessment_id,subtopic_code,direction' })
+      // ⚠️ ALL FIVE KEY COLUMNS, IN THE KEY'S OWN ORDER. This target read
+      // 'assessment_id,subtopic_code,direction' — the key as it stood before 20260854 — and since
+      // that migration applied on 24 Aug 2026 there has been no unique constraint matching it, so
+      // EVERY SAVE ON THIS SCREEN FAILED with 42P10, "there is no unique or exclusion constraint
+      // matching the ON CONFLICT specification". Reproduced on localhost 25 Aug 2026.
+      // Nothing was corrupted: 42P10 is raised at plan time, so no row was ever touched.
+      // 20260855 §7 forked the same target inside three SQL functions and §10 read them back at
+      // install; this one lives in TypeScript, where no migration can check it.
+      .upsert(row, { onConflict: 'assessment_id,subtopic_code,axis,direction,iro_key' })
       .select('subtopic_code')
 
     setSaving(s => ({ ...s, [k]: false }))
