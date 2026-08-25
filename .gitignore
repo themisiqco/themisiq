@@ -37,3 +37,4 @@ app/concierge-test/
 # generated CBAM reference data — rebuild with scripts/gen-cbam-defaults.ts
 public/data/
 supabase/.temp/
+.venv-sql/
