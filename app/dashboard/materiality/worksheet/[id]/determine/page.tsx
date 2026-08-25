@@ -639,7 +639,7 @@ export default function LeadDetermine() {
                       <div style={{ fontSize: 13, fontWeight: 600, color: PURPLE, margin: '14px 0 8px' }}>
                         {u.name}
                         <span style={{ fontSize: 11, color: MUTE, fontWeight: 400 }}>
-                          {' '}· named issue under {headingFor(s.subtopic_code).code || s.subtopic_code}
+                          {' '}· IRO under {headingFor(s.subtopic_code).code || s.subtopic_code}
                         </span>
                       </div>
                     )}

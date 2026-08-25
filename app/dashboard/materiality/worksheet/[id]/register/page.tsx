@@ -558,6 +558,19 @@ export default function WorksheetRegister() {
               ) : (
                 <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
                   {register.entries.map(e => {
+                    /**
+                     * ⚠️ headingFor IS CORRECT HERE, AND ONLY HERE. An entry needs both sides to
+                     * compare, and register.ts omits every IRO before that point —
+                     * `if ((st.iro_key ?? '') !== '') omit('never_in_survey_scope', …)` — because a
+                     * survey question names an ESRS sub-topic and an IRO can never have been in
+                     * one. So `entries` holds own rows only, one per code, and resolving by
+                     * subtopic_code cannot pick up the wrong name. RegisterEntry carries no
+                     * iro_key at all, which makes an IRO entry unrepresentable rather than merely
+                     * absent — the type is the guarantee, not this comment.
+                     *
+                     * If that ever changes, this render and its `key={e.subtopic_code}` both need
+                     * the treatment the omitted list below already has.
+                     */
                     const h = headingFor(e.subtopic_code)
                     return (
                       <div key={e.subtopic_code} style={{ border: `0.5px solid ${LINE}`,
@@ -627,16 +640,43 @@ export default function WorksheetRegister() {
 
                 <div style={{ display: 'grid', gap: 8 }}>
                   {register.omitted.map(o => {
+                    const isIro = o.iro_key !== ''
                     const h = headingFor(o.subtopic_code)
+                    /**
+                     * ⚠️ THE UNIT'S OWN NAME, NOT ITS PARENT'S. headingFor() resolves by
+                     * subtopic_code alone, so calling it for an IRO returns the SUB-TOPIC's name —
+                     * which is why two rows under one code both read "Water pollution" and the
+                     * IRO's own name appeared nowhere. buildRegister already puts the right name on
+                     * every row: OmittedSubTopic.short_name is the sub-topic's on an own row and
+                     * the IRO's on an IRO's. The assembly was never wrong; this display discarded
+                     * what it was handed.
+                     *
+                     * The own row keeps headingFor, because its title carries the topic framing
+                     * worksheetSubtopicHeading() adds. That framing describes the ESRS topic and
+                     * would misdescribe an IRO named under it, so an IRO's name is rendered plain.
+                     *
+                     * `?? o.iro_key` is the last resort, not an expected path: the assembly
+                     * substitutes orphanIroName() when no name row exists, so a bare key here means
+                     * a row reached the register by some other route. A key is ugly and traceable;
+                     * a blank would be neither.
+                     */
+                    const parentName = resolveSubtopicName(o.subtopic_code, sources) ?? o.subtopic_code
+                    const title = isIro ? (o.short_name ?? o.iro_key) : h.title
                     return (
                       // ⚠️ THE PAIR, NOT THE CODE. A sub-topic and every IRO named under it share
                       // a subtopic_code, so keying on it alone collapses them into one row.
                       <div key={`${o.subtopic_code}|${o.iro_key}`} style={{ border: `0.5px solid ${LINE}`,
                                                           borderRadius: 10, padding: '10px 14px' }}>
                         <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
-                          <div style={{ fontSize: 12.5, fontWeight: 600, color: INK }}>{h.title}</div>
+                          <div style={{ fontSize: 12.5, fontWeight: 600, color: INK }}>{title}</div>
+                          {/* ⚠️ THE RELATIONSHIP IS STATED, NOT LEFT TO THE REASON TEXT. A reader
+                              must be able to tell a sub-topic's own row from an IRO named under it
+                              from the name and this line alone — "never put to anyone" explains
+                              why a row could not be compared, not what the row IS. */}
                           <span style={{ fontSize: 11, color: MUTE }}>
-                            {h.code ? `${h.code} · ` : ''}{o.topic_label}
+                            {isIro
+                              ? <>IRO under {parentName}{h.code ? ` · ${h.code}` : ''} · {o.topic_label}</>
+                              : <>{h.code ? `${h.code} · ` : ''}{o.topic_label}</>}
                           </span>
                           <Chip text={REASON_LABEL[o.reason]} fg={AMBER} bg={AMBER_BG} />
                         </div>
