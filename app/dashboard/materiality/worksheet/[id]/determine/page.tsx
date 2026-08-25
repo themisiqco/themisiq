@@ -89,7 +89,35 @@ type Agg = {
 }
 
 
-const key = (c: string, d: Direction) => `${c}::${d}`
+/**
+ * A DETERMINABLE UNIT: an ESRS sub-topic AND which IRO under it.
+ *
+ * iro_key '' is the sub-topic taken as a whole — a value with a meaning, not a sentinel for
+ * "missing" (20260855). A non-empty value names a company-defined IRO. `name` is the IRO's own
+ * name and is null on the own row, whose name is resolved at render through the shared chain so
+ * this screen and the determinations screen cannot disagree about what a sub-topic is called.
+ */
+type Unit = { subtopic_code: string; iro_key: string; name: string | null }
+
+/**
+ * A row of materiality_custom_iros — the ONLY place a named IRO's name exists.
+ * materiality_impact_determinations carries iro_key and no name, deliberately: 20260855 keeps the
+ * name off the key so renaming an IRO mid-assessment does not move its determinations.
+ */
+type IroRow = { subtopic_code: string; iro_key: string; name: string }
+
+/**
+ * ⚠️ KEYED ON THE UNIT, NOT THE SUB-TOPIC. Was `${c}::${d}` until 25 Aug 2026, which is one slot
+ * per (sub-topic, direction) — so a named IRO's draft and its parent's occupied the same slot and
+ * the last one hydrated won. Every per-block map on this screen is keyed with this: drafts,
+ * saving, blockError, blockNote. Widen one and not the others and a save error appears on a
+ * different unit's block than the one that failed.
+ *
+ * `::` is safe as a separator: subtopic codes are `E1.1`-shaped and iro_key is checked
+ * `^[a-z0-9][a-z0-9-]*$` by 20260855, so neither can contain one.
+ */
+const key = (subtopicCode: string, iroKey: string, d: Direction) =>
+  `${subtopicCode}::${iroKey}::${d}`
 const empty = (): Draft => ({
   nature: null, scale: null, scope: null, irremediability: null, likelihood: null,
   abstained: [], vcp: [], horizon: null, rationale: '', status: 'draft',
@@ -111,6 +139,7 @@ export default function LeadDetermine() {
   const [company, setCompany] = useState<string | null>(null)
   const [version, setVersion] = useState<string | null>(null)
   const [mine, setMine] = useState<{ subtopic_code: string }[]>([])
+  const [iros, setIros] = useState<IroRow[]>([])
   const [roundName_, setRoundName_] = useState<Record<string, string>>({})
   const [displayName, setDisplayName] = useState<Record<string, string>>({})
   const [refName, setRefName] = useState<Record<string, string>>({})
@@ -166,7 +195,7 @@ export default function LeadDetermine() {
       else setAggError('The survey aggregation returned nothing, and no reason.')
     }
 
-    const [qRes, sRes, dRes, tRes, tlRes, stRes, dispRes] = await Promise.all([
+    const [qRes, sRes, dRes, tRes, tlRes, stRes, dispRes, iroRes] = await Promise.all([
       roundId
         ? supabase.from('materiality_survey_questions')
             .select('subtopic_code, short_name, sort_order')
@@ -175,17 +204,28 @@ export default function LeadDetermine() {
         : Promise.resolve({ data: [], error: null }),
       supabase.from('materiality_impact_assignment_subtopics')
         .select('subtopic_code').eq('assessment_id', assessmentId),
+      // ⚠️ iro_key SELECTED AND axis PINNED. Both were absent until 25 Aug 2026. Without iro_key
+      // a named IRO's row hydrates into its PARENT's draft slot and the next keystroke saves the
+      // IRO's numbers back over the parent's own determination — a write, not just a misread.
+      // Without the axis pin a financial-axis row would do the same from the other direction.
+      // Those are the two predicates materiality_impact_subtopic_determinations exists to hold;
+      // this screen cannot read through it because that view deliberately withholds iro_key.
       supabase.from('materiality_impact_determinations')
-        .select('subtopic_code, direction, nature, scale, scope, irremediability, likelihood, abstained_dimensions, value_chain_position, time_horizon, rationale, status, assignment_id')
-        .eq('assessment_id', assessmentId).is('assignment_id', null),
+        .select('subtopic_code, iro_key, direction, nature, scale, scope, irremediability, likelihood, abstained_dimensions, value_chain_position, time_horizon, rationale, status, assignment_id')
+        .eq('assessment_id', assessmentId).is('assignment_id', null)
+        .eq('axis', 'impact'),
       supabase.from('mr_esrs_topics').select('code, label, category, sort_order').order('sort_order'),
       supabase.from('mr_esrs_topic_labels').select('topic_code, standard_version, label').eq('standard_version', sv),
       supabase.from('mr_esrs_subtopics').select('code, topic_code, label').eq('standard_version', sv),
       supabase.from('mr_esrs_subtopic_display').select('subtopic_code, short_name')
         .eq('standard_version', sv),
+      // The named IROs under this assessment. No Add control exists yet, so today this is always
+      // empty — it is here so the render below is unit-aware BEFORE the first one can be created.
+      supabase.from('materiality_custom_iros')
+        .select('subtopic_code, iro_key, name').eq('assessment_id', assessmentId),
     ])
 
-    const err = [sRes, dRes, tRes, tlRes, stRes, dispRes].find(r => r.error)?.error
+    const err = [sRes, dRes, tRes, tlRes, stRes, dispRes, iroRes].find(r => r.error)?.error
     if (err) { setLoadError(err.message); setLoading(false); return }
 
     const st = (stRes.data || []) as { code: string; topic_code: string; label: string }[]
@@ -212,7 +252,7 @@ export default function LeadDetermine() {
 
     const next: Record<string, Draft> = {}
     for (const d of (dRes.data || []) as Record<string, unknown>[]) {
-      next[key(d.subtopic_code as string, d.direction as Direction)] = {
+      next[key(d.subtopic_code as string, (d.iro_key as string) ?? '', d.direction as Direction)] = {
         nature: (d.nature as Draft['nature']) ?? null,
         scale: (d.scale as number | null) ?? null,
         scope: (d.scope as number | null) ?? null,
@@ -226,6 +266,7 @@ export default function LeadDetermine() {
       }
     }
     setDrafts(next)
+    setIros((iroRes.data || []) as IroRow[])
     setLoading(false)
   }
 
@@ -269,8 +310,9 @@ export default function LeadDetermine() {
     agg?.s1_s2_contrast?.entries.find(
       e => e.s1_subtopic_code === code || e.s2_subtopic_code === code) || null
 
-  const save = async (code: string, dir: Direction, d: Draft) => {
-    const k = key(code, dir)
+  const save = async (u: Unit, dir: Direction, d: Draft) => {
+    const code = u.subtopic_code
+    const k = key(code, u.iro_key, dir)
     setSaving(s => ({ ...s, [k]: true }))
     setBlockError(e => { const n = { ...e }; delete n[k]; return n })
 
@@ -288,7 +330,11 @@ export default function LeadDetermine() {
       //                    a sentinel for "missing" (20260855's header). A named IRO under this
       //                    sub-topic is a different row with a different key, never this one.
       axis: 'impact',
-      iro_key: '',
+      // ⚠️ THE UNIT'S OWN KEY, no longer the literal ''. The comment above still holds — this is a
+      // key column named in plain sight rather than left to its default — but the value now comes
+      // from the block being saved instead of being assumed. '' still means the sub-topic taken as
+      // a whole; a named IRO writes its own row under its own key.
+      iro_key: u.iro_key,
       direction: dir,
       nature: d.nature,
       scale: d.scale,
@@ -303,7 +349,11 @@ export default function LeadDetermine() {
       rationale: d.rationale.trim() || null,
       // ⚠️ EARNED, NOT DEFAULTED. Computed from the same predicate that decides whether the panel
       // above renders evidence — one condition, one source. There is no checkbox and no default.
-      evidence_in_view: hasEvidence(code),
+      // ⚠️ FALSE ON A NAMED IRO, ALWAYS. The evidence panel on screen is the PARENT sub-topic's:
+      // no survey question was ever put about a company-named IRO, so recording that survey
+      // evidence was in view for its determination would assert something that did not happen.
+      // Still EARNED, not defaulted — the own row computes it from the same predicate as before.
+      evidence_in_view: u.iro_key === '' && hasEvidence(code),
       assignment_id: null,
       status: 'draft',
     }
@@ -370,20 +420,20 @@ export default function LeadDetermine() {
     await load()
   }
 
-  const update = (code: string, dir: Direction, patch: Partial<Draft>) => {
-    const k = key(code, dir)
+  const update = (u: Unit, dir: Direction, patch: Partial<Draft>) => {
+    const k = key(u.subtopic_code, u.iro_key, dir)
     const next = { ...(drafts[k] || empty()), ...patch }
     setDrafts(cur => ({ ...cur, [k]: next }))
-    void save(code, dir, next)
+    void save(u, dir, next)
   }
-  const edit = (code: string, dir: Direction, patch: Partial<Draft>) => {
-    const k = key(code, dir)
+  const edit = (u: Unit, dir: Direction, patch: Partial<Draft>) => {
+    const k = key(u.subtopic_code, u.iro_key, dir)
     setDrafts(cur => ({ ...cur, [k]: { ...(cur[k] || empty()), ...patch } }))
   }
 
   /** Switching to "already happening" removes a likelihood answer — and says so. ESRS 1 ¶41. */
-  const setNature = (code: string, dir: Direction, nature: 'actual' | 'potential') => {
-    const k = key(code, dir)
+  const setNature = (u: Unit, dir: Direction, nature: 'actual' | 'potential') => {
+    const k = key(u.subtopic_code, u.iro_key, dir)
     const cur = drafts[k] || empty()
     const loses = nature === 'actual' && (cur.likelihood !== null || cur.abstained.includes('likelihood'))
     setBlockNote(n => {
@@ -393,7 +443,7 @@ export default function LeadDetermine() {
       else delete c[k]
       return c
     })
-    update(code, dir, nature === 'actual'
+    update(u, dir, nature === 'actual'
       ? { nature, likelihood: null, abstained: cur.abstained.filter(x => x !== 'likelihood') }
       : { nature })
   }
@@ -401,6 +451,29 @@ export default function LeadDetermine() {
   const headingFor = (code: string) => subtopicHeading(code, topicOf[code] || '', {
     roundSnapshot: roundName_, display: displayName, reference: refName,
   })
+
+  /**
+   * The units under each sub-topic: its own row first, then every named IRO under it by key.
+   *
+   * ⚠️ THE OWN ROW IS ALWAYS PRESENT, with or without IROs. It is the sub-topic taken as a whole
+   * and is what this screen has always determined; IROs are APPENDED to it, never substituted for
+   * it. That ordering matches carrierOrder() in lib/materiality/register.ts, so the screen and the
+   * register list a sub-topic's units in the same order.
+   *
+   * An IRO whose sub-topic is not in `mine` is skipped by the `?.` — it belongs to a contributor
+   * or is out of scope, and this screen shows only what the lead holds. PT414 door 2 makes the
+   * first of those unreachable; the second is ordinary.
+   */
+  const unitsOf = useMemo<Record<string, Unit[]>>(() => {
+    const out: Record<string, Unit[]> = {}
+    for (const s of mine) {
+      out[s.subtopic_code] = [{ subtopic_code: s.subtopic_code, iro_key: '', name: null }]
+    }
+    for (const i of [...iros].sort((a, b) => a.iro_key.localeCompare(b.iro_key, 'en'))) {
+      out[i.subtopic_code]?.push({ subtopic_code: i.subtopic_code, iro_key: i.iro_key, name: i.name })
+    }
+    return out
+  }, [mine, iros])
 
   const groups = useMemo(() => {
     const byTopic: Record<string, typeof mine> = {}
@@ -502,14 +575,35 @@ export default function LeadDetermine() {
                   code={s.subtopic_code}
                 />
 
-                {(['negative', 'positive'] as Direction[]).map(dir => (
-                  <Block key={dir} code={s.subtopic_code} dir={dir}
-                         d={drafts[key(s.subtopic_code, dir)] || empty()}
-                         saving={!!saving[key(s.subtopic_code, dir)]}
-                         error={blockError[key(s.subtopic_code, dir)]}
-                         note={blockNote[key(s.subtopic_code, dir)]}
-                         evidenced={hasEvidence(s.subtopic_code)}
-                         onNature={setNature} onChange={update} onEdit={edit} />
+                {/* ⚠️ TWO BLOCKS PER UNIT, NOT TWO PER SUB-TOPIC. unitsOf always yields at least
+                    the own row, so with no IRO recorded this renders exactly what it rendered
+                    before — the same two Blocks, from the same drafts, under the same keys. */}
+                {(unitsOf[s.subtopic_code] ?? []).map(u => (
+                  <div key={u.iro_key || '__own'}>
+                    {/* Only a NAMED IRO is labelled. The sub-topic's own row is titled above it
+                        already, and labelling it a second time would read as a second thing. */}
+                    {u.iro_key !== '' && (
+                      <div style={{ fontSize: 13, fontWeight: 600, color: PURPLE, margin: '14px 0 8px' }}>
+                        {u.name}
+                        <span style={{ fontSize: 11, color: MUTE, fontWeight: 400 }}>
+                          {' '}· named issue under {headingFor(s.subtopic_code).code || s.subtopic_code}
+                        </span>
+                      </div>
+                    )}
+                    {(['negative', 'positive'] as Direction[]).map(dir => (
+                      <Block key={dir} unit={u} dir={dir}
+                             d={drafts[key(u.subtopic_code, u.iro_key, dir)] || empty()}
+                             saving={!!saving[key(u.subtopic_code, u.iro_key, dir)]}
+                             error={blockError[key(u.subtopic_code, u.iro_key, dir)]}
+                             note={blockNote[key(u.subtopic_code, u.iro_key, dir)]}
+                             // ⚠️ FALSE ON AN IRO. The EvidencePanel above belongs to the parent
+                             // sub-topic and is deliberately NOT repeated over an IRO's blocks —
+                             // no survey covered the IRO, so its row must not say it was made
+                             // with survey evidence.
+                             evidenced={u.iro_key === '' && hasEvidence(s.subtopic_code)}
+                             onNature={setNature} onChange={update} onEdit={edit} />
+                    ))}
+                  </div>
                 ))}
               </div>
             ))}
@@ -754,12 +848,13 @@ function EvidencePanel({ ev, contrast, hasRound, aggFailed, floor, contrastCavea
 
 // ── one direction of one sub-topic ───────────────────────────────────────────────────────────────
 
-function Block({ code, dir, d, saving, error, note, evidenced, onNature, onChange, onEdit }: {
-  code: string; dir: Direction; d: Draft; saving: boolean
+function Block({ unit, dir, d, saving, error, note, evidenced, onNature, onChange, onEdit }: {
+  /** The unit this block determines — a sub-topic's own row, or one named IRO under it. */
+  unit: Unit; dir: Direction; d: Draft; saving: boolean
   error?: string; note?: string; evidenced: boolean
-  onNature: (c: string, dd: Direction, n: 'actual' | 'potential') => void
-  onChange: (c: string, dd: Direction, patch: Partial<Draft>) => void
-  onEdit: (c: string, dd: Direction, patch: Partial<Draft>) => void
+  onNature: (u: Unit, dd: Direction, n: 'actual' | 'potential') => void
+  onChange: (u: Unit, dd: Direction, patch: Partial<Draft>) => void
+  onEdit: (u: Unit, dd: Direction, patch: Partial<Draft>) => void
 }) {
   const harm = dir === 'negative'
   return (
@@ -783,7 +878,7 @@ function Block({ code, dir, d, saving, error, note, evidenced, onNature, onChang
                            : 'Is this benefit already happening, or could it happen?'} />
       <Options>
         {(['actual', 'potential'] as const).map(n => (
-          <Option key={n} selected={d.nature === n} onClick={() => onNature(code, dir, n)}
+          <Option key={n} selected={d.nature === n} onClick={() => onNature(unit, dir, n)}
                   badge={n === 'actual' ? '•' : '?'}
                   label={n === 'actual' ? 'Already happening' : 'Could happen'}
                   body={n === 'actual' ? 'It is going on now, or it has happened.'
@@ -806,39 +901,39 @@ function Block({ code, dir, d, saving, error, note, evidenced, onNature, onChang
               in this file, duplicated in the contributor form: the direction-awareness lived in
               the page and the copy lived half in the constant. */}
           <ScaleField def={scaleFor(dir)} value={d.scale} abstained={d.abstained.includes('scale')}
-                      onPick={v => onChange(code, dir, setDim(d, 'scale', v))} />
+                      onPick={v => onChange(unit, dir, setDim(d, 'scale', v))} />
           <ScaleField def={SCOPE} value={d.scope} abstained={d.abstained.includes('scope')}
-                      onPick={v => onChange(code, dir, setDim(d, 'scope', v))} />
+                      onPick={v => onChange(unit, dir, setDim(d, 'scope', v))} />
           {/* ¶41: no irremediability on a benefit, no likelihood on something already happening. */}
           {harm && (
             <ScaleField def={IRREMEDIABILITY} value={d.irremediability}
                         abstained={d.abstained.includes('irremediability')}
-                        onPick={v => onChange(code, dir, setDim(d, 'irremediability', v))} />
+                        onPick={v => onChange(unit, dir, setDim(d, 'irremediability', v))} />
           )}
           {d.nature === 'potential' && (
             <ScaleField def={LIKELIHOOD} value={d.likelihood}
                         abstained={d.abstained.includes('likelihood')}
-                        onPick={v => onChange(code, dir, setDim(d, 'likelihood', v))} />
+                        onPick={v => onChange(unit, dir, setDim(d, 'likelihood', v))} />
           )}
 
           <Question text="Anything you want to explain?"
                     hint="Optional. Kept with the determination and quoted in the report." />
           <textarea value={d.rationale} rows={3}
-                    onChange={e => onEdit(code, dir, { rationale: e.target.value })}
-                    onBlur={() => onChange(code, dir, {})}
+                    onChange={e => onEdit(unit, dir, { rationale: e.target.value })}
+                    onBlur={() => onChange(unit, dir, {})}
                     style={{ width: '100%', fontSize: 12.5, lineHeight: 1.7, padding: '10px 12px',
                              borderRadius: 10, border: `1px solid ${LINE}`, color: INK,
                              fontFamily: 'inherit', marginBottom: 18, resize: 'vertical' }} />
 
           <Question text="Where does it happen?" hint="Choose as many as apply." />
           <Pills items={VCP} on={c => d.vcp.includes(c)}
-                 onClick={c => onChange(code, dir, {
+                 onClick={c => onChange(unit, dir, {
                    vcp: d.vcp.includes(c) ? d.vcp.filter(x => x !== c) : [...d.vcp, c] })} />
 
           <div style={{ height: 14 }} />
           <Question text="Over what period?" />
           <Pills items={HORIZONS} on={c => d.horizon === c}
-                 onClick={c => onChange(code, dir, { horizon: d.horizon === c ? null : c })} />
+                 onClick={c => onChange(unit, dir, { horizon: d.horizon === c ? null : c })} />
         </>
       )}
 
