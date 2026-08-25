@@ -157,6 +157,12 @@ export default function LeadDetermine() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submittedCount, setSubmittedCount] = useState<number | null>(null)
 
+  // Naming an IRO, per sub-topic. Keyed by sub-topic code rather than by unit: an IRO is named
+  // UNDER a sub-topic, never under another IRO.
+  const [addName, setAddName] = useState<Record<string, string>>({})
+  const [adding, setAdding] = useState<Record<string, boolean>>({})
+  const [addError, setAddError] = useState<Record<string, string>>({})
+
   const [saving, setSaving] = useState<Record<string, boolean>>({})
   const [blockError, setBlockError] = useState<Record<string, string>>({})
   const [blockNote, setBlockNote] = useState<Record<string, string>>({})
@@ -420,6 +426,53 @@ export default function LeadDetermine() {
     await load()
   }
 
+  /**
+   * Name an IRO under a sub-topic. One RPC, and the database decides everything.
+   *
+   * ⚠️ NEVER OPTIMISTIC, AND `await load()` IS THE WHOLE POINT. materiality_custom_iro_create
+   * derives the row's key from the name SERVER-SIDE and, when two names slug alike, appends
+   * -2, -3 … inside an insert-and-catch loop. So the key the row actually got is frequently not
+   * what slugifying the name here would produce. Adding the unit locally would put a GUESSED key
+   * into its draft slots and into every save that followed — writing determinations under a key
+   * no row has. The refetch is what proves which key exists.
+   *
+   * ⚠️ NO CLIENT-SIDE FINALISATION CHECK, DELIBERATELY. A finalised assessment refuses this with
+   * PT413 and a sentence that explains what to do instead. Checking here as well would be a second
+   * source of truth for something the database already guards — and the two would drift the first
+   * time finalisation changed. The refusal IS the feature.
+   */
+  const addIssue = async (code: string) => {
+    const name = (addName[code] || '').trim()
+    setAdding(a => ({ ...a, [code]: true }))
+    setAddError(e => { const n = { ...e }; delete n[code]; return n })
+
+    const { data, error } = await supabase.rpc('materiality_custom_iro_create', {
+      p_assessment_id: assessmentId,
+      p_subtopic_code: code,
+      p_name: name,
+    })
+    setAdding(a => ({ ...a, [code]: false }))
+
+    // ⚠️ THE DATABASE'S OWN SENTENCE, WHOLE AND UNWRAPPED. Every refusal this call can raise —
+    // not yours, no version on the assessment, name empty or over 200, finalised (PT413), assigned
+    // to a contributor (PT414), a name already used here — is written for the person reading it
+    // and names the way out. A wrapper here could only make one of them vaguer.
+    if (error) { setAddError(e => ({ ...e, [code]: error.message })); return }
+
+    // ⚠️ THREE STATES, AND THIS IS THE THIRD — the same discipline as submitAll below. A call that
+    // returns neither an error nor a key is not a success with nothing in it; it is a call whose
+    // outcome is unknown, and saying so is the only honest thing available.
+    const iroKey = (data as { iro_key?: string } | null)?.iro_key
+    if (typeof iroKey !== 'string' || iroKey === '') {
+      setAddError(e => ({ ...e, [code]: 'That returned neither a result nor a reason, so it is not '
+        + 'known whether it was recorded. Reload this page and check before trying again.' }))
+      return
+    }
+
+    setAddName(n => ({ ...n, [code]: '' }))
+    await load()
+  }
+
   const update = (u: Unit, dir: Direction, patch: Partial<Draft>) => {
     const k = key(u.subtopic_code, u.iro_key, dir)
     const next = { ...(drafts[k] || empty()), ...patch }
@@ -605,6 +658,60 @@ export default function LeadDetermine() {
                     ))}
                   </div>
                 ))}
+
+                {/* ── name an IRO ─────────────────────────────────────────────────────────────
+                    ⚠️ AFTER THE LAST UNIT'S BLOCKS, INSIDE THIS SUB-TOPIC. The order a person
+                    reads is: the sub-topic itself, then anything named under it, then the way to
+                    name another. Above the blocks it would interrupt a sub-topic and its own two
+                    directions, which are the thing being judged. */}
+                <div style={{ border: `1px dashed ${LINE}`, borderRadius: 12,
+                              padding: '12px 14px', marginBottom: 12, background: PAPER }}>
+                  {/* ⚠️ THE WORD ARRIVES HERE, WHERE THE ACTION IS INVITED — not in a refusal.
+                      Five of the six things materiality_custom_iro_create can refuse say "IRO",
+                      and a lead who first meets the term while being told no has been taught it by
+                      a failure. This is the only screen on which one is created, so it is the
+                      place the term is introduced and expanded. The report says "IRO" bare from
+                      then on (NEVER_ASKED_NOTE), which reads correctly once this has landed. */}
+                  <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.75, marginBottom: 10 }}>
+                    <strong style={{ color: INK }}>Is there a specific impact, risk or opportunity
+                    here?</strong>{' '} ESRS calls these IROs. If one particular thing under this
+                    heading needs judging on its own — a site, a product, a supplier — name it as
+                    an IRO. It gets its own questions, and if it turns out material it can carry
+                    this topic there by itself. It appears in your report under the name you give it.
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <input
+                      value={addName[s.subtopic_code] || ''}
+                      onChange={e => setAddName(n => ({ ...n, [s.subtopic_code]: e.target.value }))}
+                      placeholder="e.g. Water scarcity at the Valencia plant"
+                      style={{ flex: 1, minWidth: 240, fontSize: 12.5, padding: '9px 12px',
+                               borderRadius: 10, border: `1px solid ${LINE}`, color: INK,
+                               fontFamily: 'inherit', background: '#fff' }} />
+                    {/* Disabled on an empty name — not a refusal in a wrapper, just not offering a
+                        call that cannot succeed. Length is left to the database, whose refusal
+                        says what the limit is and why. */}
+                    <button
+                      onClick={() => addIssue(s.subtopic_code)}
+                      disabled={!!adding[s.subtopic_code] || !(addName[s.subtopic_code] || '').trim()}
+                      style={{ flexShrink: 0, fontSize: 13, fontWeight: 600, padding: '9px 18px',
+                               borderRadius: 8, border: `1px solid ${LINE}`, background: '#fff',
+                               color: INK,
+                               cursor: adding[s.subtopic_code] ? 'not-allowed' : 'pointer',
+                               opacity: (adding[s.subtopic_code]
+                                         || !(addName[s.subtopic_code] || '').trim()) ? 0.5 : 1 }}>
+                      {adding[s.subtopic_code] ? 'Adding…' : 'Add this IRO'}
+                    </button>
+                  </div>
+
+                  {addError[s.subtopic_code] && (
+                    <div style={{ background: FAIL_BG, border: `0.5px solid ${FAIL}`, borderRadius: 8,
+                                  padding: '10px 13px', marginTop: 10, fontSize: 12, color: INK,
+                                  lineHeight: 1.75, overflowWrap: 'anywhere' }}>
+                      <strong style={{ color: FAIL, display: 'block', marginBottom: 2 }}>NOT ADDED</strong>
+                      {addError[s.subtopic_code]}
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
