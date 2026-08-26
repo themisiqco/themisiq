@@ -413,14 +413,23 @@ export default function Page() {
                 the structural half" — because the two rot on different schedules and ESRS's
                 topical structure is exactly what a revision touches. Re-typing E1–E5 / S1–S4 / G1
                 into this JSX would put the half that moves in the place nobody would check.
-                ⚠️ THE LEAD-IN IS LOAD-BEARING, NOT DECORATION. The constant opens "ESRS Set 1
-                organises THOSE TOPICS into ten topical standards" — it was written to follow
-                CSRD_DOUBLE_MATERIALITY_SENTENCE, which supplied the antecedent. Standing alone
-                under a diagram it dangles, so the first sentence supplies it and does the
-                attribution at the same time. Remove the lead-in and the caption starts with a
-                pronoun pointing at nothing. */}
+                ⚠️ THE LEAD-IN IS LOAD-BEARING, NOT DECORATION, AND IT IS WHY THE CAPTION IS TWO
+                SENTENCES. The constant opens "ESRS Set 1 organises THOSE TOPICS into ten topical
+                standards" — it was written to sit after CSRD_DOUBLE_MATERIALITY_SENTENCE, which
+                named the topics and supplied the antecedent. Standing first under a diagram it
+                would open the caption with a pronoun pointing at nothing, so a sentence has to
+                precede it. Delete the lead-in and that is the sentence you get.
+                ⚠️ AND THE ANTECEDENT IS IMPLIED HERE RATHER THAN SUPPLIED — recorded as a known
+                weakness, not as a claim that it is solved. This lead-in names the STANDARDS; the
+                constant's "those topics" refers to TOPICS, which only the diagram above states.
+                A reader takes it from the picture. It also puts "topical standards" in two
+                consecutive sentences. Both were accepted deliberately on 26 Aug 2026 in favour of
+                the positive framing — the previous lead-in read "These ten are not ThemisIQ's
+                categories", which resolved the pronoun cleanly and opened on a negation. If this
+                is ever revisited, the fix is a constant whose first clause names the topics, not
+                a third sentence bolted onto the caption. */}
             <p style={{ ...footnote, marginTop: '1rem', marginBottom: 0 }}>
-              These ten are not ThemisIQ&rsquo;s categories. {ESRS_TEN_TOPICS_SENTENCE} {ESRS_SET1_CITATION}.
+              ThemisIQ follows the ESRS topical standards published by the European Commission. {ESRS_TEN_TOPICS_SENTENCE} {ESRS_SET1_CITATION}.
             </p>
           </div>
 
