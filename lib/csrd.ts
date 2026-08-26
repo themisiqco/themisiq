@@ -50,9 +50,25 @@ export const CSRD_EU_SCOPE_SENTENCE =
   'EU companies are in scope with more than 1,000 employees and more than €450 million in net '
   + 'turnover — both, not either.'
 
+// ⚠️ THE YEARS AS NUMBERS, BECAUSE PROSE CANNOT BE READ BY A PAGE THAT NEEDS ONE FIGURE.
+// CSRD_FIRST_REPORT_SENTENCE below is now DERIVED from these, so the sentence and any page
+// interpolating a single year cannot come apart — which is the whole failure this file exists to
+// prevent, recorded at :7 where these two pages once disagreed about exactly this year.
+// A consumer that wants the sentence takes the sentence; one making an argument about lead time
+// takes the numbers. Neither retypes anything.
+export const CSRD_FIRST_REPORT_FY = 2027
+export const CSRD_FIRST_REPORT_PUBLISHED = 2028
+
+// ⚠️ DERIVED FROM THE REPORTING YEAR, DELIBERATELY NOT new Date().getFullYear(). The claim is
+// "the assessment happens the year before collection opens", which is a fact about the timetable,
+// not about today. A current-year version would tell a reader in 2028 that 2028 is the year to get
+// it done — by which point the first report is being published and the answer is wrong. This one
+// goes stale honestly: when the reporting year moves, it moves with it.
+export const CSRD_ASSESSMENT_YEAR = CSRD_FIRST_REPORT_FY - 1
+
 export const CSRD_FIRST_REPORT_SENTENCE =
   'Companies already reporting continue; everyone else who remains in scope reports for financial '
-  + 'year 2027, published in 2028.'
+  + `year ${CSRD_FIRST_REPORT_FY}, published in ${CSRD_FIRST_REPORT_PUBLISHED}.`
 
 // Stated as its own sentence rather than folded into scope, because it is a REMOVAL. A reader who
 // was told in 2024 that listed SMEs were in scope needs to see the change, not a list they are

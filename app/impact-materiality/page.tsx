@@ -148,7 +148,7 @@ export default function Page() {
               than by an appended call to action — the copy already names the other half. */}
           <p style={{ ...bodyPara, marginBottom: 0 }}>
             The ThemisIQ Impact Materiality Assessment covers the first half, end to end. The second half &mdash; the financial one &mdash; is{' '}
-            <a href="/climate-risk" style={{ color: INK, fontWeight: 400, textDecoration: 'underline' }}>ThemisIQ Climate Risk &amp; Materiality</a>
+            <a href="/climate-risk" style={{ color: INK, fontWeight: 400, textDecoration: 'underline' }}>ThemisIQ Climate Risk</a>
             , and the two are designed to work together.
           </p>
         </div>
@@ -398,7 +398,7 @@ export default function Page() {
       <section style={{ background: '#f8f7f5', padding: '5rem 2.5rem', borderTop: '0.5px solid #e8e7e4', borderBottom: '0.5px solid #e8e7e4' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ maxWidth: 760 }}>
-            <h2 style={sectionTitle}>If you already have Climate Risk &amp; Materiality</h2>
+            <h2 style={sectionTitle}>If you already have Climate Risk</h2>
             <p style={bodyPara}>
               That module screens all ten topics on both axes, so you already have a first-pass view of where your impacts sit. What it can&rsquo;t do is meet the ESRS requirement that your impact conclusions be informed by the people affected by them &mdash; its own report says so, on the cover.
             </p>
