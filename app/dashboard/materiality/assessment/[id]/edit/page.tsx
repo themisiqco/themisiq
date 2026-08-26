@@ -13,6 +13,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Nav from '../../../../../components/Nav'
 import PaywallCard from '../../../../../components/PaywallCard'
+import { PAYWALL_ASSESSMENT_EDIT, PAYWALL_HREF, PAYWALL_TITLE } from '@/lib/paywallCopy'
 import { supabase } from '../../../../../../lib/supabase'
 import { useEntitlement } from '../../../../../../lib/useEntitlement'
 import { isStandardVersion, type StandardVersion } from '../../../../../../lib/materiality'
@@ -155,9 +156,9 @@ export default function EditAssessmentPage() {
   }
 
   if (isPaid === false) return (
-    <Shell><PaywallCard title="Unlock Impact Materiality"
-      body="Editing an assessment is part of the Impact Materiality Assessment."
-      href="/pricing?modules=impact" /></Shell>
+    <Shell><PaywallCard title={PAYWALL_TITLE}
+      body={PAYWALL_ASSESSMENT_EDIT}
+      href={PAYWALL_HREF} /></Shell>
   )
   if (loading) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>

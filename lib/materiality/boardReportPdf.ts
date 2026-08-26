@@ -1,5 +1,5 @@
 /**
- * The impact materiality report, rendered.
+ * The materiality assessment report, rendered.
  *
  * ⚠️ THIS FILE RENDERS. IT DOES NOT DECIDE. Every figure and every sentence below comes from
  * buildBoardReport's output. Nothing here counts a topic, derives a materiality verdict, rewords a

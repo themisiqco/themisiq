@@ -1,5 +1,5 @@
 /**
- * The impact materiality report — the content of it, assembled from work already done.
+ * The materiality assessment report — the content of it, assembled from work already done.
  *
  * PURE. No React, no Supabase, no I/O, no dates generated here. The lib/materiality/register.ts and
  * lib/materiality/severity.ts pattern: the module assembles, the caller fetches and renders.
@@ -19,7 +19,9 @@
  * ⚠️ AND IT IS TITLED FOR WHAT IT IS, NOT FOR WHO RECEIVES IT. The same document goes to a board,
  * an audit committee, an executive team and an assurance provider. A title naming one of them has
  * to be changed for the others, and a document that gets re-titled in transit is a document nobody
- * can cite. "Impact materiality report" is what it is to all four.
+ * can cite. "Materiality assessment report" is what it is to all four. (It read "Impact
+ * materiality report" until the product rename on 26 Aug 2026. The argument above is about
+ * AUDIENCE, not about the word "Impact", and the new title satisfies it identically.)
  *
  * ⚠️ NO MEAN. ANYWHERE. app/components/surveyEvidence.tsx carries this rule for the screens and it
  * holds here: spec v10/v11 §6.2.5, the screening scale is ORDINAL. StakeholderRow has no field a
@@ -548,7 +550,7 @@ export const ROADMAP_NO_REQUIREMENTS_NOTE =
   'No disclosure requirements are held for this topic in the standard version stated for this '
   + 'assessment. That is an absence of stored requirements, not a finding that none apply.'
 
-export const TITLE = 'Impact materiality report'
+export const TITLE = 'Materiality assessment report'
 export const KIND =
   'For information. This paper reports what was found. It asks the reader to approve nothing.'
 

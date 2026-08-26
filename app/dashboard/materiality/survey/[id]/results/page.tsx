@@ -36,6 +36,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Nav from '../../../../../components/Nav'
 import PaywallCard from '../../../../../components/PaywallCard'
+import { PAYWALL_HREF, PAYWALL_SURVEY_RESULTS, PAYWALL_TITLE } from '@/lib/paywallCopy'
 import { supabase } from '../../../../../../lib/supabase'
 import { useEntitlement } from '../../../../../../lib/useEntitlement'
 // ⚠️ ONE RENDERER. These used to be defined in this file; they were extracted so the
@@ -251,9 +252,9 @@ export default function SurveyResults() {
     <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
       <Nav />
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '2rem' }}>
-        <PaywallCard title="Unlock Impact Materiality"
-          body="Stakeholder survey results are part of the Impact Materiality Assessment. Unlock it to run a survey round and read what your stakeholders said."
-          href="/pricing?modules=impact" />
+        <PaywallCard title={PAYWALL_TITLE}
+          body={PAYWALL_SURVEY_RESULTS}
+          href={PAYWALL_HREF} />
       </div>
     </div>
   )

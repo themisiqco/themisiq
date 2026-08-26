@@ -418,7 +418,7 @@ function ReportInner() {
   // ⚠️ STAYS ON 'climate-risk', AND THIS IS NOT AN OVERSIGHT.
   // This is the SCREENING's report — the ten-topic matrix produced by the climate-risk wizard at
   // /dashboard/climate-risk. It lives under /dashboard/materiality/ because of a naming accident,
-  // not because it belongs to the Impact Materiality module: nothing here reads a determination, a
+  // not because it belongs to the Materiality Assessment module: nothing here reads a determination, a
   // survey response or a finalisation. Moving this gate to 'double-materiality' would take a
   // climate-risk customer's OWN OUTPUT away from them — they paid for the wizard and this is what
   // the wizard produces.

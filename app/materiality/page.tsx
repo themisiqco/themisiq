@@ -38,7 +38,8 @@
 //
 // ⚠️ THE ROUTE, THE KEY AND THE LABEL NO LONGER READ THE SAME WORD, and that is now permanent.
 // The route is /materiality, the ModuleKey is 'double-materiality' (lib/pricing.ts), and the
-// display name is still 'Impact Materiality Assessment' (lib/pricing.ts MODULES). The merged
+// display name is 'Materiality Assessment' (lib/pricing.ts MODULES), renamed from 'Impact
+// Materiality Assessment' on 26 Aug 2026. The merged
 // page's header used to prize their alignment; three renames in one week ended it. Read each from
 // its own source and do not "restore" a symmetry the product no longer has.
 //
@@ -106,7 +107,7 @@ export default function Page() {
             {/* Two-tone, same construction as /climate-risk's "Climate Risk / Intelligence"
                 and /deals' "Not a values question. / A valuation question." — see the GRAD note. */}
             <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.5rem', color: INK }}>
-              Impact Materiality<br />
+              Materiality<br />
               <span style={{ fontStyle: 'italic', background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Assessment</span>
             </h1>
             <p style={{ fontSize: 17, color: BODY, lineHeight: 1.75, fontWeight: 300, marginBottom: '2rem' }}>
@@ -192,9 +193,18 @@ export default function Page() {
             A double materiality assessment is how a company works out which sustainability topics actually matter to it &mdash; looked at from two directions. Your impact on the world: where your operations and supply chain cause harm or do good. The world&rsquo;s impact on you: where sustainability issues create financial risk or opportunity. A topic is material if it&rsquo;s significant either way. Both halves together are what makes it double.
           </p>
           {/* The /climate-risk link is carried by the module name inside the sentence rather
-              than by an appended call to action — the copy already names the other half. */}
+              than by an appended call to action — the copy already names the other half.
+              ⚠️ THIS SENTENCE IS WHERE THE NAMING RULE BITES, AND IT GOVERNS EVERY FUTURE EDIT TO
+              THIS PAGE. "Materiality Assessment" is the PRODUCT; "impact materiality" is the AXIS.
+              The old name carried the axis inside the product name and explained itself — "the
+              Impact Materiality Assessment covers the first half" could not be misread. The new one
+              cannot do that work, and the paragraph above defines a double materiality assessment
+              as having two halves. So this page must always say the product does the impact SIDE.
+              IT MUST NEVER SAY THE PRODUCT IS HALF AN ASSESSMENT: "the Materiality Assessment
+              covers the first half" reads as the product being half of itself, which is the exact
+              collision the rule forbids. Same line for anything written here later. */}
           <p style={{ ...bodyPara, marginBottom: 0 }}>
-            The ThemisIQ Impact Materiality Assessment covers the first half, end to end. The second half &mdash; the financial one &mdash; is{' '}
+            The ThemisIQ Materiality Assessment is the impact side of that, end to end. The financial side is{' '}
             <a href="/climate-risk" style={{ color: INK, fontWeight: 400, textDecoration: 'underline' }}>ThemisIQ Climate Risk</a>
             , and the two are designed to work together.
           </p>
@@ -324,7 +334,7 @@ export default function Page() {
       <section style={{ background: '#f8f7f5', padding: '5rem 2.5rem', borderTop: '0.5px solid #e8e7e4', borderBottom: '0.5px solid #e8e7e4' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ maxWidth: 760, marginBottom: '2.5rem' }}>
-            <h2 style={sectionTitle}>Why ThemisIQ for your Impact Materiality Assessment</h2>
+            <h2 style={sectionTitle}>Why ThemisIQ for your Materiality Assessment</h2>
             <p style={{ ...bodyPara, marginBottom: 0 }}>
               This is serious work and it deserves to be done well &mdash; which usually means an expensive engagement, repeated each year. ThemisIQ makes the same methodology something your own team can run.
             </p>
@@ -485,7 +495,7 @@ export default function Page() {
         <div style={{ maxWidth: 760 }}>
           <h2 style={sectionTitle}>What you get</h2>
           <p style={bodyPara}>
-            The deliverable is the <strong>Impact materiality report</strong> &mdash; a board paper written for directors rather than specialists. <strong>No sample is published.</strong> It prints twelve sections, in this order:
+            The deliverable is the <strong>Materiality assessment report</strong> &mdash; a board paper written for directors rather than specialists. <strong>No sample is published.</strong> It prints twelve sections, in this order:
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, margin: '0 0 1.75rem' }}>
             {([
@@ -579,7 +589,7 @@ export default function Page() {
             Scope thresholds and reporting dates {CSRD_AS_OF}. {CSRD_REVISION_NOTE} If you&rsquo;re close to a threshold, check your position rather than relying on a summary.
           </p>
           <p style={{ ...footnote, marginBottom: 0 }}>
-            The ThemisIQ Impact Materiality Assessment currently supports the revised ESRS standards, required for financial years beginning on or after 1 January 2027. The 2023 standards and transitional reliefs are on the roadmap.
+            The ThemisIQ Materiality Assessment currently supports the revised ESRS standards, required for financial years beginning on or after 1 January 2027. The 2023 standards and transitional reliefs are on the roadmap.
           </p>
         </div>
       </section>

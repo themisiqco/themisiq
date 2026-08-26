@@ -17,6 +17,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Nav from '../../../components/Nav'
 import PaywallCard from '../../../components/PaywallCard'
+import { PAYWALL_HREF, PAYWALL_TITLE, PAYWALL_WORKSHEET_INDEX } from '@/lib/paywallCopy'
 import { supabase } from '../../../../lib/supabase'
 import { useEntitlement } from '../../../../lib/useEntitlement'
 
@@ -100,9 +101,9 @@ export default function WorksheetIndex() {
     <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
       <Nav />
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '2rem' }}>
-        <PaywallCard title="Unlock Impact Materiality"
-          body="The impact worksheet is part of the Impact Materiality Assessment. Unlock it to record ESRS severity determinations and share the work with colleagues."
-          href="/pricing?modules=impact" />
+        <PaywallCard title={PAYWALL_TITLE}
+          body={PAYWALL_WORKSHEET_INDEX}
+          href={PAYWALL_HREF} />
       </div>
     </div>
   )
@@ -157,7 +158,7 @@ export default function WorksheetIndex() {
             <div style={{ fontSize: 13, color: MID, lineHeight: 1.8, maxWidth: 520, margin: '0 auto' }}>
               {/* The dependency this used to name is resolved: until 22 Aug 2026 the Climate Risk
                   wizard was the only thing that inserted an assessment row, so a customer holding
-                  Impact Materiality alone landed here with nothing to open and a link to a module
+                  the Materiality Assessment alone landed here with nothing to open and a link to a module
                   they had not bought. */}
               An impact worksheet hangs off a materiality assessment. Create one to begin — three
               questions: who you are reporting as, which ESRS version you report under, and the

@@ -86,7 +86,7 @@ const MODULES: Module[] = [
   {
     // Sits next to Climate Risk deliberately — the two halves of double materiality.
     id: 'impact',
-    name: 'Impact Materiality Assessment',
+    name: 'Materiality Assessment',
     description: 'CSRD · ESRS 1 §6.2 · ESRS 2 IRO-1 / IRO-2 / SBM-3 · stakeholder engagement · ten ESRS topics assessed in both directions · divergence register · disclosure roadmap',
     // PURPLE, NOT ORANGE, AND NOT A DATE. The orange slots on this page are enforcement
     // deadlines; a 'CSRD · FY2027' tag would be a regulatory-timing claim standing on a page
@@ -95,11 +95,11 @@ const MODULES: Module[] = [
     // /impact-materiality merged into it and was deleted. Audience-style tag instead, as 'deals' uses.
     tags: [{ label: 'CSRD · double materiality', color: 'purple' }],
     cta: {
-      headline: 'Ready to run your impact materiality assessment?',
+      headline: 'Ready to run your materiality assessment?',
       sub: 'Stakeholder engagement, determinations made by named people, and a board report that shows how you got there.',
       // "Assessment" is correct here and is NOT the word retired from the climate-risk wizard on
       // 23 Aug 2026. That module produces a screening; this one produces determinations, and
-      // lib/pricing.ts:53 names it 'Impact Materiality Assessment'.
+      // lib/pricing.ts:53 names it 'Materiality Assessment'.
       btn: 'Start your assessment →',
       // ⚠️ NOT /dashboard/materiality — that path is a server redirect INTO the climate-risk
       // wizard (app/dashboard/materiality/page.tsx:20). The worksheet index is this module's own

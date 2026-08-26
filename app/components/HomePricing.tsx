@@ -15,7 +15,7 @@ const MODULES: { id: ModuleId; name: string; frameworks: string; href: string }[
   // (lib/pricing.ts:77) and is what the cart resolves through. The ModuleKey itself is not a key
   // in that map, so it would be dropped by the .filter(Boolean) at order/page.tsx:75 and the
   // customer would reach an empty order.
-  { id: 'impact', name: 'Impact Materiality Assessment', frameworks: 'CSRD · ESRS 1 · ESRS 2 · stakeholder engagement · double materiality', href: '/materiality' },
+  { id: 'impact', name: 'Materiality Assessment', frameworks: 'CSRD · ESRS 1 · ESRS 2 · stakeholder engagement · double materiality', href: '/materiality' },
   { id: 'supply', name: 'Supply Chain', frameworks: 'CS3D · EcoVadis · CDP supplier engagement · Modern Slavery Act', href: '/supply-chain' },
   { id: 'people', name: 'People & Workforce', frameworks: 'EU Pay Transparency · ESRS S1 · GRI 401–410', href: '/people' },
   { id: 'deals', name: 'Deals & Investment', frameworks: 'TCFD · SFDR · ILPA · IFC Performance Standards', href: '/deals' },
@@ -30,7 +30,7 @@ const MODULE_CTA: Record<ModuleId, { headline: string; btn: string; href: string
   // ⚠️ NOT /dashboard/materiality — that path is a server redirect INTO the climate-risk wizard
   // (app/dashboard/materiality/page.tsx:20). The worksheet index is this module's own entry
   // point and the one gated on useEntitlement('double-materiality').
-  impact: { headline: 'Ready to run your impact materiality assessment?', btn: 'Start your assessment →', href: '/dashboard/materiality/worksheet' },
+  impact: { headline: 'Ready to run your materiality assessment?', btn: 'Start your assessment →', href: '/dashboard/materiality/worksheet' },
   supply: { headline: 'Ready to map your supply chain?', btn: 'Map your supply chain →', href: '/supply-chain' },
   people: { headline: 'Do you know your gender pay gap?', btn: 'Calculate your pay gap →', href: '/people' },
   deals:  { headline: 'Ready to screen your next target?', btn: 'Screen a target →', href: '/deals' },

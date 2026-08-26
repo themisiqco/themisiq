@@ -29,7 +29,7 @@ const MODULE_LABELS: Record<ModuleKey, string> = {
   'ghg': 'GHG Emissions Inventory',
   'cbam': 'CBAM (Carbon Border Adjustment Mechanism)',
   'climate-risk': 'Climate Risk',
-  'double-materiality': 'Impact Materiality Assessment',
+  'double-materiality': 'Materiality Assessment',
   'supply-chain': 'Supply Chain / Scope 3',
   'deals': 'Deals & Investment',
   'ai-governance': 'AI Governance',

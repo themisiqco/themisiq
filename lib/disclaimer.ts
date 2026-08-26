@@ -10,7 +10,7 @@
 // Added 22 Aug 2026. One phrase — "informational, screening, planning, and prioritization" — was
 // asserted of every output on every surface, and it was wrong on three of them. The assurance
 // package's own COVER says it exists "to support third-party verification under ISO 14064-3 /
-// ISAE 3410"; its final page called itself a screening. The impact materiality report records
+// ISAE 3410"; its final page called itself a screening. The materiality assessment report records
 // determinations against ESRS 1 and states that a material topic becomes a disclosure obligation;
 // it called itself a screening too. A document that contradicts itself about what it is has a
 // worse problem than one that overstates.
@@ -31,7 +31,7 @@
 //   app/dashboard/climate-risk/report/page.tsx       (resilience report, Important Notice section)
 //   app/dashboard/materiality/report/page.tsx        (CSRD / IFRS S2 report, Important Notice section)
 //   app/api/assessment/submit/route.ts               (lead email, footer fine print)
-//   lib/materiality/boardReportPdf.ts                (impact materiality report, back cover)
+//   lib/materiality/boardReportPdf.ts                (materiality assessment report, back cover)
 //   app/dashboard/deals/report/page.tsx              (ESG deal due-diligence report, Important Notice)
 //   app/dashboard/ghg/page.tsx                       (GHG inline report — wired 22 Aug 2026)
 //

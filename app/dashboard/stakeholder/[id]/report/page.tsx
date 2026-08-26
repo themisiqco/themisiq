@@ -32,6 +32,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Nav from '../../../../components/Nav'
 import PaywallCard from '../../../../components/PaywallCard'
+import { PAYWALL_HREF, PAYWALL_STAKEHOLDER_REPORT, PAYWALL_TITLE } from '@/lib/paywallCopy'
 import { supabase } from '../../../../../lib/supabase'
 import { useEntitlement } from '../../../../../lib/useEntitlement'
 import { resolveSubtopicName } from '../../../../../lib/materiality/subtopicName'
@@ -505,7 +506,7 @@ export default function StakeholderBoardReport() {
 
     return {
       company_name: company,
-      assessment_name: roundName ? `Impact materiality · ${roundName}` : 'Impact materiality',
+      assessment_name: roundName ? `Materiality assessment · ${roundName}` : 'Materiality assessment',
       standard_version: standardVersion,
       // BoardReportInput documents `e.g. "1 January – 31 December 2026"` and formatPeriodSpan is
       // what produces it. Null when the assessment records no period — the cover still prints
@@ -612,9 +613,9 @@ export default function StakeholderBoardReport() {
   }
 
   if (isPaid === false) return (
-    <Shell><PaywallCard title="Unlock Impact Materiality"
-      body="The stakeholder board paper is part of the Impact Materiality Assessment."
-      href="/pricing?modules=impact" /></Shell>
+    <Shell><PaywallCard title={PAYWALL_TITLE}
+      body={PAYWALL_STAKEHOLDER_REPORT}
+      href={PAYWALL_HREF} /></Shell>
   )
   if (loading) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>

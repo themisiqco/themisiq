@@ -21,6 +21,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Nav from '../../../../../components/Nav'
 import PaywallCard from '../../../../../components/PaywallCard'
+import { PAYWALL_HREF, PAYWALL_TITLE, PAYWALL_WORKSHEET } from '@/lib/paywallCopy'
 import { supabase } from '../../../../../../lib/supabase'
 import { useEntitlement } from '../../../../../../lib/useEntitlement'
 import {
@@ -201,9 +202,9 @@ export default function Iro1Page() {
   }
 
   if (isPaid === false) return (
-    <Shell><PaywallCard title="Unlock Impact Materiality"
-      body="The impact worksheet is part of the Impact Materiality Assessment."
-      href="/pricing?modules=impact" /></Shell>
+    <Shell><PaywallCard title={PAYWALL_TITLE}
+      body={PAYWALL_WORKSHEET}
+      href={PAYWALL_HREF} /></Shell>
   )
   if (loading) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>

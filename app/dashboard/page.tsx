@@ -107,7 +107,7 @@ const MODULES: DashboardModule[] = [
   },
   {
     id: 'double_materiality',
-    name: 'Impact Materiality',
+    name: 'Materiality Assessment',
     sub: 'ESRS 1 §6.2 · stakeholder survey',
     desc: 'Survey affected stakeholders, delegate sub-topics to named contributors, and record a defensible impact materiality determination.',
     href: '/dashboard/materiality/worksheet',

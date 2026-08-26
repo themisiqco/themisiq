@@ -24,6 +24,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Nav from '../../../components/Nav'
 import PaywallCard from '../../../components/PaywallCard'
+import { PAYWALL_HREF, PAYWALL_SURVEY, PAYWALL_TITLE } from '@/lib/paywallCopy'
 import { supabase } from '../../../../lib/supabase'
 import { useEntitlement } from '../../../../lib/useEntitlement'
 
@@ -159,9 +160,9 @@ export default function SurveyRounds() {
       <Nav />
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '2rem' }}>
         <PaywallCard
-          title="Unlock Impact Materiality"
-          body="Stakeholder surveys are part of the Impact Materiality Assessment. Unlock it to run a survey round, choose which ESRS sub-topics are in scope, and gather stakeholder views as evidence for your materiality assessment."
-          href="/pricing?modules=impact"
+          title={PAYWALL_TITLE}
+          body={PAYWALL_SURVEY}
+          href={PAYWALL_HREF}
         />
       </div>
     </div>

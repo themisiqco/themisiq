@@ -29,6 +29,7 @@ import Link from 'next/link'
 import Papa from 'papaparse'
 import Nav from '../../../../../../components/Nav'
 import PaywallCard from '../../../../../../components/PaywallCard'
+import { PAYWALL_HREF, PAYWALL_SURVEY, PAYWALL_TITLE } from '@/lib/paywallCopy'
 import { supabase } from '../../../../../../../lib/supabase'
 import { useEntitlement } from '../../../../../../../lib/useEntitlement'
 import {
@@ -293,9 +294,9 @@ export default function RespondentImport() {
   if (isPaid === false) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav /><div style={{ maxWidth: 760, margin: '0 auto', padding: '2rem' }}>
-        <PaywallCard title="Unlock Impact Materiality"
-          body="Stakeholder surveys are part of the Impact Materiality Assessment."
-          href="/pricing?modules=impact" />
+        <PaywallCard title={PAYWALL_TITLE}
+          body={PAYWALL_SURVEY}
+          href={PAYWALL_HREF} />
       </div>
     </div>
   )

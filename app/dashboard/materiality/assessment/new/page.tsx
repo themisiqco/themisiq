@@ -4,7 +4,7 @@
  * Create a materiality assessment without the Climate Risk wizard.
  *
  * ⚠️ WHY THIS EXISTS. Until 22 Aug 2026 the wizard at /dashboard/climate-risk was the ONLY thing
- * that inserted a materiality_assessments row, so a customer holding Impact Materiality alone —
+ * that inserted a materiality_assessments row, so a customer holding the Materiality Assessment alone —
  * a module sold separately from that day — landed on an empty worksheet list with nothing to open
  * and a link to a module they had not bought.
  */
@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Nav from '../../../../components/Nav'
 import PaywallCard from '../../../../components/PaywallCard'
+import { PAYWALL_ASSESSMENT_NEW, PAYWALL_HREF, PAYWALL_TITLE } from '@/lib/paywallCopy'
 import { supabase } from '../../../../../lib/supabase'
 import { useEntitlement } from '../../../../../lib/useEntitlement'
 import { AssessmentForm, type AssessmentFormValues } from '../AssessmentForm'
@@ -86,9 +87,9 @@ export default function NewAssessmentPage() {
   }
 
   if (isPaid === false) return (
-    <Shell><PaywallCard title="Unlock Impact Materiality"
-      body="Creating an assessment is part of the Impact Materiality Assessment."
-      href="/pricing?modules=impact" /></Shell>
+    <Shell><PaywallCard title={PAYWALL_TITLE}
+      body={PAYWALL_ASSESSMENT_NEW}
+      href={PAYWALL_HREF} /></Shell>
   )
 
   return (

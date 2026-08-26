@@ -50,7 +50,7 @@ export const MODULES: { key: ModuleKey; name: string }[] = [
   { key: 'ghg',           name: 'GHG Inventory (Scope 1, 2 & 3)' },
   { key: 'cbam',          name: 'CBAM (Carbon Border Adjustment Mechanism)' },
   { key: 'climate-risk',  name: 'Climate Risk' },
-  { key: 'double-materiality', name: 'Impact Materiality Assessment' },
+  { key: 'double-materiality', name: 'Materiality Assessment' },
   { key: 'supply-chain',  name: 'Supply Chain' },
   { key: 'people',        name: 'People & Workforce' },
   { key: 'deals',         name: 'Deals & Investment' },

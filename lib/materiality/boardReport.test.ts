@@ -94,7 +94,7 @@ const report = (subtopics: RegisterSubTopic[],
                 over: Partial<BoardReportInput> = {}): BoardReport =>
   buildBoardReport({
     company_name: 'Northwind Ltd',
-    assessment_name: 'FY2026 impact materiality',
+    assessment_name: 'FY2026 materiality assessment',
     standard_version: 'esrs_2026',
     reporting_period: '1 January – 31 December 2026',
     round_name: 'Round one',
