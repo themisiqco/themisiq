@@ -79,7 +79,7 @@ type Round = {
 type Group = { code: string; label: string; questions: Question[] }
 
 export default function SurveyScope() {
-  const isPaid = useEntitlement('impact-materiality')
+  const isPaid = useEntitlement('double-materiality')
   const params = useParams()
   const roundId = params.id as string
 

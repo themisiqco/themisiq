@@ -88,7 +88,7 @@ const Shell = ({ children }: { children: React.ReactNode }) => (
 export default function Iro1Page() {
   const params = useParams()
   const assessmentId = String(params?.id ?? '')
-  const isPaid = useEntitlement('impact-materiality')
+  const isPaid = useEntitlement('double-materiality')
 
   const [company, setCompany] = useState<string | null>(null)
   const [row, setRow] = useState<(Iro1Row & { status?: string }) | null>(null)

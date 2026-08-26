@@ -83,7 +83,7 @@ const STATUS = {
 } as const
 
 export default function SurveyRespondents() {
-  const isPaid = useEntitlement('impact-materiality')
+  const isPaid = useEntitlement('double-materiality')
   const params = useParams()
   const roundId = params.id as string
 

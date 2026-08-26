@@ -193,7 +193,7 @@ const isCategory = (v: unknown): v is TopicCategory =>
   v === 'env' || v === 'soc' || v === 'gov'
 
 export default function WorksheetRegister() {
-  const isPaid = useEntitlement('impact-materiality')
+  const isPaid = useEntitlement('double-materiality')
   const params = useParams()
   const assessmentId = params.id as string
 

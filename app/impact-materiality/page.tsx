@@ -54,7 +54,7 @@ const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 
 export default function Page() {
   // Price from the single source of truth. NEVER retype the figure (CLAUDE.md).
-  const impactPrice = FLAT_MODULE_PRICES['impact-materiality'].toLocaleString('en-US')
+  const impactPrice = FLAT_MODULE_PRICES['double-materiality'].toLocaleString('en-US')
 
   return (
     <div style={{ fontFamily: FONT, background: '#fff', color: INK }}>

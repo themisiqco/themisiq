@@ -39,7 +39,7 @@ export type ModuleKey =
   // customer lost worksheet access by it moving. Had one existed, this would have required a
   // backfill granting 'impact-materiality' to every 'climate-risk' holder. It did not, and the
   // absence of that migration is recorded here so a future reader does not go looking for one.
-  | 'impact-materiality'
+  | 'double-materiality'
   | 'supply-chain'   // Supplier Portal (data collection)
   | 'people'
   | 'deals'
@@ -50,7 +50,7 @@ export const MODULES: { key: ModuleKey; name: string }[] = [
   { key: 'ghg',           name: 'GHG Inventory (Scope 1, 2 & 3)' },
   { key: 'cbam',          name: 'CBAM (Carbon Border Adjustment Mechanism)' },
   { key: 'climate-risk',  name: 'Climate Risk' },
-  { key: 'impact-materiality', name: 'Impact Materiality Assessment' },
+  { key: 'double-materiality', name: 'Impact Materiality Assessment' },
   { key: 'supply-chain',  name: 'Supply Chain' },
   { key: 'people',        name: 'People & Workforce' },
   { key: 'deals',         name: 'Deals & Investment' },
@@ -74,7 +74,7 @@ export const LEGACY_PRICING_PAGE_ID: Record<string, ModuleKey> = {
   // shorthand is SILENTLY DROPPED from the cart. A customer could select this module, pay, and not
   // receive it. pricing.test.ts derives both sides from MODULES, so omitting this fails a test
   // rather than a customer; removing it and watching that test go red is how it was checked.
-  impact: 'impact-materiality',
+  impact: 'double-materiality',
   supply: 'supply-chain',
   people: 'people',
   deals: 'deals',
@@ -190,7 +190,7 @@ export const FLAT_MODULE_PRICES: Record<Exclude<ModuleKey, 'ghg'>, number> = {
   // RAISING IT IS EXPECTED once a buyer has seen what the module actually does; the parity above is
   // an entry price for a module nobody has bought yet, not a statement that a stakeholder survey
   // and a wizard are worth the same.
-  'impact-materiality': 4900,
+  'double-materiality': 4900,
   'deals':         4900,
   'supply-chain':  2900,
   'cyber':         2900,

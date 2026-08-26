@@ -206,7 +206,7 @@ const participationOf = (people: Person[], label: (code: string) => string) => {
 export default function StakeholderBoardReport() {
   // See the header: inherited from the worksheet routes, expected to change when this module gets
   // its own entitlement.
-  const isPaid = useEntitlement('impact-materiality')
+  const isPaid = useEntitlement('double-materiality')
   const params = useParams()
   const assessmentId = params.id as string
 

@@ -180,7 +180,7 @@ function ServerNote({ children, bg = PAPER, fg = MID }:
 // ── page ─────────────────────────────────────────────────────────────────────────────────────────
 
 export default function SurveyResults() {
-  const isPaid = useEntitlement('impact-materiality')
+  const isPaid = useEntitlement('double-materiality')
   const params = useParams()
   const roundId = params.id as string
 

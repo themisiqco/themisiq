@@ -50,7 +50,7 @@ type Respondent = {
 type Progress = { n_asked: number; n_answered: number; n_abstained: number; n_skipped: number; last_activity: string | null }
 
 export default function SurveyProgress() {
-  const isPaid = useEntitlement('impact-materiality')
+  const isPaid = useEntitlement('double-materiality')
   const params = useParams()
   const roundId = params.id as string
 

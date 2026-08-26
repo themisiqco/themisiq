@@ -15,7 +15,7 @@ const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
 const ID_TO_PRICE_KEY: Record<string, keyof typeof FLAT_MODULE_PRICES> = {
   cbam: 'cbam',
   climate_risk: 'climate-risk',
-  impact_materiality: 'impact-materiality',
+  double_materiality: 'double-materiality',
   supply_chain: 'supply-chain',
   ai: 'ai-governance',
   cyber: 'cyber',
@@ -106,7 +106,7 @@ const MODULES: DashboardModule[] = [
     previewable: true,
   },
   {
-    id: 'impact_materiality',
+    id: 'double_materiality',
     name: 'Impact Materiality',
     sub: 'ESRS 1 §6.2 · stakeholder survey',
     desc: 'Survey affected stakeholders, delegate sub-topics to named contributors, and record a defensible impact materiality determination.',
@@ -236,7 +236,7 @@ export default function Dashboard() {
         'climate-risk': ['climate_risk'],
         // ⚠️ WITHOUT THIS A PAYING CUSTOMER SEES NO TILE. This map is not type-checked against
         // ModuleKey, so a module added to pricing.ts and forgotten here is bought and invisible.
-        'impact-materiality': ['impact_materiality'],
+        'double-materiality': ['double_materiality'],
         'supply-chain': ['supply_chain', 'portal'],
         'people': ['people'],
         'deals': ['deals'],

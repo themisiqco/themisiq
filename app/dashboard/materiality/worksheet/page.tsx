@@ -57,7 +57,7 @@ const versionLabel = (v: string | null) =>
     : 'No standard version stated'
 
 export default function WorksheetIndex() {
-  const isPaid = useEntitlement('impact-materiality')
+  const isPaid = useEntitlement('double-materiality')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [rows, setRows] = useState<Row[]>([])

@@ -112,7 +112,7 @@ const RULE_TEXT: Record<string, string> = {
 }
 
 export default function Determinations() {
-  const isPaid = useEntitlement('impact-materiality')
+  const isPaid = useEntitlement('double-materiality')
   const params = useParams()
   const assessmentId = params.id as string
 

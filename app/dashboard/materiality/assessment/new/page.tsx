@@ -37,7 +37,7 @@ const Shell = ({ children }: { children: React.ReactNode }) => (
 
 export default function NewAssessmentPage() {
   const router = useRouter()
-  const isPaid = useEntitlement('impact-materiality')
+  const isPaid = useEntitlement('double-materiality')
 
   const [values, setValues] = useState<AssessmentFormValues>({
     companyName: '', version: null, periodStart: '', periodEnd: '',

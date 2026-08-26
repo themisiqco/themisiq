@@ -130,7 +130,7 @@ const setDim = (d: Draft, dim: Dim, v: number | null): Partial<Draft> => ({
 })
 
 export default function LeadDetermine() {
-  const isPaid = useEntitlement('impact-materiality')
+  const isPaid = useEntitlement('double-materiality')
   const params = useParams()
   const assessmentId = params.id as string
 

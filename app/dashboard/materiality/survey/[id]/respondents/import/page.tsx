@@ -49,7 +49,7 @@ const FAIL_BG = '#fef3f2'
 type Round = { id: string; name: string; company_name: string | null; status: string; questionnaire_version: number; standard_version: string }
 
 export default function RespondentImport() {
-  const isPaid = useEntitlement('impact-materiality')
+  const isPaid = useEntitlement('double-materiality')
   const params = useParams()
   const roundId = params.id as string
   const fileRef = useRef<HTMLInputElement>(null)

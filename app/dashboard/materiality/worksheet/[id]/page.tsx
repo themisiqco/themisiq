@@ -121,7 +121,7 @@ const input: React.CSSProperties = {
 }
 
 export default function WorksheetAssign() {
-  const isPaid = useEntitlement('impact-materiality')
+  const isPaid = useEntitlement('double-materiality')
   const params = useParams()
   const assessmentId = params.id as string
 

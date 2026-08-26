@@ -39,7 +39,7 @@ export default function EditAssessmentPage() {
   const params = useParams()
   const router = useRouter()
   const assessmentId = String(params?.id ?? '')
-  const isPaid = useEntitlement('impact-materiality')
+  const isPaid = useEntitlement('double-materiality')
 
   const [values, setValues] = useState<AssessmentFormValues | null>(null)
   const [versionLock, setVersionLock] = useState<VersionLock>({ kind: 'free' })

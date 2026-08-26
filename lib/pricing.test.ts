@@ -6,7 +6,7 @@ import { cartQuote, ADDONS, addOnRequirementsMet, priceLine, FLAT_MODULE_PRICES,
 // routes (charge), so these assertions protect the actual charged amount once
 // NEW_PRICING_ACTIVE is flipped on.
 const ALL: ModuleKey[] = [
-  'ghg', 'cbam', 'climate-risk', 'impact-materiality', 'supply-chain', 'people', 'deals',
+  'ghg', 'cbam', 'climate-risk', 'double-materiality', 'supply-chain', 'people', 'deals',
   'ai-governance', 'cyber',
 ]
 

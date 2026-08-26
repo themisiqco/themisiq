@@ -54,7 +54,7 @@ const STATUS = {
 } as const
 
 export default function SurveyRounds() {
-  const isPaid = useEntitlement('impact-materiality')
+  const isPaid = useEntitlement('double-materiality')
   const router = useRouter()
 
   const [loading, setLoading] = useState(true)
