@@ -11,7 +11,7 @@ const MODULES: { id: ModuleId; name: string; frameworks: string; href: string }[
   { id: 'ghg', name: 'Climate — GHG Inventory · Scope 1, 2 & 3', frameworks: 'SB 253 · CDP · ESRS E1 · GRI 305 · IFRS S2', href: '/climate-ghg' },
   { id: 'cbam', name: 'CBAM — Carbon Border Adjustment Mechanism', frameworks: 'Regulation (EU) 2023/956 · specific embedded emissions (SEE) · direct & indirect split · precursor tracing · installation-level actuals · verification-ready summary for your EU importer', href: '/pricing?modules=cbam' },
   { id: 'risk', name: 'Climate Risk', frameworks: 'SB 261 · TCFD · IFRS S2 · scenario analysis', href: '/climate-risk' },
-  // ⚠️ id 'impact', NOT 'impact-materiality' — this id IS the LEGACY_PRICING_PAGE_ID shorthand
+  // ⚠️ id 'impact', NOT the ModuleKey 'double-materiality' — this id IS the LEGACY_PRICING_PAGE_ID shorthand
   // (lib/pricing.ts:77) and is what the cart resolves through. The ModuleKey itself is not a key
   // in that map, so it would be dropped by the .filter(Boolean) at order/page.tsx:75 and the
   // customer would reach an empty order.
@@ -29,7 +29,7 @@ const MODULE_CTA: Record<ModuleId, { headline: string; btn: string; href: string
   risk:   { headline: 'Ready to assess your climate risk?', btn: 'Assess your climate risk →', href: '/dashboard/climate-risk' },
   // ⚠️ NOT /dashboard/materiality — that path is a server redirect INTO the climate-risk wizard
   // (app/dashboard/materiality/page.tsx:20). The worksheet index is this module's own entry
-  // point and the one gated on useEntitlement('impact-materiality').
+  // point and the one gated on useEntitlement('double-materiality').
   impact: { headline: 'Ready to run your impact materiality assessment?', btn: 'Start your assessment →', href: '/dashboard/materiality/worksheet' },
   supply: { headline: 'Ready to map your supply chain?', btn: 'Map your supply chain →', href: '/supply-chain' },
   people: { headline: 'Do you know your gender pay gap?', btn: 'Calculate your pay gap →', href: '/people' },

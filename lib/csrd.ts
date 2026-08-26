@@ -4,21 +4,26 @@
 // WHY THIS FILE EXISTS. On 23 August 2026 two ThemisIQ pages stated the law differently.
 // /materiality carried a hand-typed card headed "Wave 2 · 2026" saying large EU companies "file
 // their first ESRS reports starting in 2026 for FY2025 data; Wave 2 listed SMEs follow for FY2026".
-// /impact-materiality, written later, said the first reports cover FY2027 and are published in 2028
-// and that listed SMEs have been removed from mandatory scope entirely. A customer reading both in
-// one session got two accounts of when they must report and whether they are in scope at all.
+// /impact-materiality — a separate page then, merged into /materiality on 26 Aug 2026 and deleted
+// — said the first reports cover FY2027 and are published in 2028, and that listed SMEs have been
+// removed from mandatory scope entirely. A customer reading both in one session got two accounts
+// of when they must report and whether they are in scope at all.
 // The IFRS S2 side of the SAME CARD did not drift, because it reads IFRS_S2_STATUS_SENTENCE from
 // lib/ifrsS2.ts. The CSRD side drifted because it was prose nobody owned. That asymmetry is the
 // whole argument for this file.
 // ANY SURFACE STATING A CSRD SCOPE THRESHOLD OR REPORTING DATE IMPORTS FROM HERE.
 //
-// ⚠️ ONE DOCUMENTED COPY REMAINS, AND A CONSTANT DOES NOT CLOSE IT BY ITSELF.
-// app/impact-materiality/page.tsx states these facts in flowing prose at the paragraphs beginning
-// "EU companies are in scope with…", "Non-EU companies are caught on…" and "2028 isn't far away…",
-// and in its first footnote. That prose is deliberately written and interpolating it through
-// constants would damage it, so it is NOT wired to this file. It is instead RECORDED here: if a
-// value below changes, those four passages change with it. This reduces two independent sources to
-// one authority plus one known copy. It does not make the copy disappear.
+// ⚠️ THE DOCUMENTED COPY IS CLOSED. IT WAS OPEN FOR THREE DAYS AND THIS IS HOW IT SHUT.
+// This paragraph used to record a known second source: app/impact-materiality/page.tsx stated these
+// facts in flowing prose — "EU companies are in scope with…", "Non-EU companies are caught on…",
+// "2028 isn't far away…", and its first footnote — and was NOT wired to this file, on the grounds
+// that interpolating deliberately-written prose through constants would damage it. The reduction
+// was two independent sources to one authority plus one known copy.
+// On 26 Aug 2026 that page merged into /materiality and the copy was wired up after all: the prose
+// voice survived intact and every figure in it is now an interpolation. The merge is also what
+// forced CSRD_FIRST_REPORT_FY and CSRD_FIRST_REPORT_PUBLISHED into existence below, because one of
+// those passages argues from a single year rather than reprinting the sentence.
+// THE LESSON IS THE ONE WORTH KEEPING: "prose too good to interpolate" held for three days.
 //
 // ⚠️ NO CSRD_CITATION. The Directive's own number appears NOWHERE in this codebase, and typing one
 // from memory into the file whose entire job is preventing drift would be the wrong way to open it.

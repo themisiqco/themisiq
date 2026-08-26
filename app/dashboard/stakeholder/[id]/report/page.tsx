@@ -16,7 +16,7 @@
  * and the register and the report must never describe different work.
  *
  * ⚠️ THE ENTITLEMENT GATE IS INHERITED AND IS EXPECTED TO CHANGE.
- * useEntitlement('impact-materiality') is what the worksheet routes use, and this route sits under
+ * useEntitlement('double-materiality') is what the worksheet routes use, and this route sits under
  * /dashboard/stakeholder — the first page of a module being split out with its own entitlement.
  * When that split lands, this gate changes with it. It is written the same way as its siblings so
  * that change is one edit in an obvious place, not an archaeology exercise.

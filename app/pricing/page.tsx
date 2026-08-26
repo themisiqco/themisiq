@@ -91,7 +91,8 @@ const MODULES: Module[] = [
     // PURPLE, NOT ORANGE, AND NOT A DATE. The orange slots on this page are enforcement
     // deadlines; a 'CSRD · FY2027' tag would be a regulatory-timing claim standing on a page
     // with nothing to qualify it. The footnotes that carry that qualification live on
-    // /impact-materiality, not here. Audience-style tag instead, as 'deals' uses.
+    // /materiality, not here — they moved there with the module page on 26 Aug 2026, when
+    // /impact-materiality merged into it and was deleted. Audience-style tag instead, as 'deals' uses.
     tags: [{ label: 'CSRD · double materiality', color: 'purple' }],
     cta: {
       headline: 'Ready to run your impact materiality assessment?',
@@ -102,7 +103,7 @@ const MODULES: Module[] = [
       btn: 'Start your assessment →',
       // ⚠️ NOT /dashboard/materiality — that path is a server redirect INTO the climate-risk
       // wizard (app/dashboard/materiality/page.tsx:20). The worksheet index is this module's own
-      // entry point and the one gated on useEntitlement('impact-materiality').
+      // entry point and the one gated on useEntitlement('double-materiality').
       href: '/dashboard/materiality/worksheet',
     },
   },

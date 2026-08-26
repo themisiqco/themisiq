@@ -173,11 +173,16 @@ discoverable. Reported, not actioned — recorded here at Lisa's instruction.
 
 ### Nothing proves a module is discoverable — only that its cart resolves
 
-`impact-materiality` shipped priced (`FLAT_MODULE_PRICES`, $4,900), entitled
-(`useEntitlement('impact-materiality')` on seven worksheet/survey routes) and
+`double-materiality` — the ModuleKey renamed from `impact-materiality` on
+26 Aug 2026 — shipped priced (`FLAT_MODULE_PRICES`, $4,900), entitled
+(`useEntitlement('double-materiality')` on fifteen worksheet/survey routes) and
 purchasable, while appearing on **no** marketing surface: absent from the Nav
 Solutions dropdown, from `HomePricing.tsx` and from `/pricing`. The full suite
 was green throughout.
+
+Since fixed on all three: `Nav.tsx:15` and `HomePricing.tsx:18` both link to
+`/materiality`, and `pricing/page.tsx:88` is a full `MODULES` entry rendered on
+the live branch at `:560`. The finding about what the suite proves stands.
 
 The reason the suite was green is precise and worth keeping: `pricing.test.ts:88`
 asserts every `ModuleKey` is reachable through `LEGACY_PRICING_PAGE_ID`, and
@@ -257,7 +262,7 @@ Two caveats before doing it:
 - The name matters. `ModuleId` inside `lib/pricing.ts` would sit confusingly
   beside `ModuleKey`; `ModulePageId` or `ModuleShorthand` says which of the two
   identifier spaces it belongs to. The distinction is exactly the one that
-  `?modules=impact-materiality` gets wrong.
+  `?modules=double-materiality` gets wrong.
 
 ### `/advisory` has no navigation entry
 

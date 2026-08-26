@@ -37,7 +37,7 @@ export type ModuleKey =
   // ⚠️ NO MIGRATION PATH WAS NEEDED, AND THAT IS A FACT ABOUT 22 AUG 2026, NOT A DESIGN CLAIM.
   // Nobody held any entitlement when this split happened — no customer had 'climate-risk', so no
   // customer lost worksheet access by it moving. Had one existed, this would have required a
-  // backfill granting 'impact-materiality' to every 'climate-risk' holder. It did not, and the
+  // backfill granting 'double-materiality' to every 'climate-risk' holder. It did not, and the
   // absence of that migration is recorded here so a future reader does not go looking for one.
   | 'double-materiality'
   | 'supply-chain'   // Supplier Portal (data collection)

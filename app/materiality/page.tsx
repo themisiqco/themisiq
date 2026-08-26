@@ -21,9 +21,10 @@
 // ⚠️ EVERY CSRD DATE AND THRESHOLD IS IMPORTED FROM lib/csrd.ts. NEVER TYPE ONE INTO THIS JSX.
 // Both merged pages carried these figures in prose and they had already contradicted each other:
 // this page's old §3 said "Wave 2 · 2026 … first ESRS reports starting in 2026 for FY2025 data",
-// the pre-Omnibus position, while /impact-materiality on the same site said FY2027. Importing was
-// the fix, and the merge preserves it — section 5 keeps the other page's prose voice and reads
-// every figure from a constant. lib/csrd.ts:7 records the same collision from the other side.
+// the pre-Omnibus position, while /impact-materiality — then a separate page, now merged into this
+// one and deleted — said FY2027. Importing was the fix, and the merge preserves it: section 5 keeps
+// the other page's prose voice and reads every figure from a constant. lib/csrd.ts:7 records the
+// same collision from the other side.
 // ONE EXCEPTION, NAMED: the roadmap footnote's "1 January 2027" is a statement about what this
 // PRODUCT supports, not about CSRD scope, and lib/csrd.ts holds no constant for it.
 //
@@ -38,9 +39,8 @@
 // ⚠️ THE ROUTE, THE KEY AND THE LABEL NO LONGER READ THE SAME WORD, and that is now permanent.
 // The route is /materiality, the ModuleKey is 'double-materiality' (lib/pricing.ts), and the
 // display name is still 'Impact Materiality Assessment' (lib/pricing.ts MODULES). The merged
-// page's header used to prize their
-// alignment; three renames in one week ended it. Read each from its own source and do not
-// "restore" a symmetry the product no longer has.
+// page's header used to prize their alignment; three renames in one week ended it. Read each from
+// its own source and do not "restore" a symmetry the product no longer has.
 //
 // TEMPLATE. Section rhythm, Nav, Footer and the style consts at the foot of this file come from
 // app/deals/page.tsx by way of the merged page. The s{} style object, ghostBtn and gradText that
@@ -473,9 +473,14 @@ export default function Page() {
       {/* ⚠️ id="what-you-get" IS LOAD-BEARING AND KEPT ACROSS THE MERGE. It was the target of a
           deliverables card on /materiality — the page this one merged INTO — which linked here
           rather than restating the twelve section names. That card is gone and its one sentence
-          that was not a duplicate, "No sample is published", is in the intro below. The id stays:
-          it is a published anchor, and app/components/HomePricing.tsx and the old /impact-materiality
-          route both still point at it. */}
+          that was not a duplicate, "No sample is published", is in the intro below.
+          ⚠️ NOTHING IN THIS REPO LINKS TO THIS ANCHOR ANY MORE — verified, and it stays anyway.
+          An earlier version of this note claimed HomePricing.tsx and the old /impact-materiality
+          route pointed at it; neither ever did. HomePricing's href carried no fragment, and the old
+          route was a different page with its own copy of this section. The real reason to keep the
+          id is that it is PUBLISHED: /impact-materiality#what-you-get was live for four days and is
+          redirected here by next.config.ts, so an external link or a bookmark still lands on it. An
+          anchor costs nothing; a stranger's link breaking costs a visit. */}
       <section id="what-you-get" style={{ padding: '5rem 2.5rem', maxWidth: 1100, margin: '0 auto', borderTop: '0.5px solid #e8e7e4', scrollMarginTop: 80 }}>
         <div style={{ maxWidth: 760 }}>
           <h2 style={sectionTitle}>What you get</h2>

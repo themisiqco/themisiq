@@ -419,7 +419,7 @@ function ReportInner() {
   // This is the SCREENING's report — the ten-topic matrix produced by the climate-risk wizard at
   // /dashboard/climate-risk. It lives under /dashboard/materiality/ because of a naming accident,
   // not because it belongs to the Impact Materiality module: nothing here reads a determination, a
-  // survey response or a finalisation. Moving this gate to 'impact-materiality' would take a
+  // survey response or a finalisation. Moving this gate to 'double-materiality' would take a
   // climate-risk customer's OWN OUTPUT away from them — they paid for the wizard and this is what
   // the wizard produces.
   // The inconsistency is in the URL, not in the gate. Fix it by moving the route if it ever
