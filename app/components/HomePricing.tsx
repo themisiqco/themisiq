@@ -15,7 +15,7 @@ const MODULES: { id: ModuleId; name: string; frameworks: string; href: string }[
   // (lib/pricing.ts:77) and is what the cart resolves through. The ModuleKey itself is not a key
   // in that map, so it would be dropped by the .filter(Boolean) at order/page.tsx:75 and the
   // customer would reach an empty order.
-  { id: 'impact', name: 'Impact Materiality Assessment', frameworks: 'CSRD · ESRS 1 · ESRS 2 · stakeholder engagement · double materiality', href: '/impact-materiality' },
+  { id: 'impact', name: 'Impact Materiality Assessment', frameworks: 'CSRD · ESRS 1 · ESRS 2 · stakeholder engagement · double materiality', href: '/materiality' },
   { id: 'supply', name: 'Supply Chain', frameworks: 'CS3D · EcoVadis · CDP supplier engagement · Modern Slavery Act', href: '/supply-chain' },
   { id: 'people', name: 'People & Workforce', frameworks: 'EU Pay Transparency · ESRS S1 · GRI 401–410', href: '/people' },
   { id: 'deals', name: 'Deals & Investment', frameworks: 'TCFD · SFDR · ILPA · IFC Performance Standards', href: '/deals' },
