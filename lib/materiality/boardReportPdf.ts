@@ -21,7 +21,7 @@
  * in a viewer. The caller decides:
  *
  *   const doc = generateBoardReportPDF(report)
- *   doc.save(`ThemisIQ_ImpactMaterialityReport_${(report.cover.company_name || 'Company').replace(/\s+/g, '_')}.pdf`)
+ *   doc.save(`ThemisIQ_MaterialityAssessmentReport_${(report.cover.company_name || 'Company').replace(/\s+/g, '_')}.pdf`)
  *
  * which keeps assurancePdf.ts's naming shape without keeping its side effect.
  */

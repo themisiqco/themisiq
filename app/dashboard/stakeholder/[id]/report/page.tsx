@@ -602,7 +602,17 @@ export default function StakeholderBoardReport() {
       const report = buildBoardReport(input)
       const doc = generate(report)
       // The naming shape lib/assurancePdf.ts uses.
-      doc.save(`ThemisIQ_ImpactMaterialityReport_${(company || 'Company').replace(/\s+/g, '_')}.pdf`)
+      //
+      // ⚠️ THIS FILENAME IS A SECOND COPY OF THE REPORT'S TITLE AND IT HAS ALREADY DRIFTED ONCE.
+      // TITLE in lib/materiality/boardReport.ts was renamed on 26 Aug 2026 with the product; this
+      // string was missed and shipped a day naming a product that no longer existed — in the one
+      // place a customer keeps, their Downloads folder. Corrected 27 Aug 2026.
+      // IT COULD READ FROM TITLE, and that is the right end state: this file already imports from
+      // boardReport.ts twice. What stopped it being done here is that TITLE is sentence case
+      // ("Materiality assessment report") and a filename wants Pascal case, so the transform is a
+      // convention decision that belongs in one shared helper rather than re-derived per caller.
+      // Until that exists, this string is a known copy — if TITLE moves, MOVE THIS WITH IT.
+      doc.save(`ThemisIQ_MaterialityAssessmentReport_${(company || 'Company').replace(/\s+/g, '_')}.pdf`)
     } catch (e) {
       // Said as what it is. No half-written PDF exists: the failure happens before save.
       setBuildError('The paper could not be assembled, and nothing was downloaded. '
