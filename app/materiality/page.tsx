@@ -499,18 +499,21 @@ export default function Page() {
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, margin: '0 0 1.75rem' }}>
             {([
-              ['What this exercise was', null],
-              ['What we found', null],
-              ['Who took part', null],
-              ['What stakeholders told us', null],
-              ['Where your own people disagree', null],
-              ['Inside and outside', 'your own workforce beside workers in your supply chain'],
-              ['What our own assessment concluded', null],
-              ['What becomes disclosable', null],
-              ['Where the two views differ', null],
-              ['How this was done', null],
-              ['What this does not cover', null],
-              ['What this tells you, beyond compliance', null],
+              ['Purpose and method', null],
+              ['Findings', null],
+              ['Stakeholder engagement', null],
+              ['Stakeholder responses', null],
+              ['Divided responses', null],
+              // ⚠️ THE GLOSS SHRANK BECAUSE THE HEADING GREW. It read "your own workforce beside
+              // workers in your supply chain" — the explanation a two-word heading needed. The
+              // heading now says that itself, so the gloss keeps only what it still adds.
+              ['Own workforce and value chain', 'the two set beside each other'],
+              ['Severity determinations', null],
+              ['Disclosure requirements', null],
+              ['Divergence register', null],
+              ['Method and standards applied', null],
+              ['Scope and limitations', null],
+              ['Implications', null],
             ] as [string, string | null][]).map(([h, gloss], i) => (
               <div key={h} style={{ display: 'flex', gap: 14, alignItems: 'baseline', fontSize: 15, lineHeight: 1.6 }}>
                 <span style={{ color: MUTED, fontWeight: 300, fontVariantNumeric: 'tabular-nums', minWidth: 18, flexShrink: 0 }}>{i + 1}</span>

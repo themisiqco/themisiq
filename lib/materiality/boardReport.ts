@@ -31,6 +31,16 @@
  * ⚠️ THE AUDIENCE IS A BOARD, NOT A SUSTAINABILITY TEAM. Directors carry the disclosure duty and
  * are not specialists. Every section is written so that a reader of section 2 alone can describe
  * what was done, and no section requires the reader to already know what a sub-topic is.
+ *
+ * ⚠️ THE HEADINGS ARE NOUN PHRASES; THE BODY PROSE IS NOT. THE REGISTER SHIFT IS IN THE HEADINGS
+ * ALONE. Renamed 27 Aug 2026 from spoken narration — "What we found", "Who took part", "How this
+ * was done" — to a document's parts: Findings, Stakeholder engagement, Method and standards
+ * applied. The twelve *_HEADING constants below carry that form and nothing else does.
+ * Every paragraph under them still explains itself in plain language to a director who is not a
+ * specialist, which is the rule directly above this one. A heading names a part; the prose under it
+ * does the work, and rewriting the prose to match the headings' register would undo the paragraph
+ * above. The constants are scattered through this file beside the prose they head rather than
+ * gathered into a block, so this note is here — where a reader arrives before any of them.
  */
 
 import {
@@ -499,7 +509,7 @@ export const NOT_FINALISED_NOTE =
   + 'the disclosure requirements it lists are read from the current reference set rather than a '
   + 'fixed copy.'
 
-export const ROADMAP_HEADING = 'What becomes disclosable'
+export const ROADMAP_HEADING = 'Disclosure requirements'
 
 export const ROADMAP_WHAT_THIS_IS =
   'A topic assessed as material carries disclosure requirements. These are the requirements that '
@@ -557,7 +567,7 @@ export const TITLE = 'Materiality assessment report'
 export const KIND =
   'For information. This paper reports what was found. It asks the reader to approve nothing.'
 
-export const WHAT_THIS_IS_HEADING = 'What this exercise was'
+export const WHAT_THIS_IS_HEADING = 'Purpose and method'
 
 export const WHAT_THIS_IS_PARAGRAPHS: string[] = [
   'We asked the people affected by this organisation — and the people who work in it and with it — '
@@ -592,7 +602,7 @@ export const COVERAGE_DEFINITION =
   + 'sub-topic nobody rated carries no stakeholder view at all, so the comparison in this report '
   + 'cannot be drawn for it. That is a finding about what can currently be seen, not a low score.'
 
-export const FINDINGS_HEADING = 'What we found'
+export const FINDINGS_HEADING = 'Findings'
 
 export const FINDINGS_DEFINITIONS = {
   assessed:
@@ -609,7 +619,7 @@ export const FINDINGS_DEFINITIONS = {
   coverage: COVERAGE_DEFINITION,
 } as const
 
-export const POLARISATION_HEADING = 'Where your own people disagree'
+export const POLARISATION_HEADING = 'Divided responses'
 
 export const POLARISATION_WHAT_THIS_IS =
   'On these sub-topics respondents are at BOTH ends of the scale and few are in the middle. There '
@@ -642,7 +652,7 @@ export const POLARISATION_NONE =
   'No sub-topic came back split. That is a result rather than a blank page: on every topic with '
   + 'enough answers to judge, respondents landed in the same part of the scale as each other.'
 
-export const CONTRAST_HEADING = 'Inside and outside'
+export const CONTRAST_HEADING = 'Own workforce and value chain'
 
 export const CONTRAST_NONE =
   'No labour pairs could be drawn. Both sides of a pair have to be in scope for the same survey '
@@ -673,7 +683,7 @@ export const NEVER_ASKED_NOTE =
   + 'could not be compared, not because a comparison came back empty. Nothing was withheld and no '
   + 'difference was found to be absent; the question was never asked.'
 
-export const PARTICIPATION_HEADING = 'Who took part'
+export const PARTICIPATION_HEADING = 'Stakeholder engagement'
 
 export const PARTICIPATION_NOTE =
   'ESRS 2 requires an undertaking to disclose how it engaged stakeholders and who those '
@@ -696,7 +706,7 @@ export const PARTICIPATION_COMPLETION_NOTE =
   + 'completion figure of zero beside ratings elsewhere in this document is those two facts, not a '
   + 'contradiction between them.'
 
-export const STAKEHOLDER_HEADING = 'What stakeholders told us'
+export const STAKEHOLDER_HEADING = 'Stakeholder responses'
 
 export const STAKEHOLDER_SCALE_NOTE =
   'Respondents chose one of three answers for each topic: that existing programmes are sufficient; '
@@ -716,7 +726,7 @@ export const SPLIT_NOTE =
   + 'single figure that would describe this room, which is why the distribution is shown rather '
   + 'than summarised.'
 
-export const ASSESSMENT_HEADING = 'What our own assessment concluded'
+export const ASSESSMENT_HEADING = 'Severity determinations'
 
 export const ABSTENTION_NOTE =
   'Where an assessor recorded that they did not have enough visibility to judge a dimension, it is '
@@ -732,9 +742,13 @@ export const ABSTENTION_NOTE =
   // 2026, when the numbers began to print and a wrong one became visible.
   + 'and section 12 returns to it.'
 
-export const DIFFERENCES_HEADING = 'Where the two views differ'
+// ⚠️ THE SAME NAME THE OBJECT INSIDE IT ALREADY HAD. register.ts builds a DivergenceRegister and
+// calls it "the divergence register" in its own prose; this section is where that register prints.
+// Until 27 Aug 2026 the heading said "Where the two views differ" while the thing under it was the
+// divergence register, and a reader meeting both had to work out they were one thing.
+export const DIFFERENCES_HEADING = 'Divergence register'
 
-export const METHODOLOGY_HEADING = 'How this was done'
+export const METHODOLOGY_HEADING = 'Method and standards applied'
 
 /**
  * The provisions applied, NAMED. A report that says "in line with the standard" gives a
@@ -804,7 +818,7 @@ export const THRESHOLDS_NOTE =
   + 'set, exactly as written at the time. The values were fixed onto the survey round when it was '
   + 'created, so a later change to any of them cannot restate what this round found.'
 
-export const LIMITATIONS_HEADING = 'What this does not cover'
+export const LIMITATIONS_HEADING = 'Scope and limitations'
 
 export const LIMITATIONS: string[] = [
   'This is the impact half of double materiality. It asks what effect the organisation has on '
@@ -886,7 +900,11 @@ export const ATTRIBUTION_NOTE =
   + 'topic itself was not separately judged material, and its own determinations are shown beneath '
   + 'the marking exactly as they were recorded.'
 
-export const WHY_HEADING = 'What this tells you, beyond compliance'
+// ⚠️ "Implications", NOT "Observations". This is the section a board reads first — it holds what
+// the organisation cannot yet see, and what follows from a material topic. "Observations" was the
+// flattest noun of the twelve and read as an appendix; this section does not report more findings,
+// it says what the findings mean.
+export const WHY_HEADING = 'Implications'
 
 export const WHY_THIS_MATTERS: { title: string; body: string }[] = [
   {
