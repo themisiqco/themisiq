@@ -811,7 +811,11 @@ export function buildRegister(input: RegisterInput): DivergenceRegister {
                 parts.push(`${r.result.abstained.join(', ')} recorded as not enough visibility`)
               }
               if (r.result.unscored.length > 0) {
-                parts.push(`${r.result.unscored.join(', ')} not scored`)
+                // ⚠️ "not yet scored", MATCHING PAGE 13's LINE WORD FOR WORD. This read "not
+                // scored", which lands as a settled state — a decision taken — where the fact is
+                // unfinished work. One document, one vocabulary: a reader meeting both pages must
+                // not have to work out whether two phrasings mean two things.
+                parts.push(`${r.result.unscored.join(', ')} not yet scored`)
               }
               return `${r.row.direction}: ${parts.join('; ')}`
             })

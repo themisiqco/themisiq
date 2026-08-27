@@ -812,9 +812,18 @@ export const LIMITATIONS: string[] = [
   + 'total that describes no group who was ever asked. Where more than one round exists, this '
   + 'paper reports against one of them and says which.',
 
-  'Where respondents did not answer, and where an assessor recorded that they could not judge a '
-  + 'dimension, that absence is reported as an absence. It is not a low score and must not be read '
-  + 'as one. It means the organisation cannot currently see the topic well enough to judge it.',
+  // ⚠️ TWO ABSENCES, NAMED SEPARATELY. This said "it means the organisation cannot currently see
+  // the topic well enough to judge it" of ALL absence — true of a recorded abstention and false of
+  // a dimension nobody had reached yet, which is an unfinished worksheet and not a limit on what
+  // the organisation can see. Fifth site of the same conflation, corrected 27 Aug 2026. The
+  // "never a low score" rule is untouched: it was always true of both.
+  'Where respondents did not answer, and where a dimension carries no severity judgement, that '
+  + 'absence is reported as an absence. It is never a low score and must not be read as one. Two '
+  + 'different absences are reported separately and mean different things: where an assessor '
+  + 'RECORDED that they could not judge a dimension, the organisation cannot currently see that '
+  + 'topic well enough to judge it, and that is a finding about the organisation. Where a dimension '
+  + 'was simply not yet scored, the determination is unfinished — which is a fact about the work, '
+  + 'and not about what can be seen.',
 
   'The severity judgements are the preparer’s own, made under the disclosed method. They are '
   + 'not an independent opinion, and they have not been assured.',
@@ -889,8 +898,12 @@ export const WHY_THIS_MATTERS: { title: string; body: string }[] = [
       'Every dimension an assessor recorded as "not enough visibility" is a topic the organisation '
       + 'does not currently have the information to judge. That is a finding about the '
       + 'organisation, not a gap in the survey, and it points directly at where data collection is '
-      + 'missing. A dimension left unscored is not this finding — it is work not yet done, and it '
-      + 'is reported separately for that reason.',
+      // ⚠️ "and it is reported separately for that reason" WAS A CLAIM ABOUT THE PIPELINE, not
+      // about the data — true only where a renderer actually splits the two lists, and asserted
+      // globally. That is the same error one layer up: prose promising behaviour the code may not
+      // deliver. Narrowed 27 Aug 2026 to what this paper can vouch for.
+      + 'missing. A dimension left unscored is not this finding — it is work not yet done. The two '
+      + 'are named differently wherever this paper reports an incomplete determination.',
   },
   {
     title: 'Where the inside and the outside disagree',

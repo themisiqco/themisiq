@@ -829,7 +829,7 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
      * read like thirty. The same sentence repeated is not more information.
      *
      * ⚠️ GROUPED ON THE DETAIL ITSELF, NOT ON THE REASON CODE, and that distinction is what keeps
-     * the per-topic ones intact. "negative: scale, scope, irremediability not scored" is genuinely
+     * the per-topic ones intact. "negative: scale, scope, irremediability not yet scored" is genuinely
      * about ONE topic and differs from every other incomplete row, so it forms a group of one and
      * keeps its own line. An exclusion reason recorded per topic behaves the same way. Only rows
      * whose sentence is word-for-word identical collapse — which is exactly the rows for which the

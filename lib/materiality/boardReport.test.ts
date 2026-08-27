@@ -520,8 +520,24 @@ describe('section 9 — limitations', () => {
     expect(R.limitations.items.join(' ')).toMatch(/not combined|one survey round/i)
   })
 
-  it('states that an absence is not a low score', () => {
-    expect(R.limitations.items.join(' ')).toMatch(/not a low score/i)
+  it('states that an absence is never a low score', () => {
+    // ⚠️ MATCHES EITHER WORDING, AND THE WIDENING IS DELIBERATE RATHER THAN A CLIMBDOWN. This read
+    // /not a low score/ and failed on 27 Aug 2026 when the sentence was STRENGTHENED to "never a
+    // low score" — the phrasing every other statement of this rule already used (ABSTENTION_NOTE,
+    // METHOD_NOTES.abstention, severity.ts's §6.1 header). A test pinned to one phrasing of a rule
+    // fails on an improvement to it, which teaches the next reader to loosen the assertion rather
+    // than to check the claim.
+    expect(R.limitations.items.join(' ')).toMatch(/(?:not|never) a low score/i)
+  })
+
+  it('distinguishes a recorded abstention from a dimension not yet scored', () => {
+    // ⚠️ THE CLAIM THE PHRASING TEST CANNOT MAKE. Section 11 used to say of ALL absence that "the
+    // organisation cannot currently see the topic well enough to judge it" — true of a recorded
+    // abstention, false of an unfinished determination. Asserting the DISTINCTION is what guards
+    // that, and it is what the old test would have gone on passing through.
+    const all = R.limitations.items.join(' ')
+    expect(all).toMatch(/recorded that they could not judge/i)
+    expect(all).toMatch(/not yet scored/i)
   })
 
   it('names what the paper does not claim', () => {
