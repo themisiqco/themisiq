@@ -453,7 +453,7 @@ export default function Page() {
             <div style={hairlineCell}>
               <div style={cellTitle}>You finish with something you can hand over.</div>
               <p style={cellBody}>
-                A board report written for directors rather than specialists. Its contents, and the two things that come with it, are set out under <em>What you get</em> below.
+                A board report written for directors or senior leadership rather than specialists. Its contents, and the two things that come with it, are set out under <em>What you get</em> below.
               </p>
             </div>
           </div>
@@ -495,7 +495,7 @@ export default function Page() {
         <div style={{ maxWidth: 760 }}>
           <h2 style={sectionTitle}>What you get</h2>
           <p style={bodyPara}>
-            The deliverable is the <strong>Materiality assessment report</strong> &mdash; a board paper written for directors rather than specialists. <strong>No sample is published.</strong> It prints twelve sections, in this order:
+            The deliverable is the <strong>Materiality assessment report</strong> &mdash; a board paper written for directors or senior leadership rather than specialists. <strong>No sample is published.</strong> It prints twelve sections, in this order:
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, margin: '0 0 1.75rem' }}>
             {([

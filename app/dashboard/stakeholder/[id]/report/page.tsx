@@ -698,8 +698,8 @@ export default function StakeholderBoardReport() {
           does not cover, and what it tells a board beyond compliance.
         </div>
         <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.9, marginTop: 10 }}>
-          It is written for directors rather than for specialists, and it asks the board to approve
-          nothing — it reports what was found.
+          It is written for directors or senior leadership rather than for specialists, and it asks
+          the reader to approve nothing — it reports what was found.
         </div>
       </div>
 

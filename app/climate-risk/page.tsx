@@ -290,6 +290,46 @@ export default function Page() {
         </p>
       </section>
 
+      {/* ═══ IF YOU HAVE ALREADY COMPLETED YOUR CLIMATE RISK ASSESSMENT ══════════
+          THE RETURN PATH. /materiality carries "If you already have Climate Risk" pointing here;
+          this is the same handoff from the other side, and the two must not drift into describing
+          the boundary differently.
+          AFTER THE SAMPLES, BEFORE THE PRICE, DELIBERATELY. A reader arrives having just read the
+          sample card's own sentence — that the screening "does not include the stakeholder
+          engagement ESRS requires on the impact side" — so this section answers a question they
+          are already holding rather than raising one.
+          ⚠️ NOT TINTED, THOUGH ITS MIRROR ON /materiality IS. That page sets this section on
+          #f8f7f5 between two white ones. Here the PRICING section immediately below is ALREADY
+          #f8f7f5 with the same borders, so a tinted block would merge with it into one band and
+          the reader would lose the boundary between an argument and a price. Plain, at the page's
+          standard section measure. */}
+      <section style={{ padding: '5rem 2.5rem', maxWidth: 1100, margin: '0 auto' }}>
+        <div style={{ maxWidth: 760 }}>
+          <h2 style={sectionTitle}>If you have already completed your Climate Risk assessment</h2>
+          <p style={bodyPara}>
+            The screening tells you which of the ten ESRS topics are likely to matter. The Materiality Assessment is where you establish that they do.
+          </p>
+          <p style={bodyPara}>
+            You run a stakeholder survey &mdash; your own workforce, workers in your value chain, communities, customers &mdash; and see what each group says about each topic. You delegate sub-topics to the people in your organisation who know them, and each records a severity determination against the ESRS criteria, for harm and for benefit separately. Where you and your stakeholders see a topic differently, the report sets the two side by side, because that difference is the first thing an assurance provider asks about.
+          </p>
+          <p style={bodyPara}>
+            The deliverable is a board paper that records the assessment and the reasoning behind it &mdash; the findings, the stakeholders engaged, the determinations reached, and the disclosure requirements each material topic carries. It is written to be read by directors or senior leadership and handed to an auditor.
+          </p>
+          {/* ⚠️ THE FIGURE IS READ, NEVER TYPED — FLAT_MODULE_PRICES is the single source of truth
+              (lib/pricing.ts, CLAUDE.md). The pricing block below reads climate-risk's the same
+              way. A hardcoded price on this page would be the fourth to drift in two days.
+              ⚠️ AND THE DISCOUNT IS DELIBERATELY NOT RESTATED HERE. It was, in draft: two prices
+              sitting near each other invite a reader to add them. But the PRICING lede three
+              sections down already states the rule more completely than this line could — "two
+              modules −10%, three or more −20%" — and a reader weighing two figures reaches it
+              within seconds. One rule, stated once, in the place that states it best. */}
+          <p style={{ ...bodyPara, marginBottom: '2rem' }}>
+            ${FLAT_MODULE_PRICES['double-materiality'].toLocaleString()} per year.
+          </p>
+          <a href="/materiality" style={{ ...btnPrimary, textDecoration: 'none' }}>The Materiality Assessment module &rarr;</a>
+        </div>
+      </section>
+
       {/* PRICING */}
       <section style={{ background: '#f8f7f5', borderTop: '0.5px solid #e8e7e4', borderBottom: '0.5px solid #e8e7e4', padding: '5rem 2.5rem' }}>
         <div style={{ maxWidth: 800, margin: '0 auto', textAlign: 'center' }}>
@@ -368,3 +408,11 @@ const ghostBtn: React.CSSProperties = {
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
 const sectionTitle: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }
 const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, margin: '0 auto', lineHeight: 1.75, fontWeight: 300 }
+// ⚠️ COPIED VERBATIM FROM app/materiality/page.tsx WITH THE CROSS-SELL SECTION ON 27 Aug 2026 —
+// the same move ghostBtn made with the sample cards on 26 Aug, and for the same reason. This page
+// had no LEFT-ALIGNED body-paragraph style: sectionSub is centred (margin: '0 auto', maxWidth 540)
+// and serves section ledes, which is not what a four-paragraph argument at maxWidth 760 needs.
+// NOT re-derived from sectionSub with the centring stripped: the cross-sell mirrors /materiality's
+// and must read as the same voice, so it takes that page's measurements rather than an
+// approximation of them.
+const bodyPara: React.CSSProperties = { fontSize: 15, color: '#555553', fontWeight: 300, lineHeight: 1.8, marginBottom: '1.25rem' }
