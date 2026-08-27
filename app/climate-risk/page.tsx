@@ -154,8 +154,20 @@ export default function Page() {
 
         <div style={{ textAlign: 'center' }}>
           <a href="/dashboard/climate-risk" style={{ ...btnPrimary, textDecoration: 'none' }}>Assess your climate risk →</a>
-          <p style={{ fontSize: 13, color: '#555553', maxWidth: 460, margin: '14px auto 0', fontWeight: 300, lineHeight: 1.6 }}>Reporting under CSRD/ESRS? The same assessment also produces the double-materiality matrix across all ten ESRS topics.</p>
-          <a href="/materiality" style={{ display: 'inline-block', marginTop: 12, fontSize: 14, fontWeight: 600, color: '#7425e3', borderBottom: '2px solid #7425e3', paddingBottom: 3, textDecoration: 'none' }}>See the materiality samples →</a>
+          {/* ⚠️ THE QUALIFIER BELONGS HERE MOST OF ALL, AND IT WAS ONLY ON THE SAMPLE CARD.
+              This sits directly under the primary CTA — the highest-attention spot on the page and
+              the point a buyer decides. It said the assessment "also produces the double-materiality
+              matrix across all ten ESRS topics", which is true and, unqualified, reads as CSRD
+              coverage. The card in the samples section already carries the honest version of this
+              sentence and its comment says why it must not be trimmed; the same boundary now stands
+              where it is acted on, not only where it is downloaded. The second sentence below is
+              that card's, near-verbatim, so the two read as one voice rather than two hedges.
+              ⚠️ AND THE LINK LABEL PROMISED SAMPLES THAT ARE ON THIS PAGE. Both sample PDFs moved
+              from /materiality to here on 26 Aug 2026, so "See the materiality samples →" sent a
+              reader looking for downloads to the one page that no longer has any. /materiality is
+              now the Materiality Assessment module page, and the label says that. */}
+          <p style={{ fontSize: 13, color: '#555553', maxWidth: 460, margin: '14px auto 0', fontWeight: 300, lineHeight: 1.6 }}>Reporting under CSRD/ESRS? The same assessment scores all ten ESRS topics on both axes from industry baselines &mdash; a first pass that scopes the work rather than doing it. It does not include the stakeholder engagement ESRS requires on the impact side.</p>
+          <a href="/materiality" style={{ display: 'inline-block', marginTop: 12, fontSize: 14, fontWeight: 600, color: '#7425e3', borderBottom: '2px solid #7425e3', paddingBottom: 3, textDecoration: 'none' }}>The Materiality Assessment module →</a>
         </div>
       </section>
 
@@ -190,7 +202,13 @@ export default function Page() {
           </thead>
           <tbody>
             {[
-              ['CSRD · ESRS E1', 'European Union', 'Large EU & EU-active companies', 'In force (scope simplified by Omnibus)', '✓ Full — ESRS E1 climate risk'],
+              // ⚠️ "(E1 only)" IS THE WHOLE POINT OF THIS CELL. The text was accurate before it —
+              // it named ESRS E1, and E1 coverage genuinely is full — but "✓ Full" in a column
+              // headed "ThemisIQ coverage", one cell from "In force", beside a row labelled CSRD,
+              // is read as CSRD coverage by anyone scanning the table. E1 is one of ten topical
+              // standards, and the impact side of the other nine is a separate module. The scope
+              // qualifier now survives the scan, not only the sentence.
+              ['CSRD · ESRS E1', 'European Union', 'Large EU & EU-active companies', 'In force (scope simplified by Omnibus)', '✓ Full — ESRS E1 climate risk (E1 only)'],
               ['IFRS S2 (ISSB)', 'Multiple', 'Adopted jurisdiction by jurisdiction', 'Live where adopted — voluntary or mandatory', '✓ Full — TCFD + scenario analysis'],
               ['UK SRS (S1 & S2)', 'United Kingdom', 'Listed & large companies', 'Rules expected from FY2027', '✓ Full — ISSB-aligned'],
               ['Australia · AASB S2', 'Australia', 'Large entities, phased', 'Phasing in from Jan 2025', '✓ Full — IFRS S2 basis'],
@@ -282,9 +300,17 @@ export default function Page() {
               the only module marketing page that quotes the discount at all, so it had drifted
               furthest: "bundle to save" described a bundle the product removed on 23 Jul 2026. */}
           <p style={sectionSub}>A complete TCFD-aligned climate risk assessment — one flat annual price. Add modules and the multi-module discount applies automatically: two modules −10%, three or more −20%.</p>
+          {/* ⚠️ "screening", NOT "materiality". The feature read "Single + double materiality
+              (IFRS S2 · CSRD/ESRS)" — a claim of full coverage in a priced feature list, which is
+              the one place a buyer reads as a promise about what they are paying for. What this
+              module does is score the ten topics from industry baselines; what it does not do is
+              the stakeholder engagement ESRS requires on the impact side. One word carries that,
+              and it is the module's own word: the sample is titled "Double Materiality SCREENING
+              Report" and /methodology calls it "a structured screening intended to scope and
+              support". */}
           <div style={{ maxWidth: 400, margin: '2.5rem auto 0', textAlign: 'left' }}>
             {[
-              { plan: 'Climate Risk', price: '$' + FLAT_MODULE_PRICES['climate-risk'].toLocaleString(), cadence: '/ reporting year', features: ['Physical & transition risk assessment', 'Single + double materiality (IFRS S2 · CSRD/ESRS)', '3 IPCC scenario pathways', 'TCFD-aligned report structure', 'IFRS S2 · CSRD ESRS E1 · SB 261 mapping'], featured: true },
+              { plan: 'Climate Risk', price: '$' + FLAT_MODULE_PRICES['climate-risk'].toLocaleString(), cadence: '/ reporting year', features: ['Physical & transition risk assessment', 'Materiality screening — both axes, ten ESRS topics (IFRS S2 · CSRD/ESRS)', '3 IPCC scenario pathways', 'TCFD-aligned report structure', 'IFRS S2 · CSRD ESRS E1 · SB 261 mapping'], featured: true },
             ].map(({ plan, price, cadence, features, featured }) => (
               <div key={plan} style={{ background: featured ? '#0d0d0d' : '#fff', borderRadius: 12, padding: '2rem', border: featured ? 'none' : '0.5px solid #e8e7e4' }}>
                 <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: featured ? 'rgba(255,255,255,0.4)' : '#888784', marginBottom: 8 }}>{plan}</div>
