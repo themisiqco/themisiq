@@ -397,12 +397,48 @@ describe('abstentions render as abstentions, never as low scores', () => {
           determinations: [MATERIAL_NEG(), posDet(null, 3)] }),
   ]
 
+  /**
+   * ⚠️ THE SEAM THE BUG CROSSED. buildBoardReport used to assign `abstained: r.missing`, so this
+   * fixture — which records no abstention at all — produced a report claiming the assessor had
+   * "recorded that they did not have enough visibility". The two fixtures below differ ONLY in
+   * whether abstained_dimensions is set, and the report must tell them apart.
+   */
+  const DECLINED = [
+    sub({ subtopic_code: 'B.1', overall: overall(BELOW),
+          determinations: [MATERIAL_NEG(),
+                           posDet(null, 3, { abstained_dimensions: ['scale'] })] }),
+  ]
+
+  it('a DECLINED dimension is abstained; an unreached one is unscored', () => {
+    const declined = report(DECLINED).assessmentView.rows[0]
+      .directions.find(d => d.direction === 'positive')
+    expect(declined?.abstained).toEqual(['scale'])
+    expect(declined?.unscored).toEqual([])
+
+    const unreached = report(ABSTAINED).assessmentView.rows[0]
+      .directions.find(d => d.direction === 'positive')
+    expect(unreached?.abstained).toEqual([])
+    expect(unreached?.unscored).toEqual(['scale'])
+
+    // ⚠️ AND THE VERDICT IS THE SAME FOR BOTH. The split changed what is reported, never what is
+    // computed — §6.1's rule is untouched by it.
+    for (const d of [declined, unreached]) {
+      expect(d?.complete).toBe(false)
+      expect(d?.severity).toBeNull()
+      expect(d?.material).toBeNull()
+    }
+  })
+
   it('an unscored dimension is named, with no severity and no verdict', () => {
     const r = report(ABSTAINED)
     const row = r.assessmentView.rows[0]
     const positive = row.directions.find(d => d.direction === 'positive')
 
-    expect(positive?.abstained).toEqual(['scale'])
+    // ⚠️ THIS ASSERTION USED TO READ `.abstained` AND WAS THE BUG, FROZEN. The fixture records no
+    // abstention — posDet(null, 3) simply leaves scale unscored — so the field naming a recorded
+    // §6.1 answer must be EMPTY here, and the dimension belongs in `unscored`.
+    expect(positive?.unscored).toEqual(['scale'])
+    expect(positive?.abstained).toEqual([])
     expect(positive?.complete).toBe(false)
     // ⚠️ null, NOT false and NOT zero. §6.1: absence is never a low.
     expect(positive?.material).toBeNull()

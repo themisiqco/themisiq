@@ -100,7 +100,17 @@
  * "Not enough visibility" is null, never zero and never a low. So a determination missing any
  * dimension in its basis yields:
  *
- *     { complete: false, severity: null, material: null, rule: null, missing: [...] }
+ *     { complete: false, severity: null, material: null, rule: null,
+ *       abstained: [...], unscored: [...] }
+ *
+ * ⚠️ TWO LISTS, AND THE SHAPE IS THE FIX. Until 27 Aug 2026 this was ONE list, `missing`, holding
+ * every null whatever its cause — and boardReport.ts renamed it `abstained` on the way out, so the
+ * board report told a reader an assessor "recorded that they did not have enough visibility" about
+ * dimensions nobody had reached. A DECLINED dimension is a recorded answer under §6.1; an UNSCORED
+ * one is an unfinished worksheet. They are different findings about the organisation, and section
+ * 12 of the report draws a conclusion from one of them.
+ * Two lists rather than one tagged list because the wrong sentence then cannot be written: there is
+ * no field a renderer can reach for that means "either of these".
  *
  * There is NO default, no zero-fill, no partial mean over the dimensions that are present, and no
  * "treat absent as 1". A partial mean would be the worst of the available wrong answers: it looks
@@ -158,6 +168,17 @@ export type SeverityInput = {
   irremediability?: number | null
   /** Never folded into the number — see the header. Carried so the caller can see what was recorded. */
   likelihood?: number | null
+  /**
+   * Dimensions the determiner RECORDED as "not enough visibility" —
+   * materiality_impact_determinations.abstained_dimensions, passed through as stored.
+   *
+   * ⚠️ TYPED readonly string[], NOT Dimension[], DELIBERATELY. The stored array's domain is
+   * scale / scope / irremediability / LIKELIHOOD (20260841), and likelihood is not a Dimension here
+   * because it is never folded into severity. A caller passing the column straight through is the
+   * behaviour we want; making them cast or pre-filter is how a filter gets forgotten in one of four
+   * call sites. The narrowing happens ONCE, below, against `basis`.
+   */
+  abstained?: readonly string[] | null
 }
 
 type LikelihoodReport = {
@@ -182,7 +203,8 @@ export type SeverityResult = SeverityCommon &
         rule: SeverityRule
         /** The dimension values used, in `basis` order. Lets a caller show the working. */
         values: number[]
-        missing: []
+        abstained: []
+        unscored: []
       }
     | {
         complete: false
@@ -190,16 +212,28 @@ export type SeverityResult = SeverityCommon &
         material: null
         rule: null
         values: null
-        /** Dimensions in `basis` that were absent. Never treated as a value of any kind. */
-        missing: Dimension[]
+        /**
+         * Dimensions in `basis` the determiner DECLINED to judge — §6.1's fourth answer, a recorded
+         * answer. Never treated as a value of any kind.
+         */
+        abstained: Dimension[]
+        /** Dimensions in `basis` with no value and no abstention — nobody reached them. */
+        unscored: Dimension[]
       }
   )
 
 /**
- * Thrown for a value outside 1-4 or a non-integer. NOT used for absence: absence is §6.1's
- * abstention and returns `complete: false`. This is a programming error — 20260838's CHECK
- * constraints make an out-of-range value unstorable, so it can only arrive from a bug, and silently
- * clamping or rounding it would put a fabricated number into a compliance figure.
+ * Thrown for a value outside 1-4 or a non-integer, and for a dimension carrying BOTH a value and
+ * an abstention. NOT used for plain absence: an absent dimension returns `complete: false`, named
+ * in `abstained` or `unscored` according to which it is.
+ *
+ * ⚠️ THIS COMMENT USED TO CALL ALL ABSENCE "abstention" — the same conflation the two-list split
+ * exists to end, sitting in the type that now carries the field. Corrected 27 Aug 2026.
+ *
+ * Both cases are programming errors: 20260838's CHECK constraints make an out-of-range value
+ * unstorable, and 20260841's _abstention_excludes_value makes value-plus-abstention unstorable, so
+ * either can only arrive from a bug. Clamping one or reconciling the other would put a fabricated
+ * number — or a fabricated intention — into a compliance figure.
  */
 export class SeverityInputError extends Error {
   constructor(message: string) {
@@ -263,7 +297,21 @@ export function computeSeverity(input: SeverityInput): SeverityResult {
 
   // ── gather the basis dimensions. Absence is recorded, never defaulted (§6.1). ─────────────────
   const present: number[] = []
-  const missing: Dimension[] = []
+  const abstained: Dimension[] = []
+  const unscored: Dimension[] = []
+
+  /**
+   * ⚠️ FILTERED BY basis, EXACTLY AS THE VALUES ARE, AND THIS IS NOT DEFENSIVE TIDYING.
+   * For a positive determination irremediability is not in `basis` (¶41), so it was never put to
+   * the determiner. Reporting an abstention against it would tell a board the assessor declined a
+   * question nobody asked — a claim about a person, invented by a filter that was left out.
+   * The stored array can also carry 'likelihood', which is not a Dimension and is never folded into
+   * severity; the same filter drops it. 20260841's _abstention_respects_p41 already refuses both at
+   * the database, so this is a second gate on a row that should not exist — the posture assertPoint
+   * already takes toward an out-of-range value.
+   */
+  const declined = new Set<string>(
+    (input.abstained ?? []).filter(d => (basis as string[]).includes(d)))
 
   for (const d of basis) {
     // irremediability is only read when it is in the basis, which is what makes it IGNORED rather
@@ -272,14 +320,35 @@ export function computeSeverity(input: SeverityInput): SeverityResult {
       : d === 'scope' ? input.scope
       : input.irremediability ?? null
 
-    if (raw === null || raw === undefined) { missing.push(d); continue }
+    if (declined.has(d)) {
+      // ⚠️ REFUSE, NEVER RECONCILE. A dimension with a value AND an abstention is a contradiction
+      // about what the determiner meant, and picking either one is the software deciding that for
+      // them. impact_save_determination refuses the same combination at the write
+      // (20260841 _abstention_excludes_value) for the same reason, so a row reaching here in that
+      // state is a bug upstream, not an input to be salvaged.
+      if (raw !== null && raw !== undefined) {
+        throw new SeverityInputError(
+          `${d} carries both a value (${JSON.stringify(raw)}) and an abstention. A dimension is ` +
+          `either scored or recorded as "not enough visibility" (§6.1), never both — the database ` +
+          `refuses this combination at the write. Nothing is assumed about which was meant.`,
+        )
+      }
+      abstained.push(d)
+      continue
+    }
+
+    if (raw === null || raw === undefined) { unscored.push(d); continue }
     assertPoint(raw, d)
     present.push(raw)
   }
 
-  if (missing.length > 0) {
+  // ⚠️ THE VERDICT IS UNCHANGED BY THE SPLIT, AND MUST STAY THAT WAY. Both lists lead here: a
+  // declined dimension and an unreached one both yield no severity and no materiality conclusion.
+  // The split changes what is REPORTED, never what is COMPUTED — §6.1's rule at the top of this
+  // file is untouched.
+  if (abstained.length > 0 || unscored.length > 0) {
     return { complete: false, severity: null, material: null, rule: null, values: null,
-             missing, basis, likelihood }
+             abstained, unscored, basis, likelihood }
   }
 
   const anyAtTopBand = present.some(v => v === OVERRIDE_BAND)
@@ -295,7 +364,8 @@ export function computeSeverity(input: SeverityInput): SeverityResult {
       // nothing to add. Reporting this as 'override' would claim a rule fired that did not.
       rule: anyAtTopBand ? 'subsumed_override' : 'max',
       values: present,
-      missing: [],
+      abstained: [],
+      unscored: [],
       basis,
       likelihood,
     }
@@ -309,7 +379,8 @@ export function computeSeverity(input: SeverityInput): SeverityResult {
     // 'override' names only the cases the override actually DECIDED — where the mean did not.
     rule: !byMean && anyAtTopBand ? 'override' : 'mean',
     values: present,
-    missing: [],
+    abstained: [],
+    unscored: [],
     basis,
     likelihood,
   }

@@ -160,6 +160,13 @@ type Det = {
   nature: 'actual' | 'potential' | null
   scale: number | null; scope: number | null
   irremediability: number | null; likelihood: number | null
+  /**
+   * ⚠️ SELECTED SINCE 20260841 AND UNDECLARED UNTIL 27 Aug 2026 — the shape of the defect, twice.
+   * The query above already asked for this column; the type did not name it, so the mapping below
+   * dropped it and computeSeverity could not tell a dimension the assessor DECLINED from one nobody
+   * reached. A field fetched and untyped is a field silently discarded.
+   */
+  abstained_dimensions: string[] | null
   status: string
 }
 
@@ -359,6 +366,10 @@ export default function WorksheetRegister() {
         status: d.status,
         scale: d.scale, scope: d.scope,
         irremediability: d.irremediability, likelihood: d.likelihood,
+        // ⚠️ CARRIED, NOT DROPPED. This mapping narrowed the fetched row and silently discarded
+        // abstained_dimensions — the column was selected above and thrown away here, which is where
+        // "the assessor declined" became indistinguishable from "nobody reached it".
+        abstained_dimensions: d.abstained_dimensions,
       })
     }
 

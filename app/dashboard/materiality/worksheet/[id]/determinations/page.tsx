@@ -419,6 +419,11 @@ function DeterminationRow({ dir, d, prior, category, contributor, onOverride }: 
     direction: dir, nature: d.nature, category,
     scale: d.scale, scope: d.scope,
     irremediability: d.irremediability, likelihood: d.likelihood,
+    // ⚠️ PASSED, OR THE SUMMARY ABOVE CANNOT TELL THE TWO APART. This screen has fetched
+    // abstained_dimensions since 20260841 and rendered it in the dimension grid, but never handed
+    // it to computeSeverity — so severity's own view of the determination was the one missing the
+    // distinction, on the screen that already drew it.
+    abstained: d.abstained_dimensions,
   }
   const sev = computeSeverity(input)
 
@@ -438,13 +443,25 @@ function DeterminationRow({ dir, d, prior, category, contributor, onOverride }: 
       </div>
 
       {/* ⚠️ INCOMPLETE IS SAID, NOT SCORED. computeSeverity returns complete:false with a null
-          severity and the dimensions that are missing; a partial average would look like a real
-          figure and would be systematically low. */}
+          severity and the dimensions that are absent; a partial average would look like a real
+          figure and would be systematically low.
+          ⚠️ AND THE TWO CAUSES ARE SAID SEPARATELY, because this screen already draws the same
+          distinction one block down: the dimension grid renders NO_VISIBILITY_LABEL for a declined
+          dimension and "Not answered" for an unreached one. Reading a single `missing` list here
+          contradicted the grid directly below it — "still to be judged: scale" beside a cell
+          reading "Not enough visibility to assess". Both are now taken from computeSeverity's two
+          lists, so the summary and the grid cannot disagree. */}
       {!sev.complete ? (
         <div style={{ background: AMBER_BG, border: `0.5px solid ${AMBER}`, borderRadius: 10,
                       padding: '11px 14px', fontSize: 12.5, color: INK, lineHeight: 1.8 }}>
-          <strong>No severity — this determination is incomplete.</strong> Still to be judged:{' '}
-          {sev.missing.join(', ')}. Nothing is assumed for a dimension nobody has answered.
+          <strong>No severity — this determination is incomplete.</strong>{' '}
+          {sev.abstained.length > 0 && (
+            <>Recorded as not enough visibility to judge: {sev.abstained.join(', ')}.{' '}</>
+          )}
+          {sev.unscored.length > 0 && (
+            <>Still to be judged: {sev.unscored.join(', ')}.{' '}</>
+          )}
+          Nothing is assumed for a dimension nobody has answered.
         </div>
       ) : (
         <div style={{ display: 'flex', gap: 14, alignItems: 'baseline', flexWrap: 'wrap',

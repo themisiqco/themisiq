@@ -247,7 +247,7 @@ describe('ESRS 1 ¶41 — positive impacts carry no irremediability', () => {
     expect(computeSeverity({ ...base, direction: 'positive' }).complete).toBe(true)
     const negative = computeSeverity({ ...base, direction: 'negative' })
     expect(negative.complete).toBe(false)
-    expect(negative.missing).toEqual(['irremediability'])
+    expect(negative.unscored).toEqual(['irremediability'])
   })
 
   it('the two-dimension threshold lands exactly on 2.5 and is material', () => {
@@ -336,7 +336,71 @@ describe('§6.1 — a missing dimension is not a low score', () => {
     expect(r.material).toBeNull()
     expect(r.rule).toBeNull()
     expect(r.values).toBeNull()
-    expect(r.missing).toEqual([dim])
+    expect(r.unscored).toEqual([dim])
+  })
+
+  /**
+   * ⚠️ THE PARALLEL it.each, AND IT IS PARALLEL RATHER THAN A RENAME OF THE ONE ABOVE.
+   * That one is about SCORING — a null is not a low — and it stays true whatever the null's cause.
+   * This one is about REPORTING: the same absence, recorded as §6.1's fourth answer, must land in
+   * the other list. Converting the first into this would have left the declined path untested for
+   * two of the three dimensions, which is the shape of gap the two-list split exists to close.
+   */
+  it.each(dims)('a negative determination DECLINING %s is abstained, not unscored', dim => {
+    const full = { scale: 3, scope: 3, irremediability: 3 }
+    const r = computeSeverity(neg(
+      dim === 'scale' ? null : full.scale,
+      dim === 'scope' ? null : full.scope,
+      dim === 'irremediability' ? null : full.irremediability,
+      { abstained: [dim] },
+    ))
+    // The verdict is identical to the unscored case above — the split changed reporting, not
+    // computation.
+    expect(r.complete).toBe(false)
+    expect(r.severity).toBeNull()
+    expect(r.material).toBeNull()
+    expect(r.rule).toBeNull()
+    expect(r.values).toBeNull()
+    // And the two lists disagree, which is the whole point.
+    expect(r.abstained).toEqual([dim])
+    expect(r.unscored).toEqual([])
+  })
+
+  it('one determination can carry both, and each dimension lands in exactly one list', () => {
+    // scale DECLINED, scope simply never reached, irremediability scored.
+    const r = computeSeverity(neg(null, null, 3, { abstained: ['scale'] }))
+    expect(r.complete).toBe(false)
+    expect(r.abstained).toEqual(['scale'])
+    expect(r.unscored).toEqual(['scope'])
+  })
+
+  it('a value AND an abstention on one dimension is REFUSED, never reconciled', () => {
+    // 20260841's _abstention_excludes_value makes this unstorable, so it can only arrive from a
+    // bug. Picking either half would be the software deciding what the determiner meant.
+    expect(() => computeSeverity(neg(3, 3, 3, { abstained: ['scale'] })))
+      .toThrow(SeverityInputError)
+    expect(() => computeSeverity(neg(3, 3, 3, { abstained: ['scale'] })))
+      .toThrow(/both a value \(3\) and an abstention/)
+  })
+
+  it('an irremediability abstention on a POSITIVE is never reported — ¶41', () => {
+    // Irremediability is not in a positive's basis, so it was never put to the determiner.
+    // Reporting it would claim they declined a question nobody asked.
+    const r = computeSeverity({
+      direction: 'positive', nature: 'actual', category: 'env',
+      scale: 3, scope: 3, abstained: ['irremediability'],
+    })
+    expect(r.complete).toBe(true)
+    expect(r.abstained).toEqual([])
+    expect(r.unscored).toEqual([])
+  })
+
+  it('a likelihood abstention reaches neither list — it is not a severity dimension', () => {
+    // The stored column's domain includes likelihood; the basis filter drops it.
+    const r = computeSeverity(neg(3, 3, 3, { abstained: ['likelihood'] }))
+    expect(r.complete).toBe(true)
+    expect(r.abstained).toEqual([])
+    expect(r.unscored).toEqual([])
   })
 
   // ⚠️ THE FAILURE THIS GUARDS AGAINST. A silent default would be systematically low and would look
@@ -361,13 +425,13 @@ describe('§6.1 — a missing dimension is not a low score', () => {
   it('several missing dimensions are all named', () => {
     const r = computeSeverity(neg(null, null, 3))
     expect(r.complete).toBe(false)
-    expect(r.missing).toEqual(['scale', 'scope'])
+    expect(r.unscored).toEqual(['scale', 'scope'])
   })
 
   it('an entirely empty determination yields no conclusion of any kind', () => {
     const r = computeSeverity(neg(null, null, null))
     expect(r.complete).toBe(false)
-    expect(r.missing).toEqual(['scale', 'scope', 'irremediability'])
+    expect(r.unscored).toEqual(['scale', 'scope', 'irremediability'])
     expect(r.material).toBeNull()
   })
 
@@ -375,7 +439,7 @@ describe('§6.1 — a missing dimension is not a low score', () => {
     const r = computeSeverity({ direction: 'negative', nature: 'actual', category: 'env',
                                 scale: 3, scope: 3 })
     expect(r.complete).toBe(false)
-    expect(r.missing).toEqual(['irremediability'])
+    expect(r.unscored).toEqual(['irremediability'])
   })
 
   it('basis is reported even when the determination is incomplete', () => {

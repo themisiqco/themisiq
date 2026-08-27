@@ -325,7 +325,10 @@ export type AssessmentDirectionRow = {
   basis: Dimension[]
   values: number[] | null
   /** ⚠️ ABSTENTIONS, SHOWN AS ABSTENTIONS. Dimensions nobody could judge — never a low score. */
+  /** Dimensions the assessor DECLINED to judge — §6.1's fourth answer, a recorded answer. */
   abstained: Dimension[]
+  /** Dimensions with no value and no abstention. Nobody reached them. */
+  unscored: Dimension[]
   /** Which dimensions carried the result, read off the engine's own rule. Empty when incomplete. */
   drivers: Dimension[]
 }
@@ -717,10 +720,12 @@ export const ASSESSMENT_HEADING = 'What our own assessment concluded'
 
 export const ABSTENTION_NOTE =
   'Where an assessor recorded that they did not have enough visibility to judge a dimension, it is '
-  + 'shown here as exactly that. It is never counted as a low score. A topic missing any dimension '
-  + 'produces no severity and no materiality conclusion at all — it is reported as unfinished, '
-  + 'naming what is absent. What cannot be seen is a finding in its own right, and section 10 '
-  + 'returns to it.'
+  + 'shown here as exactly that, and it is never counted as a low score. Where a dimension was '
+  + 'simply not scored, that is shown as what it is — an unfinished determination, not a judgement '
+  + 'about what can be seen. The two are never merged. A topic missing any dimension, for either '
+  + 'reason, produces no severity and no materiality conclusion at all — it is reported as '
+  + 'unfinished, naming what is absent and why. What cannot be seen is a finding in its own right, '
+  + 'and section 10 returns to it.'
 
 export const DIFFERENCES_HEADING = 'Where the two views differ'
 
@@ -881,9 +886,11 @@ export const WHY_THIS_MATTERS: { title: string; body: string }[] = [
   {
     title: 'What the organisation cannot yet see',
     body:
-      'Every dimension recorded as "not enough visibility" is a topic the organisation does not '
-      + 'currently have the information to judge. That is a finding about the organisation, not a '
-      + 'gap in the survey, and it points directly at where data collection is missing.',
+      'Every dimension an assessor recorded as "not enough visibility" is a topic the organisation '
+      + 'does not currently have the information to judge. That is a finding about the '
+      + 'organisation, not a gap in the survey, and it points directly at where data collection is '
+      + 'missing. A dimension left unscored is not this finding — it is work not yet done, and it '
+      + 'is reported separately for that reason.',
   },
   {
     title: 'Where the inside and the outside disagree',
@@ -991,7 +998,8 @@ function judge(subtopics: RegisterSubTopic[]): Judged[] {
         // unfinished, naming what is absent" — and dropping the row made it unrepresentable.
         rows.push({
           direction, determined: false, nature: null, material: null, complete: false,
-          severity: null, rule: null, basis: [], values: null, abstained: [], drivers: [],
+          severity: null, rule: null, basis: [], values: null, abstained: [], unscored: [],
+          drivers: [],
         })
         continue
       }
@@ -1005,6 +1013,7 @@ function judge(subtopics: RegisterSubTopic[]): Judged[] {
         scope: det.scope,
         irremediability: det.irremediability ?? null,
         likelihood: det.likelihood ?? null,
+        abstained: det.abstained_dimensions ?? null,
       })
 
       rows.push({
@@ -1017,8 +1026,13 @@ function judge(subtopics: RegisterSubTopic[]): Judged[] {
         rule: r.rule,
         basis: r.basis,
         values: r.complete ? r.values : null,
-        // ⚠️ The dimensions nobody could judge, named. Never folded into the figure, never a zero.
-        abstained: r.missing,
+        // ⚠️ NO LONGER A RENAME, AND THAT RENAME WAS THE BUG. This read `abstained: r.missing`
+        // until 27 Aug 2026 — every null dimension, whatever its cause, printed as an abstention
+        // the assessor had "recorded". computeSeverity now returns the two separately and this
+        // passes both through unchanged. Never fold them back into one field: ABSTENTION_NOTE and
+        // section 12's prose both draw a conclusion from the abstained list ALONE.
+        abstained: r.abstained,
+        unscored: r.unscored,
         drivers: r.complete ? driversFor(r.rule, r.basis, r.values) : [],
       })
     }

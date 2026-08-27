@@ -355,7 +355,7 @@ describe('an unscored direction has no conclusion, and never reaches carried_by'
     expect(positive?.complete).toBe(false)
     expect(positive?.material).toBeNull()
     expect(positive?.severity).toBeNull()
-    expect(positive?.missing).toEqual(['scale'])
+    expect(positive?.unscored).toEqual(['scale'])
 
     // ⚠️ THE ASSERTION THIS DESCRIBE EXISTS FOR. A null must never be counted as a carrier, and
     // must never be counted as a "not material" either.

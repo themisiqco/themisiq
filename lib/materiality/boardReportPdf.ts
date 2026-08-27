@@ -310,9 +310,15 @@ const assessmentBlock = (l: Layout, row: AssessmentRow): void => {
       continue
     }
     if (!d.complete) {
-      // ⚠️ AN ABSTENTION, SAID AS ONE. Never a zero, never a low, never an empty cell that reads
-      // like a score of nothing.
-      lines.push(`${label}: not enough visibility to judge ${d.abstained.join(', ')} — no severity`)
+      // ⚠️ TWO CAUSES, TWO SENTENCES, AND ONE ROW MAY CARRY BOTH. An abstention is a recorded
+      // answer under §6.1 — never a zero, never a low, never an empty cell that reads like a score
+      // of nothing. An unscored dimension is an unfinished worksheet, which is a fact about the
+      // work and not about what the organisation can see. One sentence for both told a reader the
+      // assessor had declined a question they had simply not reached.
+      const parts: string[] = []
+      if (d.abstained.length > 0) parts.push(`not enough visibility to judge ${d.abstained.join(', ')}`)
+      if (d.unscored.length > 0) parts.push(`${d.unscored.join(', ')} not yet scored`)
+      lines.push(`${label}: ${parts.join(' · ')} — no severity`)
       continue
     }
     const drivers = d.drivers.length ? ` · carried by ${d.drivers.join(', ')}` : ''

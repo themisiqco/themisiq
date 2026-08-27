@@ -111,6 +111,14 @@ export type Determination = {
   /** Ignored by computeSeverity when direction is 'positive' (¶41). */
   irremediability?: number | null
   likelihood?: number | null
+  /**
+   * materiality_impact_determinations.abstained_dimensions, as stored. Passed to computeSeverity,
+   * which narrows it against the basis.
+   * ⚠️ THIS TYPE CLAIMS TO MIRROR THE TABLE AND DID NOT. The column has existed since 20260841 and
+   * was absent here, so the abstention was dropped before severity ever saw it — which is what let
+   * the board report claim an abstention nobody had recorded. Added 27 Aug 2026.
+   */
+  abstained_dimensions?: readonly string[] | null
 }
 
 /** Mirrors the results page's SubTopic, plus the category and the determinations. */
@@ -396,6 +404,7 @@ export function rollUpDeterminations(subtopics: RegisterSubTopic[]): Map<string,
         scope: row.scope,
         irremediability: row.irremediability ?? null,
         likelihood: row.likelihood ?? null,
+        abstained: row.abstained_dimensions ?? null,
       })
       // ⚠️ `result.complete &&` IS THE LOAD-BEARING HALF; `=== true` IS BELT AND BRACES.
       // severity.ts returns { complete: false, material: null } together, so the guard already
@@ -462,8 +471,10 @@ export type DirectionOutcome = {
   severity: number | null
   rule: SeverityRule | null
   basis: Dimension[]
-  /** Dimensions not scored. Empty when complete. */
-  missing: Dimension[]
+  /** Dimensions the determiner DECLINED to judge (§6.1). Empty when complete. */
+  abstained: Dimension[]
+  /** Dimensions nobody reached — no value, no abstention. Empty when complete. */
+  unscored: Dimension[]
 }
 
 export type RegisterEntry = {
@@ -727,6 +738,7 @@ export function buildRegister(input: RegisterInput): DivergenceRegister {
         scope: row.scope,
         irremediability: row.irremediability ?? null,
         likelihood: row.likelihood ?? null,
+        abstained: row.abstained_dimensions ?? null,
       })
       return { row, result }
     })
@@ -739,7 +751,8 @@ export function buildRegister(input: RegisterInput): DivergenceRegister {
       severity: r.result.severity,
       rule: r.result.rule,
       basis: r.result.basis,
-      missing: r.result.missing,
+      abstained: r.result.abstained,
+      unscored: r.result.unscored,
     }))
 
     // ⚠️ material === true, not a truthiness test: `material` is null on an incomplete direction.
@@ -787,7 +800,21 @@ export function buildRegister(input: RegisterInput): DivergenceRegister {
         omit(
           'determination_incomplete',
           incomplete
-            .map(r => `${r.row.direction}: ${r.result.missing.join(', ')} not scored`)
+            // ⚠️ THE TWO CAUSES READ DIFFERENTLY BECAUSE THEY ARE DIFFERENT FINDINGS. This said
+            // "not scored" for both — accurate for a dimension nobody reached, false for one the
+            // determiner declined, because an abstention IS a recorded answer under §6.1. Same
+            // error the board report made, in the other document; the two move together or they
+            // describe one determination two ways.
+            .map(r => {
+              const parts: string[] = []
+              if (r.result.abstained.length > 0) {
+                parts.push(`${r.result.abstained.join(', ')} recorded as not enough visibility`)
+              }
+              if (r.result.unscored.length > 0) {
+                parts.push(`${r.result.unscored.join(', ')} not scored`)
+              }
+              return `${r.row.direction}: ${parts.join('; ')}`
+            })
             .join('; '),
         )
         continue
