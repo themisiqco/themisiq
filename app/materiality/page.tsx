@@ -523,8 +523,16 @@ export default function Page() {
               </div>
             ))}
           </div>
+          {/* ⚠️ THIS QUOTES A SECTION NAME AND IS THE THIRTEENTH COPY OF ONE. It missed the
+              27 Aug 2026 heading rename by a single paragraph — the list above was updated and this
+              sentence still named "What this tells you, beyond compliance" while the list said
+              "Implications". If a *_HEADING constant moves, this sentence moves with the list.
+              ⚠️ AND THE SENTENCE NOW CARRIES WHAT THE OLD TITLE CARRIED. "What this tells you,
+              beyond compliance" explained itself — the words "beyond compliance" were in it. The
+              new title does not, so "what the exercise is worth when nobody is making you do it" is
+              doing that work alone. It always did it better than the title; do not trim it. */}
           <p style={bodyPara}>
-            The last of those, <em>What this tells you, beyond compliance</em>, is the section to read if you want to know what the exercise is worth when nobody is making you do it: where attention is, and where it is not; what the organisation cannot yet see; where the inside and the outside disagree; and what follows from a material topic.
+            The last of those, <em>Implications</em>, is the section to read if you want to know what the exercise is worth when nobody is making you do it: where attention is, and where it is not; what the organisation cannot yet see; where the inside and the outside disagree; and what follows from a material topic.
           </p>
           <p style={bodyPara}>Two more things come out of the same work:</p>
           <p style={bodyPara}>
