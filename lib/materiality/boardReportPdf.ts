@@ -24,6 +24,30 @@
  *   doc.save(`ThemisIQ_MaterialityAssessmentReport_${(report.cover.company_name || 'Company').replace(/\s+/g, '_')}.pdf`)
  *
  * which keeps assurancePdf.ts's naming shape without keeping its side effect.
+ *
+ * =====================================================================
+ * ⚠️ THE PRINTED SECTION NUMBERS ARE AUTHORITATIVE. THE COMMENTS ARE NOT.
+ * =====================================================================
+ * From 27 Aug 2026 every section prints its number ("3. Who took part") and the contents page on
+ * page 2 lists all twelve with the page each starts on. Those numbers come from ONE place — the
+ * section() helper in generateBoardReportPDF, counting in render order — so they cannot drift from
+ * the document they describe.
+ *
+ * THE COMMENTS IN THIS FILE AND IN boardReport.ts, register.ts AND THE TESTS USE AN OLDER SCHEME,
+ * roughly fifty sites, in which polarisation and contrast are sub-sections 5b and 5c and the
+ * roadmap is 6b — so it runs to 10 where the printed numbering runs to 12. It also contradicts
+ * itself: :251 below calls the assessment "section 6" and :306, inside that same block, calls it
+ * "section 9".
+ *
+ * WHEN A COMMENT AND A PRINTED NUMBER DISAGREE, THE PRINTED NUMBER IS RIGHT. Renumbering the
+ * comments is a separate sweep, deliberately not done here: it would have buried the two
+ * customer-facing corrections that shipped with this change — ABSTENTION_NOTE's "section 10" and
+ * the roadmap note's "section 3", both wrong under the printed scheme and both read by a board.
+ *
+ * ⚠️ AND ONE COMMENT IS NOW WRONG ABOUT A PAGE, NOT A SECTION. boardReport.ts:260 says "PAGE 3 IS
+ * THE PAGE A BOARD REMEMBERS", written when findings landed on physical page 3. The contents page
+ * takes page 2, so findings is page 4 now. The claim is about the first page of argument, which is
+ * still findings; only the number moved.
  */
 
 import type jsPDF from 'jspdf'
@@ -120,6 +144,139 @@ const sectionPage = (l: Layout, opts: { continueIfRoom?: number } = {}): void =>
     return
   }
   l.newPage()
+}
+
+/**
+ * ── THE CONTENTS PAGE ───────────────────────────────────────────────────────────────────────────
+ * Metrics in ONE place, because the measure and the draw must not disagree: contentsHeightPages
+ * decides how many pages to reserve before the body exists, and contentsFill draws into exactly
+ * that space afterwards. Two copies of a line height is two answers to "does it fit".
+ */
+const TOC = {
+  size: 11,
+  lead: 20,
+  /** Left column for the section number, right column for the page number. Fixed, so a wrapped
+   *  title cannot push a page number out of alignment. */
+  numberColumn: 26,
+  pageColumn: 32,
+  above: 14,
+  /** heading level 1: above + size*1.3 + below, from layout.ts's HEADING table. */
+  headingBlock: 26 + 20 * 1.3 + 12,
+} as const
+
+/**
+ * The twelve section titles, in render order — the contents' input and the reservation's basis.
+ *
+ * ⚠️ EXPORTED SO A TEST CAN COUNT THEM. This list and the twelve section() calls in
+ * generateBoardReportPDF are two statements of the same fact, and nothing but a test holds them
+ * together: a section added to the render without an entry here would be measured out of the
+ * reservation, and an entry here without a section() call would reserve room for a line nobody
+ * draws. generateBoardReportPDF asserts the two agree at render time; boardReport.test.ts asserts
+ * the count is twelve.
+ */
+export const sectionTitles = (report: BoardReport): string[] => [
+  report.whatThisIs.heading, report.findings.heading, report.participation.heading,
+  report.stakeholderView.heading, report.polarisation.heading, report.contrast.heading,
+  report.assessmentView.heading, report.roadmap.heading, report.differences.heading,
+  report.methodology.heading, report.limitations.heading, report.whyThisMatters.heading,
+]
+
+/**
+ * How many pages the contents needs, from the titles alone.
+ *
+ * ⚠️ MEASURED BEFORE THE BODY EXISTS, WHICH IS WHAT MAKES THE RESERVATION SAFE. It depends on the
+ * titles and the page geometry only — never on the page numbers, which sit right-aligned in a fixed
+ * column and cannot change a line count. If this were computed after the body, the reservation
+ * would already be the wrong size.
+ */
+const contentsHeightPages = (l: Layout, titles: string[]): number => {
+  const usable = l.pageHeight - MARGIN.top - MARGIN.bottom
+  const textWidth = l.contentWidth - TOC.numberColumn - TOC.pageColumn
+  setType(l.doc, TOC.size, 'normal', INK)
+  const lines = titles.reduce(
+    (n, tt) => n + (l.doc.splitTextToSize(tt, textWidth) as string[]).length, 0)
+  return Math.max(1, Math.ceil((TOC.headingBlock + TOC.above + lines * TOC.lead) / usable))
+}
+
+/**
+ * Draw the contents into the pages reserved for it.
+ *
+ * ⚠️ DIRECT doc CALLS WITH setPage, NOT THE LAYOUT CURSOR — the same shape as the footer loop at
+ * the foot of this file, and for the same reason: the layout's cursor belongs to the sequential
+ * body render, and setPage does not move it.
+ *
+ * ⚠️ THROWS RATHER THAN SPILL, AND THE ASYMMETRY IS THE POINT. If this needed a page the
+ * reservation did not claim, it would run into the body and every page number it had already
+ * printed would be one too low — a contents page that looks entirely correct and sends a reader to
+ * the wrong page. A throw reaches the caller as "The paper could not be assembled, and nothing was
+ * downloaded", which is recoverable. A wrong number is not, because nothing about it looks wrong.
+ */
+const contentsFill = (
+  l: Layout,
+  entries: { n: number; title: string; page: number }[],
+  firstPage: number,
+  pageCount: number,
+): void => {
+  const doc = l.doc
+  const textWidth = l.contentWidth - TOC.numberColumn - TOC.pageColumn
+  const bottom = l.pageHeight - MARGIN.bottom
+  let page = firstPage
+  doc.setPage(page)
+
+  setType(doc, 20, 'normal', INK)
+  let y = MARGIN.top + 26 + 20
+  doc.text('Contents', MARGIN.left, y)
+  y += 12 + TOC.above
+
+  for (const e of entries) {
+    const lines = (() => {
+      setType(doc, TOC.size, 'normal', INK)
+      return doc.splitTextToSize(e.title, textWidth) as string[]
+    })()
+
+    if (y + lines.length * TOC.lead > bottom) {
+      page += 1
+      if (page >= firstPage + pageCount) {
+        throw new Error(
+          `The contents needs more than the ${pageCount} page(s) reserved for it. The reservation ` +
+          `is measured from the same titles before the body is drawn, so this means the measure ` +
+          `and the draw have come apart — see TOC in lib/materiality/boardReportPdf.ts. Nothing ` +
+          `was produced: a contents page drawn past its reservation would print page numbers that ` +
+          `are all one too low, and would look correct.`,
+        )
+      }
+      doc.setPage(page)
+      y = MARGIN.top + TOC.size
+    }
+
+    setType(doc, TOC.size, 'normal', MUTED)
+    doc.text(String(e.n), MARGIN.left, y)
+
+    setType(doc, TOC.size, 'normal', INK)
+    doc.text(lines, MARGIN.left + TOC.numberColumn, y)
+
+    const pageLabel = String(e.page)
+    setType(doc, TOC.size, 'normal', INK)
+    const pageX = l.pageWidth - MARGIN.right - doc.getTextWidth(pageLabel)
+    doc.text(pageLabel, pageX, y)
+
+    // ⚠️ LEADERS ON THE LAST LINE OF THE TITLE, so a wrapped title's dots run from where the words
+    // actually stop rather than from the width of the column.
+    const lastLineWidth = (() => {
+      setType(doc, TOC.size, 'normal', INK)
+      return doc.getTextWidth(lines[lines.length - 1])
+    })()
+    const leaderStart = MARGIN.left + TOC.numberColumn + lastLineWidth + 6
+    const leaderEnd = pageX - 6
+    if (leaderEnd > leaderStart) {
+      setType(doc, TOC.size, 'normal', MUTED)
+      const dotWidth = doc.getTextWidth('·  ')
+      const dots = '·  '.repeat(Math.max(0, Math.floor((leaderEnd - leaderStart) / dotWidth)))
+      if (dots) doc.text(dots, leaderStart, y + (lines.length - 1) * TOC.lead)
+    }
+
+    y += lines.length * TOC.lead
+  }
 }
 
 // ── section 5: the distributions ─────────────────────────────────────────────────────────────────
@@ -569,14 +726,55 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
     coverNote: report.cover.cover_note,
   })
 
+  /**
+   * ⚠️ PAGE 2 IS CLAIMED HERE AND DRAWN LAST. jsPDF renders sequentially, so the contents cannot
+   * know a page number until the body has been laid out. The page is reserved now, the body records
+   * where each section landed as it goes, and setPage() fills it at the end — the same machinery
+   * the footer loop has always used to stamp "n of total" after the fact.
+   *
+   * NOT A TWO-PASS RENDER: createLayout() registers Charis into THIS document's virtual filesystem
+   * (see layout.ts's note), so rendering the body twice means paying font registration twice and
+   * holding two documents open to produce one.
+   *
+   * ⚠️ THE RESERVATION IS MEASURED, NOT ASSUMED, AND THAT IS THE WHOLE SAFETY ARGUMENT. If the
+   * contents ever needed more room than was reserved, drawing it would run into page 3 — which
+   * holds the body — and EVERY page number printed on it would be one too low, silently. So the
+   * height is computed from the same twelve titles that will be drawn, BEFORE the body exists, and
+   * enough pages are claimed for it. contentsFill re-checks and throws rather than spill.
+   */
+  const TITLES = sectionTitles(report)
+  const contentsFirstPage = l.page()
+  const contentsPageCount = contentsHeightPages(l, TITLES)
+  for (let i = 0; i < contentsPageCount; i++) l.newPage()
+
+  /**
+   * Where each section landed, filled by section() as the body renders.
+   *
+   * ⚠️ RECORDED AFTER l.heading(), NEVER BEFORE. heading() calls ensure(), which breaks to a new
+   * page rather than orphan a heading at the foot of one — so the page a section STARTS on is only
+   * known once its heading has been drawn. Recording first would put a section on page 12 in the
+   * contents while it prints on 13, and only on the documents where a heading happened to fall
+   * near a page boundary.
+   */
+  const contents: { n: number; title: string; page: number }[] = []
+  let sectionNo = 0
+  const section = (title: string, level: 1 | 2 = 1): void => {
+    sectionNo += 1
+    l.heading(`${sectionNo}. ${title}`, level)
+    contents.push({ n: sectionNo, title, page: l.page() })
+  }
+
   // The cover carries the title and the "for information" line; repeating them here would be the
-  // second copy. Printed once, at the head of the paper proper.
+  // second copy. Printed once, at the head of the paper proper. UNNUMBERED: it is a running head,
+  // not a section, and numbering it would make the twelve thirteen.
   l.heading(report.cover.title, 1)
   l.lead(report.cover.kind)
   l.rule()
 
   // ── 2 · WHAT THIS IS ─────────────────────────────────────────────────────────────────────────
-  l.heading(report.whatThisIs.heading, 2)
+  // ⚠️ LEVEL 2 AND NUMBERED. It shares the running-head page rather than owning one — the only
+  // section that does — but it is section 1 of twelve and the contents must point at it.
+  section(report.whatThisIs.heading, 2)
   report.whatThisIs.paragraphs.forEach((p, i) => (i === 0 ? l.lead(p) : l.body(p)))
 
   // ── 3 · FINDINGS ─────────────────────────────────────────────────────────────────────────────
@@ -584,7 +782,7 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
   // carries out of the room. A dense page of them reads as a table to be checked later; three
   // figures with air around them read as the finding they are.
   sectionPage(l)
-  l.heading(report.findings.heading, 1)
+  section(report.findings.heading)
   l.spacer(10)
 
   const figures: [number, string, string][] = [
@@ -656,7 +854,7 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
 
   // ── 4 · PARTICIPATION ────────────────────────────────────────────────────────────────────────
   sectionPage(l)
-  l.heading(report.participation.heading, 1)
+  section(report.participation.heading)
   l.spacer(6)
 
   const rows: [string, number, number, number][] = [
@@ -697,7 +895,7 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
 
   // ── 5 · WHAT STAKEHOLDERS SAID ───────────────────────────────────────────────────────────────
   sectionPage(l)
-  l.heading(report.stakeholderView.heading, 1)
+  section(report.stakeholderView.heading)
   // ⚠️ THE LEGEND STAYS ABOVE; THE JUSTIFICATION MOVES BELOW. scale_note says what bands 1, 2 and 3
   // MEAN — without it the first chart is unreadable, so it is not method, it is the key. The
   // no-average explanation is an argument for a choice already made, and it now sits in section 8
@@ -726,7 +924,7 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
 
   // ── 5b · WHERE YOUR OWN PEOPLE DISAGREE ──────────────────────────────────────────────────────
   sectionPage(l)
-  l.heading(report.polarisation.heading, 1)
+  section(report.polarisation.heading)
   if (report.polarisation.rows.length === 0) {
     // A result, not an empty state.
     l.body(report.polarisation.none_note)
@@ -739,7 +937,7 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
 
   // ── 5c · INSIDE AND OUTSIDE ──────────────────────────────────────────────────────────────────
   sectionPage(l)
-  l.heading(report.contrast.heading, 1)
+  section(report.contrast.heading)
 
   if (report.contrast.unavailable_note) {
     l.body(report.contrast.unavailable_note)
@@ -783,7 +981,7 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
 
   // ── 6 · WHAT THE ASSESSMENT CONCLUDED ────────────────────────────────────────────────────────
   sectionPage(l)
-  l.heading(report.assessmentView.heading, 1)
+  section(report.assessmentView.heading)
   // Above the rows, so it is read before the first marked one rather than after the last.
   if (report.assessmentView.attribution_note) l.body(report.assessmentView.attribution_note)
   for (const row of report.assessmentView.rows) assessmentBlock(l, row)
@@ -795,7 +993,7 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
 
   // ── 6b · WHAT BECOMES DISCLOSABLE ────────────────────────────────────────────────────────────
   sectionPage(l)
-  l.heading(report.roadmap.heading, 1)
+  section(report.roadmap.heading)
   l.body(report.roadmap.what_this_is)
   l.body(report.roadmap.what_this_is_not)
   if (report.roadmap.resolved_note) l.body(report.roadmap.resolved_note)
@@ -804,7 +1002,7 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
 
   // ── 7 · WHERE THE TWO VIEWS DIFFER ───────────────────────────────────────────────────────────
   sectionPage(l)
-  l.heading(report.differences.heading, 1)
+  section(report.differences.heading)
 
   // ⚠️ what_this_is_not IS NOT RENDERED. It is written for a developer deciding what to merge and
   // it uses the word "divergence", which reads to a customer as a finding against them. The same
@@ -858,7 +1056,7 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
 
   // ── 8 · METHODOLOGY ──────────────────────────────────────────────────────────────────────────
   sectionPage(l)
-  l.heading(report.methodology.heading, 1)
+  section(report.methodology.heading)
 
   for (const p of report.methodology.provisions) {
     // ⚠️ NOT SUMMARISED. These were written for a verifier, who will look the reference up and
@@ -895,7 +1093,7 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
   // frank about what it does not cover is the reason a reader can trust what it does. Set at body
   // size in ink — the same size as the findings.
   sectionPage(l)
-  l.heading(report.limitations.heading, 1)
+  section(report.limitations.heading)
   for (const item of report.limitations.items) l.body(item)
 
   l.rule()
@@ -904,7 +1102,7 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
 
   // ── 10 · WHY THIS MATTERS ────────────────────────────────────────────────────────────────────
   sectionPage(l, { continueIfRoom: 320 })
-  l.heading(report.whyThisMatters.heading, 1)
+  section(report.whyThisMatters.heading)
   // ⚠️ AHEAD OF THE ITEMS AND OUTSIDE THE keepTogether LOOP — see MATERIAL_VIA_IRO_NOTE. The items
   // are four fixed reflections; this is a statement about THIS paper, and rendering it as a fifth
   // title-and-body would make the two indistinguishable.
@@ -1022,6 +1220,24 @@ export function generateBoardReportPDF(report: BoardReport): jsPDF {
   // company and the assessment on every page — this report circulates detached from its cover,
   // and a page found on its own has to say what it belongs to. Same position, same muted grey
   // (4.83:1 on paper), same size.
+  /**
+   * ⚠️ THE TWO STATEMENTS OF THE SAME FACT, CHECKED AGAINST EACH OTHER BEFORE ANYTHING IS DRAWN.
+   * sectionTitles() is what the reservation was measured from; `contents` is what the body actually
+   * rendered. They are twelve and twelve today, and nothing in the type system holds them together
+   * — a section added to the render without an entry in that list, or the reverse, is exactly the
+   * drift that produced the two numbering schemes this change had to choose between.
+   */
+  if (contents.length !== TITLES.length) {
+    throw new Error(
+      `The contents lists ${TITLES.length} sections and the document rendered ${contents.length}. ` +
+      `sectionTitles() in lib/materiality/boardReportPdf.ts and the section() calls in this ` +
+      `function are two statements of one fact and have come apart. Nothing was produced: a ` +
+      `contents page missing a section, or reserving room for one that does not exist, is a paper ` +
+      `whose numbering cannot be trusted.`,
+    )
+  }
+  contentsFill(l, contents, contentsFirstPage, contentsPageCount)
+
   const total = doc.getNumberOfPages()
   const stamp = [report.cover.company_name, report.cover.assessment_name]
     .filter(Boolean).join(' · ')

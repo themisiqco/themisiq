@@ -725,7 +725,12 @@ export const ABSTENTION_NOTE =
   + 'about what can be seen. The two are never merged. A topic missing any dimension, for either '
   + 'reason, produces no severity and no materiality conclusion at all — it is reported as '
   + 'unfinished, naming what is absent and why. What cannot be seen is a finding in its own right, '
-  + 'and section 10 returns to it.'
+  // ⚠️ SECTION 12, NOT 10. This read "section 10" under the numbering the code comments use, in
+  // which polarisation and contrast are sub-sections 5b/5c and the roadmap is 6b. The PRINTED
+  // numbering — the one a reader can verify by counting headings, and the one the contents page on
+  // page 2 prints — makes "What this tells you, beyond compliance" section 12. Corrected 27 Aug
+  // 2026, when the numbers began to print and a wrong one became visible.
+  + 'and section 12 returns to it.'
 
 export const DIFFERENCES_HEADING = 'Where the two views differ'
 
@@ -918,7 +923,9 @@ export const WHY_THIS_MATTERS: { title: string; body: string }[] = [
     body:
       'A topic determined material becomes a disclosure obligation. Each obligation becomes data '
       + 'that has to be collected, at a quality that can be assured, by people whose time is '
-      + 'budgeted. The list of material topics in section 3 is therefore also the earliest view '
+      // ⚠️ SECTION 2, NOT 3 — "What we found" carries the material topics. Same correction as
+      // ABSTENTION_NOTE's, same cause: the comment scheme and the printed scheme differ.
+      + 'budgeted. The list of material topics in section 2 is therefore also the earliest view '
       + 'you have of next year’s reporting workload.',
   },
 ]

@@ -25,6 +25,7 @@ import {
   buildBoardReport,
   ATTRIBUTION_NOTE, FINDINGS_DEFINITIONS, KIND, LIMITATIONS, MATERIAL_VIA_IRO_NOTE,
   NEVER_ASKED_NOTE, NOT_CLAIMED, NO_MEAN_NOTE, TITLE,
+  WHAT_THIS_IS_HEADING, WHY_HEADING,
   standardVersionLabel,
   type BoardReport, type BoardReportInput, type ThresholdRow,
 } from './boardReport'
@@ -32,6 +33,7 @@ import {
   buildRegister, SUBMITTED_STATUS,
   type Determination, type Overall, type RegisterSubTopic, type TopBox,
 } from './register'
+import { generateBoardReportPDF, sectionTitles } from './boardReportPdf'
 
 const THRESHOLD = 0.50
 const DENOM = 12
@@ -1042,5 +1044,53 @@ describe('the disjunction roll-up', () => {
       expect(after.topics_material).toBeGreaterThanOrEqual(before.topics_material)
       expect(after.topics_assessed).toBeGreaterThanOrEqual(before.topics_assessed)
     }
+  })
+})
+
+
+/**
+ * ⚠️ THE GAP NEITHER THE MEASURE NOR THE THROW CAN CLOSE.
+ * boardReportPdf.ts states the twelve sections TWICE: once in sectionTitles(), which the contents
+ * page is measured and reserved from, and once as twelve section() calls in render order. Nothing
+ * in the type system ties them together. A thirteenth section added to the render without an entry
+ * in the list, or an entry added without a call, is the same drift class as the two numbering
+ * schemes that had to be reconciled on 27 Aug 2026 — a fact stated in two places, kept in step by
+ * nobody.
+ *
+ * The renderer asserts the two agree at render time. These tests hold the count itself, from both
+ * ends: the list is twelve, and rendering the real fixture — which exercises that assertion — does
+ * not throw.
+ */
+describe('the contents page and the sections it lists', () => {
+  // Own fixture: FIXTURE above is scoped to its own describe. One material sub-topic is enough —
+  // every section renders regardless of what is in it, which is the property under test.
+  const PAPER: RegisterSubTopic[] = [
+    sub({ subtopic_code: 'E1.1', overall: overall(ABOVE),
+          determinations: [MATERIAL_NEG(), IMMATERIAL_POS()] }),
+  ]
+
+  it('sectionTitles lists exactly the twelve sections the paper promises', () => {
+    const titles = sectionTitles(report(PAPER))
+    expect(titles).toHaveLength(12)
+    // In render order, and these are the twelve /materiality's "What you get" list publishes.
+    expect(titles[0]).toBe(WHAT_THIS_IS_HEADING)
+    expect(titles[11]).toBe(WHY_HEADING)
+    // No blanks: an empty title reserves a line and prints nothing.
+    expect(titles.every(x => x.trim().length > 0)).toBe(true)
+  })
+
+  it('rendering the paper does not throw — the list and the section() calls agree', () => {
+    // ⚠️ THIS IS THE ASSERTION THAT MATTERS, and it is indirect on purpose: generateBoardReportPDF
+    // throws when contents.length !== sectionTitles().length, so a passing render IS the proof
+    // that twelve entries were recorded for twelve reserved lines. It also exercises the contents
+    // reservation end to end — measure, reserve, render, fill — which no pure test can.
+    expect(() => generateBoardReportPDF(report(PAPER))).not.toThrow()
+  })
+
+  it('the rendered document has a cover, a contents page and a body', () => {
+    const doc = generateBoardReportPDF(report(PAPER))
+    // Page 1 cover, page 2 contents, and a body after it. The exact total moves with the fixture;
+    // what must hold is that the contents did not eat the body or vice versa.
+    expect(doc.getNumberOfPages()).toBeGreaterThan(2)
   })
 })
