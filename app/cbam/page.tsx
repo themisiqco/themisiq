@@ -29,7 +29,7 @@ export default function Page() {
               The CBAM definitive regime is live.<br />
               <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Don’t let default values price you out.</span>
             </h1>
-            <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 300, marginBottom: '2rem', maxWidth: 480 }}>
+            <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem', maxWidth: 480 }}>
               Your EU customer declares a number for your goods either way. Without yours, they use the published default for your country — set conservatively, and increased by a mark-up of 10% in 2026, rising to 30% by 2028. ThemisIQ computes installation-level actuals under the definitive-period rules, and builds the summary your customer needs.
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
@@ -56,7 +56,7 @@ export default function Page() {
               <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid ${color}22` }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '2.2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color, marginTop: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{unit}</div>
-                <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 300, lineHeight: 1.4 }}>{label}</div>
+                <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{label}</div>
               </div>
             ))}
           </div>
@@ -81,7 +81,7 @@ export default function Page() {
           ].map(({ title, desc }) => (
             <div key={title} style={{ background: '#fff', padding: '2rem' }}>
               <div style={{ fontSize: 16, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 300 }}>{desc}</div>
+              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
             </div>
           ))}
         </div>
@@ -95,10 +95,10 @@ export default function Page() {
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
               What computes today.
             </h2>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
               From setup to a verifier&apos;s inbox. Enter your installation and its production processes, record the fuels and materials each process consumes, declare any CBAM precursors that go into your goods, and the module calculates the specific embedded emissions per tonne. It then builds the Annex IV §1.2 emissions summary your customer needs, as a downloadable spreadsheet, and gives you a secure read-only link to send your verifier.
             </p>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
               Available now: iron and steel (CN 72–73) and aluminium (CN 76). More CBAM sectors — cement, fertilisers, and hydrogen — are in active development. We show you what is live so you always know exactly what the module computes.
             </p>
           </div>
@@ -122,7 +122,7 @@ export default function Page() {
             {['Cement', 'Fertilisers', 'Hydrogen'].map(sector => (
               <div key={sector} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#888784', flexShrink: 0, marginTop: 5 }} />
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 300 }}>{sector}</div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 400 }}>{sector}</div>
               </div>
             ))}
           </div>
@@ -172,7 +172,7 @@ export default function Page() {
           Your EU customer will declare a number for your goods.<br />
           <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Make it yours.</span>
         </h2>
-        <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
           ThemisIQ computes installation-level actuals under the definitive-period rules, and builds the Annex IV §1.2 summary your EU customer carries into their CBAM declaration.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
@@ -195,4 +195,4 @@ const btnPrimary: React.CSSProperties = { fontSize: 14, fontWeight: 500, padding
 const btnSecondary: React.CSSProperties = { fontSize: 14, fontWeight: 400, padding: '13px 22px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', display: 'inline-block' }
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
 const sectionTitle: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }
-const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, margin: '0 auto', lineHeight: 1.75, fontWeight: 300 }
+const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, margin: '0 auto', lineHeight: 1.75, fontWeight: 400 }

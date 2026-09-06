@@ -26,7 +26,7 @@ export default function Page() {
               Cyber Governance &<br />
               <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Resilience</span>
             </h1>
-            <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 300, marginBottom: '2rem', maxWidth: 480 }}>
+            <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem', maxWidth: 480 }}>
               NIS2, DORA, SEC cyber disclosure, ISO 27001, and NIST CSF — all in one platform. Cyber risk registers, policy management, incident workflows, vendor reviews, and board-level reporting.
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
@@ -52,7 +52,7 @@ export default function Page() {
               <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid ${color}22` }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color, marginTop: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{unit}</div>
-                <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 300, lineHeight: 1.4 }}>{label}</div>
+                <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{label}</div>
               </div>
             ))}
           </div>
@@ -93,11 +93,11 @@ export default function Page() {
               <div key={name} style={{ background: 'rgba(255,255,255,0.04)', padding: '2rem', borderTop: `3px solid ${color}` }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', marginBottom: 4 }}>{name}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color, marginBottom: 12, background: `${color}22`, padding: '2px 8px', borderRadius: 99, display: 'inline-block' }}>{active}</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5, marginBottom: 16, fontWeight: 300 }}>{who}</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>{who}</div>
                 {key.map((item, i) => (
                   <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                     <span style={{ color, flexShrink: 0, marginTop: 1 }}>→</span>
-                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: 300, lineHeight: 1.5 }}>{item}</span>
+                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: 400, lineHeight: 1.5 }}>{item}</span>
                   </div>
                 ))}
               </div>
@@ -124,7 +124,7 @@ export default function Page() {
             <div key={title} style={{ background: '#fff', padding: '2rem' }}>
               
               <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 300 }}>{desc}</div>
+              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
             </div>
           ))}
         </div>
@@ -136,7 +136,7 @@ export default function Page() {
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
             <div style={eyebrow}>Incident notification timelines</div>
             <h2 style={sectionTitle}>The clock starts the moment you detect it.</h2>
-            <p style={{ fontSize: 15, color: '#555553', maxWidth: 540, margin: '0 auto', lineHeight: 1.75, fontWeight: 300 }}>ThemisIQ's incident response workflow triggers the right notification at the right time — so you never miss a regulatory deadline under pressure.</p>
+            <p style={{ fontSize: 15, color: '#555553', maxWidth: 540, margin: '0 auto', lineHeight: 1.75, fontWeight: 400 }}>ThemisIQ's incident response workflow triggers the right notification at the right time — so you never miss a regulatory deadline under pressure.</p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
             {[
@@ -148,7 +148,7 @@ export default function Page() {
               <div key={time} style={{ background: '#fff', padding: '2rem', borderTop: `4px solid ${color}` }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color, marginBottom: 4 }}>{time}</div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
-                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 300 }}>{desc}</div>
+                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{desc}</div>
               </div>
             ))}
           </div>
@@ -196,7 +196,7 @@ export default function Page() {
           NIS2 is active. DORA is active.<br />
           <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Are you compliant?</span>
         </h2>
-        <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
           ThemisIQ's cyber governance gap assessment identifies where you stand against NIS2, DORA, and SEC cyber rules — and tells you exactly what to fix first.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>

@@ -38,7 +38,7 @@ import type { SefaBenchmarkWorkings } from '../../../../lib/cbam/sefaCompute'
 
 // ── House style, matching app/dashboard/cbam/page.tsx ──
 const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
-const sectionSub: React.CSSProperties = { fontSize: 14, color: '#555553', fontWeight: 300, lineHeight: 1.7, marginBottom: '2rem' }
+const sectionSub: React.CSSProperties = { fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.7, marginBottom: '2rem' }
 const itemHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: '1.15rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }
 
 type AnyField = ReportField<unknown>
@@ -88,7 +88,7 @@ function FieldValue({ field, render }: { field: AnyField; render?: (v: never) =>
     return (
       <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#888784', background: '#f1f0ee', border: '0.5px solid #e8e7e4', borderRadius: 5, padding: '1px 7px' }}>Not applicable</span>
-        <span style={{ fontSize: 12, color: '#888784', fontStyle: 'italic', fontWeight: 300 }}>{field.reason}</span>
+        <span style={{ fontSize: 12, color: '#888784', fontStyle: 'italic', fontWeight: 400 }}>{field.reason}</span>
       </span>
     )
   }
@@ -125,7 +125,7 @@ function ItemSection({ n, title, children }: { n: string; title: string; childre
 
 // A muted note used where an optional Part-2 item is absent from the response.
 function AbsentPart2({ what }: { what: string }) {
-  return <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, fontStyle: 'italic' }}>{what} are not present in this report slice (no per-good computations returned).</div>
+  return <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, fontStyle: 'italic' }}>{what} are not present in this report slice (no per-good computations returned).</div>
 }
 
 export default function CbamReportPage() {
@@ -236,7 +236,7 @@ export default function CbamReportPage() {
           <div style={{ position: 'absolute', inset: 0, zIndex: 10, backdropFilter: 'blur(8px)', background: 'rgba(248,247,245,0.85)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ background: '#fff', borderRadius: 16, padding: '2.5rem', boxShadow: '0 8px 40px rgba(0,0,0,0.12)', border: '0.5px solid #e8e7e4', maxWidth: 480, textAlign: 'center' }}>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 8 }}>CBAM is a paid module.</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 300 }}>Generate the verifier-ready Annex IV §1.2 summary emissions report — with every field shown as a value, a reasoned N/A, or an outstanding to-do. Unlock the CBAM module to begin.</div>
+              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 400 }}>Generate the verifier-ready Annex IV §1.2 summary emissions report — with every field shown as a value, a reasoned N/A, or an outstanding to-do. Unlock the CBAM module to begin.</div>
               <button onClick={() => (window.location.href = '/pricing')} style={{ width: '100%', fontSize: 14, fontWeight: 600, padding: '14px 28px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d' }}>
                 Unlock CBAM →
               </button>
@@ -254,7 +254,7 @@ export default function CbamReportPage() {
         <div style={sectionHead}>CBAM §1.2 summary report</div>
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '2rem', marginTop: '1rem' }}>
           <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>No installations yet</div>
-          <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, fontWeight: 300 }}>
+          <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, fontWeight: 400 }}>
             A report covers one installation and reporting period, so you&rsquo;ll need to add an installation and its production processes first. You can do that in{' '}
             <a href="/dashboard/cbam/setup" style={{ color: '#7425e3', textDecoration: 'underline' }}>setup</a>, then come back here.
           </div>
@@ -340,7 +340,7 @@ export default function CbamReportPage() {
               <div style={{ fontSize: 13, fontWeight: 600, color: '#92400e', marginBottom: 4 }}>
                 {data.processesWithoutRecord.length} process{data.processesWithoutRecord.length === 1 ? '' : 'es'} not backed by a computed record
               </div>
-              <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, fontWeight: 300 }}>
+              <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, fontWeight: 400 }}>
                 This report is not fully backed by computed figures. Run compute for these processes so their emissions are calculated: {data.processesWithoutRecord.join(', ')}.
               </div>
             </div>
@@ -434,7 +434,7 @@ export default function CbamReportPage() {
           <ItemSection n="(12)" title="Precursors — default values used">
             {report.item12_defaultPrecursors
               ? (report.item12_defaultPrecursors.length === 0
-                  ? <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>No default-value precursors.</div>
+                  ? <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>No default-value precursors.</div>
                   : report.item12_defaultPrecursors.map((p, i) => (
                       <div key={p.cnCode + i} style={{ padding: '10px 0', borderBottom: '0.5px solid #f1f0ee' }}>
                         <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>(12)(a) CN {p.cnCode}</div>
@@ -449,7 +449,7 @@ export default function CbamReportPage() {
           <ItemSection n="(13)" title="Precursors — actual values used">
             {report.item13_actualPrecursors
               ? (report.item13_actualPrecursors.length === 0
-                  ? <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>No actual-value precursors.</div>
+                  ? <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>No actual-value precursors.</div>
                   : report.item13_actualPrecursors.map((p, i) => (
                       <div key={p.cnCode + i} style={{ padding: '10px 0', borderBottom: '0.5px solid #f1f0ee' }}>
                         <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>(13)(a) CN {p.cnCode}</div>
@@ -478,7 +478,7 @@ export default function CbamReportPage() {
           <ItemSection n="(16)" title="Precursor origin (traceability)">
             {report.item16_precursorOrigin
               ? (report.item16_precursorOrigin.length === 0
-                  ? <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>No precursors to trace.</div>
+                  ? <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>No precursors to trace.</div>
                   : report.item16_precursorOrigin.map((p, i) => (
                       <div key={p.cnCode + i} style={{ padding: '10px 0', borderBottom: '0.5px solid #f1f0ee' }}>
                         <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>CN {p.cnCode}</div>
@@ -598,10 +598,10 @@ function CbamVerifierInvite({ installationId, companyId, reportingPeriod }: { in
           IR (EU) 2025/2547 and issues a verification REPORT, not an assurance opinion. Same
           argument, different profession — keep the wording matched to each. (The claim about the
           document LINKS themselves is shared and does live in one place: lib/verifierDocNotice.ts.) */}
-      <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.7, marginBottom: '0.75rem' }}>
+      <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.7, marginBottom: '0.75rem' }}>
         Generate a read-only link for your independent verifier. They&apos;ll see this installation&apos;s Annex IV &sect;1.2 summary and source documents for {reportingPeriod}, with no ability to edit. Links expire in 90 days, and you can revoke one at any time.
       </p>
-      <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.7, marginBottom: '1.25rem' }}>
+      <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.7, marginBottom: '1.25rem' }}>
         Revoking closes the link: the page stops loading and no further documents can be opened. It does not reach anything already downloaded. That is normal and expected &mdash; an accredited CBAM verifier is required to keep the evidence behind their report in their own working papers.
       </p>
 
@@ -689,7 +689,7 @@ function MissingChecklist({ completeness }: { completeness: CompletenessResult }
       <span style={{ fontSize: 11, fontWeight: 700, color: '#888784', flexShrink: 0, minWidth: 40 }}>{m.item}</span>
       <div>
         <div style={{ fontSize: 13, fontWeight: 400, color: '#555553' }}>{m.field}</div>
-        {m.hint && <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.5, marginTop: 2 }}>{m.hint}</div>}
+        {m.hint && <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.5, marginTop: 2 }}>{m.hint}</div>}
       </div>
     </div>
   )
@@ -704,14 +704,14 @@ function MissingChecklist({ completeness }: { completeness: CompletenessResult }
         <div style={{ background: '#fff', border: '1.5px solid #f5d9ad', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#92400e', marginBottom: 4 }}>Before this report is complete</div>
           <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 4 }}>{suppliedCount} of {requiredCount} supplied · {outstandingCount} to supply</div>
-          <div style={{ fontSize: 12, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '1rem' }}>Each is a required field with no answer yet. Supply it where the hint points, then regenerate.</div>
+          <div style={{ fontSize: 12, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: '1rem' }}>Each is a required field with no answer yet. Supply it where the hint points, then regenerate.</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {operatorGaps.map((m, i) => (
               <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', background: '#FEF3E2', border: '0.5px solid #f5d9ad', borderRadius: 8, padding: '10px 12px' }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: '#92400e', flexShrink: 0, minWidth: 40 }}>{m.item}</span>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{m.field}</div>
-                  {m.hint && <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.5, marginTop: 2 }}>{m.hint}</div>}
+                  {m.hint && <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.5, marginTop: 2 }}>{m.hint}</div>}
                 </div>
               </div>
             ))}
@@ -724,14 +724,14 @@ function MissingChecklist({ completeness }: { completeness: CompletenessResult }
           {platformLimits.length > 0 && (
             <>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#555553', marginBottom: 4 }}>Not captured by this report</div>
-              <div style={{ fontSize: 12, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '0.75rem' }}>These items are part of §1.2 but ThemisIQ cannot currently produce them. They are not gaps in your data, and no action from you will clear them.</div>
+              <div style={{ fontSize: 12, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: '0.75rem' }}>These items are part of §1.2 but ThemisIQ cannot currently produce them. They are not gaps in your data, and no action from you will clear them.</div>
               <div style={{ marginBottom: regulatorLimits.length > 0 ? '1.5rem' : 0 }}>{platformLimits.map(limitRow)}</div>
             </>
           )}
           {regulatorLimits.length > 0 && (
             <>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#555553', marginBottom: 4 }}>Unresolved in the regulation</div>
-              <div style={{ fontSize: 12, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '0.75rem' }}>The instrument does not settle these. They are recorded rather than assumed — no classification or value has been inferred.</div>
+              <div style={{ fontSize: 12, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: '0.75rem' }}>The instrument does not settle these. They are recorded rather than assumed — no classification or value has been inferred.</div>
               <div>{regulatorLimits.map(limitRow)}</div>
             </>
           )}
@@ -769,13 +769,13 @@ function ErrorPanel({ err }: { err: ErrState }) {
     return (
       <div style={{ marginTop: '1.5rem', background: '#FEF3E2', border: '0.5px solid #f5d9ad', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
         <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>One more thing to confirm before the report</div>
-        <div style={{ fontSize: 13, color: '#92400e', lineHeight: 1.7, fontWeight: 300 }}>{err.message}</div>
+        <div style={{ fontSize: 13, color: '#92400e', lineHeight: 1.7, fontWeight: 400 }}>{err.message}</div>
         {/* The message names the goods by CN code; setup is where they are declared. NOT
             deep-linked to the specific process — that needs useSearchParams, which needs a
             Suspense split on the setup page, plus sequencing against its installation load
             and seeding its step state. Worth doing on its own terms, not for a convenience
             link. The reader matches the CN codes to the process list themselves. */}
-        <div style={{ fontSize: 13, color: '#92400e', lineHeight: 1.7, fontWeight: 300, marginTop: 8 }}>
+        <div style={{ fontSize: 13, color: '#92400e', lineHeight: 1.7, fontWeight: 400, marginTop: 8 }}>
           Go to{' '}
           <a href="/dashboard/cbam/setup" style={{ color: '#7425e3', textDecoration: 'underline' }}>setup</a> to declare them.
         </div>
@@ -799,7 +799,7 @@ function ErrorPanel({ err }: { err: ErrState }) {
     return (
       <div style={{ marginTop: '1.5rem', background: '#FEF3E2', border: '0.5px solid #f5d9ad', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: '#92400e', marginBottom: 4 }}>Session expired (401)</div>
-        <div style={{ fontSize: 13, color: '#92400e', lineHeight: 1.6, fontWeight: 300 }}>{err.message} <a href="/login" style={{ color: '#7425e3', textDecoration: 'underline' }}>Sign in again</a>.</div>
+        <div style={{ fontSize: 13, color: '#92400e', lineHeight: 1.6, fontWeight: 400 }}>{err.message} <a href="/login" style={{ color: '#7425e3', textDecoration: 'underline' }}>Sign in again</a>.</div>
       </div>
     )
   }

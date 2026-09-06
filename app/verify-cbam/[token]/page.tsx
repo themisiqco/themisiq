@@ -182,7 +182,7 @@ export default function CbamVerifierPage() {
           <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.6rem,3vw,2rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>
             {verifierName ? `Welcome, ${verifierName}` : 'Confirm your details to continue'}
           </h1>
-          <p style={{ fontSize: 14, color: '#555553', fontWeight: 300, lineHeight: 1.7, marginBottom: '1.75rem' }}>
+          <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.7, marginBottom: '1.75rem' }}>
             You&rsquo;ve been invited to verify {installationName ? <strong style={{ fontWeight: 500, color: '#0d0d0d' }}>{installationName}</strong> : 'an installation'}{reportingPeriod != null ? <> for <strong style={{ fontWeight: 500, color: '#0d0d0d' }}>{reportingPeriod}</strong></> : ''}. Please confirm your email and agree to the Terms and Privacy Policy to proceed.
           </p>
 
@@ -258,7 +258,7 @@ export default function CbamVerifierPage() {
         <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem,3vw,2.4rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>
           {installationName || 'CBAM Installation'}{reportingPeriod != null ? ` · ${reportingPeriod}` : ''}
         </h1>
-        <p style={{ fontSize: 14, color: '#555553', fontWeight: 300, marginBottom: '2rem' }}>
+        <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, marginBottom: '2rem' }}>
           Specific Embedded Emissions (SEE) summary — IR (EU) 2025/2547 Annex IV §1.2{verifierName ? ` · Prepared for ${verifierName}` : ''}
         </p>
 
@@ -698,7 +698,7 @@ function ReportBody({ data, token, history, historyLoading }: { data: VerifierRe
       {/* Source documents */}
       <div style={{ marginBottom: '2rem' }}>
         <SectionHead>Source documents</SectionHead>
-        <p style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '1rem' }}>{VERIFIER_DOC_LINK_NOTICE}</p>
+        <p style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1rem' }}>{VERIFIER_DOC_LINK_NOTICE}</p>
         {documents.length === 0 ? (
           <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.5rem', textAlign: 'center', fontSize: 13, color: '#888784' }}>No source documents attached.</div>
         ) : documents.map((d) => (
@@ -713,7 +713,7 @@ function ReportBody({ data, token, history, historyLoading }: { data: VerifierRe
         {completeness.limitations.length > 0 && (
           <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: '1.25rem' }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#555553', marginBottom: 4 }}>Scope limitations of the producing tool</div>
-            <p style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '0.75rem' }}>These §1.2 items were not produced by ThemisIQ. Each is recorded rather than omitted or estimated. They are not operator gaps — no action by the operator clears them, and they are excluded from the supplied count below.</p>
+            <p style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '0.75rem' }}>These §1.2 items were not produced by ThemisIQ. Each is recorded rather than omitted or estimated. They are not operator gaps — no action by the operator clears them, and they are excluded from the supplied count below.</p>
             {completeness.limitations.map((m: CompletenessItem, i: number) => (
               <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '6px 0', borderBottom: '0.5px solid #e8e7e4', fontSize: 13 }}>
                 <span style={{ fontSize: 11, fontWeight: 600, color: '#555553', background: '#e8e7e4', padding: '1px 8px', borderRadius: 4, whiteSpace: 'nowrap' }}>{m.item}</span>
@@ -812,7 +812,7 @@ function InvalidScreen() {
     <Shell>
       <div style={{ maxWidth: 540, margin: '4rem auto', textAlign: 'center', padding: '0 1.5rem' }}>
         <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>Link invalid or expired</h1>
-        <p style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, fontWeight: 300 }}>This link is invalid or has expired. It may have been revoked. Please contact the company that shared it with you to request a new link.</p>
+        <p style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, fontWeight: 400 }}>This link is invalid or has expired. It may have been revoked. Please contact the company that shared it with you to request a new link.</p>
       </div>
       <Footer />
     </Shell>
@@ -825,7 +825,7 @@ function ErrorScreen({ title, body }: { title: string; body: string }) {
     <Shell>
       <div style={{ maxWidth: 540, margin: '4rem auto', textAlign: 'center', padding: '0 1.5rem' }}>
         <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>{title}</h1>
-        <p style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, fontWeight: 300 }}>{body}</p>
+        <p style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, fontWeight: 400 }}>{body}</p>
       </div>
       <Footer />
     </Shell>

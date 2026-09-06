@@ -679,7 +679,7 @@ export default function AssessPage() {
           <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, marginBottom: 8, lineHeight: 1.2, color: '#0d0d0d' }}>
             We identified <span style={{ background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', fontStyle: 'italic' }}>{obligations.length} {obligations.length === 1 ? 'obligation' : 'obligations'}</span> that apply to your company.
           </h2>
-          <p style={{ fontSize: 14, color: '#555553', fontWeight: 300 }}>{critical} {critical === 1 ? 'requires' : 'require'} immediate action. {high} {high === 1 ? 'is' : 'are'} high priority. Click each to expand.</p>
+          <p style={{ fontSize: 14, color: '#555553', fontWeight: 400 }}>{critical} {critical === 1 ? 'requires' : 'require'} immediate action. {high} {high === 1 ? 'is' : 'are'} high priority. Click each to expand.</p>
           {/* WHERE TO START — the only place the driver answer is shown back. It shapes which entries
               appear and was otherwise never surfaced, so a visitor got a list sorted by urgency with
               no indication of where to begin. The cells below answer "what buys this rule"; this
@@ -703,7 +703,7 @@ export default function AssessPage() {
             if (start.length === 0) return null
             const priced = answers.driver !== 'regulatory'
             return (
-              <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, marginTop: 10 }}>
+              <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, marginTop: 10 }}>
                 Start with{' '}
                 <a href={modulesHref(start)} style={{ color: '#7425e3', fontWeight: 500, textDecoration: 'none' }}>
                   {modulesLabel(start)}{priced ? ` · ${priceLabel(modulesPrice(start))}` : ''} →
@@ -734,7 +734,7 @@ export default function AssessPage() {
           return (
             <div key={g.key} style={{ marginBottom: '1.5rem' }}>
               <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{g.title}</h3>
-              <p style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: 10 }}>{g.sub}</p>
+              <p style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: 10 }}>{g.sub}</p>
               <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
                 {rows.map(ob => (
                   /* Keyed on `name`, not on the index within the group — two groups both start at 0,
@@ -756,7 +756,7 @@ export default function AssessPage() {
                     </div>
                     {expanded[ob.name] && (
                       <div style={{ padding: '0 14px 14px', borderTop: '0.5px solid #e8e7e4' }}>
-                        <p style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, margin: '10px 0 8px', fontWeight: 300 }}>{ob.what}</p>
+                        <p style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, margin: '10px 0 8px', fontWeight: 400 }}>{ob.what}</p>
                         {/* MODULE CELL. Linked and priced ONLY where the entry maps to an
                             ObligationId. Where it does not — CSRD, the CS3D group route, the Pay
                             Transparency day-one duties, the six driver entries — it stays plain
@@ -793,7 +793,7 @@ export default function AssessPage() {
         })}
         <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '1.5rem', textAlign: 'center' as const }}>
           <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#fff', marginBottom: 6 }}>Want help navigating all {obligations.length} obligations?</h3>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: '1.25rem', fontWeight: 300 }}>A ThemisIQ advisor will review your results and tell you exactly what to do first. No charge for the initial call.</p>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: '1.25rem', fontWeight: 400 }}>A ThemisIQ advisor will review your results and tell you exactly what to do first. No charge for the initial call.</p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' as const }}>
             <a href="/advisory" style={{ fontSize: 13, fontWeight: 500, padding: '10px 24px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none' }}>Book free consultation</a>
            <a href="/dashboard/ghg" style={{ fontSize: 13, padding: '10px 24px', borderRadius: 8, background: 'none', color: 'rgba(255,255,255,0.6)', border: '0.5px solid rgba(255,255,255,0.15)', textDecoration: 'none' }}>Calculate your emissions →</a>
@@ -811,11 +811,11 @@ export default function AssessPage() {
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>Almost there</div>
           <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', fontWeight: 400, marginBottom: 8, lineHeight: 1.2, color: '#0d0d0d' }}>Your compliance map is ready.</h2>
-          <p style={{ fontSize: 14, color: '#555553', fontWeight: 300, lineHeight: 1.6 }}>Enter your details to see what applies to you — each with its timing, what it requires, and the ThemisIQ module that addresses it.</p>
+          <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.6 }}>Enter your details to see what applies to you — each with its timing, what it requires, and the ThemisIQ module that addresses it.</p>
         </div>
         <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '1.5rem', display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
           <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, color: '#fff', marginBottom: 4 }}>Where should we send your results?</h3>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 8, fontWeight: 300 }}>Results display instantly. We'll also email a PDF you can share with your board or legal team.</p>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 8, fontWeight: 400 }}>Results display instantly. We'll also email a PDF you can share with your board or legal team.</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <input value={email.first} onChange={e => setEmail(v => ({...v, first: e.target.value}))} placeholder="First name" style={inputStyle} />
             <input value={email.last} onChange={e => setEmail(v => ({...v, last: e.target.value}))} placeholder="Last name" style={inputStyle} />
@@ -852,7 +852,7 @@ export default function AssessPage() {
             <div style={{ fontSize: 11, color: '#888784' }}>Question {step + 1} of {EMAIL_STEP}</div>
           </div>
           <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.35rem', fontWeight: 400, lineHeight: 1.25, marginBottom: 6, color: '#0d0d0d' }}>{q.title}</h2>
-          <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '1.25rem' }}>{q.sub}</p>
+          <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.25rem' }}>{q.sub}</p>
 
           {q.type === 'slider' && (
             <div>
@@ -948,7 +948,7 @@ export default function AssessPage() {
               <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '0.75rem', color: '#0d0d0d' }}>
                 Which compliance regulations<br />apply to <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>your company?</span>
               </h1>
-              <p style={{ fontSize: 15, color: '#555553', fontWeight: 300, lineHeight: 1.7, maxWidth: 600, margin: "0 auto", textAlign: "center" }}>
+              <p style={{ fontSize: 15, color: '#555553', fontWeight: 400, lineHeight: 1.7, maxWidth: 600, margin: "0 auto", textAlign: "center" }}>
                 Answer {EMAIL_STEP} questions. Get a personalised Compliance Obligation Map — the rules that apply to you, what your customers and investors are asking for, and the ThemisIQ module that addresses each one.
               </p>
             </div>

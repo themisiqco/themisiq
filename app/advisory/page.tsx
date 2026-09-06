@@ -16,7 +16,7 @@ export default function AdvisoryPage() {
             <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Fixed fees.</span><br />
             Named advisors.
           </h1>
-          <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 300, marginBottom: '2.5rem', maxWidth: 560 }}>
+          <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 400, marginBottom: '2.5rem', maxWidth: 560 }}>
             ThemisIQ Advisory connects you with named sustainability, governance, and regulatory specialists — former regulators, Big 4 practitioners, and sector experts — at transparent fixed fees.
           </p>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '3rem' }}>
@@ -46,7 +46,7 @@ export default function AdvisoryPage() {
             {['Junior associates do the work, partner signs off', 'Billable hours — costs grow unpredictably', 'Generalist teams learning your sector on your budget', 'Months to mobilise, weeks to deliver', 'Deliverable is a report. Implementation is extra.', 'No platform — findings live in a PDF'].map((item, i) => (
               <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
                 <span style={{ color: '#B91C1C', flexShrink: 0 }}>✗</span>
-                <span style={{ fontSize: 13, color: '#888784', fontWeight: 300, lineHeight: 1.5 }}>{item}</span>
+                <span style={{ fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.5 }}>{item}</span>
               </div>
             ))}
           </div>
@@ -55,7 +55,7 @@ export default function AdvisoryPage() {
             {['Named senior advisor — you know who is doing the work', 'Fixed fees — scope and cost agreed before engagement starts', 'Specialists with direct sector and regulatory experience', 'Available within days, not months', 'Findings implemented directly in your ThemisIQ platform', 'Platform + advisory — your programme is live, not just documented'].map((item, i) => (
               <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
                 <span style={{ color: '#64fe3e', flexShrink: 0 }}>✓</span>
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 300, lineHeight: 1.5 }}>{item}</span>
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 400, lineHeight: 1.5 }}>{item}</span>
               </div>
             ))}
           </div>
@@ -86,7 +86,7 @@ export default function AdvisoryPage() {
                   <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 2 }}>{title}</div>
                   <div style={{ fontSize: 12, fontWeight: 600, background: 'linear-gradient(135deg,#7425e3,#1fb1ff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>{price}</div>
                 </div>
-                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 300, flex: 1 }}>{desc}</div>
+                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 400, flex: 1 }}>{desc}</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 5 }}>
                   {tags.map(tag => <span key={tag} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#555553' }}>{tag}</span>)}
                 </div>
@@ -121,7 +121,7 @@ export default function AdvisoryPage() {
                   <div style={{ fontSize: 11, color, fontWeight: 500 }}>{title}</div>
                 </div>
               </div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 300 }}>{exp}</div>
+              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{exp}</div>
             </div>
           ))}
         </div>
@@ -133,7 +133,7 @@ export default function AdvisoryPage() {
           Book your free 30-minute<br />
           <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Advisory consultation.</span>
         </h2>
-        <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
           We'll review your compliance obligations, prioritise by risk and effort, and tell you exactly what to do first. No charge. No obligation.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
@@ -156,5 +156,5 @@ const btnPrimary: React.CSSProperties = { fontSize: 14, fontWeight: 500, padding
 const btnSecondary: React.CSSProperties = { fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', display: 'inline-block' }
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
 const sectionTitle: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }
-const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, margin: '0 auto', lineHeight: 1.75, fontWeight: 300 }
+const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, margin: '0 auto', lineHeight: 1.75, fontWeight: 400 }
  

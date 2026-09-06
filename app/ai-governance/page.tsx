@@ -41,7 +41,7 @@ export default function Page() {
               AI Governance &<br />
               <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Risk Management</span>
             </h1>
-            <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 300, marginBottom: '2rem', maxWidth: 480 }}>
+            <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem', maxWidth: 480 }}>
               EU AI Act compliance. AI risk register. Model inventory. Board-level AI oversight documentation. NIST AI RMF alignment. ISO 42001 readiness. One platform for your entire AI governance programme.
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
@@ -69,7 +69,7 @@ export default function Page() {
               <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid ${color}22` }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color, marginTop: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{unit}</div>
-                <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 300, lineHeight: 1.4 }}>{label}</div>
+                <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{label}</div>
               </div>
             ))}
           </div>
@@ -88,7 +88,7 @@ export default function Page() {
                 "treat any deferral as a bonus, not a plan" — which was true when written and false from
                 27 July 2026. What moved is the application date; what a company is in scope FOR is
                 unchanged, which is the distinction this paragraph has to carry. */}
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
               If your company uses AI for HR decisions, hiring, credit scoring, or education in the EU, you are in scope for the EU AI Act Annex III high-risk provisions. Regulation (EU) 2026/1744 — published 24 July 2026, in force 27 July 2026 — deferred those obligations to {AI_ACT_HIGH_RISK_STANDALONE} for stand-alone systems, and to {AI_ACT_HIGH_RISK_EMBEDDED} where the AI is built into a product already covered by EU product-safety law. Nothing else moved: the Article 5 prohibitions have applied since February 2025, GPAI obligations since August 2025, and the Article 50 transparency duties keep their original schedule. Classification, technical documentation and registration are unchanged in substance — only the date by which they must be done.
             </p>
             {[
@@ -101,7 +101,7 @@ export default function Page() {
             ].map((item, i) => (
               <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
                 <span style={{ color: '#64fe3e', flexShrink: 0, marginTop: 2 }}>✓</span>
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 300, lineHeight: 1.5 }}>{item}</span>
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 400, lineHeight: 1.5 }}>{item}</span>
               </div>
             ))}
           </div>
@@ -147,7 +147,7 @@ export default function Page() {
             <div key={title} style={{ background: '#fff', padding: '2rem' }}>
               
               <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 300 }}>{desc}</div>
+              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
             </div>
           ))}
         </div>
@@ -208,7 +208,7 @@ export default function Page() {
               <span style={{ fontSize: 10, fontWeight: 700, color, background: bg, padding: '2px 8px', borderRadius: 99 }}>{status}</span>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1rem', fontWeight: 400, color: '#0d0d0d', margin: '10px 0 4px' }}>{label}</div>
               <div style={{ fontSize: 11, color: '#888784', marginBottom: 10 }}>{date}</div>
-              <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 300 }}>{desc}</div>
+              <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{desc}</div>
             </div>
           ))}
         </div>
@@ -223,7 +223,7 @@ export default function Page() {
           You cannot classify what you<br />have not inventoried.<br />
           <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Start with what you have.</span>
         </h2>
-        <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
           The first step is knowing what AI systems you have and whether they're high-risk. ThemisIQ's AI inventory wizard walks you through every system in days — not months.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>

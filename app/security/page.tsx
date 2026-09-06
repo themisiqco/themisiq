@@ -13,7 +13,7 @@ export default function Page() {
             Security at{' '}
             <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>ThemisIQ</span>
           </h1>
-          <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.5)', lineHeight: 1.75, fontWeight: 300, marginBottom: '2.5rem', maxWidth: 560 }}>
+          <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.5)', lineHeight: 1.75, fontWeight: 400, marginBottom: '2.5rem', maxWidth: 560 }}>
             ThemisIQ processes your most sensitive compliance data — GHG inventories, workforce metrics, supply chain records, and cyber risk registers. We take security seriously, not as a checkbox, but as a foundational design requirement.
           </p>
           <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' as const }}>
@@ -44,7 +44,7 @@ export default function Page() {
               <div style={{ fontSize: 20, flexShrink: 0 }}>{icon}</div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 2 }}>{name}</div>
-                <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>{detail}</div>
+                <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>{detail}</div>
               </div>
               <span style={{ fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 99, background: badge === 'green' ? '#E1F5EE' : '#FEF3E2', color: badge === 'green' ? '#085041' : '#633806', whiteSpace: 'nowrap' as const, flexShrink: 0 }}>{status}</span>
             </div>
@@ -68,7 +68,7 @@ export default function Page() {
                 <div style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg,#7425e3,#1fb1ff,#64fe3e)' }} />
                 <div style={{ fontSize: 22, marginBottom: 10 }}>{icon}</div>
                 <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 6 }}>{title}</div>
-                <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 300 }}>{body}</div>
+                <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{body}</div>
               </div>
             ))}
           </div>
@@ -90,7 +90,7 @@ export default function Page() {
             ].map(([title, body], i) => (
               <div key={i} style={{ borderBottom: '0.5px solid #e8e7e4', padding: '14px 0' }}>
                 <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>{title}</div>
-                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 300 }}>{body}</div>
+                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{body}</div>
               </div>
             ))}
           </div>
@@ -107,7 +107,7 @@ export default function Page() {
             ].map(([title, body], i) => (
               <div key={i} style={{ borderBottom: '0.5px solid #e8e7e4', padding: '14px 0' }}>
                 <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>{title}</div>
-                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 300 }}>{body}</div>
+                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{body}</div>
               </div>
             ))}
           </div>
@@ -129,7 +129,7 @@ export default function Page() {
               <div key={step} style={{ background: '#fff', padding: '2rem' }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 8, opacity: 0.6 }}>{step}</div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 6 }}>{title}</div>
-                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 300 }}>{body}</div>
+                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{body}</div>
               </div>
             ))}
           </div>
@@ -154,7 +154,7 @@ export default function Page() {
                 <span style={{ color: '#0F6E56', flexShrink: 0, fontWeight: 600, marginTop: 1 }}>✓</span>
                 <div>
                   <span style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{title} — </span>
-                  <span style={{ fontSize: 13, color: '#555553', fontWeight: 300 }}>{body}</span>
+                  <span style={{ fontSize: 13, color: '#555553', fontWeight: 400 }}>{body}</span>
                 </div>
               </div>
             ))}
@@ -163,7 +163,7 @@ export default function Page() {
           <div>
             <div style={eyebrow}>Report a security issue</div>
             <h2 style={sectionTitle}>Responsible disclosure.</h2>
-            <p style={{ fontSize: 14, color: '#555553', lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: 14, color: '#555553', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
               If you discover a security vulnerability or believe you have seen suspicious activity in your ThemisIQ account, please contact us immediately. We take all security reports seriously and will respond within 24 hours.
             </p>
             <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '1.5rem', marginBottom: '1rem' }}>
@@ -174,7 +174,7 @@ export default function Page() {
             </div>
             <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(29,158,117,0.25)', borderLeft: '3px solid #1D9E75', borderRadius: 8, padding: '13px 15px' }}>
               <div style={{ fontSize: 12, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }}>Enterprise security reviews</div>
-              <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 300 }}>Penetration test reports, SOC 2 bridge letters, and full security questionnaire responses are available on request for enterprise customers conducting security due diligence.</div>
+              <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>Penetration test reports, SOC 2 bridge letters, and full security questionnaire responses are available on request for enterprise customers conducting security due diligence.</div>
             </div>
           </div>
         </div>

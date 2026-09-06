@@ -109,10 +109,10 @@ export default function HomePricing() {
         {/* Header */}
         <p style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Pricing</p>
         <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }}>Simple, honest pricing.</h2>
-        <p style={{ fontSize: 15, color: '#555553', maxWidth: 540, lineHeight: 1.75, fontWeight: 300, marginBottom: '0.5rem' }}>
+        <p style={{ fontSize: 15, color: '#555553', maxWidth: 540, lineHeight: 1.75, fontWeight: 400, marginBottom: '0.5rem' }}>
           Whether your driver is a regulator, a board, an investor, or a customer — ThemisIQ is your sustainability compliance reporting solution.
         </p>
-        <p style={{ fontSize: 12, color: '#9ca3af', fontWeight: 300, marginBottom: '2rem' }}>All prices in USD</p>
+        <p style={{ fontSize: 12, color: '#9ca3af', fontWeight: 400, marginBottom: '2rem' }}>All prices in USD</p>
 
         {/* Interactive prompt */}
         <div style={{ background: GRAD, borderRadius: 12, padding: 1, marginBottom: 20 }}>
@@ -120,7 +120,7 @@ export default function HomePricing() {
             <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: GRAD, animation: 'pulse 2s ease-in-out infinite' }} />
             <div style={{ flex: 1 }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>This pricing section is interactive — </span>
-              <span style={{ fontSize: 13, color: '#555553', fontWeight: 300 }}>click a tier card to select your level, then click any module row to add it. Your total updates instantly.</span>
+              <span style={{ fontSize: 13, color: '#555553', fontWeight: 400 }}>click a tier card to select your level, then click any module row to add it. Your total updates instantly.</span>
             </div>
           </div>
         </div>
@@ -208,7 +208,7 @@ export default function HomePricing() {
         <div style={{ border: '1px solid #e8e7e4', borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', background: '#f8f7f5', padding: '10px 16px', borderBottom: '1px solid #e8e7e4', alignItems: 'center' }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784' }}>Select your compliance modules</div>
-            <div style={{ fontSize: 10, color: '#888784', fontWeight: 300 }}>Click any row to add or remove</div>
+            <div style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}>Click any row to add or remove</div>
           </div>
           {MODULES.map((mod, i) => {
             const isSelected = selected.has(mod.id)
@@ -236,7 +236,7 @@ export default function HomePricing() {
           <div id="build-your-stack" style={{ border: '1px solid #e8e7e4', borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', background: '#f8f7f5', padding: '10px 16px', borderBottom: '1px solid #e8e7e4', alignItems: 'center' }}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784' }}>Select your compliance modules</div>
-              <div style={{ fontSize: 10, color: '#888784', fontWeight: 300 }}>Click any row to add or remove</div>
+              <div style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}>Click any row to add or remove</div>
             </div>
             {MODULES.map((mod, i) => {
               const isSelected = selected.has(mod.id)
@@ -353,7 +353,7 @@ export default function HomePricing() {
 
         {/* Dynamic CTA */}
         <div style={{ background: '#fff', border: '1px solid #e8e7e4', borderRadius: 14, padding: '1.5rem', textAlign: 'center' }}>
-          <div style={{ fontSize: 13, color: '#555553', fontWeight: 300, maxWidth: 500, margin: '0 auto 12px', lineHeight: 1.8 }}>
+          <div style={{ fontSize: 13, color: '#555553', fontWeight: 400, maxWidth: 500, margin: '0 auto 12px', lineHeight: 1.8 }}>
             For many companies, we understand that emerging reporting requirements — and the pricing from other platforms and traditional consulting firms — are overwhelming. ThemisIQ offers a better way.
           </div>
           <div style={{ fontFamily: 'Georgia, serif', fontSize: 17, fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{cta.headline}</div>

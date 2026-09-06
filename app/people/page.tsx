@@ -25,7 +25,7 @@ export default function Page() {
               Workforce<br />
               <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Intelligence</span>
             </h1>
-            <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 300, marginBottom: '2rem', maxWidth: 480 }}>
+            <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem', maxWidth: 480 }}>
               Human capital reporting. Gender pay gap analysis. DEI metrics. Health & safety. Training and development. ESRS S1, GRI 401–410, EU Pay Transparency, SEC Item 101, and California Pay Data — one platform.
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
@@ -51,7 +51,7 @@ export default function Page() {
               <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid ${color}22` }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color, marginTop: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{unit}</div>
-                <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 300, lineHeight: 1.4 }}>{label}</div>
+                <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{label}</div>
               </div>
             ))}
           </div>
@@ -66,7 +66,7 @@ export default function Page() {
             <div style={{ width: 44, height: 44, borderRadius: 10, background: '#E1F5EE', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0, fontWeight: 700, color: '#0F6E56' }}>&#8800;</div>
             <div>
               <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 4 }}>ThemisIQ is not an HR system.</div>
-              <div style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, maxWidth: 560 }}>Workday, SAP, and SuccessFactors manage your people data. But none of them generate your EU Pay Transparency disclosure, your ESRS S1 workforce report, or your California DFEH submission. ThemisIQ does — in minutes, not months, at a fraction of consulting cost.</div>
+              <div style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, maxWidth: 560 }}>Workday, SAP, and SuccessFactors manage your people data. But none of them generate your EU Pay Transparency disclosure, your ESRS S1 workforce report, or your California DFEH submission. ThemisIQ does — in minutes, not months, at a fraction of consulting cost.</div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const, flexShrink: 0 }}>
@@ -118,7 +118,7 @@ export default function Page() {
               )
             })}
           </div>
-          <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: '#888784', fontWeight: 300 }}>
+          <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: '#888784', fontWeight: 400 }}>
             Big HR platforms = Workday, SAP SuccessFactors · Pay equity specialists = Syndio, Trusaic, Visier
           </div>
         </div>
@@ -132,7 +132,7 @@ export default function Page() {
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.5rem, 2.5vw, 2rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
               Do you know your gender pay gap?
             </h2>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
              Most companies don't. The EU Pay Transparency Directive — now in force — requires employers with 100+ EU employees to report their gender pay gap annually (250+ employees) or every 3 years (100–249 employees). A gap exceeding 5% in any job band triggers a mandatory joint pay assessment with worker representatives.
             </p>
             {[
@@ -144,7 +144,7 @@ export default function Page() {
             ].map((item, i) => (
               <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
                 <span style={{ color: '#64fe3e', flexShrink: 0, marginTop: 2 }}>✓</span>
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 300, lineHeight: 1.5 }}>{item}</span>
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 400, lineHeight: 1.5 }}>{item}</span>
               </div>
             ))}
           </div>
@@ -192,7 +192,7 @@ export default function Page() {
             <div key={title} style={{ background: '#fff', padding: '2rem' }}>
               
               <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 300 }}>{desc}</div>
+              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
             </div>
           ))}
         </div>
@@ -223,7 +223,7 @@ export default function Page() {
               <div key={ref} style={{ background: '#fff', padding: '1.25rem' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: '#7425e3', letterSpacing: '0.06em', marginBottom: 4 }}>{ref}</div>
                 <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>{title}</div>
-                <div style={{ fontSize: 11, color: '#888784', fontWeight: 300, lineHeight: 1.4 }}>{desc}</div>
+                <div style={{ fontSize: 11, color: '#888784', fontWeight: 400, lineHeight: 1.4 }}>{desc}</div>
               </div>
             ))}
           </div>
@@ -237,7 +237,7 @@ export default function Page() {
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
             <div style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>Framework coverage</div>
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>Every requirement. One platform.</h2>
-            <p style={{ fontSize: 14, color: '#555553', fontWeight: 300, maxWidth: 540, margin: '0 auto', lineHeight: 1.75 }}>One workforce data set generates every report automatically — regulators, investors, customers, and boards all answered from a single source of truth.</p>
+            <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, maxWidth: 540, margin: '0 auto', lineHeight: 1.75 }}>One workforce data set generates every report automatically — regulators, investors, customers, and boards all answered from a single source of truth.</p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
             {[
@@ -329,7 +329,7 @@ export default function Page() {
           Do you know your gender pay gap<br />
           <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>by job band?</span>
         </h2>
-        <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
         Most companies don't — and the EU Pay Transparency Directive is now in force, with first pay-gap reports due in 2027. ThemisIQ calculates your gap, identifies bands above 5%, and prepares your disclosure.
 
         </p>

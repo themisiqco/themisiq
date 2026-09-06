@@ -110,7 +110,7 @@ export default function Page() {
               Materiality<br />
               <span style={{ fontStyle: 'italic', background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Assessment</span>
             </h1>
-            <p style={{ fontSize: 17, color: BODY, lineHeight: 1.75, fontWeight: 300, marginBottom: '2rem' }}>
+            <p style={{ fontSize: 17, color: BODY, lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem' }}>
               The impact half of a double materiality assessment, run by your own team: stakeholder engagement, all ten ESRS topics determined in both directions, and a record of who decided what. For companies reporting under CSRD &mdash; and for the suppliers their reporting puts questions to.
             </p>
             {/* ⚠️ THE PRICE LIVES HERE NOW. The merged page carried a standalone pricing card
@@ -118,7 +118,7 @@ export default function Page() {
                 two screens later was a third statement of one number. The figure is READ, never
                 typed — see impactPrice above and CLAUDE.md. The card's substance comes with it:
                 what the price includes is the part a buyer weighs, not the digits. */}
-            <div style={{ fontSize: 15, color: BODY, fontWeight: 300, lineHeight: 1.7, marginBottom: '2rem' }}>
+            <div style={{ fontSize: 15, color: BODY, fontWeight: 400, lineHeight: 1.7, marginBottom: '2rem' }}>
               <span style={{ fontFamily: 'Georgia, serif', fontSize: '1.7rem', color: INK }}>${impactPrice}</span>
               {' '}USD per year &mdash; 365 days of platform access. No per-seat charges, no separate fee for the survey, no extra cost when you bring colleagues in to help. Add Climate Risk and the multi-module discount applies automatically.
             </div>
@@ -170,7 +170,7 @@ export default function Page() {
                     white, so the ladder alone was never a guide for body copy this deep.
                     ⚠️ Grey (#555553) was NOT the failing colour here — it measures 4.62 and
                     passes. Do not "restore" it thinking this was a contrast fix for grey. */}
-                <div style={{ fontSize: 12, color: PURPLE_SLATE, marginTop: 6, fontWeight: 300, lineHeight: 1.4 }}>{label}</div>
+                <div style={{ fontSize: 12, color: PURPLE_SLATE, marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{label}</div>
               </>
             )
             return href
@@ -516,9 +516,9 @@ export default function Page() {
               ['Implications', null],
             ] as [string, string | null][]).map(([h, gloss], i) => (
               <div key={h} style={{ display: 'flex', gap: 14, alignItems: 'baseline', fontSize: 15, lineHeight: 1.6 }}>
-                <span style={{ color: MUTED, fontWeight: 300, fontVariantNumeric: 'tabular-nums', minWidth: 18, flexShrink: 0 }}>{i + 1}</span>
+                <span style={{ color: MUTED, fontWeight: 400, fontVariantNumeric: 'tabular-nums', minWidth: 18, flexShrink: 0 }}>{i + 1}</span>
                 <span style={{ color: INK, fontWeight: 400 }}>
-                  {h}{gloss && <span style={{ color: MUTED, fontWeight: 300 }}> &mdash; {gloss}</span>}
+                  {h}{gloss && <span style={{ color: MUTED, fontWeight: 400 }}> &mdash; {gloss}</span>}
                 </span>
               </div>
             ))}
@@ -572,14 +572,14 @@ export default function Page() {
               ['Reporting under IFRS S2', 'Climate Risk on its own.'],
               ['Answering customer questionnaires', 'this one.'],
             ].map(([cond, ans]) => (
-              <div key={cond} style={{ fontSize: 17, color: INK, fontWeight: 300, lineHeight: 1.5 }}>
+              <div key={cond} style={{ fontSize: 17, color: INK, fontWeight: 400, lineHeight: 1.5 }}>
                 {cond}
                 <span aria-hidden style={{ color: PURPLE, margin: '0 12px' }}>&rarr;</span>
                 <span style={{ fontWeight: 400 }}>{ans}</span>
               </div>
             ))}
           </div>
-          <p style={{ fontSize: 15, color: BODY, fontWeight: 300, lineHeight: 1.7, margin: '1.75rem 0 0' }}>
+          <p style={{ fontSize: 15, color: BODY, fontWeight: 400, lineHeight: 1.7, margin: '1.75rem 0 0' }}>
             Buy both and the multi-module discount applies automatically.
           </p>
         </div>
@@ -617,10 +617,10 @@ const btnPrimary: React.CSSProperties = { fontSize: 14, fontWeight: 500, padding
 const btnSecondary: React.CSSProperties = { fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', display: 'inline-block' }
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
 const sectionTitle: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }
-const bodyPara: React.CSSProperties = { fontSize: 15, color: '#555553', fontWeight: 300, lineHeight: 1.8, marginBottom: '1.25rem' }
-const footnote: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 300, lineHeight: 1.7, marginBottom: '1rem' }
+const bodyPara: React.CSSProperties = { fontSize: 15, color: '#555553', fontWeight: 400, lineHeight: 1.8, marginBottom: '1.25rem' }
+const footnote: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.7, marginBottom: '1rem' }
 const cellTitle: React.CSSProperties = { fontSize: 15, fontWeight: 600, color: '#0d0d0d', marginBottom: 10 }
-const cellBody: React.CSSProperties = { fontSize: 14, color: '#555553', fontWeight: 300, lineHeight: 1.75, margin: 0 }
+const cellBody: React.CSSProperties = { fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.75, margin: 0 }
 // Two-column variant of the hairline grid used on /deals and /climate-risk — 1px gaps over a
 // #e8e7e4 ground so the cell backgrounds draw the rules.
 const hairlineGrid2: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }

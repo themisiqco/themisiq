@@ -195,7 +195,7 @@ const STYLES = `
     --violet:#7425e3; --sky:#1fb1ff; --lime:#64fe3e;
     --green:#0F6E56; --green-tint:#E1F5EE;
     --grad: linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e);
-    font-family:var(--sans); font-weight:300; color:var(--ink);
+    font-family:var(--sans); font-weight:400; color:var(--ink);
     background:#fff; line-height:1.6;
     -webkit-font-smoothing:antialiased;
   }
@@ -337,7 +337,7 @@ const STYLES = `
   .tiq details.qa summary::-webkit-details-marker{display:none;}
   .tiq details.qa summary::after{
     content:'+'; position:absolute; right:6px; top:20px; font-family:var(--sans);
-    font-size:22px; font-weight:300; color:var(--light); transition:transform .2s ease;
+    font-size:22px; font-weight:400; color:var(--light); transition:transform .2s ease;
   }
   .tiq details.qa[open] summary::after{content:'\\2013'; transform:translateY(1px);}
   .tiq details.qa .qa-body{padding:0 40px 24px 0; font-size:15px; color:var(--mid); max-width:72ch;}

@@ -92,13 +92,13 @@ const groups = [
 // ── STYLES ────────────────────────────────────────────────────────
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 12 }
 const h1: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(2.2rem, 5vw, 3.4rem)', fontWeight: 400, lineHeight: 1.15, color: '#0d0d0d', marginBottom: '1.25rem' }
-const lede: React.CSSProperties = { fontSize: 17, color: '#555553', lineHeight: 1.7, fontWeight: 300, maxWidth: 620 }
+const lede: React.CSSProperties = { fontSize: 17, color: '#555553', lineHeight: 1.7, fontWeight: 400, maxWidth: 620 }
 const grad: React.CSSProperties = { fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }
 const groupHeading: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: '1.7rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }
-const groupIntro: React.CSSProperties = { fontSize: 14, color: '#888784', fontWeight: 300, marginBottom: '1.75rem', maxWidth: 560, lineHeight: 1.6 }
+const groupIntro: React.CSSProperties = { fontSize: 14, color: '#888784', fontWeight: 400, marginBottom: '1.75rem', maxWidth: 560, lineHeight: 1.6 }
 const card: React.CSSProperties = { border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.5rem 1.5rem 1.25rem', background: '#fff', display: 'flex', flexDirection: 'column' }
 const fwName: React.CSSProperties = { fontSize: 16, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }
-const fwBody: React.CSSProperties = { fontSize: 13.5, color: '#555553', lineHeight: 1.6, fontWeight: 300, marginBottom: 12 }
+const fwBody: React.CSSProperties = { fontSize: 13.5, color: '#555553', lineHeight: 1.6, fontWeight: 400, marginBottom: 12 }
 const fwMaps: React.CSSProperties = { fontSize: 13, color: '#0d0d0d', lineHeight: 1.55, fontWeight: 400, paddingTop: 12, borderTop: '0.5px solid #f0efed', marginBottom: 14 }
 const linkRow: React.CSSProperties = { marginTop: 'auto', display: 'flex', gap: 16, alignItems: 'center' }
 const fwLink: React.CSSProperties = { fontSize: 12.5, color: '#555553', textDecoration: 'none', fontWeight: 500 }
@@ -148,7 +148,7 @@ export default function Frameworks() {
           <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, marginBottom: 12 }}>
             Don’t see your framework?
           </h2>
-          <p style={{ fontSize: 15, color: '#555553', fontWeight: 300, maxWidth: 480, margin: '0 auto 1.75rem', lineHeight: 1.7 }}>
+          <p style={{ fontSize: 15, color: '#555553', fontWeight: 400, maxWidth: 480, margin: '0 auto 1.75rem', lineHeight: 1.7 }}>
             We map to 30+ reporting frameworks and add more as regulations evolve. Tell us what you report under and we’ll confirm coverage.
           </p>
           <a href="mailto:hello@themisiq.co" style={{ fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: '#0d0d0d', color: '#fff', textDecoration: 'none', display: 'inline-block' }}>

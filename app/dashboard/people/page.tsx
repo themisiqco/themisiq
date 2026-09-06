@@ -99,7 +99,7 @@ const sectionHead: React.CSSProperties = {
 }
 
 const sectionSub: React.CSSProperties = {
-  fontSize: 13, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '2rem',
+  fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '2rem',
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────

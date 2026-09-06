@@ -27,7 +27,7 @@ export default function Page() {
               Not a values question.<br />
               <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>A valuation question.</span>
             </h1>
-            <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 300, marginBottom: '2rem', maxWidth: 480 }}>
+            <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem', maxWidth: 480 }}>
               Enter a target&rsquo;s turnover, balance sheet, headcount and jurisdiction, and see which climate and sustainability regimes it already falls under &mdash; each threshold tested limb by limb, with the figure applied and the provision it comes from. Under five minutes. Create an account and your first target is free.
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '1rem' }}>
@@ -66,8 +66,8 @@ export default function Page() {
               <div key={val} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid ${color}22` }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color, marginTop: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{unit}</div>
-                <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 300, lineHeight: 1.4 }}>{label}</div>
-                {source && <div style={{ fontSize: 11, color: '#888784', marginTop: 6, fontWeight: 300, lineHeight: 1.4 }}>{source}</div>}
+                <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{label}</div>
+                {source && <div style={{ fontSize: 11, color: '#888784', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{source}</div>}
               </div>
             ))}
           </div>
@@ -91,7 +91,7 @@ export default function Page() {
           ].map(({ title, desc }) => (
             <div key={title} style={hairlineCell}>
               <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 300 }}>{desc}</div>
+              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
             </div>
           ))}
         </div>
@@ -112,7 +112,7 @@ export default function Page() {
           ].map(({ title, desc }) => (
             <div key={title} style={hairlineCell}>
               <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 300 }}>{desc}</div>
+              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
             </div>
           ))}
         </div>
@@ -145,12 +145,12 @@ export default function Page() {
             <div key={title} style={hairlineCell}>
               <div style={eyebrow}>{stage}</div>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 10 }}>{title}</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 300, marginBottom: 16 }}>{desc}</div>
+              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400, marginBottom: 16 }}>{desc}</div>
               <div style={{ borderTop: '0.5px solid #e8e7e4', paddingTop: 12 }}>
-                <div style={{ fontSize: 12, color: '#555553', fontWeight: 300, marginBottom: 4 }}>
+                <div style={{ fontSize: 12, color: '#555553', fontWeight: 400, marginBottom: 4 }}>
                   <span style={{ color: '#888784' }}>Who pays:</span> {pays}
                 </div>
-                <div style={{ fontSize: 12, color: '#555553', fontWeight: 300 }}>
+                <div style={{ fontSize: 12, color: '#555553', fontWeight: 400 }}>
                   <span style={{ color: '#888784' }}>Effort:</span> {effort}
                 </div>
               </div>
@@ -167,7 +167,7 @@ export default function Page() {
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
               Acquiring a California company?<br />You inherit their SB 253 obligations.
             </h2>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
               A target with California nexus and revenue over ${sb253Bn}bn is a reporting entity in its own right, and stays one after you buy it. The screen tests that threshold against the figures you enter and prints the limb, the figure and the provision — so the obligation is priced into your deal rather than discovered after it.
             </p>
             {[
@@ -177,7 +177,7 @@ export default function Page() {
             ].map((item, i) => (
               <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
                 <span style={{ color: '#64fe3e', flexShrink: 0, marginTop: 2 }}>✓</span>
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 300, lineHeight: 1.5 }}>{item}</span>
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 400, lineHeight: 1.5 }}>{item}</span>
               </div>
             ))}
           </div>
@@ -220,7 +220,7 @@ export default function Page() {
           ].map(({ title, desc }) => (
             <div key={title} style={hairlineCell}>
               <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 300 }}>{desc}</div>
+              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
             </div>
           ))}
         </div>
@@ -231,7 +231,7 @@ export default function Page() {
         <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
           Your first target is <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>free.</span>
         </h2>
-        <p style={{ fontSize: 15, color: '#555553', maxWidth: 520, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 15, color: '#555553', maxWidth: 520, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
           Create an account and screen one — the complete report, every limb tested, nothing held back and no card. The subscription is for when you have a pipeline rather than a deal.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>

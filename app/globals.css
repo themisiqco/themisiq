@@ -1,29 +1,23 @@
 @import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* Immediately after the tailwindcss import, so the @theme block inside is seen by the Tailwind
+   build and its tokens generate utilities. Tailwind 4 has no tailwind.config.ts — @theme in CSS
+   is the configuration surface, and it only works if it is imported into the compiled stylesheet. */
+@import "./styles/themisiq-tokens.css";
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  /* --font-sans DELETED HERE, 5 Sep 2026. This block sits AFTER the token import above, so its
+     --font-sans overrode the one in app/styles/themisiq-tokens.css and font-sans resolved to
+     Geist — Atkinson was loaded, its variable was set, and nothing used it. The token layer now
+     owns --font-sans (var(--font-atkinson), system-ui, …).
+     --font-mono STAYS: the token layer declares no mono family, so removing this would leave
+     font-mono undefined rather than handing it to something else. */
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
+/* ⚠️ NO html OR body RULE BELOW THIS POINT. themisiq-tokens.css is imported at the top of this
+ * file, so anything later here beats it on equal specificity — which is how the starter's body
+ * rule silently held the page on Arial. Style the body from the token layer, not from here.
+ */
 
 /* Print: release the viewport-sized layout so pagination can run.
  *

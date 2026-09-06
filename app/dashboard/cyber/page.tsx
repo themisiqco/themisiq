@@ -91,7 +91,7 @@ const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
 const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.4rem, 2.5vw, 1.8rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
-const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '1.5rem' }
+const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
 const STEP_NAMES = ['Setup', 'Gap Assessment', 'Results', 'Remediation', 'Export']
 
 

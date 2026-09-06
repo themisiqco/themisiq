@@ -345,7 +345,7 @@ export default function MethodologyPage() {
             How ThemisIQ calculates,<br />
             <em style={{ background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>classifies and reports.</em>
           </h1>
-          <p style={{ fontSize: 16, color: '#555553', maxWidth: 620, lineHeight: 1.75, fontWeight: 300, marginBottom: '2rem' }}>
+          <p style={{ fontSize: 16, color: '#555553', maxWidth: 620, lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem' }}>
             Every number ThemisIQ produces is grounded in a recognised international standard or regulatory framework. We don&apos;t invent methodologies — we implement the ones that matter, correctly, and keep them current.
           </p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' as const }}>
@@ -379,7 +379,7 @@ export default function MethodologyPage() {
                   {method.sections.map(section => (
                     <div key={section.title} style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 24, paddingBottom: 16, borderBottom: '0.5px solid #f3f4f6' }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: method.color, lineHeight: 1.4 }}>{section.title}</div>
-                      <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, fontWeight: 300 }}>
+                      <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, fontWeight: 400 }}>
                         <SectionContent content={section.content} />
                         {(section as any).download && (
                           <div style={{ marginTop: 12 }}>
@@ -414,7 +414,7 @@ export default function MethodologyPage() {
         {/* Disclaimer */}
         <div style={{ marginTop: '2.5rem', background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.5rem' }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: '#555553', marginBottom: 8 }}>Important note</div>
-          <div style={{ fontSize: 13, color: '#888784', lineHeight: 1.7, fontWeight: 300 }}>
+          <div style={{ fontSize: 13, color: '#888784', lineHeight: 1.7, fontWeight: 400 }}>
             <p style={{ margin: '0 0 10px' }}>This document and all outputs generated through the ThemisIQ platform are provided for informational, screening, planning, and prioritization purposes only. They do not constitute legal, regulatory, accounting, financial, assurance, investment, or other professional advice and do not, by themselves, satisfy any reporting, disclosure, filing, compliance, assurance, or certification obligation under IFRS, ISSB, CSRD, ESRS, SEC, California climate disclosure regulations, or any other framework or jurisdiction.</p>
             <p style={{ margin: '0 0 10px' }}>Platform outputs are dependent upon information provided by users and other third-party sources. ThemisIQ Compliance Inc. does not independently verify such information and makes no representation or warranty, express or implied, regarding the completeness, accuracy, reliability, suitability, or fitness for a particular purpose of any output.</p>
             <p style={{ margin: '0 0 10px' }}>Sustainability-related laws, regulations, standards, guidance, and interpretations continue to evolve. Users remain solely responsible for determining the applicability of regulatory requirements and for obtaining independent legal, accounting, assurance, and other professional advice where appropriate.</p>

@@ -89,7 +89,7 @@ function Section({ id, num, title, children }: { id: string, num: string, title:
 }
 
 const eyebrow: React.CSSProperties = { fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 5 }
-const body: React.CSSProperties = { fontSize: 13.5, color: '#555553', lineHeight: 1.8, fontWeight: 300, marginBottom: '0.9rem' }
+const body: React.CSSProperties = { fontSize: 13.5, color: '#555553', lineHeight: 1.8, fontWeight: 400, marginBottom: '0.9rem' }
 const boxAmber: React.CSSProperties = { background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.25)', borderLeft: '3px solid #ba7517', borderRadius: 8, padding: '13px 15px', margin: '1rem 0' }
 const boxTitle: React.CSSProperties = { fontSize: 12, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }
-const boxBody: React.CSSProperties = { fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 300 }
+const boxBody: React.CSSProperties = { fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 400 }

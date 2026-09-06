@@ -1297,7 +1297,26 @@ const FRAMEWORKS = [
     intensity_denominator: 'revenue',
   },
   {
-    id: 'esrs', name: 'ESRS E1', full: 'ESRS E1 — EU CSRD (Scope 3 mandatory)', color: '#7425e3', bg: '#EDE9FE',
+    // Supply Chain's module hue (--color-module-supply / -wash), reused here as a FRAMEWORK
+    // colour. 5.6:1 on white, and hue 313 — its nearest neighbour among the other five frameworks
+    // is SB 253's red at hue 0, a 47° gap. Every framework pair now clears 20°.
+    //
+    // ⚠️ TWO COLOURS HAVE ALREADY BEEN REJECTED HERE. DO NOT RETRY EITHER.
+    //   #7425e3 / #EDE9FE — the retired brand violet. It made an ESRS card read as a ThemisIQ
+    //     action rather than as a framework, because the same violet was every button and link.
+    //   #1C5EAA / #E6EBFC — CBAM's blue, tried 5 Sep 2026 on the reasoning that CBAM and ESRS are
+    //     both EU instruments. MEASURED AND REVERSED THE SAME DAY: it is 2° from CDP's #0C447C
+    //     (hue 212 against 210), the two text colours are 1.51:1 apart and the two WASHES are
+    //     1.04:1 apart. These cards sit adjacent in the framework grid, so that is not a
+    //     difference — it is one colour appearing twice. The 12-point lightness gap was the only
+    //     separation, and lightness alone is exactly what fails in greyscale, on a projector and
+    //     on a photocopy.
+    //
+    // ⚠️ THE RULE THE FAILURE ESTABLISHES: a framework colour is chosen against the OTHER FIVE, by
+    // hue separation, not by what the framework is about. "EU framework, so use the EU-ish blue"
+    // is the reasoning that produced the collision — CDP is already blue, and thematic fit says
+    // nothing about whether two cards can be told apart.
+    id: 'esrs', name: 'ESRS E1', full: 'ESRS E1 — EU CSRD (Scope 3 mandatory)', color: '#AF3790', bg: '#F9E6F2',
     gwp: 'AR6', deadline: 'FY2024 (large EU companies)',
     desc: 'Full ESRS E1 disclosure — location AND market-based Scope 2, biogenic, by gas',
     requires: ['market_based_s2', 'renewable_energy_kwh', 'biogenic_co2'],

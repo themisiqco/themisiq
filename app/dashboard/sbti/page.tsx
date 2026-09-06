@@ -15,7 +15,7 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } fro
 // ─── Design tokens (mirroring the climate-risk dashboard) ─────────────────────
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
 const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.4rem, 2.5vw, 1.8rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
-const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '1.5rem' }
+const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
 const eyebrow: React.CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
@@ -623,7 +623,7 @@ export default function SbtiDashboard() {
     const mutedCard = (sc: Scope, note: string) => (
       <div key={sc} style={cardStyle}>
         <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', fontWeight: 400, marginBottom: 6 }}>{scopeLabel(sc)}</div>
-        <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>{note}</div>
+        <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>{note}</div>
       </div>
     )
 
@@ -752,12 +752,12 @@ export default function SbtiDashboard() {
             actually chosen. Three distinct states: no companies at all → onboarding; companies
             exist but none selected (2+ and no ?companyId=) → "select a company"; else summary/wizard. */}
         {loading ? (
-          <div style={{ fontSize: 13, color: '#888784', fontWeight: 300 }}>Loading…</div>
+          <div style={{ fontSize: 13, color: '#888784', fontWeight: 400 }}>Loading…</div>
         ) : allSeries.length === 0 ? (
           <div style={{ background: '#f8f7f5', border: '1px solid #e8e7e4', borderRadius: 14, padding: '2.5rem 2rem', textAlign: 'center' }}>
             <div style={eyebrow}>No inventory yet</div>
             <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, marginBottom: 6 }}>Set up your GHG inventory first</div>
-            <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, maxWidth: 460, margin: '0 auto 18px' }}>
+            <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, maxWidth: 460, margin: '0 auto 18px' }}>
               SBTi categorisation reads from your GHG company. Create a GHG inventory, then come back to set targets.
             </p>
             <a href="/dashboard/ghg" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: '#0d0d0d', color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Go to GHG inventory →</a>
@@ -787,7 +787,7 @@ export default function SbtiDashboard() {
             {step === 0 && (
               <>
                 <div style={eyebrow}>Step 1 · Company profile</div>
-                <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '1.5rem' }}>
+                <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }}>
                   Categorising <strong style={{ fontWeight: 600, color: '#0d0d0d' }}>{companyName}</strong> under the Corporate Net-Zero Standard V2.0 (Category A vs B).
                 </p>
 
@@ -820,7 +820,7 @@ export default function SbtiDashboard() {
 
                 <div style={{ marginTop: 18 }}>
                   <label style={labelStyle}>Is your ultimate-parent company headquartered in a World Bank high-income country?</label>
-                  <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.5, marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.5, marginBottom: 8 }}>
                     Gates the high-income categorisation route (Route 2 — the emissions / two-of-three thresholds).
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -834,9 +834,9 @@ export default function SbtiDashboard() {
                   <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color: catColor, lineHeight: 1.1 }}>
                     Category {result.category}
                   </div>
-                  <div style={{ fontSize: 13, color: '#555553', fontWeight: 300, marginTop: 6 }}>{basisLabel(result.matchedRoute)}</div>
+                  <div style={{ fontSize: 13, color: '#555553', fontWeight: 400, marginTop: 6 }}>{basisLabel(result.matchedRoute)}</div>
                   {highIncome === null && (
-                    <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 10 }}>
+                    <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, marginTop: 10 }}>
                       Declare high-income status to evaluate the high-income route.
                     </div>
                   )}
@@ -858,7 +858,7 @@ export default function SbtiDashboard() {
             {step === 1 && (
               <>
                 <div style={eyebrow}>Step 2 · Standard &amp; scope</div>
-                <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '1.5rem' }}>
+                <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }}>
                   Pick the standard version and the scopes <strong style={{ fontWeight: 600, color: '#0d0d0d' }}>{companyName}</strong> will set targets for.
                 </p>
 
@@ -868,14 +868,14 @@ export default function SbtiDashboard() {
                     <button onClick={() => pickStandard('v2_0')} style={toggleBtn(standardVersion === 'v2_0')}>Corporate Net-Zero V2.0</button>
                     <button onClick={() => pickStandard('v1_3_1')} style={toggleBtn(standardVersion === 'v1_3_1')}>V1.3.1</button>
                   </div>
-                  <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.5 }}>
                     V2.0 is effective {VERSION_DATES.v2_0EffectiveDate}, mandatory {VERSION_DATES.v2_0MandatoryDate}; V1.3.1 accepted through {VERSION_DATES.v1_3_1AcceptedUntil}.
                   </div>
                 </div>
 
                 <div style={{ marginBottom: 18 }}>
                   <label style={labelStyle}>Scopes to set targets for</label>
-                  <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.5, marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.5, marginBottom: 8 }}>
                     Under V2.0, Scope 1 and Scope 2 are set as separate targets.
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
@@ -891,7 +891,7 @@ export default function SbtiDashboard() {
                     {scopeLegality.map(({ scope, ok, reasons }) => (
                       <div key={scope} style={{ display: 'flex', gap: 8, fontSize: 13, marginBottom: 6, alignItems: 'baseline' }}>
                         <span style={{ color: ok ? '#0F6E56' : '#B91C1C', fontWeight: 700, flexShrink: 0 }}>{ok ? '✓' : '✗'}</span>
-                        <span style={{ color: '#555553', fontWeight: 300 }}>
+                        <span style={{ color: '#555553', fontWeight: 400 }}>
                           {SCOPE_LABEL[scope]}{!ok && reasons.length > 0 ? ` — ${reasons.join('; ')}` : ''}
                         </span>
                       </div>
@@ -899,7 +899,7 @@ export default function SbtiDashboard() {
                   </div>
                 )}
 
-                <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 18 }}>Targets are created in the next step.</div>
+                <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, marginTop: 18 }}>Targets are created in the next step.</div>
               </>
             )}
 
@@ -907,7 +907,7 @@ export default function SbtiDashboard() {
             {step === 2 && (
               <>
                 <div style={eyebrow}>Step 3 · Near-term targets</div>
-                <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '1.5rem' }}>
+                <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }}>
                   One near-term target per selected scope. The reduction % is pre-filled with the SBTi ACA-suggested rate; edit any field and it re-validates live.
                 </p>
 
@@ -951,7 +951,7 @@ export default function SbtiDashboard() {
                 )}
 
                 {selectedScopes.length === 0 ? (
-                  <div style={{ fontSize: 13, color: '#888784', fontWeight: 300 }}>No scopes selected — go back to Step 2 to choose scopes.</div>
+                  <div style={{ fontSize: 13, color: '#888784', fontWeight: 400 }}>No scopes selected — go back to Step 2 to choose scopes.</div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     {selectedScopes.map(sc => {
@@ -962,7 +962,7 @@ export default function SbtiDashboard() {
                         return (
                           <div key={sc} style={cardStyle}>
                             <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', fontWeight: 400, marginBottom: 8 }}>{SCOPE_LABEL[sc]}</div>
-                            <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: 12 }}>
+                            <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: 12 }}>
                               To set a Scope 3 target, complete your Scope 3 inventory first. Your near-term submission can proceed on Scope 1 + 2 alone.
                             </p>
                             <a href="/dashboard/scope3" onClick={() => { navIntentRef.current = true }} style={{ display: 'inline-block', padding: '9px 18px', borderRadius: 8, background: '#0d0d0d', color: '#fff', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>Go to Scope 3 Calculator →</a>
@@ -984,7 +984,7 @@ export default function SbtiDashboard() {
                         <div key={sc} style={cardStyle}>
                           <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', fontWeight: 400, marginBottom: 6 }}>{SCOPE_LABEL[sc]}</div>
                           {base != null && (
-                            <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginBottom: 14 }}>
+                            <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, marginBottom: 14 }}>
                               Base: {base.toLocaleString(undefined, { maximumFractionDigits: 1 })} tCO₂e{baselineYear != null ? ` (${baselineYear})` : ''}
                             </div>
                           )}
@@ -1002,7 +1002,7 @@ export default function SbtiDashboard() {
                               <input style={inputStyle} type="number" value={d.reductionPct} onChange={e => updateDraft(sc, 'reductionPct', Number(e.target.value))} />
                             </div>
                           </div>
-                          <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 8 }}>
+                          <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, marginTop: 8 }}>
                             ACA-suggested: {suggested}%
                             {Math.abs(d.reductionPct - suggested) > 0.05 && (
                               <button onClick={() => resetToSuggested(sc)} style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: '#7425e3', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>reset to suggested</button>
@@ -1014,7 +1014,7 @@ export default function SbtiDashboard() {
                             ) : (
                               <div style={{ color: '#B91C1C' }}>
                                 <span style={{ fontWeight: 600 }}>✗ Invalid</span>
-                                <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontWeight: 300, color: '#555553' }}>
+                                <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontWeight: 400, color: '#555553' }}>
                                   {v.reasons.map((r, i) => <li key={i}>{r}</li>)}
                                 </ul>
                               </div>
@@ -1033,7 +1033,7 @@ export default function SbtiDashboard() {
                                 </LineChart>
                               </ResponsiveContainer>
                             ) : (
-                              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#888784', fontWeight: 300, background: '#f8f7f5', borderRadius: 8 }}>
+                              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#888784', fontWeight: 400, background: '#f8f7f5', borderRadius: 8 }}>
                                 Fix the target to preview the trajectory.
                               </div>
                             )}
@@ -1055,7 +1055,7 @@ export default function SbtiDashboard() {
                     </button>
                   </div>
                 )}
-                <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 12 }}>Targets save to your account here; the trajectory previews update live as you edit.</div>
+                <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, marginTop: 12 }}>Targets save to your account here; the trajectory previews update live as you edit.</div>
               </>
             )}
 
@@ -1068,14 +1068,14 @@ export default function SbtiDashboard() {
                   <div style={{ background: '#f8f7f5', border: '1px solid #e8e7e4', borderRadius: 14, padding: '2.5rem 2rem', textAlign: 'center' }}>
                     <div style={eyebrow}>Near-term first</div>
                     <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, marginBottom: 6 }}>Set your near-term targets first</div>
-                    <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, maxWidth: 460, margin: '0 auto 18px' }}>
+                    <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, maxWidth: 460, margin: '0 auto 18px' }}>
                       Net-zero builds on your near-term targets. Save at least one near-term target, then come back.
                     </p>
                     <button onClick={() => setStep(2)} style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: '#0d0d0d', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer' }}>← Back to near-term targets</button>
                   </div>
                 ) : (
                   <>
-                    <p style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '1.5rem' }}>
+                    <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }}>
                       A net-zero target per scope that has a near-term target. Defaults to the {NET_ZERO.minAbsoluteReductionPct}% floor by {NET_ZERO.latestNetZeroYear}; edit and it re-validates live.
                     </p>
 
@@ -1100,7 +1100,7 @@ export default function SbtiDashboard() {
                               <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#7425e3', background: '#EDE9FE', borderRadius: 99, padding: '2px 8px' }}>Net-zero</span>
                             </div>
                             {base != null && (
-                              <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginBottom: 14 }}>
+                              <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, marginBottom: 14 }}>
                                 Base: {base.toLocaleString(undefined, { maximumFractionDigits: 1 })} tCO₂e{baselineYear != null ? ` (${baselineYear})` : ''}
                               </div>
                             )}
@@ -1118,7 +1118,7 @@ export default function SbtiDashboard() {
                                 <input style={inputStyle} type="number" value={d.reductionPct} onChange={e => updateNetZeroDraft(sc, 'reductionPct', Number(e.target.value))} />
                               </div>
                             </div>
-                            <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 8 }}>
+                            <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, marginTop: 8 }}>
                               Net-zero requires ≥{NET_ZERO.minAbsoluteReductionPct}% reduction by ≤{NET_ZERO.latestNetZeroYear}, absolute method.
                             </div>
                             <div style={{ marginTop: 12, fontSize: 13 }}>
@@ -1127,7 +1127,7 @@ export default function SbtiDashboard() {
                               ) : (
                                 <div style={{ color: '#B91C1C' }}>
                                   <span style={{ fontWeight: 600 }}>✗ Invalid</span>
-                                  <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontWeight: 300, color: '#555553' }}>
+                                  <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontWeight: 400, color: '#555553' }}>
                                     {v.reasons.map((r, i) => <li key={i}>{r}</li>)}
                                   </ul>
                                 </div>
@@ -1146,7 +1146,7 @@ export default function SbtiDashboard() {
                                   </LineChart>
                                 </ResponsiveContainer>
                               ) : (
-                                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#888784', fontWeight: 300, background: '#f8f7f5', borderRadius: 8 }}>
+                                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#888784', fontWeight: 400, background: '#f8f7f5', borderRadius: 8 }}>
                                   Fix the target to preview the trajectory.
                                 </div>
                               )}
@@ -1158,7 +1158,7 @@ export default function SbtiDashboard() {
 
                     {/* Honest-scoping note — a per-target ✓ is NOT full net-zero compliance. */}
                     <div style={{ marginTop: 20, background: '#FEF3E2', border: '1px solid #ba751733', borderRadius: 12, padding: '1rem 1.2rem' }}>
-                      <div style={{ fontSize: 12, color: '#555553', fontWeight: 300, lineHeight: 1.65 }}>
+                      <div style={{ fontSize: 12, color: '#555553', fontWeight: 400, lineHeight: 1.65 }}>
                         <strong style={{ fontWeight: 600, color: '#0d0d0d' }}>These checks are per-target only.</strong> A ✓ confirms this scope&rsquo;s net-zero rules (≥{NET_ZERO.minAbsoluteReductionPct}% reduction, ≤{NET_ZERO.latestNetZeroYear}, absolute method). It does <strong style={{ fontWeight: 600 }}>not</strong> confirm full net-zero compliance, which also requires aggregate coverage of ≥90% of total emissions across all scopes, ≥90% Scope 3 coverage, and neutralisation of residual emissions via permanent removals — all assessed separately in a later step.
                       </div>
                     </div>
@@ -1172,7 +1172,7 @@ export default function SbtiDashboard() {
                         {savingNetZero ? 'Saving…' : savedNetZero ? '✓ Saved' : 'Save net-zero targets'}
                       </button>
                     </div>
-                    <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginTop: 12 }}>Net-zero targets save to your account here, alongside your near-term targets.</div>
+                    <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, marginTop: 12 }}>Net-zero targets save to your account here, alongside your near-term targets.</div>
                   </>
                 )}
               </>

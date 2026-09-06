@@ -140,7 +140,7 @@ export default function Page() {
           <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1rem', color: ink }}>
             What your verified CBAM report looks like
           </h1>
-          <p style={{ fontSize: 15, color: muted, lineHeight: 1.75, fontWeight: 300, maxWidth: 620 }}>
+          <p style={{ fontSize: 15, color: muted, lineHeight: 1.75, fontWeight: 400, maxWidth: 620 }}>
             A sample CBAM Specific Embedded Emissions summary for an illustrative iron & steel installation — the verified report you share with your EU customers. Figures are illustrative — this is not real data.
           </p>
         </div>
@@ -155,7 +155,7 @@ export default function Page() {
             <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: faint, background: canvas, border: `0.5px solid ${hair}`, borderRadius: 99, padding: '2px 8px' }}>Illustration — not an uploader</span>
           </div>
           <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 400, color: ink, marginBottom: 6 }}>Every figure starts with a record.</h2>
-          <p style={{ fontSize: 14, color: muted, fontWeight: 300, lineHeight: 1.7, maxWidth: 620, marginBottom: '1.5rem' }}>You attach the evidence behind each number — we keep the link, so every figure in the report below traces straight back to its source document.</p>
+          <p style={{ fontSize: 14, color: muted, fontWeight: 400, lineHeight: 1.7, maxWidth: 620, marginBottom: '1.5rem' }}>You attach the evidence behind each number — we keep the link, so every figure in the report below traces straight back to its source document.</p>
           <div style={{ border: `0.5px solid ${hair}`, borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ background: canvas, borderBottom: `0.5px solid ${hair}`, padding: '10px 16px', fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: faint }}>Evidence attached · illustrative</div>
             {SAMPLE_DOCS.map((d, i) => (
@@ -181,7 +181,7 @@ export default function Page() {
           <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, color: ink, marginBottom: 4 }}>
             {SAMPLE.installationName} · {SAMPLE.reportingPeriod}
           </h2>
-          <p style={{ fontSize: 14, color: muted, fontWeight: 300, marginBottom: '1.5rem' }}>Iron & steel · {SAMPLE.installation.country} · reporting period {SAMPLE.reportingPeriod}</p>
+          <p style={{ fontSize: 14, color: muted, fontWeight: 400, marginBottom: '1.5rem' }}>Iron & steel · {SAMPLE.installation.country} · reporting period {SAMPLE.reportingPeriod}</p>
 
           {/* Coverage — the complete-and-backed signal */}
           <div style={{ background: '#E1F5EE', border: `0.5px solid ${green}33`, borderRadius: 10, padding: '10px 16px', marginBottom: '2.5rem', fontSize: 13, color: green, fontWeight: 500 }}>
@@ -302,7 +302,7 @@ export default function Page() {
               with NO live "View" buttons / signed URLs. */}
           <div style={{ marginBottom: '2.25rem' }}>
             <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, color: ink, marginBottom: '0.75rem' }}>Source documents</h3>
-            <p style={{ fontSize: 13, color: muted, fontWeight: 300, lineHeight: 1.6, marginBottom: '1rem' }}>Each figure traces back to the records you attached.</p>
+            <p style={{ fontSize: 13, color: muted, fontWeight: 400, lineHeight: 1.6, marginBottom: '1rem' }}>Each figure traces back to the records you attached.</p>
             {SAMPLE_DOCS.map((d, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, background: '#fff', border: `0.5px solid ${hair}`, borderRadius: 10, padding: '12px 16px', marginBottom: 8, flexWrap: 'wrap' as const }}>
                 <div>
@@ -326,7 +326,7 @@ export default function Page() {
         <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2, color: ink }}>
           Give your EU customers the figures they need.
         </h2>
-        <p style={{ fontSize: 15, color: muted, maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 15, color: muted, maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
           Installation-level actuals, with the evidence attached — instead of a published default set conservatively.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>

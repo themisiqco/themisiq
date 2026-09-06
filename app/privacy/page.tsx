@@ -40,7 +40,7 @@ export default function PrivacyPage() {
           </div>
           <div style={{ background: 'rgba(116,37,227,0.05)', border: '0.5px solid rgba(116,37,227,0.2)', borderLeft: '3px solid #7425e3', borderRadius: 8, padding: '13px 15px' }}>
             <div style={{ fontSize: 12, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }}>Governing law: Canada (PIPEDA · Law 25 · CASL) + US state privacy laws + GDPR / UK GDPR for EU/UK customers</div>
-            <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 300 }}>ThemisIQ Compliance Inc. is a Canadian company. This Privacy Policy complies with Canadian federal and provincial privacy law as the primary framework. Additional rights for US residents (CCPA/CPRA, state laws, CAN-SPAM, COPPA) are set out in Section 9.</div>
+            <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>ThemisIQ Compliance Inc. is a Canadian company. This Privacy Policy complies with Canadian federal and provincial privacy law as the primary framework. Additional rights for US residents (CCPA/CPRA, state laws, CAN-SPAM, COPPA) are set out in Section 9.</div>
           </div>
         </div>
       </div>
@@ -216,7 +216,7 @@ export default function PrivacyPage() {
 const sectionStyle: React.CSSProperties = { marginBottom: '2.5rem', scrollMarginTop: 80 }
 const eyebrow: React.CSSProperties = { fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 5 }
 const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: '1.45rem', fontWeight: 400, color: '#0d0d0d', marginBottom: '0.9rem', lineHeight: 1.2 }
-const body: React.CSSProperties = { fontSize: 13.5, color: '#555553', lineHeight: 1.8, fontWeight: 300, marginBottom: '0.9rem' }
+const body: React.CSSProperties = { fontSize: 13.5, color: '#555553', lineHeight: 1.8, fontWeight: 400, marginBottom: '0.9rem' }
 const divider: React.CSSProperties = { height: '0.5px', background: '#e8e7e4', margin: '2rem 0' }
 const link: React.CSSProperties = { color: '#7425e3', textDecoration: 'none' }
 const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse', margin: '0.8rem 0', fontSize: 12 }
@@ -225,4 +225,4 @@ const tdStyle: React.CSSProperties = { padding: '8px 12px', borderBottom: '0.5px
 const boxGreen: React.CSSProperties = { background: '#E1F5EE', border: '0.5px solid rgba(29,158,117,0.25)', borderLeft: '3px solid #1D9E75', borderRadius: 8, padding: '13px 15px', margin: '1rem 0' }
 const boxPurple: React.CSSProperties = { background: 'rgba(116,37,227,0.05)', border: '0.5px solid rgba(116,37,227,0.2)', borderLeft: '3px solid #7425e3', borderRadius: 8, padding: '13px 15px', margin: '1rem 0' }
 const boxTitle: React.CSSProperties = { fontSize: 12, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }
-const boxBody: React.CSSProperties = { fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 300 }
+const boxBody: React.CSSProperties = { fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 400 }

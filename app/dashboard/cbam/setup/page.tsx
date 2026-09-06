@@ -31,7 +31,7 @@ import type { CnMapRow } from '../../../../lib/cbam/cn'
 
 // ── House style, matching app/dashboard/cbam/page.tsx ──
 const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
-const sectionSub: React.CSSProperties = { fontSize: 14, color: '#555553', fontWeight: 300, lineHeight: 1.7, marginBottom: '2rem' }
+const sectionSub: React.CSSProperties = { fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.7, marginBottom: '2rem' }
 const itemHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: '1.15rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 10, marginTop: '2rem' }
 
 /**
@@ -1308,7 +1308,7 @@ export default function CbamSetupPage() {
           <div style={{ position: 'absolute', inset: 0, zIndex: 10, backdropFilter: 'blur(8px)', background: 'rgba(248,247,245,0.85)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ background: '#fff', borderRadius: 16, padding: '2.5rem', boxShadow: '0 8px 40px rgba(0,0,0,0.12)', border: '0.5px solid #e8e7e4', maxWidth: 480, textAlign: 'center' }}>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 8 }}>CBAM is a paid module.</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 300 }}>Set up your operator profile and installations, then record disclosures and generate your Annex IV §1.2 report. Unlock the CBAM module to begin.</div>
+              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 400 }}>Set up your operator profile and installations, then record disclosures and generate your Annex IV §1.2 report. Unlock the CBAM module to begin.</div>
               <button onClick={() => (window.location.href = '/pricing')} style={{ width: '100%', fontSize: 14, fontWeight: 600, padding: '14px 28px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d' }}>
                 Unlock CBAM →
               </button>
@@ -1326,7 +1326,7 @@ export default function CbamSetupPage() {
         <div style={sectionHead}>CBAM setup</div>
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '2rem', marginTop: '1rem' }}>
           <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>No company on your account yet</div>
-          <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, fontWeight: 300 }}>
+          <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, fontWeight: 400 }}>
             Every CBAM record is owned by a company, so a company must exist first. Your account has none. Companies are created in the main product flow (e.g. the GHG module’s company step) — set one up there, then return here to continue CBAM setup.
           </div>
         </div>
@@ -1370,7 +1370,7 @@ export default function CbamSetupPage() {
       {step === 1 && (
         <div>
           <div style={itemHead}>(1) Identification of the operator</div>
-          <div style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '1.25rem' }}>
+          <div style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.25rem' }}>
             One profile per company. Any field may be left blank — the report marks blanks as outstanding rather than blocking the save.
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 560 }}>
@@ -1411,20 +1411,20 @@ export default function CbamSetupPage() {
       {step === 2 && (
         <div>
           <div style={itemHead}>(2) The installation(s) under verification</div>
-          <div style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '1.25rem' }}>
+          <div style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.25rem' }}>
             Add every installation you produce CBAM goods at. Only name and country are required; the rest may be filled in progressively.
           </div>
 
           {/* Existing installations */}
           {installations.length === 0 ? (
-            <div style={{ fontSize: 13, color: '#888784', fontWeight: 300, marginBottom: '1rem' }}>No installations yet.</div>
+            <div style={{ fontSize: 13, color: '#888784', fontWeight: 400, marginBottom: '1rem' }}>No installations yet.</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
               {installations.map((inst) => (
                 <div key={inst.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px' }}>
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>{inst.name} <span style={{ color: '#888784', fontWeight: 300 }}>· {inst.country}</span></div>
-                    <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>{inst.name} <span style={{ color: '#888784', fontWeight: 400 }}>· {inst.country}</span></div>
+                    <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>
                       {inst.cbam_registry_id ? `Registry ${inst.cbam_registry_id}` : 'No Registry ID'} · {inst.un_locode ? `UN/LOCODE ${inst.un_locode}` : 'No UN/LOCODE'} · {inst.latitude && inst.longitude ? `${inst.latitude}, ${inst.longitude}` : 'No coordinates'}
                     </div>
                   </div>
@@ -1504,12 +1504,12 @@ export default function CbamSetupPage() {
         <div>
           <div style={itemHead}>(3) Production processes and emissions</div>
           {installations.length === 0 ? (
-            <div style={{ fontSize: 13, color: '#888784', fontWeight: 300, lineHeight: 1.6 }}>
+            <div style={{ fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.6 }}>
               Add an installation in Step 2 first — every process belongs to an installation, so this step depends on it.
             </div>
           ) : (
             <>
-              <div style={{ fontSize: 13, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: '1.25rem' }}>
+              <div style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.25rem' }}>
                 A process is one produced good at one installation, with the source streams (fuels, materials, outputs) whose carbon nets to its direct emissions. Nothing is computed here — computing is a separate, deliberate action.
               </div>
 
@@ -1525,13 +1525,13 @@ export default function CbamSetupPage() {
                   that number back to its evidence. */}
               <div style={{ marginBottom: '1.5rem', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', color: '#0d0d0d', marginBottom: 4 }}>Evidence documents</div>
-                <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '1rem' }}>
+                <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1rem' }}>
                   Upload the records behind your figures — weighbridge tickets, fuel delivery notes, laboratory analyses, production logs. These are <strong>not read or parsed</strong>: you tally your own records and enter the figure, and the document is the provenance link a verifier follows back from a number to its evidence. Accepted: PDF, PNG, JPEG, CSV, XLSX (max 25 MB). Legacy .xls is not accepted — save as .xlsx.
                 </div>
 
                 {/* Uploaded documents */}
                 {documents.length === 0 ? (
-                  <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, marginBottom: '1rem' }}>No documents uploaded yet.</div>
+                  <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, marginBottom: '1rem' }}>No documents uploaded yet.</div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: '1rem' }}>
                     {documents.map((doc) => (
@@ -1588,26 +1588,26 @@ export default function CbamSetupPage() {
 
               {/* Existing processes */}
               {processes.length === 0 ? (
-                <div style={{ fontSize: 13, color: '#888784', fontWeight: 300, marginBottom: '1rem' }}>No processes yet for this installation.</div>
+                <div style={{ fontSize: 13, color: '#888784', fontWeight: 400, marginBottom: '1rem' }}>No processes yet for this installation.</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
                   {processes.map((proc) => (
                     <div key={proc.id} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                         <div>
-                          <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>CN {proc.cn_code} <span style={{ color: '#888784', fontWeight: 300 }}>· {categoryLabel(goodsCategories, proc.category_code)}{proc.route_code ? ` · ${routeLabel(proc.route_code)}` : ''}</span></div>
-                          <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>Activity level {proc.activity_level} t · {proc.reporting_period} · {calcModeLabel(proc.calc_mode)}{proc.steel_grade ? ` · ${steelGradeLabel(proc.steel_grade)}` : ''}</div>
+                          <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>CN {proc.cn_code} <span style={{ color: '#888784', fontWeight: 400 }}>· {categoryLabel(goodsCategories, proc.category_code)}{proc.route_code ? ` · ${routeLabel(proc.route_code)}` : ''}</span></div>
+                          <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>Activity level {proc.activity_level} t · {proc.reporting_period} · {calcModeLabel(proc.calc_mode)}{proc.steel_grade ? ` · ${steelGradeLabel(proc.steel_grade)}` : ''}</div>
                           {/* Precursor status. Rows are the evidence of a declaration; the
                               declaration column only carries the state rows cannot express. */}
                           {(() => {
                             const m = precursorMeta[proc.id]
                             if (m && m.count > 0) {
-                              return <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>Precursors — {m.count} entered</div>
+                              return <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>Precursors — {m.count} entered</div>
                             }
                             if (m && m.declaration === 'none') {
-                              return <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>Precursors — none, {lowerFirst(declarationReasonLabel(m.reason))}</div>
+                              return <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>Precursors — none, {lowerFirst(declarationReasonLabel(m.reason))}</div>
                             }
-                            return <div style={{ fontSize: 12, color: '#92400e', fontWeight: 300 }}>Precursors — not yet declared</div>
+                            return <div style={{ fontSize: 12, color: '#92400e', fontWeight: 400 }}>Precursors — not yet declared</div>
                           })()}
                         </div>
                         <div style={{ display: 'flex', gap: 8 }}>
@@ -1651,7 +1651,7 @@ export default function CbamSetupPage() {
 
                             {/* What a precursor figure currently rests on. Stated plainly rather
                                 than offered as a choice — see the comment on savePrecursor. */}
-                            <div style={{ fontSize: 12, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: 10 }}>
+                            <div style={{ fontSize: 12, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: 10 }}>
                               Precursor figures currently use the published default values. Support for using a supplier&apos;s own verified figure is coming.
                             </div>
 
@@ -1704,7 +1704,7 @@ export default function CbamSetupPage() {
                                     {editingPrecursor.boundary === 'joint' && (
                                       // Neutral, not amber: this is how joint production is
                                       // supposed to work, not a problem to fix.
-                                      <div style={{ marginTop: 4, fontSize: 12, color: '#555553', fontWeight: 300, lineHeight: 1.5 }}>
+                                      <div style={{ marginTop: 4, fontSize: 12, color: '#555553', fontWeight: 400, lineHeight: 1.5 }}>
                                         The emissions of a precursor made inside this process&apos;s boundary are already counted in this process&apos;s own figure, so entering it here records it without adding it again.
                                       </div>
                                     )}
@@ -1721,7 +1721,7 @@ export default function CbamSetupPage() {
 
                                   <div style={{ borderTop: '0.5px solid #e8e7e4', paddingTop: 12 }}>
                                     <div style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d', marginBottom: 2 }}>Who produced it — all optional</div>
-                                    <div style={{ fontSize: 11, color: '#888784', fontWeight: 300, lineHeight: 1.5, marginBottom: 10 }}>Traceability only. These feed no calculation, and leaving them blank does not affect your figure.</div>
+                                    <div style={{ fontSize: 11, color: '#888784', fontWeight: 400, lineHeight: 1.5, marginBottom: 10 }}>Traceability only. These feed no calculation, and leaving them blank does not affect your figure.</div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                       <CbamField label="Operator name">
                                         <input value={editingPrecursor.origin_operator_name} onChange={(e) => setPrecF('origin_operator_name', e.target.value)} style={cbamInputStyle} />
@@ -1748,12 +1748,12 @@ export default function CbamSetupPage() {
                             {/* ── Declaration ── */}
                             <div style={{ marginTop: 14, borderTop: '0.5px solid #e8e7e4', paddingTop: 12 }}>
                               {precursors.length > 0 ? (
-                                <div style={{ fontSize: 12, color: '#555553', fontWeight: 300, lineHeight: 1.6 }}>
+                                <div style={{ fontSize: 12, color: '#555553', fontWeight: 400, lineHeight: 1.6 }}>
                                   This process&apos;s precursors are declared by the entries above — nothing further is needed.
                                 </div>
                               ) : m?.declaration === 'none' ? (
                                 <div>
-                                  <div style={{ fontSize: 12, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: 8 }}>
+                                  <div style={{ fontSize: 12, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: 8 }}>
                                     You have stated that this process consumes no CBAM precursors — {lowerFirst(declarationReasonLabel(m.reason))}.
                                     {m.note ? <> Your note: “{m.note}”</> : null}
                                   </div>
@@ -1761,7 +1761,7 @@ export default function CbamSetupPage() {
                                 </div>
                               ) : (
                                 <div>
-                                  <div style={{ fontSize: 12, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginBottom: 10 }}>
+                                  <div style={{ fontSize: 12, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: 10 }}>
                                     If this process consumes no CBAM precursors, say so here. A report cannot be generated until every process has either its precursors entered or this statement made.
                                   </div>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 460 }}>
@@ -1802,7 +1802,7 @@ export default function CbamSetupPage() {
                                   ['Total', computeResult.see_record.see_total],
                                 ] as [string, number][]).map(([label, v]) => (
                                   <div key={label}>
-                                    <div style={{ fontSize: 11, color: '#888784', fontWeight: 300 }}>{label}</div>
+                                    <div style={{ fontSize: 11, color: '#888784', fontWeight: 400 }}>{label}</div>
                                     {/* Same formatting the report page uses for these figures
                                         (fmtNum): locale-grouped, up to 6 decimal places. */}
                                     <div style={{ fontSize: 14, color: '#0d0d0d', fontWeight: 500 }}>{v.toLocaleString(undefined, { maximumFractionDigits: 6 })}</div>
@@ -1816,7 +1816,7 @@ export default function CbamSetupPage() {
                                 <div style={{ marginTop: 10, background: '#FEF3E2', border: '0.5px solid #f5d9ad', borderRadius: 8, padding: '10px 12px' }}>
                                   <div style={{ fontSize: 12, color: '#92400e', fontWeight: 600, marginBottom: 4 }}>Some precursors fell back to a published default</div>
                                   {computeResult.unresolved.map((u, i) => (
-                                    <div key={`${u.cnCode}-${i}`} style={{ fontSize: 12, color: '#92400e', fontWeight: 300, lineHeight: 1.6 }}>
+                                    <div key={`${u.cnCode}-${i}`} style={{ fontSize: 12, color: '#92400e', fontWeight: 400, lineHeight: 1.6 }}>
                                       {/* An UNRECOGNISED reason renders verbatim rather than
                                           being dropped — see UNRESOLVED_REASONS. */}
                                       CN {u.cnCode} — {UNRESOLVED_REASONS[u.reason] ?? u.reason}
@@ -2015,7 +2015,7 @@ export default function CbamSetupPage() {
                         // back to the raw code is for a category the map names but goodsCategories
                         // has not loaded; showing a code beats showing nothing.
                         const labelFor = (code: string) => goodsCategories.find((c) => c.code === code)?.label ?? code
-                        const line: React.CSSProperties = { marginTop: 4, fontSize: 12, fontWeight: 300, lineHeight: 1.5 }
+                        const line: React.CSSProperties = { marginTop: 4, fontSize: 12, fontWeight: 400, lineHeight: 1.5 }
                         if (a.kind === 'consistent') {
                           // Rendered, not silent: a passed check and a check that never ran must
                           // not look the same.
@@ -2045,7 +2045,7 @@ export default function CbamSetupPage() {
                           // Light by design: an offer, not a call to action. The select remains the
                           // way to choose; these buttons are a shortcut to it, not a replacement.
                           const chip: React.CSSProperties = {
-                            fontSize: 12, fontWeight: 300, lineHeight: 1.5, padding: '2px 10px',
+                            fontSize: 12, fontWeight: 400, lineHeight: 1.5, padding: '2px 10px',
                             background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4',
                             borderRadius: 999, cursor: 'pointer',
                           }
@@ -2095,7 +2095,7 @@ export default function CbamSetupPage() {
                           </select>
                         </CbamField>
                       ) : (
-                        <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.5 }}>This category has no production route — the route is left unset (correct for e.g. iron/steel products and sintered ore).</div>
+                        <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.5 }}>This category has no production route — the route is left unset (correct for e.g. iron/steel products and sintered ore).</div>
                       )
                     )}
                     {/*
@@ -2129,7 +2129,7 @@ export default function CbamSetupPage() {
                             aria-controls="cbam-boundary-guidance"
                             onClick={() => setBoundaryOpen((o) => !o)}
                             style={{
-                              fontSize: 12, fontWeight: 300, lineHeight: 1.5, padding: '2px 10px',
+                              fontSize: 12, fontWeight: 400, lineHeight: 1.5, padding: '2px 10px',
                               background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4',
                               borderRadius: 999, cursor: 'pointer',
                             }}
@@ -2153,18 +2153,18 @@ export default function CbamSetupPage() {
                                   {/* Our framing. Kept visually distinct from the quoted text
                                       below so a reader can tell which words are whose. */}
                                   <div style={{ fontSize: 12, fontWeight: 400, lineHeight: 1.5, color: '#555553' }}>{g.heading}</div>
-                                  <div style={{ fontSize: 12, fontWeight: 300, lineHeight: 1.5, color: '#888784' }}>{g.leadIn}</div>
+                                  <div style={{ fontSize: 12, fontWeight: 400, lineHeight: 1.5, color: '#888784' }}>{g.leadIn}</div>
                                   {g.entries.map((e) => (
                                     <div key={e.cite} style={{ marginTop: 8 }}>
                                       {/* Darker than the heading and leadIn above it, and matching
                                           the provisions below it: the cite ATTRIBUTES the
                                           regulation's text, so it belongs with the quoted words
                                           rather than with our framing of them. */}
-                                      <div style={{ fontSize: 12, fontWeight: 300, lineHeight: 1.5, color: '#555553' }}>{e.cite}</div>
+                                      <div style={{ fontSize: 12, fontWeight: 400, lineHeight: 1.5, color: '#555553' }}>{e.cite}</div>
                                       <ul style={{ margin: '2px 0 0', paddingLeft: 16 }}>
                                         {e.provisions.map((p, i) => (
                                           // Verbatim. No slice, no ellipsis, no casing change.
-                                          <li key={i} style={{ fontSize: 12, fontWeight: 300, lineHeight: 1.5, color: '#555553' }}>{p}</li>
+                                          <li key={i} style={{ fontSize: 12, fontWeight: 400, lineHeight: 1.5, color: '#555553' }}>{p}</li>
                                         ))}
                                       </ul>
                                     </div>
@@ -2257,7 +2257,7 @@ function StepTab({ n, label, sub, active, onClick, muted }: { n: number; label: 
       }}
     >
       <div style={{ fontSize: 13, fontWeight: 600 }}>{n}. {label}</div>
-      <div style={{ fontSize: 11, fontWeight: 300, color: active ? 'rgba(255,255,255,0.75)' : '#888784' }}>{sub}</div>
+      <div style={{ fontSize: 11, fontWeight: 400, color: active ? 'rgba(255,255,255,0.75)' : '#888784' }}>{sub}</div>
     </button>
   )
 }

@@ -18,7 +18,7 @@ export default function Home() {
         <div style={{ maxWidth: 860, margin: '0 auto' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', marginBottom: '3.5rem' }}>
             <Logo size={320} />
-            <p style={{ fontSize: 15, color: '#888784', letterSpacing: '0.02em', fontWeight: 300 }}>
+            <p style={{ fontSize: 15, color: '#888784', letterSpacing: '0.02em', fontWeight: 400 }}>
               Compliance Intelligence for Sustainable Business
             </p>
           </div>
@@ -26,7 +26,7 @@ export default function Home() {
             Countless compliance requirements.<br />
             <em style={gradText}>One Intelligent Platform.</em>
           </h1>
-          <p style={{ fontSize: 17, color: '#555553', maxWidth: 580, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.75 }}>
+          <p style={{ fontSize: 17, color: '#555553', maxWidth: 580, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.75 }}>
             From GHG emissions and climate risk to supply chain, M&A diligence, AI governance, workforce, and cybersecurity — ThemisIQ turns complex compliance into competitive clarity.
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: '2.5rem' }}>
@@ -81,7 +81,7 @@ export default function Home() {
       <div style={{ padding: '4rem 2.5rem', background: '#f8f7f5', borderBottom: '0.5px solid #e8e7e4' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', textAlign: 'center' }}>
           <p style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Framework coverage</p>
-          <p style={{ fontSize: 14, color: '#555553', fontWeight: 300, marginBottom: '1.5rem' }}>Every major regulatory and voluntary framework. Pre-mapped. Export-ready.</p>
+          <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, marginBottom: '1.5rem' }}>Every major regulatory and voluntary framework. Pre-mapped. Export-ready.</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
             {['SB 253 (California)', 'SB 261 (California)', 'ESRS E1 / CSRD', 'IFRS S2', 'CDP Climate', 'EcoVadis', 'TCFD', 'GHG Protocol', 'SEC Climate Rule', 'GRI', 'SBTi', 'RE100', 'NIST AI RMF', 'EU AI Act', 'ISO 27001', 'NIST CSF', 'SASB', 'EU Pay Transparency', 'NIS2', 'DORA'].map(fw => (
               <span key={fw} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 99, background: '#fff', border: '0.5px solid #e8e7e4', color: '#555553', cursor: 'default' }}>{fw}</span>
@@ -101,7 +101,7 @@ export default function Home() {
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f8f7f5' }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff' }}>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.2 }}>{mod.name === 'Supply Chain & Scope 3' ? <>Supply Chain &amp; <span style={{ whiteSpace: 'nowrap' }}>Scope 3</span></> : mod.name}</div>
-              <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 300 }}>{mod.desc}</div>
+              <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{mod.desc}</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 'auto', paddingTop: 8 }}>
                 {mod.tags.map(t => <span key={t} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#888784' }}>{t}</span>)}
               </div>
@@ -116,7 +116,7 @@ export default function Home() {
           <div style={{ maxWidth: 640 }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 8 }}>Advisory Services</div>
             <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: 8 }}>Available across all modules</div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, fontWeight: 300 }}>Expert advisory services — sector-specific guidance, assurance prep, and board-ready narratives from practitioners who speak your language.</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, fontWeight: 400 }}>Expert advisory services — sector-specific guidance, assurance prep, and board-ready narratives from practitioners who speak your language.</div>
           </div>
           <span style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', padding: '12px 24px', borderRadius: 8, whiteSpace: 'nowrap', flexShrink: 0 }}>Talk to a specialist →</span>
         </a>
@@ -131,7 +131,7 @@ export default function Home() {
             <div style={{ flex: '1 1 420px' }}>
               <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 6 }}>Single or double · which one applies to you</div>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.2, marginBottom: 6 }}>The Materiality Assessment</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 300 }}>Single materiality for IFRS S2, double materiality for CSRD — the methodology your auditor expects. See two sample reports for the same entity.</div>
+              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>Single materiality for IFRS S2, double materiality for CSRD — the methodology your auditor expects. See two sample reports for the same entity.</div>
             </div>
             <span style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', padding: '11px 22px', borderRadius: 8, whiteSpace: 'nowrap' }}>See sample reports →</span>
           </a>
@@ -146,7 +146,7 @@ export default function Home() {
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
               A climate resilience report that holds up under scrutiny.
             </h2>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', lineHeight: 1.75, fontWeight: 300 }}>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', lineHeight: 1.75, fontWeight: 400 }}>
               IFRS S2 and CSRD/ESRS don&apos;t just ask you to run a scenario — they ask you to show resilience across a <em>diverse range</em> of climate futures, and to document the judgment behind it. ThemisIQ produces exactly that: a multi-scenario resilience report, generated from your assessment, with every figure traceable to its basis.
             </p>
           </div>
@@ -180,7 +180,7 @@ export default function Home() {
             ].map(([title, desc]) => (
               <div key={title} style={{ background: 'rgba(255,255,255,0.03)', borderLeft: '2px solid rgba(116,37,227,0.6)', borderRadius: '0 10px 10px 0', padding: '1rem 1.25rem' }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginBottom: 4 }}>{title}</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, fontWeight: 300 }}>{desc}</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, fontWeight: 400 }}>{desc}</div>
               </div>
             ))}
           </div>
@@ -208,7 +208,7 @@ export default function Home() {
               <div key={num}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '2.5rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', opacity: 0.5, marginBottom: '0.75rem' }}>{num}</div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: '0.5rem' }}>{title}</div>
-                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 300 }}>{desc}</div>
+                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
               </div>
             ))}
           </div>
@@ -221,7 +221,7 @@ export default function Home() {
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>Not sure where to start?</div>
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Built for who's asking.</h2>
-            <p style={{ fontSize: 15, color: '#555553', maxWidth: 520, margin: '0 auto', fontWeight: 300 }}>Whether it's a customer, your bank, your board or your investor — here's where to start for each.</p>
+            <p style={{ fontSize: 15, color: '#555553', maxWidth: 520, margin: '0 auto', fontWeight: 400 }}>Whether it's a customer, your bank, your board or your investor — here's where to start for each.</p>
           </div>
           {/* The OLD-model cards stood here — four priced pack tiles reading PACKS and routing to
               /get-started/*. Deleted, not left behind a flag: NEW_PRICING_ACTIVE has been true since
@@ -266,7 +266,7 @@ export default function Home() {
         <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
           The first SB 253 report is <em style={gradText}> {SB253_FIRST_REPORT_DATE}, {SB253_DATE_STATUS}.</em>
         </h2>
-        <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
           ThemisIQ can have your Scope 1 and 2 inventory complete and the CARB template pre-filled in days — not months.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -323,4 +323,4 @@ const btnSecondary: React.CSSProperties = { fontSize: 14, fontWeight: 400, paddi
 const gradText: React.CSSProperties = { fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
 const sectionTitle: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }
-const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, lineHeight: 1.75, fontWeight: 300 }
+const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, lineHeight: 1.75, fontWeight: 400 }

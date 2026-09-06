@@ -35,7 +35,7 @@ export default function Page() {
               GHG Emissions<br />
               <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Intelligence</span>
             </h1>
-            <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 300, marginBottom: '2rem', maxWidth: 480 }}>
+            <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem', maxWidth: 480 }}>
               Full Scope 1, 2, and 3 GHG inventory under the GHG Protocol. Audit-trail-first, verifier-ready. Pre-filled CARB SB 253 template export. CDP, ESRS E1, and EcoVadis in one inventory.
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
@@ -61,7 +61,7 @@ export default function Page() {
               <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid ${color}22` }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '2.2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color, marginTop: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{unit}</div>
-                <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 300, lineHeight: 1.4 }}>{label}</div>
+                <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{label}</div>
               </div>
             ))}
           </div>
@@ -74,7 +74,7 @@ export default function Page() {
           <div style={{ maxWidth: 640 }}>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#7425e3', marginBottom: 6 }}>Just been asked for your carbon footprint?</div>
             <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.3 }}>See exactly how it works — from your bills to a submittable report.</div>
-            <p style={{ fontSize: 14, color: '#555553', fontWeight: 300, lineHeight: 1.6, marginTop: 8 }}>A step-by-step walkthrough, transparent pricing, and answers to every question — whether the request comes from a customer, an investor, your board, or a regulator.</p>
+            <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginTop: 8 }}>A step-by-step walkthrough, transparent pricing, and answers to every question — whether the request comes from a customer, an investor, your board, or a regulator.</p>
           </div>
           <a href="/calculate-emissions" style={{ ...btnPrimary, textDecoration: 'none', whiteSpace: 'nowrap' as const }}>How it works →</a>
         </div>
@@ -88,13 +88,13 @@ export default function Page() {
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
               {SB253_FIRST_REPORT_DATE} is {SB253_DATE_STATUS}.<br />Are you ready?
             </h2>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
               SB 253 requires California-nexus companies with global revenue over $1B to disclose Scope 1 and 2 emissions. {SB253_STATUS_SENTENCE} ThemisIQ can have your inventory complete and the CARB template pre-filled in days — not months.
             </p>
             {['Guided inventory wizard — no spreadsheets', 'IPCC AR6 emission factors (AR4 on CARB export)', 'Pre-filled CARB SB 253 official template', 'Good-faith enforcement confirmed by CARB for year one', `Scope 3 preparation for ${SB253_SCOPE3_FROM}`].map((item, i) => (
               <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8, alignItems: 'flex-start' }}>
                 <span style={{ color: '#64fe3e', flexShrink: 0, marginTop: 2 }}>✓</span>
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 300, lineHeight: 1.5 }}>{item}</span>
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 400, lineHeight: 1.5 }}>{item}</span>
               </div>
             ))}
           </div>
@@ -138,7 +138,7 @@ export default function Page() {
             <div key={title} style={{ background: '#fff', padding: '2rem' }}>
    
               <div style={{ fontSize: 16, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 300 }}>{desc}</div>
+              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
             </div>
           ))}
         </div>
@@ -152,13 +152,13 @@ export default function Page() {
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
               Every carbon claim now needs proof behind it.
             </h2>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
               Canada&apos;s Competition Act now targets unsubstantiated environmental claims. If you state &ldquo;net zero,&rdquo; &ldquo;carbon neutral,&rdquo; or &ldquo;emissions reduced by X%,&rdquo; the burden is on you to prove it — under a reverse-onus standard, the company making the claim must show it is adequately and properly substantiated, not the regulator. An audit-trailed GHG inventory is that proof.
             </p>
             {['Reverse onus — you must substantiate the claim', 'Penalties up to $10M or 3% of global revenue', 'Applies to marketing, websites, and reports', 'ThemisIQ gives every figure a documented, defensible basis'].map((item, i) => (
               <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8, alignItems: 'flex-start' }}>
                 <span style={{ color: '#64fe3e', flexShrink: 0, marginTop: 2 }}>✓</span>
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 300, lineHeight: 1.5 }}>{item}</span>
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 400, lineHeight: 1.5 }}>{item}</span>
               </div>
             ))}
           </div>
@@ -231,7 +231,7 @@ export default function Page() {
                 {features.map((f, i) => (
                   <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                     <span style={{ color: featured ? '#64fe3e' : '#0F6E56', flexShrink: 0 }}>✓</span>
-                    <span style={{ fontSize: 13, color: featured ? 'rgba(255,255,255,0.65)' : '#555553', fontWeight: 300 }}>{f}</span>
+                    <span style={{ fontSize: 13, color: featured ? 'rgba(255,255,255,0.65)' : '#555553', fontWeight: 400 }}>{f}</span>
                   </div>
                 ))}
                 <a href="/pricing?modules=ghg#build-your-stack" style={{ display: 'block', textAlign: 'center', padding: '11px', borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: 'none', background: featured ? 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)' : '#0d0d0d', color: featured ? '#0d0d0d' : '#fff', marginTop: '1.5rem' }}>
@@ -257,7 +257,7 @@ export default function Page() {
           SB 253 Scope 1 + 2.<br />
           <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Start today.</span>
         </h2>
-        <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
           ThemisIQ can have your Scope 1 and 2 inventory complete and the CARB template pre-filled in days. Reports unlocked on paid plan. No credit card required.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
@@ -283,4 +283,4 @@ const btnPrimary: React.CSSProperties = { fontSize: 14, fontWeight: 500, padding
 const btnSecondary: React.CSSProperties = { fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', display: 'inline-block' }
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
 const sectionTitle: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }
-const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, margin: '0 auto', lineHeight: 1.75, fontWeight: 300 }
+const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, margin: '0 auto', lineHeight: 1.75, fontWeight: 400 }

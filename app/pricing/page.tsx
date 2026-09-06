@@ -333,7 +333,7 @@ function PricingPageInner() {
     // Hero
     heroLabel: { display: 'inline-block', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#7425e3', border: '1px solid rgba(116,37,227,0.2)', borderRadius: 99, padding: '4px 14px', marginBottom: 14 },
     heroTitle: { fontFamily: 'Georgia, serif', fontSize: 28, fontWeight: 400, color: '#0d0d0d', lineHeight: 1.3, marginBottom: 12 },
-    heroSub: { fontSize: 13, color: '#555553', fontWeight: 300, maxWidth: 520, margin: '0 auto', lineHeight: 1.8 },
+    heroSub: { fontSize: 13, color: '#555553', fontWeight: 400, maxWidth: 520, margin: '0 auto', lineHeight: 1.8 },
     // Prompt
     promptWrap: { borderRadius: 12, padding: 1, marginBottom: 20, background: GRAD },
     promptInner: { background: '#fff', borderRadius: 11, padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 12 },
@@ -353,7 +353,7 @@ function PricingPageInner() {
     hintGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8, marginBottom: 20 },
     // CTA
     ctaWrap: { background: '#fff', border: '1px solid #e8e7e4', borderRadius: 14, padding: '1.75rem', textAlign: 'center' as const },
-    ctaPara: { fontSize: 13, color: '#555553', fontWeight: 300, maxWidth: 500, margin: '0 auto 14px', lineHeight: 1.8 },
+    ctaPara: { fontSize: 13, color: '#555553', fontWeight: 400, maxWidth: 500, margin: '0 auto 14px', lineHeight: 1.8 },
     ctaHeadline: { fontFamily: 'Georgia, serif', fontSize: 18, fontWeight: 400, color: '#0d0d0d', marginBottom: 4 },
     ctaSub: { fontSize: 11, color: '#888784', marginBottom: 18 },
     ctaBtns: { display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' as const },
@@ -491,7 +491,7 @@ function PricingPageInner() {
             <div style={{ ...s.promptDot, animation: 'pulse 2s ease-in-out infinite' }} />
             <div style={{ flex: 1 }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d' }}>This pricing tool is interactive — </span>
-              <span style={{ fontSize: 12, color: '#555553', fontWeight: 300 }}>select the compliance modules your business needs. Your total updates instantly, with the multi-module discount applied automatically — two modules −10%, three or more −20%.</span>
+              <span style={{ fontSize: 12, color: '#555553', fontWeight: 400 }}>select the compliance modules your business needs. Your total updates instantly, with the multi-module discount applied automatically — two modules −10%, three or more −20%.</span>
             </div>
           </div>
         </div>
@@ -514,7 +514,7 @@ function PricingPageInner() {
         {/* Section title */}
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
           <div style={{ fontFamily: 'Georgia, serif', fontSize: 22, fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Simple, honest pricing</div>
-          <div style={{ fontSize: 12, color: '#555553', fontWeight: 300 }}>Start with one module. Build your compliance platform as you grow.</div>
+          <div style={{ fontSize: 12, color: '#555553', fontWeight: 400 }}>Start with one module. Build your compliance platform as you grow.</div>
         </div>
 
         {/* Pick-and-pace hero (NEW model) — surfaces the volume discount, not a bundle price */}
@@ -556,7 +556,7 @@ function PricingPageInner() {
           <div id="build-your-stack" style={s.moduleWrap}>
             <div style={s.moduleHeader}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784' }}>Select your compliance modules</div>
-              <div style={{ fontSize: 10, color: '#888784', fontWeight: 300 }}>Click any row to add or remove</div>
+              <div style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}>Click any row to add or remove</div>
             </div>
             {MODULES.map((mod, i) => {
               const isSelected = selected.has(mod.id)

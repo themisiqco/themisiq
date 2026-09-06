@@ -400,7 +400,7 @@ export default function Dashboard() {
                       <div style={{ fontSize: 11, fontWeight: 600, color: mod.color, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{mod.sub}</div>
                     </div>
 
-                    <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.5, marginBottom: 12, fontWeight: 300 }}>{mod.desc}</div>
+                    <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.5, marginBottom: 12, fontWeight: 400 }}>{mod.desc}</div>
 
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 12 }}>
                       {mod.frameworks.slice(0, 3).map(fw => (

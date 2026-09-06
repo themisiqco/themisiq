@@ -63,7 +63,7 @@ export default function Page() {
           <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1rem', color: ink }}>
             What you&rsquo;ll need before you can file
           </h1>
-          <p style={{ fontSize: 15, color: muted, lineHeight: 1.75, fontWeight: 300, maxWidth: 620 }}>
+          <p style={{ fontSize: 15, color: muted, lineHeight: 1.75, fontWeight: 400, maxWidth: 620 }}>
             The hard part of a CBAM declaration isn&rsquo;t the calculation — it&rsquo;s gathering twenty-seven pieces of information from six different parts of your organisation, several of which have long lead times. This is the full list, grouped by who holds it. Nothing here requires an account. Before you start collecting them, it&rsquo;s worth understanding why this matters.
           </p>
         </div>
@@ -76,13 +76,13 @@ export default function Page() {
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <div style={{ borderLeft: `3px solid ${violet}`, paddingLeft: '1.75rem' }}>
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 400, color: ink, marginBottom: '1rem' }}>Why this is worth the effort</h2>
-            <p style={{ fontSize: 15, color: muted, lineHeight: 1.75, fontWeight: 300, maxWidth: 620, marginBottom: '1rem' }}>
+            <p style={{ fontSize: 15, color: muted, lineHeight: 1.75, fontWeight: 400, maxWidth: 620, marginBottom: '1rem' }}>
               Your EU customer must declare the embedded emissions for your goods whether you supply verified emissions data or not. If you do not provide actual emissions, they can use the European Commission&rsquo;s published default values for your country and product.
             </p>
-            <p style={{ fontSize: 15, color: muted, lineHeight: 1.75, fontWeight: 300, maxWidth: 620, marginBottom: '1rem' }}>
+            <p style={{ fontSize: 15, color: muted, lineHeight: 1.75, fontWeight: 400, maxWidth: 620, marginBottom: '1rem' }}>
               Those default values are intentionally conservative to reduce the risk of understating embedded emissions. For most CBAM goods, they are increased by a mark-up of 10% in 2026, 20% in 2027, and 30% from 2028 onwards. Fertilisers are the exception, with a 1% mark-up throughout.
             </p>
-            <p style={{ fontSize: 15, color: muted, lineHeight: 1.75, fontWeight: 300, maxWidth: 620 }}>
+            <p style={{ fontSize: 15, color: muted, lineHeight: 1.75, fontWeight: 400, maxWidth: 620 }}>
               The resulting embedded emissions determine the number of CBAM certificates your EU customer must surrender. If your installation&rsquo;s verified emissions are lower than the applicable default value, providing verified emissions data can reduce the number of certificates they need to purchase, lowering the carbon cost of importing your goods.
             </p>
           </div>
@@ -91,7 +91,7 @@ export default function Page() {
               it is scheduling advice. Canvas ground and a hairline, no accent colour. */}
           <div style={{ marginTop: '2.5rem', background: canvas, border: `0.5px solid ${hair}`, borderRadius: 10, padding: '1.25rem 1.5rem' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: ink, marginBottom: 6 }}>Plan ahead</div>
-            <p style={{ fontSize: 15, color: muted, lineHeight: 1.75, fontWeight: 300, maxWidth: 620 }}>
+            <p style={{ fontSize: 15, color: muted, lineHeight: 1.75, fontWeight: 400, maxWidth: 620 }}>
               Most information inside your own organisation can usually be gathered within a few days. Verified reports from suppliers often take weeks or months, particularly where a supplier has not reported under CBAM before. Request those first.
             </p>
           </div>
@@ -103,7 +103,7 @@ export default function Page() {
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
 
           {/* How to read the citations and the common-practice marker. */}
-          <p style={{ fontSize: 13, color: faint, fontWeight: 300, lineHeight: 1.7, maxWidth: 620, marginBottom: '2.5rem' }}>
+          <p style={{ fontSize: 13, color: faint, fontWeight: 400, lineHeight: 1.7, maxWidth: 620, marginBottom: '2.5rem' }}>
             Most items below point to the provision that requires them. A few — marked common practice — describe where this information usually sits in an organisation rather than something the regulation specifies, so confirm those against your own site.
           </p>
 
@@ -115,7 +115,7 @@ export default function Page() {
                 <span aria-hidden style={{ width: 8, height: 8, borderRadius: 2, background: accent, flexShrink: 0 }} />
                 <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 400, color: ink }}>{group.meta.label}</h2>
               </div>
-              <p style={{ fontSize: 14, color: faint, fontWeight: 300, marginBottom: '1.75rem', maxWidth: 560, lineHeight: 1.6 }}>{group.meta.blurb}</p>
+              <p style={{ fontSize: 14, color: faint, fontWeight: 400, marginBottom: '1.75rem', maxWidth: 560, lineHeight: 1.6 }}>{group.meta.blurb}</p>
 
               {/* MULTI-COLUMN, NOT GRID. A grid sizes every row to its tallest card, so a
                   one-line entry beside a paragraph-length one leaves visible dead space.
@@ -148,15 +148,15 @@ export default function Page() {
                       )}
                     </div>
 
-                    <div style={{ fontSize: 13, color: muted, fontWeight: 300, lineHeight: 1.65, marginBottom: 8 }}>{entry.whereToFind}</div>
-                    <div style={{ fontSize: 13, color: ink, fontWeight: 300, lineHeight: 1.65 }}>{entry.goodEnough}</div>
+                    <div style={{ fontSize: 13, color: muted, fontWeight: 400, lineHeight: 1.65, marginBottom: 8 }}>{entry.whereToFind}</div>
+                    <div style={{ fontSize: 13, color: ink, fontWeight: 400, lineHeight: 1.65 }}>{entry.goodEnough}</div>
 
                     {entry.whyAsked && (
-                      <div style={{ fontSize: 13, color: muted, fontWeight: 300, lineHeight: 1.65, marginTop: 8, paddingTop: 8, borderTop: `0.5px solid ${hair}` }}>{entry.whyAsked}</div>
+                      <div style={{ fontSize: 13, color: muted, fontWeight: 400, lineHeight: 1.65, marginTop: 8, paddingTop: 8, borderTop: `0.5px solid ${hair}` }}>{entry.whyAsked}</div>
                     )}
 
                     {entry.sourceRef && (
-                      <div style={{ fontSize: 11, color: faint, fontWeight: 300, lineHeight: 1.5, marginTop: 8 }}>{entry.sourceRef}</div>
+                      <div style={{ fontSize: 11, color: faint, fontWeight: 400, lineHeight: 1.5, marginTop: 8 }}>{entry.sourceRef}</div>
                     )}
                   </div>
                 ))}
@@ -172,7 +172,7 @@ export default function Page() {
         <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2, color: ink }}>
           Ready when you are.
         </h2>
-        <p style={{ fontSize: 15, color: muted, maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 15, color: muted, maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
           Gather the information once, then keep it with the figures it supports. The module calculates your specific embedded emissions and prepares the summary your EU customer needs.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>

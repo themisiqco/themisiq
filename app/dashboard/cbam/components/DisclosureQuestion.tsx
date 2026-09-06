@@ -60,7 +60,7 @@ export default function DisclosureQuestion({
       <div style={{ padding: '1.25rem', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }}>{question}</div>
-          <div style={{ fontSize: 12, color: '#888784', fontWeight: 300, lineHeight: 1.5 }}>{hint}</div>
+          <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.5 }}>{hint}</div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginTop: 1 }}>
           <button
@@ -84,7 +84,7 @@ export default function DisclosureQuestion({
         </div>
       </div>
       {value === null && (
-        <div style={{ padding: '0 1.25rem 0.85rem', fontSize: 11, color: '#888784', fontWeight: 300 }}>Not yet answered</div>
+        <div style={{ padding: '0 1.25rem 0.85rem', fontSize: 11, color: '#888784', fontWeight: 400 }}>Not yet answered</div>
       )}
       {value === true && children && (
         <div style={{ padding: '0 1.25rem 1.25rem', borderTop: '0.5px solid #e8e7e4' }}>

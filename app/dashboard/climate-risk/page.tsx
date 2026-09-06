@@ -30,7 +30,7 @@ import {
 // ─── Design tokens (matching the live climate page) ───────────────────────────
 const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
 const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.4rem, 2.5vw, 1.8rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
-const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 300, lineHeight: 1.6, marginBottom: '1.5rem' }
+const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
 
@@ -1051,7 +1051,7 @@ export default function MaterialityWizard() {
               <div style={{ background: '#0d0d0d', borderRadius: 16, padding: '2rem 1.75rem', maxWidth: 420, textAlign: 'center', boxShadow: '0 12px 40px rgba(13,13,13,0.28)' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', marginBottom: 12 }}>Preview</div>
                 <h3 style={{ fontFamily: 'Georgia, serif', fontWeight: 400, fontSize: '1.4rem', color: '#fff', margin: '0 0 10px', lineHeight: 1.3 }}>Unlock your full assessment</h3>
-                <p style={{ fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: '0 0 20px' }}>You can see your headline results above. Unlock the Climate Risk module to view the full materiality matrix, topic-by-topic scores, risk register, and download the report.</p>
+                <p style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: '0 0 20px' }}>You can see your headline results above. Unlock the Climate Risk module to view the full materiality matrix, topic-by-topic scores, risk register, and download the report.</p>
                 <a href="/pricing" style={{ display: 'inline-block', padding: '11px 26px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>See pricing &amp; unlock &rarr;</a>
               </div>
             </div>

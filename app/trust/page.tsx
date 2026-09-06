@@ -96,10 +96,10 @@ export default function TrustPage() {
             We know trust is everything.<br />
             <em style={{ background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Here is exactly how we earn it.</em>
           </h1>
-          <p style={{ fontSize: 16, color: '#555553', maxWidth: 620, lineHeight: 1.75, fontWeight: 300, marginBottom: '1.5rem' }}>
+          <p style={{ fontSize: 16, color: '#555553', maxWidth: 620, lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
             You are entering sensitive compliance data into ThemisIQ — emissions figures, workforce data, supplier relationships, AI systems. We take that responsibility seriously. This page explains exactly what we do with your data, what we never do, and what rights you have.
           </p>
-          <p style={{ fontSize: 13, color: '#888784', fontWeight: 300 }}>
+          <p style={{ fontSize: 13, color: '#888784', fontWeight: 400 }}>
             Questions? Contact us at <a href="mailto:privacy@themisiq.co" style={{ color: '#7425e3', textDecoration: 'none' }}>privacy@themisiq.co</a>
           </p>
         </div>
@@ -116,7 +116,7 @@ export default function TrustPage() {
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '1rem', fontWeight: 400, color: p.color, marginTop: 2 }}>{i + 1}</div>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 6 }}>{p.title}</div>
-                  <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, fontWeight: 300 }}>{p.content}</div>
+                  <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, fontWeight: 400 }}>{p.content}</div>
                 </div>
               </div>
             ))}
@@ -132,7 +132,7 @@ export default function TrustPage() {
                 {section.items.map((item, i) => (
                   <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 24, padding: '1rem 1.5rem', borderBottom: i < section.items.length - 1 ? '0.5px solid #f3f4f6' : 'none', alignItems: 'flex-start' }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{item.label}</div>
-                    <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 300 }}>{item.detail}</div>
+                    <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{item.detail}</div>
                   </div>
                 ))}
               </div>
@@ -148,7 +148,7 @@ export default function TrustPage() {
               <div key={c.law} style={{ display: 'grid', gridTemplateColumns: '120px 180px 1fr', gap: 24, padding: '1rem 1.5rem', borderBottom: i < COMPLIANCE.length - 1 ? '0.5px solid #f3f4f6' : 'none', alignItems: 'flex-start' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#0d0d0d' }}>{c.law}</div>
                 <div style={{ fontSize: 12, color: '#888784' }}>{c.jurisdiction}</div>
-                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 300 }}>{c.note}</div>
+                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{c.note}</div>
               </div>
             ))}
           </div>

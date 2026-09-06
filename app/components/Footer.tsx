@@ -21,7 +21,7 @@ export default function Footer() {
       <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '2.2fr 1fr 1fr 1fr', gap: '3rem' }}>
         <div>
           <Logo size={130} />
-          <p style={{ fontSize: 13, color: '#888784', lineHeight: 1.65, fontWeight: 300, marginTop: '1rem', maxWidth: 270 }}>
+          <p style={{ fontSize: 13, color: '#888784', lineHeight: 1.65, fontWeight: 400, marginTop: '1rem', maxWidth: 270 }}>
             Compliance Intelligence for Sustainable Business. GHG emissions, climate risk, supply chain, M&A diligence, AI governance, people & workforce, and cybersecurity — one platform.
           </p>
         </div>

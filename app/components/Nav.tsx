@@ -213,7 +213,7 @@ export default function Nav() {
               textDecoration: 'none',
             }}>
               <div style={{ fontSize: 15, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }}>{label}</div>
-              <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>{sub}</div>
+              <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>{sub}</div>
             </a>
           ))}
           {isAuthed && (
@@ -223,7 +223,7 @@ export default function Nav() {
               textDecoration: 'none',
             }}>
               <div style={{ fontSize: 15, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }}>Dashboard</div>
-              <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>Your platform home</div>
+              <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>Your platform home</div>
             </a>
           )}
           <a
@@ -239,7 +239,7 @@ export default function Nav() {
             }}
           >
             <div style={{ fontSize: 15, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }}>{isAuthed ? 'Log out' : 'Log in'}</div>
-            <div style={{ fontSize: 12, color: '#888784', fontWeight: 300 }}>{isAuthed ? 'Sign out of your account' : 'Access your dashboard'}</div>
+            <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>{isAuthed ? 'Sign out of your account' : 'Access your dashboard'}</div>
           </a>
           <div style={{ marginTop: '1rem' }}>
             <a href="/pricing" style={{

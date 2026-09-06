@@ -86,14 +86,14 @@ export default function ResetPasswordPage() {
           {/* HEADER */}
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Set a new password</h1>
-            <p style={{ fontSize: 14, color: '#888784', fontWeight: 300 }}>Choose a new password for your account</p>
+            <p style={{ fontSize: 14, color: '#888784', fontWeight: 400 }}>Choose a new password for your account</p>
           </div>
 
           {/* CARD */}
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '2rem' }}>
 
             {status === 'checking' && (
-              <p style={{ fontSize: 14, color: '#888784', textAlign: 'center', fontWeight: 300, margin: 0 }}>Verifying your reset link…</p>
+              <p style={{ fontSize: 14, color: '#888784', textAlign: 'center', fontWeight: 400, margin: 0 }}>Verifying your reset link…</p>
             )}
 
             {status === 'invalid' && (

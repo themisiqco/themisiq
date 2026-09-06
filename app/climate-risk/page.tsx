@@ -25,7 +25,7 @@ export default function Page() {
               Climate Risk<br />
               <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Intelligence</span>
             </h1>
-            <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 300, marginBottom: '2rem', maxWidth: 480 }}>
+            <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem', maxWidth: 480 }}>
               Whether the request comes from an investor, a lender, your board, or a regulator — produce a defensible, TCFD-aligned climate risk assessment. Physical and transition risk across three IPCC scenarios. IFRS S2, CSRD ESRS E1, and SB 261 ready, from one assessment.
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
@@ -52,8 +52,8 @@ export default function Page() {
               <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid ${color}22` }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '2.2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color, marginTop: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{unit}</div>
-                <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 300, lineHeight: 1.4 }}>{label}</div>
-                {source && <div style={{ fontSize: 11, color: '#888784', marginTop: 6, fontWeight: 300, lineHeight: 1.4 }}>{source}</div>}
+                <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{label}</div>
+                {source && <div style={{ fontSize: 11, color: '#888784', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{source}</div>}
               </div>
             ))}
           </div>
@@ -68,7 +68,7 @@ export default function Page() {
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
               Regulation is only part of the story.
             </h2>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 300 }}>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 400 }}>
               Most climate risk reporting isn&apos;t triggered by a law at all — it&apos;s triggered by someone you answer to. Climate risk has become a standard part of how capital, credit, and commercial relationships are evaluated.
             </p>
           </div>
@@ -81,7 +81,7 @@ export default function Page() {
             ].map(({ who, desc, color }) => (
               <div key={who} style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '1.5rem' }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color, marginBottom: 8 }}>{who}</div>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', fontWeight: 300, lineHeight: 1.6 }}>{desc}</div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', fontWeight: 400, lineHeight: 1.6 }}>{desc}</div>
               </div>
             ))}
           </div>
@@ -106,7 +106,7 @@ export default function Page() {
           ].map(({ title, desc }) => (
             <div key={title} style={{ background: '#fff', padding: '2rem' }}>
               <div style={{ fontSize: 16, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 300 }}>{desc}</div>
+              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
             </div>
           ))}
         </div>
@@ -147,7 +147,7 @@ export default function Page() {
           ].map(([title, desc]) => (
             <div key={title} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderLeft: '2px solid #7425e3', borderRadius: '0 10px 10px 0', padding: '1rem 1.25rem' }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', marginBottom: 4 }}>{title}</div>
-              <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 300 }}>{desc}</div>
+              <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{desc}</div>
             </div>
           ))}
         </div>
@@ -166,7 +166,7 @@ export default function Page() {
               from /materiality to here on 26 Aug 2026, so "See the materiality samples →" sent a
               reader looking for downloads to the one page that no longer has any. /materiality is
               now the Materiality Assessment module page, and the label says that. */}
-          <p style={{ fontSize: 13, color: '#555553', maxWidth: 460, margin: '14px auto 0', fontWeight: 300, lineHeight: 1.6 }}>Reporting under CSRD/ESRS? The same assessment scores all ten ESRS topics on both axes from industry baselines &mdash; a first pass that scopes the work rather than doing it. It does not include the stakeholder engagement ESRS requires on the impact side.</p>
+          <p style={{ fontSize: 13, color: '#555553', maxWidth: 460, margin: '14px auto 0', fontWeight: 400, lineHeight: 1.6 }}>Reporting under CSRD/ESRS? The same assessment scores all ten ESRS topics on both axes from industry baselines &mdash; a first pass that scopes the work rather than doing it. It does not include the stakeholder engagement ESRS requires on the impact side.</p>
           <a href="/materiality" style={{ display: 'inline-block', marginTop: 12, fontSize: 14, fontWeight: 600, color: '#7425e3', borderBottom: '2px solid #7425e3', paddingBottom: 3, textDecoration: 'none' }}>The Materiality Assessment module →</a>
         </div>
       </section>
@@ -224,7 +224,7 @@ export default function Page() {
             ))}
           </tbody>
         </table>
-        <div style={{ fontSize: 11, color: '#888784', marginTop: 14, lineHeight: 1.6, fontWeight: 300 }}>
+        <div style={{ fontSize: 11, color: '#888784', marginTop: 14, lineHeight: 1.6, fontWeight: 400 }}>
           Regulatory timing and scope are evolving: the EU Omnibus reform is in force with its scope simplified, UK SRS rules are expected, and enforcement of California&apos;s SB 261 is barred pending appeal. Confirm your specific obligations with qualified counsel. ThemisIQ keeps framework mappings current as rules are finalised.
         </div>
       </section>
@@ -359,7 +359,7 @@ export default function Page() {
                 {features.map((f, i) => (
                   <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                     <span style={{ color: featured ? '#64fe3e' : '#0F6E56', flexShrink: 0 }}>✓</span>
-                    <span style={{ fontSize: 13, color: featured ? 'rgba(255,255,255,0.65)' : '#555553', fontWeight: 300 }}>{f}</span>
+                    <span style={{ fontSize: 13, color: featured ? 'rgba(255,255,255,0.65)' : '#555553', fontWeight: 400 }}>{f}</span>
                   </div>
                 ))}
                 <a href="/dashboard/climate-risk" style={{ display: 'block', textAlign: 'center', padding: '11px', borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: 'none', background: featured ? 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)' : '#0d0d0d', color: featured ? '#0d0d0d' : '#fff', marginTop: '1.5rem' }}>
@@ -377,7 +377,7 @@ export default function Page() {
           Someone&apos;s going to ask.<br />
           <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Be ready.</span>
         </h2>
-        <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 300, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
           ThemisIQ guides you through a complete, TCFD-aligned climate risk assessment and produces a publishable report — for whoever is asking. Build it free; unlock the export on a paid plan.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
@@ -407,7 +407,7 @@ const ghostBtn: React.CSSProperties = {
 }
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
 const sectionTitle: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }
-const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, margin: '0 auto', lineHeight: 1.75, fontWeight: 300 }
+const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, margin: '0 auto', lineHeight: 1.75, fontWeight: 400 }
 // ⚠️ COPIED VERBATIM FROM app/materiality/page.tsx WITH THE CROSS-SELL SECTION ON 27 Aug 2026 —
 // the same move ghostBtn made with the sample cards on 26 Aug, and for the same reason. This page
 // had no LEFT-ALIGNED body-paragraph style: sectionSub is centred (margin: '0 auto', maxWidth 540)
@@ -415,4 +415,4 @@ const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWid
 // NOT re-derived from sectionSub with the centring stripped: the cross-sell mirrors /materiality's
 // and must read as the same voice, so it takes that page's measurements rather than an
 // approximation of them.
-const bodyPara: React.CSSProperties = { fontSize: 15, color: '#555553', fontWeight: 300, lineHeight: 1.8, marginBottom: '1.25rem' }
+const bodyPara: React.CSSProperties = { fontSize: 15, color: '#555553', fontWeight: 400, lineHeight: 1.8, marginBottom: '1.25rem' }
