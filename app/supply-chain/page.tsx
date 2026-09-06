@@ -19,7 +19,7 @@ export default function Page() {
           <div>
             <div style={eyebrow}>Supply Chain & Sustainable Procurement</div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
-             Supply Chain & <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Sustainable Procurement</span>
+             Supply Chain & <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Sustainable Procurement</span>
             </h1>
             <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem', maxWidth: 480 }}>
              Know your supply chain risks. Collect sustainability data from suppliers. Meet CS3D, EcoVadis, Modern Slavery and ESRS S2 obligations — without spreadsheets or consultants.
@@ -140,7 +140,7 @@ export default function Page() {
               ['04', 'Feed your Scope 3', 'Pull supplier-reported Category 1 emissions into your GHG inventory, with spend-based gap-fill for non-responders. You review the full breakdown before it\'s applied.'],
             ].map(([num, title, desc]) => (
               <div key={num}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', opacity: 0.5, marginBottom: '0.75rem' }}>{num}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', fontWeight: 400, color: 'var(--color-brand)', opacity: 0.5, marginBottom: '0.75rem' }}>{num}</div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: '0.5rem' }}>{title}</div>
                 <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
               </div>
@@ -153,7 +153,7 @@ export default function Page() {
       <section style={{ padding: '6rem 2.5rem', textAlign: 'center' }}>
         <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
           CS3D applies from {CS3D_APPLIES_FROM}.<br />
-          <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Start building now.</span>
+          <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Start building now.</span>
         </h2>
         <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
           Supply chain due diligence programmes take 12–18 months to establish properly. The companies starting now will be ready. The ones starting in 2026 won't be.

@@ -59,7 +59,7 @@ export default function Home() {
               </a>
             ) : (
               <>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 4 }}>{val}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: 'var(--color-brand)', marginBottom: 4 }}>{val}</div>
                 <div style={{ fontSize: 12, color: '#888784' }}>{label}</div>
               </>
             )}
@@ -116,11 +116,16 @@ export default function Home() {
           onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.9' }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1' }}>
           <div style={{ maxWidth: 640 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 8 }}>Advisory Services</div>
+            {/* ⚠️ INTERIM. This eyebrow wants var(--color-brand) like every other flattened
+            gradient span on this page — but this one sits inside the dark advisory band
+            (background '#0d0d0d' on the <a> above), where brand teal measures 2.55:1.
+            on-dark is 6.40:1 and holds until the band itself converts; at that point put
+            brand back and delete this note. */}
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-on-dark)', marginBottom: 8 }}>Advisory Services</div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: 8 }}>Available across all modules</div>
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, fontWeight: 400 }}>Expert advisory services — sector-specific guidance, assurance prep, and board-ready narratives from practitioners who speak your language.</div>
           </div>
-          <span style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', padding: '12px 24px', borderRadius: 8, whiteSpace: 'nowrap', flexShrink: 0 }}>Talk to a specialist →</span>
+          <span style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', background: 'var(--color-brand)', padding: '12px 24px', borderRadius: 8, whiteSpace: 'nowrap', flexShrink: 0 }}>Talk to a specialist →</span>
         </a>
       </section>
 
@@ -135,7 +140,7 @@ export default function Home() {
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.2, marginBottom: 6 }}>The Materiality Assessment</div>
               <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>Single materiality for IFRS S2, double materiality for CSRD — the methodology your auditor expects. See two sample reports for the same entity.</div>
             </div>
-            <span style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', padding: '11px 22px', borderRadius: 8, whiteSpace: 'nowrap' }}>See sample reports →</span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', background: 'var(--color-brand)', padding: '11px 22px', borderRadius: 8, whiteSpace: 'nowrap' }}>See sample reports →</span>
           </a>
         </div>
       </section>
@@ -188,7 +193,7 @@ export default function Home() {
           </div>
 
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' as const }}>
-            <a href="/dashboard/climate-risk" style={{ fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none' }}>Assess your climate risk →</a>
+            <a href="/dashboard/climate-risk" style={{ fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: 'var(--color-brand)', color: '#0d0d0d', textDecoration: 'none' }}>Assess your climate risk →</a>
             <a href="/climate-risk" style={{ fontSize: 13, fontWeight: 500, padding: '11px 24px', borderRadius: 8, border: '0.5px solid rgba(255,255,255,0.3)', color: '#fff', textDecoration: 'none' }}>See how it works</a>
             <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Also produces the CSRD double-materiality matrix across all ten ESRS topics.</span>
           </div>
@@ -208,7 +213,7 @@ export default function Home() {
               ['04', 'Stand behind your numbers', 'Every calculation and data point is logged with a full audit trail. Your verifiers, auditors, and regulators get everything they need — without the scramble.'],
             ].map(([num, title, desc]) => (
               <div key={num}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', opacity: 0.5, marginBottom: '0.75rem' }}>{num}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', fontWeight: 400, color: 'var(--color-brand)', opacity: 0.5, marginBottom: '0.75rem' }}>{num}</div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: '0.5rem' }}>{title}</div>
                 <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
               </div>
@@ -320,6 +325,6 @@ const modules = [
 const navLink: React.CSSProperties = { fontSize: 13, color: '#555553', textDecoration: 'none' }
 const btnOutline: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', cursor: 'pointer' }
 const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'var(--color-brand)', color: '#fff', border: 'none', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }
-const gradText: React.CSSProperties = { fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }
+const gradText: React.CSSProperties = { fontStyle: 'italic', color: 'var(--color-brand)' }
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
 const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, lineHeight: 1.75, fontWeight: 400 }

@@ -25,7 +25,7 @@ export default function Page() {
             <div style={eyebrow}>People & Workforce</div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
               Workforce<br />
-              <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Intelligence</span>
+              <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Intelligence</span>
             </h1>
             <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem', maxWidth: 480 }}>
               Human capital reporting. Gender pay gap analysis. DEI metrics. Health & safety. Training and development. ESRS S1, GRI 401–410, EU Pay Transparency, SEC Item 101, and California Pay Data — one platform.
@@ -329,7 +329,7 @@ export default function Page() {
       <section style={{ padding: '6rem 2.5rem', textAlign: 'center' }}>
         <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
           Do you know your gender pay gap<br />
-          <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>by job band?</span>
+          <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>by job band?</span>
         </h2>
         <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
         Most companies don't — and the EU Pay Transparency Directive is now in force, with first pay-gap reports due in 2027. ThemisIQ calculates your gap, identifies bands above 5%, and prepares your disclosure.

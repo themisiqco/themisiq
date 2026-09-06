@@ -194,7 +194,7 @@ const STYLES = `
     --ink:#0d0d0d; --mid:#555553; --light:#888784; --surface:#f8f7f5; --border:#e8e7e4;
     --violet:#7425e3; --sky:#1fb1ff; --lime:#64fe3e;
     --green:#0F6E56; --green-tint:#E1F5EE;
-    --grad: linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e);
+    --grad: var(--color-brand);
     font-family:var(--sans); font-weight:400; color:var(--ink);
     background:#fff; line-height:1.6;
     -webkit-font-smoothing:antialiased;

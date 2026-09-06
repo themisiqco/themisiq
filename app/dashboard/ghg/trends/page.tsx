@@ -405,7 +405,7 @@ export default function TrendsPage() {
               </p>
               {/* Carry the selected company to SBTi (highest-precedence selection) so it binds to
                   THIS company, not the alphabetical-first. `selected` is guaranteed non-null here. */}
-              <a href={`/dashboard/sbti?companyId=${selected.companyId}`} style={{ display: 'inline-block', fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none' }}>Set science-based targets →</a>
+              <a href={`/dashboard/sbti?companyId=${selected.companyId}`} style={{ display: 'inline-block', fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: 'var(--color-brand)', color: '#0d0d0d', textDecoration: 'none' }}>Set science-based targets →</a>
             </div>
           )}
 

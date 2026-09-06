@@ -52,7 +52,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           A logotype is a brand asset, not a heading: changing its face changes the mark.
           It also has to match the same wordmark in email HTML, which cannot resolve a
           custom property or rely on a web font loading. See app/components/headingStyles.ts. */}
-          <a href="/" style={{ textDecoration: 'none', fontFamily: 'Georgia, serif', fontSize: '1.35rem', fontWeight: 400, background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>ThemisIQ</a>
+          <a href="/" style={{ textDecoration: 'none', fontFamily: 'Georgia, serif', fontSize: '1.35rem', fontWeight: 400, background: GRAD }}>ThemisIQ</a>
           <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784' }}>Secure checkout</span>
         </div>
       </div>

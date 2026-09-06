@@ -41,7 +41,7 @@ export default function Page() {
             <div style={eyebrow}>AI Governance</div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
               AI Governance &<br />
-              <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Risk Management</span>
+              <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Risk Management</span>
             </h1>
             <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem', maxWidth: 480 }}>
               EU AI Act compliance. AI risk register. Model inventory. Board-level AI oversight documentation. NIST AI RMF alignment. ISO 42001 readiness. One platform for your entire AI governance programme.

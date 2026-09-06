@@ -854,7 +854,7 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
                 ? 'Your saved targets and their reports are still here, and you can still work on them. Renewing lets you screen new ones again.'
                 : `This report stays available. Screening further targets is $${FLAT_MODULE_PRICES['deals'].toLocaleString('en-US')} USD a year: unlimited targets, saved to one pipeline you can export as a single spreadsheet, plus the link you hand a target to make disclosure a condition of proceeding.`}
             </div>
-            <a href="/pricing?modules=deals" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
+            <a href="/pricing?modules=deals" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: 'var(--color-brand)', color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
               See Deals pricing →
             </a>
           </div>

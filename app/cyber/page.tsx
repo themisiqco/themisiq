@@ -26,7 +26,7 @@ export default function Page() {
             <div style={eyebrow}>Cyber Governance</div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
               Cyber Governance &<br />
-              <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Resilience</span>
+              <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Resilience</span>
             </h1>
             <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem', maxWidth: 480 }}>
               NIS2, DORA, SEC cyber disclosure, ISO 27001, and NIST CSF — all in one platform. Cyber risk registers, policy management, incident workflows, vendor reviews, and board-level reporting.

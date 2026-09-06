@@ -93,7 +93,7 @@ const groups = [
 // ── STYLES ────────────────────────────────────────────────────────
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 12 }
 const lede: React.CSSProperties = { fontSize: 17, color: '#555553', lineHeight: 1.7, fontWeight: 400, maxWidth: 620 }
-const grad: React.CSSProperties = { fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }
+const grad: React.CSSProperties = { fontStyle: 'italic', color: 'var(--color-brand)' }
 const groupIntro: React.CSSProperties = { fontSize: 14, color: '#888784', fontWeight: 400, marginBottom: '1.75rem', maxWidth: 560, lineHeight: 1.6 }
 const card: React.CSSProperties = { border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.5rem 1.5rem 1.25rem', background: '#fff', display: 'flex', flexDirection: 'column' }
 const fwName: React.CSSProperties = { fontSize: 16, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }

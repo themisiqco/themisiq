@@ -326,7 +326,7 @@ export default function AIGovernanceDashboard() {
       {/* Add system buttons */}
       {addMode === null && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: '1.5rem' }}>
-          <button onClick={() => setAddMode('library')} style={{ padding: '1rem', borderRadius: 12, background: 'linear-gradient(135deg,rgba(116,37,227,0.05),rgba(31,177,255,0.05))', border: '1.5px solid #7425e3', cursor: 'pointer', textAlign: 'left' }}>
+          <button onClick={() => setAddMode('library')} style={{ padding: '1rem', borderRadius: 12, background: 'color-mix(in srgb, var(--color-brand) 5%, transparent)', border: '1.5px solid #7425e3', cursor: 'pointer', textAlign: 'left' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#7425e3', marginBottom: 4 }}>Choose from library →</div>
             <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.5 }}>34 common AI systems with auto-classification. Pick yours in seconds.</div>
           </button>
@@ -340,7 +340,7 @@ export default function AIGovernanceDashboard() {
       {/* Library picker */}
       {addMode === 'library' && (
         <div style={{ border: '1.5px solid #7425e3', borderRadius: 14, overflow: 'hidden', marginBottom: '1.5rem' }}>
-          <div style={{ background: 'linear-gradient(135deg,#7425e3,#1fb1ff)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ background: 'var(--color-brand)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>AI System Library</div>
             <button onClick={() => setAddMode(null)} style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', background: 'none', border: 'none', cursor: 'pointer' }}>✕ Close</button>
           </div>

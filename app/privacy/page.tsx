@@ -31,7 +31,7 @@ export default function PrivacyPage() {
         <div style={{ maxWidth: 920, margin: '0 auto' }}>
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>ThemisIQ Compliance Inc.</div>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }}>
-            Privacy <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Policy</span>
+            Privacy <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Policy</span>
           </h1>
           <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' as const, marginBottom: '1rem' }}>
             {['Effective: May 17, 2026', 'TIQ-PRV-001 · v2.0', 'ThemisIQ Compliance Inc. · Canada', 'privacy@themisiq.co'].map(item => (
@@ -176,7 +176,7 @@ export default function PrivacyPage() {
           </div>
           <div style={divider} />
 
-          <div id="s9" style={{ ...sectionStyle, background: 'linear-gradient(135deg,rgba(116,37,227,0.03),rgba(31,177,255,0.02))', border: '0.5px solid rgba(116,37,227,0.15)', borderRadius: 12, padding: '1.5rem' }}>
+          <div id="s9" style={{ ...sectionStyle, background: 'var(--color-brand-wash)', border: '0.5px solid rgba(116,37,227,0.15)', borderRadius: 12, padding: '1.5rem' }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, background: 'rgba(116,37,227,0.1)', color: '#7425e3', padding: '3px 10px', borderRadius: 99, marginBottom: 10 }}>🇺🇸 US residents — additional rights</div>
             <div style={eyebrow}>Section 9</div>
             <h2 style={sectionHead}>Additional rights for US residents</h2>

@@ -1308,7 +1308,7 @@ export default function CbamSetupPage() {
             <div style={{ background: '#fff', borderRadius: 16, padding: '2.5rem', boxShadow: '0 8px 40px rgba(0,0,0,0.12)', border: '0.5px solid #e8e7e4', maxWidth: 480, textAlign: 'center' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 8 }}>CBAM is a paid module.</div>
               <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 400 }}>Set up your operator profile and installations, then record disclosures and generate your Annex IV §1.2 report. Unlock the CBAM module to begin.</div>
-              <button onClick={() => (window.location.href = '/pricing')} style={{ width: '100%', fontSize: 14, fontWeight: 600, padding: '14px 28px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d' }}>
+              <button onClick={() => (window.location.href = '/pricing')} style={{ width: '100%', fontSize: 14, fontWeight: 600, padding: '14px 28px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'var(--color-brand)', color: '#0d0d0d' }}>
                 Unlock CBAM →
               </button>
             </div>
@@ -2295,7 +2295,7 @@ function ErrorBox({ prefix, message }: { prefix: string; message: string }) {
 const primaryBtn = (disabled: boolean): React.CSSProperties => ({
   fontSize: 14, fontWeight: 600, padding: '11px 24px', borderRadius: 10, border: 'none',
   cursor: disabled ? 'not-allowed' : 'pointer',
-  background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d',
+  background: 'var(--color-brand)', color: '#0d0d0d',
   opacity: disabled ? 0.6 : 1,
 })
 const ghostBtn: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '11px 18px', borderRadius: 10, background: 'transparent', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' }

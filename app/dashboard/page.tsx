@@ -286,7 +286,7 @@ export default function Dashboard() {
           <div style={{ maxWidth: 1000, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 400, marginBottom: 4 }}>
-                Welcome to ThemisIQ! 👋
+                Welcome to ThemisIQ!
               </div>
               <div style={{ fontSize: 13, color: 'var(--color-ink-2)' }}>
                 Start by checking which compliance requirements apply to your company — it takes 2 minutes.

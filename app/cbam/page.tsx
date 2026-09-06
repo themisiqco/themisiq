@@ -29,7 +29,7 @@ export default function Page() {
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>CBAM · Carbon Border Adjustment Mechanism</div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
               The CBAM definitive regime is live.<br />
-              <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Don’t let default values price you out.</span>
+              <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Don’t let default values price you out.</span>
             </h1>
             <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem', maxWidth: 480 }}>
               Your EU customer declares a number for your goods either way. Without yours, they use the published default for your country — set conservatively, and increased by a mark-up of 10% in 2026, rising to 30% by 2028. ThemisIQ computes installation-level actuals under the definitive-period rules, and builds the summary your customer needs.
@@ -172,7 +172,7 @@ export default function Page() {
       <section style={{ padding: '6rem 2.5rem', textAlign: 'center' }}>
         <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
           Your EU customer will declare a number for your goods.<br />
-          <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Make it yours.</span>
+          <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Make it yours.</span>
         </h2>
         <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
           ThemisIQ computes installation-level actuals under the definitive-period rules, and builds the Annex IV §1.2 summary your EU customer carries into their CBAM declaration.

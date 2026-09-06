@@ -15,7 +15,7 @@ export default function AdvisoryPage() {
           <div style={eyebrow}>ThemisIQ Advisory</div>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.4rem, 5vw, 3.6rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d', maxWidth: 700 }}>
             Expert guidance.<br />
-            <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Fixed fees.</span><br />
+            <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Fixed fees.</span><br />
             Named advisors.
           </h1>
           <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 400, marginBottom: '2.5rem', maxWidth: 560 }}>
@@ -28,7 +28,7 @@ export default function AdvisoryPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, maxWidth: 600 }}>
             {[['30 min', 'Free initial consultation'], ['Fixed fees', 'No billable hours surprises'], ['Named advisor', 'Same person throughout']].map(([val, label]) => (
               <div key={label} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem', textAlign: 'center' as const }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 4 }}>{val}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 400, color: 'var(--color-brand)', marginBottom: 4 }}>{val}</div>
                 <div style={{ fontSize: 11, color: '#888784' }}>{label}</div>
               </div>
             ))}
@@ -73,20 +73,19 @@ export default function AdvisoryPage() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
             {[
-              { icon: '📋', title: 'Regulatory Filing', price: 'From $4,000', desc: 'SB 253 submission preparation, CARB template completion, CDP response, ESRS disclosure drafting. Filing-ready outputs with your named advisor sign-off.', tags: ['SB 253', 'CDP', 'ESRS'] },
-              { icon: '🔬', title: 'Verifier Preparation', price: 'From $6,000', desc: 'Pre-assurance data room preparation, methodology documentation, verifier selection support, and issue resolution during the assurance process.', tags: ['Limited assurance', 'Reasonable assurance', 'ISAE 3410'] },
-              { icon: '🤝', title: 'M&A Climate Diligence', price: 'From $8,000', desc: 'Scope 3 inherited emissions assessment, TCFD risk evaluation, SBTi target compatibility, and climate risk quantification for investment committee reporting.', tags: ['M&A', 'PE', 'IFRS S2'] },
-              { icon: '📊', title: 'Board Reporting', price: 'From $3,500', desc: 'Climate and ESG board pack design, director briefing preparation, TCFD governance narrative, and board-level training on climate disclosure obligations.', tags: ['Board', 'TCFD', 'Governance'] },
-              { icon: '🗺️', title: 'Framework Eligibility', price: 'From $2,500', desc: 'Determine which regulations apply to your company across all jurisdictions. Prioritised compliance roadmap with effort and cost estimates per obligation.', tags: ['Multi-framework', 'Roadmap', 'Prioritisation'] },
-              { icon: '🎯', title: 'SBTi Guidance', price: 'From $5,000', desc: 'Science-based target setting, near-term and net-zero pathway design, SBTi submission preparation, and target validation support.', tags: ['SBTi', 'Net zero', '1.5°C'] },
-              { icon: '🔗', title: 'Supply Chain Strategy', price: 'From $6,000', desc: 'Supplier engagement programme design, Scope 3 Category 1 primary data collection strategy, EcoVadis programme management, and CS3D due diligence framework.', tags: ['Scope 3', 'EcoVadis', 'CS3D'] },
-              { icon: '🏆', title: 'Retained Advisory', price: '$4,500–$12,000/month', desc: 'Ongoing strategic sustainability advisory. Monthly calls, regulatory monitoring, document review, and priority access to the full ThemisIQ advisor network.', tags: ['Ongoing', 'Strategic', 'Priority access'] },
-            ].map(({ icon, title, price, desc, tags }) => (
+              { title: 'Regulatory Filing', price: 'From $4,000', desc: 'SB 253 submission preparation, CARB template completion, CDP response, ESRS disclosure drafting. Filing-ready outputs with your named advisor sign-off.', tags: ['SB 253', 'CDP', 'ESRS'] },
+              { title: 'Verifier Preparation', price: 'From $6,000', desc: 'Pre-assurance data room preparation, methodology documentation, verifier selection support, and issue resolution during the assurance process.', tags: ['Limited assurance', 'Reasonable assurance', 'ISAE 3410'] },
+              { title: 'M&A Climate Diligence', price: 'From $8,000', desc: 'Scope 3 inherited emissions assessment, TCFD risk evaluation, SBTi target compatibility, and climate risk quantification for investment committee reporting.', tags: ['M&A', 'PE', 'IFRS S2'] },
+              { title: 'Board Reporting', price: 'From $3,500', desc: 'Climate and ESG board pack design, director briefing preparation, TCFD governance narrative, and board-level training on climate disclosure obligations.', tags: ['Board', 'TCFD', 'Governance'] },
+              { title: 'Framework Eligibility', price: 'From $2,500', desc: 'Determine which regulations apply to your company across all jurisdictions. Prioritised compliance roadmap with effort and cost estimates per obligation.', tags: ['Multi-framework', 'Roadmap', 'Prioritisation'] },
+              { title: 'SBTi Guidance', price: 'From $5,000', desc: 'Science-based target setting, near-term and net-zero pathway design, SBTi submission preparation, and target validation support.', tags: ['SBTi', 'Net zero', '1.5°C'] },
+              { title: 'Supply Chain Strategy', price: 'From $6,000', desc: 'Supplier engagement programme design, Scope 3 Category 1 primary data collection strategy, EcoVadis programme management, and CS3D due diligence framework.', tags: ['Scope 3', 'EcoVadis', 'CS3D'] },
+              { title: 'Retained Advisory', price: '$4,500–$12,000/month', desc: 'Ongoing strategic sustainability advisory. Monthly calls, regulatory monitoring, document review, and priority access to the full ThemisIQ advisor network.', tags: ['Ongoing', 'Strategic', 'Priority access'] },
+            ].map(({ title, price, desc, tags }) => (
               <div key={title} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.5rem', display: 'flex', flexDirection: 'column' as const, gap: '0.75rem' }}>
-                <div style={{ fontSize: 24 }}>{icon}</div>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 2 }}>{title}</div>
-                  <div style={{ fontSize: 12, fontWeight: 600, background: 'linear-gradient(135deg,#7425e3,#1fb1ff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>{price}</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-brand)' }}>{price}</div>
                 </div>
                 <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 400, flex: 1 }}>{desc}</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 5 }}>

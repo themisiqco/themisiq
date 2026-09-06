@@ -24,6 +24,8 @@
 import jsPDF from 'jspdf'
 import { registerCharis, CHARIS_FAMILY } from '../fonts/charis'
 import { THEMISIQ_WORDMARK_DATA_URI, WORDMARK_ASPECT } from './logo'
+import { BRAND } from '../brand'
+import { PAPER, INK, SECONDARY, MUTED } from './palette'
 
 // ── page ─────────────────────────────────────────────────────────────────────────────────────────
 
@@ -42,39 +44,24 @@ const FOOTER_BASELINE_UP = 22
 // ── colour ───────────────────────────────────────────────────────────────────────────────────────
 
 /**
- * ⚠️ EVERY GREY HERE WAS MEASURED, NOT INHERITED. The site's muted grey #888784 reaches only
- * 3.36:1 against the paper colour — it fails WCAG AA for body and supporting text (4.5:1) and
- * passes only the 3:1 large-text bar. It is NOT used in this module at any size. A board paper is
- * read by directors, in meeting rooms, on printouts, and often by people over fifty; a grey that
- * fails on a backlit screen fails worse on a laser print of a laser print.
+ * The palette moved to lib/pdf/palette.ts so lib/assurancePdf.ts can share it without
+ * importing this module and its 232 KB of fonts and logo. Re-exported here because callers
+ * (and lib/materiality/boardReportPdf.ts) already import these names from layout.
+ */
+export { PAPER, INK, SECONDARY, MUTED } from './palette'
+
+/**
+ * The rule colour. ⚠️ FOR THE HAIRLINE ONLY — NEVER FOR TEXT, and the reason has changed.
+ * It used to be GRADIENT_STOPS, the retired violet→cyan→green ramp, two of whose three stops were
+ * illegible as type (#1fb1ff 2.23:1, #64fe3e 1.24:1 on PAPER) — so the ban existed because a word
+ * could land on an unreadable stop. BRAND is 7.13:1 on PAPER and would in fact be legible; the ban
+ * stays anyway, because a rule and a heading are different things and this module owns the rule.
  *
- * Ratios below are computed against PAPER (#f8f7f5), which is the background of the cover and the
- * assumed background of every page. Against pure white each is very slightly higher, so a page that
- * is left white rather than tinted stays compliant.
+ * ⚠️ A LITERAL, IMPORTED — NOT A CSS VARIABLE. jsPDF resolves no custom properties. Importing
+ * BRAND from lib/brand.ts rather than retyping #095C6B keeps this value inside the drift check in
+ * lib/brand.test.ts, which asserts every constant there against app/styles/themisiq-tokens.css.
  */
-export const PAPER = '#f8f7f5'
-
-/** 18.15:1 on PAPER. Body text, headings, anything that carries meaning. */
-export const INK = '#0d0d0d'
-
-/** 6.98:1 on PAPER. Secondary body — captions that are still prose. */
-export const SECONDARY = '#555553'
-
-/**
- * 4.83:1 on PAPER. The lightest grey this module permits for small text: footers, labels, the
- * cover's supporting lines. Chosen over #888784 (3.36:1, fails) and over #767572 (4.30:1, still
- * fails) — this clears 4.5:1 with enough margin that a slightly darker paper stock cannot push it
- * under.
- */
-export const MUTED = '#6e6d6a'
-
-/**
- * The brand gradient's three stops. ⚠️ FOR THE HAIRLINE ONLY — NEVER FOR TEXT.
- * On PAPER: #7425e3 is 6.29:1 and would be legible, but #1fb1ff is 2.23:1 and #64fe3e is 1.24:1,
- * both far below any threshold. Keeping all three out of type removes the question of which stop a
- * given word landed on.
- */
-export const GRADIENT_STOPS = ['#7425e3', '#1fb1ff', '#64fe3e'] as const
+const RULE_COLOUR = BRAND
 
 // ── type scale ───────────────────────────────────────────────────────────────────────────────────
 
@@ -108,22 +95,6 @@ const FOOTER_SIZE = 8
 const RULE_HEIGHT = 2
 
 // ── colour helpers ───────────────────────────────────────────────────────────────────────────────
-
-const hexToRgb = (hex: string): [number, number, number] => [
-  parseInt(hex.slice(1, 3), 16),
-  parseInt(hex.slice(3, 5), 16),
-  parseInt(hex.slice(5, 7), 16),
-]
-
-const mix = (a: string, b: string, t: number): [number, number, number] => {
-  const [ar, ag, ab] = hexToRgb(a)
-  const [br, bg, bb] = hexToRgb(b)
-  return [
-    Math.round(ar + (br - ar) * t),
-    Math.round(ag + (bg - ag) * t),
-    Math.round(ab + (bb - ab) * t),
-  ]
-}
 
 // ── the layout ───────────────────────────────────────────────────────────────────────────────────
 
@@ -261,30 +232,25 @@ export function createLayout(): Layout {
   }
 
   /**
-   * The brand gradient, as a HAIRLINE.
+   * The brand rule, as a HAIRLINE. Signature and vertical rhythm unchanged: it still reserves
+   * `height + 14`, still advances y by 6 before and `height + 8` after, and still returns y — the
+   * ten-plus call sites in lib/materiality/boardReportPdf.ts are untouched by this.
    *
-   * ⚠️ NEVER AS A FIELD OR A BACKGROUND, AND THE REASON IS THE OUTPUT DEVICE. Office laser printers
-   * dither large areas of continuous tone; a gradient panel that looks smooth on screen prints as
-   * visible banding, and the purple-to-blue half muddies to grey. Kept to a 2pt band of stepped
-   * rectangles it reads as a coloured rule, which is what it is for.
+   * ⚠️ NEVER AS A FIELD OR A BACKGROUND. Office laser printers dither large areas of continuous
+   * tone, so any wide block of colour risks visible banding. A 2pt band reads as a coloured rule,
+   * which is what it is for. (The other half of the old warning — that the purple-to-blue ramp
+   * muddied to grey in print — retired with the gradient.)
    *
-   * The rectangles overlap by half a point so no hairline gaps open between them at print
-   * resolution.
+   * ONE RECTANGLE. This was 120 stepped rectangles overlapping by half a point, because faking a
+   * gradient in jsPDF means drawing it a slice at a time and the overlap stopped hairline gaps
+   * opening between slices at print resolution. A solid rule needs neither.
    */
   const rule = (): number => {
     const height = Math.min(RULE_HEIGHT, 3)
     ensure(height + 14)
     y += 6
-    const steps = 120
-    const segment = contentWidth / steps
-    for (let i = 0; i < steps; i++) {
-      const t = i / (steps - 1)
-      const [r, g, b] = t < 0.5
-        ? mix(GRADIENT_STOPS[0], GRADIENT_STOPS[1], t * 2)
-        : mix(GRADIENT_STOPS[1], GRADIENT_STOPS[2], (t - 0.5) * 2)
-      doc.setFillColor(r, g, b)
-      doc.rect(MARGIN.left + i * segment, y, segment + 0.5, height, 'F')
-    }
+    doc.setFillColor(RULE_COLOUR)
+    doc.rect(MARGIN.left, y, contentWidth, height, 'F')
     y += height + 8
     return y
   }

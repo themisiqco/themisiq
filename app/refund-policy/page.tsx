@@ -10,7 +10,7 @@ export default function Page() {
         <div style={{ maxWidth: 920, margin: '0 auto' }}>
           <div style={eyebrow}>ThemisIQ Compliance Inc.</div>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }}>
-            Refund <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Policy</span>
+            Refund <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Policy</span>
           </h1>
           <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' as const, marginBottom: '1rem' }}>
             {['Governed by: Ontario, Canada law', 'hello@themisiq.co'].map(item => (

@@ -27,7 +27,7 @@ export default function Page() {
             <div style={eyebrow}>Deals & Investment</div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
               Not a values question.<br />
-              <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>A valuation question.</span>
+              <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>A valuation question.</span>
             </h1>
             <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem', maxWidth: 480 }}>
               Enter a target&rsquo;s turnover, balance sheet, headcount and jurisdiction, and see which climate and sustainability regimes it already falls under &mdash; each threshold tested limb by limb, with the figure applied and the provision it comes from. Under five minutes. Create an account and your first target is free.
@@ -231,7 +231,7 @@ export default function Page() {
       {/* CTA */}
       <section style={{ padding: '6rem 2.5rem', textAlign: 'center' }}>
         <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
-          Your first target is <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>free.</span>
+          Your first target is <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>free.</span>
         </h2>
         <p style={{ fontSize: 15, color: '#555553', maxWidth: 520, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
           Create an account and screen one — the complete report, every limb tested, nothing held back and no card. The subscription is for when you have a pipeline rather than a deal.

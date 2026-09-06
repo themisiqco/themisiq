@@ -25,7 +25,7 @@ export default function Page() {
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>ThemisIQ Climate</div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
               Climate Risk<br />
-              <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Intelligence</span>
+              <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Intelligence</span>
             </h1>
             <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem', maxWidth: 480 }}>
               Whether the request comes from an investor, a lender, your board, or a regulator — produce a defensible, TCFD-aligned climate risk assessment. Physical and transition risk across three IPCC scenarios. IFRS S2, CSRD ESRS E1, and SB 261 ready, from one assessment.
@@ -364,7 +364,7 @@ export default function Page() {
                     <span style={{ fontSize: 13, color: featured ? 'rgba(255,255,255,0.65)' : '#555553', fontWeight: 400 }}>{f}</span>
                   </div>
                 ))}
-                <a href="/dashboard/climate-risk" style={{ display: 'block', textAlign: 'center', padding: '11px', borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: 'none', background: featured ? 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)' : '#0d0d0d', color: featured ? '#0d0d0d' : '#fff', marginTop: '1.5rem' }}>
+                <a href="/dashboard/climate-risk" style={{ display: 'block', textAlign: 'center', padding: '11px', borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: 'none', background: featured ? 'var(--color-brand)' : '#0d0d0d', color: featured ? '#0d0d0d' : '#fff', marginTop: '1.5rem' }}>
                   Assess your climate risk →
                 </a>
               </div>
@@ -377,7 +377,7 @@ export default function Page() {
       <section style={{ padding: '6rem 2.5rem', textAlign: 'center' }}>
         <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
           Someone&apos;s going to ask.<br />
-          <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Be ready.</span>
+          <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Be ready.</span>
         </h2>
         <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
           ThemisIQ guides you through a complete, TCFD-aligned climate risk assessment and produces a publishable report — for whoever is asking. Build it free; unlock the export on a paid plan.

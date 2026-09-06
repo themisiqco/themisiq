@@ -34,15 +34,14 @@ export default function Page() {
         <h2 style={sectionTitle}>Our security posture.</h2>
         <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 0, border: '0.5px solid #e8e7e4', borderRadius: 12, overflow: 'hidden', marginTop: '1.5rem' }}>
           {[
-            { name: 'SOC 2 Type I', status: 'In progress', badge: 'amber', detail: 'Target: Q4 2026 — gap assessment in progress', icon: '🛡️' },
-            { name: 'SOC 2 Type II', status: 'In progress', badge: 'amber', detail: 'Target: Q2 2027 — dependent on Type I completion', icon: '🛡️' },
-            { name: 'ISO 27001:2022', status: 'In progress', badge: 'amber', detail: 'Target: Q2 2027 — controls mapped, ISMS design phase', icon: '📋' },
-            { name: 'PIPEDA & Law 25 (Québec)', status: 'Compliant', badge: 'green', detail: 'DPA templates complete · privacy breach procedures in place', icon: '🔒' },
-            { name: 'GDPR / UK GDPR — data processor', status: 'Compliant', badge: 'green', detail: 'Standard Contractual Clauses (SCCs) in place · DPA available on request', icon: '🌍' },
-            { name: 'PCI DSS', status: 'Via Stripe', badge: 'green', detail: 'Payment processing via Stripe (PCI DSS Level 1) — ThemisIQ never stores card data', icon: '💳' },
-          ].map(({ name, status, badge, detail, icon }, i) => (
+            { name: 'SOC 2 Type I', status: 'In progress', badge: 'amber', detail: 'Target: Q4 2026 — gap assessment in progress' },
+            { name: 'SOC 2 Type II', status: 'In progress', badge: 'amber', detail: 'Target: Q2 2027 — dependent on Type I completion' },
+            { name: 'ISO 27001:2022', status: 'In progress', badge: 'amber', detail: 'Target: Q2 2027 — controls mapped, ISMS design phase' },
+            { name: 'PIPEDA & Law 25 (Québec)', status: 'Compliant', badge: 'green', detail: 'DPA templates complete · privacy breach procedures in place' },
+            { name: 'GDPR / UK GDPR — data processor', status: 'Compliant', badge: 'green', detail: 'Standard Contractual Clauses (SCCs) in place · DPA available on request' },
+            { name: 'PCI DSS', status: 'Via Stripe', badge: 'green', detail: 'Payment processing via Stripe (PCI DSS Level 1) — ThemisIQ never stores card data' },
+          ].map(({ name, status, badge, detail }, i) => (
             <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px 20px', background: i % 2 === 0 ? '#fff' : '#f8f7f5', borderBottom: '0.5px solid #e8e7e4' }}>
-              <div style={{ fontSize: 20, flexShrink: 0 }}>{icon}</div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 2 }}>{name}</div>
                 <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>{detail}</div>
@@ -60,14 +59,13 @@ export default function Page() {
           <h2 style={sectionTitle}>Where your data lives.</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, marginTop: '1.5rem' }}>
             {[
-              { icon: '🗄️', title: 'Database — Supabase (AWS)', body: 'All customer platform data stored in Supabase on AWS infrastructure. Supabase holds SOC 2 Type II and ISO 27001 certifications. US-East region by default.' },
-              { icon: '☁️', title: 'Application — Vercel', body: 'ThemisIQ application hosted on Vercel with global CDN. Vercel holds SOC 2 Type II certification. HTTPS enforced on all endpoints; HSTS enabled.' },
-              { icon: '💳', title: 'Payments — Stripe', body: 'All payment processing handled by Stripe, PCI DSS Level 1 certified. ThemisIQ never stores, processes, or transmits card numbers.' },
-              { icon: '💾', title: 'Backups — continuous PITR', body: 'Continuous point-in-time recovery with 30-day retention. Backups replicated to geographically separate AWS region. RTO: 4 hours. RPO: 1 hour.' },
-            ].map(({ icon, title, body }) => (
+              { title: 'Database — Supabase (AWS)', body: 'All customer platform data stored in Supabase on AWS infrastructure. Supabase holds SOC 2 Type II and ISO 27001 certifications. US-East region by default.' },
+              { title: 'Application — Vercel', body: 'ThemisIQ application hosted on Vercel with global CDN. Vercel holds SOC 2 Type II certification. HTTPS enforced on all endpoints; HSTS enabled.' },
+              { title: 'Payments — Stripe', body: 'All payment processing handled by Stripe, PCI DSS Level 1 certified. ThemisIQ never stores, processes, or transmits card numbers.' },
+              { title: 'Backups — continuous PITR', body: 'Continuous point-in-time recovery with 30-day retention. Backups replicated to geographically separate AWS region. RTO: 4 hours. RPO: 1 hour.' },
+            ].map(({ title, body }) => (
               <div key={title} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.5rem', position: 'relative' as const, overflow: 'hidden' }}>
-                <div style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg,#7425e3,#1fb1ff,#64fe3e)' }} />
-                <div style={{ fontSize: 22, marginBottom: 10 }}>{icon}</div>
+                <div style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: 3, background: 'var(--color-brand)' }} />
                 <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 6 }}>{title}</div>
                 <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{body}</div>
               </div>
@@ -128,7 +126,7 @@ export default function Page() {
               { step: '04', title: 'Review', body: 'Every P1 and P2 incident has a mandatory post-incident review within 14 days. Findings shared with affected customers on request.' },
             ].map(({ step, title, body }) => (
               <div key={step} style={{ background: '#fff', padding: '2rem' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 8, opacity: 0.6 }}>{step}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 400, color: 'var(--color-brand)', marginBottom: 8, opacity: 0.6 }}>{step}</div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 6 }}>{title}</div>
                 <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{body}</div>
               </div>

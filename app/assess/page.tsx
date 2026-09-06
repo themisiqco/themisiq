@@ -625,8 +625,8 @@ export default function AssessPage() {
 
     { id: 'revenue' as keyof Answers, title: "What is your company's global annual revenue?", sub: 'Determines eligibility for SB 253 ($1B), SB 261 ($500M), ESRS/CSRD, and Modern Slavery Act thresholds.', type: 'slider' },
     { id: 'employees' as keyof Answers, title: 'How many employees does your company have globally?', sub: 'Determines CSRD/ESRS scope, EU Pay Transparency, and California Pay Data Reporting thresholds.', type: 'options', options: [{ value: 'under50', label: 'Under 50', sub: 'Small organisation' }, { value: '50_249', label: '50–249', sub: 'NIS2 important entity threshold' }, { value: '250_499', label: '250–499', sub: 'ESRS mid-size · EU Pay Transparency (every 3 years)' }, { value: '500_999', label: '500–999', sub: 'ESRS large entity · EU Pay Transparency annual' }, { value: '1000_4999', label: '1,000–4,999', sub: 'Full ESRS scope · EU AI Act · NIS2 essential entity' }, { value: '5000plus', label: '5,000+', sub: 'All obligations apply · SEC human capital disclosure' }] },
-    { id: 'jurisdictions' as keyof Answers, title: 'Where does your company operate or have revenue?', sub: 'Select all that apply. Each jurisdiction triggers different mandatory disclosure obligations.', type: 'multiselect', options: [{ value: 'california', label: '🇺🇸 California, USA', sub: 'SB 253, SB 261, CA Pay Data' }, { value: 'us_other', label: '🇺🇸 United States (other)', sub: 'SEC rules, NIST, Model Risk' }, { value: 'eu', label: '🇪🇺 European Union', sub: 'CSRD, ESRS, NIS2, DORA, EU AI Act' }, { value: 'uk', label: '🇬🇧 United Kingdom', sub: 'TCFD mandatory, Modern Slavery Act' }, { value: 'australia', label: '🇦🇺 Australia', sub: 'Modern Slavery Act, AASB S2' }, { value: 'canada', label: '🇨🇦 Canada', sub: 'IFRS S2 adoption, federal modern slavery' }, { value: 'apac', label: '🌏 Asia Pacific (other)', sub: 'Singapore, Japan, Hong Kong TCFD' }, { value: 'global', label: '🌐 Global / multiple regions', sub: 'CDP, GRI, SBTi, UNGP' }] },
-    { id: 'sectors' as keyof Answers, title: 'Which sectors best describe your business?', sub: 'Determines NIS2 essential/important entity status, DORA applicability, and EU AI Act high-risk categories.', type: 'multiselect', options: [{ value: 'financial', label: '🏦 Financial services', sub: 'DORA, NIS2 essential, SR 11-7' }, { value: 'energy', label: '⚡ Energy / utilities', sub: 'NIS2 essential, SB 253, ESRS' }, { value: 'health', label: '🏥 Healthcare', sub: 'NIS2 essential, EU AI Act high-risk' }, { value: 'manufacturing', label: '🏭 Manufacturing / industrial', sub: 'SB 253, ESRS E1, NIS2 important' }, { value: 'tech', label: '💻 Technology / digital', sub: 'EU AI Act, NIS2, DORA (if fintech)' }, { value: 'transport', label: '🚚 Transport / logistics', sub: 'NIS2 essential, Scope 3 Cat.4' }, { value: 'retail', label: '🛍️ Retail / consumer', sub: 'Supply chain, SB 253, ESRS' }, { value: 'other', label: '💼 Professional services', sub: 'ESRS, CDP, GRI' }] },
+    { id: 'jurisdictions' as keyof Answers, title: 'Where does your company operate or have revenue?', sub: 'Select all that apply. Each jurisdiction triggers different mandatory disclosure obligations.', type: 'multiselect', options: [{ value: 'california', label: 'California, USA', sub: 'SB 253, SB 261, CA Pay Data' }, { value: 'us_other', label: 'United States (other)', sub: 'SEC rules, NIST, Model Risk' }, { value: 'eu', label: 'European Union', sub: 'CSRD, ESRS, NIS2, DORA, EU AI Act' }, { value: 'uk', label: 'United Kingdom', sub: 'TCFD mandatory, Modern Slavery Act' }, { value: 'australia', label: 'Australia', sub: 'Modern Slavery Act, AASB S2' }, { value: 'canada', label: 'Canada', sub: 'IFRS S2 adoption, federal modern slavery' }, { value: 'apac', label: 'Asia Pacific (other)', sub: 'Singapore, Japan, Hong Kong TCFD' }, { value: 'global', label: 'Global / multiple regions', sub: 'CDP, GRI, SBTi, UNGP' }] },
+    { id: 'sectors' as keyof Answers, title: 'Which sectors best describe your business?', sub: 'Determines NIS2 essential/important entity status, DORA applicability, and EU AI Act high-risk categories.', type: 'multiselect', options: [{ value: 'financial', label: 'Financial services', sub: 'DORA, NIS2 essential, SR 11-7' }, { value: 'energy', label: 'Energy / utilities', sub: 'NIS2 essential, SB 253, ESRS' }, { value: 'health', label: 'Healthcare', sub: 'NIS2 essential, EU AI Act high-risk' }, { value: 'manufacturing', label: 'Manufacturing / industrial', sub: 'SB 253, ESRS E1, NIS2 important' }, { value: 'tech', label: 'Technology / digital', sub: 'EU AI Act, NIS2, DORA (if fintech)' }, { value: 'transport', label: 'Transport / logistics', sub: 'NIS2 essential, Scope 3 Cat.4' }, { value: 'retail', label: 'Retail / consumer', sub: 'Supply chain, SB 253, ESRS' }, { value: 'other', label: 'Professional services', sub: 'ESRS, CDP, GRI' }] },
     // Two questions, not one. SUBTITLES DESCRIBE THE OPTION, NEVER THE OUTCOME — the old ones made
     // determinations before the visitor had answered, and got them wrong: 'EU publicly listed ·
     // CSRD large company · ESRS full suite from FY2024' asserted CSRD scope from listing alone, when
@@ -677,7 +677,7 @@ export default function AssessPage() {
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, background: '#f8f7f5', border: '0.5px solid #e8e7e4', padding: '4px 14px', borderRadius: 99, marginBottom: 12, color: '#888784' }}>Your Compliance Obligation Map</div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, marginBottom: 8, lineHeight: 1.2, color: '#0d0d0d' }}>
-            We identified <span style={{ background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', fontStyle: 'italic' }}>{obligations.length} {obligations.length === 1 ? 'obligation' : 'obligations'}</span> that apply to your company.
+            We identified <span style={{ color: 'var(--color-brand)', fontStyle: 'italic' }}>{obligations.length} {obligations.length === 1 ? 'obligation' : 'obligations'}</span> that apply to your company.
           </h2>
           <p style={{ fontSize: 14, color: '#555553', fontWeight: 400 }}>{critical} {critical === 1 ? 'requires' : 'require'} immediate action. {high} {high === 1 ? 'is' : 'are'} high priority. Click each to expand.</p>
           {/* WHERE TO START — the only place the driver answer is shown back. It shapes which entries
@@ -827,7 +827,7 @@ export default function AssessPage() {
               only while the email gate sat at a hardcoded step 7 and made questions[7] unreachable.
               Once the array grew and supply_chain became a live question, 8 was the index of
               supply_chain: the visitor submitted the form and was shown a question again. */}
-          <button onClick={() => { if (email.emailAddr.includes("@")) { submitToAPI(); setStep(RESULTS_STEP) } }} style={{ fontSize: 14, fontWeight: 500, padding: 12, borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', border: 'none', cursor: 'pointer', marginTop: 4 }}>
+          <button onClick={() => { if (email.emailAddr.includes("@")) { submitToAPI(); setStep(RESULTS_STEP) } }} style={{ fontSize: 14, fontWeight: 500, padding: 12, borderRadius: 8, background: 'var(--color-brand)', color: '#0d0d0d', border: 'none', cursor: 'pointer', marginTop: 4 }}>
             Show my Compliance Obligation Map →
           </button>
           <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', textAlign: 'center' as const }}>No spam. No sales calls unless you ask.</p>
@@ -856,7 +856,7 @@ export default function AssessPage() {
 
           {q.type === 'slider' && (
             <div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', textAlign: 'center' as const, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 10 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', textAlign: 'center' as const, color: 'var(--color-brand)', marginBottom: 10 }}>
                 {REVENUE_LABELS[val as number ?? 5]}
               </div>
               {/* `max` derives from REVENUE_INDICES, so the slider's range and the RevenueAnswer type
@@ -922,7 +922,7 @@ export default function AssessPage() {
       {step < RESULTS_STEP && (
         <div style={{ background: '#fff', padding: '0.75rem 2rem', display: 'flex', alignItems: 'center', gap: '1rem', borderBottom: '0.5px solid #e8e7e4' }}>
           <div style={{ flex: 1, height: 4, background: '#e8e7e4', borderRadius: 99, overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg,#7425e3,#1fb1ff,#64fe3e)', borderRadius: 99, transition: 'width 0.4s ease' }} />
+            <div style={{ height: '100%', width: `${pct}%`, background: 'var(--color-brand)', borderRadius: 99, transition: 'width 0.4s ease' }} />
           </div>
           <div style={{ fontSize: 12, color: '#888784', whiteSpace: 'nowrap' as const }}>
             {step < EMAIL_STEP ? `Step ${step + 1} of ${EMAIL_STEP}` : 'Almost done'}
@@ -946,7 +946,7 @@ export default function AssessPage() {
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
               <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 12 }}>Free · 3 minutes · Instant results</div>
               <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '0.75rem', color: '#0d0d0d' }}>
-                Which compliance regulations<br />apply to <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>your company?</span>
+                Which compliance regulations<br />apply to <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>your company?</span>
               </h1>
               <p style={{ fontSize: 15, color: '#555553', fontWeight: 400, lineHeight: 1.7, maxWidth: 600, margin: "0 auto", textAlign: "center" }}>
                 Answer {EMAIL_STEP} questions. Get a personalised Compliance Obligation Map — the rules that apply to you, what your customers and investors are asking for, and the ThemisIQ module that addresses each one.
