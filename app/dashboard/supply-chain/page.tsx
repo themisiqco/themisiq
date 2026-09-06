@@ -5,6 +5,7 @@ import Nav from '../../components/Nav'
 import Papa from 'papaparse'
 import { useEntitlement } from '../../../lib/useEntitlement'
 import { CS3D_APPLIES_FROM } from '../../../lib/cs3d'
+import { sectionHead } from '@/app/components/headingStyles'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -133,7 +134,6 @@ const newSupplier = (): Supplier => ({
 const GRAD = 'var(--color-brand)'
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
-const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.4rem, 2.5vw, 1.8rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
 const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
 
 const RISK_CONFIG: Record<RiskLevel, { label: string; color: string; bg: string; border: string }> = {
@@ -456,7 +456,7 @@ export default function SupplyChainDashboard() {
               { label: 'Total suppliers', count: inventory.suppliers.length, color: '#0d0d0d', bg: '#f8f7f5' },
             ].map(({ label, count, color, bg }) => (
               <div key={label} style={{ background: bg, borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', fontWeight: 400, color }}>{count}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 400, color }}>{count}</div>
                 <div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>{label}</div>
               </div>
             ))}
@@ -522,7 +522,7 @@ export default function SupplyChainDashboard() {
               </div>
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '2.5rem', fontWeight: 400, color: '#64fe3e', lineHeight: 1 }}>{totalScope3.toFixed(1)}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', fontWeight: 400, color: '#64fe3e', lineHeight: 1 }}>{totalScope3.toFixed(1)}</div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>mt CO₂e</div>
             </div>
           </div>
@@ -571,7 +571,7 @@ export default function SupplyChainDashboard() {
           ].map(({ label, val, urgent }) => (
             <div key={label}>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>{label}</div>
-              <div style={{ fontSize: typeof val === 'number' ? '1.6rem' : '1rem', fontFamily: typeof val === 'number' ? 'Georgia, serif' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 600, color: urgent ? '#64fe3e' : '#fff', lineHeight: 1.2 }}>{val}</div>
+              <div style={{ fontSize: typeof val === 'number' ? '1.6rem' : '1rem', fontFamily: typeof val === 'number' ? 'var(--font-display)' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 600, color: urgent ? '#64fe3e' : '#fff', lineHeight: 1.2 }}>{val}</div>
             </div>
           ))}
         </div>
@@ -612,7 +612,7 @@ export default function SupplyChainDashboard() {
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Supply Chain & Scope 3</div>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>Supplier Risk Register & Scope 3 Assessment</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>Supplier Risk Register & Scope 3 Assessment</div>
           </div>
           {inventory.suppliers.length > 0 && (
             <div style={{ textAlign: 'right' }}>

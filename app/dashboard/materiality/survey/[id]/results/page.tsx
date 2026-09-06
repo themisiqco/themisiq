@@ -65,7 +65,7 @@ const CARD: React.CSSProperties = {
   padding: '1.5rem', marginBottom: 18,
 }
 const H2: React.CSSProperties = {
-  fontFamily: 'Georgia, serif', fontSize: '1.25rem', color: INK, marginBottom: 6,
+  fontFamily: 'var(--font-display)', fontSize: '1.25rem', color: INK, marginBottom: 6,
 }
 
 // ── payload types. Mirrors survey_aggregate; every field is read, none is computed. ──────────────
@@ -294,7 +294,7 @@ export default function SurveyResults() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.7rem', color: INK }}>{agg.round.name}</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: INK }}>{agg.round.name}</div>
           <Chip text={agg.round.status === 'closed' ? 'Closed' : 'Open'}
                 fg={agg.round.status === 'closed' ? BLUE : GREEN}
                 bg={agg.round.status === 'closed' ? BLUE_BG : GREEN_BG} />
@@ -321,7 +321,7 @@ export default function SurveyResults() {
           ].map(t => (
             <div key={t.label} style={{ background: t.bg, border: `0.5px solid ${LINE}`, borderRadius: 12,
                                         padding: '1rem', textAlign: 'center' }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color: t.color }}>{t.val}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color: t.color }}>{t.val}</div>
               <div style={{ fontSize: 11, color: MUTE, marginTop: 4 }}>{t.label}</div>
             </div>
           ))}
@@ -566,7 +566,7 @@ export default function SurveyResults() {
 
               {byTopic.map(t => (
                 <div key={t.code} style={{ marginBottom: 22 }}>
-                  <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', color: INK,
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', color: INK,
                                 paddingBottom: 6, borderBottom: `1px solid ${LINE}`, marginBottom: 10 }}>
                     {t.label} <span style={{ fontSize: 11, color: MUTE }}>{t.code}</span>
                   </div>
@@ -579,7 +579,7 @@ export default function SurveyResults() {
 
               {agg.entity_specific.length > 0 && (
                 <div>
-                  <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', color: INK,
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', color: INK,
                                 paddingBottom: 6, borderBottom: `1px solid ${LINE}`, marginBottom: 10 }}>
                     Entity-specific questions
                   </div>

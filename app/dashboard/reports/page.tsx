@@ -91,7 +91,7 @@ export default function ReportsPage() {
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Your account</div>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>Saved reports</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>Saved reports</div>
         </div>
       </div>
 
@@ -111,7 +111,7 @@ export default function ReportsPage() {
 
         {!loading && !error && rows.length === 0 && (
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '3rem 2rem', textAlign: 'center' }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 8 }}>No saved reports yet</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 8 }}>No saved reports yet</div>
             <p style={{ fontSize: 13, color: '#888784', lineHeight: 1.6, maxWidth: 420, margin: '0 auto 20px' }}>
               Run an assessment to generate your first report. Once generated, it will appear here so you can reopen or re-download it any time.
             </p>

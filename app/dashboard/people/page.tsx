@@ -94,7 +94,7 @@ const labelStyle: React.CSSProperties = {
 }
 
 const sectionHead: React.CSSProperties = {
-  fontFamily: 'Georgia, serif', fontSize: 'clamp(1.4rem, 2.5vw, 1.8rem)',
+  fontFamily: 'var(--font-display)', fontSize: 'clamp(1.4rem, 2.5vw, 1.8rem)',
   fontWeight: 400, color: '#0d0d0d', marginBottom: 8,
 }
 
@@ -457,7 +457,7 @@ export default function PeopleDashboard() {
           ].map(({ label, val, color, bg }) => (
             <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.25rem', border: `0.5px solid color-mix(in srgb, ${color} 13%, transparent)` }}>
               <div style={{ fontSize: 11, color: '#888784', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{label}</div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', fontWeight: 400, color }}>{val}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 400, color }}>{val}</div>
             </div>
           ))}
         </div>
@@ -534,7 +534,7 @@ export default function PeopleDashboard() {
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>People & Workforce</div>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>Gender Pay Gap & Workforce Compliance</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>Gender Pay Gap & Workforce Compliance</div>
           </div>
           <div style={{ fontSize: 12, color: '#888784' }}>
             {inventory.company && <span style={{ fontWeight: 500, color: '#0d0d0d' }}>{inventory.company} · </span>}
@@ -600,7 +600,7 @@ export default function PeopleDashboard() {
               {inventory.bands.some(b => b.male_avg_salary > 0 && b.female_avg_salary > 0) && (
                 <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem' }}>
                   <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784', marginBottom: 10 }}>Pay gap preview</div>
-                  <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', fontWeight: 400, color: Math.abs(calcMeanGap(inventory.bands)) >= 5 ? '#B91C1C' : '#0F6E56', marginBottom: 4 }}>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 400, color: Math.abs(calcMeanGap(inventory.bands)) >= 5 ? '#B91C1C' : '#0F6E56', marginBottom: 4 }}>
                     {calcMeanGap(inventory.bands).toFixed(1)}%
                   </div>
                   <div style={{ fontSize: 11, color: '#888784' }}>mean gender pay gap</div>

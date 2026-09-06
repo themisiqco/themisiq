@@ -676,7 +676,7 @@ export default function AssessPage() {
       <div>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, background: '#f8f7f5', border: '0.5px solid #e8e7e4', padding: '4px 14px', borderRadius: 99, marginBottom: 12, color: '#888784' }}>Your Compliance Obligation Map</div>
-          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, marginBottom: 8, lineHeight: 1.2, color: '#0d0d0d' }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, marginBottom: 8, lineHeight: 1.2, color: '#0d0d0d' }}>
             We identified <span style={{ background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', fontStyle: 'italic' }}>{obligations.length} {obligations.length === 1 ? 'obligation' : 'obligations'}</span> that apply to your company.
           </h2>
           <p style={{ fontSize: 14, color: '#555553', fontWeight: 400 }}>{critical} {critical === 1 ? 'requires' : 'require'} immediate action. {high} {high === 1 ? 'is' : 'are'} high priority. Click each to expand.</p>
@@ -720,7 +720,7 @@ export default function AssessPage() {
         </div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: '1.5rem' }}>
           {[{ val: critical, label: 'Immediate action', color: '#B91C1C' }, { val: high, label: 'High priority', color: 'var(--color-module-climate)' }, { val: obligations.length - critical - high, label: 'Monitor / annual', color: '#1fb1ff' }].map(({ val, label, color }) => (
             <div key={label} style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px', textAlign: 'center' as const }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color, marginBottom: 2 }}>{val}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color, marginBottom: 2 }}>{val}</div>
               <div style={{ fontSize: 11, color: '#888784' }}>{label}</div>
             </div>
           ))}
@@ -733,7 +733,7 @@ export default function AssessPage() {
           if (rows.length === 0) return null
           return (
             <div key={g.key} style={{ marginBottom: '1.5rem' }}>
-              <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{g.title}</h3>
+              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{g.title}</h3>
               <p style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: 10 }}>{g.sub}</p>
               <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
                 {rows.map(ob => (
@@ -792,7 +792,7 @@ export default function AssessPage() {
           )
         })}
         <div className="tq-band" style={{ borderRadius: 12, padding: '1.5rem', textAlign: 'center' as const }}>
-          <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, marginBottom: 6 }}>Want help navigating all {obligations.length} obligations?</h3>
+          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, marginBottom: 6 }}>Want help navigating all {obligations.length} obligations?</h3>
           <p style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: '1.25rem', fontWeight: 400 }}>A ThemisIQ advisor will review your results and tell you exactly what to do first. No charge for the initial call.</p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' as const }}>
             <a href="/advisory" style={{ fontSize: 13, fontWeight: 500, padding: '10px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none' }}>Book free consultation</a>
@@ -810,11 +810,11 @@ export default function AssessPage() {
       <div>
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>Almost there</div>
-          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', fontWeight: 400, marginBottom: 8, lineHeight: 1.2, color: '#0d0d0d' }}>Your compliance map is ready.</h2>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 400, marginBottom: 8, lineHeight: 1.2, color: '#0d0d0d' }}>Your compliance map is ready.</h2>
           <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.6 }}>Enter your details to see what applies to you — each with its timing, what it requires, and the ThemisIQ module that addresses it.</p>
         </div>
         <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '1.5rem', display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
-          <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, color: '#fff', marginBottom: 4 }}>Where should we send your results?</h3>
+          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 400, color: '#fff', marginBottom: 4 }}>Where should we send your results?</h3>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 8, fontWeight: 400 }}>Results display instantly. We'll also email a PDF you can share with your board or legal team.</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <input value={email.first} onChange={e => setEmail(v => ({...v, first: e.target.value}))} placeholder="First name" style={inputStyle} />
@@ -851,12 +851,12 @@ export default function AssessPage() {
             <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#0d0d0d', color: '#fff', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{step + 1}</div>
             <div style={{ fontSize: 11, color: '#888784' }}>Question {step + 1} of {EMAIL_STEP}</div>
           </div>
-          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.35rem', fontWeight: 400, lineHeight: 1.25, marginBottom: 6, color: '#0d0d0d' }}>{q.title}</h2>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.35rem', fontWeight: 400, lineHeight: 1.25, marginBottom: 6, color: '#0d0d0d' }}>{q.title}</h2>
           <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.25rem' }}>{q.sub}</p>
 
           {q.type === 'slider' && (
             <div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', textAlign: 'center' as const, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 10 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', textAlign: 'center' as const, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 10 }}>
                 {REVENUE_LABELS[val as number ?? 5]}
               </div>
               {/* `max` derives from REVENUE_INDICES, so the slider's range and the RevenueAnswer type
@@ -945,7 +945,7 @@ export default function AssessPage() {
           {step === 0 && (
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
               <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 12 }}>Free · 3 minutes · Instant results</div>
-              <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '0.75rem', color: '#0d0d0d' }}>
+              <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '0.75rem', color: '#0d0d0d' }}>
                 Which compliance regulations<br />apply to <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>your company?</span>
               </h1>
               <p style={{ fontSize: 15, color: '#555553', fontWeight: 400, lineHeight: 1.7, maxWidth: 600, margin: "0 auto", textAlign: "center" }}>

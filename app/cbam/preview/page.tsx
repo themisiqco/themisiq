@@ -121,7 +121,7 @@ function ItemSection({ n, title, children }: { n: string; title: string; childre
     <div style={{ marginBottom: '2.25rem' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: '0.75rem' }}>
         <span style={{ fontFamily: 'Georgia, serif', fontSize: 13, color: violet }}>{n}</span>
-        <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, color: ink }}>{title}</h3>
+        <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 400, color: ink }}>{title}</h3>
       </div>
       {children}
     </div>
@@ -138,7 +138,7 @@ export default function Page() {
       <section style={{ padding: '4rem 2.5rem 2.5rem', borderBottom: `0.5px solid ${hair}`, background: canvas }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: violet, background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.25)', borderRadius: 99, padding: '4px 12px', marginBottom: 16 }}>Sample report · Illustrative example</span>
-          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1rem', color: ink }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1rem', color: ink }}>
             What your verified CBAM report looks like
           </h1>
           <p style={{ fontSize: 15, color: muted, lineHeight: 1.75, fontWeight: 400, maxWidth: 620 }}>
@@ -155,7 +155,7 @@ export default function Page() {
             <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: faint }}>Step 1 · Attach evidence</span>
             <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: faint, background: canvas, border: `0.5px solid ${hair}`, borderRadius: 99, padding: '2px 8px' }}>Illustration — not an uploader</span>
           </div>
-          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 400, color: ink, marginBottom: 6 }}>Every figure starts with a record.</h2>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 400, color: ink, marginBottom: 6 }}>Every figure starts with a record.</h2>
           <p style={{ fontSize: 14, color: muted, fontWeight: 400, lineHeight: 1.7, maxWidth: 620, marginBottom: '1.5rem' }}>You attach the evidence behind each number — we keep the link, so every figure in the report below traces straight back to its source document.</p>
           <div style={{ border: `0.5px solid ${hair}`, borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ background: canvas, borderBottom: `0.5px solid ${hair}`, padding: '10px 16px', fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: faint }}>Evidence attached · illustrative</div>
@@ -179,7 +179,7 @@ export default function Page() {
 
           {/* Report header */}
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: faint, marginBottom: 8 }}>CBAM §1.2 · Specific Embedded Emissions summary</div>
-          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, color: ink, marginBottom: 4 }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, color: ink, marginBottom: 4 }}>
             {SAMPLE.installationName} · {SAMPLE.reportingPeriod}
           </h2>
           <p style={{ fontSize: 14, color: muted, fontWeight: 400, marginBottom: '1.5rem' }}>Iron & steel · {SAMPLE.installation.country} · reporting period {SAMPLE.reportingPeriod}</p>
@@ -243,7 +243,7 @@ export default function Page() {
                     part of the certificate obligation (matches the engine + §1.2 report). */}
                 <div style={{ background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.2)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
                   <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: violet, marginBottom: 4 }}>Specific embedded emissions (SEE)</div>
-                  <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.9rem', fontWeight: 400, color: ink, lineHeight: 1 }}>{n3(g.specificDirect)} <span style={{ fontSize: 13, color: faint }}>tCO₂e / tonne</span></div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.9rem', fontWeight: 400, color: ink, lineHeight: 1 }}>{n3(g.specificDirect)} <span style={{ fontSize: 13, color: faint }}>tCO₂e / tonne</span></div>
                   <div style={{ fontSize: 12, color: muted, marginTop: 10, lineHeight: 1.55 }}>
                     Indirect emissions: not applicable — Annex II good, direct emissions only.
                   </div>
@@ -302,7 +302,7 @@ export default function Page() {
               provenance. Static list, matching the verifier report's doc section but
               with NO live "View" buttons / signed URLs. */}
           <div style={{ marginBottom: '2.25rem' }}>
-            <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, color: ink, marginBottom: '0.75rem' }}>Source documents</h3>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 400, color: ink, marginBottom: '0.75rem' }}>Source documents</h3>
             <p style={{ fontSize: 13, color: muted, fontWeight: 400, lineHeight: 1.6, marginBottom: '1rem' }}>Each figure traces back to the records you attached.</p>
             {SAMPLE_DOCS.map((d, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, background: '#fff', border: `0.5px solid ${hair}`, borderRadius: 10, padding: '12px 16px', marginBottom: 8, flexWrap: 'wrap' as const }}>
@@ -324,7 +324,7 @@ export default function Page() {
 
       {/* CTA */}
       <section style={{ background: canvas, borderTop: `0.5px solid ${hair}`, padding: '5rem 2.5rem', textAlign: 'center' }}>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2, color: ink }}>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2, color: ink }}>
           Give your EU customers the figures they need.
         </h2>
         <p style={{ fontSize: 15, color: muted, maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>

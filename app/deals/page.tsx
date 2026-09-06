@@ -6,6 +6,7 @@ import { IFRS_S2_ADOPTION_COUNT, IFRS_S2_ADOPTION_SOURCE } from '../../lib/ifrsS
 import { SB253_STATUTE } from '../../lib/sb253'
 import { THRESHOLD_TESTS } from '../../lib/deals/assessment'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
+import { sectionTitle } from '@/app/components/headingStyles'
 
 export default function Page() {
   // Price from the single source of truth, formatted as app/cbam/page.tsx does.
@@ -24,7 +25,7 @@ export default function Page() {
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
           <div>
             <div style={eyebrow}>Deals & Investment</div>
-            <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
               Not a values question.<br />
               <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>A valuation question.</span>
             </h1>
@@ -65,7 +66,7 @@ export default function Page() {
               },
             ].map(({ val, unit, label, source, color, bg }) => (
               <div key={val} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid color-mix(in srgb, ${color} 13%, transparent)` }}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color, marginTop: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{unit}</div>
                 <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{label}</div>
                 {source && <div style={{ fontSize: 11, color: '#888784', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{source}</div>}
@@ -145,7 +146,7 @@ export default function Page() {
           ].map(({ stage, title, desc, pays, effort }) => (
             <div key={title} style={hairlineCell}>
               <div style={eyebrow}>{stage}</div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 10 }}>{title}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 10 }}>{title}</div>
               <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400, marginBottom: 16 }}>{desc}</div>
               <div style={{ borderTop: '0.5px solid #e8e7e4', paddingTop: 12 }}>
                 <div style={{ fontSize: 12, color: '#555553', fontWeight: 400, marginBottom: 4 }}>
@@ -165,7 +166,7 @@ export default function Page() {
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
           <div>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>SB 253 — M&A liability</div>
-            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
               Acquiring a California company?<br />You inherit their SB 253 obligations.
             </h2>
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
@@ -229,7 +230,7 @@ export default function Page() {
 
       {/* CTA */}
       <section style={{ padding: '6rem 2.5rem', textAlign: 'center' }}>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
           Your first target is <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>free.</span>
         </h2>
         <p style={{ fontSize: 15, color: '#555553', maxWidth: 520, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
@@ -252,7 +253,6 @@ export default function Page() {
 }
 
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
-const sectionTitle: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }
 // The three-column hairline grid used on /cyber and /climate-risk — 1px gaps over a #e8e7e4 ground
 // so the cell backgrounds draw the rules. Cells are plain white with 2rem padding.
 const hairlineGrid3: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }

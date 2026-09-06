@@ -328,7 +328,7 @@ export default function RespondentImport() {
           <Link href={`/dashboard/materiality/survey/${roundId}/respondents`} style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none' }}>← Respondents</Link>
         </div>
 
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.7rem', color: '#0d0d0d' }}>Import a list</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: '#0d0d0d' }}>Import a list</div>
         {/* ⚠️ LEAD WITH THE COMPANY, LABEL THE ROUND. A bare round name as subtitle renders whatever
             the round was called — "Shaped fixture" on a test round — as though it were the page's
             identity. The company name is the thing that means something to a customer; the round
@@ -358,7 +358,7 @@ export default function RespondentImport() {
 
         {/* PATH 2 */}
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '1.35rem 1.6rem', marginBottom: 16, opacity: closed ? 0.5 : 1 }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 6 }}>Download the template, or upload any list you already have</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 6 }}>Download the template, or upload any list you already have</div>
           <div style={{ fontSize: 12.5, color: '#555553', lineHeight: 1.7, marginBottom: 10 }}>
             The template is a starting point, not a required format — if you already keep a list of
             people, upload it as it is. {CATEGORY_COLUMNS_LINE}
@@ -415,7 +415,7 @@ export default function RespondentImport() {
 
         {/* PATH 3 — upload */}
         <div ref={uploadBoxRef} style={{ background: '#fff', border: `0.5px solid ${downloaded && !rows ? GREEN : '#e8e7e4'}`, borderRadius: 16, padding: '1.35rem 1.6rem', marginBottom: 20, opacity: closed ? 0.5 : 1, scrollMarginTop: 20 }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 6 }}>Upload your list</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 6 }}>Upload your list</div>
           <div style={{ fontSize: 12.5, color: '#555553', lineHeight: 1.7, marginBottom: 12 }}>
             The template you just downloaded, or any .csv or .xlsx with a name and an email column.
             Nothing else is needed — you assign categories on the next step, from a list, so a typo

@@ -55,7 +55,7 @@ export default function SignupPage() {
       <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ maxWidth: 420, textAlign: 'center', padding: '2rem' }}>
           <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#E1F5EE', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', fontSize: 24 }}>✓</div>
-          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Check your email</h2>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Check your email</h2>
           <p style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, fontWeight: 400, marginBottom: '1.5rem' }}>
             We've sent a confirmation link to <strong>{form.email}</strong>. Click the link to activate your account and start your free assessment.
           </p>
@@ -83,7 +83,7 @@ export default function SignupPage() {
           {/* HEADER */}
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>Your sustainability compliance platform</div>
-            <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Countless compliance requirements. One Intelligent Platform.</h1>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Countless compliance requirements. One Intelligent Platform.</h1>
             <p style={{ fontSize: 14, color: '#888784', fontWeight: 400 }}>Whether your driver is a regulator, a board, an investor, or a customer — ThemisIQ is your sustainability compliance reporting solution.</p>
           </div>
 

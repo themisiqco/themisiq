@@ -85,7 +85,7 @@ export default function ResetPasswordPage() {
 
           {/* HEADER */}
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-            <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Set a new password</h1>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Set a new password</h1>
             <p style={{ fontSize: 14, color: '#888784', fontWeight: 400 }}>Choose a new password for your account</p>
           </div>
 

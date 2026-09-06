@@ -8,6 +8,7 @@ import { PACK_SLUG_MODULES } from '../lib/packEntryPoints'
 import Nav from './components/Nav'
 import Footer from './components/Footer'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
+import { sectionTitle } from '@/app/components/headingStyles'
 
 export default function Home() {
   return (
@@ -23,7 +24,7 @@ export default function Home() {
               Compliance Intelligence for Sustainable Business
             </p>
           </div>
-          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2.6rem, 5vw, 4rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.6rem, 5vw, 4rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
             Countless compliance requirements.<br />
             <em style={gradText}>One Intelligent Platform.</em>
           </h1>
@@ -58,7 +59,7 @@ export default function Home() {
               </a>
             ) : (
               <>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 4 }}>{val}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 4 }}>{val}</div>
                 <div style={{ fontSize: 12, color: '#888784' }}>{label}</div>
               </>
             )}
@@ -69,7 +70,7 @@ export default function Home() {
      {/* ── TRUST BAR ── */}
       <div className="tq-band-bleed" style={{ padding: '1.5rem 2.5rem', textAlign: 'center' as const }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-          <p style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1rem, 2vw, 1.3rem)', fontWeight: 400, marginBottom: '1rem', lineHeight: 1.5 }}>
+          <p style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1rem, 2vw, 1.3rem)', fontWeight: 400, marginBottom: '1rem', lineHeight: 1.5 }}>
             We know trust is everything. At ThemisIQ, you can trust our methodologies and how we handle your data.
           </p>
           <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' as const }}>
@@ -101,7 +102,7 @@ export default function Home() {
             <a key={i} href={mod.href} style={{ background: '#fff', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textDecoration: 'none', transition: 'background 0.15s', cursor: 'pointer', borderRight: i % 4 < 3 ? '0.5px solid #e8e7e4' : 'none', borderBottom: i < 4 ? '0.5px solid #e8e7e4' : 'none' }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f8f7f5' }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff' }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.2 }}>{mod.name === 'Supply Chain & Scope 3' ? <>Supply Chain &amp; <span style={{ whiteSpace: 'nowrap' }}>Scope 3</span></> : mod.name}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.2 }}>{mod.name === 'Supply Chain & Scope 3' ? <>Supply Chain &amp; <span style={{ whiteSpace: 'nowrap' }}>Scope 3</span></> : mod.name}</div>
               <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{mod.desc}</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 'auto', paddingTop: 8 }}>
                 {mod.tags.map(t => <span key={t} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#888784' }}>{t}</span>)}
@@ -116,7 +117,7 @@ export default function Home() {
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1' }}>
           <div style={{ maxWidth: 640 }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 8 }}>Advisory Services</div>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: 8 }}>Available across all modules</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: 8 }}>Available across all modules</div>
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, fontWeight: 400 }}>Expert advisory services — sector-specific guidance, assurance prep, and board-ready narratives from practitioners who speak your language.</div>
           </div>
           <span style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', padding: '12px 24px', borderRadius: 8, whiteSpace: 'nowrap', flexShrink: 0 }}>Talk to a specialist →</span>
@@ -131,7 +132,7 @@ export default function Home() {
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff' }}>
             <div style={{ flex: '1 1 420px' }}>
               <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 6 }}>Single or double · which one applies to you</div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.2, marginBottom: 6 }}>The Materiality Assessment</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.2, marginBottom: 6 }}>The Materiality Assessment</div>
               <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>Single materiality for IFRS S2, double materiality for CSRD — the methodology your auditor expects. See two sample reports for the same entity.</div>
             </div>
             <span style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', padding: '11px 22px', borderRadius: 8, whiteSpace: 'nowrap' }}>See sample reports →</span>
@@ -144,7 +145,7 @@ export default function Home() {
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ maxWidth: 640, marginBottom: '2.5rem' }}>
             <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>Flagship output · Climate Risk &amp; Materiality</p>
-            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
               A climate resilience report that holds up under scrutiny.
             </h2>
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', lineHeight: 1.75, fontWeight: 400 }}>
@@ -161,7 +162,7 @@ export default function Home() {
               { role: 'High warming', warming: '~4.4°C', src: 'IPCC SSP5-8.5', color: '#ba7517' },
             ].map(s => (
               <div key={s.role} style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '1.25rem' }}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: s.color, lineHeight: 1 }}>{s.warming}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: s.color, lineHeight: 1 }}>{s.warming}</div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginTop: 8 }}>{s.role}</div>
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>{s.src}</div>
               </div>
@@ -207,7 +208,7 @@ export default function Home() {
               ['04', 'Stand behind your numbers', 'Every calculation and data point is logged with a full audit trail. Your verifiers, auditors, and regulators get everything they need — without the scramble.'],
             ].map(([num, title, desc]) => (
               <div key={num}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '2.5rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', opacity: 0.5, marginBottom: '0.75rem' }}>{num}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', opacity: 0.5, marginBottom: '0.75rem' }}>{num}</div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: '0.5rem' }}>{title}</div>
                 <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
               </div>
@@ -221,7 +222,7 @@ export default function Home() {
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>Not sure where to start?</div>
-            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Built for who's asking.</h2>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Built for who's asking.</h2>
             <p style={{ fontSize: 15, color: '#555553', maxWidth: 520, margin: '0 auto', fontWeight: 400 }}>Whether it's a customer, your bank, your board or your investor — here's where to start for each.</p>
           </div>
           {/* The OLD-model cards stood here — four priced pack tiles reading PACKS and routing to
@@ -246,7 +247,7 @@ export default function Home() {
                 onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = pack.color}
                 onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = `color-mix(in srgb, ${pack.color} 15%, transparent)`}>
                 <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: pack.color, marginBottom: 6 }}>{pack.driver}</div>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>{pack.name}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>{pack.name}</div>
                 {pack.items.map(item => (
                   <div key={item} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                     <span style={{ color: pack.color, flexShrink: 0, fontSize: 12 }}>✓</span>
@@ -264,7 +265,7 @@ export default function Home() {
       <HomePricing />
       {/* ── CTA ── */}
       <section style={{ padding: '6rem 2.5rem', textAlign: 'center', borderTop: '0.5px solid #e8e7e4' }}>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
           The first SB 253 report is <em style={gradText}> {SB253_FIRST_REPORT_DATE}, {SB253_DATE_STATUS}.</em>
         </h2>
         <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
@@ -321,5 +322,4 @@ const btnOutline: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding
 const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'var(--color-brand)', color: '#fff', border: 'none', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }
 const gradText: React.CSSProperties = { fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
-const sectionTitle: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }
 const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, lineHeight: 1.75, fontWeight: 400 }

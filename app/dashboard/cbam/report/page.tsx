@@ -35,11 +35,10 @@ import type {
   Item4Good, Item5TotalDirect,
 } from '../../../../lib/cbam/report/types'
 import type { SefaBenchmarkWorkings } from '../../../../lib/cbam/sefaCompute'
+import { itemHeadTight as itemHead, sectionHeadFixed as sectionHead } from '@/app/components/headingStyles'
 
 // ── House style, matching app/dashboard/cbam/page.tsx ──
-const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
 const sectionSub: React.CSSProperties = { fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.7, marginBottom: '2rem' }
-const itemHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: '1.15rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }
 
 type AnyField = ReportField<unknown>
 
@@ -235,7 +234,7 @@ export default function CbamReportPage() {
           </div>
           <div style={{ position: 'absolute', inset: 0, zIndex: 10, backdropFilter: 'blur(8px)', background: 'rgba(248,247,245,0.85)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ background: '#fff', borderRadius: 16, padding: '2.5rem', boxShadow: '0 8px 40px rgba(0,0,0,0.12)', border: '0.5px solid #e8e7e4', maxWidth: 480, textAlign: 'center' }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 8 }}>CBAM is a paid module.</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 8 }}>CBAM is a paid module.</div>
               <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 400 }}>Generate the verifier-ready Annex IV §1.2 summary emissions report — with every field shown as a value, a reasoned N/A, or an outstanding to-do. Unlock the CBAM module to begin.</div>
               <button onClick={() => (window.location.href = '/pricing')} style={{ width: '100%', fontSize: 14, fontWeight: 600, padding: '14px 28px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d' }}>
                 Unlock CBAM →
@@ -253,7 +252,7 @@ export default function CbamReportPage() {
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '3rem 2rem' }}>
         <div style={sectionHead}>CBAM §1.2 summary report</div>
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '2rem', marginTop: '1rem' }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>No installations yet</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>No installations yet</div>
           <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, fontWeight: 400 }}>
             A report covers one installation and reporting period, so you&rsquo;ll need to add an installation and its production processes first. You can do that in{' '}
             <a href="/dashboard/cbam/setup" style={{ color: '#7425e3', textDecoration: 'underline' }}>setup</a>, then come back here.
@@ -703,7 +702,7 @@ function MissingChecklist({ completeness }: { completeness: CompletenessResult }
       ) : (
         <div style={{ background: '#fff', border: '1.5px solid #f5d9ad', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#92400e', marginBottom: 4 }}>Before this report is complete</div>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 4 }}>{suppliedCount} of {requiredCount} supplied · {outstandingCount} to supply</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 4 }}>{suppliedCount} of {requiredCount} supplied · {outstandingCount} to supply</div>
           <div style={{ fontSize: 12, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: '1rem' }}>Each is a required field with no answer yet. Supply it where the hint points, then regenerate.</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {operatorGaps.map((m, i) => (
@@ -768,7 +767,7 @@ function ErrorPanel({ err }: { err: ErrState }) {
   if (err.code === 'precursor_declaration_required') {
     return (
       <div style={{ marginTop: '1.5rem', background: '#FEF3E2', border: '0.5px solid #f5d9ad', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>One more thing to confirm before the report</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>One more thing to confirm before the report</div>
         <div style={{ fontSize: 13, color: '#92400e', lineHeight: 1.7, fontWeight: 400 }}>{err.message}</div>
         {/* The message names the goods by CN code; setup is where they are declared. NOT
             deep-linked to the specific process — that needs useSearchParams, which needs a
@@ -787,7 +786,7 @@ function ErrorPanel({ err }: { err: ErrState }) {
     return (
       <div style={{ marginTop: '1.5rem', background: '#FEE2E2', border: '1.5px solid #ef4444', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#991b1b', marginBottom: 6 }}>Stale record — conflict (409)</div>
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>A stored figure disagrees with a fresh recomputation</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>A stored figure disagrees with a fresh recomputation</div>
         <div style={{ fontSize: 13, color: '#7f1d1d', lineHeight: 1.6, marginBottom: 10, whiteSpace: 'pre-wrap', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{err.message}</div>
         <div style={{ fontSize: 13, color: '#991b1b', lineHeight: 1.6, fontWeight: 500 }}>
           No report is shown, because these figures would contradict what was stored. Re-run compute for the affected process to produce a new record, then generate the report again.

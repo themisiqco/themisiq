@@ -285,7 +285,7 @@ export default function Dashboard() {
         <div className="tq-band-bleed" style={{ padding: '1.5rem 2.5rem' }}>
           <div style={{ maxWidth: 1000, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
             <div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, marginBottom: 4 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 400, marginBottom: 4 }}>
                 Welcome to ThemisIQ! 👋
               </div>
               <div style={{ fontSize: 13, color: 'var(--color-ink-2)' }}>
@@ -309,7 +309,7 @@ export default function Dashboard() {
         <div style={{ maxWidth: 1000, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Dashboard</div>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>
               {user?.email?.split('@')[0] ? `Welcome back` : 'Your ThemisIQ platform'}
             </div>
           </div>
@@ -337,7 +337,7 @@ export default function Dashboard() {
             { label: 'AI Act high-risk from', val: AI_ACT_HIGH_RISK_STANDALONE, color: '#B91C1C', bg: '#FCEBEB' },
           ].map(({ label, val, color, bg }) => (
             <div key={label} style={{ background: bg, borderRadius: 12, padding: '1rem', textAlign: 'center', border: '0.5px solid #e8e7e4' }}>
-              <div style={{ fontFamily: typeof val === 'number' ? 'Georgia, serif' : 'inherit', fontSize: typeof val === 'number' ? '1.8rem' : '1rem', fontWeight: typeof val === 'number' ? 400 : 600, color, lineHeight: 1.2, marginBottom: 4 }}>{val}</div>
+              <div style={{ fontFamily: typeof val === 'number' ? 'var(--font-display)' : 'inherit', fontSize: typeof val === 'number' ? '1.8rem' : '1rem', fontWeight: typeof val === 'number' ? 400 : 600, color, lineHeight: 1.2, marginBottom: 4 }}>{val}</div>
               <div style={{ fontSize: 11, color: '#888784' }}>{label}</div>
             </div>
           ))}
@@ -346,7 +346,7 @@ export default function Dashboard() {
         {/* Module grid */}
         <div style={{ marginBottom: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, color: '#0d0d0d' }}>Your compliance modules</h2>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 400, color: '#0d0d0d' }}>Your compliance modules</h2>
             {activeModuleCount === 0 && (
               <div style={{ fontSize: 12, color: '#888784' }}>Click any module to preview · unlock to export</div>
             )}
@@ -440,7 +440,7 @@ export default function Dashboard() {
         {/* Upgrade prompt for free users */}
         {activeModuleCount === 0 && (
           <div className="tq-band" style={{ borderRadius: 16, padding: '2rem', textAlign: 'center' }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, marginBottom: 8 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 400, marginBottom: 8 }}>
               Ready to unlock your compliance programme?
             </div>
             <div style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: 20, lineHeight: 1.6, maxWidth: 500, margin: '0 auto 20px' }}>

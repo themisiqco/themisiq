@@ -126,7 +126,7 @@ export default function SupplierResponseViewer() {
           <button onClick={() => router.push(`/dashboard/supply-chain/portal/${campaignId}`)} style={{ fontSize: 12, color: '#888784', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 8 }}>← Back to campaign</button>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
             <div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{supplier?.supplier_name}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{supplier?.supplier_name}</div>
               <div style={{ fontSize: 13, color: '#888784' }}>{supplier?.supplier_email}</div>
               {supplier?.contact_name && <div style={{ fontSize: 13, color: '#888784' }}>{supplier.contact_name}</div>}
             </div>
@@ -147,7 +147,7 @@ export default function SupplierResponseViewer() {
         {/* Completion summary */}
         <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.25rem 1.5rem', marginBottom: 20, display: 'flex', alignItems: 'center', gap: '2rem' }}>
           <div style={{ textAlign: 'center', flexShrink: 0 }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '2.5rem', fontWeight: 400, color: pct >= 80 ? '#64fe3e' : pct >= 50 ? '#fde68a' : '#f87171', lineHeight: 1 }}>{pct}%</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', fontWeight: 400, color: pct >= 80 ? '#64fe3e' : pct >= 50 ? '#fde68a' : '#f87171', lineHeight: 1 }}>{pct}%</div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>complete</div>
           </div>
           <div style={{ flex: 1 }}>

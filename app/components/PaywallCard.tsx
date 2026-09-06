@@ -34,7 +34,7 @@ export default function PaywallCard({
     <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
       <div style={{ background: '#0d0d0d', borderRadius: 16, padding: '2.5rem 2rem', maxWidth: 440, textAlign: 'center', boxShadow: '0 12px 40px rgba(13,13,13,0.18)' }}>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', marginBottom: 14 }}>Locked</div>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontWeight: 400, fontSize: '1.6rem', color: '#fff', margin: '0 0 12px', lineHeight: 1.25 }}>{title}</h2>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 400, fontSize: '1.6rem', color: '#fff', margin: '0 0 12px', lineHeight: 1.25 }}>{title}</h2>
         <p style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.6)', lineHeight: 1.65, margin: '0 0 24px' }}>{body}</p>
         <a href={href} style={{ display: 'inline-block', padding: '12px 28px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>{cta}</a>
       </div>

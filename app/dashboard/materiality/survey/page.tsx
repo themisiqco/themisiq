@@ -176,7 +176,7 @@ export default function SurveyRounds() {
 
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 20, marginBottom: 6 }}>
           <div>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.7rem', color: '#0d0d0d' }}>Stakeholder surveys</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: '#0d0d0d' }}>Stakeholder surveys</div>
             <div style={{ fontSize: 13.5, color: '#555553', lineHeight: 1.7, marginTop: 6, maxWidth: 620 }}>
               Ask the people who see your company — staff, suppliers, communities, customers — which
               sustainability topics they think you should prioritise. Their answers are the
@@ -194,7 +194,7 @@ export default function SurveyRounds() {
 
         {showNew && (
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '1.5rem 1.75rem', margin: '20px 0' }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', color: '#0d0d0d', marginBottom: 16 }}>New survey round</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: '#0d0d0d', marginBottom: 16 }}>New survey round</div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
               <div>
@@ -310,7 +310,7 @@ export default function SurveyRounds() {
 
         {!loading && !loadError && rounds.length === 0 && !showNew && (
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '2.5rem', textAlign: 'center', marginTop: 20 }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', color: '#0d0d0d', marginBottom: 8 }}>No survey rounds yet</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: '#0d0d0d', marginBottom: 8 }}>No survey rounds yet</div>
             <div style={{ fontSize: 13, color: '#888784', lineHeight: 1.7, maxWidth: 460, margin: '0 auto' }}>
               A round is one survey sent to one group of people. Most companies run several — staff
               first, then suppliers, then communities — and use them together.

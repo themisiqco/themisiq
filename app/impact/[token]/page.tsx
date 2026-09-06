@@ -429,7 +429,7 @@ export default function ImpactWorksheet() {
   return (
     <Frame wide>
       <div style={{ marginBottom: 26 }}>
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color: INK }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color: INK }}>
           {company} — impact assessment
         </div>
         <div style={{ fontSize: 13, color: MUTE, marginTop: 6 }}>
@@ -460,7 +460,7 @@ export default function ImpactWorksheet() {
 
       {groups.map(g => (
         <div key={g.code} style={{ marginBottom: 30 }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', color: INK,
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: INK,
                         paddingBottom: 8, borderBottom: `1px solid ${LINE}`, marginBottom: 16 }}>
             {g.label}
           </div>
@@ -690,6 +690,10 @@ const Frame = ({ children, wide }: { children: React.ReactNode; wide?: boolean }
                 background: PAPER, minHeight: '100vh' }}>
     <div style={{ background: INK, padding: '18px 0' }}>
       <div style={{ maxWidth: wide ? 820 : 620, margin: '0 auto', padding: '0 1.5rem' }}>
+        {/* WORDMARK — stays 'Georgia, serif', deliberately not var(--font-display).
+        A logotype is a brand asset, not a heading: changing its face changes the mark.
+        It also has to match the same wordmark in email HTML, which cannot resolve a
+        custom property or rely on a web font loading. See app/components/headingStyles.ts. */}
         <div style={{ fontFamily: 'Georgia, serif', fontSize: 19, fontWeight: 700, color: '#fff' }}>ThemisIQ</div>
         <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.45)', marginTop: 2,
                       textTransform: 'uppercase', letterSpacing: '0.08em' }}>Impact assessment</div>
@@ -705,7 +709,7 @@ const Card = ({ children }: { children: React.ReactNode }) => (
 )
 
 const H = ({ children, small }: { children: React.ReactNode; small?: boolean }) => (
-  <div style={{ fontFamily: 'Georgia, serif', fontSize: small ? '1.15rem' : '1.4rem',
+  <div style={{ fontFamily: 'var(--font-display)', fontSize: small ? '1.15rem' : '1.4rem',
                 color: INK, marginBottom: 10 }}>{children}</div>
 )
 

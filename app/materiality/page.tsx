@@ -58,6 +58,7 @@ import {
   ESRS_TEN_TOPICS_SENTENCE, ESRS_SET1_CITATION,
 } from '@/lib/csrd'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
+import { sectionTitle } from '@/app/components/headingStyles'
 
 
 // ─── Diagram palette ──────────────────────────────────────────────────────────
@@ -107,7 +108,7 @@ export default function Page() {
             <div style={eyebrow}>ThemisIQ module</div>
             {/* Two-tone, same construction as /climate-risk's "Climate Risk / Intelligence"
                 and /deals' "Not a values question. / A valuation question." — see the GRAD note. */}
-            <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.5rem', color: INK }}>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.5rem', color: INK }}>
               Materiality<br />
               <span style={{ fontStyle: 'italic', background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Assessment</span>
             </h1>
@@ -120,7 +121,7 @@ export default function Page() {
                 typed — see impactPrice above and CLAUDE.md. The card's substance comes with it:
                 what the price includes is the part a buyer weighs, not the digits. */}
             <div style={{ fontSize: 15, color: BODY, fontWeight: 400, lineHeight: 1.7, marginBottom: '2rem' }}>
-              <span style={{ fontFamily: 'Georgia, serif', fontSize: '1.7rem', color: INK }}>${impactPrice}</span>
+              <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: INK }}>${impactPrice}</span>
               {' '}USD per year &mdash; 365 days of platform access. No per-seat charges, no separate fee for the survey, no extra cost when you bring colleagues in to help. Add Climate Risk and the multi-module discount applies automatically.
             </div>
             {/* Deliberately the SAME two CTAs as section 10. A visitor who reads the whole page
@@ -161,7 +162,7 @@ export default function Page() {
             const box: React.CSSProperties = { background: purpleGround(alpha), borderRadius: 12, padding: '1.5rem', border: `0.5px solid ${edge}`, display: 'block', textDecoration: 'none' }
             const inner = (
               <>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '2.2rem', fontWeight: 400, color: PURPLE, lineHeight: 1 }}>{val}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.2rem', fontWeight: 400, color: PURPLE, lineHeight: 1 }}>{val}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color: PURPLE_INK, marginTop: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{unit}</div>
                 {/* ⚠️ PURPLE_SLATE, NOT PURPLE_MID, AND THE DEEPEST CARD IS WHY. PURPLE_MID on
                     the 0.28 ground is 4.28:1 — under WCAG AA's 4.5 for 12px/300 normal text.
@@ -272,14 +273,14 @@ export default function Page() {
               the whole job of a guardrail. */}
           <div style={{ background: PURPLE_TINT, border: `2px solid ${PURPLE}`, borderRadius: 14, padding: '1.5rem 1.75rem' }}>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: PURPLE, marginBottom: 6 }}>The impact half &middot; you are here</div>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: INK, marginBottom: 8 }}>Materiality Assessment</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: INK, marginBottom: 8 }}>Materiality Assessment</div>
             <p style={{ fontSize: 13, color: BODY, lineHeight: 1.7, margin: 0 }}>
               How your organisation affects people and the environment. Stakeholder engagement, all ten ESRS topics determined by named people, a divergence register and a disclosure roadmap.
             </p>
           </div>
           <a href="/climate-risk" style={{ display: 'block', background: '#fff', border: `0.5px solid ${HAIR}`, borderRadius: 14, padding: '1.5rem 1.75rem', textDecoration: 'none' }}>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: '#0C447C', marginBottom: 6 }}>The financial half</div>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: INK, marginBottom: 8 }}>Climate Risk</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: INK, marginBottom: 8 }}>Climate Risk</div>
             <p style={{ fontSize: 13, color: BODY, lineHeight: 1.7, margin: '0 0 12px' }}>
               How sustainability issues affect your organisation. IFRS S2 single materiality, physical and transition risk, multi-scenario resilience, and a ten-topic screening.
             </p>
@@ -566,7 +567,7 @@ export default function Page() {
           the copy's own separator and the only ornament — five seconds to scan. */}
       <section style={{ padding: '4.5rem 2.5rem 3rem', maxWidth: 1100, margin: '0 auto' }}>
         <div style={{ maxWidth: 760 }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.5rem', fontWeight: 400, color: INK, marginBottom: '1.5rem' }}>Not sure which to buy?</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 400, color: INK, marginBottom: '1.5rem' }}>Not sure which to buy?</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {[
               ['Reporting under CSRD', 'both.'],
@@ -615,7 +616,6 @@ export default function Page() {
 
 // ─── Styles — same set as app/deals/page.tsx, plus bodyPara / footnote / 2-col grid ──────
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
-const sectionTitle: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }
 const bodyPara: React.CSSProperties = { fontSize: 15, color: '#555553', fontWeight: 400, lineHeight: 1.8, marginBottom: '1.25rem' }
 const footnote: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.7, marginBottom: '1rem' }
 const cellTitle: React.CSSProperties = { fontSize: 15, fontWeight: 600, color: '#0d0d0d', marginBottom: 10 }

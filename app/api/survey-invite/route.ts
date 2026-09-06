@@ -75,6 +75,7 @@ const shell = (inner: string) => `<!DOCTYPE html>
 <body style="margin:0;padding:0;background:#f8f7f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
   <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;border:0.5px solid #e8e7e4;">
     <div style="background:#0d0d0d;padding:24px 32px;">
+      <!-- Georgia here is deliberate, not a missed sweep: this is email HTML. A mail client cannot resolve var(--font-display), and web fonts do not load reliably in mail, so Literata would silently fall back anyway. Georgia is web-safe and is what every recipient actually sees. See app/components/headingStyles.ts. -->
       <div style="font-size:20px;font-weight:700;color:#fff;font-family:Georgia,serif;">ThemisIQ</div>
       <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px;text-transform:uppercase;letter-spacing:0.08em;">Stakeholder survey</div>
     </div>

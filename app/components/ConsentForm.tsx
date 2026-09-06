@@ -58,7 +58,7 @@ export default function ConsentForm({
   // stopPropagation so a click inside doesn't close a wrapping modal overlay (harmless inline).
   return (
     <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, maxWidth: 560, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '1.75rem' }}>
-      <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, color: '#0d0d0d', marginBottom: 4 }}>{title}</div>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, color: '#0d0d0d', marginBottom: 4 }}>{title}</div>
       <div style={{ fontSize: 12, color: '#888784', marginBottom: 8 }}>{subtitle}</div>
       <label style={consentLabel}>Business legal name</label>
       <input value={bizName} onChange={e => setBizName(e.target.value)} placeholder="Acme Industries Inc." style={consentInput} />

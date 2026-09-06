@@ -253,7 +253,7 @@ export default function SurveyProgress() {
       <Nav />
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '2rem' }}>
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '2rem' }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: '#0d0d0d', marginBottom: 10 }}>This round could not be opened</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: '#0d0d0d', marginBottom: 10 }}>This round could not be opened</div>
           <div style={{ fontSize: 13.5, color: '#555553', lineHeight: 1.7 }}>{loadError}</div>
         </div>
       </div>
@@ -274,7 +274,7 @@ export default function SurveyProgress() {
           <Link href={`/dashboard/materiality/survey/${roundId}/results`} style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none' }}>Results</Link>
         </div>
 
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.7rem', color: '#0d0d0d' }}>{round?.name}</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: '#0d0d0d' }}>{round?.name}</div>
         <div style={{ fontSize: 13, color: '#888784', marginTop: 4, marginBottom: 20 }}>
           {round?.company_name}{round?.deadline && ` · deadline ${fmt(round.deadline)}`}
         </div>
@@ -288,7 +288,7 @@ export default function SurveyProgress() {
             { label: 'Never opened it', val: counts.neverOpened, color: BLUE, bg: BLUE_BG },
           ].map(t => (
             <div key={t.label} style={{ background: t.bg, border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem', textAlign: 'center' }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color: t.color }}>{t.val}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color: t.color }}>{t.val}</div>
               <div style={{ fontSize: 11, color: '#888784', marginTop: 4 }}>{t.label}</div>
             </div>
           ))}
@@ -334,7 +334,7 @@ export default function SurveyProgress() {
 
         {/* Chase list */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#0d0d0d' }}>
             {chase.length === 0 ? 'Everyone has submitted' : `${chase.length} still to hear from`}
           </div>
           {counts.neverOpened > 0 && (
@@ -413,7 +413,7 @@ export default function SurveyProgress() {
               </div>
             ) : (
               <div>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 10 }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 10 }}>
                   Reopen this round?
                 </div>
                 <div style={{ fontSize: 12.5, color: '#555553', lineHeight: 1.8, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -467,7 +467,7 @@ export default function SurveyProgress() {
             </div>
           ) : (
             <div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 10 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 10 }}>
                 Close this round?
               </div>
               <div style={{ fontSize: 12.5, color: '#555553', lineHeight: 1.8, display: 'flex', flexDirection: 'column', gap: 8 }}>

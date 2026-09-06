@@ -88,7 +88,7 @@ export default function SupplierQuestionnaire() {
   if (notFound) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
       <div style={{ background: '#fff', borderRadius: 16, padding: '3rem', textAlign: 'center', maxWidth: 400 }}>
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 8 }}>Link not found</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 8 }}>Link not found</div>
         <div style={{ fontSize: 14, color: '#888784', lineHeight: 1.6 }}>This questionnaire link is invalid or has expired. Please contact the company who sent you this link.</div>
       </div>
     </div>
@@ -98,7 +98,7 @@ export default function SupplierQuestionnaire() {
     <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
       <div style={{ background: '#fff', borderRadius: 16, padding: '3rem', textAlign: 'center', maxWidth: 480 }}>
         <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#E1F5EE', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', fontSize: 28 }}>✓</div>
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', color: '#0d0d0d', marginBottom: 8 }}>Thank you!</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', color: '#0d0d0d', marginBottom: 8 }}>Thank you!</div>
         <div style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, marginBottom: 8 }}>
           Your sustainability questionnaire for <strong>{campaign?.name}</strong> has been submitted successfully.
         </div>
@@ -164,7 +164,7 @@ export default function SupplierQuestionnaire() {
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '2rem', marginBottom: 16 }}>
             <div style={{ marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '0.5px solid #e8e7e4' }}>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: currentSection.color, marginBottom: 4 }}>Section {activeSection + 1} of {sections.length}</div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{currentSection.title}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{currentSection.title}</div>
               <div style={{ fontSize: 13, color: '#888784' }}>{currentSection.desc}</div>
             </div>
 

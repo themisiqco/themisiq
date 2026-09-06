@@ -153,6 +153,7 @@ export async function POST(req: NextRequest) {
         : obligations.filter((o: any) => o.group === g.key)
       if (rows.length === 0) return ''
       return `
+    <!-- Georgia here is deliberate, not a missed sweep: this is email HTML. A mail client cannot resolve var(--font-display), and web fonts do not load reliably in mail, so Literata would silently fall back anyway. Georgia is web-safe and is what every recipient actually sees. See app/components/headingStyles.ts. -->
     <div style="font-size:13px;font-weight:600;color:#0d0d0d;font-family:Georgia,serif;margin:0 0 2px;">${g.title}</div>
     <div style="font-size:11px;color:#888784;line-height:1.55;margin-bottom:8px;">${g.sub}</div>
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e8e7e4;border-radius:8px;overflow:hidden;margin-bottom:18px;">
@@ -184,6 +185,7 @@ export async function POST(req: NextRequest) {
   <!-- HERO -->
   <tr><td style="background:#111;padding:28px 32px 24px;">
     <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.35);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:10px;">Prepared for ${leadIdent}</div>
+    <!-- Georgia here is deliberate, not a missed sweep: this is email HTML. A mail client cannot resolve var(--font-display), and web fonts do not load reliably in mail, so Literata would silently fall back anyway. Georgia is web-safe and is what every recipient actually sees. See app/components/headingStyles.ts. -->
     <div style="font-size:22px;font-weight:400;color:#fff;line-height:1.25;font-family:Georgia,serif;margin-bottom:10px;">We identified <span style="font-style:italic;">${total} ${total === 1 ? 'obligation' : 'obligations'}</span> that apply to ${theirCompany}.</div>
     <div style="font-size:13px;color:rgba(255,255,255,0.5);line-height:1.65;margin-bottom:20px;">${critical} ${critical === 1 ? 'requires' : 'require'} immediate action. ${high} ${high === 1 ? 'is' : 'are'} high priority. Review your full Compliance Obligation Map below.</div>
     <table cellpadding="0" cellspacing="0" border="0"><tr>

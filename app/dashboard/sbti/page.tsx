@@ -11,10 +11,10 @@ import type { CompanySeries, SeriesYear } from '../../../lib/ghg/series'
 import { describeYearStatus } from '../../../lib/ghg/series'
 import { VERSION_DATES, NET_ZERO } from '../../../lib/sbti/params'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts'
+import { sectionHead } from '@/app/components/headingStyles'
 
 // ─── Design tokens (mirroring the climate-risk dashboard) ─────────────────────
 const GRAD = 'var(--color-brand)'
-const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.4rem, 2.5vw, 1.8rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
 const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
@@ -622,7 +622,7 @@ export default function SbtiDashboard() {
 
     const mutedCard = (sc: Scope, note: string) => (
       <div key={sc} style={cardStyle}>
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', fontWeight: 400, marginBottom: 6 }}>{scopeLabel(sc)}</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', fontWeight: 400, marginBottom: 6 }}>{scopeLabel(sc)}</div>
         <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>{note}</div>
       </div>
     )
@@ -666,7 +666,7 @@ export default function SbtiDashboard() {
               return (
                 <div key={sc} style={cardStyle}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                    <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', fontWeight: 400 }}>{scopeLabel(sc)}</div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', fontWeight: 400 }}>{scopeLabel(sc)}</div>
                     <span style={pillStyle(status)}>{PILL[status].label}</span>
                   </div>
                   {driftNote(sc, d)}
@@ -690,7 +690,7 @@ export default function SbtiDashboard() {
               return (
                 <div key={sc} style={cardStyle}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                    <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', fontWeight: 400 }}>{scopeLabel(sc)}</div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', fontWeight: 400 }}>{scopeLabel(sc)}</div>
                     <span style={pillStyle('long_term')}>{PILL.long_term.label}</span>
                   </div>
                   {driftNote(sc, d)}
@@ -756,7 +756,7 @@ export default function SbtiDashboard() {
         ) : allSeries.length === 0 ? (
           <div style={{ background: '#f8f7f5', border: '1px solid #e8e7e4', borderRadius: 14, padding: '2.5rem 2rem', textAlign: 'center' }}>
             <div style={eyebrow}>No inventory yet</div>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, marginBottom: 6 }}>Set up your GHG inventory first</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 400, marginBottom: 6 }}>Set up your GHG inventory first</div>
             <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, maxWidth: 460, margin: '0 auto 18px' }}>
               SBTi categorisation reads from your GHG company. Create a GHG inventory, then come back to set targets.
             </p>
@@ -764,7 +764,7 @@ export default function SbtiDashboard() {
           </div>
         ) : !companyId ? (
           <div style={{ background: '#f8f7f5', border: '1px solid #e8e7e4', borderRadius: 14, padding: '2.5rem 2rem', textAlign: 'center' }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', fontWeight: 400, color: '#0d0d0d' }}>Select a company to view or set its science-based targets.</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', fontWeight: 400, color: '#0d0d0d' }}>Select a company to view or set its science-based targets.</div>
           </div>
         ) : view === 'summary' ? (
           <SbtiSummary onEdit={() => setView('wizard')} />
@@ -831,7 +831,7 @@ export default function SbtiDashboard() {
 
                 <div style={{ marginTop: 24, background: catBg, border: `1px solid color-mix(in srgb, ${catColor} 13%, transparent)`, borderRadius: 14, padding: '1.6rem 1.8rem' }}>
                   <div style={eyebrow}>Live categorisation</div>
-                  <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color: catColor, lineHeight: 1.1 }}>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 400, color: catColor, lineHeight: 1.1 }}>
                     Category {result.category}
                   </div>
                   <div style={{ fontSize: 13, color: '#555553', fontWeight: 400, marginTop: 6 }}>{basisLabel(result.matchedRoute)}</div>
@@ -961,7 +961,7 @@ export default function SbtiDashboard() {
                       if (sc === 's3' && base === null) {
                         return (
                           <div key={sc} style={cardStyle}>
-                            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', fontWeight: 400, marginBottom: 8 }}>{SCOPE_LABEL[sc]}</div>
+                            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', fontWeight: 400, marginBottom: 8 }}>{SCOPE_LABEL[sc]}</div>
                             <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: 12 }}>
                               To set a Scope 3 target, complete your Scope 3 inventory first. Your near-term submission can proceed on Scope 1 + 2 alone.
                             </p>
@@ -982,7 +982,7 @@ export default function SbtiDashboard() {
 
                       return (
                         <div key={sc} style={cardStyle}>
-                          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', fontWeight: 400, marginBottom: 6 }}>{SCOPE_LABEL[sc]}</div>
+                          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', fontWeight: 400, marginBottom: 6 }}>{SCOPE_LABEL[sc]}</div>
                           {base != null && (
                             <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, marginBottom: 14 }}>
                               Base: {base.toLocaleString(undefined, { maximumFractionDigits: 1 })} tCO₂e{baselineYear != null ? ` (${baselineYear})` : ''}
@@ -1067,7 +1067,7 @@ export default function SbtiDashboard() {
                 {nearTermTargetScopes.length === 0 ? (
                   <div style={{ background: '#f8f7f5', border: '1px solid #e8e7e4', borderRadius: 14, padding: '2.5rem 2rem', textAlign: 'center' }}>
                     <div style={eyebrow}>Near-term first</div>
-                    <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, marginBottom: 6 }}>Set your near-term targets first</div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 400, marginBottom: 6 }}>Set your near-term targets first</div>
                     <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, maxWidth: 460, margin: '0 auto 18px' }}>
                       Net-zero builds on your near-term targets. Save at least one near-term target, then come back.
                     </p>
@@ -1096,7 +1096,7 @@ export default function SbtiDashboard() {
                         return (
                           <div key={sc} style={cardStyle}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', fontWeight: 400 }}>{SCOPE_LABEL[sc]}</div>
+                              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', fontWeight: 400 }}>{SCOPE_LABEL[sc]}</div>
                               <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#7425e3', background: '#EDE9FE', borderRadius: 99, padding: '2px 8px' }}>Net-zero</span>
                             </div>
                             {base != null && (

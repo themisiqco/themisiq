@@ -213,7 +213,7 @@ export default function Iro1Page() {
   )
   if (loadError) return (
     <Shell><div style={CARD}>
-      <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: INK, marginBottom: 10 }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: INK, marginBottom: 10 }}>
         This could not be shown</div>
       <div style={{ fontSize: 13.5, color: MID, lineHeight: 1.75 }}>{loadError}</div>
     </div></Shell>
@@ -231,7 +231,7 @@ export default function Iro1Page() {
           <Link href={`/dashboard/materiality/worksheet/${assessmentId}/determinations`} style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>Determinations</Link>
         </div>
 
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.7rem', color: INK }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: INK }}>
           {company || 'IRO-1 disclosure'}
         </div>
         <div style={{ fontSize: 13, color: MUTE, marginTop: 4, marginBottom: 20 }}>
@@ -264,7 +264,7 @@ export default function Iro1Page() {
                                borderRadius: 999, padding: '3px 10px' }}>{chip.text}</span>
               </div>
 
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: INK, marginTop: 6 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: INK, marginTop: 6 }}>
                 {f.label}
               </div>
 
@@ -346,7 +346,7 @@ export default function Iro1Page() {
         <div style={CARD}>
           {submitted ? (
             <>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', color: INK }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: INK }}>
                 Submitted
               </div>
               <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.8, marginTop: 8 }}>
@@ -368,7 +368,7 @@ export default function Iro1Page() {
             </>
           ) : (
             <>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', color: INK }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: INK }}>
                 Submit the IRO-1 record
               </div>
               <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.8, marginTop: 8, marginBottom: 14 }}>

@@ -109,7 +109,7 @@ export default function SupplierPortalDashboard() {
         <div style={{ maxWidth: 1000, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Supply Chain & Scope 3</div>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d' }}>Supplier Portal</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d' }}>Supplier Portal</div>
           </div>
           <button onClick={() => setShowNew(true)} style={{ fontSize: 13, fontWeight: 500, padding: '10px 20px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>
             + New campaign
@@ -123,7 +123,7 @@ export default function SupplierPortalDashboard() {
         {showNew && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
             <div style={{ background: '#fff', borderRadius: 16, padding: '2rem', width: '100%', maxWidth: 480 }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: '1.5rem' }}>New supplier campaign</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: '1.5rem' }}>New supplier campaign</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div>
                   <label style={labelStyle}>Campaign name</label>
@@ -175,7 +175,7 @@ export default function SupplierPortalDashboard() {
           <div style={{ textAlign: 'center', padding: '4rem', color: '#888784' }}>Loading campaigns...</div>
         ) : campaigns.length === 0 ? (
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '4rem', textAlign: 'center' }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>No campaigns yet</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>No campaigns yet</div>
             <div style={{ fontSize: 14, color: '#888784', marginBottom: 24, lineHeight: 1.6 }}>Create your first supplier campaign to start collecting sustainability data from your supply chain.</div>
             <button onClick={() => setShowNew(true)} style={{ fontSize: 13, fontWeight: 500, padding: '11px 22px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>
               + Create your first campaign

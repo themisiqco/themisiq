@@ -49,7 +49,7 @@ export default function LoginPage() {
 
           {/* HEADER */}
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-            <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Welcome back</h1>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Welcome back</h1>
             <p style={{ fontSize: 14, color: '#888784', fontWeight: 400 }}>Sign in to your ThemisIQ account</p>
           </div>
 

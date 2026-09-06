@@ -333,7 +333,7 @@ function PricingPageInner() {
     wrap: { maxWidth: 860, margin: '0 auto', padding: '3rem 2rem' },
     // Hero
     heroLabel: { display: 'inline-block', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-brand)', border: '1px solid var(--color-band-line)', borderRadius: 99, padding: '4px 14px', marginBottom: 14 },
-    heroTitle: { fontFamily: 'Georgia, serif', fontSize: 28, fontWeight: 400, color: '#0d0d0d', lineHeight: 1.3, marginBottom: 12 },
+    heroTitle: { fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 400, color: '#0d0d0d', lineHeight: 1.3, marginBottom: 12 },
     heroSub: { fontSize: 13, color: '#555553', fontWeight: 400, maxWidth: 520, margin: '0 auto', lineHeight: 1.8 },
     // Prompt
     promptWrap: { borderRadius: 12, padding: 1, marginBottom: 20, background: GRAD },
@@ -354,7 +354,7 @@ function PricingPageInner() {
     // CTA
     ctaWrap: { background: '#fff', border: '1px solid #e8e7e4', borderRadius: 14, padding: '1.75rem', textAlign: 'center' as const },
     ctaPara: { fontSize: 13, color: '#555553', fontWeight: 400, maxWidth: 500, margin: '0 auto 14px', lineHeight: 1.8 },
-    ctaHeadline: { fontFamily: 'Georgia, serif', fontSize: 18, fontWeight: 400, color: '#0d0d0d', marginBottom: 4 },
+    ctaHeadline: { fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 400, color: '#0d0d0d', marginBottom: 4 },
     ctaSub: { fontSize: 11, color: '#888784', marginBottom: 18 },
     ctaBtns: { display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' as const },
   }
@@ -513,7 +513,7 @@ function PricingPageInner() {
 
         {/* Section title */}
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: 22, fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Simple, honest pricing</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Simple, honest pricing</div>
           <div style={{ fontSize: 12, color: '#555553', fontWeight: 400 }}>Start with one module. Build your compliance platform as you grow.</div>
         </div>
 
@@ -522,7 +522,7 @@ function PricingPageInner() {
           <div style={{ background: GRAD, borderRadius: 14, padding: 1, marginBottom: 24 }}>
             <div className="tq-band" style={{ borderRadius: 13, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 260 }}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, marginBottom: 6 }}>Pick and pace.</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, marginBottom: 6 }}>Pick and pace.</div>
                 <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6, maxWidth: 520 }}>Start with the module your next deadline demands. Add others as your obligations grow — each one is a complete, standalone deliverable, not a partial view that only works when you buy the set.</div>
                 <div style={{ fontSize: 11, color: 'var(--color-ink-2)', marginTop: 10 }}>Two modules −10% · Three or more −20%</div>
               </div>

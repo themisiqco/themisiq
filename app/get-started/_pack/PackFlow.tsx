@@ -280,7 +280,7 @@ export default function PackFlow({ slug }: { slug: string }) {
     return (
       <div style={{ minHeight: '100vh', background: PAPER, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, sans-serif' }}>
         <div style={{ textAlign: 'center' }}>
-          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 24, color: INK }}>Pack not found</h1>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, color: INK }}>Pack not found</h1>
           <a href="/pricing" style={{ color: '#7425e3', fontSize: 13, textDecoration: 'none' }}>See all packs →</a>
         </div>
       </div>
@@ -304,7 +304,7 @@ export default function PackFlow({ slug }: { slug: string }) {
             <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: pack.accent }}>Guided setup</span>
           </div>
 
-          <h1 style={{ fontFamily: 'Georgia, serif', fontWeight: 400, fontSize: 'clamp(1.9rem, 4vw, 2.7rem)', lineHeight: 1.15, color: '#fff', margin: '8px 0 6px' }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 400, fontSize: 'clamp(1.9rem, 4vw, 2.7rem)', lineHeight: 1.15, color: '#fff', margin: '8px 0 6px' }}>
             {pack.name}
           </h1>
           <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', fontWeight: 400, margin: 0 }}>{pack.driver}</p>
@@ -342,7 +342,7 @@ export default function PackFlow({ slug }: { slug: string }) {
       {/* ── Steps ── */}
       <main style={{ maxWidth: 760, margin: '0 auto', padding: '2.5rem' }}>
         <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: MUTE, marginBottom: 6 }}>Your steps</div>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontWeight: 400, fontSize: 22, color: INK, margin: '0 0 4px' }}>Everything you need, in order.</h2>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 400, fontSize: 22, color: INK, margin: '0 0 4px' }}>Everything you need, in order.</h2>
         <p style={{ fontSize: 13, color: BODY, fontWeight: 400, lineHeight: 1.7, margin: '0 0 24px', maxWidth: 540 }}>
           Work through these in sequence. Each one feeds the next, and you only pay when you export your finished report.
         </p>
@@ -411,7 +411,7 @@ export default function PackFlow({ slug }: { slug: string }) {
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 220 }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, fontWeight: 400, color: '#fff', marginBottom: 4 }}>{pack.name}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 400, color: '#fff', marginBottom: 4 }}>{pack.name}</div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', fontWeight: 400, lineHeight: 1.6, marginBottom: 14 }}>
                 Free to build — see your full results at no cost. Your plan unlocks the final, assurance-ready export.
               </div>

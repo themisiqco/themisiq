@@ -33,11 +33,10 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../../../lib/supabase'
 import { useEntitlement } from '../../../../lib/useEntitlement'
 import DisclosureQuestion, { cbamInputStyle, CbamField } from '../components/DisclosureQuestion'
+import { itemHead, sectionHeadFixed as sectionHead } from '@/app/components/headingStyles'
 
 // ── House style, matching app/dashboard/ghg/page.tsx (sectionHead/sectionSub) ──
-const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
 const sectionSub: React.CSSProperties = { fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.7, marginBottom: '2rem' }
-const itemHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: '1.15rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 10, marginTop: '2rem' }
 
 type Installation = { id: string; company_id: string; name: string; country: string }
 
@@ -255,7 +254,7 @@ export default function CbamDisclosuresPage() {
           </div>
           <div style={{ position: 'absolute', inset: 0, zIndex: 10, backdropFilter: 'blur(8px)', background: 'rgba(248,247,245,0.85)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ background: '#fff', borderRadius: 16, padding: '2.5rem', boxShadow: '0 8px 40px rgba(0,0,0,0.12)', border: '0.5px solid #e8e7e4', maxWidth: 480, textAlign: 'center' }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 8 }}>CBAM is a paid module.</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 8 }}>CBAM is a paid module.</div>
               <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 400 }}>Build your verifier-ready Carbon Border Adjustment Mechanism report — installation disclosures, embedded-emissions calculations, and Annex IV §1.2 output. Unlock the CBAM module to begin.</div>
               <button onClick={() => (window.location.href = '/pricing')} style={{ width: '100%', fontSize: 14, fontWeight: 600, padding: '14px 28px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d' }}>
                 Unlock CBAM →
@@ -276,7 +275,7 @@ export default function CbamDisclosuresPage() {
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '3rem 2rem' }}>
         <div style={sectionHead}>CBAM installation disclosures</div>
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '2rem', marginTop: '1rem' }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>No installations yet</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>No installations yet</div>
           <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, fontWeight: 400 }}>
             Disclosures are recorded for each installation and reporting period, so you&rsquo;ll need to add an installation first. You can do that in{' '}
             <a href="/dashboard/cbam/setup" style={{ color: '#7425e3', textDecoration: 'underline' }}>setup</a>, then come back here.
@@ -472,7 +471,7 @@ export default function CbamDisclosuresPage() {
       {/* ── The attestation — visually distinct, NOT a DisclosureQuestion ── */}
       <div style={{ marginTop: '2.5rem', border: '1.5px solid #7425e3', borderRadius: 12, padding: '1.5rem', background: '#faf7ff' }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 8 }}>Declaration — legal weight</div>
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 10 }}>Process-set completeness attestation</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 10 }}>Process-set completeness attestation</div>
         <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, fontWeight: 400, marginBottom: '1rem' }}>
           This is a declaration, not a factual disclosure. Attesting that the process set is complete is an assertion — under the reasonable-assurance standard — that the production processes recorded for <strong>this installation and reporting period</strong> are the complete set. It gates §1.2 items 5 and 6 (installation-level total direct and indirect emissions): <strong>those totals cannot be reported without this attestation</strong>, because a partial sum must never be presented as an installation-level total. It is unset until you act — never pre-selected.
         </div>

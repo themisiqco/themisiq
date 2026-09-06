@@ -86,7 +86,7 @@ export default function HomePricing() {
 
         {/* Header */}
         <p style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Pricing</p>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }}>Simple, honest pricing.</h2>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }}>Simple, honest pricing.</h2>
         <p style={{ fontSize: 15, color: '#555553', maxWidth: 540, lineHeight: 1.75, fontWeight: 400, marginBottom: '0.5rem' }}>
           Whether your driver is a regulator, a board, an investor, or a customer — ThemisIQ is your sustainability compliance reporting solution.
         </p>
@@ -108,7 +108,7 @@ export default function HomePricing() {
           <div style={{ background: GRAD, borderRadius: 14, padding: 1, marginBottom: 16 }}>
             <div className="tq-band" style={{ borderRadius: 13, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 260 }}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, marginBottom: 6 }}>Pick and pace.</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, marginBottom: 6 }}>Pick and pace.</div>
                 <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6, maxWidth: 520 }}>Start with the module your next deadline demands. Add others as your obligations grow — each one is a complete, standalone deliverable, not a partial view that only works when you buy the set.</div>
                 <div style={{ fontSize: 11, color: 'var(--color-ink-2)', marginTop: 10 }}>Two modules −10% · Three or more −20%</div>
               </div>
@@ -222,7 +222,7 @@ export default function HomePricing() {
           <div style={{ fontSize: 13, color: '#555553', fontWeight: 400, maxWidth: 500, margin: '0 auto 12px', lineHeight: 1.8 }}>
             For many companies, we understand that emerging reporting requirements — and the pricing from other platforms and traditional consulting firms — are overwhelming. ThemisIQ offers a better way.
           </div>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: 17, fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{cta.headline}</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{cta.headline}</div>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', marginTop: 14 }}>
             {cta.buttons.map((btn, i) => (
               <a key={i} href={btn.href} style={{ padding: '10px 20px', borderRadius: 8, fontSize: 12, fontWeight: btn.primary ? 600 : 500, color: btn.primary ? '#0d0d0d' : '#0d0d0d', background: btn.primary ? GRAD : '#fff', border: btn.primary ? 'none' : '1px solid #e8e7e4', textDecoration: 'none', whiteSpace: 'nowrap' }}>

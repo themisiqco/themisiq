@@ -35,6 +35,7 @@ import {
 } from '../../../lib/ghg/engine'
 import { disclaimerParas } from '../../../lib/disclaimer'
 import { btnPrimary } from '@/app/components/buttonStyles'
+import { sectionHeadFixed as auditSectionHead, sectionHeadFixed as sectionHead } from '@/app/components/headingStyles'
 import type {
   GwpVersion, Location, Inventory, SourceDoc, ExtractedProposal,
   ConciergeStatus, CoveragePeriod, CoverageResolution, DeclarableStream, UnpriceableLocation,
@@ -315,7 +316,7 @@ function GhgEntryWall({ access }: { access: Extract<EntitlementAccess, 'expired'
       </nav>
       <div style={{ maxWidth: 560, margin: '0 auto', padding: '4rem 1.5rem' }}>
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '2.5rem', textAlign: 'center' as const, boxShadow: '0 2px 20px rgba(0,0,0,0.04)' }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 10 }}>{copy.title}</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 10 }}>{copy.title}</div>
           <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.75rem', fontWeight: 400 }}>{copy.body}</div>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' as const }}>
             {copy.href ? (
@@ -335,7 +336,7 @@ function PaywallOverlay({ frameworks }: { frameworks: string[] }) {
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 10, backdropFilter: 'blur(8px)', background: 'rgba(248,247,245,0.85)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ background: '#fff', borderRadius: 16, padding: '2.5rem', boxShadow: '0 8px 40px rgba(0,0,0,0.12)', border: '0.5px solid #e8e7e4', maxWidth: 480, textAlign: 'center' as const }}>
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 8 }}>Your GHG inventory is complete.</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 8 }}>Your GHG inventory is complete.</div>
         <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 400 }}>Your Scope 1 and Scope 2 emissions have been calculated to {frameworks.join(', ')} standards, with full calculation workings ready for third-party assurance. Unlock your submission-ready reports with one click.</div>
         <div style={{ background: '#f8f7f5', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', textAlign: 'left' as const }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', marginBottom: 10, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>What you unlock</div>
@@ -1396,7 +1397,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
         */}
         {comparability && (
           <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: 15, color: '#0d0d0d', marginBottom: 10 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, color: '#0d0d0d', marginBottom: 10 }}>
               Comparing this year with last year
             </div>
             {comparability.observations.length > 0 && (
@@ -2038,40 +2039,40 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                     <div style={{ fontSize: 10, fontWeight: 700, color: fw.color, letterSpacing: '0.06em', textTransform: 'uppercase' as const, marginBottom: 8 }}>{fw.name} — GWP {fw.gwp}</div>
                     <div style={{ marginBottom: 6 }}>
                       <div style={{ fontSize: 11, color: '#888784' }}>Scope 1</div>
-                      <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: fw.color }}>{totals.s1_total.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s1_total.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
                     </div>
                     <div style={{ marginBottom: 6 }}>
                       <div style={{ fontSize: 11, color: '#888784' }}>Scope 2 (location)</div>
-                      <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: fw.color }}>{totals.s2_location.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s2_location.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
                     </div>
                     {(fw.id === 'esrs' || fw.id === 'gri') && (
                       <div style={{ marginBottom: 6 }}>
                         <div style={{ fontSize: 11, color: '#888784' }}>Scope 2 (market)</div>
-                        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: fw.color }}>{totals.s2_market.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s2_market.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
                       </div>
                     )}
                     {(fw.id === 'esrs' || fw.id === 'gri') && (
                       <div style={{ marginBottom: 6 }}>
                         <div style={{ fontSize: 11, color: '#888784' }}>Biogenic CO₂ (reported separately)</div>
-                        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: fw.color }}>{totals.biogenic.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.biogenic.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
                       </div>
                     )}
                     {totals.s3_td > 0 && (
                       <div style={{ marginBottom: 6 }}>
                         {/* Distinct Scope 3 (Cat 3) line — NZ electricity T&D losses. Never folded into S1/S2. */}
                         <div style={{ fontSize: 11, color: '#888784' }}>Scope 3 (Cat 3 — electricity T&amp;D)</div>
-                        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: fw.color }}>{totals.s3_td.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s3_td.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
                       </div>
                     )}
                     {fw.id === 'cdp' && (
                       <>
                         <div style={{ marginBottom: 6 }}>
                           <div style={{ fontSize: 11, color: '#888784' }}>Prior year Scope 1 ({inventory.reporting_year - 1})</div>
-                          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: fw.color }}>{inventory.prior_year_s1.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{inventory.prior_year_s1.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
                         </div>
                         <div style={{ marginBottom: 6 }}>
                           <div style={{ fontSize: 11, color: '#888784' }}>Prior year Scope 2 ({inventory.reporting_year - 1})</div>
-                          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: fw.color }}>{inventory.prior_year_s2.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{inventory.prior_year_s2.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
                         </div>
                       </>
                     )}
@@ -2431,7 +2432,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           {inventoryId && dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady && (
             <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.25)', borderRadius: 10, padding: '1.25rem', marginTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' as const }}>
               <div style={{ flex: 1, minWidth: 280 }}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Your inventory is the baseline for science-based targets.</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Your inventory is the baseline for science-based targets.</div>
                 <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6 }}>Set near-term and net-zero targets under the SBTi Corporate Net-Zero Standard V2.0 — built directly on the figures you just confirmed.</div>
               </div>
               {/* Carry THIS inventory's company so SBTi binds to it directly (highest-precedence
@@ -2557,7 +2558,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
         </nav>
         <div style={{ maxWidth: 760, margin: '0 auto', padding: '3rem 1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: 12 }}>
-            <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', fontWeight: 400, color: '#0d0d0d', margin: 0 }}>Your inventories</h1>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 400, color: '#0d0d0d', margin: 0 }}>Your inventories</h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <a href="/dashboard/ghg/trends" style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none', whiteSpace: 'nowrap' }}>View trends →</a>
               <button onClick={startNewInventory} style={{ fontSize: 13, fontWeight: 500, ...btnPrimary, padding: '10px 20px' }}>+ New inventory</button>
@@ -2923,7 +2924,6 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 const unitBtn = (active: boolean): React.CSSProperties => ({ fontSize: 12, padding: '6px 14px', borderRadius: 8, background: active ? 'var(--color-brand)' : '#f8f7f5', color: active ? 'var(--color-on-dark)' : '#555553', border: `0.5px solid ${active ? 'var(--color-brand)' : '#e8e7e4'}`, cursor: 'pointer' })
 const inputStyle: React.CSSProperties = { width: '100%', fontSize: 13, padding: '9px 12px', border: '0.5px solid #e8e7e4', borderRadius: 8, outline: 'none', boxSizing: 'border-box', background: '#fff' }
-const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
 const sectionSub: React.CSSProperties = { fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.7, marginBottom: '2rem' }
 const wTd: React.CSSProperties = { padding: '6px 10px', borderBottom: '0.5px solid #e8e7e4', color: '#555553', fontSize: 11, verticalAlign: 'top' }
 const qHint: React.CSSProperties = { fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '0.75rem' }
@@ -3070,7 +3070,6 @@ function AuditTrail({ inventoryId, step }: { inventoryId: string | null; step: n
   )
 }
 
-const auditSectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
 const auditSectionSub: React.CSSProperties = { fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.7, marginBottom: '2rem' }
 
 
@@ -3141,7 +3140,7 @@ function VerifierInvite({ inventoryId }: { inventoryId: string | null }) {
 
   return (
     <div style={{ marginTop: '2.5rem', borderTop: '0.5px solid #e8e7e4', paddingTop: '2rem' }}>
-      <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Invite a verifier</h3>
+      <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Invite a verifier</h3>
       {/* WHY THE SECOND PARAGRAPH. This block used to promise a "secure" link you could "revoke
           access" to at any time. Both overstated. A verifier link is a bearer credential — whoever
           holds it can open it — and revoking closes the PAGE, not anything the verifier has already

@@ -6,6 +6,7 @@ import {
   AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED, AI_ACT_CITATION,
 } from '../../lib/aiAct'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
+import { sectionTitle } from '@/app/components/headingStyles'
 
 // NO COUNTDOWN. This page ran `Math.max(0, days until 2026-08-02)`, so once the date passed the
 // headline read "0 days to the EU AI Act deadline" rather than reading as broken — and it kept
@@ -38,7 +39,7 @@ export default function Page() {
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
           <div>
             <div style={eyebrow}>AI Governance</div>
-            <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
               AI Governance &<br />
               <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Risk Management</span>
             </h1>
@@ -68,7 +69,7 @@ export default function Page() {
               { val: 'Feb 2025', unit: 'active', label: 'prohibited AI practices already banned — manipulation, social scoring, real-time biometrics', color: '#0F6E56', bg: '#E1F5EE' },
             ].map(({ val, unit, label, color, bg }) => (
               <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid color-mix(in srgb, ${color} 13%, transparent)` }}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color, marginTop: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{unit}</div>
                 <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{label}</div>
               </div>
@@ -82,7 +83,7 @@ export default function Page() {
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
           <div>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>EU AI Act — {AI_ACT_CITATION}</div>
-            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
               The high-risk dates<br />moved. The scope did not.
             </h2>
             {/* The deferral is ENACTED. This copy previously argued the opposite — "not yet enacted law",
@@ -207,7 +208,7 @@ export default function Page() {
           ].map(({ date, status, label, desc, color, bg }) => (
             <div key={date} style={{ background: '#fff', padding: '2rem', borderTop: `4px solid ${color}` }}>
               <span style={{ fontSize: 10, fontWeight: 700, color, background: bg, padding: '2px 8px', borderRadius: 99 }}>{status}</span>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1rem', fontWeight: 400, color: '#0d0d0d', margin: '10px 0 4px' }}>{label}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 400, color: '#0d0d0d', margin: '10px 0 4px' }}>{label}</div>
               <div style={{ fontSize: 11, color: '#888784', marginBottom: 10 }}>{date}</div>
               <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{desc}</div>
             </div>
@@ -217,7 +218,7 @@ export default function Page() {
 
       {/* CTA */}
       <section className="tq-band-bleed" style={{ padding: '6rem 2.5rem', textAlign: 'center' }}>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
           {/* The reason to act is that you cannot classify what you have not inventoried, and the
               inventory is the input to every other obligation — not that a date is close. A countdown
               headline expires; this one does not. */}
@@ -246,4 +247,3 @@ const navLink: React.CSSProperties = { fontSize: 11, color: '#555553', textDecor
 const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'var(--color-brand)', color: '#fff', textDecoration: 'none', display: 'inline-block' }
 const btnOutline: React.CSSProperties = { fontSize: 13, fontWeight: 400, padding: '8px 18px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', textDecoration: 'none', display: 'inline-block' }
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
-const sectionTitle: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }

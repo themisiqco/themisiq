@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Nav from '../../components/Nav'
 import { useEntitlement } from '../../../lib/useEntitlement'
+import { sectionHead } from '@/app/components/headingStyles'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -90,7 +91,6 @@ const DOMAINS = [...new Set(CONTROLS.map(c => c.domain))]
 const GRAD = 'var(--color-brand)'
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
-const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.4rem, 2.5vw, 1.8rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
 const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
 const STEP_NAMES = ['Setup', 'Gap Assessment', 'Results', 'Remediation', 'Export']
 
@@ -331,7 +331,7 @@ export default function CyberDashboard() {
       <div className="tq-summary" style={{ marginBottom: 20 }}>
         <div className="tq-summary-body" style={{ gap: '2rem' }}>
         <div style={{ textAlign: 'center', flexShrink: 0 }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '3.5rem', fontWeight: 400, color: scoreColor, lineHeight: 1 }}>{pct}%</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '3.5rem', fontWeight: 400, color: scoreColor, lineHeight: 1 }}>{pct}%</div>
           <div style={{ fontSize: 12, fontWeight: 600, color: scoreColor, marginTop: 4 }}>{scoreLabel}</div>
         </div>
         <div style={{ flex: 1 }}>
@@ -456,7 +456,7 @@ export default function CyberDashboard() {
           ].map(({ label, val, urgent }) => (
             <div key={label}>
               <div style={{ fontSize: 10, color: 'var(--color-ink-2)', marginBottom: 4 }}>{label}</div>
-              <div style={{ fontSize: typeof val === 'number' ? '1.6rem' : '1rem', fontFamily: typeof val === 'number' ? 'Georgia, serif' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 600, color: urgent ? 'var(--color-module-cyber)' : 'var(--color-ink)', lineHeight: 1.2 }}>{val}</div>
+              <div style={{ fontSize: typeof val === 'number' ? '1.6rem' : '1rem', fontFamily: typeof val === 'number' ? 'var(--font-display)' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 600, color: urgent ? 'var(--color-module-cyber)' : 'var(--color-ink)', lineHeight: 1.2 }}>{val}</div>
             </div>
           ))}
         </div>
@@ -498,7 +498,7 @@ export default function CyberDashboard() {
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Cyber Governance</div>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>NIS2 · DORA · SEC Cyber Gap Assessment</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>NIS2 · DORA · SEC Cyber Gap Assessment</div>
           </div>
           {pct > 0 && (
             <div style={{ textAlign: 'right' }}>
@@ -530,7 +530,7 @@ export default function CyberDashboard() {
             <div style={{ position: 'sticky', top: 80 }}>
               <div className="tq-summary" style={{ marginBottom: 12, display: 'block' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }} className="tq-summary-label">Live score</div>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '2.5rem', fontWeight: 400, color: pct > 0 ? scoreColor : 'var(--color-ink-muted)', lineHeight: 1, marginBottom: 4 }}>{pct > 0 ? `${pct}%` : '—'}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', fontWeight: 400, color: pct > 0 ? scoreColor : 'var(--color-ink-muted)', lineHeight: 1, marginBottom: 4 }}>{pct > 0 ? `${pct}%` : '—'}</div>
                 {pct > 0 && <div style={{ fontSize: 11, fontWeight: 600, color: scoreColor, marginBottom: 12 }}>{scoreLabel}</div>}
                 <div style={{ height: 4, background: 'var(--color-sunken)', borderRadius: 99, overflow: 'hidden', marginBottom: 12 }}>
                   <div style={{ height: '100%', width: `${pct}%`, background: scoreColor, borderRadius: 99, transition: 'width 0.3s' }} />

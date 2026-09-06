@@ -125,7 +125,7 @@ export default function WorksheetIndex() {
           <Link href="/dashboard/materiality/survey" style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>Stakeholder surveys</Link>
         </div>
 
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.7rem', color: INK }}>Impact worksheet</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: INK }}>Impact worksheet</div>
         <div style={{ fontSize: 13, color: MID, marginTop: 6, marginBottom: 22, lineHeight: 1.8, maxWidth: 700 }}>
           Where your own severity determination is recorded, against ESRS 1 — how grave an impact is,
           how widespread, and how hard to put right. The stakeholder survey collects what other people
@@ -152,7 +152,7 @@ export default function WorksheetIndex() {
         {rows.length === 0 && !loadError ? (
           <div style={{ background: '#fff', border: `0.5px solid ${LINE}`, borderRadius: 16,
                         padding: '2.5rem', textAlign: 'center' }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: INK, marginBottom: 10 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: INK, marginBottom: 10 }}>
               No assessments yet
             </div>
             <div style={{ fontSize: 13, color: MID, lineHeight: 1.8, maxWidth: 520, margin: '0 auto' }}>

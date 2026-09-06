@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GHG Emissions — page rebuilt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600;7..72,700&family=Atkinson+Hyperlegible+Next:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FFFFFF; --ground:#F7F8F8; --surface:#FCFCFC; --sunken:#EDEFF0;
+  --ink:#151A1D; --ink-2:#3B474D; --ink-muted:#5A686E;
+  --brand:#095C6B; --brand-hover:#0C7385; --brand-wash:#D7EFF6; --brand-line:#9FCBD6;
+  --band:#CCE7EF; --band-line:#A8D2DD;
+  --climate:#A94E0D; --on-dark:#EAEDEE;
+  --line:#D7DDDF; --line-strong:#AAB4B8;
+  --display:'Literata',Georgia,serif; --ui:'Atkinson Hyperlegible Next',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--ui);
+  font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.tnum{font-variant-numeric:tabular-nums lining-nums}
+
+/* deadline bar — real, dated, actionable */
+.bar{background:var(--brand);color:var(--on-dark);font-weight:500;
+  letter-spacing:.008em;padding:9px 2.5rem;font-size:14px;
+  display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.bar strong{font-weight:700}
+.bar a{color:var(--on-dark);text-decoration:underline;text-underline-offset:3px}
+
+.wrap{max-width:1080px;margin:0 auto;padding:56px 40px 88px}
+
+/* masthead — full width, no two-column hero */
+.eyebrow{font-size:13px;font-weight:600;color:var(--ink-muted);letter-spacing:.06em;
+  text-transform:uppercase}
+h1{font-family:var(--display);font-size:56px;font-weight:600;line-height:1.06;
+  letter-spacing:-.024em;margin:14px 0 0;max-width:16ch}
+h1 .q{display:block;color:var(--brand)}
+.lede{font-size:19px;line-height:1.55;color:var(--ink-2);max-width:56ch;margin:22px 0 0}
+
+.actions{display:flex;gap:12px;margin-top:28px;align-items:center;flex-wrap:wrap}
+.btn{font-family:var(--ui);font-size:16px;font-weight:600;padding:12px 22px;
+  border-radius:3px;border:1px solid var(--brand);background:var(--brand);
+  color:var(--on-dark);letter-spacing:.006em;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--brand)}
+.actions .quiet{font-size:16px;color:var(--ink-muted);text-decoration:underline;
+  text-underline-offset:3px;margin-left:6px}
+
+/* the specification table — replaces the 2x2 pastel card grid */
+.spec-head{display:flex;align-items:baseline;gap:14px;margin:56px 0 0;
+  padding-bottom:12px;border-bottom:2px solid var(--ink)}
+.spec-head h2{font-family:var(--display);font-size:25px;font-weight:600;margin:0;
+  letter-spacing:-.014em}
+.spec-head span{font-size:14px;font-weight:500;color:var(--ink-muted)}
+.spec{width:100%;border-collapse:collapse}
+.spec th{text-align:left;font-size:14px;font-weight:600;color:var(--ink-muted);
+  padding:16px 20px 16px 0;vertical-align:top;width:210px;
+  border-bottom:1px solid var(--line)}
+.spec td{padding:16px 0;border-bottom:1px solid var(--line);vertical-align:top;
+  font-variant-numeric:tabular-nums lining-nums}
+.spec tr:last-child th,.spec tr:last-child td{border-bottom:0}
+.spec .big{font-family:var(--display);font-size:23px;font-weight:600;
+  line-height:1.15;letter-spacing:-.012em}
+.spec .note{font-size:15px;color:var(--ink-2);margin-top:4px;max-width:52ch}
+.spec .fw{font-size:16px;line-height:1.75;max-width:56ch}
+
+/* deadline callout — filing tab, the one thing that is time-critical */
+.tab{display:flex;background:var(--paper);border:1px solid var(--line);
+  border-left:6px solid var(--climate);border-radius:2px 6px 6px 2px;margin-top:34px}
+.tab-body{flex:1;padding:20px 24px;display:flex;justify-content:space-between;
+  align-items:center;gap:26px}
+.tab-label{font-size:13px;font-weight:700;color:var(--climate);letter-spacing:.012em}
+.tab-title{font-family:var(--display);font-size:23px;font-weight:600;margin-top:4px;
+  letter-spacing:-.014em;line-height:1.2}
+.tab-sub{font-size:15px;color:var(--ink-2);margin-top:5px;max-width:46ch}
+.tab-fig{font-family:var(--display);font-size:31px;font-weight:600;line-height:1.05;
+  color:var(--climate);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tab-fig small{display:block;font-family:var(--ui);font-size:13px;font-weight:600;
+  color:var(--ink-muted);margin-top:5px}
+
+.note-box{margin-top:56px;padding:22px 26px;background:var(--surface);
+  border:1px solid var(--line-strong);border-left:4px solid var(--brand)}
+.note-box h3{font-family:var(--display);font-size:19px;font-weight:600;margin:0 0 10px}
+.note-box ul{margin:0;padding-left:20px}
+.note-box li{font-size:16px;color:var(--ink-2);margin-bottom:8px;max-width:76ch}
+@media(max-width:820px){
+  .wrap{padding:34px 18px 64px}.bar{padding:9px 18px}
+  h1{font-size:37px}
+  .spec th{display:block;width:auto;padding-bottom:2px;border-bottom:0}
+  .spec td{display:block;padding-top:2px}
+  .tab-body{flex-direction:column;align-items:flex-start}
+  .tab-fig{text-align:left}
+}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <span><strong>SB 253</strong> first report due 10 November 2026 — proposed, Scope 1 + 2 for the prior fiscal year.</span>
+  <a href="#">Check if it applies to you</a>
+</div>
+
+<div class="wrap">
+
+  <div class="eyebrow">ThemisIQ Climate</div>
+  <h1>GHG Emissions<span class="q">Inventory</span></h1>
+  <p class="lede">Full Scope 1, 2 and 3 inventory under the GHG Protocol.
+  Audit-trail-first and verifier-ready, with a pre-filled CARB SB 253 template
+  export. CDP, ESRS E1 and EcoVadis come out of the same inventory.</p>
+
+  <div class="actions">
+    <button class="btn">See your emissions</button>
+    <button class="btn ghost">From $4,900/yr</button>
+    <a class="quiet" href="#">Book a demo</a>
+  </div>
+
+  <div class="spec-head">
+    <h2>What you get</h2>
+    <span>One inventory, collected once</span>
+  </div>
+
+  <table class="spec">
+    <tbody>
+      <tr>
+        <th>Scope coverage</th>
+        <td>
+          <div class="big">Scope 1, 2 and 3</div>
+          <div class="note">All 15 Scope 3 categories. Location and market-based
+          Scope 2, biogenic reported separately, by gas.</div>
+        </td>
+      </tr>
+      <tr>
+        <th>Audit trail</th>
+        <td>
+          <div class="big">Every edit logged</div>
+          <div class="note">Who changed which figure, when, and what it was before.
+          Immutable, and readable by your verifier without a call.</div>
+        </td>
+      </tr>
+      <tr>
+        <th>Frameworks</th>
+        <td>
+          <div class="fw">SB 253 (California) · CDP C6 · ESRS E1 · IFRS S2 ·
+          EcoVadis · GHG Protocol · SBTi · CARB template export</div>
+          <div class="note">Enter your data once. Each report is generated from
+          it — no duplicate entry, no reconciliation between versions.</div>
+        </td>
+      </tr>
+      <tr>
+        <th>Emission factors</th>
+        <td>
+          <div class="big">IPCC AR6 · edition-tracked</div>
+          <div class="note">Every figure traceable to the factor table and edition
+          it was calculated from, so a year-over-year comparison holds up.</div>
+        </td>
+      </tr>
+      <tr>
+        <th>Price</th>
+        <td>
+          <div class="big">From $4,900/yr</div>
+          <div class="note">Up to 3 locations. Multi-module discounts apply from
+          the second module.</div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="tab">
+    <div class="tab-body">
+      <div>
+        <div class="tab-label">Next reporting date</div>
+        <div class="tab-title">California SB 253</div>
+        <div class="tab-sub">Scope 1 + 2 for the prior fiscal year. Proposed, not
+        final — CARB has not published the final regulation.</div>
+      </div>
+      <div class="tab-fig">10 Nov<small class="tnum">2026</small></div>
+    </div>
+  </div>
+
+  <div class="note-box">
+    <h3>What changed, and why</h3>
+    <ul>
+      <li><strong>The 2×2 pastel card grid is gone.</strong> Those four cards
+      weren't four of the same thing — a deadline, a scope count, a claim and a
+      framework count — and presenting them identically implied a parity they
+      don't have. Their colours were a decorative rotation, so "15 Scope 3
+      categories" was violet for no reason.</li>
+      <li><strong>The gradient headline is gone.</strong> A word set in a
+      violet-to-green gradient is the loudest generated-design signal on the page,
+      and it was on all eight marketing pages.</li>
+      <li><strong>Specifications became a specification table.</strong> Your buyer
+      is comparing you against Persefoni and Watershed on capability. A label-value
+      table is scannable and comparable; four cards are not.</li>
+      <li><strong>Only the deadline gets colour.</strong> It is the one genuinely
+      time-critical fact, so it takes the amber filing tab. Everything else is
+      ink on white.</li>
+      <li><strong>The pill tag row is gone.</strong> Frameworks are now a row in
+      the table, where a reader can actually find them.</li>
+      <li><strong>Arrows dropped from buttons,</strong> and "See your emissions
+      instantly" lost the word instantly — the claim was doing the arrow's job.</li>
+      <li><strong>The two-column hero is gone.</strong> Copy left, cards right is
+      the default SaaS arrangement. A full-width masthead over a table reads as
+      documentation, which is what you are selling.</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

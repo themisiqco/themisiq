@@ -641,7 +641,7 @@ export default function WorksheetAssign() {
   if (loadError || !assessment) return (
     <Shell>
       <div style={CARD}>
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: INK, marginBottom: 10 }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: INK, marginBottom: 10 }}>
           This worksheet could not be opened
         </div>
         <div style={{ fontSize: 13.5, color: MID, lineHeight: 1.75 }}>{loadError}</div>
@@ -784,7 +784,7 @@ export default function WorksheetAssign() {
           {round && <Link href={`/dashboard/materiality/survey/${round.id}/results`} style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>Survey results</Link>}
         </div>
 
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.7rem', color: INK }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: INK }}>
           {assessment.company_name || 'Impact worksheet'}
         </div>
         <div style={{ fontSize: 13, color: MUTE, marginTop: 4, marginBottom: 20 }}>
@@ -829,7 +829,7 @@ export default function WorksheetAssign() {
             The link this table has never had written to it. Three screens have been sitting in
             their "no round linked" branch for want of this control. */}
         <div style={CARD}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.25rem', color: INK, marginBottom: 6 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', color: INK, marginBottom: 6 }}>
             Survey round
           </div>
 
@@ -995,7 +995,7 @@ export default function WorksheetAssign() {
 
         {/* ── contributors ──────────────────────────────────────────────────────────────────── */}
         <div style={CARD}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.25rem', color: INK, marginBottom: 6 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', color: INK, marginBottom: 6 }}>
             Who is determining what
           </div>
           <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.8, marginBottom: 16 }}>
@@ -1143,7 +1143,7 @@ export default function WorksheetAssign() {
         {/* ── assignment ────────────────────────────────────────────────────────────────────── */}
         {!noVersion && scope.length > 0 && (
           <div style={CARD}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.25rem', color: INK, marginBottom: 6 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', color: INK, marginBottom: 6 }}>
               Divide the sub-topics
             </div>
             <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.8, marginBottom: 6 }}>
@@ -1212,7 +1212,7 @@ export default function WorksheetAssign() {
               <div key={g.code} style={{ marginBottom: 20 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
                               gap: 10, paddingBottom: 6, borderBottom: `1px solid ${LINE}`, marginBottom: 8 }}>
-                  <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', color: INK }}>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', color: INK }}>
                     {g.label} <span style={{ fontSize: 11, color: MUTE }}>{g.code}</span>
                   </div>
                   <button
@@ -1281,7 +1281,7 @@ export default function WorksheetAssign() {
             offered where it is possible, with NO claim that it is needed — because we cannot know.
             Making that claim requires snapshotting determinations too, which is its own design. */}
         <div style={CARD}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.25rem', color: INK, marginBottom: 6 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', color: INK, marginBottom: 6 }}>
             Finalise this assessment
           </div>
 
@@ -1380,7 +1380,7 @@ export default function WorksheetAssign() {
           actually returned, so the two can be compared rather than assumed equal. */}
       {confirmMove && (
         <Modal>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', color: INK, marginBottom: 10 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: INK, marginBottom: 10 }}>
             Move {confirmMove.moves.length} {confirmMove.moves.length === 1 ? 'sub-topic' : 'sub-topics'} to {confirmMove.toLabel}?
           </div>
           <div style={{ fontSize: 13, color: MID, lineHeight: 1.8 }}>
@@ -1412,7 +1412,7 @@ export default function WorksheetAssign() {
 
       {confirmRevoke && (
         <Modal>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', color: INK, marginBottom: 10 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: INK, marginBottom: 10 }}>
             Withdraw {label(confirmRevoke)}’s access?
           </div>
           <div style={{ fontSize: 13, color: MID, lineHeight: 1.8 }}>

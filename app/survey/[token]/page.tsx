@@ -608,7 +608,7 @@ export default function StakeholderSurvey() {
 
   if (deadLink) return shell(
     <div style={{ textAlign: 'center' }}>
-      <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 10 }}>This survey link is no longer active</div>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 10 }}>This survey link is no longer active</div>
       <div style={{ fontSize: 14, color: '#555553', lineHeight: 1.7 }}>
         It may have expired, it may have been withdrawn, or the survey may already have been
         submitted from this link. This page is not told which.
@@ -622,7 +622,7 @@ export default function StakeholderSurvey() {
   // Anything that is NOT the token gate. The actual message is shown rather than paraphrased.
   if (loadError) return shell(
     <div>
-      <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 10 }}>This survey could not be opened</div>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 10 }}>This survey could not be opened</div>
       <div style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, marginBottom: 14 }}>
         The link itself is valid. Something else stopped the survey loading, and this is what the
         server reported:
@@ -640,7 +640,7 @@ export default function StakeholderSurvey() {
   if (submitted) return shell(
     <div style={{ textAlign: 'center' }}>
       <div style={{ width: 64, height: 64, borderRadius: '50%', background: GREEN_BG, color: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', fontSize: 28 }}>✓</div>
-      <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', color: '#0d0d0d', marginBottom: 10 }}>Thank you</div>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', color: '#0d0d0d', marginBottom: 10 }}>Thank you</div>
       <div style={{ fontSize: 14, color: '#555553', lineHeight: 1.7 }}>
         Your responses for <strong>{round?.name}</strong> have been submitted to {companyInline}.
       </div>
@@ -710,7 +710,7 @@ export default function StakeholderSurvey() {
         {/* How this works. The scale is explained ONCE, here, so each question can render four
             visually equal options with no per-question commentary tilting the choice. */}
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '1.5rem 1.75rem', marginBottom: 20 }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.35rem', color: '#0d0d0d', marginBottom: 10 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.35rem', color: '#0d0d0d', marginBottom: 10 }}>
             {introHeading}
           </div>
 
@@ -773,7 +773,7 @@ export default function StakeholderSurvey() {
         {groups.map((group, gi) => (
           <div key={`${group.label}-${gi}`} id={`survey-group-${gi}`} style={{ marginBottom: 28, scrollMarginTop: 130 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 12, paddingBottom: 8, borderBottom: '0.5px solid #e8e7e4' }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d' }}>{group.label}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#0d0d0d' }}>{group.label}</div>
               <div style={{ fontSize: 11.5, color: '#888784' }}>
                 {group.questions.filter(q => saved[q.question_id] !== undefined).length} of {group.questions.length}
               </div>
@@ -939,7 +939,7 @@ export default function StakeholderSurvey() {
             at the foot of the page: it sits in its own card, immediately before Submit, at the same
             visual weight as a question. */}
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '1.5rem 1.75rem', marginTop: 8, marginBottom: 16 }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>
             One last question
           </div>
           <div style={{ fontSize: 15, fontWeight: 500, color: '#0d0d0d', lineHeight: 1.5, marginBottom: 4 }}>
@@ -988,7 +988,7 @@ export default function StakeholderSurvey() {
 
         {/* Submit */}
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '1.5rem 1.75rem', marginTop: 8 }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 10 }}>Submit your responses</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 10 }}>Submit your responses</div>
 
           {/* One-way, said BEFORE the button rather than in a confirm dialog after it. survey_submit
               refuses a second call and there is no unlock path — 20260821 makes that a database

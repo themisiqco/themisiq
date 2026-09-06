@@ -160,7 +160,7 @@ export default function DealsListPage() {
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Deals &amp; Investment</div>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>Your targets</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>Your targets</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
             {/* Hidden until there is something to export — an export button on an empty list
@@ -201,7 +201,7 @@ export default function DealsListPage() {
 
         {!loading && !error && rows.length === 0 && (
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '3rem 2rem', textAlign: 'center' }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 8 }}>No deals yet</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 8 }}>No deals yet</div>
             <p style={{ fontSize: 13, color: '#888784', lineHeight: 1.6, maxWidth: 460, margin: '0 auto 20px' }}>
               Start a deal to screen a target company: tell us its sector, where it operates and how big it is,
               and you&rsquo;ll get the ESG risks to raise, the reporting rules that apply to it, and an estimate

@@ -14,6 +14,7 @@ import { supabase } from '../../../lib/supabase'
 // user walled" or "may they see results" has reintroduced the drift the extraction removed.
 import { resolveWizardGate, type FreeTierDeal, type SessionState } from '../../../lib/deals/gates'
 import { saveDealDraft, takeDealDraft } from '../../../lib/deals/draft'
+import { sectionHead } from '@/app/components/headingStyles'
 import {
   getObligations, getApplicableFrameworks, getFrameworkApplicability, getComplianceCost,
   sectorRisks, DEFAULT_PIPELINE_TARGETS, DEAL_CURRENCIES, JURISDICTIONS,
@@ -53,7 +54,6 @@ const SECTORS = [
 const GRAD = 'var(--color-brand)'
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
-const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.4rem, 2.5vw, 1.8rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
 const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
 
 const SEVERITY_CONFIG = {
@@ -559,7 +559,7 @@ function DealsDashboardInner() {
   // fine. It closes over `deal`, so hoisting it out of the component is not free either.
   const signInPrompt = () => (
     <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '2rem', textAlign: 'center' as const, marginBottom: 20 }}>
-      <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 8 }}>Sign in to see your results</div>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 8 }}>Sign in to see your results</div>
       <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, maxWidth: 460, margin: '0 auto 18px' }}>
         Screening one target is free. Everything you have entered is kept — signing in brings you
         straight back to this deal with the figures still in place.
@@ -812,7 +812,7 @@ function DealsDashboardInner() {
              one, and silence would read as a clean bill of health. Neither is true: we simply have
              nothing pre-written for this sector. */
           <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '1.75rem 2rem', fontSize: 13, color: '#555553', lineHeight: 1.7 }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', color: '#0d0d0d', marginBottom: 8 }}>No standard findings for this sector</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', color: '#0d0d0d', marginBottom: 8 }}>No standard findings for this sector</div>
             We keep a set of common ESG risks for each sector, and &ldquo;{deal.sector}&rdquo; isn&rsquo;t one of them, so
             there is nothing pre-written to show here. <strong style={{ fontWeight: 600 }}>That is not a finding that this target has no
             ESG risks.</strong> If one of the listed sectors is close to what it does, choosing it in{' '}
@@ -854,7 +854,7 @@ function DealsDashboardInner() {
                 : []),
             ].map(({ label, count, color, bg }) => (
               <div key={label} style={{ background: bg, borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', fontWeight: 400, color }}>{count}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 400, color }}>{count}</div>
                 <div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>{label}</div>
               </div>
             ))}
@@ -939,12 +939,12 @@ function DealsDashboardInner() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div>
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>Traditional consultant</div>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.9rem', fontWeight: 400, color: '#fff', lineHeight: 1.1 }}>{consultantRange}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.9rem', fontWeight: 400, color: '#fff', lineHeight: 1.1 }}>{consultantRange}</div>
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>first-year, billed by the hour</div>
               </div>
               <div style={{ borderLeft: '0.5px solid rgba(255,255,255,0.12)', paddingLeft: 16 }}>
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>With ThemisIQ</div>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.9rem', fontWeight: 400, color: '#64fe3e', lineHeight: 1.1 }}>{themisIqFigure}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.9rem', fontWeight: 400, color: '#64fe3e', lineHeight: 1.1 }}>{themisIqFigure}</div>
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>{includedModulesLabel}</div>
               </div>
             </div>
@@ -1055,7 +1055,7 @@ function DealsDashboardInner() {
           ].map(({ label, val, urgent }) => (
             <div key={label}>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>{label}</div>
-              <div style={{ fontSize: typeof val === 'number' ? '1.6rem' : '1rem', fontFamily: typeof val === 'number' ? 'Georgia, serif' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 600, color: urgent ? '#64fe3e' : '#fff', lineHeight: 1.2 }}>{val}</div>
+              <div style={{ fontSize: typeof val === 'number' ? '1.6rem' : '1rem', fontFamily: typeof val === 'number' ? 'var(--font-display)' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 600, color: urgent ? '#64fe3e' : '#fff', lineHeight: 1.2 }}>{val}</div>
             </div>
           ))}
         </div>
@@ -1228,7 +1228,7 @@ function DealsDashboardInner() {
               never-purchased copy would invite them to buy a module they already own. 'unknown' gets
               neither claim: the entitlement read failed, so nothing about their account was
               established and an error that guesses at a cause eventually names the wrong one. */}
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.5rem', fontWeight: 400, color: '#fff', marginBottom: 10 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 400, color: '#fff', marginBottom: 10 }}>
             {gate.reason === 'free-deal-used' ? 'You have used your free deal'
               : gate.reason === 'expired' ? 'Your Deals access has expired.'
               : 'We could not confirm your access.'}
@@ -1300,7 +1300,7 @@ function DealsDashboardInner() {
                 lands. Same treatment as GHG trends' "← Back to GHG inventory". */}
             <a href="/dashboard/deals/list" style={{ fontSize: 13, fontWeight: 600, color: '#7425e3', textDecoration: 'none', display: 'inline-block', marginBottom: 8 }}>← Your targets</a>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Deals & Investment</div>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>ESG Deal Due Diligence</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>ESG Deal Due Diligence</div>
           </div>
           {deal.target_name && <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{deal.target_name}</div>}
         </div>

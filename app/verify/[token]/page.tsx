@@ -373,7 +373,7 @@ export default function VerifierPage() {
     return (
       <Shell>
         <div style={{ maxWidth: 540, margin: '4rem auto', textAlign: 'center', padding: '0 1.5rem' }}>
-          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>Link invalid or expired</h1>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>Link invalid or expired</h1>
           <p style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, fontWeight: 400 }}>This verification link is no longer valid. It may have expired or been revoked. Please contact the company that shared it with you to request a new link.</p>
         </div>
       </Shell>
@@ -410,7 +410,7 @@ export default function VerifierPage() {
       <Shell>
         <div style={{ maxWidth: 540, margin: '3.5rem auto', padding: '0 1.5rem' }}>
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Independent Verification Review</div>
-          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.6rem,3vw,2rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>Confirm your details to continue</h1>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.6rem,3vw,2rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>Confirm your details to continue</h1>
           <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.7, marginBottom: '1.75rem' }}>
             You&rsquo;ve been invited to review {gateCompany ? <>the GHG inventory for <strong style={{ fontWeight: 500, color: '#0d0d0d' }}>{gateCompany}</strong></> : 'a GHG inventory'} for independent assurance. Please confirm your email and agree to the Terms and Privacy Policy to proceed.
           </p>
@@ -489,7 +489,7 @@ export default function VerifierPage() {
         </div>
 
         <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Independent Verification Review</div>
-        <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem,3vw,2.4rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{inv.company_name || 'GHG Inventory'}</h1>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem,3vw,2.4rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{inv.company_name || 'GHG Inventory'}</h1>
         {/* GWP basis sits with the other inventory-level qualifiers, above the figures it qualifies.
             ISO 14064-3 7.1.4.9(b) requires the verifier to confirm the GWP set used, so its ABSENCE
             has to be visible too — a missing basis reads as "not stated", never as a silent omission.
@@ -993,12 +993,12 @@ function Shell({ children }: { children: React.ReactNode }) {
   )
 }
 function SectionHead({ children }: { children: React.ReactNode }) {
-  return <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: '1rem' }}>{children}</h2>
+  return <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: '1rem' }}>{children}</h2>
 }
 function Stat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '14px', textAlign: 'center' }}>
-      <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.5rem', color, marginBottom: 2 }}>{value}</div>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', color, marginBottom: 2 }}>{value}</div>
       <div style={{ fontSize: 10, color: '#888784' }}>{label}</div>
     </div>
   )

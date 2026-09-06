@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useEntitlement } from '../../../lib/useEntitlement'
 import Nav from '../../components/Nav'
+import { sectionHead } from '@/app/components/headingStyles'
 import {
   AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED, AI_ACT_CITATION,
 } from '../../../lib/aiAct'
@@ -165,7 +166,6 @@ const fromLibrary = (lib: typeof AI_SYSTEM_LIBRARY[0]): AISystem => {
 const GRAD = 'var(--color-brand)'
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
-const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.4rem, 2.5vw, 1.8rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
 const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
 
 const RISK_CONFIG: Record<RiskLevel, { label: string; color: string; bg: string; border: string }> = {
@@ -501,7 +501,7 @@ export default function AIGovernanceDashboard() {
               { label: 'Minimal risk', count: minimalRisk, color: '#0F6E56', bg: '#E1F5EE' },
             ].map(({ label, count, color, bg }) => (
               <div key={label} style={{ background: bg, borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color }}>{count}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color }}>{count}</div>
                 <div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>{label}</div>
               </div>
             ))}
@@ -562,7 +562,7 @@ export default function AIGovernanceDashboard() {
           ].map(({ label, val, urgent }) => (
             <div key={label}>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>{label}</div>
-              <div style={{ fontSize: typeof val === 'number' ? '1.6rem' : '0.85rem', fontFamily: typeof val === 'number' ? 'Georgia, serif' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 500, color: urgent ? '#64fe3e' : '#fff', lineHeight: 1.2 }}>{val}</div>
+              <div style={{ fontSize: typeof val === 'number' ? '1.6rem' : '0.85rem', fontFamily: typeof val === 'number' ? 'var(--font-display)' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 500, color: urgent ? '#64fe3e' : '#fff', lineHeight: 1.2 }}>{val}</div>
             </div>
           ))}
         </div>
@@ -603,7 +603,7 @@ export default function AIGovernanceDashboard() {
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>AI Governance</div>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>EU AI Act Inventory & Gap Assessment</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>EU AI Act Inventory & Gap Assessment</div>
           </div>
           <div style={{ fontSize: 12, color: '#888784' }}>{inventory.company && <span style={{ fontWeight: 500, color: '#0d0d0d' }}>{inventory.company} · </span>}Regulation (EU) 2024/1689</div>
         </div>

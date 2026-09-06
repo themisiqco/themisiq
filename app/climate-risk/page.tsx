@@ -5,6 +5,7 @@ import { SB261_TABLE_STATUS } from '@/lib/sb261'
 import { IFRS_S2_ADOPTION_COUNT, IFRS_S2_ADOPTION_SOURCE } from '@/lib/ifrsS2'
 import Footer from '@/app/components/Footer'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
+import { sectionTitle } from '@/app/components/headingStyles'
 export default function Page() {
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d' }}>
@@ -22,7 +23,7 @@ export default function Page() {
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
           <div>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>ThemisIQ Climate</div>
-            <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
               Climate Risk<br />
               <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Intelligence</span>
             </h1>
@@ -51,7 +52,7 @@ export default function Page() {
               { val: '2', unit: 'risk types', label: 'physical & transition', source: null, color: '#0F6E56', bg: '#E1F5EE' },
             ].map(({ val, unit, label, source, color, bg }) => (
               <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid color-mix(in srgb, ${color} 13%, transparent)` }}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '2.2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color, marginTop: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{unit}</div>
                 <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{label}</div>
                 {source && <div style={{ fontSize: 11, color: '#888784', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{source}</div>}
@@ -62,27 +63,27 @@ export default function Page() {
       </section>
 
       {/* WHO'S ASKING — demand drivers */}
-      <section style={{ background: '#0d0d0d', padding: '4rem 2.5rem' }}>
+      <section className="tq-band-bleed" style={{ padding: '4rem 2.5rem' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ marginBottom: '2.5rem', maxWidth: 620 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>Why companies do this</div>
-            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-ink-2)', marginBottom: 8 }}>Why companies do this</div>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem' }}>
               Regulation is only part of the story.
             </h2>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 400 }}>
+            <p style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.75, fontWeight: 400 }}>
               Most climate risk reporting isn&apos;t triggered by a law at all — it&apos;s triggered by someone you answer to. Climate risk has become a standard part of how capital, credit, and commercial relationships are evaluated.
             </p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
             {[
-              { who: 'Investors', desc: 'Institutional investors and PE/VC backers increasingly require TCFD- or IFRS S2-aligned climate risk disclosure as part of diligence and ongoing portfolio monitoring. PRI signatories ask portfolio companies directly.', color: '#7425e3' },
-              { who: 'Banks & lenders', desc: 'Climate risk assessment is now routine in credit decisions and loan covenants. Lenders need to understand the physical and transition risk on their books — and they push that requirement down to borrowers.', color: '#1fb1ff' },
-              { who: 'Boards & audit committees', desc: 'Directors carry oversight duty for material climate risk. A structured assessment gives the board the documented risk picture they need — and protects them if exposure is later questioned.', color: '#64fe3e' },
-              { who: 'Customers & supply chain', desc: 'Large buyers cascade their own climate commitments down to suppliers. A credible risk assessment is increasingly a condition of winning or keeping enterprise contracts.', color: '#ba7517' },
+              { who: 'Investors', desc: 'Institutional investors and PE/VC backers increasingly require TCFD- or IFRS S2-aligned climate risk disclosure as part of diligence and ongoing portfolio monitoring. PRI signatories ask portfolio companies directly.', color: 'var(--color-module-deals)' },
+              { who: 'Banks & lenders', desc: 'Climate risk assessment is now routine in credit decisions and loan covenants. Lenders need to understand the physical and transition risk on their books — and they push that requirement down to borrowers.', color: 'var(--color-module-cbam)' },
+              { who: 'Boards & audit committees', desc: 'Directors carry oversight duty for material climate risk. A structured assessment gives the board the documented risk picture they need — and protects them if exposure is later questioned.', color: 'var(--color-module-ai)' },
+              { who: 'Customers & supply chain', desc: 'Large buyers cascade their own climate commitments down to suppliers. A credible risk assessment is increasingly a condition of winning or keeping enterprise contracts.', color: 'var(--color-module-climate)' },
             ].map(({ who, desc, color }) => (
-              <div key={who} style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '1.5rem' }}>
+              <div key={who} style={{ background: 'var(--color-paper)', border: '0.5px solid var(--color-line)', borderRadius: 12, padding: '1.5rem' }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color, marginBottom: 8 }}>{who}</div>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', fontWeight: 400, lineHeight: 1.6 }}>{desc}</div>
+                <div style={{ fontSize: 13, color: 'var(--color-ink-2)', fontWeight: 400, lineHeight: 1.6 }}>{desc}</div>
               </div>
             ))}
           </div>
@@ -129,7 +130,7 @@ export default function Page() {
             { role: 'High warming', warming: '~4.4°C', src: 'IPCC SSP5-8.5', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
           ].map(scn => (
             <div key={scn.role} style={{ background: scn.bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid color-mix(in srgb, ${scn.color} 13%, transparent)` }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color: scn.color, lineHeight: 1 }}>{scn.warming}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 400, color: scn.color, lineHeight: 1 }}>{scn.warming}</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', marginTop: 8 }}>{scn.role}</div>
               <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{scn.src}</div>
             </div>
@@ -251,7 +252,7 @@ export default function Page() {
           <div style={{ background: '#fff', border: '2px solid #0C447C', borderRadius: 14, overflow: 'hidden' }}>
             <div style={{ background: '#E6F1FB', padding: '1.25rem 1.5rem', borderBottom: '1px solid rgba(12,68,124,0.2)' }}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0C447C', marginBottom: 4 }}>IFRS S2 / ISSB sample</div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.25rem', color: '#0d0d0d' }}>Climate Resilience Analysis Report</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', color: '#0d0d0d' }}>Climate Resilience Analysis Report</div>
               <div style={{ fontSize: 12, color: '#555553', marginTop: 4 }}>Multi-scenario resilience · IFRS S2 · 8 pages</div>
               <div style={{ fontSize: 11, color: '#0C447C', fontWeight: 600, marginTop: 6 }}>From Climate Risk &amp; Materiality</div>
             </div>
@@ -267,7 +268,7 @@ export default function Page() {
           <div style={{ background: '#fff', border: '2px solid #1e1b4b', borderRadius: 14, overflow: 'hidden' }}>
             <div style={{ background: '#eef2ff', padding: '1.25rem 1.5rem', borderBottom: '1px solid rgba(30,27,75,0.2)' }}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1e1b4b', marginBottom: 4 }}>CSRD / ESRS sample</div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.25rem', color: '#0d0d0d' }}>Double Materiality Screening Report</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', color: '#0d0d0d' }}>Double Materiality Screening Report</div>
               <div style={{ fontSize: 12, color: '#555553', marginTop: 4 }}>Double materiality · 15 pages · with matrix</div>
               <div style={{ fontSize: 11, color: '#1e1b4b', fontWeight: 600, marginTop: 6 }}>From Climate Risk &amp; Materiality</div>
             </div>
@@ -355,7 +356,7 @@ export default function Page() {
             ].map(({ plan, price, cadence, features, featured }) => (
               <div key={plan} style={{ background: featured ? '#0d0d0d' : '#fff', borderRadius: 12, padding: '2rem', border: featured ? 'none' : '0.5px solid #e8e7e4' }}>
                 <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: featured ? 'rgba(255,255,255,0.4)' : '#888784', marginBottom: 8 }}>{plan}</div>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '2.4rem', fontWeight: 400, color: featured ? '#fff' : '#0d0d0d' }}>{price}<span style={{ fontSize: 14, fontWeight: 400, color: featured ? 'rgba(255,255,255,0.4)' : '#888784' }}>{cadence}</span></div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.4rem', fontWeight: 400, color: featured ? '#fff' : '#0d0d0d' }}>{price}<span style={{ fontSize: 14, fontWeight: 400, color: featured ? 'rgba(255,255,255,0.4)' : '#888784' }}>{cadence}</span></div>
                 <div style={{ height: '0.5px', background: featured ? 'rgba(255,255,255,0.1)' : '#e8e7e4', margin: '1.25rem 0' }} />
                 {features.map((f, i) => (
                   <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
@@ -374,7 +375,7 @@ export default function Page() {
 
       {/* CTA */}
       <section style={{ padding: '6rem 2.5rem', textAlign: 'center' }}>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
           Someone&apos;s going to ask.<br />
           <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Be ready.</span>
         </h2>
@@ -405,7 +406,6 @@ const ghostBtn: React.CSSProperties = {
   cursor: 'pointer', whiteSpace: 'nowrap', textDecoration: 'none', display: 'inline-block',
 }
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
-const sectionTitle: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }
 const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, margin: '0 auto', lineHeight: 1.75, fontWeight: 400 }
 // ⚠️ COPIED VERBATIM FROM app/materiality/page.tsx WITH THE CROSS-SELL SECTION ON 27 Aug 2026 —
 // the same move ghostBtn made with the sample cards on 26 Aug, and for the same reason. This page

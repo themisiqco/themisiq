@@ -294,7 +294,7 @@ export default function Determinations() {
   )
   if (loadError) return (
     <Shell><div style={CARD}>
-      <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: INK, marginBottom: 10 }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: INK, marginBottom: 10 }}>
         These could not be shown</div>
       <div style={{ fontSize: 13.5, color: MID, lineHeight: 1.75 }}>{loadError}</div>
     </div></Shell>
@@ -315,7 +315,7 @@ export default function Determinations() {
           <Link href={`/dashboard/materiality/worksheet/${assessmentId}/determine`} style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>Your own determinations</Link>
         </div>
 
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.7rem', color: INK }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: INK }}>
           {company || 'Determinations'}
         </div>
         <div style={{ fontSize: 13, color: MUTE, marginTop: 4, marginBottom: 20 }}>
@@ -337,7 +337,7 @@ export default function Determinations() {
 
         {groups.map(g => (
           <div key={g.code} style={{ marginBottom: 26 }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: INK,
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: INK,
                           paddingBottom: 6, borderBottom: `1px solid ${LINE}`, marginBottom: 12 }}>
               {g.label} <span style={{ fontSize: 11, color: MUTE }}>{g.code}</span>
             </div>
@@ -375,7 +375,7 @@ export default function Determinations() {
 
         {groups.length === 0 && (
           <div style={{ ...CARD, textAlign: 'center', padding: '2.5rem' }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: INK, marginBottom: 10 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: INK, marginBottom: 10 }}>
               Nothing assigned yet
             </div>
             <div style={{ fontSize: 13, color: MID, lineHeight: 1.8 }}>
@@ -466,7 +466,7 @@ function DeterminationRow({ dir, d, prior, category, contributor, onOverride }: 
       ) : (
         <div style={{ display: 'flex', gap: 14, alignItems: 'baseline', flexWrap: 'wrap',
                       marginBottom: 10 }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.5rem',
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem',
                         color: sev.material ? PURPLE : INK }}>
             {sev.severity.toFixed(2)}
           </div>
@@ -640,7 +640,7 @@ function OverridePanel({ state, setState, contributor, saving, error, onSave, on
                   alignItems: 'flex-start', justifyContent: 'center', padding: '2rem 1.5rem',
                   overflowY: 'auto', zIndex: 60 }}>
       <div style={{ background: '#fff', borderRadius: 16, padding: '1.8rem', maxWidth: 640, width: '100%' }}>
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: INK, marginBottom: 8 }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: INK, marginBottom: 8 }}>
           Record a different determination
         </div>
         <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.8, marginBottom: 16 }}>

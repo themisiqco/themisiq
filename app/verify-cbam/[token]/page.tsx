@@ -179,7 +179,7 @@ export default function CbamVerifierPage() {
           <ReadOnlyBanner />
 
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Independent CBAM Verification</div>
-          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.6rem,3vw,2rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.6rem,3vw,2rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>
             {verifierName ? `Welcome, ${verifierName}` : 'Confirm your details to continue'}
           </h1>
           <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.7, marginBottom: '1.75rem' }}>
@@ -255,7 +255,7 @@ export default function CbamVerifierPage() {
         <ReadOnlyBanner />
 
         <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Independent CBAM Verification</div>
-        <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem,3vw,2.4rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem,3vw,2.4rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>
           {installationName || 'CBAM Installation'}{reportingPeriod != null ? ` · ${reportingPeriod}` : ''}
         </h1>
         <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, marginBottom: '2rem' }}>
@@ -811,7 +811,7 @@ function InvalidScreen() {
   return (
     <Shell>
       <div style={{ maxWidth: 540, margin: '4rem auto', textAlign: 'center', padding: '0 1.5rem' }}>
-        <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>Link invalid or expired</h1>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>Link invalid or expired</h1>
         <p style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, fontWeight: 400 }}>This link is invalid or has expired. It may have been revoked. Please contact the company that shared it with you to request a new link.</p>
       </div>
       <Footer />
@@ -824,7 +824,7 @@ function ErrorScreen({ title, body }: { title: string; body: string }) {
   return (
     <Shell>
       <div style={{ maxWidth: 540, margin: '4rem auto', textAlign: 'center', padding: '0 1.5rem' }}>
-        <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>{title}</h1>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>{title}</h1>
         <p style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, fontWeight: 400 }}>{body}</p>
       </div>
       <Footer />
@@ -843,7 +843,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   )
 }
 function SectionHead({ children }: { children: React.ReactNode }) {
-  return <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: '1rem' }}>{children}</h2>
+  return <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: '1rem' }}>{children}</h2>
 }
 // Footer — CBAM-correct assurance citation (IR (EU) 2025/2546 + EN ISO/IEC 14065),
 // NOT the GHG page's ISO 14064-3 / ISAE 3410 wording.

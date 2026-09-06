@@ -2,6 +2,7 @@
 import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
+import { sectionTitle } from '@/app/components/headingStyles'
 
 export default function AdvisoryPage() {
   return (
@@ -12,7 +13,7 @@ export default function AdvisoryPage() {
       <section style={{ padding: '5rem 2.5rem 4rem', borderBottom: '0.5px solid #e8e7e4', background: '#f8f7f5' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={eyebrow}>ThemisIQ Advisory</div>
-          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2.4rem, 5vw, 3.6rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d', maxWidth: 700 }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.4rem, 5vw, 3.6rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d', maxWidth: 700 }}>
             Expert guidance.<br />
             <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Fixed fees.</span><br />
             Named advisors.
@@ -27,7 +28,7 @@ export default function AdvisoryPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, maxWidth: 600 }}>
             {[['30 min', 'Free initial consultation'], ['Fixed fees', 'No billable hours surprises'], ['Named advisor', 'Same person throughout']].map(([val, label]) => (
               <div key={label} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem', textAlign: 'center' as const }}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 4 }}>{val}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 4 }}>{val}</div>
                 <div style={{ fontSize: 11, color: '#888784' }}>{label}</div>
               </div>
             ))}
@@ -130,7 +131,7 @@ export default function AdvisoryPage() {
 
       {/* CTA */}
       <section className="tq-band-bleed" style={{ padding: '5rem 2.5rem', textAlign: 'center' }}>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1rem', lineHeight: 1.2 }}>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1rem', lineHeight: 1.2 }}>
           Book your free 30-minute<br />
           <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Advisory consultation.</span>
         </h2>
@@ -154,6 +155,5 @@ export default function AdvisoryPage() {
 const navLink: React.CSSProperties = { fontSize: 11, color: '#555553', textDecoration: 'none' }
 const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'var(--color-brand)', color: '#fff', textDecoration: 'none', display: 'inline-block' }
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
-const sectionTitle: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }
 const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, margin: '0 auto', lineHeight: 1.75, fontWeight: 400 }
  

@@ -251,7 +251,7 @@ export default function CampaignDetail() {
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
             <div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{campaign?.name}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{campaign?.name}</div>
               {campaign?.description && <div style={{ fontSize: 13, color: '#888784' }}>{campaign.description}</div>}
             </div>
             <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
@@ -285,7 +285,7 @@ export default function CampaignDetail() {
             { label: 'Awaiting response', val: invited, color: '#0C447C', bg: '#E6F1FB' },
           ].map(({ label, val, color, bg }) => (
             <div key={label} style={{ background: bg, border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem', textAlign: 'center' }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', fontWeight: 400, color }}>{val}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 400, color }}>{val}</div>
               <div style={{ fontSize: 11, color: '#888784', marginTop: 4 }}>{label}</div>
             </div>
           ))}
@@ -309,7 +309,7 @@ export default function CampaignDetail() {
         {showAdd && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
             <div style={{ background: '#fff', borderRadius: 16, padding: '2rem', width: '100%', maxWidth: 420 }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, color: '#0d0d0d', marginBottom: '1.25rem' }}>Add supplier</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 400, color: '#0d0d0d', marginBottom: '1.25rem' }}>Add supplier</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div>
                   <label style={labelStyle}>Company name</label>

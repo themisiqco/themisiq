@@ -92,7 +92,7 @@ export default function TrustPage() {
       <section style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '4rem 2.5rem 3rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 12 }}>ThemisIQ · Trust & Data</div>
-          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1.25rem', color: '#0d0d0d' }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1.25rem', color: '#0d0d0d' }}>
             We know trust is everything.<br />
             <em style={{ background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Here is exactly how we earn it.</em>
           </h1>
@@ -178,7 +178,7 @@ export default function TrustPage() {
 
         {/* Contact */}
         <div className="tq-band" style={{ borderRadius: 14, padding: '2rem', textAlign: 'center' as const }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, marginBottom: 8 }}>Questions about your data?</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, marginBottom: 8 }}>Questions about your data?</div>
           <div style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: 20, lineHeight: 1.6 }}>
             Contact our privacy team at <a href="mailto:privacy@themisiq.co" style={{ color: 'var(--color-brand)', textDecoration: 'none' }}>privacy@themisiq.co</a>. We respond within 2 business days. For data deletion requests, we act within 30 days.
           </div>

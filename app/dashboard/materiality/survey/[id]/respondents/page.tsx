@@ -247,7 +247,7 @@ export default function SurveyRespondents() {
       <Nav />
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '2rem' }}>
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '2rem' }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: '#0d0d0d', marginBottom: 10 }}>This round could not be opened</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: '#0d0d0d', marginBottom: 10 }}>This round could not be opened</div>
           <div style={{ fontSize: 13.5, color: '#555553', lineHeight: 1.7 }}>{loadError}</div>
         </div>
       </div>
@@ -267,7 +267,7 @@ export default function SurveyRespondents() {
           <Link href={`/dashboard/materiality/survey/${roundId}/scope`} style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none' }}>Topics in scope</Link>
         </div>
 
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.7rem', color: '#0d0d0d' }}>Who is being asked</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: '#0d0d0d' }}>Who is being asked</div>
         {/* Company first, round name labelled — see the note on the import screen. */}
         <div style={{ fontSize: 13.5, color: '#555553', lineHeight: 1.7, marginTop: 6, maxWidth: 640 }}>
           {round?.company_name || 'This survey'}
@@ -300,7 +300,7 @@ export default function SurveyRespondents() {
         {/* Add */}
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '1.5rem 1.75rem', marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d' }}>Add a respondent</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#0d0d0d' }}>Add a respondent</div>
             {/* The one-at-a-time form below is unchanged; this only points at the bulk paths. */}
             <Link href={`/dashboard/materiality/survey/${roundId}/respondents/import`}
               style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none' }}>
@@ -384,7 +384,7 @@ export default function SurveyRespondents() {
         {/* List */}
         {people.length === 0 ? (
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '2.5rem', textAlign: 'center' }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>Nobody added yet</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>Nobody added yet</div>
             <div style={{ fontSize: 13, color: '#888784', lineHeight: 1.7, maxWidth: 460, margin: '0 auto' }}>
               Add the people you want to hear from. A mix of internal staff and people outside the
               organisation gives the engagement record ESRS 2 SBM-2 asks for.

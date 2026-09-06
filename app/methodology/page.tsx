@@ -341,7 +341,7 @@ export default function MethodologyPage() {
       <section style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '4rem 2.5rem 3rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 12 }}>ThemisIQ · Methodologies</div>
-          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1.25rem', color: '#0d0d0d' }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1.25rem', color: '#0d0d0d' }}>
             How ThemisIQ calculates,<br />
             <em style={{ background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>classifies and reports.</em>
           </h1>
@@ -371,7 +371,7 @@ export default function MethodologyPage() {
             <div key={method.module} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
               <div style={{ background: method.bg, padding: '1.5rem 2rem', borderBottom: `1px solid color-mix(in srgb, ${method.color} 13%, transparent)` }}>
                 <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: method.color, marginBottom: 6 }}>Module methodology</div>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{method.module}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{method.module}</div>
                 <div style={{ fontSize: 12, color: '#555553', fontWeight: 500 }}>{method.standard}</div>
               </div>
               <div style={{ padding: '1.5rem 2rem' }}>
@@ -426,7 +426,7 @@ export default function MethodologyPage() {
 
         {/* CTA */}
         <div className="tq-band" style={{ marginTop: '2rem', borderRadius: 14, padding: '2rem', textAlign: 'center' as const }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, marginBottom: 8 }}>Questions about our methodologies?</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, marginBottom: 8 }}>Questions about our methodologies?</div>
           <div style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: 20 }}>Our team includes practitioners who have applied these frameworks in real reporting contexts.</div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
             <a href="/trust" style={{ fontSize: 13, fontWeight: 500, padding: '10px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none' }}>How we handle your data →</a>

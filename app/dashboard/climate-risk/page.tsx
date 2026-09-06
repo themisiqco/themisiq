@@ -6,6 +6,7 @@ import { useEntitlement } from '../../../lib/useEntitlement'
 import { stepBlockers, canAdvanceStep, outstandingText, type BlockerField }
   from '../../../lib/climate/wizardSteps'
 import Nav from '../../components/Nav'
+import { sectionHead } from '@/app/components/headingStyles'
 // resolveTopicLabels is the SAME pure function /api/materiality uses at write time. Importing it
 // here rather than reimplementing the overlay is the point: the wizard and the write path cannot
 // disagree about which name belongs to which version, or about what counts as a fallback.
@@ -29,7 +30,6 @@ import {
 
 // ─── Design tokens (matching the live climate page) ───────────────────────────
 const GRAD = 'var(--color-brand)'
-const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.4rem, 2.5vw, 1.8rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
 const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
@@ -485,7 +485,7 @@ export default function MaterialityWizard() {
         <Nav />
         <div style={{ maxWidth: 900, margin: '0 auto', padding: '2.5rem 2.5rem' }}>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Climate Risk &amp; Materiality</div>
-          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Which assessment do you need?</h1>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Which assessment do you need?</h1>
           <p style={{ ...sectionSub, marginBottom: 24 }}>Assess your climate-related physical and transition risk, and determine what's material under your reporting standard. Double materiality adds impact materiality to single (financial) materiality. Choose the standard you report under.</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'stretch' }}>
             {[
@@ -1026,10 +1026,10 @@ export default function MaterialityWizard() {
 
         {/* count cards */}
         <div style={{ display: 'grid', gridTemplateColumns: mode === 'csrd' ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
-          <div style={{ background: '#FCEBEB', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color: '#B91C1C' }}>{s.physicalHigh ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>High physical risks</div></div>
-          <div style={{ background: '#FEF3E2', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color: 'var(--color-module-climate)' }}>{s.transitionHigh ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>High transition risks</div></div>
-          <div style={{ background: '#E1F5EE', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color: '#0F6E56' }}>{s.opportunitiesStrong ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>Strong opportunities</div></div>
-          {mode === 'csrd' && <div style={{ background: '#EDE9FE', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color: '#7425e3' }}>{s.topicsBothAxes ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>Topics material on both axes</div></div>}
+          <div style={{ background: '#FCEBEB', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color: '#B91C1C' }}>{s.physicalHigh ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>High physical risks</div></div>
+          <div style={{ background: '#FEF3E2', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color: 'var(--color-module-climate)' }}>{s.transitionHigh ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>High transition risks</div></div>
+          <div style={{ background: '#E1F5EE', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color: '#0F6E56' }}>{s.opportunitiesStrong ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>Strong opportunities</div></div>
+          {mode === 'csrd' && <div style={{ background: '#EDE9FE', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color: '#7425e3' }}>{s.topicsBothAxes ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>Topics material on both axes</div></div>}
         </div>
 
         {isPaid ? (
@@ -1050,7 +1050,7 @@ export default function MaterialityWizard() {
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
               <div className="tq-band" style={{ borderRadius: 16, padding: '2rem 1.75rem', maxWidth: 420, textAlign: 'center' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-2)', marginBottom: 12 }}>Preview</div>
-                <h3 style={{ fontFamily: 'Georgia, serif', fontWeight: 400, fontSize: '1.4rem', margin: '0 0 10px', lineHeight: 1.3 }}>Unlock your full assessment</h3>
+                <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 400, fontSize: '1.4rem', margin: '0 0 10px', lineHeight: 1.3 }}>Unlock your full assessment</h3>
                 <p style={{ fontSize: 13, fontWeight: 400, color: 'var(--color-ink-2)', lineHeight: 1.6, margin: '0 0 20px' }}>You can see your headline results above. Unlock the Climate Risk module to view the full materiality matrix, topic-by-topic scores, risk register, and download the report.</p>
                 <a href="/pricing" style={{ display: 'inline-block', padding: '11px 26px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>See pricing &amp; unlock &rarr;</a>
               </div>
@@ -1308,7 +1308,7 @@ export default function MaterialityWizard() {
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Climate Risk &amp; Materiality</div>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>{mode === 'csrd' ? 'CSRD double materiality' : 'IFRS S2 single materiality'}</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>{mode === 'csrd' ? 'CSRD double materiality' : 'IFRS S2 single materiality'}</div>
           </div>
           {/* setStandardVersion(null) is not optional here. Returning to the mode gate must clear
               the version, or the next assessment silently inherits this one's — and it would

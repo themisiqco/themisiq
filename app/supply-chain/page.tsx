@@ -4,6 +4,7 @@ import Footer from '@/app/components/Footer'
 import { FLAT_MODULE_PRICES } from '../../lib/pricing'
 import { CS3D_APPLIES_FROM, CS3D_EMPLOYEE_THRESHOLD, CS3D_TURNOVER_THRESHOLD } from '../../lib/cs3d'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
+import { sectionTitle } from '@/app/components/headingStyles'
 
 export default function Page() {
   // Price from the single source of truth, formatted as app/cbam/page.tsx does.
@@ -17,7 +18,7 @@ export default function Page() {
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
           <div>
             <div style={eyebrow}>Supply Chain & Sustainable Procurement</div>
-            <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
              Supply Chain & <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Sustainable Procurement</span>
             </h1>
             <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem', maxWidth: 480 }}>
@@ -45,7 +46,7 @@ export default function Page() {
               { val: '$2,900', unit: 'portal/yr', label: 'vs $15,000–$50,000 for EcoVadis supplier outreach — same outcome', color: '#0C447C', bg: '#E6F1FB' },
             ].map(({ val, unit, label, color, bg }) => (
               <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid color-mix(in srgb, ${color} 13%, transparent)` }}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color, marginTop: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{unit}</div>
                 <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{label}</div>
               </div>
@@ -55,14 +56,14 @@ export default function Page() {
       </section>
 
       {/* CS3D CALLOUT */}
-      <section style={{ background: '#0d0d0d', padding: '4rem 2.5rem' }}>
+      <section className="tq-band-bleed" style={{ padding: '4rem 2.5rem' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>EU CS3D — Corporate Sustainability Due Diligence</div>
-            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-ink-2)', marginBottom: 8 }}>EU CS3D — Corporate Sustainability Due Diligence</div>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem' }}>
               Civil liability for supply chain failures.<br />Start preparing now.
             </h2>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
               {/* "Large companies" scoped nothing a reader could check, and (EU) 2026/470 raised the
                   limbs fivefold on headcount — so the word now means something far narrower than when
                   this copy was written. Both limbs, and the AND, stated so a non-lawyer can self-assess. */}
@@ -70,13 +71,13 @@ export default function Page() {
             </p>
             {['Human rights due diligence (HRDD) across full value chain', 'Accessible grievance mechanisms for value chain workers', 'Risk-based supplier prioritisation and monitoring', 'Civil liability for failures — not just regulatory fines', 'ESRS G1 and S2 disclosure integration'].map((item, i) => (
               <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
-                <span style={{ color: '#64fe3e', flexShrink: 0, marginTop: 2 }}>✓</span>
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 400, lineHeight: 1.5 }}>{item}</span>
+                <span style={{ color: 'var(--color-module-ai)', flexShrink: 0, marginTop: 2 }}>✓</span>
+                <span style={{ fontSize: 13, color: 'var(--color-ink-2)', fontWeight: 400, lineHeight: 1.5 }}>{item}</span>
               </div>
             ))}
           </div>
-          <div style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: '2rem' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 16 }}>Key supply chain frameworks</div>
+          <div style={{ background: 'var(--color-paper)', border: '0.5px solid var(--color-line)', borderRadius: 16, padding: '2rem' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--color-ink-2)', marginBottom: 16 }}>Key supply chain frameworks</div>
             {[
               { fw: 'EU CS3D', scope: 'Human rights + environmental HRDD', deadline: `${CS3D_APPLIES_FROM} (large companies)`, urgency: 'critical' },
               { fw: 'ESRS S2', scope: 'Value chain workers', deadline: 'FY2024 (large EU)', urgency: 'critical' },
@@ -85,15 +86,15 @@ export default function Page() {
               { fw: 'Modern Slavery Act', scope: 'UK + Australia transparency statement', deadline: 'Annual', urgency: 'medium' },
               { fw: 'EcoVadis', scope: 'Supplier sustainability ratings', deadline: 'Customer-requested', urgency: 'medium' },
             ].map(({ fw, scope, deadline, urgency }) => {
-              const color = urgency === 'critical' ? '#B91C1C' : urgency === 'high' ? '#ba7517' : '#888784'
+              const color = urgency === 'critical' ? '#B91C1C' : urgency === 'high' ? 'var(--color-module-climate)' : 'var(--color-ink-muted)'
               return (
-                <div key={fw} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '0.5px solid rgba(255,255,255,0.07)' }}>
+                <div key={fw} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '0.5px solid var(--color-line)' }}>
                   <div style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0, marginTop: 5 }} />
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: '#fff', marginBottom: 2 }}>{fw}</div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{scope}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{fw}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-ink-2)' }}>{scope}</div>
                   </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', flexShrink: 0, textAlign: 'right' as const }}>{deadline}</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-ink-2)', flexShrink: 0, textAlign: 'right' as const }}>{deadline}</div>
                 </div>
               )
             })}
@@ -139,7 +140,7 @@ export default function Page() {
               ['04', 'Feed your Scope 3', 'Pull supplier-reported Category 1 emissions into your GHG inventory, with spend-based gap-fill for non-responders. You review the full breakdown before it\'s applied.'],
             ].map(([num, title, desc]) => (
               <div key={num}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '2.5rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', opacity: 0.5, marginBottom: '0.75rem' }}>{num}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', opacity: 0.5, marginBottom: '0.75rem' }}>{num}</div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: '0.5rem' }}>{title}</div>
                 <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
               </div>
@@ -150,7 +151,7 @@ export default function Page() {
 
       {/* CTA */}
       <section style={{ padding: '6rem 2.5rem', textAlign: 'center' }}>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
           CS3D applies from {CS3D_APPLIES_FROM}.<br />
           <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Start building now.</span>
         </h2>
@@ -176,5 +177,4 @@ const navLink: React.CSSProperties = { fontSize: 11, color: '#555553', textDecor
 const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'var(--color-brand)', color: '#fff', textDecoration: 'none', display: 'inline-block' }
 const btnOutline: React.CSSProperties = { fontSize: 13, fontWeight: 400, padding: '8px 18px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', textDecoration: 'none', display: 'inline-block' }
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
-const sectionTitle: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }
 const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, margin: '0 auto', lineHeight: 1.75, fontWeight: 400 }

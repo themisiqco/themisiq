@@ -554,7 +554,7 @@ export default function LeadDetermine() {
   )
   if (loadError) return (
     <Shell><div style={{ background: '#fff', border: `0.5px solid ${LINE}`, borderRadius: 16, padding: '2rem' }}>
-      <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: INK, marginBottom: 10 }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: INK, marginBottom: 10 }}>
         This could not be opened</div>
       <div style={{ fontSize: 13.5, color: MID, lineHeight: 1.75 }}>{loadError}</div>
     </div></Shell>
@@ -571,7 +571,7 @@ export default function LeadDetermine() {
           <Link href={`/dashboard/materiality/worksheet/${assessmentId}/determinations`} style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>All determinations</Link>
         </div>
 
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.7rem', color: INK }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: INK }}>
           Your own determinations
         </div>
         <div style={{ fontSize: 13, color: MUTE, marginTop: 4, marginBottom: 18 }}>
@@ -602,7 +602,7 @@ export default function LeadDetermine() {
 
         {groups.map(g => (
           <div key={g.code} style={{ marginBottom: 28 }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: INK,
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: INK,
                           paddingBottom: 6, borderBottom: `1px solid ${LINE}`, marginBottom: 14 }}>
               {g.label} <span style={{ fontSize: 11, color: MUTE }}>{g.code}</span>
             </div>
@@ -721,7 +721,7 @@ export default function LeadDetermine() {
         {mine.length === 0 && (
           <div style={{ background: '#fff', border: `0.5px solid ${LINE}`, borderRadius: 16,
                         padding: '2.5rem', textAlign: 'center' }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: INK, marginBottom: 10 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: INK, marginBottom: 10 }}>
               Nothing left for you
             </div>
             <div style={{ fontSize: 13, color: MID, lineHeight: 1.8 }}>
@@ -769,7 +769,7 @@ export default function LeadDetermine() {
               </div>
             ) : (
               <div>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', color: INK,
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', color: INK,
                               marginBottom: 10 }}>
                   Submit your determinations?
                 </div>

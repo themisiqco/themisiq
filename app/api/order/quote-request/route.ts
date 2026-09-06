@@ -117,6 +117,7 @@ export async function POST(req: NextRequest) {
   <tr><td style="background:linear-gradient(90deg,#7425e3,#1fb1ff,#64fe3e);height:4px;font-size:1px;line-height:1px;">&nbsp;</td></tr>
   <tr><td style="background:#0d0d0d;padding:24px 32px;"><span style="font-size:20px;font-weight:800;color:#fff;letter-spacing:-0.5px;">ThemisIQ</span></td></tr>
   <tr><td style="background:#fff;padding:32px;">
+    <!-- Georgia here is deliberate, not a missed sweep: this is email HTML. A mail client cannot resolve var(--font-display), and web fonts do not load reliably in mail, so Literata would silently fall back anyway. Georgia is web-safe and is what every recipient actually sees. See app/components/headingStyles.ts. -->
     <div style="font-family:Georgia,serif;font-size:22px;color:#0d0d0d;margin-bottom:12px;">Thanks — we've received your request.</div>
     <div style="font-size:14px;color:#555553;line-height:1.7;margin-bottom:16px;">Hi ${name}, thank you for your interest in ThemisIQ. Our team will prepare a quote for your selected configuration (${modules}) and follow up shortly at this address.</div>
     <div style="font-size:13px;color:#888784;line-height:1.7;">If it's urgent, reply to this email or reach us at hello@themisiq.co.</div>

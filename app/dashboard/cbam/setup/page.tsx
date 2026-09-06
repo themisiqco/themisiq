@@ -28,11 +28,10 @@ import { buildBoundaryGuidanceView } from '../../../../lib/cbam/boundaryGuidance
 import { routeLabel, calcModeLabel, steelGradeLabel, ccModeLabel, streamKindLabel } from '../../../../lib/cbam/labels'
 import type { SourceStream } from '../../../../lib/cbam/types'
 import type { CnMapRow } from '../../../../lib/cbam/cn'
+import { itemHead, sectionHeadFixed as sectionHead } from '@/app/components/headingStyles'
 
 // ── House style, matching app/dashboard/cbam/page.tsx ──
-const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
 const sectionSub: React.CSSProperties = { fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.7, marginBottom: '2rem' }
-const itemHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: '1.15rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 10, marginTop: '2rem' }
 
 /**
  * Bring a just-opened add/edit form into view.
@@ -1307,7 +1306,7 @@ export default function CbamSetupPage() {
           </div>
           <div style={{ position: 'absolute', inset: 0, zIndex: 10, backdropFilter: 'blur(8px)', background: 'rgba(248,247,245,0.85)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ background: '#fff', borderRadius: 16, padding: '2.5rem', boxShadow: '0 8px 40px rgba(0,0,0,0.12)', border: '0.5px solid #e8e7e4', maxWidth: 480, textAlign: 'center' }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 8 }}>CBAM is a paid module.</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 8 }}>CBAM is a paid module.</div>
               <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 400 }}>Set up your operator profile and installations, then record disclosures and generate your Annex IV §1.2 report. Unlock the CBAM module to begin.</div>
               <button onClick={() => (window.location.href = '/pricing')} style={{ width: '100%', fontSize: 14, fontWeight: 600, padding: '14px 28px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d' }}>
                 Unlock CBAM →
@@ -1325,7 +1324,7 @@ export default function CbamSetupPage() {
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '3rem 2rem' }}>
         <div style={sectionHead}>CBAM setup</div>
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '2rem', marginTop: '1rem' }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>No company on your account yet</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>No company on your account yet</div>
           <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, fontWeight: 400 }}>
             Every CBAM record is owned by a company, so a company must exist first. Your account has none. Companies are created in the main product flow (e.g. the GHG module’s company step) — set one up there, then return here to continue CBAM setup.
           </div>
@@ -1443,7 +1442,7 @@ export default function CbamSetupPage() {
           {/* Add / edit form */}
           {editing && (
             <div style={{ marginTop: '1rem', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.5rem', maxWidth: 620 }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', color: '#0d0d0d', marginBottom: '1rem' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', color: '#0d0d0d', marginBottom: '1rem' }}>
                 {editing.id ? 'Edit installation' : 'New installation'}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -1524,7 +1523,7 @@ export default function CbamSetupPage() {
                   the document is the provenance link a verifier follows from
                   that number back to its evidence. */}
               <div style={{ marginBottom: '1.5rem', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', color: '#0d0d0d', marginBottom: 4 }}>Evidence documents</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', color: '#0d0d0d', marginBottom: 4 }}>Evidence documents</div>
                 <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1rem' }}>
                   Upload the records behind your figures — weighbridge tickets, fuel delivery notes, laboratory analyses, production logs. These are <strong>not read or parsed</strong>: you tally your own records and enter the figure, and the document is the provenance link a verifier follows back from a number to its evidence. Accepted: PDF, PNG, JPEG, CSV, XLSX (max 25 MB). Legacy .xls is not accepted — save as .xlsx.
                 </div>
@@ -1980,7 +1979,7 @@ export default function CbamSetupPage() {
               {/* Process add / edit form */}
               {editingProc && (
                 <div ref={procFormRef} style={{ marginTop: '1rem', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.5rem', maxWidth: 640 }}>
-                  <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', color: '#0d0d0d', marginBottom: '1rem' }}>{editingProc.id ? 'Edit process' : 'New process'}</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', color: '#0d0d0d', marginBottom: '1rem' }}>{editingProc.id ? 'Edit process' : 'New process'}</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     <CbamField label="Installation — required">
                       <select value={editingProc.installation_id} onChange={(e) => setProc('installation_id', e.target.value)} style={cbamInputStyle}>

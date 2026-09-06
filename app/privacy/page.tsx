@@ -30,7 +30,7 @@ export default function PrivacyPage() {
       <div style={{ background: '#f8f7f5', borderBottom: '0.5px solid #e8e7e4', padding: '3.5rem 2.5rem 3rem' }}>
         <div style={{ maxWidth: 920, margin: '0 auto' }}>
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>ThemisIQ Compliance Inc.</div>
-          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2.2rem, 4vw, 3rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }}>
             Privacy <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Policy</span>
           </h1>
           <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' as const, marginBottom: '1rem' }}>
@@ -198,7 +198,7 @@ export default function PrivacyPage() {
             <div style={eyebrow}>Section 11</div>
             <h2 style={sectionHead}>Contact & complaints</h2>
             <div style={{ background: '#0d0d0d', borderRadius: 10, padding: '1.25rem 1.5rem', margin: '1rem 0' }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', fontWeight: 400, color: '#fff', marginBottom: 8 }}>Privacy Officer — ThemisIQ Compliance Inc.</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 400, color: '#fff', marginBottom: 8 }}>Privacy Officer — ThemisIQ Compliance Inc.</div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>Email: privacy@themisiq.co · Response: 30 days (Canada/EU) · 45 days (US)</div>
             </div>
           </div>
@@ -215,7 +215,7 @@ export default function PrivacyPage() {
 
 const sectionStyle: React.CSSProperties = { marginBottom: '2.5rem', scrollMarginTop: 80 }
 const eyebrow: React.CSSProperties = { fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 5 }
-const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: '1.45rem', fontWeight: 400, color: '#0d0d0d', marginBottom: '0.9rem', lineHeight: 1.2 }
+const sectionHead: React.CSSProperties = { fontFamily: 'var(--font-display)', fontSize: '1.45rem', fontWeight: 400, color: '#0d0d0d', marginBottom: '0.9rem', lineHeight: 1.2 }
 const body: React.CSSProperties = { fontSize: 13.5, color: '#555553', lineHeight: 1.8, fontWeight: 400, marginBottom: '0.9rem' }
 const divider: React.CSSProperties = { height: '0.5px', background: '#e8e7e4', margin: '2rem 0' }
 const link: React.CSSProperties = { color: '#7425e3', textDecoration: 'none' }

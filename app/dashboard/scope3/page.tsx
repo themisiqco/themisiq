@@ -7,6 +7,7 @@ import { useEntitlement } from '../../../lib/useEntitlement'
 import { EMISSION_FACTORS, DEFAULT_SPEND_EF } from '../../../lib/emissionFactors'
 import { resolvePcafResult, assessAsset } from '../../../lib/pcaf/engine'
 import type { PcafPortfolioAsset, PcafAssetClass, EmissionInputs } from '../../../lib/pcaf/types'
+import { sectionHead } from '@/app/components/headingStyles'
 
 // ─── Scope 3 Category Definitions ────────────────────────────────────────────
 
@@ -71,7 +72,6 @@ const PCAF_ASSET_CLASSES: { value: PcafAssetClass; label: string; denominatorLab
 const GRAD = 'var(--color-brand)'
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
-const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.4rem, 2.5vw, 1.8rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
 const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
 
 const STEP_NAMES = ['Setup', 'Materiality', 'Calculate', 'Results', 'Export']
@@ -952,7 +952,7 @@ export default function Scope3Dashboard() {
         {/* Total */}
         <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.5rem', marginBottom: 20, display: 'flex', alignItems: 'center', gap: '2rem' }}>
           <div style={{ textAlign: 'center', flexShrink: 0 }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '3rem', fontWeight: 400, color: '#64fe3e', lineHeight: 1 }}>{totalScope3.toFixed(1)}</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '3rem', fontWeight: 400, color: '#64fe3e', lineHeight: 1 }}>{totalScope3.toFixed(1)}</div>
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>mt CO₂e total Scope 3</div>
           </div>
           <div style={{ flex: 1 }}>
@@ -1018,7 +1018,7 @@ export default function Scope3Dashboard() {
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
               <div className="tq-band" style={{ borderRadius: 16, padding: '2rem', maxWidth: 420, textAlign: 'center' }}>
                 <div style={{ fontSize: 26, marginBottom: 10 }}>🔒</div>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, marginBottom: 8 }}>Unlock your full Scope 3 results</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, marginBottom: 8 }}>Unlock your full Scope 3 results</div>
                 <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.6, marginBottom: 18 }}>Your complete inventory is ready — the total, the category-by-category breakdown, and the data-quality flags for every line. Unlock the GHG module to view and download it.</div>
                 <a href="/pricing" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>See pricing &amp; unlock →</a>
                 <div style={{ fontSize: 11, color: 'var(--color-ink-2)', marginTop: 12 }}>The calculator stays free — you only pay to unlock results &amp; export.</div>
@@ -1046,7 +1046,7 @@ export default function Scope3Dashboard() {
           ].map(({ label, val }) => (
             <div key={label}>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>{label}</div>
-              <div style={{ fontSize: typeof val === 'number' ? '1.4rem' : '0.9rem', fontFamily: typeof val === 'number' ? 'Georgia, serif' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 600, color: '#fff', lineHeight: 1.2 }}>{val}</div>
+              <div style={{ fontSize: typeof val === 'number' ? '1.4rem' : '0.9rem', fontFamily: typeof val === 'number' ? 'var(--font-display)' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 600, color: '#fff', lineHeight: 1.2 }}>{val}</div>
             </div>
           ))}
         </div>
@@ -1135,7 +1135,7 @@ export default function Scope3Dashboard() {
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Climate — GHG Inventory</div>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>Scope 3 Complete Calculator</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>Scope 3 Complete Calculator</div>
           </div>
           {totalScope3 > 0 && (
             <div style={{ textAlign: 'right' }}>

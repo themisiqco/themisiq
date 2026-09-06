@@ -68,7 +68,7 @@ const CARD: React.CSSProperties = {
   padding: '1.5rem', marginBottom: 18,
 }
 const H2: React.CSSProperties = {
-  fontFamily: 'Georgia, serif', fontSize: '1.25rem', color: INK, marginBottom: 6,
+  fontFamily: 'var(--font-display)', fontSize: '1.25rem', color: INK, marginBottom: 6,
 }
 
 // ── shared bits, the same three the results screen draws ─────────────────────────────────────────
@@ -466,7 +466,7 @@ export default function WorksheetRegister() {
   )
   if (loadError) return (
     <Shell><div style={CARD}>
-      <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: INK, marginBottom: 10 }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: INK, marginBottom: 10 }}>
         This could not be shown</div>
       <div style={{ fontSize: 13.5, color: MID, lineHeight: 1.75 }}>{loadError}</div>
     </div></Shell>
@@ -485,7 +485,7 @@ export default function WorksheetRegister() {
           <Link href={`/dashboard/materiality/worksheet/${assessmentId}/iro-1`} style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>IRO-1 disclosure</Link>
         </div>
 
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.7rem', color: INK }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: INK }}>
           {company || 'Assessment'}
         </div>
         <div style={{ fontSize: 13, color: MUTE, marginTop: 4, marginBottom: 20 }}>

@@ -61,7 +61,7 @@ export default function Page() {
       <section style={{ padding: '4rem 2.5rem 2.5rem', borderBottom: `0.5px solid ${hair}`, background: canvas }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: violet, background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.25)', borderRadius: 99, padding: '4px 12px', marginBottom: 16 }}>Free · No account needed</span>
-          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1rem', color: ink }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1rem', color: ink }}>
             What you&rsquo;ll need before you can file
           </h1>
           <p style={{ fontSize: 15, color: muted, lineHeight: 1.75, fontWeight: 400, maxWidth: 620 }}>
@@ -76,7 +76,7 @@ export default function Page() {
       <section style={{ padding: '3rem 2.5rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <div style={{ borderLeft: `3px solid ${violet}`, paddingLeft: '1.75rem' }}>
-            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 400, color: ink, marginBottom: '1rem' }}>Why this is worth the effort</h2>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 400, color: ink, marginBottom: '1rem' }}>Why this is worth the effort</h2>
             <p style={{ fontSize: 15, color: muted, lineHeight: 1.75, fontWeight: 400, maxWidth: 620, marginBottom: '1rem' }}>
               Your EU customer must declare the embedded emissions for your goods whether you supply verified emissions data or not. If you do not provide actual emissions, they can use the European Commission&rsquo;s published default values for your country and product.
             </p>
@@ -114,7 +114,7 @@ export default function Page() {
             <div key={group.group} style={{ marginBottom: '3.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                 <span aria-hidden style={{ width: 8, height: 8, borderRadius: 2, background: accent, flexShrink: 0 }} />
-                <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 400, color: ink }}>{group.meta.label}</h2>
+                <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 400, color: ink }}>{group.meta.label}</h2>
               </div>
               <p style={{ fontSize: 14, color: faint, fontWeight: 400, marginBottom: '1.75rem', maxWidth: 560, lineHeight: 1.6 }}>{group.meta.blurb}</p>
 
@@ -170,7 +170,7 @@ export default function Page() {
 
       {/* CTA */}
       <section style={{ background: canvas, borderTop: `0.5px solid ${hair}`, padding: '5rem 2.5rem', textAlign: 'center' }}>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2, color: ink }}>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2, color: ink }}>
           Ready when you are.
         </h2>
         <p style={{ fontSize: 15, color: muted, maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>

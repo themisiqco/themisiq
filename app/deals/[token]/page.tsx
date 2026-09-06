@@ -41,6 +41,10 @@ function Shell({ children }: { children: React.ReactNode }) {
       {/* Branded header — self-contained (this is a shareable deliverable, not the app nav) */}
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1rem 1.5rem' }}>
         <div style={{ maxWidth: 860, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          {/* WORDMARK — stays 'Georgia, serif', deliberately not var(--font-display).
+          A logotype is a brand asset, not a heading: changing its face changes the mark.
+          It also has to match the same wordmark in email HTML, which cannot resolve a
+          custom property or rely on a web font loading. See app/components/headingStyles.ts. */}
           <a href="/" style={{ textDecoration: 'none', fontFamily: 'Georgia, serif', fontSize: '1.35rem', fontWeight: 400, background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>ThemisIQ</a>
           <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784' }}>ESG compliance assessment</span>
         </div>
@@ -77,7 +81,7 @@ export default function DealAssessmentPage() {
 
   if (loading) return (
     <Shell>
-      <div style={{ textAlign: 'center', padding: '5rem 0', fontFamily: 'Georgia, serif', fontSize: '1.2rem', background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+      <div style={{ textAlign: 'center', padding: '5rem 0', fontFamily: 'var(--font-display)', fontSize: '1.2rem', background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
         Loading your assessment…
       </div>
     </Shell>
@@ -86,7 +90,7 @@ export default function DealAssessmentPage() {
   if (notFound || !data) return (
     <Shell>
       <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '2.5rem', textAlign: 'center', marginTop: '2rem' }}>
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.5rem', fontWeight: 400, marginBottom: 10 }}>This assessment link isn&rsquo;t valid</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 400, marginBottom: 10 }}>This assessment link isn&rsquo;t valid</div>
         <div style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, maxWidth: 460, margin: '0 auto' }}>
           This link isn&rsquo;t valid or is no longer shared. Please contact the sender for an up-to-date link.
         </div>
@@ -156,7 +160,7 @@ export default function DealAssessmentPage() {
       {/* Hero */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 6 }}>ESG compliance assessment</div>
-        <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.15, margin: '0 0 8px' }}>{data.target_name || 'Target company'}</h1>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.15, margin: '0 0 8px' }}>{data.target_name || 'Target company'}</h1>
         {sectorJur && <div style={{ fontSize: 14, color: '#555553' }}>{sectorJur}</div>}
         <div style={{ fontSize: 12, color: '#888784', marginTop: 6 }}>Prepared via ThemisIQ — the ESG compliance platform for deals.</div>
       </div>
@@ -177,7 +181,7 @@ export default function DealAssessmentPage() {
       {/* Applicable frameworks */}
       {frameworks.length > 0 && (
         <section style={{ marginBottom: 28 }}>
-          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, marginBottom: 10 }}>Applicable frameworks</h2>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, marginBottom: 10 }}>Applicable frameworks</h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {frameworks.map(fw => (
               <span key={fw} style={{ fontSize: 12, fontWeight: 500, padding: '5px 12px', borderRadius: 99, background: '#EDE9FE', color: '#7425e3', border: '0.5px solid rgba(116,37,227,0.2)' }}>{fw}</span>
@@ -190,7 +194,7 @@ export default function DealAssessmentPage() {
           owner's report condition the same findings the same way. */}
       {risks.length > 0 && (
         <section style={{ marginBottom: 28 }}>
-          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, marginBottom: 4 }}>Material ESG findings</h2>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, marginBottom: 4 }}>Material ESG findings</h2>
           <p style={{ fontSize: 13, color: '#555553', marginBottom: 14, lineHeight: 1.6 }}>Sector-specific ESG risks identified for {data.target_name || 'this company'}.</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {risks.map((risk, i) => {
@@ -220,18 +224,18 @@ export default function DealAssessmentPage() {
 
       {/* Two-tier cost card — consultant vs ThemisIQ (same structure as the dashboard) */}
       <section style={{ marginBottom: 28 }}>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, marginBottom: 12 }}>Your compliance cost</h2>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, marginBottom: 12 }}>Your compliance cost</h2>
         <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.5rem', marginBottom: 16 }}>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 16 }}>Estimated ESG compliance cost — {data.target_name || 'Target'}</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 }}>
             <div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>Traditional consultant</div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.9rem', fontWeight: 400, color: '#fff', lineHeight: 1.1 }}>{consultantRange}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.9rem', fontWeight: 400, color: '#fff', lineHeight: 1.1 }}>{consultantRange}</div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>first-year, billed by the hour</div>
             </div>
             <div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>With ThemisIQ</div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.9rem', fontWeight: 400, color: '#64fe3e', lineHeight: 1.1 }}>{themisIqFigure}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.9rem', fontWeight: 400, color: '#64fe3e', lineHeight: 1.1 }}>{themisIqFigure}</div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>{includedModulesLabel}</div>
             </div>
           </div>
@@ -280,7 +284,7 @@ export default function DealAssessmentPage() {
 
       {/* Data-room readiness */}
       <section style={{ marginBottom: 28 }}>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, marginBottom: 12 }}>Data-room readiness</h2>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, marginBottom: 12 }}>Data-room readiness</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[
             { label: 'GHG inventory / emissions data', ready: !!data.has_ghg_data },
@@ -296,7 +300,7 @@ export default function DealAssessmentPage() {
 
       {/* Conversion CTA */}
       <section className="tq-band" style={{ borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.4rem, 4vw, 1.8rem)', fontWeight: 400, marginBottom: 8 }}>Get compliance-ready with ThemisIQ</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.4rem, 4vw, 1.8rem)', fontWeight: 400, marginBottom: 8 }}>Get compliance-ready with ThemisIQ</div>
         <div style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.6, marginBottom: 20, maxWidth: 520, margin: '0 auto 20px' }}>
           Build your GHG inventory, map your frameworks, and produce verifier-ready reports — priced like software, scoped to exactly what this deal needs.
         </div>

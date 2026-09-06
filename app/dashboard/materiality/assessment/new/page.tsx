@@ -97,7 +97,7 @@ export default function NewAssessmentPage() {
       <div style={{ marginBottom: 16 }}>
         <Link href="/dashboard/materiality/worksheet" style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>← Impact worksheet</Link>
       </div>
-      <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.7rem', color: INK }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: INK }}>
         New materiality assessment
       </div>
       <div style={{ fontSize: 13, color: MID, marginTop: 6, marginBottom: 24, lineHeight: 1.8 }}>

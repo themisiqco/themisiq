@@ -318,7 +318,7 @@ export default function SurveyScope() {
       <Nav />
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '2rem' }}>
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '2rem' }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: '#0d0d0d', marginBottom: 10 }}>This scope screen could not be opened</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: '#0d0d0d', marginBottom: 10 }}>This scope screen could not be opened</div>
           <div style={{ fontSize: 13.5, color: '#555553', lineHeight: 1.7 }}>{loadError}</div>
         </div>
       </div>
@@ -403,7 +403,7 @@ export default function SurveyScope() {
         )}
 
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '1.5rem 1.75rem', marginBottom: 20 }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: '#0d0d0d', marginBottom: 8 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: '#0d0d0d', marginBottom: 8 }}>
             Which topics should this survey cover?
           </div>
           <div style={{ fontSize: 13.5, color: '#555553', lineHeight: 1.75 }}>
@@ -418,7 +418,7 @@ export default function SurveyScope() {
           return (
             <div key={group.code} id={`scope-group-${gi}`} style={{ marginBottom: 26, scrollMarginTop: 150 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10, paddingBottom: 8, borderBottom: '0.5px solid #e8e7e4' }}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', color: '#0d0d0d' }}>{group.label}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', color: '#0d0d0d' }}>{group.label}</div>
                 <div style={{ fontSize: 11.5, color: inc === group.questions.length ? '#888784' : AMBER }}>
                   {inc} of {group.questions.length} included
                 </div>

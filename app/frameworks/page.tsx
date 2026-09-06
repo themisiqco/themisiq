@@ -3,6 +3,7 @@ import Nav from '@/app/components/Nav'
 import Footer from '@/app/components/Footer'
 import { SB253_POSTURE, SB253_PROGRAMME_URL, SB253_STATUTE } from '@/lib/sb253'
 import { SB261_CITATION, SB261_DOCKET_URL, SB261_TABLE_STATUS } from '@/lib/sb261'
+import { groupHeading, pageTitle as h1 } from '@/app/components/headingStyles'
 import {
   CA_PAY_DATA_URL,
   CDP_URL,
@@ -91,10 +92,8 @@ const groups = [
 
 // ── STYLES ────────────────────────────────────────────────────────
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 12 }
-const h1: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(2.2rem, 5vw, 3.4rem)', fontWeight: 400, lineHeight: 1.15, color: '#0d0d0d', marginBottom: '1.25rem' }
 const lede: React.CSSProperties = { fontSize: 17, color: '#555553', lineHeight: 1.7, fontWeight: 400, maxWidth: 620 }
 const grad: React.CSSProperties = { fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }
-const groupHeading: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: '1.7rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }
 const groupIntro: React.CSSProperties = { fontSize: 14, color: '#888784', fontWeight: 400, marginBottom: '1.75rem', maxWidth: 560, lineHeight: 1.6 }
 const card: React.CSSProperties = { border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.5rem 1.5rem 1.25rem', background: '#fff', display: 'flex', flexDirection: 'column' }
 const fwName: React.CSSProperties = { fontSize: 16, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }
@@ -145,7 +144,7 @@ export default function Frameworks() {
       {/* CTA */}
       <section style={{ background: '#f8f7f5', borderTop: '0.5px solid #e8e7e4' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '4rem 2.5rem', textAlign: 'center' }}>
-          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, marginBottom: 12 }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 400, marginBottom: 12 }}>
             Don’t see your framework?
           </h2>
           <p style={{ fontSize: 15, color: '#555553', fontWeight: 400, maxWidth: 480, margin: '0 auto 1.75rem', lineHeight: 1.7 }}>

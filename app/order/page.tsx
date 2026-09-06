@@ -48,6 +48,10 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh', color: '#0d0d0d' }}>
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1rem 1.5rem' }}>
         <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          {/* WORDMARK — stays 'Georgia, serif', deliberately not var(--font-display).
+          A logotype is a brand asset, not a heading: changing its face changes the mark.
+          It also has to match the same wordmark in email HTML, which cannot resolve a
+          custom property or rely on a web font loading. See app/components/headingStyles.ts. */}
           <a href="/" style={{ textDecoration: 'none', fontFamily: 'Georgia, serif', fontSize: '1.35rem', fontWeight: 400, background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>ThemisIQ</a>
           <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784' }}>Secure checkout</span>
         </div>
@@ -80,7 +84,7 @@ function OrderInner() {
     return (
       <Shell>
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '2.5rem', textAlign: 'center' }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, marginBottom: 10 }}>Nothing selected yet</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 400, marginBottom: 10 }}>Nothing selected yet</div>
           <div style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, marginBottom: 20, maxWidth: 420, margin: '0 auto 20px' }}>
             This order link doesn&rsquo;t include any modules. Choose what you need on the pricing page to get started.
           </div>
@@ -139,7 +143,7 @@ function OrderInner() {
     <Shell>
       <div data-ref={ref ?? undefined}>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 6 }}>Pre-configured order</div>
-        <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.7rem, 5vw, 2.3rem)', fontWeight: 400, lineHeight: 1.15, margin: '0 0 20px' }}>Your ThemisIQ order</h1>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.7rem, 5vw, 2.3rem)', fontWeight: 400, lineHeight: 1.15, margin: '0 0 20px' }}>Your ThemisIQ order</h1>
 
         {/* Order summary */}
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '1.5rem', marginBottom: 20 }}>
@@ -162,7 +166,7 @@ function OrderInner() {
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, marginTop: 14, paddingTop: 14, borderTop: '0.5px solid #e8e7e4' }}>
             <span style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#555553' }}>Total</span>
-            <span style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d' }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d' }}>
               {quote.requiresQuote ? 'Custom quote' : `${usd(quote.totalUSD)}/yr`}
             </span>
           </div>
@@ -180,7 +184,7 @@ function OrderInner() {
         ) : (
           // QUOTE path (>$10k or GHG Advisory) — placeholder this stage. NEVER routes to card checkout.
           <div style={{ background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.2)', borderRadius: 14, padding: '1.75rem' }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>This configuration needs a custom quote</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>This configuration needs a custom quote</div>
             <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: 16 }}>
               {quote.requiresQuote
                 ? 'GHG Advisory (uncapped locations) is tailored to your footprint, so it’s priced individually.'

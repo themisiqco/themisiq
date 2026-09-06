@@ -73,6 +73,7 @@ async function sendInvoiceLoginLink(stripe: Stripe, invoice: Stripe.Invoice) {
   <tr><td style="background:linear-gradient(90deg,#7425e3,#1fb1ff,#64fe3e);height:4px;font-size:1px;line-height:1px;">&nbsp;</td></tr>
   <tr><td style="background:#0d0d0d;padding:24px 32px;"><span style="font-size:20px;font-weight:800;color:#fff;letter-spacing:-0.5px;">ThemisIQ</span></td></tr>
   <tr><td style="background:#fff;padding:32px;">
+    <!-- Georgia here is deliberate, not a missed sweep: this is email HTML. A mail client cannot resolve var(--font-display), and web fonts do not load reliably in mail, so Literata would silently fall back anyway. Georgia is web-safe and is what every recipient actually sees. See app/components/headingStyles.ts. -->
     <div style="font-family:Georgia,serif;font-size:22px;color:#0d0d0d;margin-bottom:12px;">Your ThemisIQ access is ready.</div>
     <div style="font-size:14px;color:#555553;line-height:1.7;margin-bottom:20px;">Your payment is confirmed and your modules are unlocked. Click below to log in — no password needed.</div>
     <a href="${actionLink}" style="display:inline-block;font-size:14px;font-weight:600;color:#0d0d0d;background:linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e);padding:12px 26px;border-radius:8px;text-decoration:none;">Log in to ThemisIQ →</a>

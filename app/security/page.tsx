@@ -1,6 +1,7 @@
 'use client'
 import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
+import { sectionTitle } from '@/app/components/headingStyles'
 
 export default function Page() {
   return (
@@ -9,7 +10,7 @@ export default function Page() {
       <div style={{ background: '#0d0d0d', padding: '5rem 2.5rem 4rem', borderBottom: '0.5px solid #1a1a1a' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>ThemisIQ Compliance Inc.</div>
-          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2.4rem, 5vw, 3.6rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#fff', maxWidth: 700 }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.4rem, 5vw, 3.6rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#fff', maxWidth: 700 }}>
             Security at{' '}
             <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>ThemisIQ</span>
           </h1>
@@ -127,7 +128,7 @@ export default function Page() {
               { step: '04', title: 'Review', body: 'Every P1 and P2 incident has a mandatory post-incident review within 14 days. Findings shared with affected customers on request.' },
             ].map(({ step, title, body }) => (
               <div key={step} style={{ background: '#fff', padding: '2rem' }}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 8, opacity: 0.6 }}>{step}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 400, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 8, opacity: 0.6 }}>{step}</div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 6 }}>{title}</div>
                 <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{body}</div>
               </div>
@@ -190,4 +191,3 @@ export default function Page() {
 const navLink: React.CSSProperties = { fontSize: 11, color: '#555553', textDecoration: 'none' }
 const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'var(--color-brand)', color: '#fff', textDecoration: 'none', display: 'inline-block' }
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
-const sectionTitle: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }

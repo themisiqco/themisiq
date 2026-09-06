@@ -9,7 +9,7 @@ export default function Page() {
       <div style={{ background: '#f8f7f5', borderBottom: '0.5px solid #e8e7e4', padding: '3.5rem 2.5rem 3rem' }}>
         <div style={{ maxWidth: 920, margin: '0 auto' }}>
           <div style={eyebrow}>ThemisIQ Compliance Inc.</div>
-          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2.2rem, 4vw, 3rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }}>
             Refund <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Policy</span>
           </h1>
           <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' as const, marginBottom: '1rem' }}>
@@ -60,7 +60,7 @@ export default function Page() {
 
           <Section id="r6" num="Section 6" title="Contact">
             <div style={{ background: '#0d0d0d', borderRadius: 10, padding: '1.25rem 1.5rem', margin: '1rem 0' }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', fontWeight: 400, color: '#fff', marginBottom: 8 }}>Refund enquiries — ThemisIQ Compliance Inc.</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 400, color: '#fff', marginBottom: 8 }}>Refund enquiries — ThemisIQ Compliance Inc.</div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Email: <a href="mailto:hello@themisiq.co" style={{ color: '#64fe3e' }}>hello@themisiq.co</a></div>
             </div>
           </Section>
@@ -80,7 +80,7 @@ function Section({ id, num, title, children }: { id: string, num: string, title:
     <>
       <div id={id} style={{ marginBottom: '2.5rem', scrollMarginTop: 80 }}>
         <div style={eyebrow}>{num}</div>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.45rem', fontWeight: 400, color: '#0d0d0d', marginBottom: '0.9rem', lineHeight: 1.2 }}>{title}</h2>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.45rem', fontWeight: 400, color: '#0d0d0d', marginBottom: '0.9rem', lineHeight: 1.2 }}>{title}</h2>
         {children}
       </div>
       <div style={{ height: '0.5px', background: '#e8e7e4', margin: '2rem 0' }} />
