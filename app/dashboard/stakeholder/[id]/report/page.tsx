@@ -684,18 +684,44 @@ export default function StakeholderBoardReport() {
       <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.7rem', color: INK }}>
         {company || 'Board paper'}
       </div>
+      {/* ⚠️ "your board" WENT WITH THE REST OF THE ASSUMPTION. Swept 27 Aug 2026 alongside the
+          directors-or-senior-leadership rename and the card below: not every CSRD-scope buyer has
+          a board, and leaving the subtitle saying so would have left the fix half-done on the one
+          screen where all three sentences are read together. */}
       <div style={{ fontSize: 13, color: MUTE, marginTop: 4, marginBottom: 20 }}>
-        A paper for your board, about what this assessment found
+        A paper about what this assessment found
       </div>
 
       <div style={CARD}>
         <div style={H2}>What the paper contains</div>
+        {/* ⚠️ THIS SENTENCE NAMES SECTIONS, IN LOWERCASE, AND IT WENT STALE WHOLESALE WHEN THEY
+            WERE RENAMED ON 27 Aug 2026. It read as prose and behaved as a contents list: "who took
+            part", "what the paper does not cover" and "what it tells a board beyond compliance"
+            were the headings verbatim, and four more were a word away. Renaming the twelve left all
+            seven describing a document that no longer uses those words.
+            SAME FAILURE AS app/materiality/page.tsx's "The last of those, …" line the same day: a
+            section named in prose, a short distance from the thing that names it properly, updated
+            in one place and not the other. There the list was two paragraphs above; here the
+            headings live in another file entirely, which is why nothing flagged it.
+            ⚠️ SO IT NOW DESCRIBES RATHER THAN NAMES, AND THAT IS THE PART THAT STOPS THIS
+            RECURRING. "the severity determinations your team recorded" survives a rename of section
+            7; "what your assessment concluded" did not. If a heading is ever quoted here again,
+            quote the constant from lib/materiality/boardReport.ts rather than retyping it.
+            ⚠️ AND IT NOW COVERS TWELVE OF TWELVE. It described seven. The three it omitted were
+            where responses divided, the own-workforce/value-chain contrast, and — the one that
+            mattered — THE DISCLOSURE REQUIREMENTS. /materiality sells that as a deliverable in its
+            own right ("a disclosure roadmap listing which requirements your conclusions have
+            triggered"), and this card is read immediately before the generate button by someone
+            deciding whether the paper is worth producing. Completeness beats elegance here: the
+            sentence is longer and lists rather than summarises, deliberately. */}
         <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.9 }}>
           It opens with what we asked and what your own assessment did, then gives three figures —
           topics assessed, topics found material, and topics where the two views point differently.
-          After that: who took part, what respondents said on each topic, what your assessment
-          concluded and why, where the two differ, the rules and thresholds applied, what the paper
-          does not cover, and what it tells a board beyond compliance.
+          After that: who was engaged and what they said on each topic, where responses divided,
+          your own workforce set beside workers in your value chain, the severity determinations
+          your team recorded, the disclosure requirements each material topic carries, the register
+          of where the two views differ, the method and standards applied, the scope and
+          limitations, and what the findings imply.
         </div>
         <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.9, marginTop: 10 }}>
           It is written for directors or senior leadership rather than for specialists, and it asks
