@@ -240,6 +240,27 @@ h3 { font-size: var(--text-xl); }
 .tq-row-selected { background: var(--tq-mod-wash, var(--color-brand-wash)); }
 
 /* ================================================================
+   EDGE VOCABULARY — three devices, three meanings, no overlap.
+
+   ⚠️ THE 6px LEFT BAR MEANS MODULE IDENTITY AND NOTHING ELSE.
+   It had spread across four unrelated roles — module identity, semantic
+   urgency, scenario colour and plain decoration — and a mark that means
+   four things means none of them. The narrowing:
+
+     6px LEFT bar   module identity. .tq-summary only, and only where a
+                    [data-module] ancestor sets --tq-mod. If there is no
+                    module, there is no left bar.
+     4px TOP rule   semantic state — urgency, scenario, status. .tq-callout.
+                    A state is about the content, not about which product
+                    you are in, so it takes a different edge.
+     1px border     everything else. Colour lives in the label and the
+                    button, not in the frame.
+
+   Do not add a left bar to anything that is not a module surface, and do
+   not colour a 1px border to imply state — that is what .tq-callout is for.
+   ================================================================ */
+
+/* ================================================================
    Summary block — "filing tab"
    Light panel, module hue on the left edge and in the figure.
    Colour marks; it does not flood.
@@ -266,7 +287,8 @@ h3 { font-size: var(--text-xl); }
   color: var(--tq-mod, var(--color-brand));
   letter-spacing: 0.012em;
 }
-.tq-summary-title {
+.tq-summary-title,
+.tq-callout-title {
   font-family: var(--font-display);
   font-size: var(--text-2xl);
   font-weight: 600;
@@ -274,7 +296,8 @@ h3 { font-size: var(--text-xl); }
   line-height: 1.2;
   margin-top: 4px;
 }
-.tq-summary-sub {
+.tq-summary-sub,
+.tq-callout-sub {
   font-size: var(--text-xs);
   font-weight: 500;
   color: var(--color-ink-muted);
@@ -301,6 +324,82 @@ h3 { font-size: var(--text-xl); }
 @media (max-width: 760px) {
   .tq-summary-body { flex-direction: column; align-items: flex-start; gap: 16px; }
   .tq-summary-figure { text-align: left; }
+}
+
+/* ================================================================
+   Callout — semantic state, NOT module identity.
+   A 4px TOP rule in the state's own colour over a plain 1px border.
+   Set --tq-state at the call site (urgency, scenario, status); it falls
+   back to the climate hue, which is the amber every warning already uses.
+
+   ⚠️ DELIBERATELY NOT A LEFT BAR. The left edge is reserved for module
+   identity on .tq-summary. A deadline is urgent regardless of which module
+   you are looking at, so it must not borrow the module's device.
+   ================================================================ */
+
+.tq-callout {
+  /* --tq-state-wash tints the panel; without it the callout sits on paper. Both hooks are set at
+     the call site, so the DEVICE (4px top rule, 1px border, radius) lives only here. */
+  background: var(--tq-state-wash, var(--color-paper));
+  border: 1px solid var(--color-line);
+  border-top: 4px solid var(--tq-state, var(--color-module-climate));
+  border-radius: var(--radius-panel);
+}
+
+/* Padded variant for the short note boxes — title + body, no figure, no flex row.
+   The larger callouts use .tq-callout-body, which brings its own padding. */
+.tq-callout-note { padding: 13px 15px; }
+
+/* ⚠️ NOT -title AND -body. Those names are already taken by the large callout: -title is the
+   23px display line and -body is the flex layout wrapper. A note box's heading is 13px UI type
+   and its text is prose, so they need their own names rather than overloading two that already
+   mean something else. */
+.tq-callout-heading {
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  color: var(--color-ink);
+  margin-bottom: 3px;
+}
+.tq-callout-text {
+  font-size: var(--text-2xs);
+  font-weight: 400;
+  color: var(--color-ink-2);
+  line-height: 1.6;
+}
+.tq-callout-body {
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+}
+.tq-callout-label {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  color: var(--tq-state, var(--color-module-climate));
+  letter-spacing: 0.012em;
+}
+.tq-callout-figure {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--tq-state, var(--color-module-climate));
+  font-variant-numeric: tabular-nums lining-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.tq-callout-figure small {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  color: var(--color-ink-muted);
+  margin-top: 6px;
+}
+@media (max-width: 760px) {
+  .tq-callout-body { flex-direction: column; align-items: flex-start; gap: 16px; }
+  .tq-callout-figure { text-align: left; }
 }
 
 /* ================================================================

@@ -147,7 +147,7 @@ export default function Page() {
             ['Data lineage', 'A clear boundary between your inputs and platform reference defaults — what assurance needs to see.'],
             ['Limitations & notice', 'Where screening ends and formal assessment begins, with a formal Important Notice on every report.'],
           ].map(([title, desc]) => (
-            <div key={title} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderLeft: '2px solid #7425e3', borderRadius: '0 10px 10px 0', padding: '1rem 1.25rem' }}>
+            <div key={title} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem 1.25rem' }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', marginBottom: 4 }}>{title}</div>
               <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{desc}</div>
             </div>

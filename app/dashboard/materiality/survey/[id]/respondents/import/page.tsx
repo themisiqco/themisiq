@@ -524,7 +524,7 @@ export default function RespondentImport() {
                       <div key={r.key} id={`row-${r.key}`}
                         style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', borderRadius: 8,
                           borderLeft: `3px solid ${blocked || dup ? '#e8e7e4' : cat ? GREEN : AMBER}`,
-                          background: selected.has(r.key) ? '#f3f0fb' : 'transparent' }}>
+                          background: selected.has(r.key) ? 'var(--color-brand-wash)' : 'transparent' }}>
                         {!blocked && !dup && (
                           <input type="checkbox" checked={selected.has(r.key)}
                             onChange={e => setSelected(prev => { const n = new Set(prev); e.target.checked ? n.add(r.key) : n.delete(r.key); return n })} />

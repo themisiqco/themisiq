@@ -740,7 +740,7 @@ export default function AssessPage() {
                   /* Keyed on `name`, not on the index within the group — two groups both start at 0,
                      so an index key would make the first regulatory and first market card share an
                      expand state and open together. Names are unique within a result set. */
-                  <div key={ob.name} style={{ border: '0.5px solid #e8e7e4', borderRadius: 10, overflow: 'hidden', background: '#fff', borderLeft: `4px solid ${URGENCY_COLOR[ob.urgency]}` }}>
+                  <div key={ob.name} style={{ border: '0.5px solid #e8e7e4', borderRadius: 10, overflow: 'hidden', background: '#fff', borderTop: `4px solid ${URGENCY_COLOR[ob.urgency]}` }}>
                     <div onClick={() => toggleExpand(ob.name)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', cursor: 'pointer' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ width: 8, height: 8, borderRadius: '50%', background: URGENCY_COLOR[ob.urgency], flexShrink: 0 }} />

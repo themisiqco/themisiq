@@ -17,9 +17,9 @@ export default function Page() {
               <span key={item} style={{ fontSize: 12, color: '#888784' }}>{item}</span>
             ))}
           </div>
-          <div style={boxAmber}>
-            <div style={boxTitle}>Master Subscription Agreement</div>
-            <div style={boxBody}>{`These Terms of Service (the "Agreement") govern access to and use of the ThemisIQ platform and related services provided by ThemisIQ Compliance Inc. ("ThemisIQ", "we", "us", or "our"). By purchasing or using the Service, you agree to be bound by this Agreement.`}</div>
+          <div className="tq-callout tq-callout-note" style={{ '--tq-state': 'var(--color-module-climate)', '--tq-state-wash': '#FEF3E2' } as React.CSSProperties}>
+            <div className="tq-callout-heading">Master Subscription Agreement</div>
+            <div className="tq-callout-text">{`These Terms of Service (the "Agreement") govern access to and use of the ThemisIQ platform and related services provided by ThemisIQ Compliance Inc. ("ThemisIQ", "we", "us", or "our"). By purchasing or using the Service, you agree to be bound by this Agreement.`}</div>
           </div>
         </div>
       </div>
@@ -202,6 +202,3 @@ function BulletItem({ text }: { text: string }) {
 
 const eyebrow: React.CSSProperties = { fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 5 }
 const body: React.CSSProperties = { fontSize: 13.5, color: '#555553', lineHeight: 1.8, fontWeight: 400, marginBottom: '0.9rem' }
-const boxAmber: React.CSSProperties = { background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 25%, transparent)', borderLeft: '3px solid var(--color-module-climate)', borderRadius: 8, padding: '13px 15px', margin: '1rem 0' }
-const boxTitle: React.CSSProperties = { fontSize: 12, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }
-const boxBody: React.CSSProperties = { fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 400 }

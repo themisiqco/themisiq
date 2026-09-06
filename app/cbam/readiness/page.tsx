@@ -70,12 +70,12 @@ export default function Page() {
         </div>
       </section>
 
-      {/* WHY — a pull-quote, not another section: white ground, violet rule, text inset.
+      {/* WHY — a pull-quote, not another section: white ground, neutral rule, text inset.
           Every figure here is verified against IR (EU) 2025/2621 Annex I. Do not adjust a
           number or add a sector. */}
       <section style={{ padding: '3rem 2.5rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
-          <div style={{ borderLeft: `3px solid ${violet}`, paddingLeft: '1.75rem' }}>
+          <div style={{ borderLeft: '3px solid var(--color-line-strong)', paddingLeft: '1.75rem' }}>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 400, color: ink, marginBottom: '1rem' }}>Why this is worth the effort</h2>
             <p style={{ fontSize: 15, color: muted, lineHeight: 1.75, fontWeight: 400, maxWidth: 620, marginBottom: '1rem' }}>
               Your EU customer must declare the embedded emissions for your goods whether you supply verified emissions data or not. If you do not provide actual emissions, they can use the European Commission&rsquo;s published default values for your country and product.

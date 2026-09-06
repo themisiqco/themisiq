@@ -112,7 +112,7 @@ export default function TrustPage() {
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: '1.5rem' }}>Our core data principles</div>
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
             {PRINCIPLES.map((p, i) => (
-              <div key={p.title} style={{ background: '#fff', border: `1px solid color-mix(in srgb, ${p.color} 13%, transparent)`, borderLeft: `4px solid ${p.color}`, borderRadius: 12, padding: '1.25rem 1.5rem', display: 'grid', gridTemplateColumns: '24px 1fr', gap: 16, alignItems: 'flex-start' }}>
+              <div key={p.title} style={{ background: '#fff', border: '1px solid var(--color-line)', borderRadius: 12, padding: '1.25rem 1.5rem', display: 'grid', gridTemplateColumns: '24px 1fr', gap: 16, alignItems: 'flex-start' }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '1rem', fontWeight: 400, color: p.color, marginTop: 2 }}>{i + 1}</div>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 6 }}>{p.title}</div>

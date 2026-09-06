@@ -67,7 +67,7 @@ export default function Page() {
               <div key={title} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.5rem', position: 'relative' as const, overflow: 'hidden' }}>
                 <div style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: 3, background: 'var(--color-brand)' }} />
                 <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 6 }}>{title}</div>
-                <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{body}</div>
+                <div className="tq-callout-text">{body}</div>
               </div>
             ))}
           </div>
@@ -171,9 +171,9 @@ export default function Page() {
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>Response time: 24 hours for all security reports</div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 8, fontStyle: 'italic' }}>We do not pursue legal action against researchers acting in good faith.</div>
             </div>
-            <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(29,158,117,0.25)', borderLeft: '3px solid #1D9E75', borderRadius: 8, padding: '13px 15px' }}>
-              <div style={{ fontSize: 12, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }}>Enterprise security reviews</div>
-              <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>Penetration test reports, SOC 2 bridge letters, and full security questionnaire responses are available on request for enterprise customers conducting security due diligence.</div>
+            <div className="tq-callout tq-callout-note" style={{ '--tq-state': '#1D9E75', '--tq-state-wash': '#E1F5EE' } as React.CSSProperties}>
+              <div className="tq-callout-heading">Enterprise security reviews</div>
+              <div className="tq-callout-text">Penetration test reports, SOC 2 bridge letters, and full security questionnaire responses are available on request for enterprise customers conducting security due diligence.</div>
             </div>
           </div>
         </div>

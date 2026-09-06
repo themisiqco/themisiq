@@ -90,19 +90,23 @@ export default function Page() {
             </tbody>
           </table>
 
-          {/* ── DEADLINE CALLOUT — the filing tab.
-              --tq-mod is the .tq-summary component's own hook for a module hue, so
-              the amber edge, label and figure all come from one declaration.
-              sbStatVal / sbStatUnit stay DERIVED from SB253_FIRST_REPORT_DATE (see
-              the note at the top of this file) — the date is never retyped here. ── */}
-          <div className="tq-summary" style={{ '--tq-mod': 'var(--color-module-climate)', marginTop: 34 } as React.CSSProperties}>
-            <div className="tq-summary-body">
+          {/* ── DEADLINE CALLOUT — .tq-callout, NOT .tq-summary.
+              ⚠️ THIS USED .tq-summary WITH --tq-mod SET TO THE CLIMATE HUE, WHICH WAS THE WRONG
+              DEVICE. The 6px left bar means module identity; an SB 253 filing date is semantic
+              urgency, and it is urgent whether you are looking at GHG, CBAM or Climate Risk. It
+              now takes the 4px top rule that says "state" — see the edge vocabulary in
+              app/styles/themisiq-tokens.css. --tq-state carries the colour, so the label and the
+              figure stay exactly as they were.
+              sbStatVal / sbStatUnit stay DERIVED from SB253_FIRST_REPORT_DATE (see the note at the
+              top of this file) — the date is never retyped here. ── */}
+          <div className="tq-callout" style={{ '--tq-state': 'var(--color-module-climate)', marginTop: 34 } as React.CSSProperties}>
+            <div className="tq-callout-body">
               <div>
-                <div className="tq-summary-label">Next reporting date</div>
-                <div className="tq-summary-title">California SB 253</div>
-                <div className="tq-summary-sub">Scope 1 + 2 for the prior fiscal year. {SB253_DATE_STATUS}, not final.</div>
+                <div className="tq-callout-label">Next reporting date</div>
+                <div className="tq-callout-title">California SB 253</div>
+                <div className="tq-callout-sub">Scope 1 + 2 for the prior fiscal year. {SB253_DATE_STATUS}, not final.</div>
               </div>
-              <div className="tq-summary-figure">{sbStatVal}<small>{sbStatUnit}</small></div>
+              <div className="tq-callout-figure">{sbStatVal}<small>{sbStatUnit}</small></div>
             </div>
           </div>
 

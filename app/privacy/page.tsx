@@ -38,9 +38,9 @@ export default function PrivacyPage() {
               <span key={item} style={{ fontSize: 12, color: '#888784' }}>{item}</span>
             ))}
           </div>
-          <div style={{ background: 'rgba(116,37,227,0.05)', border: '0.5px solid rgba(116,37,227,0.2)', borderLeft: '3px solid #7425e3', borderRadius: 8, padding: '13px 15px' }}>
-            <div style={{ fontSize: 12, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }}>Governing law: Canada (PIPEDA · Law 25 · CASL) + US state privacy laws + GDPR / UK GDPR for EU/UK customers</div>
-            <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>ThemisIQ Compliance Inc. is a Canadian company. This Privacy Policy complies with Canadian federal and provincial privacy law as the primary framework. Additional rights for US residents (CCPA/CPRA, state laws, CAN-SPAM, COPPA) are set out in Section 9.</div>
+          <div className="tq-callout tq-callout-note" style={{ '--tq-state': '#7425e3', '--tq-state-wash': 'rgba(116,37,227,0.05)' } as React.CSSProperties}>
+            <div className="tq-callout-heading">Governing law: Canada (PIPEDA · Law 25 · CASL) + US state privacy laws + GDPR / UK GDPR for EU/UK customers</div>
+            <div className="tq-callout-text">ThemisIQ Compliance Inc. is a Canadian company. This Privacy Policy complies with Canadian federal and provincial privacy law as the primary framework. Additional rights for US residents (CCPA/CPRA, state laws, CAN-SPAM, COPPA) are set out in Section 9.</div>
           </div>
         </div>
       </div>
@@ -83,9 +83,9 @@ export default function PrivacyPage() {
                 ].map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} style={{ ...tdStyle, background: i % 2 === 0 ? '#fff' : '#f8f7f5' }}>{cell}</td>)}</tr>)}
               </tbody>
             </table>
-            <div style={boxGreen}>
-              <div style={boxTitle}>What we never collect</div>
-              <div style={boxBody}>Payment card numbers (Stripe handles these). Special category personal data unless specifically agreed in writing. We never sell personal data. We use no advertising cookies or tracking pixels.</div>
+            <div className="tq-callout tq-callout-note" style={{ '--tq-state': '#1D9E75', '--tq-state-wash': '#E1F5EE' } as React.CSSProperties}>
+              <div className="tq-callout-heading">What we never collect</div>
+              <div className="tq-callout-text">Payment card numbers (Stripe handles these). Special category personal data unless specifically agreed in writing. We never sell personal data. We use no advertising cookies or tracking pixels.</div>
             </div>
           </div>
           <div style={divider} />
@@ -132,9 +132,9 @@ export default function PrivacyPage() {
                 ].map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} style={{ ...tdStyle, background: i % 2 === 0 ? '#fff' : '#f8f7f5' }}>{cell}</td>)}</tr>)}
               </tbody>
             </table>
-            <div style={boxGreen}>
-              <div style={boxTitle}>We do not sell, share, or trade personal data</div>
-              <div style={boxBody}>ThemisIQ does not sell personal information as defined under CCPA. We do not share personal information for cross-context behavioural advertising. ThemisIQ products are entirely ad-free.</div>
+            <div className="tq-callout tq-callout-note" style={{ '--tq-state': '#1D9E75', '--tq-state-wash': '#E1F5EE' } as React.CSSProperties}>
+              <div className="tq-callout-heading">We do not sell, share, or trade personal data</div>
+              <div className="tq-callout-text">ThemisIQ does not sell personal information as defined under CCPA. We do not share personal information for cross-context behavioural advertising. ThemisIQ products are entirely ad-free.</div>
             </div>
           </div>
           <div style={divider} />
@@ -143,9 +143,9 @@ export default function PrivacyPage() {
             <div style={eyebrow}>Section 6</div>
             <h2 style={sectionHead}>International transfers</h2>
             <p style={body}>ThemisIQ is Canadian. Data is processed in Canada and transferred to sub-processors in the United States.</p>
-            <div style={boxPurple}>
-              <div style={boxTitle}>EU/UK customers — GDPR transfer mechanism</div>
-              <div style={boxBody}>For EU/UK customers, we rely on Standard Contractual Clauses (SCCs) under GDPR Article 46(2)(c) and the UK International Data Transfer Agreement (IDTA). Our DPA incorporating SCCs is available at legal@themisiq.co.</div>
+            <div className="tq-callout tq-callout-note" style={{ '--tq-state': '#7425e3', '--tq-state-wash': 'rgba(116,37,227,0.05)' } as React.CSSProperties}>
+              <div className="tq-callout-heading">EU/UK customers — GDPR transfer mechanism</div>
+              <div className="tq-callout-text">For EU/UK customers, we rely on Standard Contractual Clauses (SCCs) under GDPR Article 46(2)(c) and the UK International Data Transfer Agreement (IDTA). Our DPA incorporating SCCs is available at legal@themisiq.co.</div>
             </div>
           </div>
           <div style={divider} />
@@ -222,7 +222,3 @@ const link: React.CSSProperties = { color: '#7425e3', textDecoration: 'none' }
 const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse', margin: '0.8rem 0', fontSize: 12 }
 const thStyle: React.CSSProperties = { background: '#0d0d0d', color: '#fff', padding: '8px 12px', textAlign: 'left', fontWeight: 500, fontSize: 11 }
 const tdStyle: React.CSSProperties = { padding: '8px 12px', borderBottom: '0.5px solid #e8e7e4', color: '#555553', verticalAlign: 'top', lineHeight: 1.5 }
-const boxGreen: React.CSSProperties = { background: '#E1F5EE', border: '0.5px solid rgba(29,158,117,0.25)', borderLeft: '3px solid #1D9E75', borderRadius: 8, padding: '13px 15px', margin: '1rem 0' }
-const boxPurple: React.CSSProperties = { background: 'rgba(116,37,227,0.05)', border: '0.5px solid rgba(116,37,227,0.2)', borderLeft: '3px solid #7425e3', borderRadius: 8, padding: '13px 15px', margin: '1rem 0' }
-const boxTitle: React.CSSProperties = { fontSize: 12, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }
-const boxBody: React.CSSProperties = { fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 400 }

@@ -971,12 +971,12 @@ export default function MaterialityWizard() {
     const trans: any[] = result?.transition || []
     return (
       <>
-        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderLeft: '3px solid var(--color-module-climate)', borderRadius: '0 14px 14px 0', padding: '1rem', marginBottom: 12 }}>
+        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderTop: '4px solid var(--color-module-climate)', borderRadius: 'var(--radius-panel)', padding: '1rem', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 2 }}>Physical risks <span style={{ fontWeight: 400, color: '#aaa', fontSize: 12 }}>industry × geography × scenario</span></div>
           <p style={{ fontSize: 12, color: '#888784', margin: '0 0 12px' }}>Flagged only where your industry sensitivity meets real regional hazard exposure.</p>
           <div>{phys.length ? phys.map((p: any, i: number) => <span key={'p'+i}>{p.dataStatus === 'no_reference_data' ? pill(p.hazard, 'unknown', 'not assessed — no reference data') : pill(p.hazard, p.band, 'in ' + p.drivingRegion)}</span>) : <span style={{ fontSize: 13, color: '#888784' }}>No material physical risks at this intersection.</span>}</div>
         </div>
-        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderLeft: '3px solid #534AB7', borderRadius: '0 14px 14px 0', padding: '1rem', marginBottom: 12 }}>
+        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderTop: '4px solid #534AB7', borderRadius: 'var(--radius-panel)', padding: '1rem', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 12 }}>Transition risks <span style={{ fontWeight: 400, color: '#aaa', fontSize: 12 }}>industry carbon × jurisdiction × scenario</span></div>
           <div>{trans.length ? trans.map((t: any, i: number) => <span key={'t'+i}>{pill(t.driver, t.band)}</span>) : <span style={{ fontSize: 13, color: '#888784' }}>None flagged.</span>}</div>
         </div>
@@ -988,7 +988,7 @@ export default function MaterialityWizard() {
   const renderOpportunities = () => {
     const opps: any[] = result?.opportunities || []
     return (
-      <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderLeft: '3px solid #0F6E56', borderRadius: '0 14px 14px 0', padding: '1rem', marginBottom: 12 }}>
+      <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderTop: '4px solid #0F6E56', borderRadius: 'var(--radius-panel)', padding: '1rem', marginBottom: 12 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 2 }}>Climate opportunities <span style={{ fontWeight: 400, color: '#aaa', fontSize: 12 }}>TCFD categories · industry × scenario</span></div>
         <p style={{ fontSize: 12, color: '#888784', margin: '0 0 12px' }}>The upside view IFRS S2 and TCFD ask for alongside risk — where the transition creates opportunity for your industry.</p>
         {opps.length ? (
@@ -1210,7 +1210,7 @@ export default function MaterialityWizard() {
         </div>
 
         {/* resilience synthesis statement — the "so what" */}
-        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderLeft: '3px solid #7425e3', borderRadius: '0 14px 14px 0', padding: '1.25rem', marginBottom: 12 }}>
+        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderTop: '4px solid #7425e3', borderRadius: 'var(--radius-panel)', padding: '1.25rem', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 8 }}>Resilience read</div>
           <p style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, margin: 0 }}>{syn.statement}</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, marginTop: 14 }}>
@@ -1239,15 +1239,15 @@ export default function MaterialityWizard() {
         )}
 
         {/* comparison grids */}
-        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderLeft: '3px solid var(--color-module-climate)', borderRadius: '0 14px 14px 0', padding: '1rem', marginBottom: 12 }}>
+        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderTop: '4px solid var(--color-module-climate)', borderRadius: 'var(--radius-panel)', padding: '1rem', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 10 }}>Physical risks across scenarios</div>
           {physical.length ? itemRows(physical, 'physical') : <span style={{ fontSize: 13, color: '#888784' }}>No material physical risks at this intersection.</span>}
         </div>
-        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderLeft: '3px solid #534AB7', borderRadius: '0 14px 14px 0', padding: '1rem', marginBottom: 12 }}>
+        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderTop: '4px solid #534AB7', borderRadius: 'var(--radius-panel)', padding: '1rem', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 10 }}>Transition risks across scenarios</div>
           {transition.length ? itemRows(transition, 'transition') : <span style={{ fontSize: 13, color: '#888784' }}>None flagged.</span>}
         </div>
-        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderLeft: '3px solid #0F6E56', borderRadius: '0 14px 14px 0', padding: '1rem', marginBottom: 12 }}>
+        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderTop: '4px solid #0F6E56', borderRadius: 'var(--radius-panel)', padding: '1rem', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 10 }}>Opportunities across scenarios</div>
           {opportunity.length ? itemRows(opportunity, 'opportunity') : <span style={{ fontSize: 13, color: '#888784' }}>No opportunity profile available for this industry yet.</span>}
         </div>
