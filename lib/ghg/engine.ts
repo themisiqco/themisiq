@@ -1330,7 +1330,7 @@ const FRAMEWORKS = [
     intensity_denominator: 'revenue',
   },
   {
-    id: 'ecovadis', name: 'EcoVadis', full: 'EcoVadis — E1 Module', color: '#ba7517', bg: '#FEF3E2',
+    id: 'ecovadis', name: 'EcoVadis', full: 'EcoVadis — E1 Module', color: 'var(--color-module-climate)', bg: '#FEF3E2',
     gwp: 'AR6', deadline: 'Annual — assessment cycle',
     desc: 'Simplified Scope 1 + 2 total with revenue and employee intensity ratios',
     requires: ['employee_count'],

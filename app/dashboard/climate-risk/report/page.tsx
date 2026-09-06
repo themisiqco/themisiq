@@ -47,10 +47,10 @@ const JURISDICTION_LABEL: Record<string, string> = {
 }
 
 // ─── Styled bits (print-friendly) ─────────────────────────────────────────────
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 const SEV = {
   high: { color: '#B91C1C', bg: '#FCEBEB', border: '#B91C1C' },
-  med:  { color: '#ba7517', bg: '#FEF3E2', border: '#ba7517' },
+  med:  { color: 'var(--color-module-climate)', bg: '#FEF3E2', border: 'var(--color-module-climate)' },
   low:  { color: '#888784', bg: '#f8f7f5', border: '#e8e7e4' },
 } as const
 
@@ -156,7 +156,7 @@ function Pill({ band }: { band: 'high' | 'med' | 'low' | 'unknown' }) {
   // 'unknown' shouldn't reach here — but the band union now includes it, so guard defensively rather
   // than crash on a future invariant change. Amber "Not assessed", never a silent LOW.
   if (band === 'unknown') {
-    return <span style={{ background: '#FDF6EC', color: '#8A5A12', border: '0.5px solid #EAD9BE', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99 }}>NOT ASSESSED</span>
+    return <span style={{ background: '#FDF6EC', color: 'var(--color-module-climate)', border: '0.5px solid #EAD9BE', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99 }}>NOT ASSESSED</span>
   }
   const c = SEV[band]
   return <span style={{ background: c.bg, color: c.color, border: `0.5px solid ${c.border}`, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99 }}>{band.toUpperCase()}</span>
@@ -325,9 +325,9 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
 
   return (
     <div className="report-root" style={{ background: '#fff', minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', color: '#0d0d0d' }}>
-      <div className="no-print" style={{ position: 'sticky', top: 0, background: '#0d0d0d', color: '#fff', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
+      <div className="no-print" style={{ position: 'sticky', top: 0, background: 'var(--color-ink)', color: '#fff', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
         <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>ThemisIQ · Climate resilience analysis report</div>
-        <button onClick={() => window.print()} style={{ fontSize: 13, fontWeight: 500, padding: '8px 20px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>⬇ Save as PDF (Cmd+P)</button>
+        <button onClick={() => window.print()} style={{ fontSize: 13, fontWeight: 500, padding: '8px 20px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>⬇ Save as PDF (Cmd+P)</button>
       </div>
 
       <div className="report-body" style={{ maxWidth: 780, margin: '0 auto', padding: '3rem 3rem 4rem' }}>

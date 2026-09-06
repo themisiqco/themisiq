@@ -31,10 +31,10 @@ import { PAYWALL_HREF, PAYWALL_SURVEY, PAYWALL_TITLE } from '@/lib/paywallCopy'
 import { supabase } from '../../../../../lib/supabase'
 import { useEntitlement } from '../../../../../lib/useEntitlement'
 
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 const GREEN = '#0F6E56'
 const GREEN_BG = '#E1F5EE'
-const AMBER = '#ba7517'
+const AMBER = 'var(--color-module-climate)'
 const AMBER_BG = '#FEF3E2'
 const BLUE = '#0C447C'
 const BLUE_BG = '#E6F1FB'
@@ -339,7 +339,7 @@ export default function SurveyProgress() {
           </div>
           {counts.neverOpened > 0 && (
             <button onClick={sendAllUnopened} disabled={bulk?.running}
-              style={{ fontSize: 12.5, fontWeight: 600, padding: '8px 16px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: bulk?.running ? 'not-allowed' : 'pointer', opacity: bulk?.running ? 0.6 : 1 }}>
+              style={{ fontSize: 12.5, fontWeight: 600, padding: '8px 16px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: bulk?.running ? 'not-allowed' : 'pointer', opacity: bulk?.running ? 0.6 : 1 }}>
               {bulk?.running ? `Sending ${bulk.done} of ${bulk.total}…` : `Remind the ${counts.neverOpened} who never opened it`}
             </button>
           )}

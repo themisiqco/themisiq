@@ -572,7 +572,7 @@ const OBLIGATION_GROUPS: { key: Obligation['group']; title: string; sub: string 
   { key: 'market',     title: 'Market-driven',           sub: 'What your customers, investors and lenders are asking for. Often because they have a reporting obligation of their own: a large customer’s Scope 3 is your Scope 1 and 2.' },
 ]
 
-const URGENCY_COLOR: Record<string, string> = { critical: '#B91C1C', high: '#ba7517', medium: '#0C447C', monitor: '#888784' }
+const URGENCY_COLOR: Record<string, string> = { critical: '#B91C1C', high: 'var(--color-module-climate)', medium: '#0C447C', monitor: '#888784' }
 const URGENCY_BG: Record<string, string> = { critical: '#FCEBEB', high: '#FEF3E2', medium: '#E6F1FB', monitor: '#f8f7f5' }
 const URGENCY_TEXT: Record<string, string> = { critical: '#501313', high: '#633806', medium: '#0C447C', monitor: '#888784' }
 
@@ -718,7 +718,7 @@ export default function AssessPage() {
             We&apos;ve emailed a copy of your Compliance Obligation Map to <strong>{email.emailAddr || 'your inbox'}</strong>. If you don&apos;t see it within a few minutes, please check your spam or junk folder — and mark it &ldquo;not spam&rdquo; so future updates reach you.
           </div>
         </div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: '1.5rem' }}>
-          {[{ val: critical, label: 'Immediate action', color: '#B91C1C' }, { val: high, label: 'High priority', color: '#ba7517' }, { val: obligations.length - critical - high, label: 'Monitor / annual', color: '#1fb1ff' }].map(({ val, label, color }) => (
+          {[{ val: critical, label: 'Immediate action', color: '#B91C1C' }, { val: high, label: 'High priority', color: 'var(--color-module-climate)' }, { val: obligations.length - critical - high, label: 'Monitor / annual', color: '#1fb1ff' }].map(({ val, label, color }) => (
             <div key={label} style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px', textAlign: 'center' as const }}>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color, marginBottom: 2 }}>{val}</div>
               <div style={{ fontSize: 11, color: '#888784' }}>{label}</div>
@@ -791,12 +791,12 @@ export default function AssessPage() {
             </div>
           )
         })}
-        <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '1.5rem', textAlign: 'center' as const }}>
-          <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#fff', marginBottom: 6 }}>Want help navigating all {obligations.length} obligations?</h3>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: '1.25rem', fontWeight: 400 }}>A ThemisIQ advisor will review your results and tell you exactly what to do first. No charge for the initial call.</p>
+        <div className="tq-band" style={{ borderRadius: 12, padding: '1.5rem', textAlign: 'center' as const }}>
+          <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, marginBottom: 6 }}>Want help navigating all {obligations.length} obligations?</h3>
+          <p style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: '1.25rem', fontWeight: 400 }}>A ThemisIQ advisor will review your results and tell you exactly what to do first. No charge for the initial call.</p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-            <a href="/advisory" style={{ fontSize: 13, fontWeight: 500, padding: '10px 24px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none' }}>Book free consultation</a>
-           <a href="/dashboard/ghg" style={{ fontSize: 13, padding: '10px 24px', borderRadius: 8, background: 'none', color: 'rgba(255,255,255,0.6)', border: '0.5px solid rgba(255,255,255,0.15)', textDecoration: 'none' }}>Calculate your emissions →</a>
+            <a href="/advisory" style={{ fontSize: 13, fontWeight: 500, padding: '10px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none' }}>Book free consultation</a>
+           <a href="/dashboard/ghg" style={{ fontSize: 13, padding: '10px 24px', borderRadius: 8, background: 'none', color: 'var(--color-brand)', border: '0.5px solid var(--color-brand)', textDecoration: 'none' }}>Calculate your emissions →</a>
           </div>
         </div>
         <div style={{ textAlign: 'center', marginTop: '1rem' }}>

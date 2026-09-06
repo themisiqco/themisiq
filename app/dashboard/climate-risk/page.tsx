@@ -28,7 +28,7 @@ import {
 } from '../../../lib/materiality/versionAgreement'
 
 // ─── Design tokens (matching the live climate page) ───────────────────────────
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.4rem, 2.5vw, 1.8rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
 const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
@@ -37,11 +37,11 @@ const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', bo
 // severity palette (matches live climate page)
 const SEV = {
   high: { label: 'HIGH', color: '#B91C1C', bg: '#FCEBEB', border: '#B91C1C' },
-  med:  { label: 'MED', color: '#ba7517', bg: '#FEF3E2', border: '#ba7517' },
+  med:  { label: 'MED', color: 'var(--color-module-climate)', bg: '#FEF3E2', border: 'var(--color-module-climate)' },
   low:  { label: 'LOW', color: '#888784', bg: '#f8f7f5', border: '#e8e7e4' },
   // Data gap (no reference data / no baseline) — amber, distinct from LOW grey. Never reads as an
   // assessed finding of no exposure/immateriality; scored null, not 0.
-  unknown: { label: 'N/A', color: '#8A5A12', bg: '#FDF6EC', border: '#EAD9BE' },
+  unknown: { label: 'N/A', color: 'var(--color-module-climate)', bg: '#FDF6EC', border: '#EAD9BE' },
 }
 
 // opportunity palette — green to read as upside, distinct from the risk reds/ambers
@@ -555,7 +555,7 @@ export default function MaterialityWizard() {
                     user reading both cards may well select a version and then choose s2; without
                     this, that choice would ride along into a run it has no meaning for. Explicit
                     at the point of divergence rather than trusting the radio to be untouched. */}
-                <button onClick={() => { setMode(o.m); setStep(0); if (o.m === 's2') setStandardVersion(null) }} style={{ fontSize: 13, fontWeight: 500, padding: '10px 20px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>Start {o.t} screening</button>
+                <button onClick={() => { setMode(o.m); setStep(0); if (o.m === 's2') setStandardVersion(null) }} style={{ fontSize: 13, fontWeight: 500, padding: '10px 20px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>Start {o.t} screening</button>
               </div>
             ))}
           </div>
@@ -604,7 +604,7 @@ export default function MaterialityWizard() {
               something the user just DID; the sector prompt is something they have not yet done.
               One is feedback, the other would be a reprimand for inaction. */}
           {blockers.find(b => b.field === 'period') && (
-            <div style={{ fontSize: 11.5, color: '#ba7517', marginTop: 6, lineHeight: 1.6 }}>
+            <div style={{ fontSize: 11.5, color: 'var(--color-module-climate)', marginTop: 6, lineHeight: 1.6 }}>
               {blockers.find(b => b.field === 'period')!.atField}
             </div>
           )}
@@ -658,8 +658,8 @@ export default function MaterialityWizard() {
         const chk = checkReportingPeriod(periodStart || null, periodEnd || null, standardVersion)
         if (chk.status !== 'conflict') return null
         return (
-          <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.3)', borderRadius: 10, padding: '10px 14px', marginBottom: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 3 }}>
+          <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '10px 14px', marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 3 }}>
               The reporting period and the ESRS version you selected do not agree
             </div>
             <div style={{ fontSize: 11.5, color: '#555553', lineHeight: 1.6 }}>
@@ -683,7 +683,7 @@ export default function MaterialityWizard() {
         })}
       </div>
       {blockerAt('sector') && (
-        <div style={{ fontSize: 11.5, color: '#ba7517', marginTop: 6, lineHeight: 1.6 }}>
+        <div style={{ fontSize: 11.5, color: 'var(--color-module-climate)', marginTop: 6, lineHeight: 1.6 }}>
           {blockerAt('sector')!.atField}
         </div>
       )}
@@ -726,7 +726,7 @@ export default function MaterialityWizard() {
         </div>
       ))}
       {blockerAt('regions') && (
-        <div style={{ fontSize: 11.5, color: '#ba7517', marginTop: 6, lineHeight: 1.6 }}>
+        <div style={{ fontSize: 11.5, color: 'var(--color-module-climate)', marginTop: 6, lineHeight: 1.6 }}>
           {blockerAt('regions')!.atField}
         </div>
       )}
@@ -876,7 +876,7 @@ export default function MaterialityWizard() {
     const W = 500, H = 360, padL = 48, padR = 16, padT = 16, padB = 40
     const midX = padL + 0.5 * (W - padL - padR)
     const midY = padT + 0.5 * (H - padT - padB)
-    const dotColor = (q: string) => q === 'both' ? '#A32D2D' : (q === 'financial' || q === 'impact') ? '#ba7517' : '#888784'
+    const dotColor = (q: string) => q === 'both' ? '#A32D2D' : (q === 'financial' || q === 'impact') ? 'var(--color-module-climate)' : '#888784'
 
     // Offset overlapping dots so labels remain readable when topics share coordinates
     const OFFSET = 14
@@ -921,7 +921,7 @@ export default function MaterialityWizard() {
           ))}
         </svg>
         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, fontSize: 12, color: '#555553' }}>
-          {[['#A32D2D', 'Material on both'], ['#ba7517', 'Material on one axis'], ['#888784', 'Lower priority']].map(([c, l]) => (
+          {[['#A32D2D', 'Material on both'], ['var(--color-module-climate)', 'Material on one axis'], ['#888784', 'Lower priority']].map(([c, l]) => (
             <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: '50%', background: c, display: 'inline-block' }} />{l}</span>
           ))}
         </div>
@@ -971,7 +971,7 @@ export default function MaterialityWizard() {
     const trans: any[] = result?.transition || []
     return (
       <>
-        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderLeft: '3px solid #ba7517', borderRadius: '0 14px 14px 0', padding: '1rem', marginBottom: 12 }}>
+        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderLeft: '3px solid var(--color-module-climate)', borderRadius: '0 14px 14px 0', padding: '1rem', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 2 }}>Physical risks <span style={{ fontWeight: 400, color: '#aaa', fontSize: 12 }}>industry × geography × scenario</span></div>
           <p style={{ fontSize: 12, color: '#888784', margin: '0 0 12px' }}>Flagged only where your industry sensitivity meets real regional hazard exposure.</p>
           <div>{phys.length ? phys.map((p: any, i: number) => <span key={'p'+i}>{p.dataStatus === 'no_reference_data' ? pill(p.hazard, 'unknown', 'not assessed — no reference data') : pill(p.hazard, p.band, 'in ' + p.drivingRegion)}</span>) : <span style={{ fontSize: 13, color: '#888784' }}>No material physical risks at this intersection.</span>}</div>
@@ -1027,7 +1027,7 @@ export default function MaterialityWizard() {
         {/* count cards */}
         <div style={{ display: 'grid', gridTemplateColumns: mode === 'csrd' ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
           <div style={{ background: '#FCEBEB', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color: '#B91C1C' }}>{s.physicalHigh ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>High physical risks</div></div>
-          <div style={{ background: '#FEF3E2', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color: '#ba7517' }}>{s.transitionHigh ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>High transition risks</div></div>
+          <div style={{ background: '#FEF3E2', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color: 'var(--color-module-climate)' }}>{s.transitionHigh ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>High transition risks</div></div>
           <div style={{ background: '#E1F5EE', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color: '#0F6E56' }}>{s.opportunitiesStrong ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>Strong opportunities</div></div>
           {mode === 'csrd' && <div style={{ background: '#EDE9FE', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color: '#7425e3' }}>{s.topicsBothAxes ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>Topics material on both axes</div></div>}
         </div>
@@ -1048,11 +1048,11 @@ export default function MaterialityWizard() {
               {renderOpportunities()}
             </div>
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-              <div style={{ background: '#0d0d0d', borderRadius: 16, padding: '2rem 1.75rem', maxWidth: 420, textAlign: 'center', boxShadow: '0 12px 40px rgba(13,13,13,0.28)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', marginBottom: 12 }}>Preview</div>
-                <h3 style={{ fontFamily: 'Georgia, serif', fontWeight: 400, fontSize: '1.4rem', color: '#fff', margin: '0 0 10px', lineHeight: 1.3 }}>Unlock your full assessment</h3>
-                <p style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: '0 0 20px' }}>You can see your headline results above. Unlock the Climate Risk module to view the full materiality matrix, topic-by-topic scores, risk register, and download the report.</p>
-                <a href="/pricing" style={{ display: 'inline-block', padding: '11px 26px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>See pricing &amp; unlock &rarr;</a>
+              <div className="tq-band" style={{ borderRadius: 16, padding: '2rem 1.75rem', maxWidth: 420, textAlign: 'center' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-2)', marginBottom: 12 }}>Preview</div>
+                <h3 style={{ fontFamily: 'Georgia, serif', fontWeight: 400, fontSize: '1.4rem', margin: '0 0 10px', lineHeight: 1.3 }}>Unlock your full assessment</h3>
+                <p style={{ fontSize: 13, fontWeight: 400, color: 'var(--color-ink-2)', lineHeight: 1.6, margin: '0 0 20px' }}>You can see your headline results above. Unlock the Climate Risk module to view the full materiality matrix, topic-by-topic scores, risk register, and download the report.</p>
+                <a href="/pricing" style={{ display: 'inline-block', padding: '11px 26px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>See pricing &amp; unlock &rarr;</a>
               </div>
             </div>
           </div>
@@ -1098,7 +1098,7 @@ export default function MaterialityWizard() {
         {/* download report — disabled until acknowledgment */}
         {savedId && (
           acknowledgedReport ? (
-            <a href={`/dashboard/materiality/report?id=${savedId}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', fontSize: 13, fontWeight: 500, padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', textDecoration: 'none', marginBottom: 8 }}>
+            <a href={`/dashboard/materiality/report?id=${savedId}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', fontSize: 13, fontWeight: 500, padding: '11px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', textDecoration: 'none', marginBottom: 8 }}>
               ⬇ Download {mode === 'csrd' ? 'CSRD' : 'IFRS S2'} report (PDF)
             </a>
           ) : (
@@ -1130,7 +1130,7 @@ export default function MaterialityWizard() {
     }
     const clsColor: Record<string, { bg: string; color: string; border: string }> = {
       'persistent': { bg: '#FCEBEB', color: '#B91C1C', border: '#B91C1C' },
-      'warming-contingent': { bg: '#FEF3E2', color: '#ba7517', border: '#ba7517' },
+      'warming-contingent': { bg: '#FEF3E2', color: 'var(--color-module-climate)', border: 'var(--color-module-climate)' },
       'policy-path-contingent': { bg: '#EDE9FE', color: '#7425e3', border: '#7425e3' },
       'low-across-futures': { bg: '#f8f7f5', color: '#888784', border: '#e8e7e4' },
     }
@@ -1239,7 +1239,7 @@ export default function MaterialityWizard() {
         )}
 
         {/* comparison grids */}
-        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderLeft: '3px solid #ba7517', borderRadius: '0 14px 14px 0', padding: '1rem', marginBottom: 12 }}>
+        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderLeft: '3px solid var(--color-module-climate)', borderRadius: '0 14px 14px 0', padding: '1rem', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 10 }}>Physical risks across scenarios</div>
           {physical.length ? itemRows(physical, 'physical') : <span style={{ fontSize: 13, color: '#888784' }}>No material physical risks at this intersection.</span>}
         </div>
@@ -1278,7 +1278,7 @@ export default function MaterialityWizard() {
         )}
         {savedId && (
           acknowledgedReport ? (
-            <a href={`/dashboard/climate-risk/report?id=${savedId}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', fontSize: 13, fontWeight: 500, padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', textDecoration: 'none', marginBottom: 8 }}>
+            <a href={`/dashboard/climate-risk/report?id=${savedId}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', fontSize: 13, fontWeight: 500, padding: '11px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', textDecoration: 'none', marginBottom: 8 }}>
               ⬇ Download resilience report (PDF)
             </a>
           ) : (
@@ -1339,13 +1339,13 @@ export default function MaterialityWizard() {
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                       <button onClick={submitResilience} disabled={submitting || !canAdvance()} style={{ fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: '#fff', color: '#0d0d0d', border: '1px solid #e8e7e4', cursor: submitting ? 'wait' : 'pointer', opacity: (submitting || !canAdvance()) ? 0.5 : 1 }}>{submitting ? 'Running…' : 'Run resilience analysis →'}</button>
-                      <button onClick={submit} disabled={submitting || !canAdvance()} style={{ fontSize: 13, fontWeight: 600, padding: '9px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: submitting ? 'wait' : 'pointer', opacity: (submitting || !canAdvance()) ? 0.5 : 1 }}>{submitting ? 'Running…' : 'Run double materiality screening →'}</button>
+                      <button onClick={submit} disabled={submitting || !canAdvance()} style={{ fontSize: 13, fontWeight: 600, padding: '9px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: submitting ? 'wait' : 'pointer', opacity: (submitting || !canAdvance()) ? 0.5 : 1 }}>{submitting ? 'Running…' : 'Run double materiality screening →'}</button>
                     </div>
                     <div style={{ fontSize: 11, color: '#888784', textAlign: 'right', maxWidth: 400, lineHeight: 1.5 }}>Double materiality plots all ten ESRS topics on the financial × impact matrix using your inputs above. Resilience tests three diverse climate futures (Paris-aligned, current trajectory, high warming). Both are pre-mapped to CSRD/ESRS disclosure requirements and support that reporting — neither, by itself, satisfies it. Each is saved as its own report.</div>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-                    <button onClick={submitResilience} disabled={submitting || !canAdvance()} style={{ fontSize: 13, fontWeight: 600, padding: '9px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: submitting ? 'wait' : 'pointer', opacity: (submitting || !canAdvance()) ? 0.5 : 1 }}>{submitting ? 'Running…' : 'Run resilience analysis →'}</button>
+                    <button onClick={submitResilience} disabled={submitting || !canAdvance()} style={{ fontSize: 13, fontWeight: 600, padding: '9px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: submitting ? 'wait' : 'pointer', opacity: (submitting || !canAdvance()) ? 0.5 : 1 }}>{submitting ? 'Running…' : 'Run resilience analysis →'}</button>
                     <div style={{ fontSize: 11, color: '#888784', textAlign: 'right', maxWidth: 320, lineHeight: 1.5 }}>Recommended. Tests three diverse climate futures (Paris-aligned, current trajectory, high warming) — screening-level support for the scenario analysis IFRS S2 and CSRD ask for.</div>
                   </div>
                 )
@@ -1362,7 +1362,7 @@ export default function MaterialityWizard() {
                   <button
                     onClick={() => { if (canAdvance()) setStep(s => s + 1); else setNudged(true) }}
                     aria-disabled={!canAdvance()}
-                    style={{ fontSize: 13, fontWeight: 500, padding: '9px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: canAdvance() ? 'pointer' : 'not-allowed', opacity: canAdvance() ? 1 : 0.5 }}>Next →</button>
+                    style={{ fontSize: 13, fontWeight: 500, padding: '9px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: canAdvance() ? 'pointer' : 'not-allowed', opacity: canAdvance() ? 1 : 0.5 }}>Next →</button>
                   {/* ⚠️ ONE LINE NAMING EVERYTHING OUTSTANDING, not a stack and not the first
                       problem only — a message that reports one requirement at a time sends the
                       user round the loop once per requirement, which is a slower version of the
@@ -1380,7 +1380,7 @@ export default function MaterialityWizard() {
           ) : (
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
               <button onClick={() => { setStep(0); setResult(null); setResilienceResult(null); setAcknowledgedReport(false) }} style={{ fontSize: 13, padding: '9px 20px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: 'pointer' }}>↺ Start over</button>
-              <button onClick={() => { setMode(null); setStep(0); setResult(null); setResilienceResult(null); setAcknowledgedReport(false); setStandardVersion(null) }} style={{ fontSize: 13, fontWeight: 500, padding: '9px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>New assessment →</button>
+              <button onClick={() => { setMode(null); setStep(0); setResult(null); setResilienceResult(null); setAcknowledgedReport(false); setStandardVersion(null) }} style={{ fontSize: 13, fontWeight: 500, padding: '9px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>New assessment →</button>
             </div>
           )}
         </div>

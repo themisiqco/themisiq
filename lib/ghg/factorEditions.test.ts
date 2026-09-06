@@ -625,7 +625,7 @@ describe('the trends page renders a DISTINCT output for each state', () => {
     // customer's own numbers.
     expect(trendsSrc, 'amber panel, same tokens as the SBTi estimation panel').toContain('#FDF6EC')
     expect(trendsSrc).toContain('#EAD9BE')
-    expect(trendsSrc, 'the strip label uses the same amber the GWP warning uses').toContain('#ba7517')
+    expect(trendsSrc, 'the strip label uses the same amber the GWP warning uses').toContain('var(--color-module-climate)')
     // Nothing about the state may appear in a condition that suppresses the chart or the metrics.
     for (const gate of ['factorEditionState !== ', 'factorEditionState ===']) {
       expect(trendsSrc, `${gate} would be a gate, not a disclosure`).not.toContain(gate)

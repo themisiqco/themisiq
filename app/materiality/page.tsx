@@ -57,6 +57,7 @@ import {
   CSRD_FIRST_REPORT_FY, CSRD_FIRST_REPORT_PUBLISHED, CSRD_ASSESSMENT_YEAR,
   ESRS_TEN_TOPICS_SENTENCE, ESRS_SET1_CITATION,
 } from '@/lib/csrd'
+import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 
 
 // ─── Diagram palette ──────────────────────────────────────────────────────────
@@ -78,7 +79,7 @@ const PURPLE_INK   = '#26215C'  // darkest — every title in both diagrams
 // carries meaning — container weight, lens against ground, a five-step luminance ladder — and
 // a three-stop gradient would destroy the very thing that makes them readable. Two different
 // jobs, two different treatments; consistency between them would be the mistake.
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 
 // ⚠️ #7425e3 DECOMPOSED, because a fill-opacity ground needs channels, not a hex string.
 // Diagram 2 gets this free from SVG fillOpacity; CSS has no equivalent that tints a box without
@@ -613,8 +614,6 @@ export default function Page() {
 }
 
 // ─── Styles — same set as app/deals/page.tsx, plus bodyPara / footnote / 2-col grid ──────
-const btnPrimary: React.CSSProperties = { fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: '#0d0d0d', color: '#fff', display: 'inline-block' }
-const btnSecondary: React.CSSProperties = { fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', display: 'inline-block' }
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
 const sectionTitle: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }
 const bodyPara: React.CSSProperties = { fontSize: 15, color: '#555553', fontWeight: 400, lineHeight: 1.8, marginBottom: '1.25rem' }

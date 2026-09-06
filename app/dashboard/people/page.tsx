@@ -71,7 +71,7 @@ const calcMeanGap = (bands: JobBand[]): number => {
 }
 
 const STEP_NAMES = ['Frameworks', 'Company setup', 'Job bands', 'Pay data', 'Workforce metrics', 'Results & export']
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD']
 
 const DEFAULT_INVENTORY: PeopleInventory = {
@@ -228,7 +228,7 @@ export default function PeopleDashboard() {
           { id: 'sasb', name: 'SASB Human Capital', desc: 'Sector-specific workforce metrics · investor-grade', urgency: 'medium' },
         ].map(fw => {
           const selected = inventory.jurisdictions.includes(fw.id)
-          const urgencyColor = fw.urgency === 'critical' ? '#B91C1C' : fw.urgency === 'high' ? '#ba7517' : '#888784'
+          const urgencyColor = fw.urgency === 'critical' ? '#B91C1C' : fw.urgency === 'high' ? 'var(--color-module-climate)' : '#888784'
           const urgencyBg = fw.urgency === 'critical' ? '#FCEBEB' : fw.urgency === 'high' ? '#FEF3E2' : '#f8f7f5'
           return (
             <div key={fw.id} onClick={() => toggleJurisdiction(fw.id)} style={{ border: `2px solid ${selected ? '#7425e3' : '#e8e7e4'}`, borderRadius: 12, padding: '1.25rem', cursor: 'pointer', background: selected ? '#fff' : '#f8f7f5', transition: 'all 0.15s' }}>
@@ -455,7 +455,7 @@ export default function PeopleDashboard() {
             { label: 'Bands above 5%', val: `${bandsAboveThreshold.length}`, color: bandsAboveThreshold.length > 0 ? '#B91C1C' : '#0F6E56', bg: bandsAboveThreshold.length > 0 ? '#FCEBEB' : '#E1F5EE' },
             { label: 'Total employees', val: totalEmployees.toLocaleString(), color: '#0d0d0d', bg: '#f8f7f5' },
           ].map(({ label, val, color, bg }) => (
-            <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.25rem', border: `0.5px solid ${color}22` }}>
+            <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.25rem', border: `0.5px solid color-mix(in srgb, ${color} 13%, transparent)` }}>
               <div style={{ fontSize: 11, color: '#888784', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{label}</div>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', fontWeight: 400, color }}>{val}</div>
             </div>
@@ -506,15 +506,15 @@ export default function PeopleDashboard() {
                 <span style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>I confirm that the data entered is accurate to the best of my knowledge and has been sourced from actual HR and payroll records. I understand that ThemisIQ applies the correct methodology to the data I provide, and that accuracy of the underlying data is my responsibility.</span>
               </label>
             </div>
-            <button onClick={() => dataConfirmed && generateExport()} style={{ fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: dataConfirmed ? 'pointer' : 'not-allowed', opacity: dataConfirmed ? 1 : 0.4 }}>
+            <button onClick={() => dataConfirmed && generateExport()} style={{ fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: dataConfirmed ? 'pointer' : 'not-allowed', opacity: dataConfirmed ? 1 : 0.4 }}>
               ⬇ Download Gender Pay Gap Report (CSV)
             </button>
           </div>
         ) : (
-          <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', marginBottom: 8 }}>Unlock your report</div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 16, lineHeight: 1.6 }}>Your pay gap has been calculated. Upgrade to download your EU Pay Transparency report, ESRS S1 disclosure, and CA Pay Data submission.</div>
-            <a href="/pricing" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
+          <div className="tq-band" style={{ borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Unlock your report</div>
+            <div style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: 16, lineHeight: 1.6 }}>Your pay gap has been calculated. Upgrade to download your EU Pay Transparency report, ESRS S1 disclosure, and CA Pay Data submission.</div>
+            <a href="/pricing" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
               See pricing & unlock reports →
             </a>
           </div>
@@ -568,7 +568,7 @@ export default function PeopleDashboard() {
                 ← Back
               </button>
               {step < STEP_NAMES.length - 1 && (
-                <button onClick={() => setStep(s => Math.min(STEP_NAMES.length - 1, s + 1))} style={{ fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>
+                <button onClick={() => setStep(s => Math.min(STEP_NAMES.length - 1, s + 1))} style={{ fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>
                   Next →
                 </button>
               )}

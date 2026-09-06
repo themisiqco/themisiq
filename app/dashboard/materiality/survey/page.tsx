@@ -28,10 +28,10 @@ import { PAYWALL_HREF, PAYWALL_SURVEY, PAYWALL_TITLE } from '@/lib/paywallCopy'
 import { supabase } from '../../../../lib/supabase'
 import { useEntitlement } from '../../../../lib/useEntitlement'
 
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 const GREEN = '#0F6E56'
 const GREEN_BG = '#E1F5EE'
-const AMBER = '#ba7517'
+const AMBER = 'var(--color-module-climate)'
 const AMBER_BG = '#FEF3E2'
 const FAIL = '#b42318'
 const FAIL_BG = '#fef3f2'
@@ -186,7 +186,7 @@ export default function SurveyRounds() {
           </div>
           {!showNew && (
             <button onClick={() => setShowNew(true)}
-              style={{ flexShrink: 0, fontSize: 13, fontWeight: 600, padding: '10px 20px', borderRadius: 9, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>
+              style={{ flexShrink: 0, fontSize: 13, fontWeight: 600, padding: '10px 20px', borderRadius: 9, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>
               New survey round
             </button>
           )}

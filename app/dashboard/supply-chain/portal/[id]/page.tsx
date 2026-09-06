@@ -33,13 +33,13 @@ interface Campaign {
   deadline: string | null
 }
 
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF']
 const GRID_COLS = '2fr 1fr 1fr 1fr 1fr auto'
 
 const STATUS_CONFIG = {
   invited:     { label: 'Invited', color: '#0C447C', bg: '#E6F1FB' },
-  in_progress: { label: 'In progress', color: '#ba7517', bg: '#FEF3E2' },
+  in_progress: { label: 'In progress', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
   completed:   { label: 'Completed', color: '#0F6E56', bg: '#E1F5EE' },
   expired:     { label: 'Expired', color: '#888784', bg: '#f8f7f5' },
 }
@@ -268,7 +268,7 @@ export default function CampaignDetail() {
                   {exporting ? 'Exporting...' : `⬇ Export all (${suppliers.filter(s => s.status === 'completed').length})`}
                 </button>
               )}
-              <button onClick={() => setShowAdd(true)} style={{ fontSize: 12, fontWeight: 500, padding: '8px 14px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>+ Add supplier</button>
+              <button onClick={() => setShowAdd(true)} style={{ fontSize: 12, fontWeight: 500, padding: '8px 14px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>+ Add supplier</button>
             </div>
           </div>
         </div>
@@ -281,7 +281,7 @@ export default function CampaignDetail() {
           {[
             { label: 'Total invited', val: suppliers.length, color: '#0d0d0d', bg: '#fff' },
             { label: 'Completed', val: completed, color: '#0F6E56', bg: '#E1F5EE' },
-            { label: 'In progress', val: inProgress, color: '#ba7517', bg: '#FEF3E2' },
+            { label: 'In progress', val: inProgress, color: 'var(--color-module-climate)', bg: '#FEF3E2' },
             { label: 'Awaiting response', val: invited, color: '#0C447C', bg: '#E6F1FB' },
           ].map(({ label, val, color, bg }) => (
             <div key={label} style={{ background: bg, border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem', textAlign: 'center' }}>
@@ -326,7 +326,7 @@ export default function CampaignDetail() {
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: '1.25rem', justifyContent: 'flex-end' }}>
                 <button onClick={() => setShowAdd(false)} style={{ fontSize: 13, padding: '9px 18px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: 'pointer' }}>Cancel</button>
-                <button onClick={addSupplier} disabled={saving || !newSupplier.supplier_name || !newSupplier.supplier_email} style={{ fontSize: 13, fontWeight: 500, padding: '9px 18px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer', opacity: saving || !newSupplier.supplier_name || !newSupplier.supplier_email ? 0.5 : 1 }}>
+                <button onClick={addSupplier} disabled={saving || !newSupplier.supplier_name || !newSupplier.supplier_email} style={{ fontSize: 13, fontWeight: 500, padding: '9px 18px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer', opacity: saving || !newSupplier.supplier_name || !newSupplier.supplier_email ? 0.5 : 1 }}>
                   {saving ? 'Adding...' : 'Add supplier'}
                 </button>
               </div>
@@ -340,7 +340,7 @@ export default function CampaignDetail() {
             <div style={{ fontSize: 14, color: '#888784', marginBottom: 16 }}>No suppliers added yet</div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
               <button onClick={() => fileRef.current?.click()} style={{ fontSize: 12, padding: '9px 18px', borderRadius: 8, background: '#f8f7f5', border: '1px solid #e8e7e4', color: '#555553', cursor: 'pointer' }}>Import from CSV</button>
-              <button onClick={() => setShowAdd(true)} style={{ fontSize: 12, fontWeight: 500, padding: '9px 18px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>+ Add manually</button>
+              <button onClick={() => setShowAdd(true)} style={{ fontSize: 12, fontWeight: 500, padding: '9px 18px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>+ Add manually</button>
             </div>
           </div>
         ) : (
@@ -400,7 +400,7 @@ export default function CampaignDetail() {
                     ) : (
                       <>
                         {s.status !== 'completed' && (
-                          <button onClick={() => sendInvite(s, 'invite')} disabled={isSending} style={{ fontSize: 10, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', opacity: isSending ? 0.5 : 1 }}>
+                          <button onClick={() => sendInvite(s, 'invite')} disabled={isSending} style={{ fontSize: 10, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', opacity: isSending ? 0.5 : 1 }}>
                             {isSending ? '...' : '✉ Send invite'}
                           </button>
                         )}

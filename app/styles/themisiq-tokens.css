@@ -57,6 +57,13 @@
   --color-on-dark:       #EAEDEE;
   --color-on-dark-muted: #B2BDC1;
 
+  /* ---- CTA band -------------------------------------------------- */
+  /* The replacement for the filled dark panel. 124 of those existed across 47 pages when this
+     was added; the system has no dark fills, so a band is how a call to action gets emphasis
+     without inverting the page. Contrast measured, not assumed: ink 13.6:1, brand 5.9:1. */
+  --color-band:      #CCE7EF;
+  --color-band-line: #A8D2DD;
+
   /* ---- Lines ----------------------------------------------------- */
   --color-line:        #D7DDDF;
   --color-line-strong: #AAB4B8;
@@ -157,6 +164,39 @@ h3 { font-size: var(--text-xl); }
   color: var(--color-on-dark);
   font-weight: 600;
   letter-spacing: 0.004em;
+}
+
+/* ================================================================
+   CTA band — the light replacement for a filled dark panel
+   ⚠️ TEXT IS INK, NOT REVERSED. A dark panel carried white or near-white
+   text; on this band that text disappears. Anything moved onto .tq-band
+   has to have its colour REMOVED so it inherits ink, not merely have its
+   background swapped — the same failure as black-on-teal buttons.
+   ================================================================ */
+
+.tq-band {
+  background: var(--color-band);
+  border: 1px solid var(--color-band-line);
+  border-radius: var(--radius-panel);
+  padding: 34px 36px;
+  color: var(--color-ink);
+}
+
+/* Full-bleed variant, for a band that runs edge to edge of the viewport rather
+   than sitting inside a content column. A box needs four sides and a radius; a
+   strip that has no left or right edge on screen needs neither, and drawing them
+   puts rounded corners and a hairline hard against the window frame.
+   Two horizontal rules instead — the band is separated from what is above and
+   below it, which is the whole job at full width.
+   NO PADDING HERE, deliberately: the five sites range from a 6rem hero to a
+   1.5rem dashboard strip, and each keeps its own. */
+.tq-band-bleed {
+  background: var(--color-band);
+  border: 0;
+  border-top: 1px solid var(--color-band-line);
+  border-bottom: 1px solid var(--color-band-line);
+  border-radius: 0;
+  color: var(--color-ink);
 }
 
 /* ================================================================

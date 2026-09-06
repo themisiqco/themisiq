@@ -49,7 +49,7 @@ import { DistBar, Counters, pct, medianText, type Overall }
 
 const PURPLE = '#7425e3'
 const GREEN = '#0F6E56'
-const AMBER = '#ba7517'
+const AMBER = 'var(--color-module-climate)'
 const AMBER_BG = '#FEF3E2'
 const BLUE = '#0C447C'
 const BLUE_BG = '#E6F1FB'
@@ -888,7 +888,7 @@ function EvidencePanel({ ev, contrast, hasRound, aggFailed, floor, contrastCavea
       {abstentionLed ? (
         // §6.1 as a finding, not as a quiet row. A bar drawn from two answers beside thirteen
         // abstentions would read as a low-priority topic; it is the opposite.
-        <div style={{ background: AMBER_BG, border: `0.5px solid ${AMBER}55`, borderRadius: 8,
+        <div style={{ background: AMBER_BG, border: `0.5px solid color-mix(in srgb, ${AMBER} 33%, transparent)`, borderRadius: 8,
                       padding: '10px 13px', marginBottom: 10, fontSize: 12, color: INK, lineHeight: 1.75 }}>
           <strong>{o.n_abstained} of {o.n_asked} said they could not judge this.</strong>{' '}
           {o.n_answered === 0

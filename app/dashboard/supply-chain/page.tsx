@@ -130,7 +130,7 @@ const newSupplier = (): Supplier => ({
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
 const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.4rem, 2.5vw, 1.8rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
@@ -139,7 +139,7 @@ const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWe
 const RISK_CONFIG: Record<RiskLevel, { label: string; color: string; bg: string; border: string }> = {
   critical: { label: 'CRITICAL', color: '#fff', bg: '#B91C1C', border: '#B91C1C' },
   high:     { label: 'HIGH', color: '#B91C1C', bg: '#FCEBEB', border: '#B91C1C' },
-  medium:   { label: 'MEDIUM', color: '#ba7517', bg: '#FEF3E2', border: '#ba7517' },
+  medium:   { label: 'MEDIUM', color: 'var(--color-module-climate)', bg: '#FEF3E2', border: 'var(--color-module-climate)' },
   low:      { label: 'LOW', color: '#0F6E56', bg: '#E1F5EE', border: '#0F6E56' },
 }
 
@@ -360,7 +360,7 @@ export default function SupplyChainDashboard() {
       {inventory.suppliers.length === 0 ? (
         <div style={{ background: '#f8f7f5', border: '1px dashed #e8e7e4', borderRadius: 12, padding: '2rem', textAlign: 'center' }}>
           <div style={{ fontSize: 14, color: '#888784', marginBottom: 12 }}>No suppliers added yet</div>
-          <button onClick={addSupplier} style={{ fontSize: 13, fontWeight: 500, padding: '10px 20px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>+ Add your first supplier</button>
+          <button onClick={addSupplier} style={{ fontSize: 13, fontWeight: 500, padding: '10px 20px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>+ Add your first supplier</button>
         </div>
       ) : inventory.suppliers[activeSupplier] && (
         <div style={{ border: '1px solid #e8e7e4', borderRadius: 14, overflow: 'hidden' }}>
@@ -452,7 +452,7 @@ export default function SupplyChainDashboard() {
             {[
               { label: 'Critical risk', count: critical, color: '#B91C1C', bg: '#FCEBEB' },
               { label: 'High risk', count: high, color: '#B91C1C', bg: '#FCEBEB' },
-              { label: 'Need assessment', count: needsAssessment, color: '#ba7517', bg: '#FEF3E2' },
+              { label: 'Need assessment', count: needsAssessment, color: 'var(--color-module-climate)', bg: '#FEF3E2' },
               { label: 'Total suppliers', count: inventory.suppliers.length, color: '#0d0d0d', bg: '#f8f7f5' },
             ].map(({ label, count, color, bg }) => (
               <div key={label} style={{ background: bg, borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}>
@@ -539,7 +539,7 @@ export default function SupplyChainDashboard() {
                 <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{s.name || `Supplier ${i + 1}`}</div>
                 <div style={{ fontSize: 12, color: '#555553' }}>{s.sector}</div>
                 <div style={{ fontSize: 12, color: '#555553' }}>{s.annual_spend > 0 ? `${s.currency} ${s.annual_spend.toLocaleString()}` : '—'}</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: s.scope3_emissions > 100 ? '#B91C1C' : s.scope3_emissions > 10 ? '#ba7517' : '#0F6E56' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: s.scope3_emissions > 100 ? '#B91C1C' : s.scope3_emissions > 10 ? 'var(--color-module-climate)' : '#0F6E56' }}>
                   {s.scope3_emissions > 0 ? `${s.scope3_emissions.toFixed(2)} mt` : '—'}
                 </div>
               </div>
@@ -585,15 +585,15 @@ export default function SupplyChainDashboard() {
               <span style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>I confirm that the supplier data entered is accurate to the best of my knowledge. I understand that ThemisIQ's Scope 3 estimates are spend-based and should be verified with primary data from suppliers.</span>
             </label>
           </div>
-          <button onClick={() => dataConfirmed && generateExport()} style={{ fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: dataConfirmed ? 'pointer' : 'not-allowed', opacity: dataConfirmed ? 1 : 0.4 }}>
+          <button onClick={() => dataConfirmed && generateExport()} style={{ fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: dataConfirmed ? 'pointer' : 'not-allowed', opacity: dataConfirmed ? 1 : 0.4 }}>
             ⬇ Download Supplier Risk Register (CSV)
           </button>
         </div>
       ) : (
-        <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', marginBottom: 8 }}>Unlock your full supply chain programme</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 20, lineHeight: 1.6 }}>Download your full supplier risk register — every supplier scored by country, sector and spend — and pull supplier-reported data into your Scope 3 Category 1 calculation.</div>
-          <a href="/pricing" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>See pricing →</a>
+        <div className="tq-band" style={{ borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Unlock your full supply chain programme</div>
+          <div style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: 20, lineHeight: 1.6 }}>Download your full supplier risk register — every supplier scored by country, sector and spend — and pull supplier-reported data into your Scope 3 Category 1 calculation.</div>
+          <a href="/pricing" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>See pricing →</a>
         </div>
       )}
     </div>
@@ -604,7 +604,7 @@ export default function SupplyChainDashboard() {
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
-      <div style={{ background: '#0F6E56', padding: '8px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+      <div style={{ background: 'var(--color-module-supply)', padding: '8px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
         <span style={{ fontSize: 12, fontWeight: 500, color: '#fff' }}>EU CS3D applies from {CS3D_APPLIES_FROM} · ESRS S2 active now · SB 253 Scope 3 deadline 2027. Map your supply chain today.</span>
       </div>
@@ -637,7 +637,7 @@ export default function SupplyChainDashboard() {
             {steps[step]()}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
               <button onClick={() => setStep(s => Math.max(0, s - 1))} style={{ fontSize: 13, padding: '9px 20px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: step === 0 ? 'not-allowed' : 'pointer', opacity: step === 0 ? 0.4 : 1 }}>← Back</button>
-              {step < STEP_NAMES.length - 1 && <button onClick={() => setStep(s => Math.min(STEP_NAMES.length - 1, s + 1))} style={{ fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>Next →</button>}
+              {step < STEP_NAMES.length - 1 && <button onClick={() => setStep(s => Math.min(STEP_NAMES.length - 1, s + 1))} style={{ fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>Next →</button>}
             </div>
           </div>
           {step < 4 && (

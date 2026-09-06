@@ -25,10 +25,10 @@ const TEMPLATES = [
   { id: 'scope3', label: 'Scope 3 Cat.1', desc: '8 questions on GHG emissions, energy use and reduction targets', color: '#0F6E56' },
   { id: 'modern_slavery', label: 'Modern Slavery Act', desc: '12 questions on forced labour, child labour and working conditions', color: '#B91C1C' },
   { id: 'cs3d', label: 'CS3D HRDD', desc: '15 questions on human rights due diligence across the value chain', color: '#0C447C' },
-  { id: 'custom', label: 'Custom questionnaire', desc: 'Define your own questions after creating the campaign', color: '#ba7517' },
+  { id: 'custom', label: 'Custom questionnaire', desc: 'Define your own questions after creating the campaign', color: 'var(--color-module-climate)' },
 ]
 
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 
 export default function SupplierPortalDashboard() {
   const isPaid = useEntitlement('supply-chain')
@@ -96,7 +96,7 @@ export default function SupplierPortalDashboard() {
   const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
   const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
 
-  const statusColor = (s: string) => s === 'active' ? '#0F6E56' : s === 'closed' ? '#888784' : '#ba7517'
+  const statusColor = (s: string) => s === 'active' ? '#0F6E56' : s === 'closed' ? '#888784' : 'var(--color-module-climate)'
   const statusBg = (s: string) => s === 'active' ? '#E1F5EE' : s === 'closed' ? '#f8f7f5' : '#FEF3E2'
 
   if (!isPaid) return <PaywallCard title="Unlock the Supply Chain module" body="The Supplier Portal is part of the Supply Chain module. Unlock it to create campaigns, invite suppliers, and review responses." href="/pricing?modules=supply" />
@@ -111,7 +111,7 @@ export default function SupplierPortalDashboard() {
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Supply Chain & Scope 3</div>
             <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d' }}>Supplier Portal</div>
           </div>
-          <button onClick={() => setShowNew(true)} style={{ fontSize: 13, fontWeight: 500, padding: '10px 20px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>
+          <button onClick={() => setShowNew(true)} style={{ fontSize: 13, fontWeight: 500, padding: '10px 20px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>
             + New campaign
           </button>
         </div>
@@ -149,7 +149,7 @@ export default function SupplierPortalDashboard() {
                   <label style={labelStyle}>Questionnaire template</label>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {TEMPLATES.map(t => (
-                      <div key={t.id} onClick={() => setNewCampaign(p => ({ ...p, questionnaire_template: t.id }))} style={{ border: `1.5px solid ${newCampaign.questionnaire_template === t.id ? t.color : '#e8e7e4'}`, borderRadius: 10, padding: '10px 14px', cursor: 'pointer', background: newCampaign.questionnaire_template === t.id ? t.color + '10' : '#f8f7f5', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div key={t.id} onClick={() => setNewCampaign(p => ({ ...p, questionnaire_template: t.id }))} style={{ border: `1.5px solid ${newCampaign.questionnaire_template === t.id ? t.color : '#e8e7e4'}`, borderRadius: 10, padding: '10px 14px', cursor: 'pointer', background: newCampaign.questionnaire_template === t.id ? `color-mix(in srgb, ${t.color} 6%, transparent)` : '#f8f7f5', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${newCampaign.questionnaire_template === t.id ? t.color : '#e8e7e4'}`, background: newCampaign.questionnaire_template === t.id ? t.color : '#fff', flexShrink: 0 }} />
                         <div>
                           <div style={{ fontSize: 12, fontWeight: 600, color: newCampaign.questionnaire_template === t.id ? t.color : '#0d0d0d' }}>{t.label}</div>
@@ -162,7 +162,7 @@ export default function SupplierPortalDashboard() {
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: '1.5rem', justifyContent: 'flex-end' }}>
                 <button onClick={() => setShowNew(false)} style={{ fontSize: 13, padding: '9px 18px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: 'pointer' }}>Cancel</button>
-                <button onClick={createCampaign} disabled={saving || !newCampaign.name} style={{ fontSize: 13, fontWeight: 500, padding: '9px 18px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer', opacity: saving || !newCampaign.name ? 0.5 : 1 }}>
+                <button onClick={createCampaign} disabled={saving || !newCampaign.name} style={{ fontSize: 13, fontWeight: 500, padding: '9px 18px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer', opacity: saving || !newCampaign.name ? 0.5 : 1 }}>
                   {saving ? 'Creating...' : 'Create campaign →'}
                 </button>
               </div>
@@ -177,7 +177,7 @@ export default function SupplierPortalDashboard() {
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '4rem', textAlign: 'center' }}>
             <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>No campaigns yet</div>
             <div style={{ fontSize: 14, color: '#888784', marginBottom: 24, lineHeight: 1.6 }}>Create your first supplier campaign to start collecting sustainability data from your supply chain.</div>
-            <button onClick={() => setShowNew(true)} style={{ fontSize: 13, fontWeight: 500, padding: '11px 22px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>
+            <button onClick={() => setShowNew(true)} style={{ fontSize: 13, fontWeight: 500, padding: '11px 22px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>
               + Create your first campaign
             </button>
           </div>

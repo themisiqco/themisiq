@@ -73,7 +73,7 @@ const CONTROLS = [
 
 const MATURITY_CONFIG: Record<Maturity, { label: string; score: number; color: string; bg: string }> = {
   none:        { label: 'Not implemented', score: 0, color: '#B91C1C', bg: '#FCEBEB' },
-  partial:     { label: 'Partially implemented', score: 1, color: '#ba7517', bg: '#FEF3E2' },
+  partial:     { label: 'Partially implemented', score: 1, color: 'var(--color-module-climate)', bg: '#FEF3E2' },
   implemented: { label: 'Fully implemented', score: 2, color: '#0F6E56', bg: '#E1F5EE' },
   optimised:   { label: 'Optimised & tested', score: 3, color: '#0C447C', bg: '#E6F1FB' },
 }
@@ -83,11 +83,11 @@ const FRAMEWORK_CONFIG: Record<Framework, { label: string; color: string; deadli
   dora:    { label: 'EU DORA', color: '#7425e3', deadline: 'Active Jan 2025' },
   sec:     { label: 'SEC Cyber', color: '#0C447C', deadline: 'Active Dec 2023' },
   iso27001:{ label: 'ISO 27001', color: '#0F6E56', deadline: 'Ongoing' },
-  nist:    { label: 'NIST CSF 2.0', color: '#ba7517', deadline: 'Ongoing' },
+  nist:    { label: 'NIST CSF 2.0', color: 'var(--color-module-climate)', deadline: 'Ongoing' },
 }
 
 const DOMAINS = [...new Set(CONTROLS.map(c => c.domain))]
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
 const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.4rem, 2.5vw, 1.8rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
@@ -156,7 +156,7 @@ export default function CyberDashboard() {
   const { score, maxScore, pct, gaps } = calcScore(inventory.responses, inventory.frameworks)
   const top5 = getTop5(gaps, inventory.frameworks)
 
-  const scoreColor = pct >= 75 ? '#0F6E56' : pct >= 50 ? '#ba7517' : '#B91C1C'
+  const scoreColor = pct >= 75 ? '#0F6E56' : pct >= 50 ? 'var(--color-module-climate)' : '#B91C1C'
   const scoreLabel = pct >= 75 ? 'Good' : pct >= 50 ? 'Developing' : pct >= 25 ? 'At Risk' : 'Critical Gaps'
 
   const domainControls = CONTROLS.filter(c =>
@@ -233,7 +233,7 @@ export default function CyberDashboard() {
             </div>
             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
               {[{ label: 'Yes', val: true }, { label: 'No', val: false }].map(opt => (
-                <button key={String(opt.val)} onClick={() => update(field as keyof CyberInventory, opt.val)} style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, background: (inventory as any)[field] === opt.val ? '#0d0d0d' : '#f8f7f5', color: (inventory as any)[field] === opt.val ? '#fff' : '#555553', border: `0.5px solid ${(inventory as any)[field] === opt.val ? '#0d0d0d' : '#e8e7e4'}`, cursor: 'pointer' }}>
+                <button key={String(opt.val)} onClick={() => update(field as keyof CyberInventory, opt.val)} style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, background: (inventory as any)[field] === opt.val ? 'var(--color-brand-wash)' : '#f8f7f5', color: (inventory as any)[field] === opt.val ? 'var(--color-ink)' : '#555553', border: `0.5px solid ${(inventory as any)[field] === opt.val ? 'var(--color-brand)' : '#e8e7e4'}`, cursor: 'pointer' }}>
                   {opt.label}
                 </button>
               ))}
@@ -275,9 +275,9 @@ export default function CyberDashboard() {
           const answered = domControls.filter(c => inventory.responses[c.id] && inventory.responses[c.id] !== 'none').length
           const isActive = activeDomain === domain
           return (
-            <button key={domain} onClick={() => setActiveDomain(domain)} style={{ fontSize: 11, padding: '6px 12px', borderRadius: 8, background: isActive ? '#0d0d0d' : '#f8f7f5', color: isActive ? '#fff' : '#555553', border: `0.5px solid ${isActive ? '#0d0d0d' : '#e8e7e4'}`, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button key={domain} onClick={() => setActiveDomain(domain)} style={{ fontSize: 11, padding: '6px 12px', borderRadius: 8, background: isActive ? 'var(--color-brand-wash)' : '#f8f7f5', color: isActive ? 'var(--color-ink)' : '#555553', border: `0.5px solid ${isActive ? 'var(--color-brand)' : '#e8e7e4'}`, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
               {domain}
-              {answered > 0 && <span style={{ fontSize: 9, background: isActive ? 'rgba(255,255,255,0.2)' : '#e8e7e4', color: isActive ? '#fff' : '#555553', padding: '1px 5px', borderRadius: 99 }}>{answered}/{domControls.length}</span>}
+              {answered > 0 && <span style={{ fontSize: 9, background: isActive ? 'var(--color-paper)' : '#e8e7e4', color: 'var(--color-ink-2)', padding: '1px 5px', borderRadius: 99 }}>{answered}/{domControls.length}</span>}
             </button>
           )
         })}
@@ -293,7 +293,7 @@ export default function CyberDashboard() {
           const current = inventory.responses[control.id] || 'none'
           const cfg = MATURITY_CONFIG[current]
           return (
-            <div key={control.id} style={{ border: `1px solid ${current !== 'none' ? cfg.color + '40' : '#e8e7e4'}`, borderRadius: 12, padding: '1rem', background: current !== 'none' ? cfg.bg + '40' : '#fff' }}>
+            <div key={control.id} style={{ border: `1px solid ${current !== 'none' ? `color-mix(in srgb, ${cfg.color} 25%, transparent)` : '#e8e7e4'}`, borderRadius: 12, padding: '1rem', background: current !== 'none' ? `color-mix(in srgb, ${cfg.color} 25%, transparent)` : '#fff' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
@@ -328,24 +328,26 @@ export default function CyberDashboard() {
       <p style={sectionSub}>Your cyber governance gap assessment across {inventory.frameworks.map(f => FRAMEWORK_CONFIG[f].label).join(', ')}.</p>
 
       {/* Score */}
-      <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.5rem', marginBottom: 20, display: 'flex', alignItems: 'center', gap: '2rem' }}>
+      <div className="tq-summary" style={{ marginBottom: 20 }}>
+        <div className="tq-summary-body" style={{ gap: '2rem' }}>
         <div style={{ textAlign: 'center', flexShrink: 0 }}>
           <div style={{ fontFamily: 'Georgia, serif', fontSize: '3.5rem', fontWeight: 400, color: scoreColor, lineHeight: 1 }}>{pct}%</div>
           <div style={{ fontSize: 12, fontWeight: 600, color: scoreColor, marginTop: 4 }}>{scoreLabel}</div>
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ height: 8, background: 'rgba(255,255,255,0.1)', borderRadius: 99, overflow: 'hidden', marginBottom: 12 }}>
+          <div style={{ height: 8, background: 'var(--color-sunken)', borderRadius: 99, overflow: 'hidden', marginBottom: 12 }}>
             <div style={{ height: '100%', width: `${pct}%`, background: scoreColor, borderRadius: 99, transition: 'width 0.5s' }} />
           </div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+          <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>
             {gaps.length} control gap{gaps.length !== 1 ? 's' : ''} identified across {inventory.frameworks.length} framework{inventory.frameworks.length !== 1 ? 's' : ''}. Score: {score}/{maxScore} points.
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
             {inventory.frameworks.map(f => (
-              <span key={f} style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 99, background: `${FRAMEWORK_CONFIG[f].color}22`, color: FRAMEWORK_CONFIG[f].color, border: `0.5px solid ${FRAMEWORK_CONFIG[f].color}44` }}>{FRAMEWORK_CONFIG[f].label}</span>
+              <span key={f} style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 99, background: `color-mix(in srgb, ${FRAMEWORK_CONFIG[f].color} 13%, transparent)`, color: FRAMEWORK_CONFIG[f].color, border: `0.5px solid color-mix(in srgb, ${FRAMEWORK_CONFIG[f].color} 27%, transparent)` }}>{FRAMEWORK_CONFIG[f].label}</span>
             ))}
           </div>
         </div>
+      </div>
       </div>
 
       {/* Domain breakdown */}
@@ -354,7 +356,7 @@ export default function CyberDashboard() {
           const domControls = CONTROLS.filter(c => c.domain === domain && inventory.frameworks.some(f => c[f as keyof typeof c]))
           const domGaps = domControls.filter(c => !inventory.responses[c.id] || inventory.responses[c.id] === 'none' || inventory.responses[c.id] === 'partial').length
           const domPct = domControls.length > 0 ? Math.round(((domControls.length - domGaps) / domControls.length) * 100) : 100
-          const color = domPct >= 75 ? '#0F6E56' : domPct >= 50 ? '#ba7517' : '#B91C1C'
+          const color = domPct >= 75 ? '#0F6E56' : domPct >= 50 ? 'var(--color-module-climate)' : '#B91C1C'
           return (
             <div key={domain} style={{ border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '0.75rem' }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: '#0d0d0d', marginBottom: 6 }}>{domain}</div>
@@ -379,7 +381,7 @@ export default function CyberDashboard() {
           const fwControls = CONTROLS.filter(c => c[fw as keyof typeof c] && inventory.frameworks.includes(fw))
           const fwGaps = fwControls.filter(c => !inventory.responses[c.id] || inventory.responses[c.id] === 'none').length
           const status = fwGaps === 0 ? 'Compliant' : fwGaps <= 2 ? 'Near compliant' : 'Gaps identified'
-          const statusColor = fwGaps === 0 ? '#0F6E56' : fwGaps <= 2 ? '#ba7517' : '#B91C1C'
+          const statusColor = fwGaps === 0 ? '#0F6E56' : fwGaps <= 2 ? 'var(--color-module-climate)' : '#B91C1C'
           return (
             <div key={fw} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '0.5px solid #e8e7e4' }}>
               <div>
@@ -387,7 +389,7 @@ export default function CyberDashboard() {
                 <div style={{ fontSize: 11, color: '#888784' }}>{FRAMEWORK_CONFIG[fw].deadline}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: statusColor + '15', color: statusColor }}>{status}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: `color-mix(in srgb, ${statusColor} 8%, transparent)`, color: statusColor }}>{status}</span>
                 {fwGaps > 0 && <div style={{ fontSize: 10, color: '#888784', marginTop: 3 }}>{fwGaps} control gap{fwGaps > 1 ? 's' : ''}</div>}
               </div>
             </div>
@@ -416,7 +418,7 @@ export default function CyberDashboard() {
             return (
               <div key={control.id} style={{ border: '1px solid #e8e7e4', borderRadius: 14, overflow: 'hidden' }}>
                 <div style={{ background: '#0d0d0d', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: GRAD, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#0d0d0d', flexShrink: 0 }}>{i + 1}</div>
+                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--color-band)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--color-ink)', flexShrink: 0 }}>{i + 1}</div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', flex: 1 }}>{control.title}</div>
                   <span style={{ fontSize: 10, color: '#888784', background: 'rgba(255,255,255,0.08)', padding: '2px 8px', borderRadius: 99 }}>{control.domain}</span>
                 </div>
@@ -424,7 +426,7 @@ export default function CyberDashboard() {
                   <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, marginBottom: 10 }}>{control.desc}</div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {fwList.map(f => <span key={f} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: FRAMEWORK_CONFIG[f].color + '15', color: FRAMEWORK_CONFIG[f].color, border: `0.5px solid ${FRAMEWORK_CONFIG[f].color}33` }}>{FRAMEWORK_CONFIG[f].label}</span>)}
+                      {fwList.map(f => <span key={f} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: `color-mix(in srgb, ${FRAMEWORK_CONFIG[f].color} 8%, transparent)`, color: FRAMEWORK_CONFIG[f].color, border: `0.5px solid color-mix(in srgb, ${FRAMEWORK_CONFIG[f].color} 20%, transparent)` }}>{FRAMEWORK_CONFIG[f].label}</span>)}
                     </div>
                     <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 99, background: MATURITY_CONFIG[current].bg, color: MATURITY_CONFIG[current].color }}>
                       Current: {MATURITY_CONFIG[current].label}
@@ -443,8 +445,8 @@ export default function CyberDashboard() {
     <div>
       <h2 style={sectionHead}>Export your assessment</h2>
       <p style={sectionSub}>Download your full gap assessment report including all controls, scores and remediation priorities.</p>
-      <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.5rem', marginBottom: 20 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Assessment summary — {inventory.company || 'Your company'}</div>
+      <div className="tq-summary" style={{ marginBottom: 20, display: 'block' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }} className="tq-summary-label">Assessment summary — {inventory.company || 'Your company'}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           {[
             { label: 'Overall score', val: `${pct}%`, urgent: pct < 50 },
@@ -453,8 +455,8 @@ export default function CyberDashboard() {
             { label: 'Status', val: scoreLabel },
           ].map(({ label, val, urgent }) => (
             <div key={label}>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>{label}</div>
-              <div style={{ fontSize: typeof val === 'number' ? '1.6rem' : '1rem', fontFamily: typeof val === 'number' ? 'Georgia, serif' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 600, color: urgent ? '#64fe3e' : '#fff', lineHeight: 1.2 }}>{val}</div>
+              <div style={{ fontSize: 10, color: 'var(--color-ink-2)', marginBottom: 4 }}>{label}</div>
+              <div style={{ fontSize: typeof val === 'number' ? '1.6rem' : '1rem', fontFamily: typeof val === 'number' ? 'Georgia, serif' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 600, color: urgent ? 'var(--color-module-cyber)' : 'var(--color-ink)', lineHeight: 1.2 }}>{val}</div>
             </div>
           ))}
         </div>
@@ -467,15 +469,15 @@ export default function CyberDashboard() {
               <span style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>I confirm this assessment reflects our current cyber governance programme to the best of my knowledge. I understand this report is for planning purposes and does not constitute a formal audit or legal advice.</span>
             </label>
           </div>
-          <button onClick={() => dataConfirmed && generateExport()} style={{ fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: dataConfirmed ? 'pointer' : 'not-allowed', opacity: dataConfirmed ? 1 : 0.4 }}>
+          <button onClick={() => dataConfirmed && generateExport()} style={{ fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: dataConfirmed ? 'pointer' : 'not-allowed', opacity: dataConfirmed ? 1 : 0.4 }}>
             ⬇ Download Cyber Gap Assessment (CSV)
           </button>
         </div>
       ) : (
-        <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', marginBottom: 8 }}>Unlock your full cyber governance programme</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 20, lineHeight: 1.6 }}>Download your full gap assessment, generate NIS2 and DORA compliance documentation, and track remediation progress over time.</div>
-          <a href="/pricing" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>See pricing & unlock reports →</a>
+        <div className="tq-band" style={{ borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Unlock your full cyber governance programme</div>
+          <div style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: 20, lineHeight: 1.6 }}>Download your full gap assessment, generate NIS2 and DORA compliance documentation, and track remediation progress over time.</div>
+          <a href="/pricing" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>See pricing & unlock reports →</a>
         </div>
       )}
     </div>
@@ -488,7 +490,7 @@ export default function CyberDashboard() {
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
-      <div style={{ background: '#B91C1C', padding: '8px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+      <div style={{ background: 'var(--color-module-cyber)', padding: '8px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
         <span style={{ fontSize: 12, fontWeight: 500, color: '#fff' }}>NIS2 active since Oct 2024 · DORA active since Jan 2025 · SEC cyber active since Dec 2023. Check your compliance now.</span>
       </div>
@@ -521,16 +523,16 @@ export default function CyberDashboard() {
             {steps[step]()}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
               <button onClick={() => setStep(s => Math.max(0, s - 1))} style={{ fontSize: 13, padding: '9px 20px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: step === 0 ? 'not-allowed' : 'pointer', opacity: step === 0 ? 0.4 : 1 }}>← Back</button>
-              {step < STEP_NAMES.length - 1 && <button onClick={() => setStep(s => Math.min(STEP_NAMES.length - 1, s + 1))} style={{ fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>Next →</button>}
+              {step < STEP_NAMES.length - 1 && <button onClick={() => setStep(s => Math.min(STEP_NAMES.length - 1, s + 1))} style={{ fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>Next →</button>}
             </div>
           </div>
           {step < 4 && (
             <div style={{ position: 'sticky', top: 80 }}>
-              <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.25rem', marginBottom: 12 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Live score</div>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '2.5rem', fontWeight: 400, color: pct > 0 ? scoreColor : 'rgba(255,255,255,0.2)', lineHeight: 1, marginBottom: 4 }}>{pct > 0 ? `${pct}%` : '—'}</div>
+              <div className="tq-summary" style={{ marginBottom: 12, display: 'block' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }} className="tq-summary-label">Live score</div>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: '2.5rem', fontWeight: 400, color: pct > 0 ? scoreColor : 'var(--color-ink-muted)', lineHeight: 1, marginBottom: 4 }}>{pct > 0 ? `${pct}%` : '—'}</div>
                 {pct > 0 && <div style={{ fontSize: 11, fontWeight: 600, color: scoreColor, marginBottom: 12 }}>{scoreLabel}</div>}
-                <div style={{ height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 99, overflow: 'hidden', marginBottom: 12 }}>
+                <div style={{ height: 4, background: 'var(--color-sunken)', borderRadius: 99, overflow: 'hidden', marginBottom: 12 }}>
                   <div style={{ height: '100%', width: `${pct}%`, background: scoreColor, borderRadius: 99, transition: 'width 0.3s' }} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -540,8 +542,8 @@ export default function CyberDashboard() {
                     { label: 'Frameworks', val: inventory.frameworks.length },
                   ].map(({ label, val, urgent }) => (
                     <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{label}</span>
-                      <span style={{ fontSize: 12, color: urgent && val ? '#64fe3e' : '#fff', fontWeight: 500 }}>{val}</span>
+                      <span style={{ fontSize: 11, color: 'var(--color-ink-2)' }}>{label}</span>
+                      <span style={{ fontSize: 12, color: urgent && val ? 'var(--color-module-cyber)' : 'var(--color-ink)', fontWeight: 500 }}>{val}</span>
                     </div>
                   ))}
                 </div>

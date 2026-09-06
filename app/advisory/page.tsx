@@ -1,6 +1,7 @@
 'use client'
 import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
+import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 
 export default function AdvisoryPage() {
   return (
@@ -128,19 +129,19 @@ export default function AdvisoryPage() {
       </section>
 
       {/* CTA */}
-      <section style={{ background: '#0d0d0d', padding: '5rem 2.5rem', textAlign: 'center' }}>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, color: '#fff', maxWidth: 680, margin: '0 auto 1rem', lineHeight: 1.2 }}>
+      <section className="tq-band-bleed" style={{ padding: '5rem 2.5rem', textAlign: 'center' }}>
+        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1rem', lineHeight: 1.2 }}>
           Book your free 30-minute<br />
-          <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Advisory consultation.</span>
+          <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Advisory consultation.</span>
         </h2>
-        <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 15, color: 'var(--color-ink-2)', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
           We'll review your compliance obligations, prioritise by risk and effort, and tell you exactly what to do first. No charge. No obligation.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-          <a href="mailto:advisory@themisiq.co" style={{ fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none', display: 'inline-block' }}>Book free consultation</a>
-          <a href="/dashboard/ghg" style={{ fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: 'rgba(255,255,255,0.6)', border: '0.5px solid rgba(255,255,255,0.15)', textDecoration: 'none', display: 'inline-block' }}>Take the free assessment first</a>
+          <a href="mailto:advisory@themisiq.co" style={{ fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none', display: 'inline-block' }}>Book free consultation</a>
+          <a href="/dashboard/ghg" style={{ fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: 'var(--color-brand)', border: '0.5px solid var(--color-brand)', textDecoration: 'none', display: 'inline-block' }}>Take the free assessment first</a>
         </div>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)', marginTop: '1.5rem' }}>advisory@themisiq.co · hello@themisiq.co</div>
+        <div style={{ fontSize: 12, color: 'var(--color-ink-2)', marginTop: '1.5rem' }}>advisory@themisiq.co · hello@themisiq.co</div>
       </section>
 
       {/* FOOTER */}
@@ -151,9 +152,7 @@ export default function AdvisoryPage() {
 }
 
 const navLink: React.CSSProperties = { fontSize: 11, color: '#555553', textDecoration: 'none' }
-const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#fff', textDecoration: 'none', display: 'inline-block' }
-const btnPrimary: React.CSSProperties = { fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: '#0d0d0d', color: '#fff', display: 'inline-block' }
-const btnSecondary: React.CSSProperties = { fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', display: 'inline-block' }
+const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'var(--color-brand)', color: '#fff', textDecoration: 'none', display: 'inline-block' }
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
 const sectionTitle: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }
 const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, margin: '0 auto', lineHeight: 1.75, fontWeight: 400 }

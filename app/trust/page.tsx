@@ -2,7 +2,7 @@
 
 import Nav from '../components/Nav'
 
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 
 const PRINCIPLES = [
   {
@@ -25,7 +25,7 @@ const PRINCIPLES = [
   },
   {
     title: 'Encrypted in transit and at rest',
-    color: '#ba7517',
+    color: 'var(--color-module-climate)',
     bg: '#FEF3E2',
     content: 'All data transmitted to and from ThemisIQ is encrypted using TLS 1.2+. All data stored in ThemisIQ is encrypted at rest using AES-256. Our infrastructure runs on Supabase (hosted on AWS) with SOC 2 Type II certified data centres.',
   },
@@ -112,7 +112,7 @@ export default function TrustPage() {
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: '1.5rem' }}>Our core data principles</div>
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
             {PRINCIPLES.map((p, i) => (
-              <div key={p.title} style={{ background: '#fff', border: `1px solid ${p.color}20`, borderLeft: `4px solid ${p.color}`, borderRadius: 12, padding: '1.25rem 1.5rem', display: 'grid', gridTemplateColumns: '24px 1fr', gap: 16, alignItems: 'flex-start' }}>
+              <div key={p.title} style={{ background: '#fff', border: `1px solid color-mix(in srgb, ${p.color} 13%, transparent)`, borderLeft: `4px solid ${p.color}`, borderRadius: 12, padding: '1.25rem 1.5rem', display: 'grid', gridTemplateColumns: '24px 1fr', gap: 16, alignItems: 'flex-start' }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '1rem', fontWeight: 400, color: p.color, marginTop: 2 }}>{i + 1}</div>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 6 }}>{p.title}</div>
@@ -177,14 +177,14 @@ export default function TrustPage() {
         </div>
 
         {/* Contact */}
-        <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '2rem', textAlign: 'center' as const }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#fff', marginBottom: 8 }}>Questions about your data?</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 20, lineHeight: 1.6 }}>
-            Contact our privacy team at <a href="mailto:privacy@themisiq.co" style={{ color: '#64fe3e', textDecoration: 'none' }}>privacy@themisiq.co</a>. We respond within 2 business days. For data deletion requests, we act within 30 days.
+        <div className="tq-band" style={{ borderRadius: 14, padding: '2rem', textAlign: 'center' as const }}>
+          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, marginBottom: 8 }}>Questions about your data?</div>
+          <div style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: 20, lineHeight: 1.6 }}>
+            Contact our privacy team at <a href="mailto:privacy@themisiq.co" style={{ color: 'var(--color-brand)', textDecoration: 'none' }}>privacy@themisiq.co</a>. We respond within 2 business days. For data deletion requests, we act within 30 days.
           </div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-            <a href="/methodology" style={{ fontSize: 13, fontWeight: 500, padding: '10px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', textDecoration: 'none' }}>Our methodologies →</a>
-            <a href="/privacy" style={{ fontSize: 13, padding: '10px 24px', borderRadius: 8, background: 'none', color: 'rgba(255,255,255,0.6)', border: '0.5px solid rgba(255,255,255,0.2)', textDecoration: 'none' }}>Full privacy policy →</a>
+            <a href="/methodology" style={{ fontSize: 13, fontWeight: 500, padding: '10px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none' }}>Our methodologies →</a>
+            <a href="/privacy" style={{ fontSize: 13, padding: '10px 24px', borderRadius: 8, background: 'none', color: 'var(--color-brand)', border: '0.5px solid var(--color-brand)', textDecoration: 'none' }}>Full privacy policy →</a>
           </div>
         </div>
       </div>

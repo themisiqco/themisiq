@@ -50,7 +50,7 @@ const SECTORS = [
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
 const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.4rem, 2.5vw, 1.8rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
@@ -58,13 +58,13 @@ const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWe
 
 const SEVERITY_CONFIG = {
   critical: { label: 'CRITICAL', color: '#B91C1C', bg: '#FCEBEB', border: '#B91C1C' },
-  high:     { label: 'HIGH', color: '#ba7517', bg: '#FEF3E2', border: '#ba7517' },
+  high:     { label: 'HIGH', color: 'var(--color-module-climate)', bg: '#FEF3E2', border: 'var(--color-module-climate)' },
   medium:   { label: 'MEDIUM', color: '#0C447C', bg: '#E6F1FB', border: '#0C447C' },
 }
 
 const STEP_NAMES = ['Deal Setup', 'ESG Screening', 'Risk Findings', 'Cost Estimate', 'Report']
 
-const verifyChip: React.CSSProperties = { fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#FEF3E2', color: '#ba7517', border: '0.5px solid rgba(186,117,23,0.35)' }
+const verifyChip: React.CSSProperties = { fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#FEF3E2', color: 'var(--color-module-climate)', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 35%, transparent)' }
 
 
 // ─── Page wrapper ─────────────────────────────────────────────────────────────
@@ -564,7 +564,7 @@ function DealsDashboardInner() {
         Screening one target is free. Everything you have entered is kept — signing in brings you
         straight back to this deal with the figures still in place.
       </div>
-      <button onClick={signInForResults} style={{ fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>
+      <button onClick={signInForResults} style={{ fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>
         Sign in to see your results →
       </button>
     </div>
@@ -672,8 +672,8 @@ function DealsDashboardInner() {
           `frameworksState` is driven by the UNION, so on a routeNotMet-only deal this branch would
           open and then interpolate an empty name list into "Size test incomplete for  —". */}
       {frameworksState === 'not-assessed' && (!view.evaluated || view.unevaluated.length > 0) ? (
-        <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 12, padding: '1.25rem', marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#ba7517', letterSpacing: '0.04em', marginBottom: 6 }}>NOT ASSESSED</div>
+        <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 20%, transparent)', borderRadius: 12, padding: '1.25rem', marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-module-climate)', letterSpacing: '0.04em', marginBottom: 6 }}>NOT ASSESSED</div>
           <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
             {view.evaluated
               ? <>Size test incomplete for {view.unevaluated.join(', ')} — <strong style={{ fontWeight: 600 }}>not evaluated</strong>, which is not a finding that none apply. {resolveFieldsPrompt(view.fieldsToResolve, view.unevaluated)}</>
@@ -689,10 +689,10 @@ function DealsDashboardInner() {
           {frameworks.map(fw => {
             const near = nearByFramework.get(fw)
             return (
-              <div key={fw} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '12px 16px', background: '#fff', border: `1px solid ${near ? 'rgba(186,117,23,0.35)' : '#e8e7e4'}`, borderRadius: 10 }}>
+              <div key={fw} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '12px 16px', background: '#fff', border: `1px solid ${near ? 'color-mix(in srgb, var(--color-module-climate) 35%, transparent)' : '#e8e7e4'}`, borderRadius: 10 }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{fw}</div>
-                  {near && <div style={{ fontSize: 11, color: '#ba7517', lineHeight: 1.55, marginTop: 5 }}>{nearSentence(near)}</div>}
+                  {near && <div style={{ fontSize: 11, color: 'var(--color-module-climate)', lineHeight: 1.55, marginTop: 5 }}>{nearSentence(near)}</div>}
                 </div>
                 {/* APPLIES is retained alongside VERIFY — near-ness annotates the finding, it does not soften it. */}
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
@@ -708,8 +708,8 @@ function DealsDashboardInner() {
       {/* Partial assessment: the list above resolved from jurisdiction and sector, but a revenue
           trigger was withheld. Naming it stops the reader inferring it was considered and excluded. */}
       {frameworksState === 'assessed-findings' && view.notAssessed.length > 0 && (
-        <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '1rem', marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#ba7517', letterSpacing: '0.04em', marginBottom: 4 }}>PARTIAL — {view.notAssessed.join(', ')} {partialHeadingPhrase(view)}</div>
+        <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 20%, transparent)', borderRadius: 10, padding: '1rem', marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-module-climate)', letterSpacing: '0.04em', marginBottom: 4 }}>PARTIAL — {view.notAssessed.join(', ')} {partialHeadingPhrase(view)}</div>
           {/* Heading keeps the UNION — it only claims something was withheld, and must name all of it.
               The body explains WHY, which is population-specific and cannot be said of both. */}
           {view.unevaluated.length > 0 && (
@@ -727,8 +727,8 @@ function DealsDashboardInner() {
           unevaluated LIMB, never by a withheld framework, so the union named rows the sentence
           misdescribes — a routeNotMet framework had every limb evaluated. */}
       {nearState === 'not-assessed' && (
-        <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '1rem', marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#ba7517', letterSpacing: '0.04em', marginBottom: 4 }}>NEAR-THRESHOLD — NOT ASSESSED</div>
+        <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 20%, transparent)', borderRadius: 10, padding: '1rem', marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-module-climate)', letterSpacing: '0.04em', marginBottom: 4 }}>NEAR-THRESHOLD — NOT ASSESSED</div>
           <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
             {view.evaluated
               ? <>No proximity check was run — the {view.unevaluated.join(' / ')} size test{view.unevaluated.length === 1 ? '' : 's'} could not be completed. {resolveFieldsPrompt(view.fieldsToResolve, view.unevaluated)}</>
@@ -740,17 +740,17 @@ function DealsDashboardInner() {
       {/* Near-but-below: these are correctly absent from the list above. Surfaced so the reader
           learns the deal sits just under a trigger, without implying it has crossed it. */}
       {nearBelow.length > 0 && (
-        <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '1rem', marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 6 }}>Approaching a reporting threshold — verify</div>
+        <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 20%, transparent)', borderRadius: 10, padding: '1rem', marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 6 }}>Approaching a reporting threshold — verify</div>
           <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, marginBottom: 10 }}>
             The following do <strong style={{ fontWeight: 600 }}>not</strong> apply on the figures entered. Each has a limb within {NEAR_PCT} of its statutory trigger, so the answer turns on how that figure is measured and on reporting-entity scope — confirm before ruling them out.
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {nearBelow.map(f => (
-              <div key={f.framework} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '10px 12px', background: '#fff', borderRadius: 8, border: '0.5px solid rgba(186,117,23,0.2)' }}>
+              <div key={f.framework} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '10px 12px', background: '#fff', borderRadius: 8, border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 20%, transparent)' }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{f.framework}</div>
-                  <div style={{ fontSize: 11, color: '#ba7517', lineHeight: 1.55, marginTop: 5 }}>{nearSentence(f)}</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-module-climate)', lineHeight: 1.55, marginTop: 5 }}>{nearSentence(f)}</div>
                 </div>
                 <span style={{ ...verifyChip, flexShrink: 0 }}>NEAR THRESHOLD</span>
               </div>
@@ -786,8 +786,8 @@ function DealsDashboardInner() {
 
       {/* THE FINDING the toggles above produce, so it is withheld with the rest of them. */}
       {resultsShown && (!deal.has_ghg_data || !deal.has_esg_report) && (
-        <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '1rem' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 4 }}>⚠ Data room gaps identified</div>
+        <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 20%, transparent)', borderRadius: 10, padding: '1rem' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>⚠ Data room gaps identified</div>
           <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
             {!deal.has_ghg_data && '· Request verified GHG inventory (Scope 1, 2, 3) from target before closing\n'}
             {!deal.has_esg_report && '· Request latest ESG report or sustainability disclosure from target'}
@@ -837,8 +837,8 @@ function DealsDashboardInner() {
               claims here would be false of it. Silence on a routeNotMet-only deal is correct — nothing
               vanished from the Framework column. */}
           {view.unevaluated.length > 0 && (
-            <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '0.85rem 1rem', marginBottom: 14, fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
-              <strong style={{ fontWeight: 600, color: '#ba7517' }}>Framework column partially resolved.</strong> The {view.unevaluated.join(' / ')} size test could not be completed, so {view.unevaluated.length === 1 ? 'it does' : 'they do'} not appear in any label below. Labels reflect only the regimes determinable from the figures provided. {resolveFieldsPrompt(view.fieldsToResolve, view.unevaluated)}
+            <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 20%, transparent)', borderRadius: 10, padding: '0.85rem 1rem', marginBottom: 14, fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
+              <strong style={{ fontWeight: 600, color: 'var(--color-module-climate)' }}>Framework column partially resolved.</strong> The {view.unevaluated.join(' / ')} size test could not be completed, so {view.unevaluated.length === 1 ? 'it does' : 'they do'} not appear in any label below. Labels reflect only the regimes determinable from the figures provided. {resolveFieldsPrompt(view.fieldsToResolve, view.unevaluated)}
             </div>
           )}
           {/* A FOURTH TILE, not a fourth severity. 'Conditional' answers a different question from
@@ -847,10 +847,10 @@ function DealsDashboardInner() {
           <div style={{ display: 'grid', gridTemplateColumns: conditionalRisks.length > 0 ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
             {[
               { label: 'Critical risks', count: criticalRisks.length, color: '#B91C1C', bg: '#FCEBEB' },
-              { label: 'High risks', count: highRisks.length, color: '#ba7517', bg: '#FEF3E2' },
+              { label: 'High risks', count: highRisks.length, color: 'var(--color-module-climate)', bg: '#FEF3E2' },
               { label: 'Medium risks', count: mediumRisks.length, color: '#0C447C', bg: '#E6F1FB' },
               ...(conditionalRisks.length > 0
-                ? [{ label: 'Conditional', count: conditionalRisks.length, color: '#ba7517', bg: '#FEF3E2' }]
+                ? [{ label: 'Conditional', count: conditionalRisks.length, color: 'var(--color-module-climate)', bg: '#FEF3E2' }]
                 : []),
             ].map(({ label, count, color, bg }) => (
               <div key={label} style={{ background: bg, borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}>
@@ -876,8 +876,8 @@ function DealsDashboardInner() {
                   .map(f => [f!.framework, f!] as const),
               ).values()]
               return (
-                <div key={i} style={{ border: `1px solid ${cfg.border}20`, borderRadius: 12, overflow: 'hidden' }}>
-                  <div style={{ background: risk.severity === 'critical' ? cfg.bg : '#fff', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `0.5px solid ${cfg.border}20` }}>
+                <div key={i} style={{ border: `1px solid color-mix(in srgb, ${cfg.border} 13%, transparent)`, borderRadius: 12, overflow: 'hidden' }}>
+                  <div style={{ background: risk.severity === 'critical' ? cfg.bg : '#fff', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `0.5px solid color-mix(in srgb, ${cfg.border} 13%, transparent)` }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{risk.risk}</div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
                       <span style={{ fontSize: 10, color: '#888784' }}>{regimeLabel(tokens)}</span>
@@ -892,7 +892,7 @@ function DealsDashboardInner() {
                         conditioned finding is the same kind of statement, so it should not arrive
                         in a new visual language the reader has to learn. */}
                     {risk.scope === 'conditional' && (
-                      <div style={{ fontSize: 11, color: '#ba7517', lineHeight: 1.55, marginTop: 8 }}>{risk.condition}</div>
+                      <div style={{ fontSize: 11, color: 'var(--color-module-climate)', lineHeight: 1.55, marginTop: 8 }}>{risk.condition}</div>
                     )}
                     {/* BOTH conditions, and they answer different questions. The token check asks
                         whether THIS finding cites CS3D at all — it is per-finding, and dropping it
@@ -900,12 +900,12 @@ function DealsDashboardInner() {
                         the deal's CS3D state has anything to say — it is per-deal, and is what
                         keeps a near-threshold row from being described twice. */}
                     {cs3dNote && tokens.some(t => t.framework === 'CS3D' && t.qualified) && (
-                      <div style={{ fontSize: 11, color: '#ba7517', lineHeight: 1.55, marginTop: 8 }}>
+                      <div style={{ fontSize: 11, color: 'var(--color-module-climate)', lineHeight: 1.55, marginTop: 8 }}>
                         <strong style={{ fontWeight: 600 }}>{cs3dNote.heading}:</strong> {cs3dNote.body}.
                       </div>
                     )}
                     {citedNear.map(f => (
-                      <div key={f.framework} style={{ fontSize: 11, color: '#ba7517', lineHeight: 1.55, marginTop: 8 }}>
+                      <div key={f.framework} style={{ fontSize: 11, color: 'var(--color-module-climate)', lineHeight: 1.55, marginTop: 8 }}>
                         <strong style={{ fontWeight: 600 }}>{f.framework}:</strong> {nearSentence(f)}
                       </div>
                     ))}
@@ -1069,8 +1069,8 @@ function DealsDashboardInner() {
           checkbox is a liability disclaimer, not a completeness check). The report stays
           downloadable — it is still useful — but the reader is told which frameworks it withheld. */}
       {view.notAssessed.length > 0 && (
-        <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '1rem', marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#ba7517', letterSpacing: '0.04em', marginBottom: 4 }}>PARTIAL — {view.notAssessed.join(', ')} NOT ASSESSED</div>
+        <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 20%, transparent)', borderRadius: 10, padding: '1rem', marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-module-climate)', letterSpacing: '0.04em', marginBottom: 4 }}>PARTIAL — {view.notAssessed.join(', ')} NOT ASSESSED</div>
           <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
             Frameworks determinable from jurisdiction and sector <strong style={{ fontWeight: 600 }}>have</strong> been assessed and appear in this report. {view.notAssessed.join(' and ')} {view.notAssessed.length === 1 ? 'is' : 'are'} marked <strong style={{ fontWeight: 600 }}>NOT ASSESSED</strong> — that is not a finding that {view.notAssessed.length === 1 ? 'it does' : 'they do'} not apply. {resolveFieldsPrompt(view.fieldsToResolve, view.notAssessed)}
           </div>
@@ -1094,7 +1094,7 @@ function DealsDashboardInner() {
             <div style={{ fontSize: 12, color: '#888784', fontStyle: 'italic' }}>Save the deal to open its report.</div>
           ) : (
             <>
-              <a href={`/dashboard/deals/report?id=${dealId}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: '#0d0d0d', textDecoration: 'none' }}>
+              <a href={`/dashboard/deals/report?id=${dealId}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', textDecoration: 'none' }}>
                 Open the full report →
               </a>
               <div style={{ fontSize: 12, color: '#888784', lineHeight: 1.6, marginTop: 10, maxWidth: 520 }}>
@@ -1129,8 +1129,8 @@ function DealsDashboardInner() {
                 {/* A live link on a deal that fails the create-gate is the urgent case: someone is
                     reading an empty assessment right now, and only the owner can stop it. */}
                 {shareBlockers.length > 0 && (
-                  <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '0.85rem 1rem', fontSize: 12, color: '#555553', lineHeight: 1.6, marginBottom: 12 }}>
-                    <div style={{ fontWeight: 600, color: '#ba7517', marginBottom: 4 }}>Anyone opening this link right now sees an empty assessment</div>
+                  <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 20%, transparent)', borderRadius: 10, padding: '0.85rem 1rem', fontSize: 12, color: '#555553', lineHeight: 1.6, marginBottom: 12 }}>
+                    <div style={{ fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>Anyone opening this link right now sees an empty assessment</div>
                     This deal has no sector saved, so there are no reporting rules or risk findings to show.
                     Either turn the link off below, or{' '}
                     <button onClick={() => setStep(0)} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: '#7425e3', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>add a sector in Deal setup</button>
@@ -1148,8 +1148,8 @@ function DealsDashboardInner() {
                  list is empty without a sector and a jurisdiction — so sharing before they are
                  filled in sends the target an assessment showing no obligations and a GHG-only
                  price. Name what to fill in and where, rather than reporting a fault. */
-              <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '0.85rem 1rem', fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
-                <div style={{ fontWeight: 600, color: '#ba7517', marginBottom: 4 }}>
+              <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 20%, transparent)', borderRadius: 10, padding: '0.85rem 1rem', fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
+                <div style={{ fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>
                   {deal.sector ? 'Save the deal first' : 'Add a sector first'}
                 </div>
                 {deal.sector ? (
@@ -1164,7 +1164,7 @@ function DealsDashboardInner() {
             ) : (
               <>
                 <div style={{ fontSize: 12, color: '#888784', marginBottom: 12 }}>🔒 Not shared — only you can see this assessment.</div>
-                <button onClick={() => toggleShare(true)} disabled={shareSaving} style={{ fontSize: 13, fontWeight: 600, padding: '10px 22px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: shareSaving ? 'not-allowed' : 'pointer' }}>{shareSaving ? 'Generating…' : 'Generate share link'}</button>
+                <button onClick={() => toggleShare(true)} disabled={shareSaving} style={{ fontSize: 13, fontWeight: 600, padding: '10px 22px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: shareSaving ? 'not-allowed' : 'pointer' }}>{shareSaving ? 'Generating…' : 'Generate share link'}</button>
               </>
             )}
           </div>
@@ -1178,10 +1178,10 @@ function DealsDashboardInner() {
           <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.2)', borderRadius: 10, padding: '0.85rem 1.25rem', marginBottom: 12, fontSize: 12, color: '#0C447C', lineHeight: 1.6 }}>
             <strong style={{ fontWeight: 600 }}>This is your free deal.</strong> Screening this target and saving it needs no subscription. Once it is saved, starting a second target needs the Deals module.
           </div>
-          <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', marginBottom: 8 }}>Unlock your full ESG diligence programme</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 20, lineHeight: 1.6 }}>Screen a target&rsquo;s ESG risk, work out which reporting rules apply to it and what compliance would cost, and produce a diligence report for your investment committee.</div>
-          <a href="/pricing" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>See pricing & unlock reports →</a>
+          <div className="tq-band" style={{ borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Unlock your full ESG diligence programme</div>
+          <div style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: 20, lineHeight: 1.6 }}>Screen a target&rsquo;s ESG risk, work out which reporting rules apply to it and what compliance would cost, and produce a diligence report for your investment committee.</div>
+          <a href="/pricing" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>See pricing & unlock reports →</a>
           </div>
         </div>
       )}
@@ -1274,7 +1274,7 @@ function DealsDashboardInner() {
                 the wrong verb for them by the same reasoning the three-populations note above
                 gives; they get the neutral pricing label the report upsell uses. */}
             {gate.reason !== 'unknown' && (
-              <a href="/pricing?modules=deals#build-your-stack" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
+              <a href="/pricing?modules=deals#build-your-stack" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
                 {gate.reason === 'expired' ? 'See Deals pricing →' : 'See pricing & unlock →'}
               </a>
             )}
@@ -1287,7 +1287,7 @@ function DealsDashboardInner() {
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
-      <div style={{ background: '#0C447C', padding: '8px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+      <div style={{ background: 'var(--color-module-deals)', padding: '8px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
         <span style={{ fontSize: 12, fontWeight: 500, color: '#fff' }}>UK SECR in force now · UK SRS (ISSB-aligned) proposed mandatory from 2027 · IFRS S2 effective · SB 253 first report {SB253_FIRST_REPORT_DATE} ({SB253_DATE_STATUS}) · CSRD for large EU companies. ESG is a material deal risk.</span>
       </div>
@@ -1325,7 +1325,7 @@ function DealsDashboardInner() {
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
               <button onClick={() => setStep(s => Math.max(0, s - 1))} style={{ fontSize: 13, padding: '9px 20px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: step === 0 ? 'not-allowed' : 'pointer', opacity: step === 0 ? 0.4 : 1 }}>← Back</button>
               <button onClick={handleSave} disabled={saving} style={{ fontSize: 13, fontWeight: saved ? 500 : 600, padding: '9px 20px', borderRadius: 8, background: saved ? '#E1F5EE' : GRAD, border: saved ? '1px solid #0F6E56' : 'none', color: saved ? '#0F6E56' : '#0d0d0d', cursor: saving ? 'not-allowed' : 'pointer' }}>{saving ? 'Saving…' : saved ? '✓ Saved' : 'Save deal'}</button>
-              {step < STEP_NAMES.length - 1 && <button onClick={() => setStep(s => Math.min(STEP_NAMES.length - 1, s + 1))} style={{ fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>Next →</button>}
+              {step < STEP_NAMES.length - 1 && <button onClick={() => setStep(s => Math.min(STEP_NAMES.length - 1, s + 1))} style={{ fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>Next →</button>}
             </div>
           </div>
           {step < 4 && (

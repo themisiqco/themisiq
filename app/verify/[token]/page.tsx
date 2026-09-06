@@ -499,7 +499,7 @@ export default function VerifierPage() {
           {' · '}
           {inv.gwp_version
             ? <>GWP basis: {inv.gwp_version}</>
-            : <span style={{ color: '#ba7517', fontWeight: 600 }}>GWP basis not stated</span>}
+            : <span style={{ color: 'var(--color-module-climate)', fontWeight: 600 }}>GWP basis not stated</span>}
         </p>
 
         {/*
@@ -803,8 +803,8 @@ export default function VerifierPage() {
                       )}
                       {w.declaration === 'undeclared' && (
                         <>
-                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: '#ba7517', background: 'rgba(186,117,23,0.12)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Not declared</span>
-                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: '#ba7517' }}>
+                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: 'var(--color-module-climate)', background: 'color-mix(in srgb, var(--color-module-climate) 12%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Not declared</span>
+                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-module-climate)' }}>
                             Nobody has said whether this location has this or not, so the inventory cannot be shown
                             to be complete without it. This is not a figure of zero.
                           </div>
@@ -819,8 +819,8 @@ export default function VerifierPage() {
                           matched pair with opposite polarity. */}
                       {w.declaration === 'declared_unquantified' && (
                         <>
-                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: '#ba7517', background: 'rgba(186,117,23,0.12)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Present, no figure</span>
-                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: '#ba7517' }}>
+                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: 'var(--color-module-climate)', background: 'color-mix(in srgb, var(--color-module-climate) 12%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Present, no figure</span>
+                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-module-climate)' }}>
                             The operator has confirmed this location has this, and has given no figure for it.
                             Whatever it emitted is missing from every total on this page. This is not a figure of
                             zero — and unlike a stream nobody was asked about, this one is known to be here.
@@ -840,8 +840,8 @@ export default function VerifierPage() {
                           supply a figure, and how big it is, is what a verifier is judging. */}
                       {w.declaration === 'no_published_factor' && (
                         <>
-                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: '#ba7517', background: 'rgba(186,117,23,0.12)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Stream not priced</span>
-                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: '#ba7517' }}>
+                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: 'var(--color-module-climate)', background: 'color-mix(in srgb, var(--color-module-climate) 12%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Stream not priced</span>
+                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-module-climate)' }}>
                             The operator reported a quantity for this stream, and no emission factor is published
                             for it in this jurisdiction. The quantity shown is what they reported; the emissions it
                             represents are missing from every total on this page. This is not a figure of zero, and
@@ -852,8 +852,8 @@ export default function VerifierPage() {
                       )}
                       {w.declaration === 'unpriceable' && (
                         <>
-                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: '#ba7517', background: 'rgba(186,117,23,0.12)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Excluded from totals</span>
-                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: '#ba7517' }}>
+                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: 'var(--color-module-climate)', background: 'color-mix(in srgb, var(--color-module-climate) 12%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Excluded from totals</span>
+                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-module-climate)' }}>
                             No published emission factor exists for the unit this location&apos;s figures are in, so it
                             could not be calculated. Every total on this page is missing this location. This is not
                             a figure of zero.
@@ -953,7 +953,7 @@ export default function VerifierPage() {
             <div key={row.id || i} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px', marginBottom: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: changed.length ? 10 : 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color, background: color + '18', padding: '3px 10px', borderRadius: 99 }}>{label}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color, background: `color-mix(in srgb, ${color} 9%, transparent)`, padding: '3px 10px', borderRadius: 99 }}>{label}</span>
                   <span style={{ fontSize: 12, color: '#555553' }}>{row.user_email || 'System'}</span>
                 </div>
                 <span style={{ fontSize: 11, color: '#888784' }}>{new Date(row.created_at).toLocaleString()}</span>

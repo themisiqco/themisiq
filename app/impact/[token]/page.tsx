@@ -40,7 +40,7 @@ import { ScaleField, Question, Options, Option } from '../../components/severity
 const PURPLE = '#7425e3'
 const GREEN = '#0F6E56'
 const GREEN_BG = '#E1F5EE'
-const AMBER = '#ba7517'
+const AMBER = 'var(--color-module-climate)'
 const AMBER_BG = '#FEF3E2'
 const BLUE = '#0C447C'
 const BLUE_BG = '#E6F1FB'

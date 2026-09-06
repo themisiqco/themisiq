@@ -15,11 +15,11 @@ import { getObligations, sectorRisks, type ResolvedRisk } from '../../../lib/dea
 import { makeMapFramework, regimeLabel } from '../../../lib/deals/reportModel'
 import { GHG_TIERS, type Tier } from '../../../lib/pricing'
 
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 
 const SEVERITY_CONFIG = {
   critical: { label: 'CRITICAL', color: '#B91C1C', bg: '#FCEBEB', border: '#B91C1C' },
-  high:     { label: 'HIGH', color: '#ba7517', bg: '#FEF3E2', border: '#ba7517' },
+  high:     { label: 'HIGH', color: 'var(--color-module-climate)', bg: '#FEF3E2', border: 'var(--color-module-climate)' },
   medium:   { label: 'MEDIUM', color: '#0C447C', bg: '#E6F1FB', border: '#0C447C' },
 }
 
@@ -196,19 +196,19 @@ export default function DealAssessmentPage() {
             {risks.map((risk, i) => {
               const cfg = SEVERITY_CONFIG[risk.severity]
               return (
-                <div key={i} style={{ border: `1px solid ${cfg.border}20`, borderRadius: 12, overflow: 'hidden', background: '#fff' }}>
-                  <div style={{ background: risk.severity === 'critical' ? cfg.bg : '#fff', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderBottom: `0.5px solid ${cfg.border}20`, flexWrap: 'wrap' }}>
+                <div key={i} style={{ border: `1px solid color-mix(in srgb, ${cfg.border} 13%, transparent)`, borderRadius: 12, overflow: 'hidden', background: '#fff' }}>
+                  <div style={{ background: risk.severity === 'critical' ? cfg.bg : '#fff', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderBottom: `0.5px solid color-mix(in srgb, ${cfg.border} 13%, transparent)`, flexWrap: 'wrap' }}>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{risk.risk}</div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
                       <span style={{ fontSize: 10, color: '#888784' }}>{regimeLabel(mapFramework(risk.framework))}</span>
-                      {risk.scope === 'conditional' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#FEF3E2', color: '#ba7517', border: '0.5px solid rgba(186,117,23,0.35)' }}>CONDITIONAL</span>}
+                      {risk.scope === 'conditional' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#FEF3E2', color: 'var(--color-module-climate)', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 35%, transparent)' }}>CONDITIONAL</span>}
                       <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: cfg.bg, color: cfg.color, border: `0.5px solid ${cfg.border}` }}>{cfg.label}</span>
                     </div>
                   </div>
                   <div style={{ padding: '10px 16px' }}>
                     <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{risk.detail}</div>
                     {risk.scope === 'conditional' && (
-                      <div style={{ fontSize: 11, color: '#ba7517', lineHeight: 1.55, marginTop: 8 }}>{risk.condition}</div>
+                      <div style={{ fontSize: 11, color: 'var(--color-module-climate)', lineHeight: 1.55, marginTop: 8 }}>{risk.condition}</div>
                     )}
                   </div>
                 </div>
@@ -288,19 +288,19 @@ export default function DealAssessmentPage() {
           ].map(({ label, ready }) => (
             <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px' }}>
               <span style={{ fontSize: 13, color: '#0d0d0d' }}>{label}</span>
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: ready ? '#E1F5EE' : '#FEF3E2', color: ready ? '#0F6E56' : '#ba7517' }}>{ready ? 'Available' : 'Not yet available'}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: ready ? '#E1F5EE' : '#FEF3E2', color: ready ? '#0F6E56' : 'var(--color-module-climate)' }}>{ready ? 'Available' : 'Not yet available'}</span>
             </div>
           ))}
         </div>
       </section>
 
       {/* Conversion CTA */}
-      <section style={{ background: '#0d0d0d', borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.4rem, 4vw, 1.8rem)', fontWeight: 400, color: '#fff', marginBottom: 8 }}>Get compliance-ready with ThemisIQ</div>
-        <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, marginBottom: 20, maxWidth: 520, margin: '0 auto 20px' }}>
+      <section className="tq-band" style={{ borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
+        <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.4rem, 4vw, 1.8rem)', fontWeight: 400, marginBottom: 8 }}>Get compliance-ready with ThemisIQ</div>
+        <div style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.6, marginBottom: 20, maxWidth: 520, margin: '0 auto 20px' }}>
           Build your GHG inventory, map your frameworks, and produce verifier-ready reports — priced like software, scoped to exactly what this deal needs.
         </div>
-        <a href={ctaHref} style={{ display: 'inline-block', padding: '13px 30px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>Get started with ThemisIQ →</a>
+        <a href={ctaHref} style={{ display: 'inline-block', padding: '13px 30px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>Get started with ThemisIQ →</a>
       </section>
     </Shell>
   )

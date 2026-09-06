@@ -27,7 +27,7 @@
 import type { CSSProperties } from 'react'
 
 export const EV_BLUE = '#0C447C'
-export const EV_AMBER = '#ba7517'
+export const EV_AMBER = 'var(--color-module-climate)'
 export const EV_AMBER_BG = '#FEF3E2'
 export const EV_PURPLE = '#7425e3'
 export const EV_INK = '#0d0d0d'

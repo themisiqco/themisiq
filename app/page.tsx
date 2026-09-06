@@ -7,6 +7,7 @@ import { NEW_PRICING_ACTIVE } from '../lib/pricing'
 import { PACK_SLUG_MODULES } from '../lib/packEntryPoints'
 import Nav from './components/Nav'
 import Footer from './components/Footer'
+import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 
 export default function Home() {
   return (
@@ -66,14 +67,14 @@ export default function Home() {
       </div>
 
      {/* ── TRUST BAR ── */}
-      <div style={{ background: '#0d0d0d', padding: '1.5rem 2.5rem', textAlign: 'center' as const }}>
+      <div className="tq-band-bleed" style={{ padding: '1.5rem 2.5rem', textAlign: 'center' as const }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-          <p style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1rem, 2vw, 1.3rem)', fontWeight: 400, color: '#fff', marginBottom: '1rem', lineHeight: 1.5 }}>
+          <p style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1rem, 2vw, 1.3rem)', fontWeight: 400, marginBottom: '1rem', lineHeight: 1.5 }}>
             We know trust is everything. At ThemisIQ, you can trust our methodologies and how we handle your data.
           </p>
           <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-            <a href="/methodology" style={{ fontSize: 13, fontWeight: 500, padding: '8px 20px', borderRadius: 8, border: '0.5px solid rgba(255,255,255,0.3)', color: '#fff', textDecoration: 'none', background: 'none' }}>Our methodologies →</a>
-            <a href="/trust" style={{ fontSize: 13, fontWeight: 500, padding: '8px 20px', borderRadius: 8, border: '0.5px solid rgba(255,255,255,0.3)', color: '#fff', textDecoration: 'none', background: 'none' }}>How we handle your data →</a>
+            <a href="/methodology" style={{ fontSize: 13, fontWeight: 500, padding: '8px 20px', borderRadius: 8, border: '0.5px solid var(--color-brand)', color: 'var(--color-brand)', textDecoration: 'none', background: 'none' }}>Our methodologies →</a>
+            <a href="/trust" style={{ fontSize: 13, fontWeight: 500, padding: '8px 20px', borderRadius: 8, border: '0.5px solid var(--color-brand)', color: 'var(--color-brand)', textDecoration: 'none', background: 'none' }}>How we handle your data →</a>
           </div>
         </div>
       </div>
@@ -241,9 +242,9 @@ export default function Home() {
               { slug: 'foundation', name: 'ESG Foundation', driver: 'Your board wants it', color: '#7425e3', items: ['GHG Inventory', 'People & Workforce', 'Climate Risk'] },
               { slug: 'investor', name: 'Investor ESG', driver: 'Your investor requires it', color: '#B91C1C', items: ['GHG Inventory', 'Climate Risk', 'Supply Chain', 'Deals & Investment'] },
             ].map(pack => (
-              <a key={pack.name} href={`/pricing?modules=${PACK_SLUG_MODULES[pack.slug]}`} style={{ background: '#fff', border: `1.5px solid ${pack.color}25`, borderRadius: 14, padding: '1.5rem', textDecoration: 'none', display: 'block', transition: 'all 0.15s' }}
+              <a key={pack.name} href={`/pricing?modules=${PACK_SLUG_MODULES[pack.slug]}`} style={{ background: '#fff', border: `1.5px solid color-mix(in srgb, ${pack.color} 15%, transparent)`, borderRadius: 14, padding: '1.5rem', textDecoration: 'none', display: 'block', transition: 'all 0.15s' }}
                 onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = pack.color}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = pack.color + '25'}>
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = `color-mix(in srgb, ${pack.color} 15%, transparent)`}>
                 <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: pack.color, marginBottom: 6 }}>{pack.driver}</div>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>{pack.name}</div>
                 {pack.items.map(item => (
@@ -317,9 +318,7 @@ const modules = [
 // ── STYLES ──────────────────────────────────────────────────────────
 const navLink: React.CSSProperties = { fontSize: 13, color: '#555553', textDecoration: 'none' }
 const btnOutline: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', cursor: 'pointer' }
-const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#fff', border: 'none', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }
-const btnPrimary: React.CSSProperties = { fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', cursor: 'pointer', display: 'inline-block' }
-const btnSecondary: React.CSSProperties = { fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', cursor: 'pointer', display: 'inline-block' }
+const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'var(--color-brand)', color: '#fff', border: 'none', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }
 const gradText: React.CSSProperties = { fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
 const sectionTitle: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }

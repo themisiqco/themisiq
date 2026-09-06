@@ -283,10 +283,10 @@ const SCENARIO_LABEL: Record<string, { l: string; d: string }> = {
 }
 
 // ─── Styled bits (print-friendly) ─────────────────────────────────────────────
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 const SEV = {
   high: { color: '#B91C1C', bg: '#FCEBEB', border: '#B91C1C' },
-  med:  { color: '#ba7517', bg: '#FEF3E2', border: '#ba7517' },
+  med:  { color: 'var(--color-module-climate)', bg: '#FEF3E2', border: 'var(--color-module-climate)' },
   low:  { color: '#888784', bg: '#f8f7f5', border: '#e8e7e4' },
 } as const
 
@@ -507,10 +507,10 @@ function ReportInner() {
   return (
     <div className="report-root" style={{ background: '#fff', minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', color: '#0d0d0d' }}>
       {/* Print button (hidden when printing) */}
-      <div className="no-print" style={{ position: 'sticky', top: 0, background: '#0d0d0d', color: '#fff', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
+      <div className="no-print" style={{ position: 'sticky', top: 0, background: 'var(--color-ink)', color: '#fff', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
         <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>ThemisIQ · {isCsrd ? 'CSRD double materiality report' : 'IFRS S2 single materiality report'}</div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={() => window.print()} style={{ fontSize: 13, fontWeight: 500, padding: '8px 20px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>
+          <button onClick={() => window.print()} style={{ fontSize: 13, fontWeight: 500, padding: '8px 20px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>
             ⬇ Save as PDF (Cmd+P)
           </button>
         </div>
@@ -571,7 +571,7 @@ function ReportInner() {
               'conflict' only. 'ok' needs no words; 'not_stated' is already visible from the two
               rows above; and 'unparseable' belongs to a free-text API caller, not to this cover. */}
           {isCsrd && a.workings?.disclosure?.periodVersionCheck?.status === 'conflict' && (
-            <p style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, margin: '0 0 12px', padding: '10px 12px', background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.3)', borderRadius: 8 }}>
+            <p style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, margin: '0 0 12px', padding: '10px 12px', background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 8 }}>
               <strong style={{ color: '#0d0d0d' }}>Reporting period and standard version.</strong>{' '}
               {a.workings.disclosure.periodVersionCheck.message}{' '}
               {a.workings.disclosure.periodVersionCheck.certainty === 'inferred' && (
@@ -598,7 +598,7 @@ function ReportInner() {
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: isCsrd ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)', gap: 12, margin: '18px 0' }}>
             <Stat label="High physical risks" val={result.summary?.physicalHigh ?? 0} color="#B91C1C" bg="#FCEBEB" />
-            <Stat label="High transition risks" val={result.summary?.transitionHigh ?? 0} color="#ba7517" bg="#FEF3E2" />
+            <Stat label="High transition risks" val={result.summary?.transitionHigh ?? 0} color="var(--color-module-climate)" bg="#FEF3E2" />
             {isCsrd && <Stat label="Topics material on both axes" val={result.summary?.topicsBothAxes ?? 0} color="#7425e3" bg="#EDE9FE" />}
           </div>
           <h3 style={h3}>Key findings</h3>
@@ -692,7 +692,7 @@ function ReportInner() {
             </p>
             <Matrix topics={matrix} />
             <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginTop: 8, fontSize: 12, color: '#555553' }}>
-              {[['#A32D2D', 'Material on both'], ['#ba7517', 'Material on one axis'], ['#888784', 'Lower priority']].map(([c, l]) => (
+              {[['#A32D2D', 'Material on both'], ['var(--color-module-climate)', 'Material on one axis'], ['#888784', 'Lower priority']].map(([c, l]) => (
                 <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: '50%', background: c, display: 'inline-block' }} />{l}</span>
               ))}
             </div>
@@ -995,7 +995,7 @@ function Pill({ band }: { band: 'high' | 'med' | 'low' | 'unknown' }) {
   // 'unknown' = a data gap (no baseline for this industry × topic, or no reference hazard data —
   // engine FIX A/C). Amber "Not assessed", NEVER an assessed LOW: a gap must not read as immateriality.
   if (band === 'unknown') {
-    return <span style={{ background: '#FDF6EC', color: '#8A5A12', border: '0.5px solid #EAD9BE', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99 }}>NOT ASSESSED</span>
+    return <span style={{ background: '#FDF6EC', color: 'var(--color-module-climate)', border: '0.5px solid #EAD9BE', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99 }}>NOT ASSESSED</span>
   }
   const c = SEV[band]
   return <span style={{ background: c.bg, color: c.color, border: `0.5px solid ${c.border}`, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99 }}>{band.toUpperCase()}</span>
@@ -1008,7 +1008,7 @@ function Matrix({ topics }: { topics: any[] }) {
   const W = 600, H = 400, padL = 56, padR = 20, padT = 20, padB = 48
   const midX = padL + 0.5 * (W - padL - padR)
   const midY = padT + 0.5 * (H - padT - padB)
-  const color = (q: string) => q === 'both' ? '#A32D2D' : (q === 'financial' || q === 'impact') ? '#ba7517' : '#888784'
+  const color = (q: string) => q === 'both' ? '#A32D2D' : (q === 'financial' || q === 'impact') ? 'var(--color-module-climate)' : '#888784'
 
   // Offset dots that would land on top of an earlier-placed dot so labels stay readable.
   // 8 directions in a small circle; first collision -> right, second -> left, etc.

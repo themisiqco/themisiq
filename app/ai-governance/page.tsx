@@ -5,6 +5,7 @@ import { FLAT_MODULE_PRICES } from '../../lib/pricing'
 import {
   AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED, AI_ACT_CITATION,
 } from '../../lib/aiAct'
+import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 
 // NO COUNTDOWN. This page ran `Math.max(0, days until 2026-08-02)`, so once the date passed the
 // headline read "0 days to the EU AI Act deadline" rather than reading as broken — and it kept
@@ -26,7 +27,7 @@ export default function Page() {
 
       {/* STATUS BANNER — states the dates, not an interval. Was an urgency banner counting down to a
           date that had already moved. */}
-      <div style={{ background: '#7425e3', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, position: 'sticky', top: 64, zIndex: 99 }}>
+      <div style={{ background: 'var(--color-module-ai)', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, position: 'sticky', top: 64, zIndex: 99 }}>
         <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff', flexShrink: 0 }} />
         <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>EU AI Act high-risk obligations: {AI_ACT_HIGH_RISK_STANDALONE} for stand-alone systems, {AI_ACT_HIGH_RISK_EMBEDDED} where the AI is inside a regulated product.</span>
         <a href="/dashboard/ai-governance" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>Check if EU AI Act applies to you →</a>
@@ -63,10 +64,10 @@ export default function Page() {
               // 'Stand-alone', not 'Annex III': this was the only annex citation on a public marketing
               // page, and the tile beside it already says "stand-alone systems". Same register.
               { val: 'Stand-alone', unit: 'high-risk', label: 'HR, hiring, credit, education AI — full conformity assessment required', color: '#7425e3', bg: '#EDE9FE' },
-              { val: '€35M', unit: 'or 7%', label: 'maximum EU AI Act fine for prohibited AI practices', color: '#ba7517', bg: '#FEF3E2' },
+              { val: '€35M', unit: 'or 7%', label: 'maximum EU AI Act fine for prohibited AI practices', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
               { val: 'Feb 2025', unit: 'active', label: 'prohibited AI practices already banned — manipulation, social scoring, real-time biometrics', color: '#0F6E56', bg: '#E1F5EE' },
             ].map(({ val, unit, label, color, bg }) => (
-              <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid ${color}22` }}>
+              <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid color-mix(in srgb, ${color} 13%, transparent)` }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color, marginTop: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{unit}</div>
                 <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{label}</div>
@@ -197,7 +198,7 @@ export default function Page() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
           {[
             { date: 'Feb 2, 2025', status: 'Active', label: 'Prohibited AI', desc: 'Manipulation, social scoring, real-time biometric surveillance in public spaces, and emotion recognition in workplaces banned. Non-compliance: fines up to €35M or 7% global revenue.', color: '#B91C1C', bg: '#FCEBEB' },
-            { date: 'May 2, 2025', status: 'Active', label: 'GPAI obligations', desc: 'General Purpose AI models (GPT-4-class and above) subject to transparency, copyright, and systemic risk provisions. GPAI providers must publish technical documentation.', color: '#ba7517', bg: '#FEF3E2' },
+            { date: 'May 2, 2025', status: 'Active', label: 'GPAI obligations', desc: 'General Purpose AI models (GPT-4-class and above) subject to transparency, copyright, and systemic risk provisions. GPAI providers must publish technical documentation.', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
             { date: AI_ACT_HIGH_RISK_STANDALONE, status: 'Prepare now', label: 'High-risk AI (Annex III)', desc: 'Stand-alone high-risk systems under Article 6(2) — HR, hiring, credit, education, essential services AI. Full conformity assessment, Article 11 documentation, EU database registration required. Fines up to €15M or 3% global revenue.', color: '#7425e3', bg: '#EDE9FE' },
             // Annex I, not Annex III: the products limb is Article 6(1), which reaches AI as a safety
             // component of goods already covered by EU product-safety law and lists those instruments
@@ -215,21 +216,21 @@ export default function Page() {
       </section>
 
       {/* CTA */}
-      <section style={{ background: '#0d0d0d', padding: '6rem 2.5rem', textAlign: 'center' }}>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2, color: '#fff' }}>
+      <section className="tq-band-bleed" style={{ padding: '6rem 2.5rem', textAlign: 'center' }}>
+        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
           {/* The reason to act is that you cannot classify what you have not inventoried, and the
               inventory is the input to every other obligation — not that a date is close. A countdown
               headline expires; this one does not. */}
           You cannot classify what you<br />have not inventoried.<br />
-          <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Start with what you have.</span>
+          <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Start with what you have.</span>
         </h2>
-        <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 15, color: 'var(--color-ink-2)', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
           The first step is knowing what AI systems you have and whether they're high-risk. ThemisIQ's AI inventory wizard walks you through every system in days — not months.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-          <a href="/dashboard/ai-governance" style={{ fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none', display: 'inline-block' }}>Start your AI inventory →</a>
-          <a href="/order?modules=ai" style={{ fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: 'rgba(255,255,255,0.7)', border: '0.5px solid rgba(255,255,255,0.2)', textDecoration: 'none', display: 'inline-block' }}>${aiPrice}/yr</a>
-          <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: 'rgba(255,255,255,0.5)', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
+          <a href="/dashboard/ai-governance" style={{ fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none', display: 'inline-block' }}>Start your AI inventory →</a>
+          <a href="/order?modules=ai" style={{ fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: 'var(--color-brand)', border: '0.5px solid var(--color-brand)', textDecoration: 'none', display: 'inline-block' }}>${aiPrice}/yr</a>
+          <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: 'var(--color-brand)', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
         </div>
       </section>
 
@@ -242,9 +243,7 @@ export default function Page() {
 }
 
 const navLink: React.CSSProperties = { fontSize: 11, color: '#555553', textDecoration: 'none' }
-const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#fff', textDecoration: 'none', display: 'inline-block' }
+const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'var(--color-brand)', color: '#fff', textDecoration: 'none', display: 'inline-block' }
 const btnOutline: React.CSSProperties = { fontSize: 13, fontWeight: 400, padding: '8px 18px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', textDecoration: 'none', display: 'inline-block' }
-const btnPrimary: React.CSSProperties = { fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: '#0d0d0d', color: '#fff', display: 'inline-block' }
-const btnSecondary: React.CSSProperties = { fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', display: 'inline-block' }
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
 const sectionTitle: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }

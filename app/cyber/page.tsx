@@ -2,6 +2,7 @@
 import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
 import { FLAT_MODULE_PRICES } from '../../lib/pricing'
+import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 
 export default function Page() {
   // Price from the single source of truth, formatted as app/cbam/page.tsx does.
@@ -11,7 +12,7 @@ export default function Page() {
       <Nav />
 
       {/* URGENCY BANNER */}
-      <div style={{ background: '#B91C1C', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+      <div style={{ background: 'var(--color-module-cyber)', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
         <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>NIS2 active since Oct 2024 · DORA active since Jan 2025 · SEC cyber disclosure active since Dec 2023. Are you compliant?</span>
         <a href="/assess" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>Check your obligations →</a>
@@ -46,10 +47,10 @@ export default function Page() {
             {[
               { val: '72h', unit: 'NIS2 report', label: 'full incident report to national authority after significant cyber incident', color: '#B91C1C', bg: '#FCEBEB' },
               { val: '€10M', unit: 'or 2%', label: 'maximum NIS2 fine for essential entity non-compliance', color: '#7425e3', bg: '#EDE9FE' },
-              { val: '4 days', unit: 'SEC 8-K', label: 'to disclose material cybersecurity incidents as a US public company', color: '#ba7517', bg: '#FEF3E2' },
+              { val: '4 days', unit: 'SEC 8-K', label: 'to disclose material cybersecurity incidents as a US public company', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
               { val: 'Art. 20', unit: 'NIS2', label: 'board members personally accountable for cyber risk management', color: '#0F6E56', bg: '#E1F5EE' },
             ].map(({ val, unit, label, color, bg }) => (
-              <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid ${color}22` }}>
+              <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid color-mix(in srgb, ${color} 13%, transparent)` }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color, marginTop: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{unit}</div>
                 <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{label}</div>
@@ -92,7 +93,7 @@ export default function Page() {
             ].map(({ name, active, who, key, color }) => (
               <div key={name} style={{ background: 'rgba(255,255,255,0.04)', padding: '2rem', borderTop: `3px solid ${color}` }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', marginBottom: 4 }}>{name}</div>
-                <div style={{ fontSize: 11, fontWeight: 600, color, marginBottom: 12, background: `${color}22`, padding: '2px 8px', borderRadius: 99, display: 'inline-block' }}>{active}</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color, marginBottom: 12, background: `color-mix(in srgb, ${color} 13%, transparent)`, padding: '2px 8px', borderRadius: 99, display: 'inline-block' }}>{active}</div>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>{who}</div>
                 {key.map((item, i) => (
                   <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
@@ -141,7 +142,7 @@ export default function Page() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
             {[
               { time: 'Hour 1', title: 'Contain & assess', desc: 'Isolate affected systems. Assign incident commander. Open ThemisIQ incident record. Determine severity classification.', color: '#7425e3' },
-              { time: 'Hour 24', title: 'NIS2 early warning', desc: 'Submit early warning to national competent authority. Indicate whether incident is suspected to be malicious. Customer notification if data breach confirmed.', color: '#ba7517' },
+              { time: 'Hour 24', title: 'NIS2 early warning', desc: 'Submit early warning to national competent authority. Indicate whether incident is suspected to be malicious. Customer notification if data breach confirmed.', color: 'var(--color-module-climate)' },
               { time: 'Hour 72', title: 'Full report + SEC 8-K', desc: 'NIS2 full incident notification. DORA ICT incident report. US public companies: assess 8-K materiality and file if material. GDPR Article 33 if personal data involved.', color: '#B91C1C' },
               { time: 'Day 30', title: 'Final report', desc: 'NIS2 final report with root cause, impact assessment, cross-border effects, and measures taken. Post-incident review completion. Corrective action verification.', color: '#0F6E56' },
             ].map(({ time, title, desc, color }) => (
@@ -191,18 +192,18 @@ export default function Page() {
       </section>
 
       {/* CTA */}
-      <section style={{ background: '#0d0d0d', padding: '6rem 2.5rem', textAlign: 'center' }}>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2, color: '#fff' }}>
+      <section className="tq-band-bleed" style={{ padding: '6rem 2.5rem', textAlign: 'center' }}>
+        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
           NIS2 is active. DORA is active.<br />
-          <span style={{ fontStyle: 'italic', background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Are you compliant?</span>
+          <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Are you compliant?</span>
         </h2>
-        <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 15, color: 'var(--color-ink-2)', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
           ThemisIQ's cyber governance gap assessment identifies where you stand against NIS2, DORA, and SEC cyber rules — and tells you exactly what to fix first.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-          <a href="/dashboard/cyber" style={{ fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#0d0d0d', textDecoration: 'none', display: 'inline-block' }}>Check your cyber readiness →</a>
-          <a href="/order?modules=cyber" style={{ fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: 'rgba(255,255,255,0.7)', border: '0.5px solid rgba(255,255,255,0.2)', textDecoration: 'none', display: 'inline-block' }}>${cyberPrice}/yr</a>
-          <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: 'rgba(255,255,255,0.5)', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
+          <a href="/dashboard/cyber" style={{ fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none', display: 'inline-block' }}>Check your cyber readiness →</a>
+          <a href="/order?modules=cyber" style={{ fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: 'var(--color-brand)', border: '0.5px solid var(--color-brand)', textDecoration: 'none', display: 'inline-block' }}>${cyberPrice}/yr</a>
+          <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: 'var(--color-brand)', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
         </div>
       </section>
 
@@ -215,9 +216,7 @@ export default function Page() {
 }
 
 const navLink: React.CSSProperties = { fontSize: 11, color: '#555553', textDecoration: 'none' }
-const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#fff', textDecoration: 'none', display: 'inline-block' }
+const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'var(--color-brand)', color: '#fff', textDecoration: 'none', display: 'inline-block' }
 const btnOutline: React.CSSProperties = { fontSize: 13, fontWeight: 400, padding: '8px 18px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', textDecoration: 'none', display: 'inline-block' }
-const btnPrimary: React.CSSProperties = { fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: '#0d0d0d', color: '#fff', display: 'inline-block' }
-const btnSecondary: React.CSSProperties = { fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', display: 'inline-block' }
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
 const sectionTitle: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }

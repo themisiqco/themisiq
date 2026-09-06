@@ -25,7 +25,7 @@ const DISCLAIMER_HTML = `<p style="font-size:10px;font-weight:700;color:#888;let
   + disclaimerParas('screening').map(par => `<p style="font-size:10px;color:#aaa;line-height:1.6;margin:0 0 6px;">${par}</p>`).join('')
 
 const URGENCY_COLOR: Record<string, string> = {
-  critical: '#B91C1C', high: '#ba7517', medium: '#0C447C', monitor: '#888784'
+  critical: '#B91C1C', high: '#A94E0D', medium: '#0C447C', monitor: '#888784'
 }
 const URGENCY_BG: Record<string, string> = {
   critical: '#FCEBEB', high: '#FEF3E2', medium: '#E6F1FB', monitor: '#f8f7f5'

@@ -33,5 +33,23 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.9"
-  }
+  },
+  "browserslist": [
+    "defaults",
+    "not chrome < 111",
+    "not edge < 111",
+    "not firefox < 113",
+    "not safari < 16.2",
+    "not ios_saf < 16.2",
+    "not samsung < 22",
+    "not opera < 97",
+    "not op_mob < 73",
+    "not and_chr < 111",
+    "not and_ff < 113",
+    "not android < 111",
+    "not op_mini all",
+    "not kaios <= 3.1",
+    "not and_qq <= 14.9",
+    "not and_uc <= 15.5"
+  ]
 }

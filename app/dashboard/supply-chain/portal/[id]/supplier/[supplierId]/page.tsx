@@ -25,10 +25,10 @@ const getResponseColor = (response: string): string => {
   const lower = response.toLowerCase()
   if (POSITIVE_RESPONSES.some(p => lower.startsWith(p))) return '#0F6E56'
   if (NEGATIVE_RESPONSES.some(n => lower === n || lower.startsWith(n))) return '#B91C1C'
-  return '#ba7517'
+  return 'var(--color-module-climate)'
 }
 
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 
 export default function SupplierResponseViewer() {
   const isPaid = useEntitlement('supply-chain')
@@ -131,10 +131,10 @@ export default function SupplierResponseViewer() {
               {supplier?.contact_name && <div style={{ fontSize: 13, color: '#888784' }}>{supplier.contact_name}</div>}
             </div>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 99, background: supplier?.status === 'completed' ? '#E1F5EE' : '#FEF3E2', color: supplier?.status === 'completed' ? '#0F6E56' : '#ba7517' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 99, background: supplier?.status === 'completed' ? '#E1F5EE' : '#FEF3E2', color: supplier?.status === 'completed' ? '#0F6E56' : 'var(--color-module-climate)' }}>
                 {supplier?.status === 'completed' ? '✓ Completed' : 'In progress'}
               </span>
-              <button onClick={exportCSV} style={{ fontSize: 12, fontWeight: 500, padding: '8px 16px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>
+              <button onClick={exportCSV} style={{ fontSize: 12, fontWeight: 500, padding: '8px 16px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>
                 ⬇ Export CSV
               </button>
             </div>
@@ -201,7 +201,7 @@ export default function SupplierResponseViewer() {
                 <div style={{ fontSize: 13, color: '#555553', fontWeight: 400 }}>{q.label}</div>
                 <div>
                   {response ? (
-                    <span style={{ fontSize: 12, fontWeight: 500, color: responseColor, background: responseColor + '15', padding: '4px 10px', borderRadius: 99, border: `0.5px solid ${responseColor}33` }}>
+                    <span style={{ fontSize: 12, fontWeight: 500, color: responseColor, background: `color-mix(in srgb, ${responseColor} 8%, transparent)`, padding: '4px 10px', borderRadius: 99, border: `0.5px solid color-mix(in srgb, ${responseColor} 20%, transparent)` }}>
                       {response}
                     </span>
                   ) : (

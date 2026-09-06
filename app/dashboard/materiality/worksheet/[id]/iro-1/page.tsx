@@ -41,7 +41,7 @@ const MID = '#555553'
 const MUTE = '#888784'
 const LINE = '#e8e7e4'
 const PAPER = '#f8f7f5'
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 
 const CARD: React.CSSProperties = {
   background: '#fff', border: `0.5px solid ${LINE}`, borderRadius: 14,
@@ -260,7 +260,7 @@ export default function Iro1Page() {
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
                               textTransform: 'uppercase', color: PURPLE }}>{f.limb}</div>
                 <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.06em',
-                               color: chip.fg, background: chip.bg, border: `0.5px solid ${chip.fg}33`,
+                               color: chip.fg, background: chip.bg, border: `0.5px solid color-mix(in srgb, ${chip.fg} 20%, transparent)`,
                                borderRadius: 999, padding: '3px 10px' }}>{chip.text}</span>
               </div>
 
@@ -328,7 +328,7 @@ export default function Iro1Page() {
               )}
 
               {err && (
-                <div style={{ background: FAIL_BG, border: `0.5px solid ${FAIL}33`, borderRadius: 8,
+                <div style={{ background: FAIL_BG, border: `0.5px solid color-mix(in srgb, ${FAIL} 20%, transparent)`, borderRadius: 8,
                               padding: '10px 13px', marginTop: 12, fontSize: 12, color: INK,
                               lineHeight: 1.75 }}>{err}</div>
               )}
@@ -379,7 +379,7 @@ export default function Iro1Page() {
                 <button
                   onClick={() => { if (blockers.length === 0) void submit(); else setNudged(true) }}
                   aria-disabled={blockers.length > 0}
-                  style={{ ...ACTION, fontWeight: 600, background: GRAD, border: 'none',
+                  style={{ ...ACTION, fontWeight: 600, background: GRAD, color: 'var(--color-on-dark)', border: 'none',
                            cursor: blockers.length ? 'not-allowed' : 'pointer',
                            opacity: blockers.length ? 0.5 : 1 }}>Submit IRO-1</button>
                 {/* ⚠️ THE SCREEN SAYS WHAT IS OUTSTANDING; POSTGRES SAYS ONLY THAT SOMETHING IS.
@@ -401,7 +401,7 @@ export default function Iro1Page() {
             </>
           )}
           {submitError && (
-            <div style={{ background: FAIL_BG, border: `0.5px solid ${FAIL}33`, borderRadius: 8,
+            <div style={{ background: FAIL_BG, border: `0.5px solid color-mix(in srgb, ${FAIL} 20%, transparent)`, borderRadius: 8,
                           padding: '10px 13px', marginTop: 12, fontSize: 12, color: INK,
                           lineHeight: 1.75 }}>{submitError}</div>
           )}

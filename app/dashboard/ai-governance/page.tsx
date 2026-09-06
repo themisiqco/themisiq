@@ -162,7 +162,7 @@ const fromLibrary = (lib: typeof AI_SYSTEM_LIBRARY[0]): AISystem => {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
 const sectionHead: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.4rem, 2.5vw, 1.8rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }
@@ -171,7 +171,7 @@ const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWe
 const RISK_CONFIG: Record<RiskLevel, { label: string; color: string; bg: string; border: string }> = {
   prohibited:   { label: 'PROHIBITED', color: '#fff', bg: '#B91C1C', border: '#B91C1C' },
   high_risk:    { label: 'HIGH RISK', color: '#B91C1C', bg: '#FCEBEB', border: '#B91C1C' },
-  limited_risk: { label: 'LIMITED RISK', color: '#ba7517', bg: '#FEF3E2', border: '#ba7517' },
+  limited_risk: { label: 'LIMITED RISK', color: 'var(--color-module-climate)', bg: '#FEF3E2', border: 'var(--color-module-climate)' },
   minimal_risk: { label: 'MINIMAL RISK', color: '#0F6E56', bg: '#E1F5EE', border: '#0F6E56' },
   unclassified: { label: 'NOT CLASSIFIED', color: '#888784', bg: '#f8f7f5', border: '#e8e7e4' },
 }
@@ -497,7 +497,7 @@ export default function AIGovernanceDashboard() {
             {[
               { label: 'Prohibited', count: prohibited, color: '#B91C1C', bg: '#FCEBEB' },
               { label: 'High risk', count: highRisk, color: '#B91C1C', bg: '#FCEBEB' },
-              { label: 'Limited risk', count: limitedRisk, color: '#ba7517', bg: '#FEF3E2' },
+              { label: 'Limited risk', count: limitedRisk, color: 'var(--color-module-climate)', bg: '#FEF3E2' },
               { label: 'Minimal risk', count: minimalRisk, color: '#0F6E56', bg: '#E1F5EE' },
             ].map(({ label, count, color, bg }) => (
               <div key={label} style={{ background: bg, borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}>
@@ -575,16 +575,16 @@ export default function AIGovernanceDashboard() {
               <span style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>I confirm that the AI systems listed are accurate to the best of my knowledge. I understand this report is for planning purposes and does not constitute legal advice.</span>
             </label>
           </div>
-          <button onClick={() => dataConfirmed && generateExport()} style={{ fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: dataConfirmed ? 'pointer' : 'not-allowed', opacity: dataConfirmed ? 1 : 0.4 }}>
+          <button onClick={() => dataConfirmed && generateExport()} style={{ fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: dataConfirmed ? 'pointer' : 'not-allowed', opacity: dataConfirmed ? 1 : 0.4 }}>
             ⬇ Download AI Inventory & Gap Assessment (CSV)
           </button>
         </div>
       ) : (
-        <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', marginBottom: 8 }}>Unlock your full AI governance programme</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 8, lineHeight: 1.6 }}>Download your EU AI Act gap assessment, generate Article 11 technical documentation, and track conformity assessment progress.</div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: 20 }}>High-risk obligations from {HIGH_RISK_BOTH_DATES}</div>
-          <a href="/pricing" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>See pricing & unlock reports →</a>
+        <div className="tq-band" style={{ borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Unlock your full AI governance programme</div>
+          <div style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: 8, lineHeight: 1.6 }}>Download your EU AI Act gap assessment, generate Article 11 technical documentation, and track conformity assessment progress.</div>
+          <div style={{ fontSize: 12, color: 'var(--color-ink-2)', marginBottom: 20 }}>High-risk obligations from {HIGH_RISK_BOTH_DATES}</div>
+          <a href="/pricing" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>See pricing & unlock reports →</a>
         </div>
       )}
     </div>
@@ -595,7 +595,7 @@ export default function AIGovernanceDashboard() {
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
-      <div style={{ background: '#7425e3', padding: '8px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+      <div style={{ background: 'var(--color-module-ai)', padding: '8px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#64fe3e', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
         <span style={{ fontSize: 12, fontWeight: 500, color: '#fff' }}>EU AI Act high-risk obligations from {HIGH_RISK_BOTH_DATES}. Start your inventory now.</span>
       </div>
@@ -623,7 +623,7 @@ export default function AIGovernanceDashboard() {
             {steps[step]()}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
               <button onClick={() => setStep(s => Math.max(0, s - 1))} style={{ fontSize: 13, padding: '9px 20px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: step === 0 ? 'not-allowed' : 'pointer', opacity: step === 0 ? 0.4 : 1 }}>← Back</button>
-              {step < STEP_NAMES.length - 1 && <button onClick={() => setStep(s => Math.min(STEP_NAMES.length - 1, s + 1))} style={{ fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>Next →</button>}
+              {step < STEP_NAMES.length - 1 && <button onClick={() => setStep(s => Math.min(STEP_NAMES.length - 1, s + 1))} style={{ fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>Next →</button>}
             </div>
           </div>
           {step < 4 && (

@@ -7,6 +7,7 @@
 // (per-process × activity level sums to the installation totals shown).
 import Nav from '../../components/Nav'
 import Footer from '@/app/components/Footer'
+import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 
 // ── Palette (matches app/cbam/page.tsx) ──
 const ink = '#0d0d0d'
@@ -184,7 +185,7 @@ export default function Page() {
           <p style={{ fontSize: 14, color: muted, fontWeight: 400, marginBottom: '1.5rem' }}>Iron & steel · {SAMPLE.installation.country} · reporting period {SAMPLE.reportingPeriod}</p>
 
           {/* Coverage — the complete-and-backed signal */}
-          <div style={{ background: '#E1F5EE', border: `0.5px solid ${green}33`, borderRadius: 10, padding: '10px 16px', marginBottom: '2.5rem', fontSize: 13, color: green, fontWeight: 500 }}>
+          <div style={{ background: '#E1F5EE', border: `0.5px solid color-mix(in srgb, ${green} 20%, transparent)`, borderRadius: 10, padding: '10px 16px', marginBottom: '2.5rem', fontSize: 13, color: green, fontWeight: 500 }}>
             All processes backed by computed records.
           </div>
 
@@ -342,5 +343,3 @@ export default function Page() {
   )
 }
 
-const btnPrimary: React.CSSProperties = { fontSize: 14, fontWeight: 500, padding: '13px 22px', borderRadius: 8, background: '#0d0d0d', color: '#fff', display: 'inline-block' }
-const btnSecondary: React.CSSProperties = { fontSize: 14, fontWeight: 400, padding: '13px 22px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', display: 'inline-block' }

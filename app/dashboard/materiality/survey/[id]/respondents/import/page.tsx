@@ -39,10 +39,10 @@ import {
   type CategoryRef, type ImportRow,
 } from '../../../../../../../lib/materiality/respondentImport'
 
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 const GREEN = '#0F6E56'
 const GREEN_BG = '#E1F5EE'
-const AMBER = '#ba7517'
+const AMBER = 'var(--color-module-climate)'
 const AMBER_BG = '#FEF3E2'
 const FAIL = '#b42318'
 const FAIL_BG = '#fef3f2'
@@ -430,7 +430,7 @@ export default function RespondentImport() {
             style={{ display: 'none' }}
             onChange={e => e.target.files?.[0] && onFile(e.target.files[0])} />
           <button ref={chooseBtnRef} onClick={() => fileRef.current?.click()} disabled={closed}
-            style={{ ...btn, fontWeight: 600, background: GRAD, color: '#0d0d0d', border: 'none' }}>
+            style={{ ...btn, fontWeight: 600, background: GRAD, color: 'var(--color-on-dark)', border: 'none' }}>
             Choose a file
           </button>
           {fileName && <span style={{ fontSize: 12, color: '#888784', marginLeft: 10 }}>{fileName}</span>}

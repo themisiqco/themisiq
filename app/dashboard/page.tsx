@@ -7,7 +7,7 @@ import { supabase } from '../../lib/supabase'
 import { FLAT_MODULE_PRICES } from '../../lib/pricing'
 import { AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED } from '../../lib/aiAct'
 
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 
 // Locked-card price lookup: dashboard module id → FLAT_MODULE_PRICES key.
 // Only the six flat-priced modules appear here; ghg/scope3/sbti/portal have no
@@ -51,8 +51,8 @@ const MODULES: DashboardModule[] = [
     sub: 'Scope 1, 2 & 3',
     desc: 'Calculate your full GHG inventory — Scope 1, 2 and 3 — across all locations and frameworks.',
     href: '/dashboard/ghg',
-    color: '#0F6E56',
-    bg: '#E1F5EE',
+    color: 'var(--color-module-ghg)',
+    bg: 'var(--color-module-ghg-wash)',
     frameworks: ['SB 253', 'CSRD', 'CDP', 'GRI 305', 'IFRS S2'],
     urgency: null,
     previewable: true,
@@ -63,8 +63,8 @@ const MODULES: DashboardModule[] = [
     sub: 'All 15 categories',
     desc: 'Calculate your full Scope 3 footprint across all 15 GHG Protocol categories.',
     href: '/dashboard/scope3',
-    color: '#0F6E56',
-    bg: '#E1F5EE',
+    color: 'var(--color-module-ghg)',
+    bg: 'var(--color-module-ghg-wash)',
     frameworks: ['GHG Protocol', 'CSRD', 'CDP', 'SBTi'],
     urgency: null,
     previewable: true,
@@ -75,8 +75,8 @@ const MODULES: DashboardModule[] = [
     sub: 'Corporate Net-Zero V2.0',
     desc: 'Set and monitor science-based targets under the SBTi Corporate Net-Zero Standard V2.0.',
     href: '/dashboard/sbti',
-    color: '#0F6E56',
-    bg: '#E1F5EE',
+    color: 'var(--color-module-ghg)',
+    bg: 'var(--color-module-ghg-wash)',
     frameworks: ['SBTi', 'Net-Zero V2.0', 'ACA'],
     urgency: null,
     previewable: false,
@@ -87,8 +87,8 @@ const MODULES: DashboardModule[] = [
     sub: 'Embedded emissions · Exporters',
     desc: 'Specific embedded emissions for goods entering the EU, and the Annex IV §1.2 summary your customer needs.',
     href: '/dashboard/cbam/setup',
-    color: '#0C447C',
-    bg: '#E6F1FB',
+    color: 'var(--color-module-cbam)',
+    bg: 'var(--color-module-cbam-wash)',
     frameworks: ['(EU) 2023/956', 'IR (EU) 2025/2547', 'Annex IV §1.2'],
     urgency: null,
     previewable: false,
@@ -99,8 +99,8 @@ const MODULES: DashboardModule[] = [
     sub: 'Physical & transition',
     desc: 'Assess physical and transition climate risks across 3 IPCC scenarios.',
     href: '/dashboard/climate-risk',
-    color: '#ba7517',
-    bg: '#FEF3E2',
+    color: 'var(--color-module-climate)',
+    bg: 'var(--color-module-climate-wash)',
     frameworks: ['TCFD', 'IFRS S2', 'CSRD ESRS E1'],
     urgency: null,
     previewable: true,
@@ -125,8 +125,8 @@ const MODULES: DashboardModule[] = [
     sub: 'Supplier Portal · CS3D',
     desc: 'Survey your suppliers, collect primary data, and risk-score your supply chain.',
     href: '/dashboard/supply-chain',
-    color: '#7425e3',
-    bg: '#EDE9FE',
+    color: 'var(--color-module-supply)',
+    bg: 'var(--color-module-supply-wash)',
     frameworks: ['CS3D', 'EcoVadis', 'ESRS S2', 'Modern Slavery'],
     urgency: null,
     previewable: true,
@@ -137,8 +137,8 @@ const MODULES: DashboardModule[] = [
     sub: 'Data collection',
     desc: 'Send sustainability questionnaires to suppliers and track responses.',
     href: '/dashboard/supply-chain/portal',
-    color: '#7425e3',
-    bg: '#EDE9FE',
+    color: 'var(--color-module-supply)',
+    bg: 'var(--color-module-supply-wash)',
     frameworks: ['EcoVadis', 'CS3D', 'Modern Slavery', 'CDP supplier engagement'],
     urgency: null,
     previewable: false,
@@ -149,8 +149,8 @@ const MODULES: DashboardModule[] = [
     sub: 'Pay gap · Safety',
     desc: 'Gender pay gap analysis, workforce metrics and EU Pay Transparency compliance.',
     href: '/dashboard/people',
-    color: '#0C447C',
-    bg: '#E6F1FB',
+    color: 'var(--color-module-people)',
+    bg: 'var(--color-module-people-wash)',
     frameworks: ['EU Pay Transparency', 'ESRS S1', 'CA Pay Data', 'GRI'],
     urgency: null,
     previewable: true,
@@ -163,8 +163,8 @@ const MODULES: DashboardModule[] = [
     // stand-alone system from one embedded in a regulated product — so the card names both dates.
     desc: `Classify every AI system under the EU AI Act. High-risk duties from ${AI_ACT_HIGH_RISK_STANDALONE}, or ${AI_ACT_HIGH_RISK_EMBEDDED} in regulated products.`,
     href: '/dashboard/ai-governance',
-    color: '#B91C1C',
-    bg: '#FCEBEB',
+    color: 'var(--color-module-ai)',
+    bg: 'var(--color-module-ai-wash)',
     frameworks: ['EU AI Act', 'NIST AI RMF', 'ISO 42001'],
     urgency: AI_ACT_HIGH_RISK_STANDALONE,
     previewable: true,
@@ -175,8 +175,8 @@ const MODULES: DashboardModule[] = [
     sub: 'NIS2 · DORA · SEC',
     desc: 'Gap assessment against NIS2, DORA and SEC cyber disclosure requirements.',
     href: '/dashboard/cyber',
-    color: '#B91C1C',
-    bg: '#FCEBEB',
+    color: 'var(--color-module-cyber)',
+    bg: 'var(--color-module-cyber-wash)',
     frameworks: ['NIS2', 'DORA', 'SEC Cyber', 'ISO 27001'],
     urgency: null,
     previewable: true,
@@ -189,8 +189,8 @@ const MODULES: DashboardModule[] = [
     // Lands on the list of saved targets, not a blank form: a firm screening several targets
     // needs to pick one, and a bare /dashboard/deals now starts a NEW deal.
     href: '/dashboard/deals/list',
-    color: '#0C447C',
-    bg: '#E6F1FB',
+    color: 'var(--color-module-deals)',
+    bg: 'var(--color-module-deals-wash)',
     frameworks: ['IFRS S2', 'TCFD', 'SB 253', 'SFDR'],
     urgency: null,
     previewable: true,
@@ -282,21 +282,21 @@ export default function Dashboard() {
 
       {/* Welcome banner for new users */}
       {showWelcome && (
-        <div style={{ background: '#0d0d0d', padding: '1.5rem 2.5rem' }}>
+        <div className="tq-band-bleed" style={{ padding: '1.5rem 2.5rem' }}>
           <div style={{ maxWidth: 1000, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
             <div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, color: '#fff', marginBottom: 4 }}>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 400, marginBottom: 4 }}>
                 Welcome to ThemisIQ! 👋
               </div>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)' }}>
+              <div style={{ fontSize: 13, color: 'var(--color-ink-2)' }}>
                 Start by checking which compliance requirements apply to your company — it takes 2 minutes.
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
-              <a href="/assess" style={{ fontSize: 13, fontWeight: 600, padding: '10px 20px', borderRadius: 8, background: GRAD, color: '#0d0d0d', textDecoration: 'none' }}>
+              <a href="/assess" style={{ fontSize: 13, fontWeight: 600, padding: '10px 20px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none' }}>
                 Check my compliance obligations →
               </a>
-              <button onClick={() => setShowWelcome(false)} style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer' }}>
+              <button onClick={() => setShowWelcome(false)} style={{ fontSize: 12, color: 'var(--color-ink-2)', background: 'none', border: 'none', cursor: 'pointer' }}>
                 Dismiss
               </button>
             </div>
@@ -319,7 +319,7 @@ export default function Dashboard() {
                 {PACK_CONFIG[activePack]?.label}
               </span>
             )}
-            <a href="/pricing" style={{ fontSize: 12, fontWeight: 500, padding: '8px 16px', borderRadius: 8, background: GRAD, color: '#0d0d0d', textDecoration: 'none' }}>
+            <a href="/pricing" style={{ fontSize: 12, fontWeight: 500, padding: '8px 16px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', textDecoration: 'none' }}>
               {activeModuleCount === 0 ? 'Unlock modules →' : 'Add modules →'}
             </a>
           </div>
@@ -364,7 +364,7 @@ export default function Dashboard() {
                   <a href={mod.href} style={{
                     display: 'block',
                     background: '#fff',
-                    border: `1.5px solid ${unlocked ? mod.color + '40' : '#e8e7e4'}`,
+                    border: `1.5px solid ${unlocked ? `color-mix(in srgb, ${mod.color} 25%, transparent)` : '#e8e7e4'}`,
                     borderRadius: 14,
                     padding: '1.25rem',
                     textDecoration: 'none',
@@ -374,7 +374,7 @@ export default function Dashboard() {
                     overflow: 'hidden',
                   }}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = mod.color; (e.currentTarget as HTMLElement).style.opacity = '1' }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = unlocked ? mod.color + '40' : '#e8e7e4'; (e.currentTarget as HTMLElement).style.opacity = unlocked ? '1' : '0.75' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = unlocked ? `color-mix(in srgb, ${mod.color} 25%, transparent)` : '#e8e7e4'; (e.currentTarget as HTMLElement).style.opacity = unlocked ? '1' : '0.75' }}
                   >
                     {/* Lock overlay for unpurchased */}
                     {!unlocked && (
@@ -404,7 +404,7 @@ export default function Dashboard() {
 
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 12 }}>
                       {mod.frameworks.slice(0, 3).map(fw => (
-                        <span key={fw} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 99, background: unlocked ? mod.bg : '#f8f7f5', color: unlocked ? mod.color : '#888784', border: `0.5px solid ${unlocked ? mod.color + '30' : '#e8e7e4'}` }}>{fw}</span>
+                        <span key={fw} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 99, background: unlocked ? mod.bg : '#f8f7f5', color: unlocked ? mod.color : '#888784', border: `0.5px solid ${unlocked ? `color-mix(in srgb, ${mod.color} 19%, transparent)` : '#e8e7e4'}` }}>{fw}</span>
                       ))}
                     </div>
 
@@ -439,16 +439,16 @@ export default function Dashboard() {
 
         {/* Upgrade prompt for free users */}
         {activeModuleCount === 0 && (
-          <div style={{ background: '#0d0d0d', borderRadius: 16, padding: '2rem', textAlign: 'center' }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, color: '#fff', marginBottom: 8 }}>
+          <div className="tq-band" style={{ borderRadius: 16, padding: '2rem', textAlign: 'center' }}>
+            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', fontWeight: 400, marginBottom: 8 }}>
               Ready to unlock your compliance programme?
             </div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 20, lineHeight: 1.6, maxWidth: 500, margin: '0 auto 20px' }}>
+            <div style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: 20, lineHeight: 1.6, maxWidth: 500, margin: '0 auto 20px' }}>
               Each module is an annual license. See current pricing for every module and GHG tier.
             </div>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <a href="/pricing" style={{ fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', textDecoration: 'none' }}>See current pricing →</a>
-              <a href="/assess" style={{ fontSize: 13, padding: '11px 24px', borderRadius: 8, background: 'none', color: 'rgba(255,255,255,0.6)', border: '0.5px solid rgba(255,255,255,0.2)', textDecoration: 'none' }}>Check my obligations first →</a>
+              <a href="/pricing" style={{ fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none' }}>See current pricing →</a>
+              <a href="/assess" style={{ fontSize: 13, padding: '11px 24px', borderRadius: 8, background: 'none', color: 'var(--color-brand)', border: '0.5px solid var(--color-brand)', textDecoration: 'none' }}>Check my obligations first →</a>
             </div>
           </div>
         )}
@@ -462,7 +462,7 @@ export default function Dashboard() {
                 const mod = MODULES.find(m => m.id === id)
                 if (!mod) return null
                 return (
-                  <a key={id} href={mod.href} style={{ fontSize: 12, fontWeight: 500, padding: '8px 16px', borderRadius: 8, background: mod.bg, color: mod.color, textDecoration: 'none', border: `0.5px solid ${mod.color}30` }}>
+                  <a key={id} href={mod.href} style={{ fontSize: 12, fontWeight: 500, padding: '8px 16px', borderRadius: 8, background: mod.bg, color: mod.color, textDecoration: 'none', border: `0.5px solid color-mix(in srgb, ${mod.color} 19%, transparent)` }}>
                     {mod.name} →
                   </a>
                 )

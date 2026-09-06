@@ -21,7 +21,7 @@ const MODULES_NAV: { href: string; label: string; labelShort: string; sub: strin
   { href: '/cbam', label: 'CBAM', labelShort: 'CBAM', sub: 'Regulation (EU) 2023/956 · verifier-ready' },
 ]
 
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 
 export default function Nav() {
   const [menuOpen, setMenuOpen] = useState(false)

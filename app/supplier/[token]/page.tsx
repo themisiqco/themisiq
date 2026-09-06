@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 import { TEMPLATES, type Section } from '../../../lib/supply-chain/templates'
 
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 
 export default function SupplierQuestionnaire() {
   const params = useParams()
@@ -244,7 +244,7 @@ export default function SupplierQuestionnaire() {
           <button onClick={() => setActiveSection(s => Math.max(0, s - 1))} style={{ fontSize: 13, padding: '9px 20px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: activeSection === 0 ? 'not-allowed' : 'pointer', opacity: activeSection === 0 ? 0.4 : 1 }}>← Previous</button>
 
           {activeSection < sections.length - 1 ? (
-            <button onClick={() => setActiveSection(s => s + 1)} style={{ fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: 'pointer' }}>
+            <button onClick={() => setActiveSection(s => s + 1)} style={{ fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>
               Next section →
             </button>
           ) : (

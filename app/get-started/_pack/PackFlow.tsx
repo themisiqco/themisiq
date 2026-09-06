@@ -7,7 +7,7 @@ import { PACKS as PRICING } from '../../../lib/pricing'
 // Design tokens — lifted directly from HomePricing.tsx so these
 // pages are visually identical to the rest of the platform.
 // ─────────────────────────────────────────────────────────────
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 const INK = '#0d0d0d'
 const PAPER = '#f8f7f5'
 const LINE = '#e8e7e4'
@@ -38,7 +38,13 @@ export interface PackConfig {
   frameworks: string      // framework mapping (from build summary)
   questionnaire: string    // template label
   steps: PackStep[]
-  // accent used for the pack — kept inside the brand gradient family
+  // Accent used for the pack.
+  // ⚠️ WAS "kept inside the brand gradient family" — that family (the violet→cyan→green
+  // gradient) is retired, so the rule the old comment stated no longer picks these values,
+  // and two of the four packs still share #1fb1ff. UNMIGRATED AND SELF-COLLIDING: the four
+  // accents need a deliberate set, not module tokens — every pack contains ghg
+  // (see PACK_SLUG_MODULES in lib/packEntryPoints.ts), so a dominant-module rule would
+  // paint all four the same colour.
   accent: string
   // Stripe Payment Link for this pack's "Pay now" button.
   // PLACEHOLDER until the real links exist — see CHECKOUT SETUP below.
@@ -382,7 +388,7 @@ export default function PackFlow({ slug }: { slug: string }) {
                   {interactive ? (
                     <a href={step.href} style={{
                       display: 'inline-block', padding: '9px 18px', borderRadius: 8,
-                      fontSize: 12, fontWeight: 600, color: '#0d0d0d',
+                      fontSize: 12, fontWeight: 600, color: 'var(--color-on-dark)',
                       background: GRAD, textDecoration: 'none', whiteSpace: 'nowrap',
                     }}>{step.cta}</a>
                   ) : (
@@ -425,13 +431,13 @@ export default function PackFlow({ slug }: { slug: string }) {
               {isLive ? (
                 <a href={pack.checkoutUrl} style={{
                   display: 'inline-block', padding: '12px 28px', borderRadius: 8,
-                  fontSize: 13, fontWeight: 700, color: '#0d0d0d',
+                  fontSize: 13, fontWeight: 700, color: 'var(--color-on-dark)',
                   background: GRAD, textDecoration: 'none', whiteSpace: 'nowrap',
                 }}>Pay now →</a>
               ) : (
                 <button onClick={() => setShowBetaNotice(true)} style={{
                   display: 'inline-block', padding: '12px 28px', borderRadius: 8,
-                  fontSize: 13, fontWeight: 700, color: '#0d0d0d',
+                  fontSize: 13, fontWeight: 700, color: 'var(--color-on-dark)',
                   background: GRAD, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
                 }}>Pay now →</button>
               )}

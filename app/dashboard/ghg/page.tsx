@@ -34,6 +34,7 @@ import {
   parseLocalDate, periodFromYearAndEnd, analyzeCoverage,
 } from '../../../lib/ghg/engine'
 import { disclaimerParas } from '../../../lib/disclaimer'
+import { btnPrimary } from '@/app/components/buttonStyles'
 import type {
   GwpVersion, Location, Inventory, SourceDoc, ExtractedProposal,
   ConciergeStatus, CoveragePeriod, CoverageResolution, DeclarableStream, UnpriceableLocation,
@@ -1250,7 +1251,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             <div key={fw.id} onClick={() => toggleFramework(fw.id)} style={{ background: selected ? fw.bg : '#fff', border: selected ? '3px solid #0F6E56' : '1.5px solid #e8e7e4', borderRadius: 12, padding: '1.25rem', cursor: 'pointer', transition: 'all 0.15s', opacity: selected ? 1 : 0.5 }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
                 <div>
-                  <div style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, color: fw.color, background: fw.bg, border: `0.5px solid ${fw.color}33`, borderRadius: 6, padding: '2px 8px', marginBottom: 6 }}>{fw.name}</div>
+                  <div style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, color: fw.color, background: fw.bg, border: `0.5px solid color-mix(in srgb, ${fw.color} 20%, transparent)`, borderRadius: 6, padding: '2px 8px', marginBottom: 6 }}>{fw.name}</div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{fw.full}</div>
                 </div>
                 <div style={{ width: 20, height: 20, borderRadius: 6, border: `1.5px solid ${selected ? '#0F6E56' : '#e8e7e4'}`, background: selected ? '#0F6E56' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -1264,9 +1265,9 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
         })}
       </div>
       {inventory.selected_frameworks.length > 0 && (
-        <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginBottom: 8 }}>Selected: {activeFrameworks.map(f => f.name).join(' · ')}</div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontWeight: 400, lineHeight: 1.6 }}>
+        <div className="tq-summary" style={{ display: 'block', padding: '1.25rem 1.5rem' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Selected: {activeFrameworks.map(f => f.name).join(' · ')}</div>
+          <div style={{ fontSize: 12, color: 'var(--color-ink-2)', fontWeight: 400, lineHeight: 1.6 }}>
             ThemisIQ will collect your data once and produce {inventory.selected_frameworks.length} report{inventory.selected_frameworks.length > 1 ? 's' : ''}.
             {needsMarketBased && ' ESRS/GRI requires market-based Scope 2 — we\'ll ask about renewable energy contracts.'}
             {needsPriorYear && ' CDP requires prior year comparison figures.'}
@@ -1573,7 +1574,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
         <p style={sectionSub}>Enter what appears on your utility bills and fuel records. All calculations happen automatically — you never need to look up emission factors.</p>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
           {inventory.locations.map((l, i) => (
-            <button key={l.id} onClick={() => setActiveLocation(i)} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: activeLocation === i ? '#0d0d0d' : '#f8f7f5', color: activeLocation === i ? '#fff' : '#555553', border: `0.5px solid ${activeLocation === i ? '#0d0d0d' : '#e8e7e4'}`, cursor: 'pointer', fontWeight: activeLocation === i ? 500 : 400 }}>
+            <button key={l.id} onClick={() => setActiveLocation(i)} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: activeLocation === i ? 'var(--color-brand-wash)' : '#f8f7f5', color: activeLocation === i ? 'var(--color-ink)' : '#555553', border: `0.5px solid ${activeLocation === i ? 'var(--color-brand)' : '#e8e7e4'}`, cursor: 'pointer', fontWeight: activeLocation === i ? 500 : 400 }}>
               {l.name || `Location ${i+1}`}
             </button>
           ))}
@@ -1593,8 +1594,8 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             where the two things named in the message (the country, and the unit on the bill) are
             actually changed, so the customer is told next to the controls that fix it. */}
         {unpriceableById.get(loc.id) && (
-          <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.3)', borderRadius: 10, padding: '0.9rem 1rem', marginBottom: '1.25rem' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#ba7517', marginBottom: 4 }}>⚠ We can&apos;t work out this location&apos;s emissions yet</div>
+          <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem', marginBottom: '1.25rem' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>⚠ We can&apos;t work out this location&apos;s emissions yet</div>
             <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>{unpriceableMessage(unpriceableById.get(loc.id)!)}</div>
             <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 4 }}>Until then this location is left out of your totals — it isn&apos;t counted as zero, and nothing else you&apos;ve entered here is lost.</div>
           </div>
@@ -1848,7 +1849,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                           steam is a material part of your footprint.
                         </div>
                       ) : (
-                        <div style={{ fontSize: 11, color: '#ba7517', lineHeight: 1.5, background: '#FEF3E2', border: '1px solid #f0d9b5', borderRadius: 6, padding: '10px 12px' }}>
+                        <div style={{ fontSize: 11, color: 'var(--color-module-climate)', lineHeight: 1.5, background: '#FEF3E2', border: '1px solid #f0d9b5', borderRadius: 6, padding: '10px 12px' }}>
                           <strong>No published factor for this jurisdiction.</strong> {entry.guidance}
                           {' '}Until you enter one, this stream is reported as unquantified and export stays locked —
                           we will not price it with another country&rsquo;s factor.
@@ -1897,8 +1898,8 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 updateLocation(activeLocation, 'stream_attestations', [...existing, ...streams.map(stream => ({ stream, attested_at: at }))])
               }
               return (
-                <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.3)', borderRadius: 12, padding: '1.15rem 1.25rem' }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#ba7517', marginBottom: 4 }}>Confirm what this location does NOT have</div>
+                <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 12, padding: '1.15rem 1.25rem' }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>Confirm what this location does NOT have</div>
                   <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, marginBottom: 12 }}>An undeclared stream is not the same as zero — completeness can&apos;t be asserted until each is either entered above or attested absent. Required before export.</div>
                   <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
                     {activeUndeclared.map(u => (
@@ -1908,40 +1909,40 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                       </label>
                     ))}
                   </div>
-                  <button onClick={() => attest(activeUndeclared.map(u => u.stream))} style={{ marginTop: 14, fontSize: 12, fontWeight: 600, padding: '9px 20px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', cursor: 'pointer' }}>Attest all remaining as absent</button>
+                  <button onClick={() => attest(activeUndeclared.map(u => u.stream))} style={{ marginTop: 14, fontSize: 12, fontWeight: 600, ...btnPrimary, padding: '9px 20px' }}>Attest all remaining as absent</button>
                 </div>
               )
             })()}
           </div>
           <div style={{ position: 'sticky', top: 80 }}>
-            <div style={{ background: '#111827', borderRadius: 12, padding: '1.5rem', marginBottom: 12 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: '#d1d5db', marginBottom: 12 }}>{loc.name} — live results</div>
+            <div className="tq-summary" style={{ display: 'block', padding: '1.5rem', marginBottom: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: 12 }} className="tq-summary-label">{loc.name} — live results</div>
               {/* NOT five dashes. A "—" beside "Scope 1 total" sits in the same column, in the same
                   row, as a figure — it reads as a measured zero rather than as an absent result.
                   The rows are removed and the reason takes their place. */}
               {blockedHere ? (
                 <div style={{ padding: '2px 0 6px' }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#fbbf24', marginBottom: 6 }}>⚠ No results for this location yet</div>
-                  <div style={{ fontSize: 12, color: '#d1d5db', lineHeight: 1.6 }}>{unpriceableMessage(blockedHere)}</div>
-                  <div style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.6, marginTop: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 6 }}>⚠ No results for this location yet</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>{unpriceableMessage(blockedHere)}</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6, marginTop: 6 }}>
                     Your other locations are unaffected, and nothing you&apos;ve entered here is lost.
                   </div>
                 </div>
               ) : [
-                { label: 'Heating & fuel', val: calc!.s1_stationary, color: '#a78bfa' },
-                { label: 'Vehicles', val: calc!.s1_mobile, color: '#1fb1ff' },
-                { label: 'Refrigerants', val: calc!.s1_fugitive, color: '#ba7517' },
-                { label: 'Scope 1 total', val: calc!.s1_total, color: '#f9fafb', bold: true },
-                { label: 'Scope 2 (electricity)', val: calc!.s2_location, color: '#64fe3e', bold: true },
+                { label: 'Heating & fuel', val: calc!.s1_stationary, color: 'var(--color-module-deals)' },
+                { label: 'Vehicles', val: calc!.s1_mobile, color: 'var(--color-module-cbam)' },
+                { label: 'Refrigerants', val: calc!.s1_fugitive, color: 'var(--color-module-climate)' },
+                { label: 'Scope 1 total', val: calc!.s1_total, color: 'var(--color-ink)', bold: true },
+                { label: 'Scope 2 (electricity)', val: calc!.s2_location, color: 'var(--color-module-ai)', bold: true },
               ].map(({ label, val, color, bold }) => (
-                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '0.5px solid rgba(255,255,255,0.07)' }}>
-                  <span style={{ fontSize: 12, color: bold ? '#f9fafb' : '#d1d5db', fontWeight: bold ? 600 : 400 }}>{label}</span>
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '0.5px solid var(--color-line)' }}>
+                  <span style={{ fontSize: 12, color: bold ? 'var(--color-ink)' : 'var(--color-ink-2)', fontWeight: bold ? 600 : 400 }}>{label}</span>
                   <span style={{ fontSize: 12, color, fontWeight: bold ? 700 : 400 }}>{val.toFixed(2)} tCO₂e</span>
                 </div>
               ))}
-              <div style={{ marginTop: 10, fontSize: 11, color: '#9ca3af', lineHeight: 1.6 }}>EPA 2024 (US) · ECCC v3.0 (CA) · DEFRA 2026 (UK) · IPCC AR6 GWP · eGRID 2023</div>
+              <div style={{ marginTop: 10, fontSize: 11, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>EPA 2024 (US) · ECCC v3.0 (CA) · DEFRA 2026 (UK) · IPCC AR6 GWP · eGRID 2023</div>
               {validateCompleteness(loc).map((w, i) => (
-                <div key={i} style={{ marginTop: 8, background: "rgba(254,243,226,0.1)", border: "0.5px solid #fcd34d", borderRadius: 6, padding: "6px 10px", fontSize: 10, color: "#fcd34d", lineHeight: 1.5 }}>{w}</div>
+                <div key={i} style={{ marginTop: 8, background: "#FEF3E2", border: "0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)", borderRadius: 6, padding: "6px 10px", fontSize: 10, color: "var(--color-module-climate)", lineHeight: 1.5 }}>{w}</div>
               ))}
             </div>
             <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem' }}>
@@ -1954,7 +1955,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   leaves a location out has to say so where it is read, or the omission is silent
                   to anyone who does not scroll. */}
               {exclusionNote && (
-                <div style={{ fontSize: 10, color: '#ba7517', marginTop: 6, lineHeight: 1.5 }}>⚠ {exclusionNote}</div>
+                <div style={{ fontSize: 10, color: 'var(--color-module-climate)', marginTop: 6, lineHeight: 1.5 }}>⚠ {exclusionNote}</div>
               )}
             </div>
           </div>
@@ -2033,7 +2034,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
               {activeFrameworks.map(fw => {
                 const totals = totalsByGwp[fw.gwp as GwpVersion]
                 return (
-                  <div key={fw.id} style={{ background: fw.bg, border: `0.5px solid ${fw.color}33`, borderRadius: 10, padding: '1.25rem' }}>
+                  <div key={fw.id} style={{ background: fw.bg, border: `0.5px solid color-mix(in srgb, ${fw.color} 20%, transparent)`, borderRadius: 10, padding: '1.25rem' }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: fw.color, letterSpacing: '0.06em', textTransform: 'uppercase' as const, marginBottom: 8 }}>{fw.name} — GWP {fw.gwp}</div>
                     <div style={{ marginBottom: 6 }}>
                       <div style={{ fontSize: 11, color: '#888784' }}>Scope 1</div>
@@ -2079,7 +2080,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                     {/* Every figure in this card — both scopes, biogenic, the intensities — is built
                         from the same excluded set, so the note belongs to the card, not to one line. */}
                     {exclusionNote && (
-                      <div style={{ fontSize: 10, color: '#ba7517', marginTop: 8, lineHeight: 1.5 }}>⚠ {exclusionNote}</div>
+                      <div style={{ fontSize: 10, color: 'var(--color-module-climate)', marginTop: 8, lineHeight: 1.5 }}>⚠ {exclusionNote}</div>
                     )}
                   </div>
                 )
@@ -2100,14 +2101,14 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
               const key = `loc_${i}`
               const locRows = allRows.filter(r => r.location === (loc.name || 'Location'))
               return (
-                <div key={loc.id} style={{ background: '#fff', border: blocked ? '0.5px solid rgba(186,117,23,0.4)' : '0.5px solid #e8e7e4', borderRadius: 12, marginBottom: 12, overflow: 'hidden' }}>
+                <div key={loc.id} style={{ background: '#fff', border: blocked ? '0.5px solid color-mix(in srgb, var(--color-module-climate) 40%, transparent)' : '0.5px solid #e8e7e4', borderRadius: 12, marginBottom: 12, overflow: 'hidden' }}>
                   <div onClick={() => setShowWorkings(w => ({...w, [key]: !w[key]}))} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', }}>
                     <div>
                       <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>{loc.name}{loc.state && ` — ${loc.state}`}</div>
                       {/* No numbers for a blocked location — not even a dash beside "S1:", which
                           still reads as a measured scope. The reason takes the figures' place. */}
                       {blocked
-                        ? <div style={{ fontSize: 12, color: '#ba7517', marginTop: 2, lineHeight: 1.5, maxWidth: 620 }}>⚠ Not included in any total. {unpriceableMessage(blocked)}</div>
+                        ? <div style={{ fontSize: 12, color: 'var(--color-module-climate)', marginTop: 2, lineHeight: 1.5, maxWidth: 620 }}>⚠ Not included in any total. {unpriceableMessage(blocked)}</div>
                         : <div style={{ fontSize: 12, color: '#888784', marginTop: 2 }}>S1: {c!.s1_total.toFixed(2)} mt · S2: {c!.s2_location.toFixed(2)} mt · Total: {(c!.s1_total + c!.s2_location).toFixed(2)} mt</div>}
                     </div>
                     <span style={{ fontSize: 12, color: '#888784' }}>{showWorkings[key] ? '▲ Hide' : '▼ Show workings'}</span>
@@ -2137,14 +2138,14 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                             // contributes nothing to any total, so a number here would be a claim.
                             if (r.declaration === 'unpriceable') {
                               return <tr key={ri} style={{ background: '#FEF3E2' }}>
-                                <td style={{ ...wTd, color: '#ba7517', fontWeight: 600 }}>{r.source}</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>{r.note}</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>{r.gwp_basis}</td>
-                                <td style={{ ...wTd, color: '#ba7517', fontWeight: 600 }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)', fontWeight: 600 }}>{r.source}</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>{r.note}</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>{r.gwp_basis}</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)', fontWeight: 600 }}>—</td>
                               </tr>
                             }
                             // The operator confirmed the stream is here and gave no figure. Same amber as
@@ -2157,14 +2158,14 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                             // this page and the verifier page saying the same thing about the same row.
                             if (r.declaration === 'declared_unquantified') {
                               return <tr key={ri} style={{ background: '#FEF3E2' }}>
-                                <td style={{ ...wTd, color: '#ba7517', fontWeight: 600 }}>{r.source}</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>{r.note}</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>{r.gwp_basis}</td>
-                                <td style={{ ...wTd, color: '#ba7517', fontWeight: 600 }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)', fontWeight: 600 }}>{r.source}</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>{r.note}</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>{r.gwp_basis}</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)', fontWeight: 600 }}>—</td>
                               </tr>
                             }
                             // ── NO PUBLISHED FACTOR ──────────────────────────────────────────────
@@ -2175,31 +2176,31 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                             // is the part a verifier needs in order to judge how much is missing.
                             if (r.declaration === 'no_published_factor') {
                               return <tr key={ri} style={{ background: '#FEF3E2' }}>
-                                <td style={{ ...wTd, color: '#ba7517', fontWeight: 600 }}>{r.source}</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>{r.activity_data == null ? '—' : `${r.activity_data.toLocaleString()} ${r.activity_unit}`}</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)', fontWeight: 600 }}>{r.source}</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>{r.activity_data == null ? '—' : `${r.activity_data.toLocaleString()} ${r.activity_unit}`}</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>
                                   {r.note}
                                   {/* What was actually checked, where a search was done. Absent for
                                       the EU entry, which never claims one. */}
                                   {r.quantification_method && <div style={{ fontSize: 10, marginTop: 3, lineHeight: 1.4, whiteSpace: 'normal' }}>{r.quantification_method}</div>}
                                 </td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>{r.gwp_basis}</td>
-                                <td style={{ ...wTd, color: '#ba7517', fontWeight: 600 }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>{r.gwp_basis}</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)', fontWeight: 600 }}>—</td>
                               </tr>
                             }
                             if (r.declaration === 'undeclared') {
                               return <tr key={ri} style={{ background: '#FEF3E2' }}>
-                                <td style={{ ...wTd, color: '#ba7517', fontWeight: 600 }}>{r.source}</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>{r.note}</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>—</td>
-                                <td style={{ ...wTd, color: '#ba7517' }}>{r.gwp_basis}</td>
-                                <td style={{ ...wTd, color: '#ba7517', fontWeight: 600 }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)', fontWeight: 600 }}>{r.source}</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>{r.note}</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)' }}>{r.gwp_basis}</td>
+                                <td style={{ ...wTd, color: 'var(--color-module-climate)', fontWeight: 600 }}>—</td>
                               </tr>
                             }
                             const s2 = r.scope === 2
@@ -2250,8 +2251,8 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
               )
             })
             })()}
-            <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '1.5rem', marginTop: '1.5rem' }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginBottom: 12 }}>Assurance readiness — ISO 14064-3 / ISAE 3410</div>
+            <div className="tq-summary" style={{ display: 'block', padding: '1.5rem', marginTop: '1.5rem' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Assurance readiness — ISO 14064-3 / ISAE 3410</div>
               {[
                 { label: 'Emission factors cited with source and year', done: true, note: 'EPA 2024 (US) · ECCC v3.0 (CA) · DEFRA 2026 (UK) · eGRID 2023 · IPCC AR6 GWP' },
                 { label: 'Calculation workings documented per source', done: true, note: 'Full formula shown for every emission source' },
@@ -2259,11 +2260,11 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 { label: 'Source documents uploaded', done: isPaid && inventory.locations.some(l => l.source_docs.length > 0), note: isPaid ? `${inventory.locations.reduce((a, l) => a + l.source_docs.length, 0)} documents` : 'Available on paid plan' },
                 { label: 'All locations included in boundary', done: inventory.locations.length > 0, note: `${inventory.locations.length} location(s)` },
               ].map(({ label, done, note }) => (
-                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '0.5px solid var(--color-line)' }}>
                   <span style={{ fontSize: 14, flexShrink: 0 }}>{done ? '✅' : '⬜'}</span>
                   <div>
-                    <div style={{ fontSize: 12, color: done ? '#fff' : 'rgba(255,255,255,0.4)', fontWeight: done ? 500 : 400 }}>{label}</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{note}</div>
+                    <div style={{ fontSize: 12, color: done ? 'var(--color-ink)' : 'var(--color-ink-2)', fontWeight: done ? 500 : 400 }}>{label}</div>
+                    <div style={{ fontSize: 10, color: 'var(--color-ink-2)' }}>{note}</div>
                   </div>
                 </div>
               ))}
@@ -2306,12 +2307,12 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           )
 
           if (scope3Encouraged) return (
-            <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+            <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 20%, transparent)', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 4 }}>Scope 3 will improve your CDP/EcoVadis score</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>Scope 3 will improve your CDP/EcoVadis score</div>
                 <div style={{ fontSize: 12, color: '#555553' }}>CDP and EcoVadis score Scope 3 disclosure. Cat.1 (purchased goods) and Cat.6 (business travel) are the highest-impact categories to start with.</div>
               </div>
-              <a href={inventoryId ? `/dashboard/scope3?inventoryId=${inventoryId}` : '/dashboard/scope3?from=ghg'} style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, background: '#ba7517', color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>Calculate Scope 3 →</a>
+              <a href={inventoryId ? `/dashboard/scope3?inventoryId=${inventoryId}` : '/dashboard/scope3?from=ghg'} style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, background: 'var(--color-module-climate)', color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>Calculate Scope 3 →</a>
             </div>
           )
 
@@ -2343,7 +2344,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
               const emp = inventory.employee_count
               return (
                 <div key={fw.id}>
-                  <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '2rem', marginBottom: '1rem' }}>
+                  <div className="tq-summary" style={{ display: 'block', padding: '2rem', marginBottom: '1rem' }}>
                     <div style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, color: fw.color, background: fw.bg, borderRadius: 6, padding: '3px 10px', marginBottom: 12 }}>{fw.name} — {fw.full}</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: '1.5rem' }}>
                       {[
@@ -2358,41 +2359,41 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                         ['Deadline', fw.deadline],
                       ].map(([label, val]) => (
                         <div key={label}>
-                          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 3 }}>{label}</div>
-                          <div style={{ fontSize: 13, color: '#fff', fontWeight: 500 }}>{val}</div>
+                          <div style={{ fontSize: 11, color: 'var(--color-ink-2)', marginBottom: 3 }}>{label}</div>
+                          <div style={{ fontSize: 13, fontWeight: 500 }}>{val}</div>
                         </div>
                       ))}
                     </div>
                     {/* The export preview restates the totals, so it restates the omission. */}
                     {exclusionNote && (
-                      <div style={{ fontSize: 11, color: '#ba7517', marginBottom: 16, lineHeight: 1.5 }}>⚠ {exclusionNote}</div>
+                      <div style={{ fontSize: 11, color: 'var(--color-module-climate)', marginBottom: 16, lineHeight: 1.5 }}>⚠ {exclusionNote}</div>
                     )}
                     {(!conciergeReady || !gridReady || !declarationsReady || !pricingReady || !steamFactorsReady) && (
-                      <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.3)', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
+                      <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
                         {unpriceableLocations.length > 0 && (
-                          <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {unpriceableLocations.length} location{unpriceableLocations.length > 1 ? 's' : ''} can&apos;t be worked out and would be left out of this report: {unpriceableLocations.map(u => u.locName).join(', ')} — fix the country or the unit on the Energy &amp; fuel step</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 2 }}>⚠ {unpriceableLocations.length} location{unpriceableLocations.length > 1 ? 's' : ''} can&apos;t be worked out and would be left out of this report: {unpriceableLocations.map(u => u.locName).join(', ')} — fix the country or the unit on the Energy &amp; fuel step</div>
                         )}
                       {conciergePending.length > 0 && (
-                          <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {conciergePending.length} uploaded figure{conciergePending.length > 1 ? 's' : ''} still need{conciergePending.length > 1 ? '' : 's'} your confirmation</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 2 }}>⚠ {conciergePending.length} uploaded figure{conciergePending.length > 1 ? 's' : ''} still need{conciergePending.length > 1 ? '' : 's'} your confirmation</div>
                         )}
                         {unresolvedCoverage.length > 0 && (
-                          <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {unresolvedCoverage.length} coverage issue{unresolvedCoverage.length > 1 ? 's' : ''} need{unresolvedCoverage.length > 1 ? '' : 's'} resolving ({unresolvedCoverage.map(u => u.status).join(', ')})</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 2 }}>⚠ {unresolvedCoverage.length} coverage issue{unresolvedCoverage.length > 1 ? 's' : ''} need{unresolvedCoverage.length > 1 ? '' : 's'} resolving ({unresolvedCoverage.map(u => u.status).join(', ')})</div>
                         )}
                         {unresolvedGridLocations.length > 0 && (
-                          <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {unresolvedGridLocations.length} location{unresolvedGridLocations.length > 1 ? 's' : ''} need{unresolvedGridLocations.length > 1 ? '' : 's'} a grid region: {unresolvedGridLocations.map(l => l.name).join(', ')}</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 2 }}>⚠ {unresolvedGridLocations.length} location{unresolvedGridLocations.length > 1 ? 's' : ''} need{unresolvedGridLocations.length > 1 ? '' : 's'} a grid region: {unresolvedGridLocations.map(l => l.name).join(', ')}</div>
                         )}
                         {streamsNeverAnswered.length > 0 && (
-                          <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {streamsNeverAnswered.length} undeclared stream{streamsNeverAnswered.length > 1 ? 's' : ''} — enter the data or attest absent on the Energy &amp; fuel step: {streamsNeverAnswered.map(u => `${u.locName}: ${STREAM_META[u.stream].name}`).join('; ')}</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 2 }}>⚠ {streamsNeverAnswered.length} undeclared stream{streamsNeverAnswered.length > 1 ? 's' : ''} — enter the data or attest absent on the Energy &amp; fuel step: {streamsNeverAnswered.map(u => `${u.locName}: ${STREAM_META[u.stream].name}`).join('; ')}</div>
                         )}
                         {streamsWithoutFigure.length > 0 && (
-                          <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {streamsWithoutFigure.length} stream{streamsWithoutFigure.length > 1 ? 's' : ''} declared with no figure — enter the amount on the Energy &amp; fuel step. You have said {streamsWithoutFigure.length > 1 ? 'these streams are' : 'this stream is'} present here, so attesting absent is not the fix: {streamsWithoutFigure.map(u => `${u.locName}: ${STREAM_META[u.stream].name}`).join('; ')}</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 2 }}>⚠ {streamsWithoutFigure.length} stream{streamsWithoutFigure.length > 1 ? 's' : ''} declared with no figure — enter the amount on the Energy &amp; fuel step. You have said {streamsWithoutFigure.length > 1 ? 'these streams are' : 'this stream is'} present here, so attesting absent is not the fix: {streamsWithoutFigure.map(u => `${u.locName}: ${STREAM_META[u.stream].name}`).join('; ')}</div>
                         )}
                         {/* Names the ACTION, not just the problem. Unlike every other gate here the
                             remedy is not "enter a number you already have" — the customer has to go
                             and ask their provider for one, so the message has to say that plainly or
                             it reads as an unexplained lock. */}
                         {steamFactorGaps.length > 0 && (
-                          <div style={{ fontSize: 12, fontWeight: 600, color: '#ba7517', marginBottom: 2 }}>⚠ {steamFactorGaps.length} location{steamFactorGaps.length > 1 ? 's' : ''} report{steamFactorGaps.length > 1 ? '' : 's'} purchased steam with no published factor for {steamFactorGaps.length > 1 ? 'their jurisdictions' : 'that jurisdiction'} — ask your district energy provider for their emission intensity and enter it on the Energy &amp; fuel step: {steamFactorGaps.map(g => `${g.locName} (${g.jurisdiction})`).join('; ')}</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 2 }}>⚠ {steamFactorGaps.length} location{steamFactorGaps.length > 1 ? 's' : ''} report{steamFactorGaps.length > 1 ? '' : 's'} purchased steam with no published factor for {steamFactorGaps.length > 1 ? 'their jurisdictions' : 'that jurisdiction'} — ask your district energy provider for their emission intensity and enter it on the Energy &amp; fuel step: {steamFactorGaps.map(g => `${g.locName} (${g.jurisdiction})`).join('; ')}</div>
                         )}
                         <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>Export is locked until every figure read from your bills is confirmed, every coverage gap, overlap, or boundary-straddle is resolved, and every emission stream is either entered or attested absent. Check the Energy &amp; fuel data step.</div>
                       </div>
@@ -2406,7 +2407,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                     <button onClick={() => dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady && generateExport(fw.id)} style={{ fontSize: 14, fontWeight: 500, opacity: (dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady) ? 1 : 0.4, cursor: (dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady) ? "pointer" : "not-allowed", padding: '12px 28px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', border: 'none', }}>
                       ⬇ Download {fw.name} Report (CSV)
                     </button>
-                    <button onClick={() => dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady && generateAssurance()} style={{ fontSize: 14, fontWeight: 500, opacity: (dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady) ? 1 : 0.4, cursor: (dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady) ? 'pointer' : 'not-allowed', padding: '12px 28px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', marginLeft: 10 }}>Download Full Assurance Package (PDF)</button>
+                    <button onClick={() => dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady && generateAssurance()} style={{ fontSize: 14, fontWeight: 500, opacity: (dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady) ? 1 : 0.4, cursor: (dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady) ? 'pointer' : 'not-allowed', ...btnPrimary, padding: '12px 28px', marginLeft: 10 }}>Download Full Assurance Package (PDF)</button>
                   </div>
                   <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem', fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
                     <strong>Disclaimer:</strong>
@@ -2559,7 +2560,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', fontWeight: 400, color: '#0d0d0d', margin: 0 }}>Your inventories</h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <a href="/dashboard/ghg/trends" style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none', whiteSpace: 'nowrap' }}>View trends →</a>
-              <button onClick={startNewInventory} style={{ fontSize: 13, fontWeight: 500, padding: '10px 20px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', cursor: 'pointer' }}>+ New inventory</button>
+              <button onClick={startNewInventory} style={{ fontSize: 13, fontWeight: 500, ...btnPrimary, padding: '10px 20px' }}>+ New inventory</button>
             </div>
           </div>
           {inventoryList.length === 0 ? (
@@ -2638,7 +2639,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             thing they cannot do is already refused by the trigger with its own message. Saying it
             up front is the difference between a known limit and a lost afternoon. */}
         {ghgAccess !== 'active' && ghgAccess !== 'loading' && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' as const, background: '#FEF3E2', border: '0.5px solid #ba751733', borderRadius: 10, padding: '12px 16px', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' as const, background: '#FEF3E2', border: '0.5px solid var(--color-module-climate)33', borderRadius: 10, padding: '12px 16px', marginBottom: '1.5rem' }}>
             <span style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.6 }}>
               {ghgAccess === 'expired'
                 ? <><strong style={{ fontWeight: 600 }}>Your GHG access has expired.</strong> You can read this inventory and everything in it. Saving changes is off until you renew.</>
@@ -2656,7 +2657,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
         {step === 2 && renderStep2()}
         {step === 3 && renderStep3()}
         {(step === 4 || step === 5) && dirty && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' as const, background: '#FEF3E2', border: '0.5px solid #ba751733', borderRadius: 10, padding: '12px 16px', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' as const, background: '#FEF3E2', border: '0.5px solid var(--color-module-climate)33', borderRadius: 10, padding: '12px 16px', marginBottom: '1.5rem' }}>
             <span style={{ fontSize: 13, color: '#0d0d0d', fontWeight: 500 }}>You have unsaved changes — save your draft before {step === 5 ? 'exporting' : 'continuing'}.</span>
             <button onClick={handleSave} disabled={isSaving} style={{ fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', border: 'none', cursor: isSaving ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' as const }}>{isSaving ? 'Saving…' : 'Save draft'}</button>
           </div>
@@ -2666,12 +2667,12 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
         {step === 6 && <><AuditTrail inventoryId={inventoryId} step={step} /><VerifierInvite inventoryId={inventoryId} /></>}
 
         {step === 2 && !gridReady && (
-          <div style={{ background: '#FEF3E2', border: '0.5px solid rgba(186,117,23,0.3)', borderRadius: 8, padding: '12px 16px', marginTop: '1.5rem', fontSize: 12, fontWeight: 600, color: '#ba7517' }}>⚠ {unresolvedGridLocations.length} location{unresolvedGridLocations.length > 1 ? 's' : ''} need{unresolvedGridLocations.length > 1 ? '' : 's'} a grid region before you can continue: {unresolvedGridLocations.map(l => l.name).join(', ')}</div>
+          <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 8, padding: '12px 16px', marginTop: '1.5rem', fontSize: 12, fontWeight: 600, color: 'var(--color-module-climate)' }}>⚠ {unresolvedGridLocations.length} location{unresolvedGridLocations.length > 1 ? 's' : ''} need{unresolvedGridLocations.length > 1 ? '' : 's'} a grid region before you can continue: {unresolvedGridLocations.map(l => l.name).join(', ')}</div>
         )}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
           <button onClick={() => setStep(s => Math.max(0, s-1))} disabled={step === 0} style={{ fontSize: 13, padding: '10px 24px', borderRadius: 8, background: 'none', border: '0.5px solid #e8e7e4', cursor: step === 0 ? 'not-allowed' : 'pointer', color: '#555553', opacity: step === 0 ? 0.4 : 1 }}>← Back</button>
           {step < STEPS.length - 1 && (
-            <button onClick={() => { if (step === 2 && !gridReady) return; setStep(s => s+1) }} disabled={step === 2 && !gridReady} style={{ fontSize: 13, fontWeight: 500, padding: '10px 28px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', opacity: (step === 2 && !gridReady) ? 0.4 : 1, cursor: (step === 2 && !gridReady) ? 'not-allowed' : 'pointer' }}>Continue →</button>
+            <button onClick={() => { if (step === 2 && !gridReady) return; setStep(s => s+1) }} disabled={step === 2 && !gridReady} style={{ fontSize: 13, fontWeight: 500, ...btnPrimary, padding: '10px 28px', opacity: (step === 2 && !gridReady) ? 0.4 : 1, cursor: (step === 2 && !gridReady) ? 'not-allowed' : 'pointer' }}>Continue →</button>
           )}
         </div>
       </div>
@@ -2753,7 +2754,7 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
           const resolved = unresolvedIssues.length === 0
           const tone =
             resolved ? { bg: '#E1F5EE', fg: '#0F6E56', icon: '✓' }
-            : { bg: '#FEF3E2', fg: '#ba7517', icon: '⚠' }
+            : { bg: '#FEF3E2', fg: 'var(--color-module-climate)', icon: '⚠' }
           const fuelPrefix = groups.size > 1 && fuelOfStrip ? `${fuelOfStrip}: ` : ''
           return (
           <div key={fuelOfStrip} style={{ marginTop: 8, background: tone.bg, borderRadius: 6, padding: '8px 10px', fontSize: 11, color: tone.fg, fontWeight: 600 }}>
@@ -2776,7 +2777,7 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
                     note: `${cov.monthsCovered} of 12 months evidenced by bills; remaining ${12 - cov.monthsCovered} month(s) estimated by scaling metered data ×12/${cov.monthsCovered} (${cov.pctEstimated}% estimated).`,
                     acknowledgedAt: new Date().toISOString(),
                   })}
-                  style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#ba7517', color: '#fff', border: 'none', cursor: 'pointer' }}
+                  style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: 'var(--color-module-climate)', color: '#fff', border: 'none', cursor: 'pointer' }}
                 >Acknowledge &amp; estimate</button>
               </div>
             )}
@@ -2791,7 +2792,7 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
                     note: `Overlapping bills detected for ${fuelOfStrip || 'this fuel'}; user confirmed the overlap is intentional (e.g. corrected re-issue) and accepted the figures as-is. No double-count adjustment applied.`,
                     acknowledgedAt: new Date().toISOString(),
                   })}
-                  style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#ba7517', color: '#fff', border: 'none', cursor: 'pointer' }}
+                  style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: 'var(--color-module-climate)', color: '#fff', border: 'none', cursor: 'pointer' }}
                 >Confirm not a duplicate</button>
               </div>
             )}
@@ -2843,7 +2844,7 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
           {doc.read_note && (
             <div style={{
               marginTop: 4, marginLeft: 14, fontSize: 11, lineHeight: 1.5,
-              color: doc.read_outcome === 'failed' ? '#ba7517' : '#555553',
+              color: doc.read_outcome === 'failed' ? 'var(--color-module-climate)' : '#555553',
             }}>
               {doc.read_outcome === 'failed' ? '⚠ ' : ''}{doc.read_note}
             </div>
@@ -2857,7 +2858,7 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
                     <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{p.value != null ? `${p.value.toLocaleString()} ${p.unit ?? ''}` : '—'}</span>
                     <span style={{ fontSize: 11, color: '#888784' }}>{p.fuelType.replace('_', ' ')}</span>
                     {(p.periodStart || p.periodEnd) && <span style={{ fontSize: 11, color: '#888784' }}>· {p.periodStart ?? '?'} → {p.periodEnd ?? '?'}</span>}
-                    <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: p.status === 'needs_manual_review' ? '#FEF3E2' : '#E1F5EE', color: p.status === 'needs_manual_review' ? '#ba7517' : '#0F6E56' }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: p.status === 'needs_manual_review' ? '#FEF3E2' : '#E1F5EE', color: p.status === 'needs_manual_review' ? 'var(--color-module-climate)' : '#0F6E56' }}>
                       {p.status === 'needs_manual_review' ? 'NEEDS REVIEW' : p.confidence.toUpperCase()}
                     </span>
                   </div>
@@ -2878,7 +2879,7 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
                         <button onClick={() => onUpdateProposal(locIdx, doc.id, pi, { status: 'confirmed' })} style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#0F6E56', color: '#fff', border: 'none', cursor: 'pointer' }}>Confirm</button>
                       )}
                       <button onClick={() => { setEditing(`${doc.id}:${pi}`); setEditVal(p.value != null ? String(p.value) : '') }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Edit</button>
-                      <button onClick={() => onUpdateProposal(locIdx, doc.id, pi, { status: 'needs_manual_review' })} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#ba7517', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Flag for review</button>
+                      <button onClick={() => onUpdateProposal(locIdx, doc.id, pi, { status: 'needs_manual_review' })} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: 'var(--color-module-climate)', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Flag for review</button>
                     </div>
                   )}
                 </div>
@@ -3013,12 +3014,12 @@ function AuditTrail({ inventoryId, step }: { inventoryId: string | null; step: n
       <h2 style={auditSectionHead}>Audit trail</h2>
       <p style={auditSectionSub}>Every change to this inventory is recorded automatically — who, what, and when — in a tamper-evident log. This is the record your verifier reviews.</p>
 
-      <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '1.25rem 1.5rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+      <div className="tq-summary" style={{ padding: '1.25rem 1.5rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>Append-only record</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: 400 }}>{rows.length} change{rows.length !== 1 ? 's' : ''} logged · entries cannot be edited or deleted</div>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }} className="tq-summary-label">Append-only record</div>
+          <div style={{ fontSize: 13, color: 'var(--color-ink-2)', fontWeight: 400 }}>{rows.length} change{rows.length !== 1 ? 's' : ''} logged · entries cannot be edited or deleted</div>
         </div>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>ISO 14064-3 / ISAE 3410 traceability</div>
+        <div style={{ fontSize: 11, color: 'var(--color-ink-2)' }}>ISO 14064-3 / ISAE 3410 traceability</div>
       </div>
 
       {loading && <div style={{ textAlign: 'center', padding: '2rem', color: '#888784', fontSize: 13 }}>Loading history…</div>}
@@ -3159,7 +3160,7 @@ function VerifierInvite({ inventoryId }: { inventoryId: string | null }) {
       <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', flexWrap: 'wrap' }}>
         <input value={name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} placeholder="Verifier name (optional)" style={{ flex: 1, minWidth: 160, fontSize: 13, padding: '10px 12px', borderRadius: 8, border: '0.5px solid #e8e7e4' }} />
         <input value={email} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)} placeholder="Verifier email (optional)" style={{ flex: 1, minWidth: 160, fontSize: 13, padding: '10px 12px', borderRadius: 8, border: '0.5px solid #e8e7e4' }} />
-        <button onClick={createInvite} disabled={creating} style={{ fontSize: 13, fontWeight: 500, padding: '10px 20px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', cursor: creating ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>{creating ? 'Generating…' : 'Generate verifier link'}</button>
+        <button onClick={createInvite} disabled={creating} style={{ fontSize: 13, fontWeight: 500, ...btnPrimary, padding: '10px 20px', cursor: creating ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>{creating ? 'Generating…' : 'Generate verifier link'}</button>
       </div>
 
       {active.length === 0 && (

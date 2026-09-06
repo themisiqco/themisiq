@@ -16,6 +16,7 @@ import Nav from '../../components/Nav'
 import Footer from '@/app/components/Footer'
 import { groupedEntries, type HolderGroup } from '../../../lib/cbam/readiness'
 import { FLAT_MODULE_PRICES } from '../../../lib/pricing'
+import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 
 // ── Palette (matches app/cbam/preview/page.tsx) ──
 const ink = '#0d0d0d'
@@ -188,5 +189,3 @@ export default function Page() {
   )
 }
 
-const btnPrimary: React.CSSProperties = { fontSize: 14, fontWeight: 500, padding: '13px 22px', borderRadius: 8, background: '#0d0d0d', color: '#fff', display: 'inline-block' }
-const btnSecondary: React.CSSProperties = { fontSize: 14, fontWeight: 400, padding: '13px 22px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', display: 'inline-block' }

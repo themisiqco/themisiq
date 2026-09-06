@@ -42,6 +42,11 @@ export const GROUND  = '#F7F8F8'   // app background
 export const SURFACE = '#FCFCFC'   // raised panel
 export const SUNKEN  = '#EDEFF0'   // wells, inactive tabs
 
+/* ---- CTA band ----------------------------------------------------------- */
+// The light replacement for a filled dark panel. Ink 13.6:1 on it, brand 5.9:1.
+export const BAND      = '#CCE7EF'
+export const BAND_LINE = '#A8D2DD'
+
 /* ---- Lines ------------------------------------------------------------- */
 export const LINE        = '#D7DDDF'
 export const LINE_STRONG = '#AAB4B8'

@@ -16,6 +16,7 @@ import { AI_ACT_HIGH_RISK_STANDALONE } from '../../lib/aiAct'
 import { CS3D_APPLIES_FROM } from '../../lib/cs3d'
 import { SB253_SHORT } from '../../lib/sb253'
 import { SB261_SHORT } from '../../lib/sb261'
+import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -177,13 +178,13 @@ const MODULES: Module[] = [
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const GRAD = 'linear-gradient(135deg, #7425e3, #1fb1ff, #64fe3e)'
+const GRAD = 'var(--color-brand)'
 
 const TAG_STYLES: Record<string, React.CSSProperties> = {
   blue:   { background: '#E6F1FB', color: '#0C447C', border: '1px solid #bfdbfe' },
   green:  { background: '#E1F5EE', color: '#0F6E56', border: '1px solid #bbf7d0' },
   orange: { background: '#FEF3E2', color: '#92400e', border: '1px solid #fde68a' },
-  purple: { background: 'rgba(116,37,227,0.08)', color: '#7425e3', border: '1px solid rgba(116,37,227,0.2)' },
+  purple: { background: 'var(--color-module-deals-wash)', color: 'var(--color-module-deals)', border: '1px solid var(--color-module-deals)' },
 }
 
 const tag = (label: string, color: string): React.CSSProperties => ({
@@ -331,7 +332,7 @@ function PricingPageInner() {
     nav: { background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2rem', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky' as const, top: 0, zIndex: 100 },
     wrap: { maxWidth: 860, margin: '0 auto', padding: '3rem 2rem' },
     // Hero
-    heroLabel: { display: 'inline-block', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#7425e3', border: '1px solid rgba(116,37,227,0.2)', borderRadius: 99, padding: '4px 14px', marginBottom: 14 },
+    heroLabel: { display: 'inline-block', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-brand)', border: '1px solid var(--color-band-line)', borderRadius: 99, padding: '4px 14px', marginBottom: 14 },
     heroTitle: { fontFamily: 'Georgia, serif', fontSize: 28, fontWeight: 400, color: '#0d0d0d', lineHeight: 1.3, marginBottom: 12 },
     heroSub: { fontSize: 13, color: '#555553', fontWeight: 400, maxWidth: 520, margin: '0 auto', lineHeight: 1.8 },
     // Prompt
@@ -347,8 +348,7 @@ function PricingPageInner() {
     moduleWrap: { border: '1px solid #e8e7e4', borderRadius: 16, overflow: 'hidden', marginBottom: 16 },
     moduleHeader: { display: 'grid', gridTemplateColumns: '1fr auto', background: '#f8f7f5', padding: '10px 16px', borderBottom: '1px solid #e8e7e4', alignItems: 'center' },
     // Price panel
-    pricePanel: { background: '#0d0d0d', borderRadius: 14, padding: '1.25rem 1.5rem', marginBottom: 16 },
-    pricePanelInner: { display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'center' },
+    pricePanel: { marginBottom: 16 },
     // Bundle hints
     hintGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8, marginBottom: 20 },
     // CTA
@@ -383,8 +383,8 @@ function PricingPageInner() {
     width: 20,
     height: 20,
     borderRadius: 5,
-    border: `1.5px solid ${active ? '#7425e3' : '#e8e7e4'}`,
-    background: active ? '#7425e3' : '#fff',
+    border: `1.5px solid ${active ? 'var(--color-brand)' : '#e8e7e4'}`,
+    background: active ? 'var(--color-brand)' : '#fff',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -415,7 +415,7 @@ function PricingPageInner() {
     borderRadius: 8,
     fontSize: 12,
     fontWeight: 600,
-    color: '#0d0d0d',
+    color: 'var(--color-on-dark)',
     background: GRAD,
     border: 'none',
     cursor: 'pointer',
@@ -520,11 +520,11 @@ function PricingPageInner() {
         {/* Pick-and-pace hero (NEW model) — surfaces the volume discount, not a bundle price */}
         {NEW_PRICING_ACTIVE && (
           <div style={{ background: GRAD, borderRadius: 14, padding: 1, marginBottom: 24 }}>
-            <div style={{ background: '#0d0d0d', borderRadius: 13, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+            <div className="tq-band" style={{ borderRadius: 13, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 260 }}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, color: '#fff', marginBottom: 6 }}>Pick and pace.</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, maxWidth: 520 }}>Start with the module your next deadline demands. Add others as your obligations grow — each one is a complete, standalone deliverable, not a partial view that only works when you buy the set.</div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 10 }}>Two modules −10% · Three or more −20%</div>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, marginBottom: 6 }}>Pick and pace.</div>
+                <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6, maxWidth: 520 }}>Start with the module your next deadline demands. Add others as your obligations grow — each one is a complete, standalone deliverable, not a partial view that only works when you buy the set.</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-2)', marginTop: 10 }}>Two modules −10% · Three or more −20%</div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <button onClick={() => document.getElementById('build-your-stack')?.scrollIntoView({ behavior: 'smooth' })} style={{ ...primaryBtn, fontSize: 12 }}>Build your stack ↓</button>
@@ -599,10 +599,10 @@ function PricingPageInner() {
                         const cap = alw == null ? 'unlimited locations' : `≤${alw} locations`
                         const active = tier === t
                         return (
-                          <button key={t} onClick={(e) => { e.stopPropagation(); setTier(t) }} style={{ flex: 1, minWidth: 130, textAlign: 'left', padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: active ? '#0d0d0d' : '#fff', color: active ? '#fff' : '#0d0d0d', border: active ? '2px solid #7425e3' : '1px solid #e8e7e4' }}>
+                          <button key={t} onClick={(e) => { e.stopPropagation(); setTier(t) }} style={{ flex: 1, minWidth: 130, textAlign: 'left', padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: active ? 'var(--color-brand-wash)' : '#fff', color: 'var(--color-ink)', border: active ? '2px solid var(--color-brand)' : '1px solid #e8e7e4' }}>
                             <div style={{ fontSize: 11, fontWeight: 700 }}>{label}</div>
                             <div style={{ fontSize: 12, marginTop: 2 }}>{tp == null ? 'Contact us' : `$${tp.toLocaleString()}/yr`}</div>
-                            <div style={{ fontSize: 9, color: active ? 'rgba(255,255,255,0.5)' : '#888784', marginTop: 2 }}>{cap}</div>
+                            <div style={{ fontSize: 9, color: 'var(--color-ink-2)', marginTop: 2 }}>{cap}</div>
                           </button>
                         )
                       })}
@@ -625,13 +625,13 @@ function PricingPageInner() {
             <div style={{ fontSize: 11, color: '#888784', marginBottom: 16 }}>Optional add-ons. We do the bill-reading; you confirm the numbers.</div>
 
             {/* Concierge */}
-            <div style={{ padding: 14, background: '#fff', borderRadius: 10, border: conciergeOn ? '2px solid #7425e3' : '1px solid #e8e7e4', marginBottom: 12 }}>
+            <div style={{ padding: 14, background: '#fff', borderRadius: 10, border: conciergeOn ? '2px solid var(--color-brand)' : '1px solid #e8e7e4', marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>Concierge — we read your bills</div>
                   <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, marginTop: 2 }}>Upload utility bills; ThemisIQ extracts the figures with source quotes for you to confirm. Priced by number of locations.</div>
                 </div>
-                <button onClick={() => setConciergeOn(v => !v)} style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', background: conciergeOn ? '#7425e3' : '#0d0d0d', color: '#fff' }}>{conciergeOn ? 'Added ✓' : 'Add'}</button>
+                <button onClick={() => setConciergeOn(v => !v)} style={{ ...(conciergeOn ? btnSecondary : btnPrimary), flexShrink: 0, fontSize: 12, fontWeight: 600, padding: '6px 14px' }}>{conciergeOn ? 'Added ✓' : 'Add'}</button>
               </div>
               {conciergeOn && (
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f0efed', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -643,7 +643,7 @@ function PricingPageInner() {
                       : `${ADDONS[conciergeResolved.key].label.replace('Concierge — ', '')} · $${ADDONS[conciergeResolved.key].price.toLocaleString()}/yr`}
                   </span>
                   {conciergeResolved.isCustomQuote && (
-                    <a href="mailto:lisa.foster@themisiq.co?subject=Concierge%20Enterprise%20quote" style={{ fontSize: 12, fontWeight: 600, color: '#7425e3', textDecoration: 'none' }}>Request a quote →</a>
+                    <a href="mailto:lisa.foster@themisiq.co?subject=Concierge%20Enterprise%20quote" style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none' }}>Request a quote →</a>
                   )}
                 </div>
               )}
@@ -653,32 +653,32 @@ function PricingPageInner() {
 
         {/* Live price panel (NEW model) */}
         {NEW_PRICING_ACTIVE && (
-          <div style={s.pricePanel}>
-            <div style={s.pricePanelInner}>
+          <div className="tq-summary" style={s.pricePanel}>
+            <div className="tq-summary-body">
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>Your platform — live estimate</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8, marginBottom: 8 }}>
+                <div style={{ letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }} className="tq-summary-label">Your platform — live estimate</div>
+                <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.8, marginBottom: 8 }}>
                   {MODULES.filter(m => selected.has(m.id)).map(m => <div key={m.id}>{m.name}</div>)}
                 </div>
                 {selectedAddOns.length > 0 && (
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8, marginBottom: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                  <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.8, marginBottom: 8, paddingTop: 8, borderTop: '1px solid var(--color-line)' }}>
                     {selectedAddOns.map(k => (
                       <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                         <span>{ADDONS[k].label}</span>
-                        <span style={{ color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap' }}>+${ADDONS[k].price.toLocaleString()}</span>
+                        <span style={{ color: 'var(--color-ink-2)', whiteSpace: 'nowrap' }}>+${ADDONS[k].price.toLocaleString()}</span>
                       </div>
                     ))}
                   </div>
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{count} module{count !== 1 ? 's' : ''} selected</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-ink-2)' }}>{count} module{count !== 1 ? 's' : ''} selected</div>
                   {volumeDiscount(count) > 0 && !quote.requiresQuote && (
-                    <div style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(100,254,62,0.15)', color: '#64fe3e', border: '1px solid rgba(100,254,62,0.3)' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#E1F5EE', color: '#0F6E56', border: '1px solid #0F6E56' }}>
                       {volumeDiscount(count) * 100}% multi-module discount applied
                     </div>
                   )}
                   {quote.requiresInvoice && (
-                    <div style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(31,177,255,0.15)', color: '#1fb1ff', border: '1px solid rgba(31,177,255,0.3)' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'var(--color-module-cbam-wash)', color: 'var(--color-module-cbam)', border: '1px solid var(--color-module-cbam)' }}>
                       Over $10k — completed by invoice
                     </div>
                   )}
@@ -686,11 +686,11 @@ function PricingPageInner() {
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
                 {quote.requiresQuote ? (
-                  <div style={{ ...gradText, fontSize: 28, fontWeight: 700, lineHeight: 1.1 }}>Contact us</div>
+                  <div className="tq-summary-figure" style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.1 }}>Contact us</div>
                 ) : (
                   <>
-                    <div style={{ ...gradText, fontSize: 36, fontWeight: 700, lineHeight: 1 }}>${newGrandTotal.toLocaleString()}</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>/year</div>
+                    <div className="tq-summary-figure" style={{ fontSize: 36, fontWeight: 700, lineHeight: 1 }}>${newGrandTotal.toLocaleString()}</div>
+                    <div style={{ fontSize: 10, color: 'var(--color-ink-2)', marginTop: 4 }}>/year</div>
                   </>
                 )}
               </div>

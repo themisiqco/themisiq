@@ -8,7 +8,7 @@
 
 import { useState } from 'react'
 
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 
 // Counsel-final consent wording version (Terms / Refund Policy / Consent Part C).
 // Must match what the checkout API records — do NOT change without legal sign-off.
@@ -95,5 +95,5 @@ const consentInput: React.CSSProperties = { width: '100%', fontSize: 13, padding
 const consentCheckRow: React.CSSProperties = { display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer' }
 const consentCheckText: React.CSSProperties = { fontSize: 12, color: '#555553', lineHeight: 1.6 }
 const consentLink: React.CSSProperties = { color: '#7425e3', textDecoration: 'underline' }
-const primaryBtn: React.CSSProperties = { padding: '10px 20px', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#0d0d0d', background: GRAD, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', textDecoration: 'none', display: 'inline-block' }
+const primaryBtn: React.CSSProperties = { padding: '10px 20px', borderRadius: 8, fontSize: 12, fontWeight: 600, color: 'var(--color-on-dark)', background: GRAD, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', textDecoration: 'none', display: 'inline-block' }
 const ghostBtn: React.CSSProperties = { padding: '10px 20px', borderRadius: 8, fontSize: 12, fontWeight: 500, color: '#0d0d0d', background: '#fff', border: '1px solid #e8e7e4', cursor: 'pointer', whiteSpace: 'nowrap', textDecoration: 'none', display: 'inline-block' }

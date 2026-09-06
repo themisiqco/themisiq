@@ -1,11 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { tierPrice, tierStrikethrough, volumeDiscount, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, FLAT_MODULE_PRICES, LEGACY_PRICING_PAGE_ID, type Tier, type GhgTier, type ModuleKey } from '@/lib/pricing'
+import { volumeDiscount, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, FLAT_MODULE_PRICES, LEGACY_PRICING_PAGE_ID, type Tier, type GhgTier, type ModuleKey } from '@/lib/pricing'
 
 type ModuleId = 'ghg' | 'cbam' | 'risk' | 'impact' | 'supply' | 'people' | 'deals' | 'ai' | 'cyber'
 
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 
 const MODULES: { id: ModuleId; name: string; frameworks: string; href: string }[] = [
   { id: 'ghg', name: 'Climate — GHG Inventory · Scope 1, 2 & 3', frameworks: 'SB 253 · CDP · ESRS E1 · GRI 305 · IFRS S2', href: '/climate-ghg' },
@@ -38,32 +38,11 @@ const MODULE_CTA: Record<ModuleId, { headline: string; btn: string; href: string
   cyber:  { headline: 'Are you NIS2 and DORA compliant?', btn: 'Check your cyber readiness →', href: '/cyber' },
 }
 
-const TIER_FEATURES: Record<Tier, { sub: string; features: string[]; color: string }> = {
-  starter: {
-    sub: 'Core reports for each module you select',
-    features: ['Core reporting frameworks', 'Assurance-ready workings', 'Audit trail — every entry logged', 'ThemisIQ Wizard — always on'],
-    color: '#0F6E56',
-  },
-  professional: {
-    sub: 'All frameworks for your selected modules',
-    features: ['Everything in Starter', 'All reporting frameworks', 'Multi-organization — up to 5 organizations', 'Verifier & third-party access role', 'Regulatory monitor — weekly alerts'],
-    color: '#64fe3e',
-  },
-  advisory: {
-    sub: 'Platform + dedicated expert guidance',
-    features: ['Everything in Professional', 'Up to 10 organizations', 'Onboarding session', 'Guided inventory review', 'Sector-specific guidance', 'Board-ready narrative'],
-    color: '#1fb1ff',
-  },
-}
-
 export default function HomePricing() {
   const [tier, setTier] = useState<Tier>('starter')
   const [selected, setSelected] = useState<Set<ModuleId>>(new Set(['ghg']))
 
   const count = selected.size
-  const gross = count * tierPrice(tier)
-  const discount = volumeDiscount(count)
-  const net = Math.round(gross * (1 - discount))
 
   // NEW-MODEL preview (behind NEW_PRICING_ACTIVE) — total from the shared cartQuote().
   const canonicalKeys = Array.from(selected).map(id => LEGACY_PRICING_PAGE_ID[id]).filter(Boolean) as ModuleKey[]
@@ -100,7 +79,6 @@ export default function HomePricing() {
   }
 
   const cta = getCta()
-  const features = TIER_FEATURES[tier]
 
   return (
     <section style={{ padding: '5rem 2.5rem', background: '#f8f7f5', borderBottom: '0.5px solid #e8e7e4' }}>
@@ -128,108 +106,23 @@ export default function HomePricing() {
         {/* Pick-and-pace hero (NEW model) — surfaces the volume discount, not a bundle price */}
         {NEW_PRICING_ACTIVE && (
           <div style={{ background: GRAD, borderRadius: 14, padding: 1, marginBottom: 16 }}>
-            <div style={{ background: '#0d0d0d', borderRadius: 13, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+            <div className="tq-band" style={{ borderRadius: 13, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 260 }}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, color: '#fff', marginBottom: 6 }}>Pick and pace.</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, maxWidth: 520 }}>Start with the module your next deadline demands. Add others as your obligations grow — each one is a complete, standalone deliverable, not a partial view that only works when you buy the set.</div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 10 }}>Two modules −10% · Three or more −20%</div>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, marginBottom: 6 }}>Pick and pace.</div>
+                <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6, maxWidth: 520 }}>Start with the module your next deadline demands. Add others as your obligations grow — each one is a complete, standalone deliverable, not a partial view that only works when you buy the set.</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-2)', marginTop: 10 }}>Two modules −10% · Three or more −20%</div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <button onClick={() => document.getElementById('build-your-stack')?.scrollIntoView({ behavior: 'smooth' })} style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', background: GRAD, color: '#0d0d0d' }}>Build your stack ↓</button>
+                <button onClick={() => document.getElementById('build-your-stack')?.scrollIntoView({ behavior: 'smooth' })} style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', background: GRAD, color: 'var(--color-on-dark)' }}>Build your stack ↓</button>
               </div>
             </div>
           </div>
-        )}
-
-        {/* Tier cards (OLD model) */}
-        {!NEW_PRICING_ACTIVE && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
-
-          {/* Starter */}
-          <div onClick={() => setTier('starter')} style={{ background: '#fff', border: tier === 'starter' ? '2px solid #7425e3' : '1px solid #e8e7e4', borderRadius: 14, padding: '1.5rem', display: 'flex', flexDirection: 'column', cursor: 'pointer', position: 'relative', transition: 'all 0.15s' }}>
-            {tier === 'starter' && <div style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', background: GRAD, fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#0d0d0d', padding: '2px 10px', borderRadius: 99, whiteSpace: 'nowrap' }}>Selected</div>}
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Starter</div>
-            <div style={{ fontSize: 11, color: '#888784', textDecoration: 'line-through', marginBottom: 2 }}>${tierStrikethrough('starter')?.toLocaleString()}</div>
-            <div style={{ fontSize: 28, fontWeight: 600, color: '#0d0d0d', marginBottom: 4 }}>${tierPrice('starter').toLocaleString()}<span style={{ fontSize: 11, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
-            <div style={{ fontSize: 9, color: '#92400e', background: '#FEF3E2', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginBottom: 14 }}>Early access</div>
-            <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: 12, flex: 1 }}>
-              <div style={{ fontSize: 11, color: '#888784', marginBottom: 8 }}>Core reports for each module you select</div>
-              {TIER_FEATURES.starter.features.map(f => (
-                <div key={f} style={{ display: 'flex', gap: 7, fontSize: 12, color: '#374151', marginBottom: 5 }}>
-                  <span style={{ color: '#0F6E56', flexShrink: 0 }}>✓</span>{f}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Professional */}
-          <div onClick={() => setTier('professional')} style={{ background: tier === 'professional' ? '#0d0d0d' : '#f8f7f5', border: tier === 'professional' ? '2px solid #7425e3' : '1px solid #e8e7e4', borderRadius: 14, padding: '1.5rem', display: 'flex', flexDirection: 'column', cursor: 'pointer', position: 'relative', transition: 'all 0.15s' }}>
-            {tier === 'professional' && <div style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', background: GRAD, fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#0d0d0d', padding: '2px 10px', borderRadius: 99, whiteSpace: 'nowrap' }}>Selected</div>}
-            <div style={{ position: 'absolute', top: tier === 'professional' ? 10 : -10, right: tier === 'professional' ? 10 : 'auto', left: tier === 'professional' ? 'auto' : '50%', transform: tier === 'professional' ? 'none' : 'translateX(-50%)' }} />
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 8 }}>Professional</div>
-            <div style={{ fontSize: 28, fontWeight: 600, color: tier === 'professional' ? '#fff' : '#0d0d0d', marginBottom: 4 }}>${tierPrice('professional').toLocaleString()}<span style={{ fontSize: 11, color: tier === 'professional' ? 'rgba(255,255,255,0.4)' : '#888784', fontWeight: 400 }}> /module/yr</span></div>
-            <div style={{ fontSize: 9, color: '#a78bfa', background: 'rgba(116,37,227,0.15)', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginBottom: 14 }}>All frameworks</div>
-            <div style={{ borderTop: `1px solid ${tier === 'professional' ? 'rgba(255,255,255,0.08)' : '#f3f4f6'}`, paddingTop: 12, flex: 1 }}>
-              <div style={{ fontSize: 11, color: tier === 'professional' ? 'rgba(255,255,255,0.4)' : '#888784', marginBottom: 8 }}>All frameworks for your selected modules</div>
-              {TIER_FEATURES.professional.features.map((f, i) => (
-                <div key={f} style={{ display: 'flex', gap: 7, fontSize: 12, color: tier === 'professional' ? (i === 0 ? 'rgba(255,255,255,0.45)' : '#fff') : '#374151', marginBottom: 5 }}>
-                  <span style={{ color: '#64fe3e', flexShrink: 0 }}>✓</span>{f}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Advisory */}
-          <div onClick={() => setTier('advisory')} style={{ background: '#fff', border: tier === 'advisory' ? '2px solid #1fb1ff' : '1px solid #e8e7e4', borderRadius: 14, padding: '1.5rem', display: 'flex', flexDirection: 'column', cursor: 'pointer', position: 'relative', transition: 'all 0.15s' }}>
-            {tier === 'advisory' && <div style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', background: GRAD, fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#0d0d0d', padding: '2px 10px', borderRadius: 99, whiteSpace: 'nowrap' }}>Selected</div>}
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1fb1ff', marginBottom: 8 }}>Advisory</div>
-            <div style={{ fontSize: 28, fontWeight: 600, color: '#0d0d0d', marginBottom: 4 }}>${tierPrice('advisory').toLocaleString()}<span style={{ fontSize: 11, color: '#888784', fontWeight: 400 }}> /module/yr</span></div>
-            <div style={{ fontSize: 9, color: '#0C447C', background: '#E6F1FB', borderRadius: 99, padding: '2px 8px', display: 'inline-block', marginBottom: 14 }}>+ Expert guidance</div>
-            <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: 12, flex: 1 }}>
-              <div style={{ fontSize: 11, color: '#888784', marginBottom: 8 }}>Platform + dedicated expert guidance</div>
-              {TIER_FEATURES.advisory.features.map(f => (
-                <div key={f} style={{ display: 'flex', gap: 7, fontSize: 12, color: '#374151', marginBottom: 5 }}>
-                  <span style={{ color: '#1fb1ff', flexShrink: 0 }}>✓</span>{f}
-                </div>
-              ))}
-            </div>
-          </div>
-
-        </div>
         )}
 
         {/* Custom / more organizations note */}
         <div style={{ textAlign: 'center', fontSize: 11, color: '#888784', lineHeight: 1.6, marginBottom: 16, maxWidth: 600, marginLeft: 'auto', marginRight: 'auto' }}>
-          * Need more than 10 organizations or have additional subsidiaries? <a href="/advisory" style={{ color: '#1fb1ff', textDecoration: 'none' }}>Contact us for custom pricing.</a>
+          * Need more than 10 organizations or have additional subsidiaries? <a href="/advisory" style={{ color: 'var(--color-brand)', textDecoration: 'none' }}>Contact us for custom pricing.</a>
         </div>
-
-        {/* Module rows (OLD model) */}
-        {!NEW_PRICING_ACTIVE && (
-        <div style={{ border: '1px solid #e8e7e4', borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', background: '#f8f7f5', padding: '10px 16px', borderBottom: '1px solid #e8e7e4', alignItems: 'center' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784' }}>Select your compliance modules</div>
-            <div style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}>Click any row to add or remove</div>
-          </div>
-          {MODULES.map((mod, i) => {
-            const isSelected = selected.has(mod.id)
-            return (
-              <div key={mod.id} onClick={() => toggleModule(mod.id)} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 12, alignItems: 'center', padding: '12px 16px', borderBottom: i < MODULES.length - 1 ? '1px solid #e8e7e4' : 'none', cursor: 'pointer', background: isSelected ? '#fff' : '#f8f7f5', opacity: isSelected ? 1 : 0.7, transition: 'all 0.15s' }}>
-                <div style={{ width: 18, height: 18, borderRadius: 4, border: `1.5px solid ${isSelected ? '#7425e3' : '#e8e7e4'}`, background: isSelected ? '#7425e3' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  {isSelected && <span style={{ color: '#fff', fontSize: 10, fontWeight: 700 }}>✓</span>}
-                </div>
-                <div>
-                  <a href={mod.href} onClick={e => e.stopPropagation()} style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', textDecoration: 'none' }}>{mod.name} ↗</a>
-                  <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{mod.frameworks}</div>
-                </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: isSelected ? '#0d0d0d' : '#888784' }}>${tierPrice(tier).toLocaleString()}</div>
-                  <div style={{ fontSize: 10, color: '#888784' }}>/yr</div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-        )}
 
         {/* Module rows (NEW model) — per-module pricing, GHG inline tier picker */}
         {NEW_PRICING_ACTIVE && (
@@ -245,7 +138,7 @@ export default function HomePricing() {
               return (
                 <div key={mod.id} style={{ borderBottom: i < MODULES.length - 1 ? '1px solid #e8e7e4' : 'none', background: isSelected ? '#fff' : '#f8f7f5', opacity: isSelected ? 1 : 0.7, transition: 'all 0.15s' }}>
                   <div onClick={() => toggleModule(mod.id)} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 12, alignItems: 'center', padding: '12px 16px', cursor: 'pointer' }}>
-                    <div style={{ width: 18, height: 18, borderRadius: 4, border: `1.5px solid ${isSelected ? '#7425e3' : '#e8e7e4'}`, background: isSelected ? '#7425e3' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ width: 18, height: 18, borderRadius: 4, border: `1.5px solid ${isSelected ? 'var(--color-brand)' : '#e8e7e4'}`, background: isSelected ? 'var(--color-brand)' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       {isSelected && <span style={{ color: '#fff', fontSize: 10, fontWeight: 700 }}>✓</span>}
                     </div>
                     <div>
@@ -264,7 +157,7 @@ export default function HomePricing() {
                         const label = t === 'starter' ? 'Essentials' : t === 'professional' ? 'Professional' : 'Advisory'
                         const active = tier === t
                         return (
-                          <button key={t} onClick={(e) => { e.stopPropagation(); setTier(t) }} style={{ flex: 1, minWidth: 130, textAlign: 'left', padding: '8px 10px', borderRadius: 8, cursor: 'pointer', background: active ? '#0d0d0d' : '#fff', color: active ? '#fff' : '#0d0d0d', border: active ? '2px solid #7425e3' : '1px solid #e8e7e4' }}>
+                          <button key={t} onClick={(e) => { e.stopPropagation(); setTier(t) }} style={{ flex: 1, minWidth: 130, textAlign: 'left', padding: '8px 10px', borderRadius: 8, cursor: 'pointer', background: active ? 'var(--color-brand-wash)' : '#fff', color: 'var(--color-ink)', border: active ? '2px solid var(--color-brand)' : '1px solid #e8e7e4' }}>
                             <div style={{ fontSize: 11, fontWeight: 700 }}>{label}</div>
                             <div style={{ fontSize: 12, marginTop: 2 }}>{tp == null ? 'Contact us' : `$${tp.toLocaleString()}/yr`}</div>
                           </button>
@@ -278,56 +171,29 @@ export default function HomePricing() {
           </div>
         )}
 
-        {/* Live price panel (OLD model) */}
-        {!NEW_PRICING_ACTIVE && (
-        <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.25rem 1.5rem', marginBottom: 14 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'center' }}>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>Your platform — live estimate</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8, marginBottom: 8 }}>
-                {MODULES.filter(m => selected.has(m.id)).map(m => <div key={m.id}>{m.name}</div>)}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{count} module{count !== 1 ? 's' : ''} selected</div>
-                {discount > 0 && (
-                  <div style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(100,254,62,0.15)', color: '#64fe3e', border: '1px solid rgba(100,254,62,0.3)' }}>
-                    {discount * 100}% bundle discount applied
-                  </div>
-                )}
-              </div>
-            </div>
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              {discount > 0 && <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', textDecoration: 'line-through' }}>${gross.toLocaleString()}</div>}
-              <div style={{ fontSize: 36, fontWeight: 700, lineHeight: 1, background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>${net.toLocaleString()}</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>/year</div>
-            </div>
-          </div>
-        </div>
-        )}
-
         {/* Live price panel (NEW model) */}
         {NEW_PRICING_ACTIVE && (
-          <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.25rem 1.5rem', marginBottom: 14 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'center' }}>
+          <div className="tq-summary" style={{ marginBottom: 14 }}>
+            <div className="tq-summary-body">
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>Your platform — live estimate</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8, marginBottom: 8 }}>
+                <div style={{ letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }} className="tq-summary-label">Your platform — live estimate</div>
+                <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.8, marginBottom: 8 }}>
                   {MODULES.filter(m => selected.has(m.id)).map(m => <div key={m.id}>{m.name}</div>)}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{count} module{count !== 1 ? 's' : ''} selected</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-ink-2)' }}>{count} module{count !== 1 ? 's' : ''} selected</div>
                   {volumeDiscount(count) > 0 && !quote.requiresQuote && (
-                    <div style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(100,254,62,0.15)', color: '#64fe3e', border: '1px solid rgba(100,254,62,0.3)' }}>{volumeDiscount(count) * 100}% multi-module discount applied</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#E1F5EE', color: '#0F6E56', border: '1px solid #0F6E56' }}>{volumeDiscount(count) * 100}% multi-module discount applied</div>
                   )}
                 </div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
                 {quote.requiresQuote ? (
-                  <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.1, background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Contact us</div>
+                  <div className="tq-summary-figure" style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.1 }}>Contact us</div>
                 ) : (
                   <>
-                    <div style={{ fontSize: 36, fontWeight: 700, lineHeight: 1, background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>${quote.totalUSD.toLocaleString()}</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>/year</div>
+                    <div className="tq-summary-figure" style={{ fontSize: 36, fontWeight: 700, lineHeight: 1 }}>${quote.totalUSD.toLocaleString()}</div>
+                    <div style={{ fontSize: 10, color: 'var(--color-ink-2)', marginTop: 4 }}>/year</div>
                   </>
                 )}
               </div>
@@ -365,7 +231,7 @@ export default function HomePricing() {
             ))}
           </div>
           <div style={{ marginTop: 14 }}>
-            <a href="/pricing" style={{ fontSize: 12, fontWeight: 600, color: '#7425e3', textDecoration: 'none' }}>See full pricing & build your platform →</a>
+            <a href="/pricing" style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none' }}>See full pricing & build your platform →</a>
           </div>
         </div>
 

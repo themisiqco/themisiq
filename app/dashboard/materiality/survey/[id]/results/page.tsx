@@ -47,7 +47,7 @@ import { BANDS, DistBar, Counters, pct, medianText,
 
 const GREEN = '#0F6E56'
 const GREEN_BG = '#E1F5EE'
-const AMBER = '#ba7517'
+const AMBER = 'var(--color-module-climate)'
 const AMBER_BG = '#FEF3E2'
 const BLUE = '#0C447C'
 const BLUE_BG = '#E6F1FB'
@@ -150,7 +150,7 @@ const titleise = (s: string | null | undefined) =>
 
 function Chip({ text, fg, bg }: { text: string; fg: string; bg: string }) {
   return (
-    <span style={{ display: 'inline-block', background: bg, color: fg, border: `0.5px solid ${fg}33`,
+    <span style={{ display: 'inline-block', background: bg, color: fg, border: `0.5px solid color-mix(in srgb, ${fg} 20%, transparent)`,
                    borderRadius: 999, padding: '2px 9px', fontSize: 10.5, fontWeight: 600,
                    letterSpacing: 0.2, whiteSpace: 'nowrap' }}>{text}</span>
   )
@@ -725,7 +725,7 @@ function SubTopicRow({ s, catName, floor }:
            scored answers beside thirteen abstentions would read as a quiet, low-priority topic.
            It is the opposite: nobody can see it. The band replaces the bar so the eye cannot make
            that mistake, and the sentence says which finding it is. */
-        <div style={{ background: AMBER_BG, border: `0.5px solid ${AMBER}55`, borderRadius: 8,
+        <div style={{ background: AMBER_BG, border: `0.5px solid color-mix(in srgb, ${AMBER} 33%, transparent)`, borderRadius: 8,
                       padding: '10px 14px' }}>
           <div style={{ fontSize: 12, color: INK, lineHeight: 1.75 }}>
             <strong>{o.n_abstained} of {o.n_asked} said they could not judge this
@@ -861,7 +861,7 @@ function TopicRowView({ t }: { t: TopicRow }) {
   const u = t.unknown ? (UNKNOWN_COPY[t.unknown_reason || ''] ||
                          { text: `Unknown — ${t.unknown_reason}.`, fg: AMBER, bg: AMBER_BG }) : null
   return (
-    <div style={{ border: `0.5px solid ${u ? u.fg + '55' : LINE}`, borderRadius: 10,
+    <div style={{ border: `0.5px solid ${u ? `color-mix(in srgb, ${u.fg} 33%, transparent)` : LINE}`, borderRadius: 10,
                   padding: '12px 16px', background: u ? u.bg : '#fff' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12,
                     alignItems: 'baseline', flexWrap: 'wrap' }}>

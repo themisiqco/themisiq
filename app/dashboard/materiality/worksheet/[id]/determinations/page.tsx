@@ -46,7 +46,7 @@ import { subtopicHeading } from '../../../../../../lib/materiality/subtopicName'
 const PURPLE = '#7425e3'
 const GREEN = '#0F6E56'
 const GREEN_BG = '#E1F5EE'
-const AMBER = '#ba7517'
+const AMBER = 'var(--color-module-climate)'
 const AMBER_BG = '#FEF3E2'
 const BLUE = '#0C447C'
 const BLUE_BG = '#E6F1FB'
@@ -735,7 +735,7 @@ function AssigneeChip({ a, name }: { a: Assignment | null; name: string }) {
 }
 
 const Chip = ({ text, fg, bg }: { text: string; fg: string; bg: string }) => (
-  <span style={{ background: bg, color: fg, border: `0.5px solid ${fg}33`, borderRadius: 999,
+  <span style={{ background: bg, color: fg, border: `0.5px solid color-mix(in srgb, ${fg} 20%, transparent)`, borderRadius: 999,
                  padding: '2px 9px', fontSize: 10.5, fontWeight: 600 }}>{text}</span>
 )
 

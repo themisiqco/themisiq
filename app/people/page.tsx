@@ -2,6 +2,7 @@
 import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
 import { FLAT_MODULE_PRICES } from '../../lib/pricing'
+import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 
 export default function Page() {
   // Price from the single source of truth, formatted as app/cbam/page.tsx does.
@@ -11,7 +12,7 @@ export default function Page() {
       <Nav />
 
       {/* URGENCY BANNER */}
-     <div style={{ background: '#ba7517', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, position: 'sticky', top: 64, zIndex: 99 }}>
+     <div style={{ background: 'var(--color-module-people)', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, position: 'sticky', top: 64, zIndex: 99 }}>
  <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>EU Pay Transparency Directive is now in force — first gender pay-gap reports due 2027. Applies to employers with 100+ EU employees.</span>
         <a href="/dashboard/people" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>Check if this applies to you →</a>
       </div>
@@ -43,12 +44,12 @@ export default function Page() {
           {/* STAT CARDS */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {[
-              { val: '5%', unit: 'gap trigger', label: 'EU Pay Transparency — gaps above 5% require mandatory joint pay assessment', color: '#ba7517', bg: '#FEF3E2' },
+              { val: '5%', unit: 'gap trigger', label: 'EU Pay Transparency — gaps above 5% require mandatory joint pay assessment', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
 { val: 'Jun 2027', unit: 'first report', label: 'EU pay-gap reporting — employers 150+', color: '#B91C1C', bg: '#FCEBEB' },
               { val: 'ESRS S1', unit: 'active now', label: 'large EU companies reporting on own workforce from FY2024', color: '#7425e3', bg: '#EDE9FE' },
               { val: '100+', unit: 'CA employees', label: 'triggers California Pay Data Reporting Act — annual DFEH submission', color: '#0F6E56', bg: '#E1F5EE' },
             ].map(({ val, unit, label, color, bg }) => (
-              <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid ${color}22` }}>
+              <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid color-mix(in srgb, ${color} 13%, transparent)` }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color, marginTop: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{unit}</div>
                 <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{label}</div>
@@ -105,7 +106,7 @@ export default function Page() {
               const renderVal = (val: boolean | string) => {
                 if (val === true) return <span style={{ color: '#0F6E56', fontWeight: 700 }}>✓</span>
                 if (val === false) return <span style={{ color: '#B91C1C' }}>✗</span>
-                if (val === 'partial') return <span style={{ color: '#ba7517', fontSize: 11 }}>Partial</span>
+                if (val === 'partial') return <span style={{ color: 'var(--color-module-climate)', fontSize: 11 }}>Partial</span>
                 return <span style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d' }}>{val}</span>
               }
               return (
@@ -296,7 +297,7 @@ export default function Page() {
                 output: 'SASB human capital metrics table',
               },
             ].map(({ name, ref, deadline, urgency, who, what, output }) => {
-              const urgencyColor = urgency === 'critical' ? '#B91C1C' : urgency === 'high' ? '#ba7517' : '#888784'
+              const urgencyColor = urgency === 'critical' ? '#B91C1C' : urgency === 'high' ? 'var(--color-module-climate)' : '#888784'
               const urgencyBg = urgency === 'critical' ? '#FCEBEB' : urgency === 'high' ? '#FEF3E2' : '#f8f7f5'
               return (
                 <div key={name} style={{ border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '1.5rem', background: '#fff', display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
@@ -306,7 +307,7 @@ export default function Page() {
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
                     <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#555553' }}>{ref}</span>
-                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: urgencyBg, color: urgencyColor, border: `0.5px solid ${urgencyColor}33` }}>{deadline}</span>
+                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: urgencyBg, color: urgencyColor, border: `0.5px solid color-mix(in srgb, ${urgencyColor} 20%, transparent)` }}>{deadline}</span>
                   </div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>Who</div>
                   <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>{who}</div>
@@ -349,9 +350,7 @@ export default function Page() {
 }
 
 const navLink: React.CSSProperties = { fontSize: 11, color: '#555553', textDecoration: 'none' }
-const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)', color: '#fff', textDecoration: 'none', display: 'inline-block' }
+const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'var(--color-brand)', color: '#fff', textDecoration: 'none', display: 'inline-block' }
 const btnOutline: React.CSSProperties = { fontSize: 13, fontWeight: 400, padding: '8px 18px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', textDecoration: 'none', display: 'inline-block' }
-const btnPrimary: React.CSSProperties = { fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: '#0d0d0d', color: '#fff', display: 'inline-block' }
-const btnSecondary: React.CSSProperties = { fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', display: 'inline-block' }
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
 const sectionTitle: React.CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }

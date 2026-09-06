@@ -2,7 +2,7 @@
 
 import Nav from '../components/Nav'
 
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 
 // A section's content is either one paragraph (42 of the 43 entries, unchanged) or an array of
 // them. The renderer used to drop the string straight into a <div>, so newlines collapsed and any
@@ -119,7 +119,7 @@ const METHODOLOGIES = [
   },
   {
     module: 'Climate Risk',
-    color: '#ba7517',
+    color: 'var(--color-module-climate)',
     bg: '#FEF3E2',
     standard: 'TCFD · IPCC AR6 · IFRS S2 · ESRS E1',
     sections: [
@@ -369,7 +369,7 @@ export default function MethodologyPage() {
         <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '2.5rem' }}>
           {METHODOLOGIES.map(method => (
             <div key={method.module} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
-              <div style={{ background: method.bg, padding: '1.5rem 2rem', borderBottom: `1px solid ${method.color}20` }}>
+              <div style={{ background: method.bg, padding: '1.5rem 2rem', borderBottom: `1px solid color-mix(in srgb, ${method.color} 13%, transparent)` }}>
                 <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: method.color, marginBottom: 6 }}>Module methodology</div>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{method.module}</div>
                 <div style={{ fontSize: 12, color: '#555553', fontWeight: 500 }}>{method.standard}</div>
@@ -425,12 +425,12 @@ export default function MethodologyPage() {
         </div>
 
         {/* CTA */}
-        <div style={{ marginTop: '2rem', background: '#0d0d0d', borderRadius: 14, padding: '2rem', textAlign: 'center' as const }}>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, color: '#fff', marginBottom: 8 }}>Questions about our methodologies?</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 20 }}>Our team includes practitioners who have applied these frameworks in real reporting contexts.</div>
+        <div className="tq-band" style={{ marginTop: '2rem', borderRadius: 14, padding: '2rem', textAlign: 'center' as const }}>
+          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', fontWeight: 400, marginBottom: 8 }}>Questions about our methodologies?</div>
+          <div style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: 20 }}>Our team includes practitioners who have applied these frameworks in real reporting contexts.</div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-            <a href="/trust" style={{ fontSize: 13, fontWeight: 500, padding: '10px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', textDecoration: 'none' }}>How we handle your data →</a>
-            <a href="/assess" style={{ fontSize: 13, padding: '10px 24px', borderRadius: 8, background: 'none', color: 'rgba(255,255,255,0.6)', border: '0.5px solid rgba(255,255,255,0.2)', textDecoration: 'none' }}>See which frameworks apply to you →</a>
+            <a href="/trust" style={{ fontSize: 13, fontWeight: 500, padding: '10px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none' }}>How we handle your data →</a>
+            <a href="/assess" style={{ fontSize: 13, padding: '10px 24px', borderRadius: 8, background: 'none', color: 'var(--color-brand)', border: '0.5px solid var(--color-brand)', textDecoration: 'none' }}>See which frameworks apply to you →</a>
           </div>
         </div>
       </div>

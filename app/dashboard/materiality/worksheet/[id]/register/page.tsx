@@ -51,7 +51,7 @@ import {
 const PURPLE = '#7425e3'
 const GREEN = '#0F6E56'
 const GREEN_BG = '#E1F5EE'
-const AMBER = '#ba7517'
+const AMBER = 'var(--color-module-climate)'
 const AMBER_BG = '#FEF3E2'
 const BLUE = '#0C447C'
 const BLUE_BG = '#E6F1FB'
@@ -75,7 +75,7 @@ const H2: React.CSSProperties = {
 
 function Chip({ text, fg, bg }: { text: string; fg: string; bg: string }) {
   return (
-    <span style={{ display: 'inline-block', background: bg, color: fg, border: `0.5px solid ${fg}33`,
+    <span style={{ display: 'inline-block', background: bg, color: fg, border: `0.5px solid color-mix(in srgb, ${fg} 20%, transparent)`,
                    borderRadius: 999, padding: '2px 9px', fontSize: 10.5, fontWeight: 600,
                    letterSpacing: 0.2, whiteSpace: 'nowrap' }}>{text}</span>
   )

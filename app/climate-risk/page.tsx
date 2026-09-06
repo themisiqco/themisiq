@@ -4,13 +4,14 @@ import { FLAT_MODULE_PRICES } from '@/lib/pricing'
 import { SB261_TABLE_STATUS } from '@/lib/sb261'
 import { IFRS_S2_ADOPTION_COUNT, IFRS_S2_ADOPTION_SOURCE } from '@/lib/ifrsS2'
 import Footer from '@/app/components/Footer'
+import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 export default function Page() {
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d' }}>
       <Nav />
 
       {/* DEMAND BANNER — climate risk is demand-driven, not just regulation-driven */}
-      <div style={{ background: '#0C447C', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap' as const }}>
+      <div style={{ background: 'var(--color-module-climate)', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap' as const }}>
         <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff', animation: 'pulse 1.5s infinite' }} />
         <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>Investors, lenders, boards, and regulators are all asking for climate risk disclosure. One assessment answers them all.</span>
         <a href="/dashboard/climate-risk" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>Assess your climate risk →</a>
@@ -46,10 +47,10 @@ export default function Page() {
             {[
               { val: '4', unit: 'stakeholders', label: 'investors · lenders · boards · regulators', source: null, color: '#0C447C', bg: '#E6F1FB' },
               { val: 'IFRS S2', unit: 'per jurisdiction', label: IFRS_S2_ADOPTION_COUNT, source: IFRS_S2_ADOPTION_SOURCE, color: '#7425e3', bg: '#EDE9FE' },
-              { val: '3', unit: 'scenarios', label: 'IPCC pathways modelled', source: null, color: '#ba7517', bg: '#FEF3E2' },
+              { val: '3', unit: 'scenarios', label: 'IPCC pathways modelled', source: null, color: 'var(--color-module-climate)', bg: '#FEF3E2' },
               { val: '2', unit: 'risk types', label: 'physical & transition', source: null, color: '#0F6E56', bg: '#E1F5EE' },
             ].map(({ val, unit, label, source, color, bg }) => (
-              <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid ${color}22` }}>
+              <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid color-mix(in srgb, ${color} 13%, transparent)` }}>
                 <div style={{ fontFamily: 'Georgia, serif', fontSize: '2.2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color, marginTop: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{unit}</div>
                 <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{label}</div>
@@ -125,9 +126,9 @@ export default function Page() {
           {[
             { role: 'Paris-aligned', warming: '~1.8°C', src: 'IPCC SSP1-2.6', color: '#0F6E56', bg: '#E1F5EE' },
             { role: 'Current trajectory', warming: '~2.7°C', src: 'IPCC SSP2-4.5', color: '#0C447C', bg: '#E6F1FB' },
-            { role: 'High warming', warming: '~4.4°C', src: 'IPCC SSP5-8.5', color: '#ba7517', bg: '#FEF3E2' },
+            { role: 'High warming', warming: '~4.4°C', src: 'IPCC SSP5-8.5', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
           ].map(scn => (
-            <div key={scn.role} style={{ background: scn.bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid ${scn.color}22` }}>
+            <div key={scn.role} style={{ background: scn.bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid color-mix(in srgb, ${scn.color} 13%, transparent)` }}>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 400, color: scn.color, lineHeight: 1 }}>{scn.warming}</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', marginTop: 8 }}>{scn.role}</div>
               <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{scn.src}</div>
@@ -395,8 +396,6 @@ export default function Page() {
   )
 }
 
-const btnPrimary: React.CSSProperties = { fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: '#0d0d0d', color: '#fff', display: 'inline-block' }
-const btnSecondary: React.CSSProperties = { fontSize: 14, fontWeight: 400, padding: '13px 32px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', display: 'inline-block' }
 // Copied verbatim from app/materiality/page.tsx:52-56 with the sample cards on 26 Aug 2026 —
 // both download links spread it. NOT re-derived from btnSecondary below, which is a different
 // shape: moving a card and restyling it in one edit hides which of the two changed how it looks.

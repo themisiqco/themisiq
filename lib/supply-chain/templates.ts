@@ -83,7 +83,7 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
         ],
       },
       {
-        id: 'procurement', title: 'Sustainable Procurement', color: '#ba7517', bg: '#FEF3E2',
+        id: 'procurement', title: 'Sustainable Procurement', color: 'var(--color-module-climate)', bg: '#FEF3E2',
         desc: 'Your own supply chain sustainability practices',
         questions: [
           { id: 'proc_code', type: 'radio', label: 'Do you have a supplier code of conduct?', options: ['Yes — signed by suppliers', 'Yes — not yet enforced', 'In development', 'No'] },
@@ -135,7 +135,7 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
         ],
       },
       {
-        id: 'child_labour', title: 'Child Labour', color: '#ba7517', bg: '#FEF3E2',
+        id: 'child_labour', title: 'Child Labour', color: 'var(--color-module-climate)', bg: '#FEF3E2',
         desc: 'Child labour prevention and minimum age compliance',
         questions: [
           { id: 'ms_child_policy', type: 'radio', label: 'Does your company have a minimum age policy aligned to ILO Convention 138?', options: ['Yes — documented and enforced', 'Yes — informal', 'No'] },
@@ -190,7 +190,7 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
         ],
       },
       {
-        id: 'hrdd_monitoring', title: 'Monitoring & Disclosure', color: '#ba7517', bg: '#FEF3E2',
+        id: 'hrdd_monitoring', title: 'Monitoring & Disclosure', color: 'var(--color-module-climate)', bg: '#FEF3E2',
         desc: 'Monitoring effectiveness and public disclosure',
         questions: [
           { id: 'cs_monitoring', type: 'radio', label: 'Does your company monitor the effectiveness of its HRDD measures?', options: ['Yes — KPIs tracked and reported', 'Yes — internal monitoring', 'Ad hoc', 'No'] },

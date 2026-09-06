@@ -26,7 +26,7 @@ import PaywallCard from '../../../components/PaywallCard'
 import { useEntitlementAccess } from '../../../../lib/useEntitlement'
 import { exportPipelineXlsx, PIPELINE_SELECT, type PipelineDealRow } from '../../../../lib/deals/exportPipelineXlsx'
 
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 
 // Only the columns this list renders. Deliberately not select('*') — the wizard does that
 // because it hydrates a whole form; a list has no use for notes, deal_value or the share token.
@@ -207,7 +207,7 @@ export default function DealsListPage() {
               and you&rsquo;ll get the ESG risks to raise, the reporting rules that apply to it, and an estimate
               of what compliance would cost. Each target you screen is saved here so you can come back to it.
             </p>
-            <a href="/dashboard/deals" style={{ display: 'inline-block', fontSize: 13, fontWeight: 500, padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', textDecoration: 'none' }}>
+            <a href="/dashboard/deals" style={{ display: 'inline-block', fontSize: 13, fontWeight: 500, padding: '11px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', textDecoration: 'none' }}>
               Screen your first target →
             </a>
           </div>
@@ -244,7 +244,7 @@ export default function DealsListPage() {
                     </div>
                     {/* New tab: the report is a document to read or print, not the next step in
                         the wizard, and opening it should not lose the list. */}
-                    <a href={`/dashboard/deals/report?id=${d.id}`} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0, fontSize: 13, fontWeight: 500, padding: '9px 18px', borderRadius: 8, background: GRAD, color: '#0d0d0d', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                    <a href={`/dashboard/deals/report?id=${d.id}`} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0, fontSize: 13, fontWeight: 500, padding: '9px 18px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
                       View report →
                     </a>
                   </div>

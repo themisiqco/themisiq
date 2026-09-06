@@ -23,7 +23,7 @@ import {
 import { startCheckout } from '../../lib/checkout'
 import ConsentForm, { type ConsentPayload } from '../components/ConsentForm'
 
-const GRAD = 'linear-gradient(135deg, #7425e3, #1fb1ff, #64fe3e)'
+const GRAD = 'var(--color-brand)'
 
 const MODULE_LABELS: Record<ModuleKey, string> = {
   'ghg': 'GHG Emissions Inventory',
@@ -84,7 +84,7 @@ function OrderInner() {
           <div style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, marginBottom: 20, maxWidth: 420, margin: '0 auto 20px' }}>
             This order link doesn&rsquo;t include any modules. Choose what you need on the pricing page to get started.
           </div>
-          <a href="/pricing" style={{ display: 'inline-block', padding: '12px 26px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>Configure your plan →</a>
+          <a href="/pricing" style={{ display: 'inline-block', padding: '12px 26px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>Configure your plan →</a>
         </div>
       </Shell>
     )
@@ -214,7 +214,7 @@ function OrderInner() {
                 <button
                   onClick={submitQuote}
                   disabled={!qReady || quoteStatus === 'sending'}
-                  style={{ marginTop: 18, fontSize: 14, fontWeight: 600, padding: '12px 26px', borderRadius: 8, background: GRAD, color: '#0d0d0d', border: 'none', cursor: (qReady && quoteStatus !== 'sending') ? 'pointer' : 'not-allowed', opacity: (qReady && quoteStatus !== 'sending') ? 1 : 0.4 }}
+                  style={{ marginTop: 18, fontSize: 14, fontWeight: 600, padding: '12px 26px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: (qReady && quoteStatus !== 'sending') ? 'pointer' : 'not-allowed', opacity: (qReady && quoteStatus !== 'sending') ? 1 : 0.4 }}
                 >
                   {quoteStatus === 'sending' ? 'Sending…' : 'Request your quote'}
                 </button>

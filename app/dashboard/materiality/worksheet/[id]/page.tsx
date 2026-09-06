@@ -43,7 +43,7 @@ import { finalisationStamp, type Readiness }
 const PURPLE = '#7425e3'
 const GREEN = '#0F6E56'
 const GREEN_BG = '#E1F5EE'
-const AMBER = '#ba7517'
+const AMBER = 'var(--color-module-climate)'
 const AMBER_BG = '#FEF3E2'
 const BLUE = '#0C447C'
 const BLUE_BG = '#E6F1FB'
@@ -1286,7 +1286,7 @@ export default function WorksheetAssign() {
           </div>
 
           {readinessError ? (
-            <div style={{ background: FAIL_BG, border: `0.5px solid ${FAIL}33`, borderRadius: 10,
+            <div style={{ background: FAIL_BG, border: `0.5px solid color-mix(in srgb, ${FAIL} 20%, transparent)`, borderRadius: 10,
                           padding: '12px 14px', fontSize: 12.5, color: INK, lineHeight: 1.8 }}>
               The finalisation status could not be read, so this card cannot say whether the assessment
               is ready. Nothing has changed. {readinessError}
@@ -1309,7 +1309,7 @@ export default function WorksheetAssign() {
                         register pages, and pulling one route module's component into another to
                         avoid nine lines would couple two screens that have no other relationship.
                         Same styling, deliberately, so the three read as one badge. */}
-                    <span style={{ background: GREEN_BG, color: GREEN, border: `0.5px solid ${GREEN}33`,
+                    <span style={{ background: GREEN_BG, color: GREEN, border: `0.5px solid color-mix(in srgb, ${GREEN} 20%, transparent)`,
                                    borderRadius: 999, padding: '2px 9px', fontSize: 10.5,
                                    fontWeight: 600 }}>{stamp.toUpperCase()}</span>
                     <span style={{ fontSize: 11.5, color: MUTE }}>
@@ -1359,7 +1359,7 @@ export default function WorksheetAssign() {
                 )}
 
                 {finaliseError && (
-                  <div style={{ background: FAIL_BG, border: `0.5px solid ${FAIL}33`, borderRadius: 8,
+                  <div style={{ background: FAIL_BG, border: `0.5px solid color-mix(in srgb, ${FAIL} 20%, transparent)`, borderRadius: 8,
                                 padding: '10px 13px', marginTop: 12, fontSize: 12, color: INK,
                                 lineHeight: 1.75 }}>
                     {finaliseError}

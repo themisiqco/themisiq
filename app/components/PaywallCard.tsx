@@ -1,6 +1,6 @@
 'use client'
 // app/components/PaywallCard.tsx
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 
 // `title` and `body` are REQUIRED, and the defaults they used to carry are gone.
 //
@@ -36,7 +36,7 @@ export default function PaywallCard({
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', marginBottom: 14 }}>Locked</div>
         <h2 style={{ fontFamily: 'Georgia, serif', fontWeight: 400, fontSize: '1.6rem', color: '#fff', margin: '0 0 12px', lineHeight: 1.25 }}>{title}</h2>
         <p style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.6)', lineHeight: 1.65, margin: '0 0 24px' }}>{body}</p>
-        <a href={href} style={{ display: 'inline-block', padding: '12px 28px', borderRadius: 8, background: GRAD, color: '#0d0d0d', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>{cta}</a>
+        <a href={href} style={{ display: 'inline-block', padding: '12px 28px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>{cta}</a>
       </div>
     </div>
   )

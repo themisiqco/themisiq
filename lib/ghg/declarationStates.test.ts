@@ -192,7 +192,7 @@ describe('every declaration state the engine emits is named by both surfaces', (
     expect(missing, missing.length === 0 ? '' :
       `THE OPERATOR DASHBOARD HAS NO RENDER BRANCH FOR A STATE THE ENGINE EMITS.` +
       fix(missing, `the 'r.declaration === …' branches in ${DASHBOARD}`,
-        `add an early-return row before the 'undeclared' branch: amber (#FEF3E2 / #ba7517), r.note in\n` +
+        `add an early-return row before the 'undeclared' branch: amber (#FEF3E2 / var(--color-module-climate)), r.note in\n` +
         `the note cell, '—' in the result cell. This surface has no badges, so the engine's own note\n` +
         `does that work — which is what keeps the two pages saying the same thing about the same row.\n\n` +
         `WITHOUT A BRANCH the row falls through to the normal fuel row. It does not crash and the note\n` +

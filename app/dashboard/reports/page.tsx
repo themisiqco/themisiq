@@ -20,7 +20,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import Nav from '../../components/Nav'
 
-const GRAD = 'linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)'
+const GRAD = 'var(--color-brand)'
 
 const SECTOR_LABEL: Record<string, string> = {
   energy: 'Energy & Utilities', finance: 'Financial Services', realestate: 'Real Estate',
@@ -115,7 +115,7 @@ export default function ReportsPage() {
             <p style={{ fontSize: 13, color: '#888784', lineHeight: 1.6, maxWidth: 420, margin: '0 auto 20px' }}>
               Run an assessment to generate your first report. Once generated, it will appear here so you can reopen or re-download it any time.
             </p>
-            <a href="/dashboard/materiality" style={{ display: 'inline-block', fontSize: 13, fontWeight: 500, padding: '11px 24px', borderRadius: 8, background: GRAD, color: '#0d0d0d', textDecoration: 'none' }}>
+            <a href="/dashboard/materiality" style={{ display: 'inline-block', fontSize: 13, fontWeight: 500, padding: '11px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', textDecoration: 'none' }}>
               Run an assessment →
             </a>
           </div>
@@ -137,14 +137,14 @@ export default function ReportsPage() {
                         <span style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d' }}>{title}</span>
                         <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 9px', borderRadius: 99, background: kc.bg, color: kc.color }}>{kindLabel(r)}</span>
                         {r.status && r.status !== 'complete' && (
-                          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 9px', borderRadius: 99, background: '#FEF3E2', color: '#ba7517' }}>{String(r.status).toUpperCase()}</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 9px', borderRadius: 99, background: '#FEF3E2', color: 'var(--color-module-climate)' }}>{String(r.status).toUpperCase()}</span>
                         )}
                       </div>
                       <div style={{ fontSize: 12, color: '#888784' }}>
                         {modeLabel(r.mode)} · {r.regionCount} region{r.regionCount === 1 ? '' : 's'} · {r.jurisdictionCount} jurisdiction{r.jurisdictionCount === 1 ? '' : 's'} · {r.horizon} term · {fmtDate(r.createdAt)}
                       </div>
                     </div>
-                    <a href={reportHref(r)} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0, fontSize: 13, fontWeight: 500, padding: '9px 18px', borderRadius: 8, background: GRAD, color: '#0d0d0d', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                    <a href={reportHref(r)} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0, fontSize: 13, fontWeight: 500, padding: '9px 18px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
                       View report →
                     </a>
                   </div>

@@ -34,7 +34,7 @@ import {
 const CONTACT = 'lisa.foster@themisiq.co'
 
 const PURPLE = '#7425e3'
-const AMBER = '#ba7517'
+const AMBER = 'var(--color-module-climate)'
 const AMBER_BG = '#FEF3E2'
 const FAIL = '#b42318'
 const FAIL_BG = '#fef3f2'
@@ -277,7 +277,7 @@ export function AssessmentForm({
         )}
 
         {versionLock.kind === 'unrepairable' && (
-          <div style={{ background: FAIL_BG, border: `0.5px solid ${FAIL}33`, borderRadius: 10,
+          <div style={{ background: FAIL_BG, border: `0.5px solid color-mix(in srgb, ${FAIL} 20%, transparent)`, borderRadius: 10,
                         padding: '12px 14px', marginTop: 10, fontSize: 12.5, color: INK,
                         lineHeight: 1.8 }}>
             {/* ⚠️ SHOULD BE UNREACHABLE, AND SAYS SO RATHER THAN BEING OMITTED. After 20260851 both
@@ -389,7 +389,7 @@ export function AssessmentForm({
       </div>
 
       {error && (
-        <div style={{ background: FAIL_BG, border: `0.5px solid ${FAIL}33`, borderRadius: 8,
+        <div style={{ background: FAIL_BG, border: `0.5px solid color-mix(in srgb, ${FAIL} 20%, transparent)`, borderRadius: 8,
                       padding: '10px 13px', marginBottom: 16, fontSize: 12, color: INK,
                       lineHeight: 1.75 }}>{error}</div>
       )}
