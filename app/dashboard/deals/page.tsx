@@ -15,6 +15,7 @@ import { supabase } from '../../../lib/supabase'
 import { resolveWizardGate, type FreeTierDeal, type SessionState } from '../../../lib/deals/gates'
 import { saveDealDraft, takeDealDraft } from '../../../lib/deals/draft'
 import { sectionHead } from '@/app/components/headingStyles'
+import { btnStep, btnStepDisabled } from '@/app/components/buttonStyles'
 import {
   getObligations, getApplicableFrameworks, getFrameworkApplicability, getComplianceCost,
   sectorRisks, DEFAULT_PIPELINE_TARGETS, DEAL_CURRENCIES, JURISDICTIONS,
@@ -54,7 +55,7 @@ const SECTORS = [
 const GRAD = 'var(--color-brand)'
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
-const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
+const sectionSub: React.CSSProperties = { fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
 
 const SEVERITY_CONFIG = {
   critical: { label: 'CRITICAL', color: '#B91C1C', bg: '#FCEBEB', border: '#B91C1C' },
@@ -80,7 +81,7 @@ function DealsShell() {
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '3rem 1.5rem', fontSize: 14, color: '#888784' }}>Loading deal…</div>
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '3rem 1.5rem', fontSize: 14, color: 'var(--color-ink-muted)' }}>Loading deal…</div>
     </div>
   )
 }
@@ -593,7 +594,7 @@ function DealsDashboardInner() {
           <input style={inputStyle} type="number" value={deal.revenue || ''} onChange={e => update('revenue', Number(e.target.value))} placeholder="e.g. 2000000" />
           {/* Echo the entered figure back in words. The statutory triggers are USD 1bn / GBP 36m, so a
               1000x entry error changes which statutes are cited — it has to be visible at input time. */}
-          <div style={{ fontSize: 11, marginTop: 6, lineHeight: 1.5, color: deal.revenue > 0 ? '#0d0d0d' : '#888784' }}>
+          <div style={{ fontSize: 11, marginTop: 6, lineHeight: 1.5, color: deal.revenue > 0 ? '#0d0d0d' : 'var(--color-ink-muted)' }}>
             {deal.revenue > 0
               ? <>Reading this as <strong style={{ fontWeight: 600 }}>{deal.currency} {deal.revenue.toLocaleString()}</strong> — {spellMagnitude(deal.revenue)}.</>
               : <>Enter the full amount in whole {deal.currency} — 2000000 for two million, not 2 or 2000.</>}
@@ -615,7 +616,7 @@ function DealsDashboardInner() {
           <label style={labelStyle}>Employees (headcount)</label>
           <input style={inputStyle} type="number" value={deal.employee_count ?? ''} placeholder="Leave blank if unknown"
             onChange={e => update('employee_count', e.target.value === '' ? null : Number(e.target.value))} />
-          <div style={{ fontSize: 11, marginTop: 6, lineHeight: 1.5, color: '#888784' }}>
+          <div style={{ fontSize: 11, marginTop: 6, lineHeight: 1.5, color: 'var(--color-ink-muted)' }}>
             {deal.employee_count == null ? 'Undeclared — limbs needing headcount cannot be assessed.' : `Declared: ${deal.employee_count.toLocaleString()}.`}
           </div>
         </div>
@@ -623,7 +624,7 @@ function DealsDashboardInner() {
           <label style={labelStyle}>Balance-sheet total ({deal.currency})</label>
           <input style={inputStyle} type="number" value={deal.total_assets ?? ''} placeholder="Leave blank if unknown"
             onChange={e => update('total_assets', e.target.value === '' ? null : Number(e.target.value))} />
-          <div style={{ fontSize: 11, marginTop: 6, lineHeight: 1.5, color: '#888784' }}>
+          <div style={{ fontSize: 11, marginTop: 6, lineHeight: 1.5, color: 'var(--color-ink-muted)' }}>
             {deal.total_assets == null ? 'Undeclared — limbs needing total assets cannot be assessed.' : `Declared: ${deal.currency} ${deal.total_assets.toLocaleString()} — ${spellMagnitude(deal.total_assets)}.`}
           </div>
         </div>
@@ -643,7 +644,7 @@ function DealsDashboardInner() {
             {DEAL_TYPES.map(dt => (
               <div key={dt.id} onClick={() => update('deal_type', dt.id)} style={{ border: `1.5px solid ${deal.deal_type === dt.id ? '#7425e3' : '#e8e7e4'}`, borderRadius: 10, padding: '0.75rem', cursor: 'pointer', background: deal.deal_type === dt.id ? '#EDE9FE' : '#f8f7f5' }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: deal.deal_type === dt.id ? '#7425e3' : '#0d0d0d', marginBottom: 3 }}>{dt.label}</div>
-                <div style={{ fontSize: 11, color: '#888784' }}>{dt.desc}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{dt.desc}</div>
               </div>
             ))}
           </div>
@@ -820,7 +821,7 @@ function DealsDashboardInner() {
             {' '}will bring up the risks that usually apply.
           </div>
         ) : (
-          <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: '#888784', fontSize: 13, lineHeight: 1.7 }}>
+          <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)', fontSize: 13, lineHeight: 1.7 }}>
             Choose a sector in{' '}
             <button onClick={() => setStep(0)} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: '#7425e3', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Deal setup</button>
             {' '}to see the ESG risks that usually come with it.
@@ -880,7 +881,7 @@ function DealsDashboardInner() {
                   <div style={{ background: risk.severity === 'critical' ? cfg.bg : '#fff', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `0.5px solid color-mix(in srgb, ${cfg.border} 13%, transparent)` }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{risk.risk}</div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                      <span style={{ fontSize: 10, color: '#888784' }}>{regimeLabel(tokens)}</span>
+                      <span style={{ fontSize: 10, color: 'var(--color-ink-muted)' }}>{regimeLabel(tokens)}</span>
                       {risk.scope === 'conditional' && <span style={verifyChip}>CONDITIONAL</span>}
                       {citedNear.length > 0 && <span style={verifyChip}>VERIFY</span>}
                       <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: cfg.bg, color: cfg.color, border: `0.5px solid ${cfg.border}` }}>{cfg.label}</span>
@@ -928,7 +929,7 @@ function DealsDashboardInner() {
       <p style={sectionSub}>Estimated cost to bring {deal.target_name || 'the target'} into ESG compliance — for your IC memo and deal valuation adjustment.</p>
 
       {!complianceCost ? (
-        <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: '#888784' }}>
+        <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>
           Enter deal value in Step 1 to generate a compliance cost estimate.
         </div>
       ) : (
@@ -952,7 +953,7 @@ function DealsDashboardInner() {
               Priced like sustainability software, scoped like a consultant&rsquo;s engagement. The difference is automation, not depth: traditional fees are dominated by manual data-collection and review hours — the platform handles those directly, without cutting the deliverable.
             </div>
           </div>
-          <div style={{ fontSize: 11, color: '#888784', marginTop: -8, marginBottom: 16, lineHeight: 1.6 }}>Benchmark figures shown in USD. <strong style={{ fontWeight: 600 }}>How we benchmark:</strong> per-obligation market ranges for standalone ESG due-diligence workstreams, scaled by number of locations and sector intensity — indicative, not a quote.</div>
+          <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: -8, marginBottom: 16, lineHeight: 1.6 }}>Benchmark figures shown in USD. <strong style={{ fontWeight: 600 }}>How we benchmark:</strong> per-obligation market ranges for standalone ESG due-diligence workstreams, scaled by number of locations and sector intensity — indicative, not a quote.</div>
 
           {/* Pipeline-ROI scenario — DASHBOARD ONLY (not shared into the public /deals/[token] page:
               wrong audience). Reuses the already-computed consultant range × DEFAULT_PIPELINE_TARGETS
@@ -966,7 +967,7 @@ function DealsDashboardInner() {
                 <div style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.6 }}>
                   Screen ~{DEFAULT_PIPELINE_TARGETS} targets/year. Traditional ESG due diligence: <strong>~USD {Math.round(obligations.consultantLow * DEFAULT_PIPELINE_TARGETS / 1000)}k–{Math.round(obligations.consultantHigh * DEFAULT_PIPELINE_TARGETS / 1000)}k</strong> in per-engagement fees. ThemisIQ: <strong style={{ color: '#0F6E56' }}>{themisIqFigure}</strong> per year, unlimited targets.
                 </div>
-                <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.6, marginTop: 6 }}>One subscription covers your whole screening pipeline, not one deal.</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 6 }}>One subscription covers your whole screening pipeline, not one deal.</div>
               </>
             )}
           </div>
@@ -978,7 +979,7 @@ function DealsDashboardInner() {
               <div key={i} style={{ marginBottom: 6 }}>
                 <div style={{ fontSize: 13, color: '#0d0d0d' }}>✓ {o.label}</div>
                 {o.scopeNote && (
-                  <div style={{ fontSize: 11, color: '#888784', marginLeft: 18, marginTop: 1, lineHeight: 1.5 }}>{o.scopeNote}</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginLeft: 18, marginTop: 1, lineHeight: 1.5 }}>{o.scopeNote}</div>
                 )}
               </div>
             ))}
@@ -993,12 +994,12 @@ function DealsDashboardInner() {
           {obligations.recommended.map((o, i) => (
             <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '0.85rem 1.25rem', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
               <div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Also recommended</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Also recommended</div>
                 <div style={{ fontSize: 13, color: '#555553' }}>{o.label}</div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d' }}>{o.pricing.kind === 'priced' ? `+ ${obligationPriceLabel(o.pricing)}` : obligationPriceLabel(o.pricing)}</div>
-                <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>consultant USD {Math.round(o.consultantLow / 1000)}k–{Math.round(o.consultantHigh / 1000)}k</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>consultant USD {Math.round(o.consultantLow / 1000)}k–{Math.round(o.consultantHigh / 1000)}k</div>
               </div>
             </div>
           ))}
@@ -1008,7 +1009,7 @@ function DealsDashboardInner() {
             <div key={i} style={{ background: '#FBF3E2', border: '0.5px solid rgba(146,102,10,0.25)', borderRadius: 10, padding: '0.85rem 1.25rem', marginBottom: 16 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: '#92660A', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Covered via SBTi target-setting</div>
               <div style={{ fontSize: 13, color: '#555553' }}>{o.label}</div>
-              {o.scopeNote && <div style={{ fontSize: 11, color: '#888784', marginTop: 3, lineHeight: 1.5 }}>{o.scopeNote}</div>}
+              {o.scopeNote && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 3, lineHeight: 1.5 }}>{o.scopeNote}</div>}
             </div>
           ))}
 
@@ -1020,7 +1021,7 @@ function DealsDashboardInner() {
             <div style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.6 }}>
               ~{(complianceCost.pctLow * 100).toFixed(2)}%–{(complianceCost.pctHigh * 100).toFixed(2)}% of deal value (~{deal.currency} {Math.round(complianceCost.low).toLocaleString()}–{Math.round(complianceCost.high).toLocaleString()}) carries ESG-related risk to assess.
             </div>
-            <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.6, marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 4 }}>
               {deal.sector || '—'}, {deal.jurisdiction}, {frameworks.length} applicable frameworks · indicative exposure, not a cost · requires specialist confirmation.
             </div>
           </div>
@@ -1091,13 +1092,13 @@ function DealsDashboardInner() {
               saved deal because it loads by id, so the unsaved state matches the share block
               below rather than offering a link that would open an empty page. */}
           {!dealId ? (
-            <div style={{ fontSize: 12, color: '#888784', fontStyle: 'italic' }}>Save the deal to open its report.</div>
+            <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontStyle: 'italic' }}>Save the deal to open its report.</div>
           ) : (
             <>
               <a href={`/dashboard/deals/report?id=${dealId}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', textDecoration: 'none' }}>
                 Open the full report →
               </a>
-              <div style={{ fontSize: 12, color: '#888784', lineHeight: 1.6, marginTop: 10, maxWidth: 520 }}>
+              <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 10, maxWidth: 520 }}>
                 Opens in a new tab. It has the findings, the applicable rules, the cost estimate and the
                 important notice, written out in full. Print it or save it as a PDF from there.
               </div>
@@ -1122,7 +1123,7 @@ function DealsDashboardInner() {
                 live and the target kept reading an empty assessment. Blockers gate CREATING a link.
                 They never gate managing one that already exists. */}
             {!dealId || !dealToken ? (
-              <div style={{ fontSize: 12, color: '#888784', fontStyle: 'italic' }}>Save the deal to generate a shareable link.</div>
+              <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontStyle: 'italic' }}>Save the deal to generate a shareable link.</div>
             ) : shareEnabled ? (
               <>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#0F6E56', marginBottom: 12 }}>🟢 Link active — anyone with this URL can view this assessment.</div>
@@ -1163,7 +1164,7 @@ function DealsDashboardInner() {
               </div>
             ) : (
               <>
-                <div style={{ fontSize: 12, color: '#888784', marginBottom: 12 }}>🔒 Not shared — only you can see this assessment.</div>
+                <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginBottom: 12 }}>🔒 Not shared — only you can see this assessment.</div>
                 <button onClick={() => toggleShare(true)} disabled={shareSaving} style={{ fontSize: 13, fontWeight: 600, padding: '10px 22px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: shareSaving ? 'not-allowed' : 'pointer' }}>{shareSaving ? 'Generating…' : 'Generate share link'}</button>
               </>
             )}
@@ -1299,7 +1300,7 @@ function DealsDashboardInner() {
                 all three. "Your targets" is the list page's own heading, so the link says where it
                 lands. Same treatment as GHG trends' "← Back to GHG inventory". */}
             <a href="/dashboard/deals/list" style={{ fontSize: 13, fontWeight: 600, color: '#7425e3', textDecoration: 'none', display: 'inline-block', marginBottom: 8 }}>← Your targets</a>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Deals & Investment</div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 4 }}>Deals & Investment</div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>ESG Deal Due Diligence</div>
           </div>
           {deal.target_name && <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{deal.target_name}</div>}
@@ -1308,7 +1309,7 @@ function DealsDashboardInner() {
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2.5rem', overflowX: 'auto' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex' }}>
           {STEP_NAMES.map((name, i) => (
-            <button key={i} onClick={() => setStep(i)} style={{ padding: '14px 16px', fontSize: 12, fontWeight: step === i ? 600 : 400, color: step === i ? '#0d0d0d' : '#888784', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? '#0C447C' : 'transparent'}`, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <button key={i} onClick={() => setStep(i)} style={{ padding: '14px 16px', fontSize: 12, fontWeight: step === i ? 600 : 400, color: step === i ? '#0d0d0d' : 'var(--color-ink-muted)', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? '#0C447C' : 'transparent'}`, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               {i + 1}. {name}
             </button>
           ))}
@@ -1323,7 +1324,7 @@ function DealsDashboardInner() {
                 only inputs that share a screen with findings. */}
             {steps[step].findingsOnly && !resultsShown ? signInPrompt() : steps[step].render()}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
-              <button onClick={() => setStep(s => Math.max(0, s - 1))} style={{ fontSize: 13, padding: '9px 20px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: step === 0 ? 'not-allowed' : 'pointer', opacity: step === 0 ? 0.4 : 1 }}>← Back</button>
+              <button onClick={() => setStep(s => Math.max(0, s - 1))} style={{ ...(step === 0 ? btnStepDisabled : btnStep) }}>← Back</button>
               <button onClick={handleSave} disabled={saving} style={{ fontSize: 13, fontWeight: saved ? 500 : 600, padding: '9px 20px', borderRadius: 8, background: saved ? '#E1F5EE' : GRAD, border: saved ? '1px solid #0F6E56' : 'none', color: saved ? '#0F6E56' : '#0d0d0d', cursor: saving ? 'not-allowed' : 'pointer' }}>{saving ? 'Saving…' : saved ? '✓ Saved' : 'Save deal'}</button>
               {step < STEP_NAMES.length - 1 && <button onClick={() => setStep(s => Math.min(STEP_NAMES.length - 1, s + 1))} style={{ fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>Next →</button>}
             </div>

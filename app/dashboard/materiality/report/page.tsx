@@ -287,7 +287,7 @@ const GRAD = 'var(--color-brand)'
 const SEV = {
   high: { color: '#B91C1C', bg: '#FCEBEB', border: '#B91C1C' },
   med:  { color: 'var(--color-module-climate)', bg: '#FEF3E2', border: 'var(--color-module-climate)' },
-  low:  { color: '#888784', bg: '#f8f7f5', border: '#e8e7e4' },
+  low:  { color: 'var(--color-ink-muted)', bg: '#f8f7f5', border: '#e8e7e4' },
 } as const
 
 // TCFD opportunity descriptions — for the report's climate-opportunities section
@@ -692,7 +692,7 @@ function ReportInner() {
             </p>
             <Matrix topics={matrix} />
             <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginTop: 8, fontSize: 12, color: '#555553' }}>
-              {[['#A32D2D', 'Material on both'], ['var(--color-module-climate)', 'Material on one axis'], ['#888784', 'Lower priority']].map(([c, l]) => (
+              {[['#A32D2D', 'Material on both'], ['var(--color-module-climate)', 'Material on one axis'], ['var(--color-ink-muted)', 'Lower priority']].map(([c, l]) => (
                 <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: '50%', background: c, display: 'inline-block' }} />{l}</span>
               ))}
             </div>
@@ -741,7 +741,7 @@ function ReportInner() {
                   they are ThemisIQ's own curated set rather than the instrument's text. That last
                   clause is not modesty; the migration header records the 2023 fidelity as
                   UNVERIFIED, and a report that cites them as the regulation would launder that. */}
-              <p style={{ ...p, fontSize: 11, color: '#888784' }}>
+              <p style={{ ...p, fontSize: 11, color: 'var(--color-ink-muted)' }}>
                 The requirements listed below are those held for{' '}
                 <strong>{roadmapVintage(a.workings?.drResolution) ?? 'the standard version stated above'}</strong>,
                 resolved when this assessment was run and stored with it — so this roadmap reprints the
@@ -757,7 +757,7 @@ function ReportInner() {
                   same predicate as the badges. Printing it unconditionally described a relief that
                   does not attach to the version served — see phaseInApplies. */}
               {matrix.some((t: any) => ESRS_DR_MAP[t.code]?.quickFixPhaseIn && phaseInApplies(a.workings?.drResolution, t.code)) && (
-                <p style={{ ...p, fontSize: 11, color: '#888784' }}>
+                <p style={{ ...p, fontSize: 11, color: 'var(--color-ink-muted)' }}>
                   Topics marked &ldquo;FY25&ndash;26 phase-in&rdquo; may be phased in for FY2025&ndash;2026 under
                   the quick-fix amendment, {PHASE_IN_INSTRUMENT}, subject to the ESRS 2.17 summary disclosure
                   where the topic is material.
@@ -777,7 +777,7 @@ function ReportInner() {
                   Cited to the ADOPTED ACT: the annex's §10.3 footnote still carries an unresolved
                   "[O.P.: please insert … the OJ reference …]", so there is no OJ citation to give. */}
               {roadmapVintage(a.workings?.drResolution) === VERSION_SHORT.esrs_2026 && (
-                <p style={{ ...p, fontSize: 11, color: '#888784' }}>
+                <p style={{ ...p, fontSize: 11, color: 'var(--color-ink-muted)' }}>
                   ESRS (2026) provides its own transitional omissions for biodiversity (E4), value-chain
                   workers (S2), affected communities (S3) and consumers and end-users (S4), at ESRS 1
                   §10.3 (paragraphs 125&ndash;127 of the adopted Annex I), together with further omissions
@@ -822,7 +822,7 @@ function ReportInner() {
               </tbody>
             </table>
           ) : (
-            <p style={{ ...p, color: '#888784' }}>No material physical risks flagged at this intersection of industry, region and scenario.</p>
+            <p style={{ ...p, color: 'var(--color-ink-muted)' }}>No material physical risks flagged at this intersection of industry, region and scenario.</p>
           )}
           <h3 style={{ ...h3, marginTop: 28 }}>Transition risks</h3>
           <p style={p}><em>Industry carbon exposure × jurisdictional policy intensity × scenario policy-speed × horizon.</em></p>
@@ -856,7 +856,7 @@ function ReportInner() {
                 ))}
               </tbody>
             </table>
-          ) : <p style={{ ...p, color: '#888784' }}>No opportunity profile available for this industry yet.</p>}
+          ) : <p style={{ ...p, color: 'var(--color-ink-muted)' }}>No opportunity profile available for this industry yet.</p>}
         </section>
 
         {/* ── ASSUMPTIONS REGISTER ───────────────────────────────────────── */}
@@ -919,11 +919,11 @@ function ReportInner() {
         <section className="page" style={{ marginTop: 48 }}>
           <H>Important Notice</H>
           {disclaimerParas('screening').map((para, i) => (
-            <p key={'disc' + i} style={{ ...p, fontSize: 11, color: '#888784' }}>{para}</p>
+            <p key={'disc' + i} style={{ ...p, fontSize: 11, color: 'var(--color-ink-muted)' }}>{para}</p>
           ))}
         </section>
 
-        <div style={{ marginTop: 32, paddingTop: 16, borderTop: '0.5px solid #e8e7e4', fontSize: 11, color: '#888784', textAlign: 'center' }}>
+        <div style={{ marginTop: 32, paddingTop: 16, borderTop: '0.5px solid #e8e7e4', fontSize: 11, color: 'var(--color-ink-muted)', textAlign: 'center' }}>
           ThemisIQ Compliance Inc. · www.themisiq.co · Report ID {String(a.id).slice(0, 8)}… · Assessment date {reportDate}
         </div>
       </div>
@@ -978,7 +978,7 @@ function H({ children }: { children: any }) {
 function Row({ k, v }: { k: string; v: string }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 12, padding: '6px 0', fontSize: 13 }}>
-      <span style={{ color: '#888784' }}>{k}</span>
+      <span style={{ color: 'var(--color-ink-muted)' }}>{k}</span>
       <span style={{ color: '#0d0d0d' }}>{v}</span>
     </div>
   )
@@ -1008,7 +1008,7 @@ function Matrix({ topics }: { topics: any[] }) {
   const W = 600, H = 400, padL = 56, padR = 20, padT = 20, padB = 48
   const midX = padL + 0.5 * (W - padL - padR)
   const midY = padT + 0.5 * (H - padT - padB)
-  const color = (q: string) => q === 'both' ? '#A32D2D' : (q === 'financial' || q === 'impact') ? 'var(--color-module-climate)' : '#888784'
+  const color = (q: string) => q === 'both' ? '#A32D2D' : (q === 'financial' || q === 'impact') ? 'var(--color-module-climate)' : 'var(--color-ink-muted)'
 
   // Offset dots that would land on top of an earlier-placed dot so labels stay readable.
   // 8 directions in a small circle; first collision -> right, second -> left, etc.
@@ -1039,10 +1039,10 @@ function Matrix({ topics }: { topics: any[] }) {
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10 }} role="img" aria-label="Double materiality matrix">
       <line x1={padL} y1={midY} x2={W - padR} y2={midY} stroke="#e8e7e4" strokeDasharray="4 4" />
       <line x1={midX} y1={padT} x2={midX} y2={H - padB} stroke="#e8e7e4" strokeDasharray="4 4" />
-      <line x1={padL} y1={padT} x2={padL} y2={H - padB} stroke="#888784" />
-      <line x1={padL} y1={H - padB} x2={W - padR} y2={H - padB} stroke="#888784" />
-      <text x={padL - 8} y={padT + 10} textAnchor="end" fontSize="11" fill="#888784">High</text>
-      <text x={padL - 8} y={H - padB} textAnchor="end" fontSize="11" fill="#888784">Low</text>
+      <line x1={padL} y1={padT} x2={padL} y2={H - padB} stroke="var(--color-ink-muted)" />
+      <line x1={padL} y1={H - padB} x2={W - padR} y2={H - padB} stroke="var(--color-ink-muted)" />
+      <text x={padL - 8} y={padT + 10} textAnchor="end" fontSize="11" fill="var(--color-ink-muted)">High</text>
+      <text x={padL - 8} y={H - padB} textAnchor="end" fontSize="11" fill="var(--color-ink-muted)">Low</text>
       <text x="18" y={H / 2} textAnchor="middle" fontSize="12" fill="#555553" transform={`rotate(-90 18 ${H / 2})`}>Financial materiality →</text>
       <text x={W / 2} y={H - 10} textAnchor="middle" fontSize="12" fill="#555553">Impact materiality →</text>
       {placed.map(pp => (
@@ -1067,8 +1067,8 @@ function MatrixTable({ topics }: { topics: any[] }) {
         {sorted.map(t => (
           <tr key={t.code} style={tr}>
             <td style={td}><span style={{ color: '#aaa', fontSize: 11 }}>{t.code}</span> {t.label}</td>
-            <td style={td}><Pill band={band(t.financial)} /> <span style={{ fontSize: 11, color: '#888784', marginLeft: 4 }}>{num(t.financial)}</span></td>
-            <td style={td}><Pill band={band(t.impact)} /> <span style={{ fontSize: 11, color: '#888784', marginLeft: 4 }}>{num(t.impact)}</span></td>
+            <td style={td}><Pill band={band(t.financial)} /> <span style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginLeft: 4 }}>{num(t.financial)}</span></td>
+            <td style={td}><Pill band={band(t.impact)} /> <span style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginLeft: 4 }}>{num(t.impact)}</span></td>
           </tr>
         ))}
       </tbody>
@@ -1154,7 +1154,7 @@ function DisclosureRoadmap({ matrix, requirements, drResolution }: { matrix: any
                         "Key datapoints to collect" reads as "nothing to collect" — a finding this
                         column cannot support, and the same absence-rendered-as-a-finding failure the
                         GHG engine's declaration states exist to prevent. */}
-                    <td style={d.datapoints ? td : { ...td, color: '#888784', fontStyle: 'italic' }}>
+                    <td style={d.datapoints ? td : { ...td, color: 'var(--color-ink-muted)', fontStyle: 'italic' }}>
                       {d.datapoints || 'Not yet summarised — see the standard text for this requirement.'}
                     </td>
                   </tr>

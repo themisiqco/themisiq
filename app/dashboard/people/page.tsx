@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import Nav from '../../components/Nav'
 import Papa from 'papaparse'
 import { useEntitlement } from '../../../lib/useEntitlement'
+import { btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -99,7 +100,7 @@ const sectionHead: React.CSSProperties = {
 }
 
 const sectionSub: React.CSSProperties = {
-  fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '2rem',
+  fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.6, marginBottom: '2rem',
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -228,7 +229,7 @@ export default function PeopleDashboard() {
           { id: 'sasb', name: 'SASB Human Capital', desc: 'Sector-specific workforce metrics · investor-grade', urgency: 'medium' },
         ].map(fw => {
           const selected = inventory.jurisdictions.includes(fw.id)
-          const urgencyColor = fw.urgency === 'critical' ? '#B91C1C' : fw.urgency === 'high' ? 'var(--color-module-climate)' : '#888784'
+          const urgencyColor = fw.urgency === 'critical' ? '#B91C1C' : fw.urgency === 'high' ? 'var(--color-module-climate)' : 'var(--color-ink-muted)'
           const urgencyBg = fw.urgency === 'critical' ? '#FCEBEB' : fw.urgency === 'high' ? '#FEF3E2' : '#f8f7f5'
           return (
             <div key={fw.id} onClick={() => toggleJurisdiction(fw.id)} style={{ border: `2px solid ${selected ? '#7425e3' : '#e8e7e4'}`, borderRadius: 12, padding: '1.25rem', cursor: 'pointer', background: selected ? '#fff' : '#f8f7f5', transition: 'all 0.15s' }}>
@@ -305,7 +306,7 @@ export default function PeopleDashboard() {
           <label style={labelStyle}>Band name</label>
           <input style={inputStyle} value={inventory.bands[activeBand]?.name || ''} onChange={e => updateBand(activeBand, 'name', e.target.value)} placeholder="e.g. Junior, Mid-level, Senior, Manager, Director, Executive" />
         </div>
-        <div style={{ fontSize: 12, color: '#888784', lineHeight: 1.6 }}>
+        <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.6 }}>
           Typical job bands: Junior · Associate · Mid-level · Senior · Lead · Manager · Director · VP · C-Suite
         </div>
         {inventory.bands.length > 1 && (
@@ -330,7 +331,7 @@ export default function PeopleDashboard() {
       <div style={{ background: '#f8f7f5', border: '1px dashed #e8e7e4', borderRadius: 12, padding: '1.25rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', marginBottom: 4 }}>Import from HR system</div>
-          <div style={{ fontSize: 12, color: '#888784', lineHeight: 1.5 }}>CSV with columns: Job Band, Male Count, Female Count, Other Count, Male Avg Salary, Female Avg Salary, Other Avg Salary</div>
+          <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.5 }}>CSV with columns: Job Band, Male Count, Female Count, Other Count, Male Avg Salary, Female Avg Salary, Other Avg Salary</div>
         </div>
         <div style={{ flexShrink: 0 }}>
           <input ref={fileRef} type="file" accept=".csv" onChange={handleCSV} style={{ display: 'none' }} />
@@ -363,7 +364,7 @@ export default function PeopleDashboard() {
                 { label: 'Other / prefer not to say', countField: 'other_count' as keyof JobBand, salaryField: 'other_avg_salary' as keyof JobBand },
               ].map(({ label, countField, salaryField }) => (
                 <div key={label} style={{ background: '#f8f7f5', borderRadius: 10, padding: '1rem' }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
                   <div style={{ marginBottom: 10 }}>
                     <label style={{ ...labelStyle, fontSize: 10 }}>Headcount</label>
                     <input style={inputStyle} type="number" value={(inventory.bands[activeBand][countField] as number) || ''} onChange={e => updateBand(activeBand, countField, Number(e.target.value))} placeholder="0" />
@@ -405,12 +406,12 @@ export default function PeopleDashboard() {
         <div>
           <label style={labelStyle}>LTIFR (Lost Time Injury Frequency Rate)</label>
           <input style={inputStyle} type="number" step="0.01" value={inventory.metrics.ltifr || ''} onChange={e => updateMetric('ltifr', Number(e.target.value))} placeholder="0.00" />
-          <div style={{ fontSize: 11, color: '#888784', marginTop: 4 }}>Injuries per million hours worked</div>
+          <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4 }}>Injuries per million hours worked</div>
         </div>
         <div>
           <label style={labelStyle}>TRIR (Total Recordable Incident Rate)</label>
           <input style={inputStyle} type="number" step="0.01" value={inventory.metrics.trir || ''} onChange={e => updateMetric('trir', Number(e.target.value))} placeholder="0.00" />
-          <div style={{ fontSize: 11, color: '#888784', marginTop: 4 }}>Recordable incidents per 200,000 hours</div>
+          <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4 }}>Recordable incidents per 200,000 hours</div>
         </div>
         <div>
           <label style={labelStyle}>Avg training hours — male employees</label>
@@ -456,7 +457,7 @@ export default function PeopleDashboard() {
             { label: 'Total employees', val: totalEmployees.toLocaleString(), color: '#0d0d0d', bg: '#f8f7f5' },
           ].map(({ label, val, color, bg }) => (
             <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.25rem', border: `0.5px solid color-mix(in srgb, ${color} 13%, transparent)` }}>
-              <div style={{ fontSize: 11, color: '#888784', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{label}</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{label}</div>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 400, color }}>{val}</div>
             </div>
           ))}
@@ -466,7 +467,7 @@ export default function PeopleDashboard() {
         <div style={{ border: '1px solid #e8e7e4', borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
           <div style={{ background: '#f8f7f5', padding: '10px 16px', borderBottom: '1px solid #e8e7e4', display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', gap: 8 }}>
             {['Job Band', 'Male', 'Female', 'Pay Gap', 'Status'].map(h => (
-              <div key={h} style={{ fontSize: 10, fontWeight: 700, color: '#888784', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
+              <div key={h} style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-ink-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
             ))}
           </div>
           {inventory.bands.map((b, i) => {
@@ -506,7 +507,7 @@ export default function PeopleDashboard() {
                 <span style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>I confirm that the data entered is accurate to the best of my knowledge and has been sourced from actual HR and payroll records. I understand that ThemisIQ applies the correct methodology to the data I provide, and that accuracy of the underlying data is my responsibility.</span>
               </label>
             </div>
-            <button onClick={() => dataConfirmed && generateExport()} style={{ fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: dataConfirmed ? 'pointer' : 'not-allowed', opacity: dataConfirmed ? 1 : 0.4 }}>
+            <button onClick={() => dataConfirmed && generateExport()} style={{ ...(dataConfirmed ? btnStepPrimary : btnStepPrimaryDisabled) }}>
               ⬇ Download Gender Pay Gap Report (CSV)
             </button>
           </div>
@@ -533,10 +534,10 @@ export default function PeopleDashboard() {
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>People & Workforce</div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 4 }}>People & Workforce</div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>Gender Pay Gap & Workforce Compliance</div>
           </div>
-          <div style={{ fontSize: 12, color: '#888784' }}>
+          <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>
             {inventory.company && <span style={{ fontWeight: 500, color: '#0d0d0d' }}>{inventory.company} · </span>}
             {inventory.reporting_year}
           </div>
@@ -547,7 +548,7 @@ export default function PeopleDashboard() {
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2.5rem', overflowX: 'auto' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex' }}>
           {STEP_NAMES.map((name, i) => (
-            <button key={i} onClick={() => setStep(i)} style={{ padding: '14px 16px', fontSize: 12, fontWeight: step === i ? 600 : 400, color: step === i ? '#0d0d0d' : '#888784', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? '#7425e3' : 'transparent'}`, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s' }}>
+            <button key={i} onClick={() => setStep(i)} style={{ padding: '14px 16px', fontSize: 12, fontWeight: step === i ? 600 : 400, color: step === i ? '#0d0d0d' : 'var(--color-ink-muted)', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? '#7425e3' : 'transparent'}`, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s' }}>
               {i + 1}. {name}
             </button>
           ))}
@@ -564,7 +565,7 @@ export default function PeopleDashboard() {
 
             {/* Navigation */}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
-              <button onClick={() => setStep(s => Math.max(0, s - 1))} style={{ fontSize: 13, padding: '9px 20px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: step === 0 ? 'not-allowed' : 'pointer', opacity: step === 0 ? 0.4 : 1 }}>
+              <button onClick={() => setStep(s => Math.max(0, s - 1))} style={{ ...(step === 0 ? btnStepDisabled : btnStep) }}>
                 ← Back
               </button>
               {step < STEP_NAMES.length - 1 && (
@@ -599,11 +600,11 @@ export default function PeopleDashboard() {
               {/* Live gap preview if data entered */}
               {inventory.bands.some(b => b.male_avg_salary > 0 && b.female_avg_salary > 0) && (
                 <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem' }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784', marginBottom: 10 }}>Pay gap preview</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 10 }}>Pay gap preview</div>
                   <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 400, color: Math.abs(calcMeanGap(inventory.bands)) >= 5 ? '#B91C1C' : '#0F6E56', marginBottom: 4 }}>
                     {calcMeanGap(inventory.bands).toFixed(1)}%
                   </div>
-                  <div style={{ fontSize: 11, color: '#888784' }}>mean gender pay gap</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>mean gender pay gap</div>
                   {inventory.bands.filter(b => Math.abs(calcGap(b.male_avg_salary, b.female_avg_salary)) >= 5).length > 0 && (
                     <div style={{ marginTop: 8, fontSize: 11, color: '#B91C1C', fontWeight: 500 }}>
                       ⚠ {inventory.bands.filter(b => Math.abs(calcGap(b.male_avg_salary, b.female_avg_salary)) >= 5).length} band(s) above 5% threshold

@@ -32,7 +32,7 @@ export const EV_AMBER_BG = '#FEF3E2'
 export const EV_PURPLE = '#7425e3'
 export const EV_INK = '#0d0d0d'
 export const EV_MID = '#555553'
-export const EV_MUTE = '#888784'
+export const EV_MUTE = 'var(--color-ink-muted)'
 export const EV_LINE = '#e8e7e4'
 export const EV_PAPER = '#f8f7f5'
 

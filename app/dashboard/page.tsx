@@ -272,7 +272,7 @@ export default function Dashboard() {
   if (loading) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
-      <div style={{ textAlign: 'center', padding: '4rem', color: '#888784' }}>Loading your dashboard...</div>
+      <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-ink-muted)' }}>Loading your dashboard...</div>
     </div>
   )
 
@@ -308,7 +308,7 @@ export default function Dashboard() {
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
         <div style={{ maxWidth: 1000, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Dashboard</div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 4 }}>Dashboard</div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>
               {user?.email?.split('@')[0] ? `Welcome back` : 'Your ThemisIQ platform'}
             </div>
@@ -331,14 +331,14 @@ export default function Dashboard() {
         {/* Summary stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
           {[
-            { label: 'Modules active', val: activeModuleCount, color: activeModuleCount > 0 ? '#0F6E56' : '#888784', bg: activeModuleCount > 0 ? '#E1F5EE' : '#f8f7f5' },
-            { label: 'Modules available', val: MODULES.length - activeModuleCount, color: '#888784', bg: '#f8f7f5' },
+            { label: 'Modules active', val: activeModuleCount, color: activeModuleCount > 0 ? '#0F6E56' : 'var(--color-ink-muted)', bg: activeModuleCount > 0 ? '#E1F5EE' : '#f8f7f5' },
+            { label: 'Modules available', val: MODULES.length - activeModuleCount, color: 'var(--color-ink-muted)', bg: '#f8f7f5' },
             { label: 'Frameworks covered', val: activeModuleCount > 0 ? unlockedModuleIds.flatMap(id => MODULES.find(m => m.id === id)?.frameworks || []).length : 0, color: '#7425e3', bg: '#EDE9FE' },
             { label: 'AI Act high-risk from', val: AI_ACT_HIGH_RISK_STANDALONE, color: '#B91C1C', bg: '#FCEBEB' },
           ].map(({ label, val, color, bg }) => (
             <div key={label} style={{ background: bg, borderRadius: 12, padding: '1rem', textAlign: 'center', border: '0.5px solid #e8e7e4' }}>
               <div style={{ fontFamily: typeof val === 'number' ? 'var(--font-display)' : 'inherit', fontSize: typeof val === 'number' ? '1.8rem' : '1rem', fontWeight: typeof val === 'number' ? 400 : 600, color, lineHeight: 1.2, marginBottom: 4 }}>{val}</div>
-              <div style={{ fontSize: 11, color: '#888784' }}>{label}</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{label}</div>
             </div>
           ))}
         </div>
@@ -348,7 +348,7 @@ export default function Dashboard() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 400, color: '#0d0d0d' }}>Your compliance modules</h2>
             {activeModuleCount === 0 && (
-              <div style={{ fontSize: 12, color: '#888784' }}>Click any module to preview · unlock to export</div>
+              <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Click any module to preview · unlock to export</div>
             )}
           </div>
 
@@ -404,7 +404,7 @@ export default function Dashboard() {
 
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 12 }}>
                       {mod.frameworks.slice(0, 3).map(fw => (
-                        <span key={fw} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 99, background: unlocked ? mod.bg : '#f8f7f5', color: unlocked ? mod.color : '#888784', border: `0.5px solid ${unlocked ? `color-mix(in srgb, ${mod.color} 19%, transparent)` : '#e8e7e4'}` }}>{fw}</span>
+                        <span key={fw} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 99, background: unlocked ? mod.bg : '#f8f7f5', color: unlocked ? mod.color : 'var(--color-ink-muted)', border: `0.5px solid ${unlocked ? `color-mix(in srgb, ${mod.color} 19%, transparent)` : '#e8e7e4'}` }}>{fw}</span>
                       ))}
                     </div>
 
@@ -425,7 +425,7 @@ export default function Dashboard() {
                           // does not give is worse than saying nothing.
                           const lead = mod.previewable ? 'Preview free' : 'Locked'
                           return (
-                            <span style={{ fontSize: 11, color: '#888784' }}>{lead}{price !== null && <> · <span style={{ color: '#7425e3', fontWeight: 500 }}>unlock for ${price.toLocaleString('en-US')}/yr</span></>}</span>
+                            <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{lead}{price !== null && <> · <span style={{ color: '#7425e3', fontWeight: 500 }}>unlock for ${price.toLocaleString('en-US')}/yr</span></>}</span>
                           )
                         })()
                       )}
@@ -456,7 +456,7 @@ export default function Dashboard() {
         {/* Active modules quick actions */}
         {activeModuleCount > 0 && (
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '1.5rem' }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#888784', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Quick actions</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-ink-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Quick actions</div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               {unlockedModuleIds.map(id => {
                 const mod = MODULES.find(m => m.id === id)
@@ -467,7 +467,7 @@ export default function Dashboard() {
                   </a>
                 )
               })}
-              <a href="/pricing" style={{ fontSize: 12, fontWeight: 500, padding: '8px 16px', borderRadius: 8, background: '#f8f7f5', color: '#888784', textDecoration: 'none', border: '0.5px solid #e8e7e4' }}>
+              <a href="/pricing" style={{ fontSize: 12, fontWeight: 500, padding: '8px 16px', borderRadius: 8, background: '#f8f7f5', color: 'var(--color-ink-muted)', textDecoration: 'none', border: '0.5px solid #e8e7e4' }}>
                 + Add module
               </a>
             </div>

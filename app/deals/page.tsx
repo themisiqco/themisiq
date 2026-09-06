@@ -69,7 +69,7 @@ export default function Page() {
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color, marginTop: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{unit}</div>
                 <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{label}</div>
-                {source && <div style={{ fontSize: 11, color: '#888784', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{source}</div>}
+                {source && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{source}</div>}
               </div>
             ))}
           </div>
@@ -150,10 +150,10 @@ export default function Page() {
               <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400, marginBottom: 16 }}>{desc}</div>
               <div style={{ borderTop: '0.5px solid #e8e7e4', paddingTop: 12 }}>
                 <div style={{ fontSize: 12, color: '#555553', fontWeight: 400, marginBottom: 4 }}>
-                  <span style={{ color: '#888784' }}>Who pays:</span> {pays}
+                  <span style={{ color: 'var(--color-ink-muted)' }}>Who pays:</span> {pays}
                 </div>
                 <div style={{ fontSize: 12, color: '#555553', fontWeight: 400 }}>
-                  <span style={{ color: '#888784' }}>Effort:</span> {effort}
+                  <span style={{ color: 'var(--color-ink-muted)' }}>Effort:</span> {effort}
                 </div>
               </div>
             </div>
@@ -240,7 +240,7 @@ export default function Page() {
           <a href="/dashboard/deals" style={{ ...btnPrimary, textDecoration: 'none' }}>Screen your first target →</a>
         </div>
         <div style={{ marginTop: '1.5rem' }}>
-          <a href="/advisory" style={{ fontSize: 13, fontWeight: 400, color: '#888784', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
+          <a href="/advisory" style={{ fontSize: 13, fontWeight: 400, color: 'var(--color-ink-muted)', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
         </div>
       </section>
 
@@ -252,7 +252,7 @@ export default function Page() {
   )
 }
 
-const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
+const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }
 // The three-column hairline grid used on /cyber and /climate-risk — 1px gaps over a #e8e7e4 ground
 // so the cell backgrounds draw the rules. Cells are plain white with 2rem padding.
 const hairlineGrid3: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }

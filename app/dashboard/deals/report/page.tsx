@@ -291,7 +291,7 @@ function H({ children }: { children: React.ReactNode }) {
 function Row({ k, v }: { k: string; v: string }) {
   return (
     <div style={{ display: 'flex', gap: 16, padding: '5px 0', fontSize: 13 }}>
-      <div style={{ minWidth: 190, color: '#888784' }}>{k}</div>
+      <div style={{ minWidth: 190, color: 'var(--color-ink-muted)' }}>{k}</div>
       <div style={{ color: '#0d0d0d', fontWeight: 500 }}>{v}</div>
     </div>
   )
@@ -654,12 +654,12 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
           </p>
           <div style={{ display: 'flex', gap: 14, marginBottom: 12, flexWrap: 'wrap', alignItems: 'stretch' }}>
             <div style={{ flex: '1.6 1 300px', border: '1px solid #0d0d0d', borderRadius: 10, padding: '16px 18px' }}>
-              <div style={{ fontSize: 11, color: '#888784', marginBottom: 6 }}>Traditional consultant — first year</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 6 }}>Traditional consultant — first year</div>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.85rem', fontWeight: 400, lineHeight: 1.15 }}>{consultantRange}</div>
               <div style={{ fontSize: 11, color: '#555553', marginTop: 6, lineHeight: 1.6 }}>Indicative market range, scaled per obligation for this target&rsquo;s sector and site count.</div>
             </div>
             <div style={{ flex: '1 1 220px', border: '1px solid #e8e7e4', borderRadius: 10, padding: '16px 18px' }}>
-              <div style={{ fontSize: 11, color: '#888784', marginBottom: 6 }}>ThemisIQ — scope-matched modules</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 6 }}>ThemisIQ — scope-matched modules</div>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.35rem', fontWeight: 400, lineHeight: 1.15, color: '#555553' }}>{themisIq}</div>
               <div style={{ fontSize: 11, color: '#555553', marginTop: 6, lineHeight: 1.6 }}>One available route, priced for the modules this scope requires.</div>
             </div>
@@ -668,7 +668,7 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
               harder to fault. The consultant figures are benchmarks, NOT citations — the source
               note on CONSULTANT_RANGES says "Indicative benchmarks, not quotes", so this must not
               claim they were cited or obtained. */}
-          <p style={{ ...note, fontSize: 11, color: '#888784' }}>
+          <p style={{ ...note, fontSize: 11, color: 'var(--color-ink-muted)' }}>
             <strong style={{ fontWeight: 600 }}>Disclosure:</strong> ThemisIQ Compliance Inc. prepared this report and also supplies the software priced in the second figure. The consultant range is an indicative benchmark drawn from market analysis, not a quotation obtained from any firm.
           </p>
 
@@ -786,25 +786,25 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
           <table style={tbl}>
             <tbody>
               <tr style={tr}>
-                <td style={{ ...td, width: 210, color: '#888784' }}>Rate source</td>
+                <td style={{ ...td, width: 210, color: 'var(--color-ink-muted)' }}>Rate source</td>
                 <td style={td}>{FX_SOURCE}</td>
               </tr>
               <tr style={tr}>
-                <td style={{ ...td, color: '#888784' }}>Rates as of</td>
+                <td style={{ ...td, color: 'var(--color-ink-muted)' }}>Rates as of</td>
                 <td style={td}>{FX_AS_OF}</td>
               </tr>
               <tr style={tr}>
-                <td style={{ ...td, color: '#888784' }}>Deal currency</td>
+                <td style={{ ...td, color: 'var(--color-ink-muted)' }}>Deal currency</td>
                 <td style={td}>{currency}</td>
               </tr>
               {fxBasisRows.map((r, i) => (
                 <tr key={i} style={tr}>
-                  <td style={{ ...td, color: '#888784' }}>{r[0]}</td>
+                  <td style={{ ...td, color: 'var(--color-ink-muted)' }}>{r[0]}</td>
                   <td style={td}>{r[1]}</td>
                 </tr>
               ))}
               <tr style={tr}>
-                <td style={{ ...td, color: '#888784' }}>Size tests available</td>
+                <td style={{ ...td, color: 'var(--color-ink-muted)' }}>Size tests available</td>
                 <td style={td}>{activeTests.map(t => `${t.framework} (${t.requires} of ${t.limbs.length})`).join(' · ') || 'None'}</td>
               </tr>
             </tbody>
@@ -815,7 +815,7 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
         <section className="page" style={{ marginTop: 48 }}>
           <H>Important Notice</H>
           {disclaimerParas('screening').map((para, i) => (
-            <p key={'disc' + i} style={{ ...p, fontSize: 11, color: '#888784' }}>{para}</p>
+            <p key={'disc' + i} style={{ ...p, fontSize: 11, color: 'var(--color-ink-muted)' }}>{para}</p>
           ))}
         </section>
 
@@ -860,7 +860,7 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
           </div>
         )}
 
-        <div style={{ marginTop: 32, paddingTop: 16, borderTop: '0.5px solid #e8e7e4', fontSize: 11, color: '#888784', textAlign: 'center', lineHeight: 1.7 }}>
+        <div style={{ marginTop: 32, paddingTop: 16, borderTop: '0.5px solid #e8e7e4', fontSize: 11, color: 'var(--color-ink-muted)', textAlign: 'center', lineHeight: 1.7 }}>
           ThemisIQ Compliance Inc. · www.themisiq.co · Reference {reference} · Generated {reportDate}
           <br />
           This assessment reflects the figures held for this deal on {reportDate}. It is derived at generation, not stored — a report generated on another date may differ.

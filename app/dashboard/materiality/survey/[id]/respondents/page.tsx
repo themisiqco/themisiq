@@ -79,8 +79,8 @@ const STATUS = {
   invited:     { label: 'Not yet opened', color: BLUE,     bg: BLUE_BG },
   in_progress: { label: 'Opened',         color: AMBER,    bg: AMBER_BG },
   completed:   { label: 'Submitted',      color: GREEN,    bg: GREEN_BG },
-  revoked:     { label: 'Revoked',        color: '#888784', bg: '#f8f7f5' },
-  expired:     { label: 'Expired',        color: '#888784', bg: '#f8f7f5' },
+  revoked:     { label: 'Revoked',        color: 'var(--color-ink-muted)', bg: '#f8f7f5' },
+  expired:     { label: 'Expired',        color: 'var(--color-ink-muted)', bg: '#f8f7f5' },
 } as const
 
 export default function SurveyRespondents() {
@@ -238,7 +238,7 @@ export default function SurveyRespondents() {
   if (loading) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
-      <div style={{ textAlign: 'center', padding: '4rem', color: '#888784' }}>Loading respondents…</div>
+      <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-ink-muted)' }}>Loading respondents…</div>
     </div>
   )
 
@@ -271,7 +271,7 @@ export default function SurveyRespondents() {
         {/* Company first, round name labelled — see the note on the import screen. */}
         <div style={{ fontSize: 13.5, color: '#555553', lineHeight: 1.7, marginTop: 6, maxWidth: 640 }}>
           {round?.company_name || 'This survey'}
-          {round?.name ? <span style={{ color: '#888784' }}> · round: {round.name}</span> : null}
+          {round?.name ? <span style={{ color: 'var(--color-ink-muted)' }}> · round: {round.name}</span> : null}
         </div>
 
         {/* ⚠️ THE OPERATIVE RULE, beside the selector rather than in a help page. The consequence —
@@ -282,7 +282,7 @@ export default function SurveyRespondents() {
           Employees and supplier contacts are asked about workforce conditions — their own — while
           customers, regulators and community representatives are not, because they cannot observe
           either workforce.
-          <div style={{ marginTop: 10, fontSize: 12.5, color: '#888784' }}>
+          <div style={{ marginTop: 10, fontSize: 12.5, color: 'var(--color-ink-muted)' }}>
             In this round that means{' '}
             <strong style={{ color: '#0d0d0d' }}>{questionsFor('s1')}</strong> questions for your own
             workforce ·{' '}
@@ -312,14 +312,14 @@ export default function SurveyRespondents() {
             <div>
               <label style={labelStyle}>Name <span style={{ color: FAIL }}>*</span></label>
               <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} placeholder="Jane Okafor" />
-              <div style={{ fontSize: 11, color: '#888784', marginTop: 5, lineHeight: 1.6 }}>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 5, lineHeight: 1.6 }}>
                 Shown to them as “Completing as”. Never stored with their answers.
               </div>
             </div>
             <div>
               <label style={labelStyle}>Email <span style={{ color: FAIL }}>*</span></label>
               <input style={inputStyle} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="jane@example.com" />
-              <div style={{ fontSize: 11, color: '#888784', marginTop: 5, lineHeight: 1.6 }}>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 5, lineHeight: 1.6 }}>
                 Used to send the invitation, and never attached to a response.
               </div>
             </div>
@@ -375,7 +375,7 @@ export default function SurveyRespondents() {
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
             <button onClick={add} disabled={!name.trim() || !email.trim() || !chosen || saving}
-              style={{ fontSize: 13, fontWeight: 600, padding: '9px 20px', borderRadius: 8, border: 'none', background: name.trim() && email.trim() && chosen ? '#0d0d0d' : '#e8e7e4', color: name.trim() && email.trim() && chosen ? '#fff' : '#b8b7b4', cursor: name.trim() && email.trim() && chosen && !saving ? 'pointer' : 'not-allowed' }}>
+              style={{ fontSize: 13, fontWeight: 600, padding: '9px 20px', borderRadius: 8, border: 'none', background: name.trim() && email.trim() && chosen ? '#0d0d0d' : '#e8e7e4', color: name.trim() && email.trim() && chosen ? '#fff' : 'var(--color-ink-muted)', cursor: name.trim() && email.trim() && chosen && !saving ? 'pointer' : 'not-allowed' }}>
               {saving ? 'Adding…' : 'Add respondent'}
             </button>
           </div>
@@ -385,14 +385,14 @@ export default function SurveyRespondents() {
         {people.length === 0 ? (
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '2.5rem', textAlign: 'center' }}>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>Nobody added yet</div>
-            <div style={{ fontSize: 13, color: '#888784', lineHeight: 1.7, maxWidth: 460, margin: '0 auto' }}>
+            <div style={{ fontSize: 13, color: 'var(--color-ink-muted)', lineHeight: 1.7, maxWidth: 460, margin: '0 auto' }}>
               Add the people you want to hear from. A mix of internal staff and people outside the
               organisation gives the engagement record ESRS 2 SBM-2 asks for.
             </div>
           </div>
         ) : (
           <>
-            <div style={{ fontSize: 12, color: '#888784', marginBottom: 10 }}>
+            <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginBottom: 10 }}>
               {active.length} respondent{active.length === 1 ? '' : 's'}
               {people.length !== active.length && ` · ${people.length - active.length} revoked`}
             </div>
@@ -408,7 +408,7 @@ export default function SurveyRespondents() {
                           <span style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>{p.invite_name || '—'}</span>
                           <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: st.color, background: st.bg, borderRadius: 99, padding: '2px 9px' }}>{st.label}</span>
                         </div>
-                        <div style={{ fontSize: 12, color: '#888784', marginTop: 3 }}>
+                        <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 3 }}>
                           {p.invite_email}
                           {c && ` · ${c.label} · ${questionsFor(c.labour_routing)} questions`}
                         </div>
@@ -430,7 +430,7 @@ export default function SurveyRespondents() {
           </>
         )}
 
-        <div style={{ marginTop: 24, textAlign: 'center', fontSize: 12, color: '#888784', lineHeight: 1.7 }}>
+        <div style={{ marginTop: 24, textAlign: 'center', fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.7 }}>
           Sending invitations and watching progress comes next.
         </div>
       </div>

@@ -88,7 +88,7 @@ const GRAD = 'var(--color-brand)'
 // channels in step with PURPLE — they are the same colour by intent, and the evidence cards
 // exist to read as the same system as the figures.
 const purpleGround = (a: number) => `rgba(116, 37, 227, ${a})`
-const INK = '#0d0d0d'; const BODY = '#555553'; const MUTED = '#888784'; const HAIR = '#e8e7e4'
+const INK = '#0d0d0d'; const BODY = '#555553'; const MUTED = 'var(--color-ink-muted)'; const HAIR = '#e8e7e4'
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 
 export default function Page() {
@@ -615,9 +615,9 @@ export default function Page() {
 }
 
 // ─── Styles — same set as app/deals/page.tsx, plus bodyPara / footnote / 2-col grid ──────
-const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
+const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }
 const bodyPara: React.CSSProperties = { fontSize: 15, color: '#555553', fontWeight: 400, lineHeight: 1.8, marginBottom: '1.25rem' }
-const footnote: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.7, marginBottom: '1rem' }
+const footnote: React.CSSProperties = { fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.7, marginBottom: '1rem' }
 const cellTitle: React.CSSProperties = { fontSize: 15, fontWeight: 600, color: '#0d0d0d', marginBottom: 10 }
 const cellBody: React.CSSProperties = { fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.75, margin: 0 }
 // Two-column variant of the hairline grid used on /deals and /climate-risk — 1px gaps over a

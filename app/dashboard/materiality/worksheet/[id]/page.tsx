@@ -51,7 +51,7 @@ const FAIL = '#b42318'
 const FAIL_BG = '#fef3f2'
 const INK = '#0d0d0d'
 const MID = '#555553'
-const MUTE = '#888784'
+const MUTE = 'var(--color-ink-muted)'
 const LINE = '#e8e7e4'
 const PAPER = '#f8f7f5'
 
@@ -115,6 +115,28 @@ const btn: React.CSSProperties = {
 }
 const btnPrimary: React.CSSProperties = {
   ...btn, background: INK, color: '#fff', border: 'none', fontWeight: 600,
+}
+/**
+ * The disabled face of btnPrimary. Kept local, NOT added to app/components/buttonStyles.ts: the
+ * shared btnPrimary is a 14px/13x32px marketing CTA in brand teal, while this one is a 12.5px/
+ * 7x14px dense control in INK. They share a name and nothing else, so a shared disabled variant
+ * would not fit either. Fill + border change, never opacity — group opacity dims the label too.
+ */
+/** The disabled face of `btn` (outline). Fill + border, never opacity — see the DISABLED AND
+ *  INACTIVE STATE block in app/styles/themisiq-tokens.css. */
+const btnDisabled: React.CSSProperties = {
+  ...btn,
+  background: 'var(--color-sunken)',
+  color: 'var(--color-ink-muted)',
+  border: '1px solid var(--color-line)',
+  cursor: 'not-allowed',
+}
+const btnPrimaryDisabled: React.CSSProperties = {
+  ...btnPrimary,
+  background: 'var(--color-sunken)',
+  color: 'var(--color-ink-muted)',
+  border: '1px solid var(--color-line)',
+  cursor: 'not-allowed',
 }
 const input: React.CSSProperties = {
   fontSize: 13, padding: '8px 10px', borderRadius: 8, border: `1px solid ${LINE}`,
@@ -928,13 +950,13 @@ export default function WorksheetAssign() {
                                visibly unavailable sends the reader to the sentence below it. */
                             <button onClick={() => void unlinkRound(r.id)}
                                     disabled={busy || blockedBy > 0}
-                                    style={{ ...btn, opacity: busy || blockedBy > 0 ? 0.45 : 1,
+                                    style={{ ...(busy || blockedBy > 0 ? btnDisabled : btn),
                                              cursor: blockedBy > 0 ? 'not-allowed' : 'pointer' }}>
                               {busy ? 'Unlinking…' : 'Unlink'}
                             </button>
                           ) : closed && versionMatches ? (
                             <button onClick={() => void linkRound(r.id)} disabled={busy}
-                                    style={{ ...btnPrimary, opacity: busy ? 0.5 : 1 }}>
+                                    style={busy ? btnPrimaryDisabled : btnPrimary}>
                               {busy ? 'Linking…' : 'Use this round'}
                             </button>
                           ) : null}
@@ -1050,9 +1072,7 @@ export default function WorksheetAssign() {
                       disabled={working || sending === a.id || !a.contributor_email || mine === 0}
                       title={!a.contributor_email ? 'This contributor has no email address.'
                              : mine === 0 ? 'Assign them some sub-topics first.' : undefined}
-                      style={{ ...btnPrimary,
-                               opacity: (!a.contributor_email || mine === 0) ? 0.4 : 1,
-                               cursor: (!a.contributor_email || mine === 0) ? 'not-allowed' : 'pointer' }}>
+                      style={(!a.contributor_email || mine === 0) ? btnPrimaryDisabled : btnPrimary}>
                       {sending === a.id ? 'Sending…' : a.invited_at ? 'Send reminder' : 'Send invitation'}
                     </button>
                     <button onClick={() => setConfirmRevoke(a)} disabled={working} style={btn}>
@@ -1113,7 +1133,7 @@ export default function WorksheetAssign() {
               <input style={input} placeholder="Role, e.g. HR Director" value={newRole} onChange={e => setNewRole(e.target.value)} />
             </div>
             <div style={{ marginTop: 10, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-              <button onClick={addContributor} disabled={working || noVersion} style={btnPrimary}>Add</button>
+              <button onClick={addContributor} disabled={working || noVersion} style={working || noVersion ? btnPrimaryDisabled : btnPrimary}>Add</button>
               <span style={{ fontSize: 11, color: MUTE }}>
                 Adding does not send anything. Invitations go out once the contributor form exists.
               </span>
@@ -1196,7 +1216,7 @@ export default function WorksheetAssign() {
                 {live.map(a => <option key={a.id} value={a.id}>{label(a)}</option>)}
               </select>
               <button onClick={startAssign} disabled={working || !target || selected.size === 0}
-                      style={{ ...btnPrimary, opacity: (!target || selected.size === 0) ? 0.5 : 1 }}>
+                      style={(!target || selected.size === 0) ? btnPrimaryDisabled : btnPrimary}>
                 Assign
               </button>
               {selected.size > 0 && (

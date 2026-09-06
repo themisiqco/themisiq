@@ -86,8 +86,8 @@ function FieldValue({ field, render }: { field: AnyField; render?: (v: never) =>
     // Neutral/muted. A legitimate answer — nothing is wrong. Reason ALWAYS shown.
     return (
       <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#888784', background: '#f1f0ee', border: '0.5px solid #e8e7e4', borderRadius: 5, padding: '1px 7px' }}>Not applicable</span>
-        <span style={{ fontSize: 12, color: '#888784', fontStyle: 'italic', fontWeight: 400 }}>{field.reason}</span>
+        <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', background: '#f1f0ee', border: '0.5px solid #e8e7e4', borderRadius: 5, padding: '1px 7px' }}>Not applicable</span>
+        <span style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontStyle: 'italic', fontWeight: 400 }}>{field.reason}</span>
       </span>
     )
   }
@@ -124,7 +124,7 @@ function ItemSection({ n, title, children }: { n: string; title: string; childre
 
 // A muted note used where an optional Part-2 item is absent from the response.
 function AbsentPart2({ what }: { what: string }) {
-  return <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, fontStyle: 'italic' }}>{what} are not present in this report slice (no per-good computations returned).</div>
+  return <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, fontStyle: 'italic' }}>{what} are not present in this report slice (no per-good computations returned).</div>
 }
 
 export default function CbamReportPage() {
@@ -268,7 +268,7 @@ export default function CbamReportPage() {
     <div style={{ maxWidth: 960, margin: '0 auto', padding: '3rem 2rem' }}>
       <div style={sectionHead}>CBAM §1.2 summary report</div>
       <div style={sectionSub}>
-        The Annex IV §1.2 emissions summary your customer needs, for one installation and reporting period. Every figure here is either supplied or explained: a field carries a <strong style={{ color: '#0d0d0d' }}>value</strong>, a <span style={{ color: '#888784' }}>Not applicable</span>{' '}with the reason it doesn&apos;t apply, or a <span style={{ color: '#92400e' }}>To supply</span>{' '}naming what&apos;s outstanding. A gap is always shown as a gap, never as a zero or a blank.
+        The Annex IV §1.2 emissions summary your customer needs, for one installation and reporting period. Every figure here is either supplied or explained: a field carries a <strong style={{ color: '#0d0d0d' }}>value</strong>, a <span style={{ color: 'var(--color-ink-muted)' }}>Not applicable</span>{' '}with the reason it doesn&apos;t apply, or a <span style={{ color: '#92400e' }}>To supply</span>{' '}naming what&apos;s outstanding. A gap is always shown as a gap, never as a zero or a blank.
       </div>
 
       {/* ── Installation + reporting-period selectors + on-demand fetch ── */}
@@ -433,7 +433,7 @@ export default function CbamReportPage() {
           <ItemSection n="(12)" title="Precursors — default values used">
             {report.item12_defaultPrecursors
               ? (report.item12_defaultPrecursors.length === 0
-                  ? <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>No default-value precursors.</div>
+                  ? <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>No default-value precursors.</div>
                   : report.item12_defaultPrecursors.map((p, i) => (
                       <div key={p.cnCode + i} style={{ padding: '10px 0', borderBottom: '0.5px solid #f1f0ee' }}>
                         <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>(12)(a) CN {p.cnCode}</div>
@@ -448,7 +448,7 @@ export default function CbamReportPage() {
           <ItemSection n="(13)" title="Precursors — actual values used">
             {report.item13_actualPrecursors
               ? (report.item13_actualPrecursors.length === 0
-                  ? <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>No actual-value precursors.</div>
+                  ? <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>No actual-value precursors.</div>
                   : report.item13_actualPrecursors.map((p, i) => (
                       <div key={p.cnCode + i} style={{ padding: '10px 0', borderBottom: '0.5px solid #f1f0ee' }}>
                         <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>(13)(a) CN {p.cnCode}</div>
@@ -477,7 +477,7 @@ export default function CbamReportPage() {
           <ItemSection n="(16)" title="Precursor origin (traceability)">
             {report.item16_precursorOrigin
               ? (report.item16_precursorOrigin.length === 0
-                  ? <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>No precursors to trace.</div>
+                  ? <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>No precursors to trace.</div>
                   : report.item16_precursorOrigin.map((p, i) => (
                       <div key={p.cnCode + i} style={{ padding: '10px 0', borderBottom: '0.5px solid #f1f0ee' }}>
                         <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>CN {p.cnCode}</div>
@@ -611,7 +611,7 @@ function CbamVerifierInvite({ installationId, companyId, reportingPeriod }: { in
       </div>
 
       {active.length === 0 && (
-        <div style={{ fontSize: 12, color: '#888784', fontStyle: 'italic' }}>No active verifier links yet.</div>
+        <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontStyle: 'italic' }}>No active verifier links yet.</div>
       )}
 
       {active.map((g) => (
@@ -619,14 +619,14 @@ function CbamVerifierInvite({ installationId, companyId, reportingPeriod }: { in
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{g.verifier_name || 'Verifier'}{g.verifier_email ? ` · ${g.verifier_email}` : ''}</div>
-              <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>Expires {new Date(g.expires_at).toLocaleDateString()}</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>Expires {new Date(g.expires_at).toLocaleDateString()}</div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => copy(g.token, g.id)} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 6, background: '#fff', border: '0.5px solid #e8e7e4', cursor: 'pointer', color: '#555553' }}>{copiedId === g.id ? '✓ Copied' : 'Copy link'}</button>
               <button onClick={() => revoke(g.id)} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 6, background: 'none', border: '0.5px solid #e8e7e4', cursor: 'pointer', color: '#B91C1C' }}>Revoke</button>
             </div>
           </div>
-          <div style={{ marginTop: 8, fontSize: 11, color: '#888784', wordBreak: 'break-all', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 6, padding: '6px 10px' }}>{linkFor(g.token)}</div>
+          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--color-ink-muted)', wordBreak: 'break-all', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 6, padding: '6px 10px' }}>{linkFor(g.token)}</div>
         </div>
       ))}
     </div>
@@ -685,10 +685,10 @@ function MissingChecklist({ completeness }: { completeness: CompletenessResult }
 
   const limitRow = (m: { item: string; field: string; hint?: string }, i: number) => (
     <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '8px 0', borderBottom: '0.5px solid #e8e7e4' }}>
-      <span style={{ fontSize: 11, fontWeight: 700, color: '#888784', flexShrink: 0, minWidth: 40 }}>{m.item}</span>
+      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-ink-muted)', flexShrink: 0, minWidth: 40 }}>{m.item}</span>
       <div>
         <div style={{ fontSize: 13, fontWeight: 400, color: '#555553' }}>{m.field}</div>
-        {m.hint && <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.5, marginTop: 2 }}>{m.hint}</div>}
+        {m.hint && <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.5, marginTop: 2 }}>{m.hint}</div>}
       </div>
     </div>
   )
@@ -710,7 +710,7 @@ function MissingChecklist({ completeness }: { completeness: CompletenessResult }
                 <span style={{ fontSize: 11, fontWeight: 700, color: '#92400e', flexShrink: 0, minWidth: 40 }}>{m.item}</span>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{m.field}</div>
-                  {m.hint && <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.5, marginTop: 2 }}>{m.hint}</div>}
+                  {m.hint && <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.5, marginTop: 2 }}>{m.hint}</div>}
                 </div>
               </div>
             ))}

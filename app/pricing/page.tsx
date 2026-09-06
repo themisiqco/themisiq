@@ -342,7 +342,7 @@ function PricingPageInner() {
     // Credibility bar
     credBar: { background: '#f8f7f5', padding: '1rem 1.5rem', marginBottom: 28, display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 12, border: '1px solid #e8e7e4', borderRadius: '0 0 12px 12px' },
     credItem: { textAlign: 'center' as const },
-    credLabel: { fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 4 },
+    credLabel: { fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: 4 },
     credVal: { fontSize: 10, color: '#374151', lineHeight: 1.6 },
     // Module rows
     moduleWrap: { border: '1px solid #e8e7e4', borderRadius: 16, overflow: 'hidden', marginBottom: 16 },
@@ -355,7 +355,7 @@ function PricingPageInner() {
     ctaWrap: { background: '#fff', border: '1px solid #e8e7e4', borderRadius: 14, padding: '1.75rem', textAlign: 'center' as const },
     ctaPara: { fontSize: 13, color: '#555553', fontWeight: 400, maxWidth: 500, margin: '0 auto 14px', lineHeight: 1.8 },
     ctaHeadline: { fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 400, color: '#0d0d0d', marginBottom: 4 },
-    ctaSub: { fontSize: 11, color: '#888784', marginBottom: 18 },
+    ctaSub: { fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 18 },
     ctaBtns: { display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' as const },
   }
 
@@ -449,7 +449,7 @@ function PricingPageInner() {
           <Link href="/dashboard">
             <img src="/logo.png" alt="ThemisIQ" style={{ height: 24, width: 'auto', display: 'block' }} />
           </Link>
-          <span style={{ fontSize: 12, color: '#888784' }}>/ Pricing</span>
+          <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>/ Pricing</span>
         </div>
         <Link href="/dashboard/ghg" style={{ ...primaryBtn, fontSize: 12, padding: '7px 16px' }}>
           See your emissions instantly →
@@ -555,8 +555,8 @@ function PricingPageInner() {
         {NEW_PRICING_ACTIVE && (
           <div id="build-your-stack" style={s.moduleWrap}>
             <div style={s.moduleHeader}>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784' }}>Select your compliance modules</div>
-              <div style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}>Click any row to add or remove</div>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-ink-muted)' }}>Select your compliance modules</div>
+              <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', fontWeight: 400 }}>Click any row to add or remove</div>
             </div>
             {MODULES.map((mod, i) => {
               const isSelected = selected.has(mod.id)
@@ -579,12 +579,12 @@ function PricingPageInner() {
                       <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.6 }}>{mod.description}</div>
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: isSelected ? '#0d0d0d' : '#888784' }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: isSelected ? '#0d0d0d' : 'var(--color-ink-muted)' }}>
                         {isGhg
                           ? `from $${(GHG_TIERS.starter.priceUSD as number).toLocaleString()}`
                           : `$${(price as number).toLocaleString()}`}
                       </div>
-                      <div style={{ fontSize: 10, color: '#888784' }}>/yr</div>
+                      <div style={{ fontSize: 10, color: 'var(--color-ink-muted)' }}>/yr</div>
                     </div>
                   </div>
                   {/* GHG inline tier picker — only when GHG is selected */}
@@ -608,7 +608,7 @@ function PricingPageInner() {
                       })}
                       {/* What counts as a location — placed at the point of CHOICE, because the tier
                           the buyer picks is a location count and nothing else on this page defines it. */}
-                      <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.6, marginTop: 10, flexBasis: '100%' }}>
+                      <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 10, flexBasis: '100%' }}>
                         One location = one site with its own electricity supply. All of that site’s energy goes in together — electricity, gas, vehicle fuel, refrigerants — so a site with separate gas and electricity accounts is still one location.
                       </div>
                     </div>
@@ -622,7 +622,7 @@ function PricingPageInner() {
         {ghgSelected && (
           <div style={{ marginTop: 24, padding: 20, background: '#f8f7f5', borderRadius: 12, border: '1px solid #e8e7e4' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#0d0d0d', marginBottom: 4 }}>Enhance your GHG inventory</div>
-            <div style={{ fontSize: 11, color: '#888784', marginBottom: 16 }}>Optional add-ons. We do the bill-reading; you confirm the numbers.</div>
+            <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 16 }}>Optional add-ons. We do the bill-reading; you confirm the numbers.</div>
 
             {/* Concierge */}
             <div style={{ padding: 14, background: '#fff', borderRadius: 10, border: conciergeOn ? '2px solid var(--color-brand)' : '1px solid #e8e7e4', marginBottom: 12 }}>
@@ -712,8 +712,8 @@ function PricingPageInner() {
             const isActive = h.band === activeBundle
             return (
               <div key={h.band} style={hintCard(activeBundle, h.band)}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: isActive ? '#0d0d0d' : '#888784' }}>{h.label}</div>
-                <div style={{ fontSize: 10, color: '#888784', marginTop: 2 }}>{h.sub}</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: isActive ? '#0d0d0d' : 'var(--color-ink-muted)' }}>{h.label}</div>
+                <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 2 }}>{h.sub}</div>
               </div>
             )
           })}
@@ -769,7 +769,7 @@ function PricingPageInner() {
 
 export default function PricingPage() {
   return (
-    <Suspense fallback={<div style={{ padding: '4rem', textAlign: 'center', color: '#888784' }}>Loading…</div>}>
+    <Suspense fallback={<div style={{ padding: '4rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>Loading…</div>}>
       <PricingPageInner />
     </Suspense>
   )

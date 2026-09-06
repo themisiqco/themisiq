@@ -5,6 +5,7 @@ import { disclaimerParas } from '../../../../lib/disclaimer'
 // places and let a cached page email a link nothing could audit. The route resolves label, href and
 // price from the same accessors /assess renders, so the two cannot quote different figures.
 import { OBLIGATIONS, obligationHref, obligationPrice, modulesLabel, priceLabel } from '../../../../lib/obligations'
+import { INK_MUTED } from '@/lib/brand'
 
 const RESEND_API_KEY   = process.env.RESEND_API_KEY!
 const FROM_EMAIL       = process.env.RESEND_FROM_EMAIL || 'noreply@themisiq.co'
@@ -25,13 +26,13 @@ const DISCLAIMER_HTML = `<p style="font-size:10px;font-weight:700;color:#888;let
   + disclaimerParas('screening').map(par => `<p style="font-size:10px;color:#aaa;line-height:1.6;margin:0 0 6px;">${par}</p>`).join('')
 
 const URGENCY_COLOR: Record<string, string> = {
-  critical: '#B91C1C', high: '#A94E0D', medium: '#0C447C', monitor: '#888784'
+  critical: '#B91C1C', high: '#A94E0D', medium: '#0C447C', monitor: '${INK_MUTED}'
 }
 const URGENCY_BG: Record<string, string> = {
   critical: '#FCEBEB', high: '#FEF3E2', medium: '#E6F1FB', monitor: '#f8f7f5'
 }
 const URGENCY_TEXT: Record<string, string> = {
-  critical: '#501313', high: '#633806', medium: '#0C447C', monitor: '#888784'
+  critical: '#501313', high: '#633806', medium: '#0C447C', monitor: '${INK_MUTED}'
 }
 
 export async function POST(req: NextRequest) {
@@ -111,7 +112,7 @@ export async function POST(req: NextRequest) {
       <tr style="background:${i % 2 === 0 ? '#fff' : '#f8f7f5'}">
         <td style="padding:10px 14px;border-bottom:1px solid #e8e7e4;font-size:12px;font-weight:600;color:#0d0d0d;vertical-align:top;">
           ${ob.name}
-          <div style="font-size:11px;font-weight:400;color:#888784;margin-top:2px;">${ob.jurisdiction}</div>
+          <div style="font-size:11px;font-weight:400;color:${INK_MUTED};margin-top:2px;">${ob.jurisdiction}</div>
         </td>
         <td style="padding:10px 14px;border-bottom:1px solid #e8e7e4;vertical-align:top;">
           <span style="font-size:10px;font-weight:700;color:${URGENCY_TEXT[ob.urgency]};background:${URGENCY_BG[ob.urgency]};padding:3px 8px;border-radius:99px;white-space:nowrap;">${ob.urgency_label}</span>
@@ -124,10 +125,10 @@ export async function POST(req: NextRequest) {
     // neither of which is a regulation. A column header is a claim about every row beneath it.
     const headerRow = `
       <tr style="background:#f8f7f5;">
-        <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:600;color:#888784;letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid #e8e7e4;">Obligation</th>
-        <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:600;color:#888784;letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid #e8e7e4;">Priority</th>
-        <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:600;color:#888784;letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid #e8e7e4;">Timing</th>
-        <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:600;color:#888784;letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid #e8e7e4;">Module</th>
+        <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:600;color:${INK_MUTED};letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid #e8e7e4;">Obligation</th>
+        <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:600;color:${INK_MUTED};letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid #e8e7e4;">Priority</th>
+        <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:600;color:${INK_MUTED};letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid #e8e7e4;">Timing</th>
+        <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:600;color:${INK_MUTED};letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid #e8e7e4;">Module</th>
       </tr>`
     // ── QUALIFICATION PROFILE (internal alert only) ────────────────
     // The visitor's answers, already resolved to display labels by the client — this route does NOT
@@ -155,7 +156,7 @@ export async function POST(req: NextRequest) {
       return `
     <!-- Georgia here is deliberate, not a missed sweep: this is email HTML. A mail client cannot resolve var(--font-display), and web fonts do not load reliably in mail, so Literata would silently fall back anyway. Georgia is web-safe and is what every recipient actually sees. See app/components/headingStyles.ts. -->
     <div style="font-size:13px;font-weight:600;color:#0d0d0d;font-family:Georgia,serif;margin:0 0 2px;">${g.title}</div>
-    <div style="font-size:11px;color:#888784;line-height:1.55;margin-bottom:8px;">${g.sub}</div>
+    <div style="font-size:11px;color:${INK_MUTED};line-height:1.55;margin-bottom:8px;">${g.sub}</div>
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e8e7e4;border-radius:8px;overflow:hidden;margin-bottom:18px;">
       ${headerRow}
       ${rows.map(row).join('')}
@@ -197,12 +198,12 @@ export async function POST(req: NextRequest) {
 
   <!-- WHITE BODY -->
   <tr><td style="background:#fff;padding:32px;">
-    <div style="font-size:11px;font-weight:600;color:#888784;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:12px;">Your compliance obligations</div>
+    <div style="font-size:11px;font-weight:600;color:${INK_MUTED};letter-spacing:0.1em;text-transform:uppercase;margin-bottom:12px;">Your compliance obligations</div>
     ${obligationRows}
 
     <div style="height:1px;background:linear-gradient(90deg,#7425e3,#1fb1ff,#64fe3e);margin:28px 0;"></div>
 
-    <div style="font-size:11px;font-weight:600;color:#888784;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:16px;">Recommended next steps</div>
+    <div style="font-size:11px;font-weight:600;color:${INK_MUTED};letter-spacing:0.1em;text-transform:uppercase;margin-bottom:16px;">Recommended next steps</div>
 
     <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:14px;"><tr>
       <td width="32" valign="top" style="padding-right:12px;"><div style="width:28px;height:28px;border-radius:50%;background:#0d0d0d;font-size:12px;font-weight:700;color:#fff;text-align:center;line-height:28px;">1</div></td>

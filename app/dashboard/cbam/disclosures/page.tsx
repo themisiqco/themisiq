@@ -327,7 +327,7 @@ export default function CbamDisclosuresPage() {
         </div>
       </div>
 
-      {loadingRow && <div style={{ fontSize: 12, color: '#888784', marginBottom: '1rem' }}>Loading disclosures…</div>}
+      {loadingRow && <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginBottom: '1rem' }}>Loading disclosures…</div>}
 
       {/* ── (7) heat ── */}
       <div style={itemHead}>(7) Whether measurable heat is imported from or exported to other installations.</div>
@@ -497,14 +497,14 @@ export default function CbamDisclosuresPage() {
               type="button"
               onClick={() => setProcessesComplete(null)}
               disabled={disabled}
-              style={{ fontSize: 12, padding: '8px 14px', borderRadius: 8, background: 'transparent', color: '#888784', border: '0.5px solid #e8e7e4', cursor: disabled ? 'not-allowed' : 'pointer' }}
+              style={{ fontSize: 12, padding: '8px 14px', borderRadius: 8, background: 'transparent', color: 'var(--color-ink-muted)', border: '0.5px solid #e8e7e4', cursor: disabled ? 'not-allowed' : 'pointer' }}
               title="Retract to unanswered — the declaration timestamp is cleared server-side on save"
             >
               Clear
             </button>
           )}
         </div>
-        <div style={{ marginTop: 12, fontSize: 11, color: '#888784' }}>
+        <div style={{ marginTop: 12, fontSize: 11, color: 'var(--color-ink-muted)' }}>
           {disc.processes_complete === null && 'Not yet declared.'}
           {disc.processes_complete === false && 'Declared incomplete — installation-level totals (items 5 and 6) will not be reported.'}
           {disc.processes_complete === true && (
@@ -537,16 +537,48 @@ export default function CbamDisclosuresPage() {
   )
 }
 
+/**
+ * The two attestation buttons — "I attest: the process set is complete" and "Declare incomplete".
+ *
+ * ⚠️ THREE THINGS WERE WRONG HERE AT ONCE, and all three mattered because of what this control
+ * asserts under the reasonable-assurance standard:
+ *
+ *  1. The fill was #7425e3, the retired brand violet.
+ *  2. SELECTED was a saturated fill with a reversed label. Selection in this system is
+ *     var(--color-brand-wash) with a var(--color-brand) border and an ink label — a marked row,
+ *     not an inverted one.
+ *  3. DISABLED was opacity: 0.6, which composited the selected face to 3.06:1. Group opacity
+ *     fades the label with the fill, so the attestation the user had just made became hard to
+ *     read the moment the row began saving. See the DISABLED AND INACTIVE STATE block in
+ *     app/styles/themisiq-tokens.css.
+ */
 function attestBtn(selected: boolean, disabled: boolean): React.CSSProperties {
+  if (disabled) {
+    return {
+      fontSize: 13,
+      fontWeight: 600,
+      padding: '9px 18px',
+      borderRadius: 8,
+      // The explicit disabled palette — .tq-disabled's values, inline because this is a style
+      // object rather than an element. Never opacity.
+      background: 'var(--color-sunken)',
+      color: 'var(--color-ink-muted)',
+      // ⚠️ THE SELECTION SURVIVES BEING DISABLED. A flat disabled face would render "attested"
+      // and "not attested" identically while the row saves, hiding which declaration the user
+      // just made at the one moment they might want to check it. The brand edge is kept; only
+      // the fill and label recede.
+      border: `1px solid ${selected ? 'var(--color-brand)' : 'var(--color-line)'}`,
+      cursor: 'not-allowed',
+    }
+  }
   return {
     fontSize: 13,
     fontWeight: 600,
     padding: '9px 18px',
     borderRadius: 8,
-    background: selected ? '#7425e3' : '#fff',
-    color: selected ? '#fff' : '#555553',
-    border: `1px solid ${selected ? '#7425e3' : '#e8e7e4'}`,
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    opacity: disabled ? 0.6 : 1,
+    background: selected ? 'var(--color-brand-wash)' : '#fff',
+    color: selected ? 'var(--color-ink)' : '#555553',
+    border: `1px solid ${selected ? 'var(--color-brand)' : '#e8e7e4'}`,
+    cursor: 'pointer',
   }
 }

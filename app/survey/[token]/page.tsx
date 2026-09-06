@@ -579,7 +579,7 @@ export default function StakeholderSurvey() {
 
   if (loading) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: '#888784', fontSize: 14 }}>Loading your survey…</div>
+      <div style={{ color: 'var(--color-ink-muted)', fontSize: 14 }}>Loading your survey…</div>
     </div>
   )
 
@@ -598,9 +598,9 @@ export default function StakeholderSurvey() {
    */
   if (closedMessage) return shell(
     <div style={{ textAlign: 'center' }}>
-      <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#f8f7f5', color: '#888784', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', fontSize: 24 }}>✓</div>
+      <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#f8f7f5', color: 'var(--color-ink-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', fontSize: 24 }}>✓</div>
       <div style={{ fontSize: 15, color: '#0d0d0d', lineHeight: 1.75 }}>{closedMessage}</div>
-      <div style={{ marginTop: 24, paddingTop: 16, borderTop: '0.5px solid #e8e7e4', fontSize: 12, color: '#888784' }}>
+      <div style={{ marginTop: 24, paddingTop: 16, borderTop: '0.5px solid #e8e7e4', fontSize: 12, color: 'var(--color-ink-muted)' }}>
         Powered by <a href="https://www.themisiq.co" style={{ color: '#7425e3', textDecoration: 'none' }}>ThemisIQ</a>
       </div>
     </div>
@@ -613,7 +613,7 @@ export default function StakeholderSurvey() {
         It may have expired, it may have been withdrawn, or the survey may already have been
         submitted from this link. This page is not told which.
       </div>
-      <div style={{ fontSize: 13, color: '#888784', lineHeight: 1.7, marginTop: 14 }}>
+      <div style={{ fontSize: 13, color: 'var(--color-ink-muted)', lineHeight: 1.7, marginTop: 14 }}>
         Please contact the company that sent you the link.
       </div>
     </div>
@@ -630,7 +630,7 @@ export default function StakeholderSurvey() {
       <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 14px', fontSize: 12.5, color: '#0d0d0d', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
         {loadError}
       </div>
-      <div style={{ fontSize: 13, color: '#888784', lineHeight: 1.7, marginTop: 14 }}>
+      <div style={{ fontSize: 13, color: 'var(--color-ink-muted)', lineHeight: 1.7, marginTop: 14 }}>
         Please send this message to the company that sent you the link — it tells them exactly what
         went wrong.
       </div>
@@ -644,10 +644,10 @@ export default function StakeholderSurvey() {
       <div style={{ fontSize: 14, color: '#555553', lineHeight: 1.7 }}>
         Your responses for <strong>{round?.name}</strong> have been submitted to {companyInline}.
       </div>
-      <div style={{ fontSize: 13, color: '#888784', lineHeight: 1.7, marginTop: 12 }}>
+      <div style={{ fontSize: 13, color: 'var(--color-ink-muted)', lineHeight: 1.7, marginTop: 12 }}>
         {savedCount} of {total} questions answered. This link is now closed and cannot be reopened.
       </div>
-      <div style={{ marginTop: 24, paddingTop: 16, borderTop: '0.5px solid #e8e7e4', fontSize: 12, color: '#888784' }}>
+      <div style={{ marginTop: 24, paddingTop: 16, borderTop: '0.5px solid #e8e7e4', fontSize: 12, color: 'var(--color-ink-muted)' }}>
         Powered by <a href="https://www.themisiq.co" style={{ color: '#7425e3', textDecoration: 'none' }}>ThemisIQ</a>
       </div>
     </div>
@@ -699,7 +699,7 @@ export default function StakeholderSurvey() {
       </div>
 
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0.7rem 2rem' }}>
-        <div style={{ maxWidth: 780, margin: '0 auto', fontSize: 13, color: '#888784' }}>
+        <div style={{ maxWidth: 780, margin: '0 auto', fontSize: 13, color: 'var(--color-ink-muted)' }}>
           Completing as: <strong style={{ color: '#0d0d0d' }}>{displayName || 'an invited stakeholder'}</strong>
           {round?.deadline && ` · Deadline: ${new Date(round.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`}
         </div>
@@ -774,7 +774,7 @@ export default function StakeholderSurvey() {
           <div key={`${group.label}-${gi}`} id={`survey-group-${gi}`} style={{ marginBottom: 28, scrollMarginTop: 130 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 12, paddingBottom: 8, borderBottom: '0.5px solid #e8e7e4' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#0d0d0d' }}>{group.label}</div>
-              <div style={{ fontSize: 11.5, color: '#888784' }}>
+              <div style={{ fontSize: 11.5, color: 'var(--color-ink-muted)' }}>
                 {group.questions.filter(q => saved[q.question_id] !== undefined).length} of {group.questions.length}
               </div>
             </div>
@@ -801,7 +801,7 @@ export default function StakeholderSurvey() {
                     )}
 
                     <div style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
-                      <div style={{ fontSize: 12, color: '#888784', flexShrink: 0, minWidth: 20 }}>{numberOf[q.question_id]}.</div>
+                      <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', flexShrink: 0, minWidth: 20 }}>{numberOf[q.question_id]}.</div>
                       <div style={{ flex: 1 }}>
                         {/* `wording` is the question, and it is the layer §3.1 gives the customer to
                             edit. It is seeded as short_name + framing, so it repeats the qualifier
@@ -817,7 +817,7 @@ export default function StakeholderSurvey() {
                           <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginTop: 8 }}>{q.context}</div>
                         )}
 
-                        <div style={{ fontSize: 13, color: '#888784', marginTop: 10, marginBottom: 10 }}>
+                        <div style={{ fontSize: 13, color: 'var(--color-ink-muted)', marginTop: 10, marginBottom: 10 }}>
                           What strategic priority should {companyInline} assign to this topic?
                         </div>
 
@@ -829,7 +829,7 @@ export default function StakeholderSurvey() {
                                 key={String(opt.key)}
                                 style={{ display: 'flex', alignItems: 'center', gap: 11, cursor: 'pointer', padding: '10px 12px', borderRadius: 10, border: `1px solid ${on ? GREEN : '#e8e7e4'}`, background: on ? GREEN_BG : '#fff', transition: 'all 0.1s' }}
                               >
-                                <div style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, border: `1.5px solid ${on ? GREEN : '#e8e7e4'}`, background: on ? GREEN : '#fff', color: on ? '#fff' : '#888784' }}>
+                                <div style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, border: `1.5px solid ${on ? GREEN : '#e8e7e4'}`, background: on ? GREEN : '#fff', color: on ? '#fff' : 'var(--color-ink-muted)' }}>
                                   {opt.badge}
                                 </div>
                                 <input
@@ -849,7 +849,7 @@ export default function StakeholderSurvey() {
                             `saved`, which only a confirmed write updates, and a failure shows the
                             server's own message with a retry rather than a tick. */}
                         <div style={{ minHeight: 18, marginTop: 8 }}>
-                          {state === 'saving' && <span style={{ fontSize: 11.5, color: '#888784' }}>Saving…</span>}
+                          {state === 'saving' && <span style={{ fontSize: 11.5, color: 'var(--color-ink-muted)' }}>Saving…</span>}
                           {state === 'error' && (
                             <div style={{ background: FAIL_BG, border: `0.5px solid ${FAIL}`, borderRadius: 8, padding: '8px 10px' }}>
                               <div style={{ fontSize: 11.5, fontWeight: 700, color: FAIL, marginBottom: 3 }}>NOT SAVED</div>
@@ -894,7 +894,7 @@ export default function StakeholderSurvey() {
                                   borderRadius: 9,
                                   border: `1px solid ${cState === 'error' ? FAIL : '#e8e7e4'}`,
                                   background: answered ? '#fff' : '#f8f7f5',
-                                  color: answered ? '#0d0d0d' : '#888784',
+                                  color: answered ? '#0d0d0d' : 'var(--color-ink-muted)',
                                   fontSize: 13, fontFamily: 'inherit', lineHeight: 1.6,
                                   resize: 'vertical', outline: 'none',
                                   cursor: answered ? 'text' : 'not-allowed',
@@ -902,8 +902,8 @@ export default function StakeholderSurvey() {
                               />
                               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 4, minHeight: 16 }}>
                                 {/* The carve-out again, at the moment of typing. */}
-                                <span style={{ fontSize: 11, color: '#888784' }}>{COMMENT_BOX_NOTE}</span>
-                                {cState === 'saving' && <span style={{ fontSize: 11, color: '#888784' }}>Saving…</span>}
+                                <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{COMMENT_BOX_NOTE}</span>
+                                {cState === 'saving' && <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Saving…</span>}
                                 {cState === 'saved' && cText === (commentSaved[q.question_id] ?? '') && cText !== '' && (
                                   <span style={{ fontSize: 11, color: GREEN, fontWeight: 600 }}>✓ Saved</span>
                                 )}
@@ -946,7 +946,7 @@ export default function StakeholderSurvey() {
             Is there anything affecting people, the environment or the business that we have not
             asked about?
           </div>
-          <div style={{ fontSize: 13, color: '#888784', lineHeight: 1.7, marginBottom: 10 }}>
+          <div style={{ fontSize: 13, color: 'var(--color-ink-muted)', lineHeight: 1.7, marginBottom: 10 }}>
             Optional. The questions above cover the topics {companyInline} chose to ask about — if
             something matters and is not among them, this is the place to say so.
           </div>
@@ -966,8 +966,8 @@ export default function StakeholderSurvey() {
             }}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 4, minHeight: 16 }}>
-            <span style={{ fontSize: 11, color: '#888784' }}>{COMMENT_BOX_NOTE}</span>
-            {closingState === 'saving' && <span style={{ fontSize: 11, color: '#888784' }}>Saving…</span>}
+            <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{COMMENT_BOX_NOTE}</span>
+            {closingState === 'saving' && <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Saving…</span>}
             {closingState === 'saved' && closing === closingSaved && closing !== '' && (
               <span style={{ fontSize: 11, color: GREEN, fontWeight: 600 }}>✓ Saved</span>
             )}
@@ -1009,7 +1009,7 @@ export default function StakeholderSurvey() {
               <div style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d', marginBottom: 6 }}>
                 {unanswered.length} {unanswered.length === 1 ? 'question is' : 'questions are'} not yet answered
               </div>
-              <div style={{ fontSize: 12, color: '#888784', lineHeight: 1.7 }}>
+              <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.7 }}>
                 {unanswered.map(q => q.short_name).join(' · ')}
               </div>
             </div>
@@ -1043,7 +1043,7 @@ export default function StakeholderSurvey() {
             <div style={{ marginTop: 14, background: FAIL_BG, border: `0.5px solid ${FAIL}`, borderRadius: 10, padding: '12px 14px' }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: FAIL, marginBottom: 4 }}>NOT SUBMITTED</div>
               <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.7 }}>{submitError}</div>
-              <div style={{ fontSize: 12, color: '#888784', lineHeight: 1.7, marginTop: 6 }}>
+              <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.7, marginTop: 6 }}>
                 Your saved answers are unaffected. You can try again, or come back to this link later.
               </div>
             </div>
@@ -1063,7 +1063,7 @@ export default function StakeholderSurvey() {
             specific ("go to {company}, not to your employer"). A vaguer restatement of the same
             promise at the foot of the page is the drift docs/survey-intro-copy.md warns about — two
             wordings of one claim, and the weaker one is the one someone would edit. */}
-        <div style={{ marginTop: 24, textAlign: 'center', fontSize: 12, color: '#888784', lineHeight: 1.7 }}>
+        <div style={{ marginTop: 24, textAlign: 'center', fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.7 }}>
           Powered by <a href="https://www.themisiq.co" style={{ color: '#7425e3', textDecoration: 'none' }}>ThemisIQ</a>
         </div>
       </div>

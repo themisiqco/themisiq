@@ -41,7 +41,7 @@ const STATUS_CONFIG = {
   invited:     { label: 'Invited', color: '#0C447C', bg: '#E6F1FB' },
   in_progress: { label: 'In progress', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
   completed:   { label: 'Completed', color: '#0F6E56', bg: '#E1F5EE' },
-  expired:     { label: 'Expired', color: '#888784', bg: '#f8f7f5' },
+  expired:     { label: 'Expired', color: 'var(--color-ink-muted)', bg: '#f8f7f5' },
 }
 
 export default function CampaignDetail() {
@@ -234,7 +234,7 @@ export default function CampaignDetail() {
   if (loading) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
-      <div style={{ textAlign: 'center', padding: '4rem', color: '#888784' }}>Loading...</div>
+      <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-ink-muted)' }}>Loading...</div>
     </div>
   )
 
@@ -247,16 +247,16 @@ export default function CampaignDetail() {
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-            <button onClick={() => router.push('/dashboard/supply-chain/portal')} style={{ fontSize: 12, color: '#888784', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>← All campaigns</button>
+            <button onClick={() => router.push('/dashboard/supply-chain/portal')} style={{ fontSize: 12, color: 'var(--color-ink-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>← All campaigns</button>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
             <div>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{campaign?.name}</div>
-              {campaign?.description && <div style={{ fontSize: 13, color: '#888784' }}>{campaign.description}</div>}
+              {campaign?.description && <div style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>{campaign.description}</div>}
             </div>
             <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 11, color: '#888784' }}>Spend currency</span>
+                <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Spend currency</span>
                 <select value={spendCurrency} onChange={e => changeCurrency(e.target.value)} style={{ fontSize: 12, padding: '7px 10px', borderRadius: 8, background: '#f8f7f5', border: '1px solid #e8e7e4', color: '#555553', cursor: 'pointer' }}>
                   {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
@@ -286,7 +286,7 @@ export default function CampaignDetail() {
           ].map(({ label, val, color, bg }) => (
             <div key={label} style={{ background: bg, border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem', textAlign: 'center' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 400, color }}>{val}</div>
-              <div style={{ fontSize: 11, color: '#888784', marginTop: 4 }}>{label}</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4 }}>{label}</div>
             </div>
           ))}
         </div>
@@ -301,7 +301,7 @@ export default function CampaignDetail() {
             <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? '#0F6E56' : GRAD, borderRadius: 99, transition: 'width 0.3s' }} />
           </div>
           {campaign?.deadline && (
-            <div style={{ fontSize: 11, color: '#888784', marginTop: 8 }}>Deadline: {new Date(campaign.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+            <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 8 }}>Deadline: {new Date(campaign.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
           )}
         </div>
 
@@ -337,7 +337,7 @@ export default function CampaignDetail() {
         {/* Supplier list */}
         {suppliers.length === 0 ? (
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '3rem', textAlign: 'center' }}>
-            <div style={{ fontSize: 14, color: '#888784', marginBottom: 16 }}>No suppliers added yet</div>
+            <div style={{ fontSize: 14, color: 'var(--color-ink-muted)', marginBottom: 16 }}>No suppliers added yet</div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
               <button onClick={() => fileRef.current?.click()} style={{ fontSize: 12, padding: '9px 18px', borderRadius: 8, background: '#f8f7f5', border: '1px solid #e8e7e4', color: '#555553', cursor: 'pointer' }}>Import from CSV</button>
               <button onClick={() => setShowAdd(true)} style={{ fontSize: 12, fontWeight: 500, padding: '9px 18px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>+ Add manually</button>
@@ -347,7 +347,7 @@ export default function CampaignDetail() {
           <div style={{ border: '0.5px solid #e8e7e4', borderRadius: 14, overflow: 'hidden', background: '#fff' }}>
             <div style={{ display: 'grid', gridTemplateColumns: GRID_COLS, background: '#f8f7f5', padding: '10px 16px', borderBottom: '0.5px solid #e8e7e4' }}>
               {['Supplier', 'Status', 'Invited', 'Annual spend', 'Completed', 'Actions'].map(h => (
-                <div key={h} style={{ fontSize: 10, fontWeight: 700, color: '#888784', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
+                <div key={h} style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-ink-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
               ))}
             </div>
             {suppliers.map((s, i) => {
@@ -369,16 +369,16 @@ export default function CampaignDetail() {
                         {s.supplier_name}
                       </Link>
                     </div>
-                    <div style={{ fontSize: 11, color: '#888784' }}>{s.supplier_email}</div>
-                    {s.contact_name && <div style={{ fontSize: 11, color: '#888784' }}>{s.contact_name}</div>}
+                    <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{s.supplier_email}</div>
+                    {s.contact_name && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{s.contact_name}</div>}
                   </div>
                   <div>
                     <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
                   </div>
-                  <div style={{ fontSize: 11, color: '#888784' }}>{new Date(s.invited_at).toLocaleDateString()}</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{new Date(s.invited_at).toLocaleDateString()}</div>
                   <div style={{ paddingRight: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 11, color: '#888784', flexShrink: 0 }}>{spendCurrency}</span>
+                      <span style={{ fontSize: 11, color: 'var(--color-ink-muted)', flexShrink: 0 }}>{spendCurrency}</span>
                       <input
                         type="number"
                         min="0"
@@ -389,7 +389,7 @@ export default function CampaignDetail() {
                       />
                     </div>
                   </div>
-                  <div style={{ fontSize: 11, color: s.completed_at ? '#0F6E56' : '#888784' }}>
+                  <div style={{ fontSize: 11, color: s.completed_at ? '#0F6E56' : 'var(--color-ink-muted)' }}>
                     {s.completed_at ? new Date(s.completed_at).toLocaleDateString() : '—'}
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexDirection: 'column', alignItems: 'flex-end' }}>
@@ -422,7 +422,7 @@ export default function CampaignDetail() {
         )}
 
         {/* CSV template */}
-        <div style={{ marginTop: 16, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '0.75rem 1rem', fontSize: 12, color: '#888784' }}>
+        <div style={{ marginTop: 16, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '0.75rem 1rem', fontSize: 12, color: 'var(--color-ink-muted)' }}>
           CSV import format: <code style={{ background: '#fff', padding: '1px 6px', borderRadius: 4 }}>Supplier, Email, Contact, Spend</code> &mdash; Spend is optional; you can also enter it inline after import. Spend is recorded in the campaign currency selected above.
         </div>
       </div>

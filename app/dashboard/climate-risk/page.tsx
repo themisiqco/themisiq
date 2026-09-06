@@ -7,6 +7,7 @@ import { stepBlockers, canAdvanceStep, outstandingText, type BlockerField }
   from '../../../lib/climate/wizardSteps'
 import Nav from '../../components/Nav'
 import { sectionHead } from '@/app/components/headingStyles'
+import { btnStep, btnStepDisabled } from '@/app/components/buttonStyles'
 // resolveTopicLabels is the SAME pure function /api/materiality uses at write time. Importing it
 // here rather than reimplementing the overlay is the point: the wizard and the write path cannot
 // disagree about which name belongs to which version, or about what counts as a fallback.
@@ -30,7 +31,7 @@ import {
 
 // ─── Design tokens (matching the live climate page) ───────────────────────────
 const GRAD = 'var(--color-brand)'
-const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
+const sectionSub: React.CSSProperties = { fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
 
@@ -38,7 +39,7 @@ const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', bo
 const SEV = {
   high: { label: 'HIGH', color: '#B91C1C', bg: '#FCEBEB', border: '#B91C1C' },
   med:  { label: 'MED', color: 'var(--color-module-climate)', bg: '#FEF3E2', border: 'var(--color-module-climate)' },
-  low:  { label: 'LOW', color: '#888784', bg: '#f8f7f5', border: '#e8e7e4' },
+  low:  { label: 'LOW', color: 'var(--color-ink-muted)', bg: '#f8f7f5', border: '#e8e7e4' },
   // Data gap (no reference data / no baseline) — amber, distinct from LOW grey. Never reads as an
   // assessed finding of no exposure/immateriality; scored null, not 0.
   unknown: { label: 'N/A', color: 'var(--color-module-climate)', bg: '#FDF6EC', border: '#EAD9BE' },
@@ -48,7 +49,7 @@ const SEV = {
 const OPP = {
   high: { label: 'STRONG', color: '#0F6E56', bg: '#E1F5EE', border: '#0F6E56' },
   med:  { label: 'MODERATE', color: '#0C7C59', bg: '#E1F5EE', border: '#7FCBB4' },
-  low:  { label: 'LIMITED', color: '#888784', bg: '#f8f7f5', border: '#e8e7e4' },
+  low:  { label: 'LIMITED', color: 'var(--color-ink-muted)', bg: '#f8f7f5', border: '#e8e7e4' },
 }
 
 // ─── Static option data (mirrors the seeded DB) ───────────────────────────────
@@ -230,7 +231,7 @@ function ResilienceMap({ items }: { items: any[] }) {
     })
   }
 
-  const axis = '#888784', grid = '#e8e7e4', muted = '#555553', ink = '#0d0d0d', hint = '#a8a6a1'
+  const axis = 'var(--color-ink-muted)', grid = '#e8e7e4', muted = '#555553', ink = '#0d0d0d', hint = '#a8a6a1'
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10 }} role="img" aria-label="Resilience scenario-response map: risks plotted by exposure under a rapid-policy future versus a high-warming future">
       <line x1={px(0.5)} y1={padT} x2={px(0.5)} y2={padT + plotH} stroke={grid} strokeDasharray="3 4" />
@@ -484,7 +485,7 @@ export default function MaterialityWizard() {
       <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
         <Nav />
         <div style={{ maxWidth: 900, margin: '0 auto', padding: '2.5rem 2.5rem' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Climate Risk &amp; Materiality</div>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 4 }}>Climate Risk &amp; Materiality</div>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Which assessment do you need?</h1>
           <p style={{ ...sectionSub, marginBottom: 24 }}>Assess your climate-related physical and transition risk, and determine what's material under your reporting standard. Double materiality adds impact materiality to single (financial) materiality. Choose the standard you report under.</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'stretch' }}>
@@ -508,7 +509,7 @@ export default function MaterialityWizard() {
                 {o.m === 'csrd' && (
                   <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
                     <div style={{ fontSize: 11, fontWeight: 600, color: '#0d0d0d', marginBottom: 3 }}>Which version of ESRS do you report under?</div>
-                    <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.5, marginBottom: 10 }}>
+                    <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.5, marginBottom: 10 }}>
                       All three apply to FY2026 and you must state which you used — but only ESRS (2026) can be selected here; see the note under the others. It sets the topic names in your report. You can leave this until later.
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -538,7 +539,7 @@ export default function MaterialityWizard() {
                         return (
                           <div key={String(opt.v)} onClick={() => { if (pick) setStandardVersion(opt.v) }} style={{ border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, borderRadius: 8, padding: '7px 10px', cursor: pick ? 'pointer' : 'not-allowed', opacity: pick ? 1 : 0.5, background: sel ? '#EDE9FE' : '#fff' }}>
                             <div style={{ fontSize: 12, fontWeight: sel ? 600 : 500, color: sel ? '#7425e3' : '#0d0d0d' }}>{opt.l}</div>
-                            <div style={{ fontSize: 10.5, color: '#888784', marginTop: 1, lineHeight: 1.4 }}>{opt.d}</div>
+                            <div style={{ fontSize: 10.5, color: 'var(--color-ink-muted)', marginTop: 1, lineHeight: 1.4 }}>{opt.d}</div>
                             {/* Shown and closed, never removed — the same decision as the assessment
                                 form. A buyer should be able to see the product knows 2023 exists. */}
                             {note && (
@@ -588,15 +589,15 @@ export default function MaterialityWizard() {
               key on the start day, so the start day is what is captured. */}
           <div style={{ display: 'flex', gap: 10 }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: '#888784', marginBottom: 4 }}>First day of the financial year</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 4 }}>First day of the financial year</div>
               <input style={inputStyle} type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: '#888784', marginBottom: 4 }}>Last day</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 4 }}>Last day</div>
               <input style={inputStyle} type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} />
             </div>
           </div>
-          <div style={{ fontSize: 11, color: '#888784', marginTop: 5, lineHeight: 1.6 }}>
+          <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 5, lineHeight: 1.6 }}>
             Optional. If your financial year is not the calendar year &mdash; 1 April 2026 to 31 March 2027,
             say &mdash; enter it as it actually runs. Which ESRS version applies depends on the day it begins.
           </div>
@@ -693,10 +694,10 @@ export default function MaterialityWizard() {
   const renderRegions = () => (
     <div>
       <h2 style={sectionHead}>Where do you operate?</h2>
-      <p style={{ fontSize: 12, color: '#888784', lineHeight: 1.6, marginTop: -4, marginBottom: 12 }}>This step is about <strong style={{ color: '#555553' }}>physical location</strong> — where your assets sit, which drives weather and climate hazards. Whose climate laws apply comes in the next step.</p>
+      <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: -4, marginBottom: 12 }}>This step is about <strong style={{ color: '#555553' }}>physical location</strong> — where your assets sit, which drives weather and climate hazards. Whose climate laws apply comes in the next step.</p>
       <p style={sectionSub}><strong style={{ color: '#7425e3', fontWeight: 600 }}>Click the ⓘ on any region to see the countries it covers and confirm your operations fall within it.</strong> These follow the IPCC AR6 climate reference regions — each carries a distinct hazard profile that drives your physical-risk results.</p>
       {regionGroups.length === 0 && (
-        <p style={{ fontSize: 12, color: '#888784' }}>Loading regions…</p>
+        <p style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Loading regions…</p>
       )}
       {regionGroups.map(g => (
         <div key={g.group} style={{ marginBottom: 16 }}>
@@ -712,10 +713,10 @@ export default function MaterialityWizard() {
                       <div style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, background: sel ? '#7425e3' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{sel && <span style={{ color: '#fff', fontSize: 8, fontWeight: 700 }}>✓</span>}</div>
                       <span style={{ fontSize: 12, fontWeight: sel ? 600 : 400, color: sel ? '#7425e3' : '#555553' }}>{r.label} <span style={{ color: '#aaa', fontSize: 11 }}>{r.code}</span></span>
                     </div>
-                    <button onClick={(e) => { e.stopPropagation(); setOpenCoverage(open ? null : r.code) }} title="What does this region cover?" style={{ width: 18, height: 18, borderRadius: '50%', border: `1px solid ${open ? '#7425e3' : '#c9c8c4'}`, background: open ? '#7425e3' : 'transparent', color: open ? '#fff' : '#888784', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0, lineHeight: 1, padding: 0 }}>i</button>
+                    <button onClick={(e) => { e.stopPropagation(); setOpenCoverage(open ? null : r.code) }} title="What does this region cover?" style={{ width: 18, height: 18, borderRadius: '50%', border: `1px solid ${open ? '#7425e3' : '#c9c8c4'}`, background: open ? '#7425e3' : 'transparent', color: open ? '#fff' : 'var(--color-ink-muted)', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0, lineHeight: 1, padding: 0 }}>i</button>
                   </div>
                   {open && (
-                    <div style={{ padding: '0 12px 10px 36px', fontSize: 11, color: '#888784', lineHeight: 1.5 }}>
+                    <div style={{ padding: '0 12px 10px 36px', fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.5 }}>
                       <span style={{ fontWeight: 600, color: '#555553' }}>Includes, broadly:</span> {REGION_COVERAGE[r.code]}
                     </div>
                   )}
@@ -733,13 +734,13 @@ export default function MaterialityWizard() {
       <div style={{ marginTop: 16 }}>
         <label style={labelStyle}>Asset profile</label>
         {/* UX fix #1: prompt line explaining what asset profile is for */}
-        <p style={{ fontSize: 12, color: '#888784', lineHeight: 1.6, marginTop: -2, marginBottom: 10 }}>Where most of your physical assets sit. This refines how the hazards above apply to you. If you're unsure, choose "Inland / mixed".</p>
+        <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: -2, marginBottom: 10 }}>Where most of your physical assets sit. This refines how the hazards above apply to you. If you're unsure, choose "Inland / mixed".</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
           {ASSET_PROFILES.map(a => {
             const sel = assetProfile === a.code
             return <div key={a.code} onClick={() => setAssetProfile(a.code)} style={{ border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer', background: sel ? '#EDE9FE' : '#f8f7f5' }}>
               <div style={{ fontSize: 13, fontWeight: sel ? 600 : 500, color: sel ? '#7425e3' : '#0d0d0d' }}>{a.label}</div>
-              <div style={{ fontSize: 11, color: '#888784', marginTop: 2, lineHeight: 1.5 }}>{a.desc}</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2, lineHeight: 1.5 }}>{a.desc}</div>
             </div>
           })}
         </div>
@@ -764,12 +765,12 @@ export default function MaterialityWizard() {
             <div style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, background: sel ? '#7425e3' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>{sel && <span style={{ color: '#fff', fontSize: 8, fontWeight: 700 }}>✓</span>}</div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 12, fontWeight: sel ? 600 : 500, color: sel ? '#7425e3' : '#0d0d0d' }}>{j.label}</div>
-              <div style={{ fontSize: 11, color: '#888784', marginTop: 2, lineHeight: 1.5 }}>{j.desc}</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2, lineHeight: 1.5 }}>{j.desc}</div>
             </div>
           </div>
         })}
       </div>
-      <p style={{ fontSize: 11, color: '#888784', lineHeight: 1.6, marginTop: 12 }}>These are simplified guides — each scheme has its own thresholds and exceptions, so check the specific rules if you're near a threshold.</p>
+      <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 12 }}>These are simplified guides — each scheme has its own thresholds and exceptions, so check the specific rules if you're near a threshold.</p>
     </div>
   )
 
@@ -792,8 +793,8 @@ export default function MaterialityWizard() {
           const sel = scenarioCode === s.code
           return <div key={s.code} onClick={() => setScenarioCode(s.code)} style={{ border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer', background: sel ? '#EDE9FE' : '#f8f7f5' }}>
             <div style={{ fontSize: 13, fontWeight: sel ? 600 : 500, color: sel ? '#7425e3' : '#0d0d0d' }}>{s.label}</div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', marginTop: 2 }}>{s.descriptor}</div>
-            <div style={{ fontSize: 11, color: '#888784', marginTop: 4, lineHeight: 1.45 }}>{s.desc}</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', marginTop: 2 }}>{s.descriptor}</div>
+            <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4, lineHeight: 1.45 }}>{s.desc}</div>
           </div>
         })}
       </div>
@@ -818,7 +819,7 @@ export default function MaterialityWizard() {
           flight (or if it failed) the list is empty — say so rather than render an empty box that
           reads as "no topics apply to you". */}
       {displayTopics.length === 0 && (
-        <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 14px', fontSize: 12, color: '#888784' }}>
+        <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 14px', fontSize: 12, color: 'var(--color-ink-muted)' }}>
           Loading the ESRS topic list…
         </div>
       )}
@@ -832,7 +833,7 @@ export default function MaterialityWizard() {
                 {/* Version-blind UX guidance, keyed by code — see ESRS_TOPIC_DESC. Under ESRS
                     (2026) S1 and S2 share one title, so for those two this line is the ONLY thing
                     telling the rows apart. */}
-                <div style={{ fontSize: 11, color: '#888784', marginTop: 2, lineHeight: 1.5 }}>{ESRS_TOPIC_DESC[t.code] ?? ''}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2, lineHeight: 1.5 }}>{ESRS_TOPIC_DESC[t.code] ?? ''}</div>
               </div>
               <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                 {[{ l: 'low', v: 2 }, { l: 'med', v: 5 }, { l: 'high', v: 8 }].map(o => {
@@ -844,7 +845,7 @@ export default function MaterialityWizard() {
           )
         })}
       </div>
-      <p style={{ fontSize: 11, color: '#888784', marginTop: 12, lineHeight: 1.6 }}>Topics you don't adjust use the industry-baseline impact score.</p>
+      <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 12, lineHeight: 1.6 }}>Topics you don't adjust use the industry-baseline impact score.</p>
     </div>
   )
 
@@ -876,7 +877,7 @@ export default function MaterialityWizard() {
     const W = 500, H = 360, padL = 48, padR = 16, padT = 16, padB = 40
     const midX = padL + 0.5 * (W - padL - padR)
     const midY = padT + 0.5 * (H - padT - padB)
-    const dotColor = (q: string) => q === 'both' ? '#A32D2D' : (q === 'financial' || q === 'impact') ? 'var(--color-module-climate)' : '#888784'
+    const dotColor = (q: string) => q === 'both' ? '#A32D2D' : (q === 'financial' || q === 'impact') ? 'var(--color-module-climate)' : 'var(--color-ink-muted)'
 
     // Offset overlapping dots so labels remain readable when topics share coordinates
     const OFFSET = 14
@@ -905,11 +906,11 @@ export default function MaterialityWizard() {
           <line x1={padL} y1={midY} x2={W - padR} y2={midY} stroke="#e8e7e4" strokeDasharray="4 4" />
           <line x1={midX} y1={padT} x2={midX} y2={H - padB} stroke="#e8e7e4" strokeDasharray="4 4" />
           {/* axes */}
-          <line x1={padL} y1={padT} x2={padL} y2={H - padB} stroke="#888784" />
-          <line x1={padL} y1={H - padB} x2={W - padR} y2={H - padB} stroke="#888784" />
+          <line x1={padL} y1={padT} x2={padL} y2={H - padB} stroke="var(--color-ink-muted)" />
+          <line x1={padL} y1={H - padB} x2={W - padR} y2={H - padB} stroke="var(--color-ink-muted)" />
           {/* axis labels */}
-          <text x={padL - 8} y={padT + 8} textAnchor="end" fontSize="11" fill="#888784">High</text>
-          <text x={padL - 8} y={H - padB} textAnchor="end" fontSize="11" fill="#888784">Low</text>
+          <text x={padL - 8} y={padT + 8} textAnchor="end" fontSize="11" fill="var(--color-ink-muted)">High</text>
+          <text x={padL - 8} y={H - padB} textAnchor="end" fontSize="11" fill="var(--color-ink-muted)">Low</text>
           <text x="14" y={H / 2} textAnchor="middle" fontSize="12" fill="#555553" transform={`rotate(-90 14 ${H / 2})`}>Financial materiality →</text>
           <text x={W / 2} y={H - 6} textAnchor="middle" fontSize="12" fill="#555553">Impact materiality →</text>
           {/* dots */}
@@ -921,7 +922,7 @@ export default function MaterialityWizard() {
           ))}
         </svg>
         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, fontSize: 12, color: '#555553' }}>
-          {[['#A32D2D', 'Material on both'], ['var(--color-module-climate)', 'Material on one axis'], ['#888784', 'Lower priority']].map(([c, l]) => (
+          {[['#A32D2D', 'Material on both'], ['var(--color-module-climate)', 'Material on one axis'], ['var(--color-ink-muted)', 'Lower priority']].map(([c, l]) => (
             <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: '50%', background: c, display: 'inline-block' }} />{l}</span>
           ))}
         </div>
@@ -946,7 +947,7 @@ export default function MaterialityWizard() {
       <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '1rem 1.25rem', marginBottom: 12, overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
-            <tr style={{ textAlign: 'left', color: '#888784' }}>
+            <tr style={{ textAlign: 'left', color: 'var(--color-ink-muted)' }}>
               <th style={{ padding: '6px 4px', fontWeight: 600, width: '46%' }}>ESRS topic</th>
               <th style={{ padding: '6px 4px', fontWeight: 600 }}>Financial</th>
               <th style={{ padding: '6px 4px', fontWeight: 600 }}>Impact</th>
@@ -973,12 +974,12 @@ export default function MaterialityWizard() {
       <>
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderTop: '4px solid var(--color-module-climate)', borderRadius: 'var(--radius-panel)', padding: '1rem', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 2 }}>Physical risks <span style={{ fontWeight: 400, color: '#aaa', fontSize: 12 }}>industry × geography × scenario</span></div>
-          <p style={{ fontSize: 12, color: '#888784', margin: '0 0 12px' }}>Flagged only where your industry sensitivity meets real regional hazard exposure.</p>
-          <div>{phys.length ? phys.map((p: any, i: number) => <span key={'p'+i}>{p.dataStatus === 'no_reference_data' ? pill(p.hazard, 'unknown', 'not assessed — no reference data') : pill(p.hazard, p.band, 'in ' + p.drivingRegion)}</span>) : <span style={{ fontSize: 13, color: '#888784' }}>No material physical risks at this intersection.</span>}</div>
+          <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', margin: '0 0 12px' }}>Flagged only where your industry sensitivity meets real regional hazard exposure.</p>
+          <div>{phys.length ? phys.map((p: any, i: number) => <span key={'p'+i}>{p.dataStatus === 'no_reference_data' ? pill(p.hazard, 'unknown', 'not assessed — no reference data') : pill(p.hazard, p.band, 'in ' + p.drivingRegion)}</span>) : <span style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>No material physical risks at this intersection.</span>}</div>
         </div>
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderTop: '4px solid #534AB7', borderRadius: 'var(--radius-panel)', padding: '1rem', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 12 }}>Transition risks <span style={{ fontWeight: 400, color: '#aaa', fontSize: 12 }}>industry carbon × jurisdiction × scenario</span></div>
-          <div>{trans.length ? trans.map((t: any, i: number) => <span key={'t'+i}>{pill(t.driver, t.band)}</span>) : <span style={{ fontSize: 13, color: '#888784' }}>None flagged.</span>}</div>
+          <div>{trans.length ? trans.map((t: any, i: number) => <span key={'t'+i}>{pill(t.driver, t.band)}</span>) : <span style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>None flagged.</span>}</div>
         </div>
       </>
     )
@@ -990,20 +991,20 @@ export default function MaterialityWizard() {
     return (
       <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderTop: '4px solid #0F6E56', borderRadius: 'var(--radius-panel)', padding: '1rem', marginBottom: 12 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 2 }}>Climate opportunities <span style={{ fontWeight: 400, color: '#aaa', fontSize: 12 }}>TCFD categories · industry × scenario</span></div>
-        <p style={{ fontSize: 12, color: '#888784', margin: '0 0 12px' }}>The upside view IFRS S2 and TCFD ask for alongside risk — where the transition creates opportunity for your industry.</p>
+        <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', margin: '0 0 12px' }}>The upside view IFRS S2 and TCFD ask for alongside risk — where the transition creates opportunity for your industry.</p>
         {opps.length ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {opps.map((o: any, i: number) => (
               <div key={'o'+i} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, color: '#0d0d0d', fontWeight: 500 }}>{o.label}</div>
-                  <div style={{ fontSize: 11, color: '#888784', marginTop: 1, lineHeight: 1.5 }}>{OPPORTUNITY_DESC[o.label] || ''}</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 1, lineHeight: 1.5 }}>{OPPORTUNITY_DESC[o.label] || ''}</div>
                 </div>
                 <div style={{ flexShrink: 0 }}>{oppPill('', o.band)}</div>
               </div>
             ))}
           </div>
-        ) : <span style={{ fontSize: 13, color: '#888784' }}>No opportunity profile available for this industry yet.</span>}
+        ) : <span style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>No opportunity profile available for this industry yet.</span>}
       </div>
     )
   }
@@ -1019,9 +1020,9 @@ export default function MaterialityWizard() {
 
         {/* summary header */}
         <div style={{ background: '#f8f7f5', borderRadius: 14, padding: '1.25rem', marginBottom: 12 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Summary</div>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }}>Summary</div>
           <div style={{ fontSize: 15, color: '#0d0d0d', marginBottom: 4 }}><strong>{companyName || ind}</strong> · {regionCodes.length} region(s) · {jurisdictionCodes.length} jurisdiction(s)</div>
-          <div style={{ fontSize: 13, color: '#888784' }}>{ind} · {sc?.label} ({sc?.descriptor}) · {horizon} term</div>
+          <div style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>{ind} · {sc?.label} ({sc?.descriptor}) · {horizon} term</div>
         </div>
 
         {/* count cards */}
@@ -1079,12 +1080,12 @@ export default function MaterialityWizard() {
               <li style={{ marginBottom: 4 }}>Independent professional review of the determined material topics prior to publication.</li>
             </ul>
 
-              <p style={{ fontSize: 11, color: '#888784', lineHeight: 1.7, margin: '0 0 8px' }}>This document and all outputs generated through the ThemisIQ platform are provided for informational, screening, planning, and prioritization purposes only. They do not constitute legal, regulatory, accounting, financial, assurance, investment, or other professional advice and do not, by themselves, satisfy any reporting, disclosure, filing, compliance, assurance, or certification obligation under IFRS, ISSB, CSRD, ESRS, SEC, California climate disclosure regulations, or any other framework or jurisdiction.</p>
-              <p style={{ fontSize: 11, color: '#888784', lineHeight: 1.7, margin: '0 0 8px' }}>Platform outputs are dependent upon information provided by users and other third-party sources. ThemisIQ Compliance Inc. does not independently verify such information and makes no representation or warranty, express or implied, regarding the completeness, accuracy, reliability, suitability, or fitness for a particular purpose of any output.</p>
-              <p style={{ fontSize: 11, color: '#888784', lineHeight: 1.7, margin: '0 0 8px' }}>Sustainability-related laws, regulations, standards, guidance, and interpretations continue to evolve. Users remain solely responsible for determining the applicability of regulatory requirements and for obtaining independent legal, accounting, assurance, and other professional advice where appropriate.</p>
-              <p style={{ fontSize: 11, color: '#888784', lineHeight: 1.7, margin: '0 0 8px' }}>Use of the platform does not create a professional-client, advisory, assurance, accounting, consulting, fiduciary, or legal relationship with ThemisIQ Compliance Inc.</p>
-              <p style={{ fontSize: 11, color: '#888784', lineHeight: 1.7, margin: '0 0 8px' }}>To the maximum extent permitted by law, ThemisIQ Compliance Inc., its directors, officers, employees, contractors, and affiliates shall not be liable for any direct, indirect, incidental, consequential, special, punitive, or economic damages arising from the use of, or reliance upon, any platform output.</p>
-              <p style={{ fontSize: 11, color: '#888784', lineHeight: 1.7, margin: '0' }}>ThemisIQ is a software platform and is not an accredited assurance provider, certification body, or regulatory authority.</p>
+              <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.7, margin: '0 0 8px' }}>This document and all outputs generated through the ThemisIQ platform are provided for informational, screening, planning, and prioritization purposes only. They do not constitute legal, regulatory, accounting, financial, assurance, investment, or other professional advice and do not, by themselves, satisfy any reporting, disclosure, filing, compliance, assurance, or certification obligation under IFRS, ISSB, CSRD, ESRS, SEC, California climate disclosure regulations, or any other framework or jurisdiction.</p>
+              <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.7, margin: '0 0 8px' }}>Platform outputs are dependent upon information provided by users and other third-party sources. ThemisIQ Compliance Inc. does not independently verify such information and makes no representation or warranty, express or implied, regarding the completeness, accuracy, reliability, suitability, or fitness for a particular purpose of any output.</p>
+              <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.7, margin: '0 0 8px' }}>Sustainability-related laws, regulations, standards, guidance, and interpretations continue to evolve. Users remain solely responsible for determining the applicability of regulatory requirements and for obtaining independent legal, accounting, assurance, and other professional advice where appropriate.</p>
+              <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.7, margin: '0 0 8px' }}>Use of the platform does not create a professional-client, advisory, assurance, accounting, consulting, fiduciary, or legal relationship with ThemisIQ Compliance Inc.</p>
+              <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.7, margin: '0 0 8px' }}>To the maximum extent permitted by law, ThemisIQ Compliance Inc., its directors, officers, employees, contractors, and affiliates shall not be liable for any direct, indirect, incidental, consequential, special, punitive, or economic damages arising from the use of, or reliance upon, any platform output.</p>
+              <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.7, margin: '0' }}>ThemisIQ is a software platform and is not an accredited assurance provider, certification body, or regulatory authority.</p>
 
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', marginTop: 12, paddingTop: 12, borderTop: '0.5px solid #e8e7e4' }}>
               <input type="checkbox" checked={acknowledgedReport} onChange={e => setAcknowledgedReport(e.target.checked)} style={{ marginTop: 3, flexShrink: 0 }} />
@@ -1102,7 +1103,7 @@ export default function MaterialityWizard() {
               ⬇ Download {mode === 'csrd' ? 'CSRD' : 'IFRS S2'} report (PDF)
             </a>
           ) : (
-            <button disabled style={{ fontSize: 13, fontWeight: 500, padding: '11px 24px', borderRadius: 8, background: '#e8e7e4', color: '#888784', border: 'none', cursor: 'not-allowed', marginBottom: 8 }}>
+            <button disabled style={{ fontSize: 13, fontWeight: 500, padding: '11px 24px', borderRadius: 8, background: '#e8e7e4', color: 'var(--color-ink-muted)', border: 'none', cursor: 'not-allowed', marginBottom: 8 }}>
               ⬇ Download {mode === 'csrd' ? 'CSRD' : 'IFRS S2'} report (PDF)
             </button>
           )
@@ -1132,7 +1133,7 @@ export default function MaterialityWizard() {
       'persistent': { bg: '#FCEBEB', color: '#B91C1C', border: '#B91C1C' },
       'warming-contingent': { bg: '#FEF3E2', color: 'var(--color-module-climate)', border: 'var(--color-module-climate)' },
       'policy-path-contingent': { bg: '#EDE9FE', color: '#7425e3', border: '#7425e3' },
-      'low-across-futures': { bg: '#f8f7f5', color: '#888784', border: '#e8e7e4' },
+      'low-across-futures': { bg: '#f8f7f5', color: 'var(--color-ink-muted)', border: '#e8e7e4' },
     }
     const cellBox = (band: Band, score: number, kind: string) => {
       const c = kind === 'opportunity' ? OPP[band] : SEV[band]
@@ -1152,7 +1153,7 @@ export default function MaterialityWizard() {
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 560 }}>
           <thead>
-            <tr style={{ textAlign: 'left', color: '#888784' }}>
+            <tr style={{ textAlign: 'left', color: 'var(--color-ink-muted)' }}>
               <th style={{ padding: '6px 8px', fontWeight: 600, minWidth: 150 }}>Item</th>
               {trio.map((t: any) => (
                 <th key={t.role} style={{ padding: '6px 8px', fontWeight: 600, textAlign: 'center' }}>{roleLabel[t.role]}<div style={{ fontSize: 10, fontWeight: 400, color: '#aaa' }}>{t.warming}</div></th>
@@ -1181,7 +1182,7 @@ export default function MaterialityWizard() {
         </table>
         <div style={{ marginTop: 8 }}>
           {list.map((it: any, i: number) => (
-            <div key={'int' + kind + i} style={{ fontSize: 11, color: '#888784', lineHeight: 1.55, marginBottom: 3 }}>{it.interpretation}</div>
+            <div key={'int' + kind + i} style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.55, marginBottom: 3 }}>{it.interpretation}</div>
           ))}
         </div>
       </div>
@@ -1194,17 +1195,17 @@ export default function MaterialityWizard() {
 
         {/* trio header — provenance inline */}
         <div style={{ background: '#f8f7f5', borderRadius: 14, padding: '1.25rem', marginBottom: 12 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Scenarios tested</div>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }}>Scenarios tested</div>
           <div style={{ fontSize: 15, color: '#0d0d0d', marginBottom: 8 }}><strong>{companyName || ind}</strong> · {ind} · {horizon} term</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
             {trio.map((t: any) => (
               <div key={t.role} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 8, padding: '8px 10px' }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d' }}>{roleLabel[t.role]}</div>
-                <div style={{ fontSize: 11, color: '#888784' }}>{t.warming} · {t.source}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{t.warming} · {t.source}</div>
               </div>
             ))}
           </div>
-          <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.6, marginTop: 10 }}>
+          <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 10 }}>
             These three pathways span a low-warming Paris-aligned future, a current-trajectory middle case, and a high-warming case — a diverse range that stresses both transition and physical risk, and includes a Paris-aligned scenario as IFRS S2 requires.
           </div>
         </div>
@@ -1215,15 +1216,15 @@ export default function MaterialityWizard() {
           <p style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, margin: 0 }}>{syn.statement}</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, marginTop: 14 }}>
             <div style={{ background: '#f8f7f5', borderRadius: 8, padding: '8px 10px' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#888784' }}>Two-channel exposure</div>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-ink-muted)' }}>Two-channel exposure</div>
               <div style={{ fontSize: 12, color: '#0d0d0d', marginTop: 2 }}>{syn.twoChannel === 'both' ? 'Both transition & physical' : syn.twoChannel === 'transition-led' ? 'Transition-led' : syn.twoChannel === 'physical-led' ? 'Physical-led' : 'Limited'}</div>
             </div>
             <div style={{ background: '#f8f7f5', borderRadius: 8, padding: '8px 10px' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#888784' }}>Scenario profile</div>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-ink-muted)' }}>Scenario profile</div>
               <div style={{ fontSize: 12, color: '#0d0d0d', marginTop: 2 }}>{syn.inverts ? 'Channels invert' : `${syn.profileSwing?.magnitude ?? '—'} shift`}</div>
             </div>
             <div style={{ background: '#f8f7f5', borderRadius: 8, padding: '8px 10px' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#888784' }}>Horizon trend</div>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-ink-muted)' }}>Horizon trend</div>
               <div style={{ fontSize: 12, color: '#0d0d0d', marginTop: 2 }}>{syn.horizonNote === 'worsens' ? 'Worsens toward 2050' : 'Stable over time'}</div>
             </div>
           </div>
@@ -1233,7 +1234,7 @@ export default function MaterialityWizard() {
         {(physical.length > 0 || transition.length > 0) && (
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '1.25rem', marginBottom: 12 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 6 }}>Resilience map</div>
-            <p style={{ fontSize: 12, color: '#888784', lineHeight: 1.6, margin: '0 0 12px' }}>Each risk is positioned by its exposure under a rapid-policy (Paris-aligned) future and under a high-warming future. Risks toward the top-right are material whichever way the future unfolds; the spread between the physical group (toward the top) and the transition group (toward the right) is the two-channel exposure. Axes use the calibrated bands (Low / Moderate / High).</p>
+            <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.6, margin: '0 0 12px' }}>Each risk is positioned by its exposure under a rapid-policy (Paris-aligned) future and under a high-warming future. Risks toward the top-right are material whichever way the future unfolds; the spread between the physical group (toward the top) and the transition group (toward the right) is the two-channel exposure. Axes use the calibrated bands (Low / Moderate / High).</p>
             <ResilienceMap items={items} />
           </div>
         )}
@@ -1241,15 +1242,15 @@ export default function MaterialityWizard() {
         {/* comparison grids */}
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderTop: '4px solid var(--color-module-climate)', borderRadius: 'var(--radius-panel)', padding: '1rem', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 10 }}>Physical risks across scenarios</div>
-          {physical.length ? itemRows(physical, 'physical') : <span style={{ fontSize: 13, color: '#888784' }}>No material physical risks at this intersection.</span>}
+          {physical.length ? itemRows(physical, 'physical') : <span style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>No material physical risks at this intersection.</span>}
         </div>
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderTop: '4px solid #534AB7', borderRadius: 'var(--radius-panel)', padding: '1rem', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 10 }}>Transition risks across scenarios</div>
-          {transition.length ? itemRows(transition, 'transition') : <span style={{ fontSize: 13, color: '#888784' }}>None flagged.</span>}
+          {transition.length ? itemRows(transition, 'transition') : <span style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>None flagged.</span>}
         </div>
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderTop: '4px solid #0F6E56', borderRadius: 'var(--radius-panel)', padding: '1rem', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 10 }}>Opportunities across scenarios</div>
-          {opportunity.length ? itemRows(opportunity, 'opportunity') : <span style={{ fontSize: 13, color: '#888784' }}>No opportunity profile available for this industry yet.</span>}
+          {opportunity.length ? itemRows(opportunity, 'opportunity') : <span style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>No opportunity profile available for this industry yet.</span>}
         </div>
 
         {/* honesty footnote */}
@@ -1264,12 +1265,12 @@ export default function MaterialityWizard() {
             <p style={{ fontSize: 12, color: '#555553', lineHeight: 1.7, margin: '0 0 10px' }}>
               <strong>This is a screening-level resilience analysis, not a formal {mode === 'csrd' ? 'CSRD / ESRS' : 'IFRS S2'} disclosure.</strong> Scenario classifications are derived from starter scoring values and require validation against your entity's own data and circumstances before publication.
             </p>
-              <p style={{ fontSize: 11, color: '#888784', lineHeight: 1.7, margin: '0 0 8px' }}>This document and all outputs generated through the ThemisIQ platform are provided for informational, screening, planning, and prioritization purposes only. They do not constitute legal, regulatory, accounting, financial, assurance, investment, or other professional advice and do not, by themselves, satisfy any reporting, disclosure, filing, compliance, assurance, or certification obligation under IFRS, ISSB, CSRD, ESRS, SEC, California climate disclosure regulations, or any other framework or jurisdiction.</p>
-              <p style={{ fontSize: 11, color: '#888784', lineHeight: 1.7, margin: '0 0 8px' }}>Platform outputs are dependent upon information provided by users and other third-party sources. ThemisIQ Compliance Inc. does not independently verify such information and makes no representation or warranty, express or implied, regarding the completeness, accuracy, reliability, suitability, or fitness for a particular purpose of any output.</p>
-              <p style={{ fontSize: 11, color: '#888784', lineHeight: 1.7, margin: '0 0 8px' }}>Sustainability-related laws, regulations, standards, guidance, and interpretations continue to evolve. Users remain solely responsible for determining the applicability of regulatory requirements and for obtaining independent legal, accounting, assurance, and other professional advice where appropriate.</p>
-              <p style={{ fontSize: 11, color: '#888784', lineHeight: 1.7, margin: '0 0 8px' }}>Use of the platform does not create a professional-client, advisory, assurance, accounting, consulting, fiduciary, or legal relationship with ThemisIQ Compliance Inc.</p>
-              <p style={{ fontSize: 11, color: '#888784', lineHeight: 1.7, margin: '0 0 8px' }}>To the maximum extent permitted by law, ThemisIQ Compliance Inc., its directors, officers, employees, contractors, and affiliates shall not be liable for any direct, indirect, incidental, consequential, special, punitive, or economic damages arising from the use of, or reliance upon, any platform output.</p>
-              <p style={{ fontSize: 11, color: '#888784', lineHeight: 1.7, margin: '0' }}>ThemisIQ is a software platform and is not an accredited assurance provider, certification body, or regulatory authority.</p>
+              <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.7, margin: '0 0 8px' }}>This document and all outputs generated through the ThemisIQ platform are provided for informational, screening, planning, and prioritization purposes only. They do not constitute legal, regulatory, accounting, financial, assurance, investment, or other professional advice and do not, by themselves, satisfy any reporting, disclosure, filing, compliance, assurance, or certification obligation under IFRS, ISSB, CSRD, ESRS, SEC, California climate disclosure regulations, or any other framework or jurisdiction.</p>
+              <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.7, margin: '0 0 8px' }}>Platform outputs are dependent upon information provided by users and other third-party sources. ThemisIQ Compliance Inc. does not independently verify such information and makes no representation or warranty, express or implied, regarding the completeness, accuracy, reliability, suitability, or fitness for a particular purpose of any output.</p>
+              <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.7, margin: '0 0 8px' }}>Sustainability-related laws, regulations, standards, guidance, and interpretations continue to evolve. Users remain solely responsible for determining the applicability of regulatory requirements and for obtaining independent legal, accounting, assurance, and other professional advice where appropriate.</p>
+              <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.7, margin: '0 0 8px' }}>Use of the platform does not create a professional-client, advisory, assurance, accounting, consulting, fiduciary, or legal relationship with ThemisIQ Compliance Inc.</p>
+              <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.7, margin: '0 0 8px' }}>To the maximum extent permitted by law, ThemisIQ Compliance Inc., its directors, officers, employees, contractors, and affiliates shall not be liable for any direct, indirect, incidental, consequential, special, punitive, or economic damages arising from the use of, or reliance upon, any platform output.</p>
+              <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.7, margin: '0' }}>ThemisIQ is a software platform and is not an accredited assurance provider, certification body, or regulatory authority.</p>
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', marginTop: 12, paddingTop: 12, borderTop: '0.5px solid #e8e7e4' }}>
               <input type="checkbox" checked={acknowledgedReport} onChange={e => setAcknowledgedReport(e.target.checked)} style={{ marginTop: 3, flexShrink: 0 }} />
               <span style={{ fontSize: 12, color: '#0d0d0d', lineHeight: 1.6 }}>I acknowledge that this resilience analysis is a screening intended to scope a formal assessment, and I accept the limitations and disclaimer above.</span>
@@ -1282,7 +1283,7 @@ export default function MaterialityWizard() {
               ⬇ Download resilience report (PDF)
             </a>
           ) : (
-            <button disabled style={{ fontSize: 13, fontWeight: 500, padding: '11px 24px', borderRadius: 8, background: '#e8e7e4', color: '#888784', border: 'none', cursor: 'not-allowed', marginBottom: 8 }}>
+            <button disabled style={{ fontSize: 13, fontWeight: 500, padding: '11px 24px', borderRadius: 8, background: '#e8e7e4', color: 'var(--color-ink-muted)', border: 'none', cursor: 'not-allowed', marginBottom: 8 }}>
               ⬇ Download resilience report (PDF)
             </button>
           )
@@ -1307,21 +1308,21 @@ export default function MaterialityWizard() {
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Climate Risk &amp; Materiality</div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 4 }}>Climate Risk &amp; Materiality</div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>{mode === 'csrd' ? 'CSRD double materiality' : 'IFRS S2 single materiality'}</div>
           </div>
           {/* setStandardVersion(null) is not optional here. Returning to the mode gate must clear
               the version, or the next assessment silently inherits this one's — and it would
               survive a browser check, because a plausible value is exactly what it would look
               like. Same at "New assessment" below. */}
-          <button onClick={() => { setMode(null); setStep(0); setResult(null); setStandardVersion(null) }} style={{ fontSize: 12, color: '#888784', background: 'none', border: '1px solid #e8e7e4', borderRadius: 8, padding: '6px 14px', cursor: 'pointer' }}>Switch mode</button>
+          <button onClick={() => { setMode(null); setStep(0); setResult(null); setStandardVersion(null) }} style={{ fontSize: 12, color: 'var(--color-ink-muted)', background: 'none', border: '1px solid #e8e7e4', borderRadius: 8, padding: '6px 14px', cursor: 'pointer' }}>Switch mode</button>
         </div>
       </div>
 
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2.5rem', overflowX: 'auto' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex' }}>
           {stepNames.map((name, i) => (
-            <div key={i} style={{ padding: '14px 16px', fontSize: 12, fontWeight: step === i ? 600 : 400, color: step === i ? '#0d0d0d' : '#888784', borderBottom: `2px solid ${step === i ? '#7425e3' : 'transparent'}`, whiteSpace: 'nowrap' }}>{i + 1}. {name}</div>
+            <div key={i} style={{ padding: '14px 16px', fontSize: 12, fontWeight: step === i ? 600 : 400, color: step === i ? '#0d0d0d' : 'var(--color-ink-muted)', borderBottom: `2px solid ${step === i ? '#7425e3' : 'transparent'}`, whiteSpace: 'nowrap' }}>{i + 1}. {name}</div>
           ))}
         </div>
       </div>
@@ -1333,7 +1334,7 @@ export default function MaterialityWizard() {
 
           {step !== resultsStep ? (
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
-              <button onClick={() => setStep(s => Math.max(0, s - 1))} disabled={step === 0} style={{ fontSize: 13, padding: '9px 20px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: step === 0 ? 'not-allowed' : 'pointer', opacity: step === 0 ? 0.4 : 1 }}>← Back</button>
+              <button onClick={() => setStep(s => Math.max(0, s - 1))} disabled={step === 0} style={{ ...(step === 0 ? btnStepDisabled : btnStep) }}>← Back</button>
               {isLastInputStep ? (
                 mode === 'csrd' ? (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
@@ -1341,12 +1342,12 @@ export default function MaterialityWizard() {
                       <button onClick={submitResilience} disabled={submitting || !canAdvance()} style={{ fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: '#fff', color: '#0d0d0d', border: '1px solid #e8e7e4', cursor: submitting ? 'wait' : 'pointer', opacity: (submitting || !canAdvance()) ? 0.5 : 1 }}>{submitting ? 'Running…' : 'Run resilience analysis →'}</button>
                       <button onClick={submit} disabled={submitting || !canAdvance()} style={{ fontSize: 13, fontWeight: 600, padding: '9px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: submitting ? 'wait' : 'pointer', opacity: (submitting || !canAdvance()) ? 0.5 : 1 }}>{submitting ? 'Running…' : 'Run double materiality screening →'}</button>
                     </div>
-                    <div style={{ fontSize: 11, color: '#888784', textAlign: 'right', maxWidth: 400, lineHeight: 1.5 }}>Double materiality plots all ten ESRS topics on the financial × impact matrix using your inputs above. Resilience tests three diverse climate futures (Paris-aligned, current trajectory, high warming). Both are pre-mapped to CSRD/ESRS disclosure requirements and support that reporting — neither, by itself, satisfies it. Each is saved as its own report.</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', textAlign: 'right', maxWidth: 400, lineHeight: 1.5 }}>Double materiality plots all ten ESRS topics on the financial × impact matrix using your inputs above. Resilience tests three diverse climate futures (Paris-aligned, current trajectory, high warming). Both are pre-mapped to CSRD/ESRS disclosure requirements and support that reporting — neither, by itself, satisfies it. Each is saved as its own report.</div>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
                     <button onClick={submitResilience} disabled={submitting || !canAdvance()} style={{ fontSize: 13, fontWeight: 600, padding: '9px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: submitting ? 'wait' : 'pointer', opacity: (submitting || !canAdvance()) ? 0.5 : 1 }}>{submitting ? 'Running…' : 'Run resilience analysis →'}</button>
-                    <div style={{ fontSize: 11, color: '#888784', textAlign: 'right', maxWidth: 320, lineHeight: 1.5 }}>Recommended. Tests three diverse climate futures (Paris-aligned, current trajectory, high warming) — screening-level support for the scenario analysis IFRS S2 and CSRD ask for.</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', textAlign: 'right', maxWidth: 320, lineHeight: 1.5 }}>Recommended. Tests three diverse climate futures (Paris-aligned, current trajectory, high warming) — screening-level support for the scenario analysis IFRS S2 and CSRD ask for.</div>
                   </div>
                 )
               ) : (
@@ -1370,7 +1371,7 @@ export default function MaterialityWizard() {
                       arrival: it is attached to the button and describes the button, so it reads
                       as guidance about a control rather than as a fault in the user's work. */}
                   {outstandingText(blockers) && (
-                    <div style={{ fontSize: 11, color: '#888784', textAlign: 'right', maxWidth: 400, lineHeight: 1.5 }}>
+                    <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', textAlign: 'right', maxWidth: 400, lineHeight: 1.5 }}>
                       Next needs {outstandingText(blockers)}.
                     </div>
                   )}

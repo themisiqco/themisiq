@@ -18,6 +18,7 @@ import type Stripe from 'stripe'
 import { getStripe } from '../../../../lib/stripe'
 import { getSupabaseAdmin } from '../../../../lib/supabaseAdmin'
 import { entitlementTerm } from '../../../../lib/entitlementTerm'
+import { INK_MUTED } from '@/lib/brand'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -77,7 +78,7 @@ async function sendInvoiceLoginLink(stripe: Stripe, invoice: Stripe.Invoice) {
     <div style="font-family:Georgia,serif;font-size:22px;color:#0d0d0d;margin-bottom:12px;">Your ThemisIQ access is ready.</div>
     <div style="font-size:14px;color:#555553;line-height:1.7;margin-bottom:20px;">Your payment is confirmed and your modules are unlocked. Click below to log in — no password needed.</div>
     <a href="${actionLink}" style="display:inline-block;font-size:14px;font-weight:600;color:#0d0d0d;background:linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e);padding:12px 26px;border-radius:8px;text-decoration:none;">Log in to ThemisIQ →</a>
-    <div style="font-size:12px;color:#888784;line-height:1.7;margin-top:20px;">This link is single-use and expires shortly. If it has expired, use &ldquo;Forgot password&rdquo; on the login page. Questions? Reach us at hello@themisiq.co.</div>
+    <div style="font-size:12px;color:${INK_MUTED};line-height:1.7;margin-top:20px;">This link is single-use and expires shortly. If it has expired, use &ldquo;Forgot password&rdquo; on the login page. Questions? Reach us at hello@themisiq.co.</div>
   </td></tr>
   <tr><td style="background:#0d0d0d;padding:18px 32px;"><div style="font-size:11px;color:rgba(255,255,255,0.3);">ThemisIQ · www.themisiq.co · hello@themisiq.co</div></td></tr>
   <tr><td style="background:linear-gradient(90deg,#7425e3,#1fb1ff,#64fe3e);height:3px;font-size:1px;line-height:1px;">&nbsp;</td></tr>

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Nav from '../../components/Nav'
 import { useEntitlement } from '../../../lib/useEntitlement'
 import { sectionHead } from '@/app/components/headingStyles'
+import { btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -91,7 +92,7 @@ const DOMAINS = [...new Set(CONTROLS.map(c => c.domain))]
 const GRAD = 'var(--color-brand)'
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
-const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
+const sectionSub: React.CSSProperties = { fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
 const STEP_NAMES = ['Setup', 'Gap Assessment', 'Results', 'Remediation', 'Export']
 
 
@@ -229,7 +230,7 @@ export default function CyberDashboard() {
           <div key={field} style={{ border: '1px solid #e8e7e4', borderRadius: 10, padding: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 2 }}>{label}</div>
-              <div style={{ fontSize: 11, color: '#888784' }}>{hint}</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{hint}</div>
             </div>
             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
               {[{ label: 'Yes', val: true }, { label: 'No', val: false }].map(opt => (
@@ -253,9 +254,9 @@ export default function CyberDashboard() {
                 <div style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${selected ? cfg.color : '#e8e7e4'}`, background: selected ? cfg.color : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   {selected && <span style={{ color: '#fff', fontSize: 8, fontWeight: 700 }}>✓</span>}
                 </div>
-                <span style={{ fontSize: 12, fontWeight: 600, color: selected ? cfg.color : '#888784' }}>{cfg.label}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: selected ? cfg.color : 'var(--color-ink-muted)' }}>{cfg.label}</span>
               </div>
-              <div style={{ fontSize: 10, color: '#888784' }}>{cfg.deadline}</div>
+              <div style={{ fontSize: 10, color: 'var(--color-ink-muted)' }}>{cfg.deadline}</div>
             </div>
           )
         })}
@@ -286,7 +287,7 @@ export default function CyberDashboard() {
       {/* Controls */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {domainControls.length === 0 ? (
-          <div style={{ padding: '1.5rem', background: '#f8f7f5', borderRadius: 10, textAlign: 'center', color: '#888784', fontSize: 13 }}>
+          <div style={{ padding: '1.5rem', background: '#f8f7f5', borderRadius: 10, textAlign: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>
             No controls in this domain for your selected frameworks.
           </div>
         ) : domainControls.map(control => {
@@ -301,7 +302,7 @@ export default function CyberDashboard() {
                     {control.weight === 3 && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: '#FCEBEB', color: '#B91C1C' }}>HIGH PRIORITY</span>}
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                       {(Object.keys(FRAMEWORK_CONFIG) as Framework[]).filter(f => inventory.frameworks.includes(f) && control[f as keyof typeof control]).map(f => (
-                        <span key={f} style={{ fontSize: 9, padding: '1px 5px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#888784' }}>{FRAMEWORK_CONFIG[f].label}</span>
+                        <span key={f} style={{ fontSize: 9, padding: '1px 5px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: 'var(--color-ink-muted)' }}>{FRAMEWORK_CONFIG[f].label}</span>
                       ))}
                     </div>
                   </div>
@@ -310,7 +311,7 @@ export default function CyberDashboard() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
                 {(Object.entries(MATURITY_CONFIG) as [Maturity, typeof MATURITY_CONFIG[Maturity]][]).map(([maturity, mcfg]) => (
-                  <button key={maturity} onClick={() => setResponse(control.id, maturity)} style={{ padding: '6px 4px', borderRadius: 8, fontSize: 10, fontWeight: current === maturity ? 700 : 400, background: current === maturity ? mcfg.bg : '#f8f7f5', color: current === maturity ? mcfg.color : '#888784', border: `1px solid ${current === maturity ? mcfg.color : '#e8e7e4'}`, cursor: 'pointer', textAlign: 'center', lineHeight: 1.3, transition: 'all 0.1s' }}>
+                  <button key={maturity} onClick={() => setResponse(control.id, maturity)} style={{ padding: '6px 4px', borderRadius: 8, fontSize: 10, fontWeight: current === maturity ? 700 : 400, background: current === maturity ? mcfg.bg : '#f8f7f5', color: current === maturity ? mcfg.color : 'var(--color-ink-muted)', border: `1px solid ${current === maturity ? mcfg.color : '#e8e7e4'}`, cursor: 'pointer', textAlign: 'center', lineHeight: 1.3, transition: 'all 0.1s' }}>
                     {mcfg.label}
                   </button>
                 ))}
@@ -375,7 +376,7 @@ export default function CyberDashboard() {
       {/* Regulatory compliance status */}
       <div style={{ border: '0.5px solid #e8e7e4', borderRadius: 12, overflow: 'hidden' }}>
         <div style={{ background: '#f8f7f5', padding: '10px 16px', borderBottom: '0.5px solid #e8e7e4' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#888784', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Regulatory status</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-ink-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Regulatory status</div>
         </div>
         {inventory.frameworks.map(fw => {
           const fwControls = CONTROLS.filter(c => c[fw as keyof typeof c] && inventory.frameworks.includes(fw))
@@ -386,11 +387,11 @@ export default function CyberDashboard() {
             <div key={fw} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '0.5px solid #e8e7e4' }}>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{FRAMEWORK_CONFIG[fw].label}</div>
-                <div style={{ fontSize: 11, color: '#888784' }}>{FRAMEWORK_CONFIG[fw].deadline}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{FRAMEWORK_CONFIG[fw].deadline}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: `color-mix(in srgb, ${statusColor} 8%, transparent)`, color: statusColor }}>{status}</span>
-                {fwGaps > 0 && <div style={{ fontSize: 10, color: '#888784', marginTop: 3 }}>{fwGaps} control gap{fwGaps > 1 ? 's' : ''}</div>}
+                {fwGaps > 0 && <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 3 }}>{fwGaps} control gap{fwGaps > 1 ? 's' : ''}</div>}
               </div>
             </div>
           )
@@ -469,7 +470,7 @@ export default function CyberDashboard() {
               <span style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>I confirm this assessment reflects our current cyber governance programme to the best of my knowledge. I understand this report is for planning purposes and does not constitute a formal audit or legal advice.</span>
             </label>
           </div>
-          <button onClick={() => dataConfirmed && generateExport()} style={{ fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: dataConfirmed ? 'pointer' : 'not-allowed', opacity: dataConfirmed ? 1 : 0.4 }}>
+          <button onClick={() => dataConfirmed && generateExport()} style={{ ...(dataConfirmed ? btnStepPrimary : btnStepPrimaryDisabled) }}>
             ⬇ Download Cyber Gap Assessment (CSV)
           </button>
         </div>
@@ -497,12 +498,12 @@ export default function CyberDashboard() {
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Cyber Governance</div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 4 }}>Cyber Governance</div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>NIS2 · DORA · SEC Cyber Gap Assessment</div>
           </div>
           {pct > 0 && (
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 10, color: '#888784', marginBottom: 2 }}>Overall score</div>
+              <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginBottom: 2 }}>Overall score</div>
               <div style={{ fontSize: 18, fontWeight: 700, color: scoreColor }}>{pct}% — {scoreLabel}</div>
             </div>
           )}
@@ -511,7 +512,7 @@ export default function CyberDashboard() {
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2.5rem', overflowX: 'auto' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex' }}>
           {STEP_NAMES.map((name, i) => (
-            <button key={i} onClick={() => setStep(i)} style={{ padding: '14px 16px', fontSize: 12, fontWeight: step === i ? 600 : 400, color: step === i ? '#0d0d0d' : '#888784', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? '#B91C1C' : 'transparent'}`, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <button key={i} onClick={() => setStep(i)} style={{ padding: '14px 16px', fontSize: 12, fontWeight: step === i ? 600 : 400, color: step === i ? '#0d0d0d' : 'var(--color-ink-muted)', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? '#B91C1C' : 'transparent'}`, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               {i + 1}. {name}
             </button>
           ))}
@@ -522,7 +523,7 @@ export default function CyberDashboard() {
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '2rem' }}>
             {steps[step]()}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
-              <button onClick={() => setStep(s => Math.max(0, s - 1))} style={{ fontSize: 13, padding: '9px 20px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: step === 0 ? 'not-allowed' : 'pointer', opacity: step === 0 ? 0.4 : 1 }}>← Back</button>
+              <button onClick={() => setStep(s => Math.max(0, s - 1))} style={{ ...(step === 0 ? btnStepDisabled : btnStep) }}>← Back</button>
               {step < STEP_NAMES.length - 1 && <button onClick={() => setStep(s => Math.min(STEP_NAMES.length - 1, s + 1))} style={{ fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>Next →</button>}
             </div>
           </div>

@@ -140,7 +140,7 @@ export default function CbamVerifierPage() {
   }, [token, result?.status, accepted])
 
   // ── Loading ────────────────────────────────────────────────────────────────
-  if (loading) return <Shell><div style={{ padding: '4rem', textAlign: 'center', color: '#888784' }}>Loading verification review…</div></Shell>
+  if (loading) return <Shell><div style={{ padding: '4rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>Loading verification review…</div></Shell>
 
   // ── Invalid / expired ────────────────────────────────────────────────────────
   if (!result || result.status === 'invalid') return <InvalidScreen />
@@ -178,7 +178,7 @@ export default function CbamVerifierPage() {
         <div style={{ maxWidth: 540, margin: '3.5rem auto', padding: '0 1.5rem' }}>
           <ReadOnlyBanner />
 
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Independent CBAM Verification</div>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }}>Independent CBAM Verification</div>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.6rem,3vw,2rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>
             {verifierName ? `Welcome, ${verifierName}` : 'Confirm your details to continue'}
           </h1>
@@ -187,7 +187,7 @@ export default function CbamVerifierPage() {
           </p>
 
           <div style={{ marginBottom: '1.25rem' }}>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#888784', marginBottom: 6 }}>Your email</label>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 6 }}>Your email</label>
             <input
               type="email"
               value={email}
@@ -210,10 +210,13 @@ export default function CbamVerifierPage() {
             onClick={handleAccept}
             disabled={!gateReady}
             style={{
-              width: '100%', fontSize: 14, fontWeight: 500, padding: '12px 20px', borderRadius: 8, border: 'none',
-              background: '#0d0d0d', color: '#fff',
+              width: '100%', fontSize: 14, fontWeight: 500, padding: '12px 20px', borderRadius: 8,
+              // ⚠️ NOT opacity — see the note on the same button in app/verify/[token]/page.tsx.
+              // At 0.45 the label rendered 3.11:1; ink-muted on sunken is 5.00:1.
+              background: gateReady ? '#0d0d0d' : 'var(--color-sunken)',
+              color: gateReady ? '#fff' : 'var(--color-ink-muted)',
+              border: `1px solid ${gateReady ? 'transparent' : 'var(--color-line)'}`,
               cursor: gateReady ? 'pointer' : 'not-allowed',
-              opacity: gateReady ? 1 : 0.45,
             }}
           >
             {submitting ? 'Confirming…' : 'Accept & view report'}
@@ -242,7 +245,7 @@ export default function CbamVerifierPage() {
       <Shell>
         <div style={{ maxWidth: 920, margin: '0 auto', padding: '2.5rem 1.5rem 4rem' }}>
           <ReadOnlyBanner />
-          <div style={{ padding: '3rem', textAlign: 'center', color: '#888784' }}>Loading the verification report…</div>
+          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>Loading the verification report…</div>
         </div>
         <Footer />
       </Shell>
@@ -254,7 +257,7 @@ export default function CbamVerifierPage() {
       <div style={{ maxWidth: 920, minWidth: 0, margin: '0 auto', padding: '2.5rem 1.5rem 4rem' }}>
         <ReadOnlyBanner />
 
-        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Independent CBAM Verification</div>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }}>Independent CBAM Verification</div>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem,3vw,2.4rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>
           {installationName || 'CBAM Installation'}{reportingPeriod != null ? ` · ${reportingPeriod}` : ''}
         </h1>
@@ -286,7 +289,7 @@ const fmtCoords = (c: Coordinates) => `${c.latitude}, ${c.longitude}`
 const fmtBenchmark = (b: SefaBenchmarkWorkings): React.ReactNode => (
   <>
     {fmtNum(b.value)}{' '}
-    <span style={{ color: '#888784', fontSize: 11 }}>(Column {b.column} · indicator {b.indicator ?? '—'} · CSCF {fmtNum(b.cscf)})</span>
+    <span style={{ color: 'var(--color-ink-muted)', fontSize: 11 }}>(Column {b.column} · indicator {b.indicator ?? '—'} · CSCF {fmtNum(b.cscf)})</span>
   </>
 )
 
@@ -303,14 +306,14 @@ function MissingMarker() {
 // The single ReportField<T> renderer. Narrows on status BEFORE reading value/reason.
 function Field<T>({ f, format }: { f: ReportField<T>; format?: (v: T) => React.ReactNode }) {
   if (f.status === 'missing') return <MissingMarker />
-  if (f.status === 'not_applicable') return <span style={{ color: '#888784', fontStyle: 'italic' }}>{f.reason}</span>
+  if (f.status === 'not_applicable') return <span style={{ color: 'var(--color-ink-muted)', fontStyle: 'italic' }}>{f.reason}</span>
   return <span style={{ color: '#0d0d0d' }}>{format ? format(f.value) : String(f.value)}</span>
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '210px 1fr', gap: 12, padding: '7px 0', borderBottom: '0.5px solid #e8e7e4', fontSize: 13, alignItems: 'baseline' }}>
-      <div style={{ color: '#888784' }}>{label}</div>
+      <div style={{ color: 'var(--color-ink-muted)' }}>{label}</div>
       <div>{children}</div>
     </div>
   )
@@ -325,12 +328,12 @@ function Section({ n, title, children }: { n: string; title: string; children: R
   )
 }
 
-const NoneNote = () => <div style={{ fontSize: 13, color: '#888784' }}>None.</div>
+const NoneNote = () => <div style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>None.</div>
 
 // (3) — ReportField<ProcessSummary[]> rendered as a small table on 'value'.
 function ProcessesField({ f }: { f: ReportField<ProcessSummary[]> }) {
   if (f.status === 'missing') return <MissingMarker />
-  if (f.status === 'not_applicable') return <span style={{ color: '#888784', fontStyle: 'italic' }}>{f.reason}</span>
+  if (f.status === 'not_applicable') return <span style={{ color: 'var(--color-ink-muted)', fontStyle: 'italic' }}>{f.reason}</span>
   if (f.value.length === 0) return <NoneNote />
   return (
     <div style={{ overflowX: 'auto' }}>
@@ -346,8 +349,8 @@ function ProcessesField({ f }: { f: ReportField<ProcessSummary[]> }) {
           {f.value.map((p, i) => (
             <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#f8f7f5', borderBottom: '0.5px solid #e8e7e4' }}>
               <td style={{ padding: '8px 10px', color: '#555553', whiteSpace: 'nowrap' }}>{shortId(p.processId)}</td>
-              <td style={{ padding: '8px 10px', color: '#555553' }}>{p.route ?? <span style={{ color: '#888784' }}>—</span>}</td>
-              <td style={{ padding: '8px 10px', color: '#0d0d0d' }}>{p.goods.length ? p.goods.join(', ') : <span style={{ color: '#888784' }}>—</span>}</td>
+              <td style={{ padding: '8px 10px', color: '#555553' }}>{p.route ?? <span style={{ color: 'var(--color-ink-muted)' }}>—</span>}</td>
+              <td style={{ padding: '8px 10px', color: '#0d0d0d' }}>{p.goods.length ? p.goods.join(', ') : <span style={{ color: 'var(--color-ink-muted)' }}>—</span>}</td>
             </tr>
           ))}
         </tbody>
@@ -361,7 +364,7 @@ function GoodCard({ g }: { g: Item4Good }) {
   return (
     <div style={cardStyle}>
       <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', marginBottom: 6 }}>
-        Good {g.cnCode ?? '—'} <span style={{ fontWeight: 400, color: '#888784' }}>· process {shortId(g.processId)}</span>
+        Good {g.cnCode ?? '—'} <span style={{ fontWeight: 400, color: 'var(--color-ink-muted)' }}>· process {shortId(g.processId)}</span>
       </div>
       <Row label="Specific direct (4)(a)"><Field f={g.specificDirect} format={fmtNum} /></Row>
       <Row label="Default share, direct (4)(b)"><Field f={g.defaultShareDirect} format={fmtNum} /></Row>
@@ -445,7 +448,7 @@ function DocRow({ doc, token }: { doc: { id: string; file_name: string; document
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px', marginBottom: 8, flexWrap: 'wrap' }}>
       <div>
         <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{doc.file_name}</div>
-        <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{doc.document_type}</div>
+        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>{doc.document_type}</div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         {failed && <span style={{ fontSize: 11, color: '#B91C1C' }}>Unavailable — try again</span>}
@@ -553,7 +556,7 @@ function ReportBody({ data, token, history, historyLoading }: { data: VerifierRe
           {coverage.processes_without_record} of {coverage.processes_total} processes are not yet backed by a computed record.
         </div>
       ) : (
-        <div style={{ marginBottom: '2rem', fontSize: 12, color: '#888784' }}>
+        <div style={{ marginBottom: '2rem', fontSize: 12, color: 'var(--color-ink-muted)' }}>
           All {coverage.processes_total} processes backed by computed records.
         </div>
       )}
@@ -698,9 +701,9 @@ function ReportBody({ data, token, history, historyLoading }: { data: VerifierRe
       {/* Source documents */}
       <div style={{ marginBottom: '2rem' }}>
         <SectionHead>Source documents</SectionHead>
-        <p style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1rem' }}>{VERIFIER_DOC_LINK_NOTICE}</p>
+        <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.6, marginBottom: '1rem' }}>{VERIFIER_DOC_LINK_NOTICE}</p>
         {documents.length === 0 ? (
-          <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.5rem', textAlign: 'center', fontSize: 13, color: '#888784' }}>No source documents attached.</div>
+          <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.5rem', textAlign: 'center', fontSize: 13, color: 'var(--color-ink-muted)' }}>No source documents attached.</div>
         ) : documents.map((d) => (
           <DocRow key={d.id} doc={d} token={token} />
         ))}
@@ -713,19 +716,19 @@ function ReportBody({ data, token, history, historyLoading }: { data: VerifierRe
         {completeness.limitations.length > 0 && (
           <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: '1.25rem' }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#555553', marginBottom: 4 }}>Scope limitations of the producing tool</div>
-            <p style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '0.75rem' }}>These §1.2 items were not produced by ThemisIQ. Each is recorded rather than omitted or estimated. They are not operator gaps — no action by the operator clears them, and they are excluded from the supplied count below.</p>
+            <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.6, marginBottom: '0.75rem' }}>These §1.2 items were not produced by ThemisIQ. Each is recorded rather than omitted or estimated. They are not operator gaps — no action by the operator clears them, and they are excluded from the supplied count below.</p>
             {completeness.limitations.map((m: CompletenessItem, i: number) => (
               <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '6px 0', borderBottom: '0.5px solid #e8e7e4', fontSize: 13 }}>
                 <span style={{ fontSize: 11, fontWeight: 600, color: '#555553', background: '#e8e7e4', padding: '1px 8px', borderRadius: 4, whiteSpace: 'nowrap' }}>{m.item}</span>
                 <span style={{ color: '#555553' }}>{m.field}</span>
-                <span style={{ color: '#888784', fontStyle: 'italic' }}>— {m.responsibility === 'platform' ? 'input not built' : 'unresolved in the regulation'}</span>
-                {m.hint ? <span style={{ color: '#888784' }}>— {m.hint}</span> : null}
+                <span style={{ color: 'var(--color-ink-muted)', fontStyle: 'italic' }}>— {m.responsibility === 'platform' ? 'input not built' : 'unresolved in the regulation'}</span>
+                {m.hint ? <span style={{ color: 'var(--color-ink-muted)' }}>— {m.hint}</span> : null}
               </div>
             ))}
           </div>
         )}
 
-        <div style={{ fontSize: 12, color: '#888784', marginBottom: completeness.outstandingCount > 0 ? '0.75rem' : 0 }}>
+        <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginBottom: completeness.outstandingCount > 0 ? '0.75rem' : 0 }}>
           {completeness.suppliedCount} of {completeness.requiredCount} operator-supplied fields provided.
         </div>
 
@@ -739,7 +742,7 @@ function ReportBody({ data, token, history, historyLoading }: { data: VerifierRe
                 <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '6px 0', borderBottom: '0.5px solid #e8e7e4', fontSize: 13 }}>
                   <span style={{ fontSize: 11, fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 8px', borderRadius: 4, whiteSpace: 'nowrap' }}>{m.item}</span>
                   <span style={{ color: '#0d0d0d' }}>{m.field}</span>
-                  {m.hint ? <span style={{ color: '#888784' }}>— {m.hint}</span> : null}
+                  {m.hint ? <span style={{ color: 'var(--color-ink-muted)' }}>— {m.hint}</span> : null}
                 </div>
               ))}
           </div>
@@ -750,9 +753,9 @@ function ReportBody({ data, token, history, historyLoading }: { data: VerifierRe
       <div style={{ marginTop: '2rem' }}>
         <SectionHead>Change history</SectionHead>
         {historyLoading ? (
-          <div style={{ fontSize: 13, color: '#888784' }}>Loading change history…</div>
+          <div style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>Loading change history…</div>
         ) : history.length === 0 ? (
-          <div style={{ fontSize: 13, color: '#888784' }}>No changes recorded.</div>
+          <div style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>No changes recorded.</div>
         ) : (
           history.map((entry, i) => {
             const changes = auditChanges(entry)
@@ -764,17 +767,17 @@ function ReportBody({ data, token, history, historyLoading }: { data: VerifierRe
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#555553', background: '#f0efed', padding: '2px 8px', borderRadius: 4 }}>{tag}</span>
                     <span style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{actionLabel}</span>
-                    <span style={{ fontSize: 12, color: '#888784' }}>{entry.user_email || 'System'}</span>
+                    <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>{entry.user_email || 'System'}</span>
                   </div>
-                  <span style={{ fontSize: 11, color: '#888784' }}>{new Date(entry.created_at).toLocaleString()}</span>
+                  <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{new Date(entry.created_at).toLocaleString()}</span>
                 </div>
                 {changes.length > 0 && (
                   <div style={{ borderTop: '0.5px solid #f0efed', paddingTop: 8 }}>
                     {changes.map((c, j) => (
                       <div key={j} style={{ fontSize: 12, color: '#555553', padding: '2px 0' }}>
-                        <span style={{ color: '#888784' }}>{c.label}:</span>{' '}
+                        <span style={{ color: 'var(--color-ink-muted)' }}>{c.label}:</span>{' '}
                         {c.from != null && c.to != null ? (
-                          <><span style={{ textDecoration: 'line-through', color: '#888784' }}>{c.from}</span> <span style={{ color: '#888784' }}>→</span> <span style={{ color: '#0d0d0d', fontWeight: 500 }}>{c.to}</span></>
+                          <><span style={{ textDecoration: 'line-through', color: 'var(--color-ink-muted)' }}>{c.from}</span> <span style={{ color: 'var(--color-ink-muted)' }}>→</span> <span style={{ color: '#0d0d0d', fontWeight: 500 }}>{c.to}</span></>
                         ) : c.to != null ? (
                           <span style={{ color: '#0d0d0d', fontWeight: 500 }}>{c.to}</span>
                         ) : (
@@ -850,7 +853,7 @@ function SectionHead({ children }: { children: React.ReactNode }) {
 function Footer() {
   return (
     <div style={{ maxWidth: 920, margin: '0 auto', padding: '0 1.5rem 4rem' }}>
-      <div style={{ marginTop: '2.5rem', padding: '1rem 1.25rem', background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, fontSize: 11, color: '#888784', lineHeight: 1.6 }}>
+      <div style={{ marginTop: '2.5rem', padding: '1rem 1.25rem', background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6 }}>
         This review is generated by the ThemisIQ platform to support independent verification under Implementing Regulation (EU) 2025/2546 by a verifier accredited to EN ISO/IEC 14065. Data is read-only. This page does not itself constitute verification, assurance, or a regulatory filing.
       </div>
     </div>

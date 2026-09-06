@@ -287,7 +287,7 @@ export default function Page() {
           </div>
           {/* What counts as a location — directly beneath the two plan cards, because the only
               difference between them a buyer must self-assess against is the location count. */}
-          <p style={{ fontSize: 12, color: '#888784', lineHeight: 1.7, marginTop: '1.25rem', maxWidth: 620 }}>
+          <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.7, marginTop: '1.25rem', maxWidth: 620 }}>
             One location = one site with its own electricity supply. All of that site’s energy goes in together — electricity, gas, vehicle fuel, refrigerants — so a site with separate gas and electricity accounts is still one location.
           </p>
         </div>
@@ -324,5 +324,5 @@ export default function Page() {
 const navLink: React.CSSProperties = { fontSize: 11, color: '#555553', textDecoration: 'none' }
 const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'var(--color-brand)', color: '#fff', textDecoration: 'none', display: 'inline-block' }
 const btnOutline: React.CSSProperties = { fontSize: 13, fontWeight: 400, padding: '8px 18px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', textDecoration: 'none', display: 'inline-block' }
-const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
+const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }
 const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, margin: '0 auto', lineHeight: 1.75, fontWeight: 400 }

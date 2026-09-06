@@ -1350,7 +1350,7 @@ export default function CbamSetupPage() {
           </CbamField>
         </div>
       ) : companies.length === 1 ? (
-        <div style={{ marginBottom: '1.5rem', fontSize: 12, color: '#888784' }}>Company: <span style={{ color: '#0d0d0d', fontWeight: 500 }}>{companies[0].name}</span></div>
+        <div style={{ marginBottom: '1.5rem', fontSize: 12, color: 'var(--color-ink-muted)' }}>Company: <span style={{ color: '#0d0d0d', fontWeight: 500 }}>{companies[0].name}</span></div>
       ) : null}
 
       {/* ── Step nav — dependency order explicit; Step 1 shown as prerequisite of
@@ -1362,7 +1362,7 @@ export default function CbamSetupPage() {
         <StepTab n={3} label="Processes & emissions" sub="goods & source streams" active={step === 3} onClick={() => setStep(3)} />
       </div>
       {step === 2 && (
-        <div style={{ fontSize: 11, color: '#888784', marginBottom: '1rem' }}>Step 1 (Operator) is a prerequisite for a complete report, but you can add installations first.</div>
+        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: '1rem' }}>Step 1 (Operator) is a prerequisite for a complete report, but you can add installations first.</div>
       )}
 
       {/* ── STEP 1: OPERATOR PROFILE ── */}
@@ -1416,14 +1416,14 @@ export default function CbamSetupPage() {
 
           {/* Existing installations */}
           {installations.length === 0 ? (
-            <div style={{ fontSize: 13, color: '#888784', fontWeight: 400, marginBottom: '1rem' }}>No installations yet.</div>
+            <div style={{ fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400, marginBottom: '1rem' }}>No installations yet.</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
               {installations.map((inst) => (
                 <div key={inst.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px' }}>
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>{inst.name} <span style={{ color: '#888784', fontWeight: 400 }}>· {inst.country}</span></div>
-                    <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>{inst.name} <span style={{ color: 'var(--color-ink-muted)', fontWeight: 400 }}>· {inst.country}</span></div>
+                    <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>
                       {inst.cbam_registry_id ? `Registry ${inst.cbam_registry_id}` : 'No Registry ID'} · {inst.un_locode ? `UN/LOCODE ${inst.un_locode}` : 'No UN/LOCODE'} · {inst.latitude && inst.longitude ? `${inst.latitude}, ${inst.longitude}` : 'No coordinates'}
                     </div>
                   </div>
@@ -1503,7 +1503,7 @@ export default function CbamSetupPage() {
         <div>
           <div style={itemHead}>(3) Production processes and emissions</div>
           {installations.length === 0 ? (
-            <div style={{ fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.6 }}>
+            <div style={{ fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.6 }}>
               Add an installation in Step 2 first — every process belongs to an installation, so this step depends on it.
             </div>
           ) : (
@@ -1524,20 +1524,20 @@ export default function CbamSetupPage() {
                   that number back to its evidence. */}
               <div style={{ marginBottom: '1.5rem', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', color: '#0d0d0d', marginBottom: 4 }}>Evidence documents</div>
-                <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1rem' }}>
+                <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.6, marginBottom: '1rem' }}>
                   Upload the records behind your figures — weighbridge tickets, fuel delivery notes, laboratory analyses, production logs. These are <strong>not read or parsed</strong>: you tally your own records and enter the figure, and the document is the provenance link a verifier follows back from a number to its evidence. Accepted: PDF, PNG, JPEG, CSV, XLSX (max 25 MB). Legacy .xls is not accepted — save as .xlsx.
                 </div>
 
                 {/* Uploaded documents */}
                 {documents.length === 0 ? (
-                  <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, marginBottom: '1rem' }}>No documents uploaded yet.</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, marginBottom: '1rem' }}>No documents uploaded yet.</div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: '1rem' }}>
                     {documents.map((doc) => (
                       <div key={doc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: '#f8f7f5', borderRadius: 8, padding: '8px 12px' }}>
                         <div style={{ fontSize: 12, color: '#0d0d0d' }}>
                           <span style={{ fontWeight: 500 }}>{doc.file_name}</span>
-                          <span style={{ color: '#888784' }}> · {doc.document_type ?? 'untyped'} · {formatKb(doc.file_size_kb)} · {new Date(doc.uploaded_at).toLocaleDateString()}</span>
+                          <span style={{ color: 'var(--color-ink-muted)' }}> · {doc.document_type ?? 'untyped'} · {formatKb(doc.file_size_kb)} · {new Date(doc.uploaded_at).toLocaleDateString()}</span>
                         </div>
                         <button type="button" onClick={() => deleteDocument(doc)} style={linkBtn}>Delete</button>
                       </div>
@@ -1568,7 +1568,7 @@ export default function CbamSetupPage() {
                     }}
                     style={{ fontSize: 12 }}
                   />
-                  {docUploading && <div style={{ fontSize: 12, color: '#888784' }}>Uploading…</div>}
+                  {docUploading && <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Uploading…</div>}
                 </div>
 
                 {docError && <ErrorBox prefix="Document error" message={docError} />}
@@ -1587,24 +1587,24 @@ export default function CbamSetupPage() {
 
               {/* Existing processes */}
               {processes.length === 0 ? (
-                <div style={{ fontSize: 13, color: '#888784', fontWeight: 400, marginBottom: '1rem' }}>No processes yet for this installation.</div>
+                <div style={{ fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400, marginBottom: '1rem' }}>No processes yet for this installation.</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
                   {processes.map((proc) => (
                     <div key={proc.id} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                         <div>
-                          <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>CN {proc.cn_code} <span style={{ color: '#888784', fontWeight: 400 }}>· {categoryLabel(goodsCategories, proc.category_code)}{proc.route_code ? ` · ${routeLabel(proc.route_code)}` : ''}</span></div>
-                          <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>Activity level {proc.activity_level} t · {proc.reporting_period} · {calcModeLabel(proc.calc_mode)}{proc.steel_grade ? ` · ${steelGradeLabel(proc.steel_grade)}` : ''}</div>
+                          <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>CN {proc.cn_code} <span style={{ color: 'var(--color-ink-muted)', fontWeight: 400 }}>· {categoryLabel(goodsCategories, proc.category_code)}{proc.route_code ? ` · ${routeLabel(proc.route_code)}` : ''}</span></div>
+                          <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>Activity level {proc.activity_level} t · {proc.reporting_period} · {calcModeLabel(proc.calc_mode)}{proc.steel_grade ? ` · ${steelGradeLabel(proc.steel_grade)}` : ''}</div>
                           {/* Precursor status. Rows are the evidence of a declaration; the
                               declaration column only carries the state rows cannot express. */}
                           {(() => {
                             const m = precursorMeta[proc.id]
                             if (m && m.count > 0) {
-                              return <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>Precursors — {m.count} entered</div>
+                              return <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>Precursors — {m.count} entered</div>
                             }
                             if (m && m.declaration === 'none') {
-                              return <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>Precursors — none, {lowerFirst(declarationReasonLabel(m.reason))}</div>
+                              return <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>Precursors — none, {lowerFirst(declarationReasonLabel(m.reason))}</div>
                             }
                             return <div style={{ fontSize: 12, color: '#92400e', fontWeight: 400 }}>Precursors — not yet declared</div>
                           })()}
@@ -1634,7 +1634,9 @@ export default function CbamSetupPage() {
                             type="button"
                             onClick={() => { if (computeProcId === proc.id) { setComputeProcId(null) } else { setPrecursorProcId(null); runCompute(proc.id) } }}
                             disabled={computeBusyId === proc.id}
-                            style={{ ...linkBtn, cursor: computeBusyId === proc.id ? 'wait' : 'pointer', opacity: computeBusyId === proc.id ? 0.6 : 1 }}
+                            style={computeBusyId === proc.id
+                                ? { ...linkBtn, background: 'var(--color-sunken)', color: 'var(--color-ink-muted)', border: '0.5px solid var(--color-line)', cursor: 'wait' }
+                                : linkBtn}
                           >
                             {computeBusyId === proc.id ? 'Calculating…' : computeProcId === proc.id ? 'Hide result' : 'Calculate'}
                           </button>
@@ -1659,14 +1661,14 @@ export default function CbamSetupPage() {
                             )}
 
                             {precursors.length === 0 ? (
-                              <div style={{ fontSize: 12, color: '#888784', marginBottom: 8 }}>No precursors entered.</div>
+                              <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginBottom: 8 }}>No precursors entered.</div>
                             ) : (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
                                 {precursors.map((pr) => (
                                   <div key={pr.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: '#f8f7f5', borderRadius: 8, padding: '8px 12px' }}>
                                     <div style={{ fontSize: 12, color: '#0d0d0d' }}>
-                                      <div><span style={{ fontWeight: 500 }}>CN {pr.cn_code}</span> <span style={{ color: '#888784' }}>· {categoryLabel(goodsCategories, pr.category_code)} · {pr.mass_consumed} t · {countryName(pr.origin_country)} · {pr.reporting_period}</span></div>
-                                      <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{BOUNDARY_OPTIONS.find((b) => b.value === pr.boundary)?.label}</div>
+                                      <div><span style={{ fontWeight: 500 }}>CN {pr.cn_code}</span> <span style={{ color: 'var(--color-ink-muted)' }}>· {categoryLabel(goodsCategories, pr.category_code)} · {pr.mass_consumed} t · {countryName(pr.origin_country)} · {pr.reporting_period}</span></div>
+                                      <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>{BOUNDARY_OPTIONS.find((b) => b.value === pr.boundary)?.label}</div>
                                     </div>
                                     <div style={{ display: 'flex', gap: 6 }}>
                                       <button type="button" onClick={() => { setEditingPrecursor(pr); setPrecursorError(null); setPrecursorNotice(null) }} style={linkBtn}>Edit</button>
@@ -1720,7 +1722,7 @@ export default function CbamSetupPage() {
 
                                   <div style={{ borderTop: '0.5px solid #e8e7e4', paddingTop: 12 }}>
                                     <div style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d', marginBottom: 2 }}>Who produced it — all optional</div>
-                                    <div style={{ fontSize: 11, color: '#888784', fontWeight: 400, lineHeight: 1.5, marginBottom: 10 }}>Traceability only. These feed no calculation, and leaving them blank does not affect your figure.</div>
+                                    <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.5, marginBottom: 10 }}>Traceability only. These feed no calculation, and leaving them blank does not affect your figure.</div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                       <CbamField label="Operator name">
                                         <input value={editingPrecursor.origin_operator_name} onChange={(e) => setPrecF('origin_operator_name', e.target.value)} style={cbamInputStyle} />
@@ -1801,7 +1803,7 @@ export default function CbamSetupPage() {
                                   ['Total', computeResult.see_record.see_total],
                                 ] as [string, number][]).map(([label, v]) => (
                                   <div key={label}>
-                                    <div style={{ fontSize: 11, color: '#888784', fontWeight: 400 }}>{label}</div>
+                                    <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontWeight: 400 }}>{label}</div>
                                     {/* Same formatting the report page uses for these figures
                                         (fmtNum): locale-grouped, up to 6 decimal places. */}
                                     <div style={{ fontSize: 14, color: '#0d0d0d', fontWeight: 500 }}>{v.toLocaleString(undefined, { maximumFractionDigits: 6 })}</div>
@@ -1839,13 +1841,13 @@ export default function CbamSetupPage() {
                           </div>
 
                           {streams.length === 0 ? (
-                            <div style={{ fontSize: 12, color: '#888784', marginBottom: 8 }}>No streams yet.</div>
+                            <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginBottom: 8 }}>No streams yet.</div>
                           ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
                               {streams.map((st) => (
                                 <div key={st.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: '#f8f7f5', borderRadius: 8, padding: '8px 12px' }}>
                                   <div style={{ fontSize: 12, color: '#0d0d0d' }}>
-                                    <div><span style={{ fontWeight: 500 }}>{st.name}</span> <span style={{ color: '#888784' }}>· {streamKindLabel(st.stream_kind)} · Activity data {st.activity_data} · {ccModeLabel(st.cc_mode)}{Number(st.biomass_fraction) > 0 ? ` · Biomass ${st.biomass_fraction}` : ''}</span></div>
+                                    <div><span style={{ fontWeight: 500 }}>{st.name}</span> <span style={{ color: 'var(--color-ink-muted)' }}>· {streamKindLabel(st.stream_kind)} · Activity data {st.activity_data} · {ccModeLabel(st.cc_mode)}{Number(st.biomass_fraction) > 0 ? ` · Biomass ${st.biomass_fraction}` : ''}</span></div>
                                     {st.source_doc_id
                                       ? <div style={{ fontSize: 11, color: '#0F6E56', marginTop: 2 }}>📎 {documentName(st.source_doc_id) ?? 'linked document'}</div>
                                       : <div style={{ fontSize: 11, color: '#92400e', marginTop: 2 }}>no source document — a verifier cannot trace this figure</div>}
@@ -2024,7 +2026,7 @@ export default function CbamSetupPage() {
                           return <div style={{ ...line, color: '#92400e' }}>Worth checking — customs code {a.matched_prefix} usually means {labelFor(a.expected_category)}, but {labelFor(a.selected_category)} is selected. Nothing is blocked, and this may be right for your good — just confirm before saving.</div>
                         }
                         if (a.reason === 'no_prefix_match') {
-                          return <div style={{ ...line, color: '#888784' }}>Not checked — we don&apos;t hold a reference for this customs code, so we can&apos;t say either way. This is not a pass.</div>
+                          return <div style={{ ...line, color: 'var(--color-ink-muted)' }}>Not checked — we don&apos;t hold a reference for this customs code, so we can&apos;t say either way. This is not a pass.</div>
                         }
                         if (a.reason === 'malformed_reference_row') {
                           return <div style={{ ...line, color: '#92400e' }}>Not checked — one of our reference records couldn&apos;t be read, so we can&apos;t say either way. This is a problem on our side, not with what you entered.</div>
@@ -2054,7 +2056,7 @@ export default function CbamSetupPage() {
                           const chipRow: React.CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }
                           if (s.kind === 'single') {
                             return (
-                              <div style={{ ...line, color: '#888784' }}>
+                              <div style={{ ...line, color: 'var(--color-ink-muted)' }}>
                                 This customs code is usually {labelFor(s.category_code)}.
                                 <div style={chipRow}>
                                   <button type="button" onClick={() => selectCategory(s.category_code)} style={chip}>Use {labelFor(s.category_code)}</button>
@@ -2064,7 +2066,7 @@ export default function CbamSetupPage() {
                           }
                           if (s.kind === 'choice') {
                             return (
-                              <div style={{ ...line, color: '#888784' }}>
+                              <div style={{ ...line, color: 'var(--color-ink-muted)' }}>
                                 This customs code can fall under either category, depending on what
                                 the goods are. It counts as {labelFor(s.primary)} unless they are in
                                 fact {labelFor(s.alternative)} — only you can say which.
@@ -2094,7 +2096,7 @@ export default function CbamSetupPage() {
                           </select>
                         </CbamField>
                       ) : (
-                        <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.5 }}>This category has no production route — the route is left unset (correct for e.g. iron/steel products and sintered ore).</div>
+                        <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.5 }}>This category has no production route — the route is left unset (correct for e.g. iron/steel products and sintered ore).</div>
                       )
                     )}
                     {/*
@@ -2152,7 +2154,7 @@ export default function CbamSetupPage() {
                                   {/* Our framing. Kept visually distinct from the quoted text
                                       below so a reader can tell which words are whose. */}
                                   <div style={{ fontSize: 12, fontWeight: 400, lineHeight: 1.5, color: '#555553' }}>{g.heading}</div>
-                                  <div style={{ fontSize: 12, fontWeight: 400, lineHeight: 1.5, color: '#888784' }}>{g.leadIn}</div>
+                                  <div style={{ fontSize: 12, fontWeight: 400, lineHeight: 1.5, color: 'var(--color-ink-muted)' }}>{g.leadIn}</div>
                                   {g.entries.map((e) => (
                                     <div key={e.cite} style={{ marginTop: 8 }}>
                                       {/* Darker than the heading and leadIn above it, and matching
@@ -2247,7 +2249,7 @@ function StepTab({ n, label, sub, active, onClick, muted }: { n: number; label: 
       style={{
         textAlign: 'left',
         background: active ? '#7425e3' : '#fff',
-        color: active ? '#fff' : (muted ? '#888784' : '#0d0d0d'),
+        color: active ? '#fff' : (muted ? 'var(--color-ink-muted)' : '#0d0d0d'),
         border: `0.5px solid ${active ? '#7425e3' : '#e8e7e4'}`,
         borderRadius: 10,
         padding: '8px 14px',
@@ -2256,7 +2258,7 @@ function StepTab({ n, label, sub, active, onClick, muted }: { n: number; label: 
       }}
     >
       <div style={{ fontSize: 13, fontWeight: 600 }}>{n}. {label}</div>
-      <div style={{ fontSize: 11, fontWeight: 400, color: active ? 'rgba(255,255,255,0.75)' : '#888784' }}>{sub}</div>
+      <div style={{ fontSize: 11, fontWeight: 400, color: active ? 'rgba(255,255,255,0.75)' : 'var(--color-ink-muted)' }}>{sub}</div>
     </button>
   )
 }

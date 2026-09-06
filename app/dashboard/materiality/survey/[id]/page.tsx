@@ -244,7 +244,7 @@ export default function SurveyProgress() {
 
   if (loading) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
-      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: '#888784' }}>Loading progress…</div>
+      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-ink-muted)' }}>Loading progress…</div>
     </div>
   )
 
@@ -275,7 +275,7 @@ export default function SurveyProgress() {
         </div>
 
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: '#0d0d0d' }}>{round?.name}</div>
-        <div style={{ fontSize: 13, color: '#888784', marginTop: 4, marginBottom: 20 }}>
+        <div style={{ fontSize: 13, color: 'var(--color-ink-muted)', marginTop: 4, marginBottom: 20 }}>
           {round?.company_name}{round?.deadline && ` · deadline ${fmt(round.deadline)}`}
         </div>
 
@@ -289,7 +289,7 @@ export default function SurveyProgress() {
           ].map(t => (
             <div key={t.label} style={{ background: t.bg, border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem', textAlign: 'center' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color: t.color }}>{t.val}</div>
-              <div style={{ fontSize: 11, color: '#888784', marginTop: 4 }}>{t.label}</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4 }}>{t.label}</div>
             </div>
           ))}
         </div>
@@ -324,7 +324,7 @@ export default function SurveyProgress() {
                   <span style={{ color: '#0d0d0d' }}>{cats[code]?.label ?? code}</span>
                   <span>
                     {c.invited} invited · {c.reached} opened ·{' '}
-                    <strong style={{ color: c.submitted > 0 ? GREEN : '#888784' }}>{c.submitted} submitted</strong>
+                    <strong style={{ color: c.submitted > 0 ? GREEN : 'var(--color-ink-muted)' }}>{c.submitted} submitted</strong>
                   </span>
                 </div>
               ))}
@@ -363,7 +363,7 @@ export default function SurveyProgress() {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>{p.invite_name || p.invite_email || '—'}</div>
-                    <div style={{ fontSize: 12, color: '#888784', marginTop: 3 }}>
+                    <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 3 }}>
                       {cats[p.stakeholder_category]?.label ?? p.stakeholder_category}
                       {' · '}
                       {/* ⚠️ THE TWO in_progress STATES, TOLD APART. */}

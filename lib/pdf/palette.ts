@@ -1,11 +1,13 @@
 /**
  * The PDF palette, shared by lib/pdf/layout.ts and lib/assurancePdf.ts.
  *
- * ⚠️ THIS FILE MUST STAY IMPORT-FREE. It holds colour strings and nothing else, deliberately:
- * layout.ts statically imports ../fonts/charis (167 KB) and ./logo (70 KB) — around 232 KB of
- * base64 before jsPDF itself, which is why app/dashboard/stakeholder/[id]/report/page.tsx
- * dynamic-imports the generator. If assurancePdf.ts imported its colours from layout.ts it would
- * drag that whole graph in for four strings. Adding an import here re-creates that problem.
+ * ⚠️ NO HEAVY IMPORTS. layout.ts statically imports ../fonts/charis (167 KB) and ./logo (70 KB) —
+ * around 232 KB of base64 before jsPDF itself, which is why
+ * app/dashboard/stakeholder/[id]/report/page.tsx dynamic-imports the generator. If assurancePdf.ts
+ * took its colours from layout.ts it would drag that whole graph in for four strings.
+ * The ONE import below is ../brand: 76 lines of colour constants with no imports of its own, and
+ * already in both PDF modules' graphs (layout.ts:27 and assurancePdf.ts:5 both take BRAND from it).
+ * It adds nothing. Anything with a dependency of its own does not belong here.
  *
  * ⚠️ IT EXISTS BECAUSE THE TWO GENERATORS DISAGREED. Each kept its own palette, and
  * assurancePdf.ts's muted grey was '#888784' — 3.36:1, below AA — for as long as layout.ts's
@@ -23,9 +25,11 @@
  * background of every page — EXCEPT the three values under "reversed" below, which are drawn on
  * the INK cover block and are measured against that instead.
  *
- * BRAND is not here. It lives in lib/brand.ts with the rest of the brand literals, where
+ * BRAND is not here either. It lives in lib/brand.ts with the rest of the brand literals, where
  * lib/brand.test.ts checks it against app/styles/themisiq-tokens.css.
  */
+
+import { INK_MUTED } from '../brand'
 
 /** The cover and page stock. Every ratio below is against this unless stated. */
 export const PAPER = '#f8f7f5'
@@ -37,11 +41,23 @@ export const INK = '#0d0d0d'
 export const SECONDARY = '#555553'
 
 /**
- * 4.83:1 on PAPER. The lightest grey permitted for small text: footers, labels, the cover's
- * supporting lines. Chosen over #888784 (3.36:1, fails) and over #767572 (4.30:1, still fails) —
- * this clears 4.5:1 with enough margin that a slightly darker paper stock cannot push it under.
+ * 5.39:1 on PAPER. The lightest grey permitted for small text: footers, labels, the cover's
+ * supporting lines.
+ *
+ * ⚠️ WAS '#6e6d6a' (4.83:1). Both values pass; this one is the same grey the screens and the email
+ * templates use, so one role now has one value across all three output formats instead of a
+ * screen grey and a print grey that happened to agree on nothing but their intent. It also buys
+ * +0.56 of ratio on the cover stock, which matters more in print than on a backlit screen.
+ *
+ * The rejections still stand and are worth keeping: #888784 (3.36:1) and #767572 (4.30:1) were
+ * both measured against this same stock and both fail. #6e6d6a passed and was only displaced for
+ * consistency, not because it was wrong.
+ *
+ * IMPORTED, NOT RETYPED — the literal lives in lib/brand.ts, where lib/brand.test.ts asserts it
+ * against app/styles/themisiq-tokens.css (--color-ink-muted). Declaring the hex again here would
+ * put it outside that check.
  */
-export const MUTED = '#6e6d6a'
+export const MUTED = INK_MUTED
 
 /**
  * 11.80:1 on PAPER. Table body text only, at 7–9pt.

@@ -191,7 +191,7 @@ const STYLES = `
   .tiq{
     --serif: Georgia, 'Times New Roman', serif;
     --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    --ink:#0d0d0d; --mid:#555553; --light:#888784; --surface:#f8f7f5; --border:#e8e7e4;
+    --ink:#0d0d0d; --mid:#555553; --light:var(--color-ink-muted); --surface:#f8f7f5; --border:#e8e7e4;
     --violet:#7425e3; --sky:#1fb1ff; --lime:#64fe3e;
     --green:#0F6E56; --green-tint:#E1F5EE;
     --grad: var(--color-brand);

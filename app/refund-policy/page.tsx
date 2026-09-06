@@ -14,7 +14,7 @@ export default function Page() {
           </h1>
           <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' as const, marginBottom: '1rem' }}>
             {['Governed by: Ontario, Canada law', 'hello@themisiq.co'].map(item => (
-              <span key={item} style={{ fontSize: 12, color: '#888784' }}>{item}</span>
+              <span key={item} style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>{item}</span>
             ))}
           </div>
           <div className="tq-callout tq-callout-note" style={{ '--tq-state': 'var(--color-module-climate)', '--tq-state-wash': '#FEF3E2' } as React.CSSProperties}>
@@ -29,7 +29,7 @@ export default function Page() {
 
         {/* TOC */}
         <div style={{ position: 'sticky', top: 80 }}>
-          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.09em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 12 }}>Contents</div>
+          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.09em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: 12 }}>Contents</div>
           {['All sales are final', 'Why', 'Pre-access goodwill cancellation', 'Genuine service failure', 'Renewal', 'Contact'].map((title, i) => (
             <a key={i} href={`#r${i+1}`} style={{ display: 'block', fontSize: 12, color: '#555553', padding: '5px 0 5px 10px', borderLeft: '2px solid transparent', textDecoration: 'none', marginBottom: 2 }}>{title}</a>
           ))}

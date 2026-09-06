@@ -20,7 +20,7 @@ export default function Home() {
         <div style={{ maxWidth: 860, margin: '0 auto' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', marginBottom: '3.5rem' }}>
             <Logo size={320} />
-            <p style={{ fontSize: 15, color: '#888784', letterSpacing: '0.02em', fontWeight: 400 }}>
+            <p style={{ fontSize: 15, color: 'var(--color-ink-muted)', letterSpacing: '0.02em', fontWeight: 400 }}>
               Compliance Intelligence for Sustainable Business
             </p>
           </div>
@@ -55,12 +55,12 @@ export default function Home() {
             {val === 'deadlines' ? (
               <a href="/assess" style={{ textDecoration: 'none', display: 'block' }}>
                 <div style={{ fontSize: 12, color: '#7425e3', fontWeight: 600, lineHeight: 1.4, marginBottom: 4 }}>Check your compliance deadlines →</div>
-                <div style={{ fontSize: 11, color: '#888784' }}>{label}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{label}</div>
               </a>
             ) : (
               <>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: 'var(--color-brand)', marginBottom: 4 }}>{val}</div>
-                <div style={{ fontSize: 12, color: '#888784' }}>{label}</div>
+                <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>{label}</div>
               </>
             )}
           </div>
@@ -82,7 +82,7 @@ export default function Home() {
       {/* ── FRAMEWORKS ── */}
       <div style={{ padding: '4rem 2.5rem', background: '#f8f7f5', borderBottom: '0.5px solid #e8e7e4' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', textAlign: 'center' }}>
-          <p style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Framework coverage</p>
+          <p style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }}>Framework coverage</p>
           <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, marginBottom: '1.5rem' }}>Every major regulatory and voluntary framework. Pre-mapped. Export-ready.</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
             {['SB 253 (California)', 'SB 261 (California)', 'ESRS E1 / CSRD', 'IFRS S2', 'CDP Climate', 'EcoVadis', 'TCFD', 'GHG Protocol', 'SEC Climate Rule', 'GRI', 'SBTi', 'RE100', 'NIST AI RMF', 'EU AI Act', 'ISO 27001', 'NIST CSF', 'SASB', 'EU Pay Transparency', 'NIS2', 'DORA'].map(fw => (
@@ -105,7 +105,7 @@ export default function Home() {
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.2 }}>{mod.name === 'Supply Chain & Scope 3' ? <>Supply Chain &amp; <span style={{ whiteSpace: 'nowrap' }}>Scope 3</span></> : mod.name}</div>
               <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{mod.desc}</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 'auto', paddingTop: 8 }}>
-                {mod.tags.map(t => <span key={t} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#888784' }}>{t}</span>)}
+                {mod.tags.map(t => <span key={t} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: 'var(--color-ink-muted)' }}>{t}</span>)}
               </div>
             </a>
           ))}
@@ -136,7 +136,7 @@ export default function Home() {
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f8f7f5' }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff' }}>
             <div style={{ flex: '1 1 420px' }}>
-              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 6 }}>Single or double · which one applies to you</div>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 6 }}>Single or double · which one applies to you</div>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.2, marginBottom: 6 }}>The Materiality Assessment</div>
               <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>Single materiality for IFRS S2, double materiality for CSRD — the methodology your auditor expects. See two sample reports for the same entity.</div>
             </div>
@@ -226,7 +226,7 @@ export default function Home() {
       <section style={{ padding: '5rem 2.5rem', background: '#f8f7f5', borderTop: '0.5px solid #e8e7e4' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>Not sure where to start?</div>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: 8 }}>Not sure where to start?</div>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Built for who's asking.</h2>
             <p style={{ fontSize: 15, color: '#555553', maxWidth: 520, margin: '0 auto', fontWeight: 400 }}>Whether it's a customer, your bank, your board or your investor — here's where to start for each.</p>
           </div>
@@ -259,7 +259,7 @@ export default function Home() {
                     <span style={{ fontSize: 12, color: '#555553' }}>{item}</span>
                   </div>
                 ))}
-                <div style={{ fontSize: 11, color: '#888784', marginTop: 12 }}>Multi-module — priced in the configurator</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 12 }}>Multi-module — priced in the configurator</div>
                 <div style={{ marginTop: 8, fontSize: 12, fontWeight: 600, color: pack.color }}>Configure →</div>
               </a>
             ))}
@@ -326,5 +326,5 @@ const navLink: React.CSSProperties = { fontSize: 13, color: '#555553', textDecor
 const btnOutline: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', cursor: 'pointer' }
 const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'var(--color-brand)', color: '#fff', border: 'none', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }
 const gradText: React.CSSProperties = { fontStyle: 'italic', color: 'var(--color-brand)' }
-const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
+const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }
 const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, lineHeight: 1.75, fontWeight: 400 }

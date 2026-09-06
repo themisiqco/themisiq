@@ -255,7 +255,7 @@ export default function TrendsPage() {
           {/* Header: company, baseline, GWP basis */}
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: '#0d0d0d' }}>{selected.company}</div>
-            <div style={{ fontSize: 12, color: '#888784', marginTop: 4 }}>
+            <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 4 }}>
               Baseline year {selected.baselineYear}
               {!selected.baselineUsable && (
                 <span style={{ color: 'var(--color-module-climate)', fontWeight: 600 }}> — not usable, so no year is shown as a change against it</span>
@@ -297,24 +297,24 @@ export default function TrendsPage() {
               {/* The headline card shows the LATEST year, even when that year is unplottable — it
                   must not quietly fall back to an older year and present it as current. */}
               <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
-                <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-display)', color: latest.scope12Total == null ? '#888784' : '#0d0d0d' }}>
+                <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-display)', color: latest.scope12Total == null ? 'var(--color-ink-muted)' : '#0d0d0d' }}>
                   {latest.scope12Total == null ? '—' : Math.round(latest.scope12Total).toLocaleString()}
                 </div>
-                <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>
                   {latest.scope12Total == null
                     ? `${latest.year} can't be shown — see below`
                     : `tCO₂e · Scope 1+2 · ${latest.year}`}
                 </div>
               </div>
               <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
-                <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-display)', color: latest.vsBaselinePct == null ? '#888784' : latest.vsBaselinePct <= 0 ? '#0F6E56' : 'var(--color-module-climate)' }}>
+                <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-display)', color: latest.vsBaselinePct == null ? 'var(--color-ink-muted)' : latest.vsBaselinePct <= 0 ? '#0F6E56' : 'var(--color-module-climate)' }}>
                   {latest.vsBaselinePct == null ? '—' : `${latest.vsBaselinePct > 0 ? '+' : ''}${latest.vsBaselinePct}%`}
                 </div>
-                <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>vs {selected.baselineYear}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>vs {selected.baselineYear}</div>
               </div>
               <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
                 <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-display)', color: '#0d0d0d' }}>{latest.perRevenue == null ? '—' : latest.perRevenue}</div>
-                <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>
                   per $M revenue
                   {intensityDelta != null && (
                     <span style={{ color: intensityDelta <= 0 ? '#0F6E56' : 'var(--color-module-climate)', fontWeight: 600 }}>{' '}({intensityDelta > 0 ? '+' : ''}{intensityDelta.toFixed(2)})</span>
@@ -323,7 +323,7 @@ export default function TrendsPage() {
               </div>
               <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
                 <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-display)', color: '#0F6E56' }}>94%</div>
-                <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>measured · limited assurance</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>measured · limited assurance</div>
               </div>
             </div>
           )}
@@ -336,7 +336,7 @@ export default function TrendsPage() {
                 <XAxis dataKey="year" type="number" domain={xDomain} allowDecimals={false} ticks={xTicks} tickCount={chartData.length} tick={{ fontSize: 12, fill: '#555553' }} />
                 <YAxis
                   tick={{ fontSize: 12, fill: '#555553' }}
-                  label={{ value: 'tCO₂e', angle: -90, position: 'insideLeft', style: { fontSize: 12, fill: '#888784' } }}
+                  label={{ value: 'tCO₂e', angle: -90, position: 'insideLeft', style: { fontSize: 12, fill: 'var(--color-ink-muted)' } }}
                 />
                 <Tooltip />
                 <Legend />
@@ -384,7 +384,7 @@ export default function TrendsPage() {
                 {y.dataStatus !== 'ok' ? (
                   <span style={{ color: 'var(--color-module-climate)', fontWeight: 600 }}>not shown</span>
                 ) : y.year === selected.baselineYear || y.vsBaselinePct == null ? (
-                  <span style={{ color: '#888784' }}>baseline</span>
+                  <span style={{ color: 'var(--color-ink-muted)' }}>baseline</span>
                 ) : (
                   <span style={{ color: y.vsBaselinePct <= 0 ? '#0F6E56' : 'var(--color-module-climate)', fontWeight: 600 }}>
                     {y.vsBaselinePct > 0 ? '+' : ''}{y.vsBaselinePct}%
@@ -398,7 +398,7 @@ export default function TrendsPage() {
               pathway line isn't rendering). Rides the page's existing GHG gating — no extra check. */}
           {selected && !hasTarget && (
             <div style={{ marginTop: 24, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '1.5rem 1.75rem' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Science-based targets</div>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }}>Science-based targets</div>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.25, marginBottom: 8 }}>You&rsquo;ve mapped your emissions. Now set your targets.</div>
               <p style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, marginBottom: 16, maxWidth: 620 }}>
                 Set near-term and net-zero targets under the SBTi Corporate Net-Zero Standard V2.0 — your baseline is already here. Your target pathway will appear on this chart.
@@ -415,14 +415,14 @@ export default function TrendsPage() {
               <div style={{ width: '100%', height: 96 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={selected.years.map((y) => ({ year: y.year, perRevenue: y.perRevenue }))} margin={{ top: 18, right: 24, bottom: 4, left: 8 }}>
-                    <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#888784' }} />
+                    <XAxis dataKey="year" tick={{ fontSize: 11, fill: 'var(--color-ink-muted)' }} />
                     <YAxis hide domain={['dataMin', 'dataMax']} />
                     <Tooltip />
                     <Line type="monotone" dataKey="perRevenue" stroke="#7425e3" strokeWidth={2} dot={{ r: 3 }} label={{ position: 'top', fontSize: 11, fill: '#7425e3', formatter: (v) => (typeof v === 'number' ? v.toFixed(1) : v) }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
-              <p style={{ fontSize: 11, color: '#888784', marginTop: 4, lineHeight: 1.6 }}>
+              <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4, lineHeight: 1.6 }}>
                 Intensity — tCO₂e per $M revenue. Falling intensity with rising revenue shows real decoupling.
               </p>
             </div>
@@ -481,7 +481,7 @@ export default function TrendsPage() {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-                <p style={{ marginTop: 8, fontSize: 11, color: '#888784', lineHeight: 1.6 }}>
+                <p style={{ marginTop: 8, fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6 }}>
                   {monthly.measuredMonths} month{monthly.measuredMonths === 1 ? '' : 's'} with utility-bill data ·{' '}
                   {monthly.totalTco2e.toLocaleString()} tCO₂e total. Months without dated bills are omitted —
                   this is a partial, concierge-sourced view; the yearly chart above is authoritative.

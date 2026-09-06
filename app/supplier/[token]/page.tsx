@@ -81,7 +81,7 @@ export default function SupplierQuestionnaire() {
 
   if (loading) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ textAlign: 'center', color: '#888784' }}>Loading your questionnaire...</div>
+      <div style={{ textAlign: 'center', color: 'var(--color-ink-muted)' }}>Loading your questionnaire...</div>
     </div>
   )
 
@@ -89,7 +89,7 @@ export default function SupplierQuestionnaire() {
     <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
       <div style={{ background: '#fff', borderRadius: 16, padding: '3rem', textAlign: 'center', maxWidth: 400 }}>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 8 }}>Link not found</div>
-        <div style={{ fontSize: 14, color: '#888784', lineHeight: 1.6 }}>This questionnaire link is invalid or has expired. Please contact the company who sent you this link.</div>
+        <div style={{ fontSize: 14, color: 'var(--color-ink-muted)', lineHeight: 1.6 }}>This questionnaire link is invalid or has expired. Please contact the company who sent you this link.</div>
       </div>
     </div>
   )
@@ -102,8 +102,8 @@ export default function SupplierQuestionnaire() {
         <div style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, marginBottom: 8 }}>
           Your sustainability questionnaire for <strong>{campaign?.name}</strong> has been submitted successfully.
         </div>
-        <div style={{ fontSize: 13, color: '#888784' }}>{campaignSupplier?.supplier_name} · {campaignSupplier?.supplier_email}</div>
-        <div style={{ marginTop: 24, padding: '1rem', background: '#f8f7f5', borderRadius: 10, fontSize: 12, color: '#888784' }}>
+        <div style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>{campaignSupplier?.supplier_name} · {campaignSupplier?.supplier_email}</div>
+        <div style={{ marginTop: 24, padding: '1rem', background: '#f8f7f5', borderRadius: 10, fontSize: 12, color: 'var(--color-ink-muted)' }}>
           Powered by <a href="https://www.themisiq.co" style={{ color: '#7425e3', textDecoration: 'none' }}>ThemisIQ</a> · www.themisiq.co
         </div>
       </div>
@@ -136,7 +136,7 @@ export default function SupplierQuestionnaire() {
 
       {/* Supplier info */}
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0.75rem 2rem' }}>
-        <div style={{ maxWidth: 760, margin: '0 auto', fontSize: 13, color: '#888784' }}>
+        <div style={{ maxWidth: 760, margin: '0 auto', fontSize: 13, color: 'var(--color-ink-muted)' }}>
           Completing as: <strong style={{ color: '#0d0d0d' }}>{campaignSupplier?.supplier_name}</strong>
           {campaignSupplier?.contact_name && ` · ${campaignSupplier.contact_name}`}
           {campaign?.deadline && ` · Deadline: ${new Date(campaign.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`}
@@ -153,7 +153,7 @@ export default function SupplierQuestionnaire() {
             return (
               <button key={sec.id} onClick={() => setActiveSection(i)} style={{ padding: '0.75rem', borderRadius: 10, border: `1.5px solid ${isActive ? sec.color : '#e8e7e4'}`, background: isActive ? sec.bg : '#fff', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: isActive ? sec.color : '#0d0d0d', marginBottom: 3 }}>{sec.title}</div>
-                <div style={{ fontSize: 10, color: '#888784' }}>{secAnswered}/{sec.questions.length} answered</div>
+                <div style={{ fontSize: 10, color: 'var(--color-ink-muted)' }}>{secAnswered}/{sec.questions.length} answered</div>
               </button>
             )
           })}
@@ -165,7 +165,7 @@ export default function SupplierQuestionnaire() {
             <div style={{ marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '0.5px solid #e8e7e4' }}>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: currentSection.color, marginBottom: 4 }}>Section {activeSection + 1} of {sections.length}</div>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{currentSection.title}</div>
-              <div style={{ fontSize: 13, color: '#888784' }}>{currentSection.desc}</div>
+              <div style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>{currentSection.desc}</div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -175,7 +175,7 @@ export default function SupplierQuestionnaire() {
                     {qi + 1}. {q.label}
                     {responses[q.id] && <span style={{ marginLeft: 8, fontSize: 10, color: '#0F6E56', fontWeight: 700 }}>✓</span>}
                   </div>
-                  {q.hint && <div style={{ fontSize: 11, color: '#888784', marginBottom: 8 }}>{q.hint}</div>}
+                  {q.hint && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 8 }}>{q.hint}</div>}
 
                   {q.type === 'radio' && q.options && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -249,7 +249,7 @@ export default function SupplierQuestionnaire() {
             </button>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-              {pct < 100 && <div style={{ fontSize: 11, color: '#888784' }}>{totalQuestions - answeredQuestions} questions remaining — you can submit with partial responses</div>}
+              {pct < 100 && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{totalQuestions - answeredQuestions} questions remaining — you can submit with partial responses</div>}
               <button onClick={submit} disabled={saving} style={{ fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}>
                 {saving ? 'Submitting...' : `Submit questionnaire (${pct}% complete)`}
               </button>
@@ -257,7 +257,7 @@ export default function SupplierQuestionnaire() {
           )}
         </div>
 
-        <div style={{ marginTop: 24, textAlign: 'center', fontSize: 12, color: '#9ca3af' }}>
+        <div style={{ marginTop: 24, textAlign: 'center', fontSize: 12, color: 'var(--color-ink-muted)' }}>
           Your responses are saved automatically as you go. You can return to this link to continue or update your responses.
           <br />Powered by <a href="https://www.themisiq.co" style={{ color: '#7425e3', textDecoration: 'none' }}>ThemisIQ</a>
         </div>

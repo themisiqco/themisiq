@@ -59,7 +59,7 @@ export default function ConsentForm({
   return (
     <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, maxWidth: 560, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '1.75rem' }}>
       <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, color: '#0d0d0d', marginBottom: 4 }}>{title}</div>
-      <div style={{ fontSize: 12, color: '#888784', marginBottom: 8 }}>{subtitle}</div>
+      <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginBottom: 8 }}>{subtitle}</div>
       <label style={consentLabel}>Business legal name</label>
       <input value={bizName} onChange={e => setBizName(e.target.value)} placeholder="Acme Industries Inc." style={consentInput} />
       <label style={consentLabel}>Registration / VAT / Tax ID</label>
@@ -83,7 +83,9 @@ export default function ConsentForm({
       </div>
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
         {onCancel && <button onClick={onCancel} style={ghostBtn}>Cancel</button>}
-        <button onClick={submit} disabled={!canSubmit} style={{ ...primaryBtn, opacity: canSubmit ? 1 : 0.4, cursor: canSubmit ? 'pointer' : 'not-allowed' }}>{submitting ? 'Starting…' : submitLabel}</button>
+        <button onClick={submit} disabled={!canSubmit} style={canSubmit
+            ? primaryBtn
+            : { ...primaryBtn, background: 'var(--color-sunken)', color: 'var(--color-ink-muted)', border: '1px solid var(--color-line)', cursor: 'not-allowed' }}>{submitting ? 'Starting…' : submitLabel}</button>
       </div>
     </div>
   )

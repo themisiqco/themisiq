@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { checkAndRecordRateLimit, ipFromHeaders } from '../../../../lib/rateLimit'
 import { createDraftInvoiceForOrder } from '../../../../lib/order/invoice'
 import type { Tier } from '../../../../lib/pricing'
+import { INK_MUTED } from '@/lib/brand'
 
 // Quote-request capture for /order carts that exceed the card threshold (>$10k) or are
 // GHG Advisory. Email-only — NO payment, NO DB table. Clones the /api/assessment/submit
@@ -120,7 +121,7 @@ export async function POST(req: NextRequest) {
     <!-- Georgia here is deliberate, not a missed sweep: this is email HTML. A mail client cannot resolve var(--font-display), and web fonts do not load reliably in mail, so Literata would silently fall back anyway. Georgia is web-safe and is what every recipient actually sees. See app/components/headingStyles.ts. -->
     <div style="font-family:Georgia,serif;font-size:22px;color:#0d0d0d;margin-bottom:12px;">Thanks — we've received your request.</div>
     <div style="font-size:14px;color:#555553;line-height:1.7;margin-bottom:16px;">Hi ${name}, thank you for your interest in ThemisIQ. Our team will prepare a quote for your selected configuration (${modules}) and follow up shortly at this address.</div>
-    <div style="font-size:13px;color:#888784;line-height:1.7;">If it's urgent, reply to this email or reach us at hello@themisiq.co.</div>
+    <div style="font-size:13px;color:${INK_MUTED};line-height:1.7;">If it's urgent, reply to this email or reach us at hello@themisiq.co.</div>
   </td></tr>
   <tr><td style="background:#0d0d0d;padding:18px 32px;"><div style="font-size:11px;color:rgba(255,255,255,0.3);">ThemisIQ · www.themisiq.co · hello@themisiq.co</div></td></tr>
   <tr><td style="background:linear-gradient(90deg,#7425e3,#1fb1ff,#64fe3e);height:3px;font-size:1px;line-height:1px;">&nbsp;</td></tr>

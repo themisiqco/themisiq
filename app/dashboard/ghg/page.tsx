@@ -34,7 +34,7 @@ import {
   parseLocalDate, periodFromYearAndEnd, analyzeCoverage,
 } from '../../../lib/ghg/engine'
 import { disclaimerParas } from '../../../lib/disclaimer'
-import { btnPrimary } from '@/app/components/buttonStyles'
+import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
 import { sectionHeadFixed as auditSectionHead, sectionHeadFixed as sectionHead } from '@/app/components/headingStyles'
 import type {
   GwpVersion, Location, Inventory, SourceDoc, ExtractedProposal,
@@ -250,7 +250,7 @@ function GHGBot({ currentStep }: { currentStep: number }) {
                 )}
               </div>
             ))}
-            {loading && <div style={{ alignSelf: 'flex-start', background: '#f8f7f5', borderRadius: '12px 12px 12px 2px', padding: '8px 12px', fontSize: 12, color: '#888784' }}>Thinking...</div>}
+            {loading && <div style={{ alignSelf: 'flex-start', background: '#f8f7f5', borderRadius: '12px 12px 12px 2px', padding: '8px 12px', fontSize: 12, color: 'var(--color-ink-muted)' }}>Thinking...</div>}
             <div ref={messagesEndRef} />
           </div>
           <div style={{ padding: '0.75rem', borderTop: '0.5px solid #e8e7e4', display: 'flex', gap: 8 }}>
@@ -312,7 +312,7 @@ function GhgEntryWall({ access }: { access: Extract<EntitlementAccess, 'expired'
     <div style={{ background: '#fff', minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
       <nav style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2rem', height: 56, display: 'flex', alignItems: 'center', gap: '1rem', position: 'sticky', top: 0, zIndex: 100 }}>
         <a href="/dashboard" style={{ textDecoration: 'none' }}><img src="/logo.png" alt="ThemisIQ" style={{ height: 24, width: 'auto', display: 'block' }} /></a>
-        <span style={{ fontSize: 12, color: '#888784' }}>/ GHG Inventory</span>
+        <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>/ GHG Inventory</span>
       </nav>
       <div style={{ maxWidth: 560, margin: '0 auto', padding: '4rem 1.5rem' }}>
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '2.5rem', textAlign: 'center' as const, boxShadow: '0 2px 20px rgba(0,0,0,0.04)' }}>
@@ -339,7 +339,7 @@ function PaywallOverlay({ frameworks }: { frameworks: string[] }) {
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 8 }}>Your GHG inventory is complete.</div>
         <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 400 }}>Your Scope 1 and Scope 2 emissions have been calculated to {frameworks.join(', ')} standards, with full calculation workings ready for third-party assurance. Unlock your submission-ready reports with one click.</div>
         <div style={{ background: '#f8f7f5', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', textAlign: 'left' as const }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', marginBottom: 10, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>What you unlock</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', marginBottom: 10, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>What you unlock</div>
           {[
             'Submission-ready reports for all selected frameworks',
             'Assurance-ready evidence uploads per emission source',
@@ -356,12 +356,12 @@ function PaywallOverlay({ frameworks }: { frameworks: string[] }) {
         <button onClick={() => window.location.href = '/signup?upgrade=true'} style={{ width: '100%', fontSize: 14, fontWeight: 600, padding: '14px 28px', borderRadius: 10, border: 'none', cursor: 'pointer', marginBottom: 10, background: 'var(--color-brand)', color: 'var(--color-on-dark)' }}>
           Unlock My Reports →
         </button>
-        <div style={{ fontSize: 11, color: '#888784', marginBottom: 12 }}>Secure payment · Instant access · Cancel anytime</div>
+        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 12 }}>Secure payment · Instant access · Cancel anytime</div>
         <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' as const, borderTop: '0.5px solid #e8e7e4', paddingTop: 12 }}>
           {['Your data is encrypted', 'Never sold or shared', 'PIPEDA compliant', 'Not used to train AI'].map(t => (
             <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#64fe3e', flexShrink: 0 }} />
-              <span style={{ fontSize: 10, color: '#888784' }}>{t}</span>
+              <span style={{ fontSize: 10, color: 'var(--color-ink-muted)' }}>{t}</span>
             </div>
           ))}
         </div>
@@ -414,10 +414,10 @@ function LockedDocUpload({ label }: { label: string }) {
   return (
     <div style={{ background: '#f8f7f5', border: '0.5px dashed #e8e7e4', borderRadius: 8, padding: '10px 14px', opacity: 0.7 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>📎 {label}</span>
-        <span style={{ fontSize: 11, padding: '4px 12px', borderRadius: 6, background: '#fff', border: '0.5px solid #e8e7e4', color: '#888784' }}>🔒 Paid plan</span>
+        <span style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>📎 {label}</span>
+        <span style={{ fontSize: 11, padding: '4px 12px', borderRadius: 6, background: '#fff', border: '0.5px solid #e8e7e4', color: 'var(--color-ink-muted)' }}>🔒 Paid plan</span>
       </div>
-      <div style={{ fontSize: 11, color: '#888784', marginTop: 6, fontWeight: 400 }}>Evidence uploads are available on paid plans — keeping your inventory assurance-ready for third-party verification.</div>
+      <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 6, fontWeight: 400 }}>Evidence uploads are available on paid plans — keeping your inventory assurance-ready for third-party verification.</div>
     </div>
   )
 }
@@ -1287,8 +1287,8 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
         <Field label="Company legal name" hint="Appears on all report submissions">
           {companyLocked ? (
             <>
-              <input value={inventory.company_name} readOnly style={{ ...inputStyle, background: '#f8f7f5', color: '#888784', cursor: 'not-allowed' }} />
-              <div style={{ fontSize: 11, color: '#888784', marginTop: 6 }}>Linked company — set when this inventory was created.</div>
+              <input value={inventory.company_name} readOnly style={{ ...inputStyle, background: '#f8f7f5', color: 'var(--color-ink-muted)', cursor: 'not-allowed' }} />
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 6 }}>Linked company — set when this inventory was created.</div>
             </>
           ) : (addingNewCompany || companies.length === 0) ? (
             <>
@@ -1455,7 +1455,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   rows={3}
                   style={{ ...inputStyle, resize: 'vertical' as const, fontFamily: 'inherit' }}
                 />
-                <div style={{ fontSize: 11, color: '#888784', marginTop: 6 }}>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 6 }}>
                   For example: you bought or sold part of the business, opened or closed a site,
                   changed how you collect or measure your data, or corrected an error in last
                   year&apos;s figures.
@@ -1549,7 +1549,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>Your current plan covers up to {locationAllowance} location{locationAllowance === 1 ? '' : 's'}. Upgrade to add more — your existing data stays exactly as it is.</div>
                   <a href="/pricing" style={{ display: 'inline-block', marginTop: 8, fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none' }}>See plans &amp; upgrade →</a>
                 </div>
-                <button onClick={() => setShowLocationWall(false)} style={{ background: 'none', border: 'none', color: '#888784', cursor: 'pointer', fontSize: 16, lineHeight: 1, flexShrink: 0 }}>×</button>
+                <button onClick={() => setShowLocationWall(false)} style={{ background: 'none', border: 'none', color: 'var(--color-ink-muted)', cursor: 'pointer', fontSize: 16, lineHeight: 1, flexShrink: 0 }}>×</button>
               </div>
             )}
           </div>
@@ -1587,7 +1587,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>Your current plan covers up to {locationAllowance} location{locationAllowance === 1 ? '' : 's'}. Upgrade to add more — your existing data stays exactly as it is.</div>
                 <a href="/pricing" style={{ display: 'inline-block', marginTop: 8, fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none' }}>See plans &amp; upgrade →</a>
               </div>
-              <button onClick={() => setShowLocationWall(false)} style={{ background: 'none', border: 'none', color: '#888784', cursor: 'pointer', fontSize: 16, lineHeight: 1, flexShrink: 0 }}>×</button>
+              <button onClick={() => setShowLocationWall(false)} style={{ background: 'none', border: 'none', color: 'var(--color-ink-muted)', cursor: 'pointer', fontSize: 16, lineHeight: 1, flexShrink: 0 }}>×</button>
             </div>
           )}
         </div>
@@ -1781,7 +1781,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                     <div>
                       <div style={{ fontSize: 12, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }}>Combustion use-class</div>
-                      <div style={{ fontSize: 11, color: '#888784', marginBottom: 8 }}>MfE publishes stationary-combustion factors by use-class. Most sites are Commercial (default).</div>
+                      <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 8 }}>MfE publishes stationary-combustion factors by use-class. Most sites are Commercial (default).</div>
                       <details>
                         <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--color-brand)' }}>{(loc.nz_use_class ?? 'commercial') === 'industrial' ? 'Industrial selected — change use-class' : 'Advanced: change use-class (using Commercial)'}</summary>
                         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -1793,7 +1793,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                     </div>
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#555553', cursor: 'pointer' }}>
                       <input type="checkbox" checked={!!loc.nz_td_losses} onChange={e => updateLocation(activeLocation, 'nz_td_losses', e.target.checked)} style={{ marginTop: 2, flexShrink: 0 }} />
-                      <span>Include electricity <strong>transmission &amp; distribution (T&amp;D) losses</strong> — reported as a separate <strong>Scope 3 Category 3</strong> line, not added to Scope 2. <span style={{ color: '#888784' }}>Off by default.</span></span>
+                      <span>Include electricity <strong>transmission &amp; distribution (T&amp;D) losses</strong> — reported as a separate <strong>Scope 3 Category 3</strong> line, not added to Scope 2. <span style={{ color: 'var(--color-ink-muted)' }}>Off by default.</span></span>
                     </label>
                   </div>
                 )}
@@ -1843,7 +1843,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                       ?? ((loc.purchased_steam_unit ?? 'mmbtu') === 'gj' ? 'kwh' : (loc.purchased_steam_unit ?? 'mmbtu'))
                     return <>
                       {entry.kind === 'published' ? (
-                        <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.5 }}>
+                        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.5 }}>
                           We apply the published factor for this jurisdiction ({entry.source}).
                           District-heating networks vary, so if your supplier publishes its own factor, that figure
                           is more accurate than ours and will be used instead — worth giving your verifier where
@@ -1947,11 +1947,11 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
               ))}
             </div>
             <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem' }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>All locations</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>All locations</div>
               <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-brand)' }}>{totals_ar6.s1_total.toFixed(2)} mt Scope 1</div>
               {gridReady
                 ? <div style={{ fontSize: 14, fontWeight: 600, color: '#0F6E56', marginTop: 4 }}>{totals_ar6.s2_location.toFixed(2)} mt Scope 2</div>
-                : <div style={{ marginTop: 4 }}><div style={{ fontSize: 14, fontWeight: 600, color: '#888784' }}>— mt Scope 2</div><div style={{ fontSize: 10, color: '#888784', marginTop: 1 }}>Resolve grid regions to preview Scope 2</div></div>}
+                : <div style={{ marginTop: 4 }}><div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-ink-muted)' }}>— mt Scope 2</div><div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 1 }}>Resolve grid regions to preview Scope 2</div></div>}
               {/* Directly under the figure, not in a banner elsewhere on the page: a total that
                   leaves a location out has to say so where it is read, or the omission is silent
                   to anyone who does not scroll. */}
@@ -2038,46 +2038,46 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   <div key={fw.id} style={{ background: fw.bg, border: `0.5px solid color-mix(in srgb, ${fw.color} 20%, transparent)`, borderRadius: 10, padding: '1.25rem' }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: fw.color, letterSpacing: '0.06em', textTransform: 'uppercase' as const, marginBottom: 8 }}>{fw.name} — GWP {fw.gwp}</div>
                     <div style={{ marginBottom: 6 }}>
-                      <div style={{ fontSize: 11, color: '#888784' }}>Scope 1</div>
-                      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s1_total.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                      <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Scope 1</div>
+                      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s1_total.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
                     </div>
                     <div style={{ marginBottom: 6 }}>
-                      <div style={{ fontSize: 11, color: '#888784' }}>Scope 2 (location)</div>
-                      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s2_location.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                      <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Scope 2 (location)</div>
+                      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s2_location.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
                     </div>
                     {(fw.id === 'esrs' || fw.id === 'gri') && (
                       <div style={{ marginBottom: 6 }}>
-                        <div style={{ fontSize: 11, color: '#888784' }}>Scope 2 (market)</div>
-                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s2_market.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Scope 2 (market)</div>
+                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s2_market.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
                       </div>
                     )}
                     {(fw.id === 'esrs' || fw.id === 'gri') && (
                       <div style={{ marginBottom: 6 }}>
-                        <div style={{ fontSize: 11, color: '#888784' }}>Biogenic CO₂ (reported separately)</div>
-                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.biogenic.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Biogenic CO₂ (reported separately)</div>
+                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.biogenic.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
                       </div>
                     )}
                     {totals.s3_td > 0 && (
                       <div style={{ marginBottom: 6 }}>
                         {/* Distinct Scope 3 (Cat 3) line — NZ electricity T&D losses. Never folded into S1/S2. */}
-                        <div style={{ fontSize: 11, color: '#888784' }}>Scope 3 (Cat 3 — electricity T&amp;D)</div>
-                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s3_td.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Scope 3 (Cat 3 — electricity T&amp;D)</div>
+                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s3_td.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
                       </div>
                     )}
                     {fw.id === 'cdp' && (
                       <>
                         <div style={{ marginBottom: 6 }}>
-                          <div style={{ fontSize: 11, color: '#888784' }}>Prior year Scope 1 ({inventory.reporting_year - 1})</div>
-                          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{inventory.prior_year_s1.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                          <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Prior year Scope 1 ({inventory.reporting_year - 1})</div>
+                          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{inventory.prior_year_s1.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
                         </div>
                         <div style={{ marginBottom: 6 }}>
-                          <div style={{ fontSize: 11, color: '#888784' }}>Prior year Scope 2 ({inventory.reporting_year - 1})</div>
-                          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{inventory.prior_year_s2.toFixed(2)}<span style={{ fontSize: 11, color: '#888784', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                          <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Prior year Scope 2 ({inventory.reporting_year - 1})</div>
+                          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{inventory.prior_year_s2.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
                         </div>
                       </>
                     )}
-                    {rev > 0 && <div style={{ fontSize: 11, color: '#888784', marginTop: 4 }}>Intensity: {(totals.s1_total / rev).toFixed(4)} mt/$M</div>}
-                    {emp > 0 && fw.id === 'ecovadis' && <div style={{ fontSize: 11, color: '#888784' }}>Per employee: {(totals.s1_total / emp * 1000).toFixed(2)} kgCO₂e</div>}
+                    {rev > 0 && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4 }}>Intensity: {(totals.s1_total / rev).toFixed(4)} mt/$M</div>}
+                    {emp > 0 && fw.id === 'ecovadis' && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Per employee: {(totals.s1_total / emp * 1000).toFixed(2)} kgCO₂e</div>}
                     {/* Every figure in this card — both scopes, biogenic, the intensities — is built
                         from the same excluded set, so the note belongs to the card, not to one line. */}
                     {exclusionNote && (
@@ -2110,29 +2110,29 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                           still reads as a measured scope. The reason takes the figures' place. */}
                       {blocked
                         ? <div style={{ fontSize: 12, color: 'var(--color-module-climate)', marginTop: 2, lineHeight: 1.5, maxWidth: 620 }}>⚠ Not included in any total. {unpriceableMessage(blocked)}</div>
-                        : <div style={{ fontSize: 12, color: '#888784', marginTop: 2 }}>S1: {c!.s1_total.toFixed(2)} mt · S2: {c!.s2_location.toFixed(2)} mt · Total: {(c!.s1_total + c!.s2_location).toFixed(2)} mt</div>}
+                        : <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 2 }}>S1: {c!.s1_total.toFixed(2)} mt · S2: {c!.s2_location.toFixed(2)} mt · Total: {(c!.s1_total + c!.s2_location).toFixed(2)} mt</div>}
                     </div>
-                    <span style={{ fontSize: 12, color: '#888784' }}>{showWorkings[key] ? '▲ Hide' : '▼ Show workings'}</span>
+                    <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>{showWorkings[key] ? '▲ Hide' : '▼ Show workings'}</span>
                   </div>
                   {showWorkings[key] && (
                     <div style={{ padding: '0 1.25rem 1.25rem', borderTop: '0.5px solid #e8e7e4' }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', margin: '1rem 0 0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase' as const }}>Calculation workings — ISO 14064-3 / ISAE 3410 transparency</div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', margin: '1rem 0 0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase' as const }}>Calculation workings — ISO 14064-3 / ISAE 3410 transparency</div>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-                        <thead><tr>{['Source', 'Activity data', 'Emission factor', 'Factor source', 'Factor vintage', 'Scope 2 method', 'GWP basis', 'Result (tCO₂e)'].map(h => <th key={h} style={{ background: '#f8f7f5', padding: '6px 10px', textAlign: 'left', fontSize: 10, fontWeight: 600, color: '#888784', borderBottom: '0.5px solid #e8e7e4' }}>{h}</th>)}</tr></thead>
+                        <thead><tr>{['Source', 'Activity data', 'Emission factor', 'Factor source', 'Factor vintage', 'Scope 2 method', 'GWP basis', 'Result (tCO₂e)'].map(h => <th key={h} style={{ background: '#f8f7f5', padding: '6px 10px', textAlign: 'left', fontSize: 10, fontWeight: 600, color: 'var(--color-ink-muted)', borderBottom: '0.5px solid #e8e7e4' }}>{h}</th>)}</tr></thead>
                         <tbody>
                           {locRows.map((r, ri) => {
                             // Declaration rows (Phase 3b) are now VISIBLE (the point of Phase 4). result_tco2e
                             // null must never render as 0 — "0" is a claim of zero, "—" is an absence.
                             if (r.declaration === 'attested_absent') {
                               return <tr key={ri} style={{ background: '#f4f4f2' }}>
-                                <td style={{ ...wTd, color: '#888784' }}>{r.source}</td>
-                                <td style={{ ...wTd, color: '#888784' }}>—</td>
-                                <td style={{ ...wTd, color: '#888784' }}>—</td>
-                                <td style={{ ...wTd, color: '#888784' }}>{r.note}</td>
-                                <td style={{ ...wTd, color: '#888784' }}>—</td>
-                                <td style={{ ...wTd, color: '#888784' }}>—</td>
-                                <td style={{ ...wTd, color: '#888784' }}>{r.gwp_basis}</td>
-                                <td style={{ ...wTd, color: '#888784', fontWeight: 600 }}>0.0000</td>
+                                <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>{r.source}</td>
+                                <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>{r.note}</td>
+                                <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>—</td>
+                                <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>{r.gwp_basis}</td>
+                                <td style={{ ...wTd, color: 'var(--color-ink-muted)', fontWeight: 600 }}>0.0000</td>
                               </tr>
                             }
                             // Same treatment as 'undeclared', and for the same reason: the location
@@ -2219,7 +2219,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                                     nothing joining them — the divergence the note exists to prevent.
                                     Only the two declaration branches rendered r.note before; the normal
                                     fuel row had no cell for it. */}
-                                {r.note && <div style={{ fontSize: 10, color: '#888784', marginTop: 3, lineHeight: 1.4, whiteSpace: 'normal' }}>{r.note}</div>}
+                                {r.note && <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 3, lineHeight: 1.4, whiteSpace: 'normal' }}>{r.note}</div>}
                               </td>
                               <td style={wTd}>{r.emission_factor_display}</td>
                               <td style={wTd}>{r.ef_source}</td>
@@ -2227,7 +2227,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                               <td style={wTd}>{r.scope2_method || '—'}</td>
                               <td style={wTd}>
                                 {r.gwp_basis}
-                                {r.quantification_method && <div style={{ fontSize: 10, color: '#888784', marginTop: 3, lineHeight: 1.4, whiteSpace: 'normal' }}>{r.quantification_method}</div>}
+                                {r.quantification_method && <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 3, lineHeight: 1.4, whiteSpace: 'normal' }}>{r.quantification_method}</div>}
                               </td>
                               {/* ⚠️ THE SCOPE IS LABELLED, NOT ONLY COLOURED. Until 5 Sep 2026 Scope 1
                                   and Scope 2 differed by hue alone — teal against green — which is no
@@ -2405,10 +2405,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                         <span style={{ fontSize: 12, color: "#555553", lineHeight: 1.6 }}>I confirm that the data entered is accurate to the best of my knowledge and has been sourced from actual utility bills and operational records. I understand that ThemisIQ applies the correct methodology to the data I provide, and that accuracy of the underlying data is my responsibility.</span>
                       </label>
                     </div>
-                    <button onClick={() => dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady && generateExport(fw.id)} style={{ fontSize: 14, fontWeight: 500, opacity: (dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady) ? 1 : 0.4, cursor: (dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady) ? "pointer" : "not-allowed", padding: '12px 28px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', border: 'none', }}>
+                    <button onClick={() => dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady && generateExport(fw.id)} style={(dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady) ? btnStepPrimary : btnStepPrimaryDisabled}>
                       ⬇ Download {fw.name} Report (CSV)
                     </button>
-                    <button onClick={() => dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady && generateAssurance()} style={{ fontSize: 14, fontWeight: 500, opacity: (dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady) ? 1 : 0.4, cursor: (dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady) ? 'pointer' : 'not-allowed', ...btnPrimary, padding: '12px 28px', marginLeft: 10 }}>Download Full Assurance Package (PDF)</button>
+                    <button onClick={() => dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady && generateAssurance()} style={(dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady) ? btnStepPrimary : btnStepPrimaryDisabled}>Download Full Assurance Package (PDF)</button>
                   </div>
                   <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem', fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
                     <strong>Disclaimer:</strong>
@@ -2545,7 +2545,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
   }
 
   if (mode === 'loading') {
-    return <div style={{ background: '#fff', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888784', fontSize: 14 }}>Loading…</div>
+    return <div style={{ background: '#fff', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-ink-muted)', fontSize: 14 }}>Loading…</div>
   }
   if (mode === 'list') {
     return (
@@ -2553,7 +2553,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
         <nav style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2rem', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <a href="/dashboard" style={{ textDecoration: 'none' }}><img src="/logo.png" alt="ThemisIQ" style={{ height: 24, width: 'auto', display: 'block' }} /></a>
-            <span style={{ fontSize: 12, color: '#888784' }}>/ GHG Inventory</span>
+            <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>/ GHG Inventory</span>
           </div>
         </nav>
         <div style={{ maxWidth: 760, margin: '0 auto', padding: '3rem 1.5rem' }}>
@@ -2565,14 +2565,14 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             </div>
           </div>
           {inventoryList.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: '#888784', fontSize: 14 }}>No inventories yet. Click &ldquo;New inventory&rdquo; to begin.</div>
+            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-ink-muted)', fontSize: 14 }}>No inventories yet. Click &ldquo;New inventory&rdquo; to begin.</div>
           ) : (
             inventoryList.map(inv => (
               <a key={inv.id} href={`/dashboard/ghg?id=${inv.id}`} style={{ textDecoration: 'none', display: 'block' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '16px 20px', marginBottom: 10, cursor: 'pointer', flexWrap: 'wrap' }}>
                   <div>
                     <div style={{ fontSize: 15, fontWeight: 500, color: '#0d0d0d' }}>{inv.company_name || 'Untitled inventory'}</div>
-                    <div style={{ fontSize: 12, color: '#888784', marginTop: 3 }}>Reporting year {inv.reporting_year} · Updated {new Date(inv.updated_at).toLocaleDateString()}</div>
+                    <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 3 }}>Reporting year {inv.reporting_year} · Updated {new Date(inv.updated_at).toLocaleDateString()}</div>
                   </div>
                   <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-brand)' }}>Open →</span>
                 </div>
@@ -2602,7 +2602,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
   // wall accepts, and a sixth state added later fails to compile here instead of rendering blank.
   if (mode === 'wizard' && !inventoryId && ghgAccess !== 'active') {
     if (ghgAccess === 'loading') {
-      return <div style={{ background: '#fff', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888784', fontSize: 14 }}>Loading…</div>
+      return <div style={{ background: '#fff', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-ink-muted)', fontSize: 14 }}>Loading…</div>
     }
     return <GhgEntryWall access={ghgAccess} />
   }
@@ -2614,7 +2614,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           <a href="/dashboard" style={{ textDecoration: 'none' }}>
             <img src="/logo.png" alt="ThemisIQ" style={{ height: 24, width: 'auto', display: 'block' }} />
           </a>
-          <span style={{ fontSize: 12, color: '#888784' }}>/ GHG Inventory</span>
+          <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>/ GHG Inventory</span>
           {activeFrameworks.length > 0 && <span style={{ fontSize: 11, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 99, padding: '2px 10px', color: '#555553' }}>{activeFrameworks.map(f => f.name).join(' · ')}</span>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -2627,7 +2627,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
 
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2rem', display: 'flex', overflowX: 'auto' as const }}>
         {STEPS.map((s, i) => (
-          <button key={s} onClick={() => setStep(i)} style={{ fontSize: 12, padding: '14px 16px', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? 'var(--color-brand)' : 'transparent'}`, color: step === i ? 'var(--color-brand)' : '#888784', cursor: 'pointer', fontWeight: step === i ? 500 : 400, whiteSpace: 'nowrap' as const }}>
+          <button key={s} onClick={() => setStep(i)} style={{ fontSize: 12, padding: '14px 16px', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? 'var(--color-brand)' : 'transparent'}`, color: step === i ? 'var(--color-brand)' : 'var(--color-ink-muted)', cursor: 'pointer', fontWeight: step === i ? 500 : 400, whiteSpace: 'nowrap' as const }}>
             {i + 1}. {s}
           </button>
         ))}
@@ -2671,9 +2671,9 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 8, padding: '12px 16px', marginTop: '1.5rem', fontSize: 12, fontWeight: 600, color: 'var(--color-module-climate)' }}>⚠ {unresolvedGridLocations.length} location{unresolvedGridLocations.length > 1 ? 's' : ''} need{unresolvedGridLocations.length > 1 ? '' : 's'} a grid region before you can continue: {unresolvedGridLocations.map(l => l.name).join(', ')}</div>
         )}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
-          <button onClick={() => setStep(s => Math.max(0, s-1))} disabled={step === 0} style={{ fontSize: 13, padding: '10px 24px', borderRadius: 8, background: 'none', border: '0.5px solid #e8e7e4', cursor: step === 0 ? 'not-allowed' : 'pointer', color: '#555553', opacity: step === 0 ? 0.4 : 1 }}>← Back</button>
+          <button onClick={() => setStep(s => Math.max(0, s-1))} disabled={step === 0} style={{ ...(step === 0 ? btnStepDisabled : btnStep) }}>← Back</button>
           {step < STEPS.length - 1 && (
-            <button onClick={() => { if (step === 2 && !gridReady) return; setStep(s => s+1) }} disabled={step === 2 && !gridReady} style={{ fontSize: 13, fontWeight: 500, ...btnPrimary, padding: '10px 28px', opacity: (step === 2 && !gridReady) ? 0.4 : 1, cursor: (step === 2 && !gridReady) ? 'not-allowed' : 'pointer' }}>Continue →</button>
+            <button onClick={() => { if (step === 2 && !gridReady) return; setStep(s => s+1) }} disabled={step === 2 && !gridReady} style={(step === 2 && !gridReady) ? btnStepPrimaryDisabled : btnStepPrimary}>Continue →</button>
           )}
         </div>
       </div>
@@ -2711,13 +2711,13 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
       {/* Click-to-pick region (drop works anywhere on the card above). Same picker as before. */}
       <div onClick={() => !uploading && ref.current?.click()} style={{ cursor: uploading ? 'default' : 'pointer', marginBottom: docs.length > 0 ? 8 : 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-          <span style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>📎 {label}</span>
+          <span style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>📎 {label}</span>
           <span style={{ fontSize: 11, padding: '4px 12px', borderRadius: 6, background: '#fff', border: '0.5px solid #e8e7e4', color: '#555553' }}>{uploading ? 'Uploading…' : '+ Upload'}</span>
         </div>
         <div style={{ fontSize: 13, color: '#0d0d0d', fontWeight: 500 }}>
           {conciergeReads ? 'Drag & drop your bill here, or click to upload' : 'Drag & drop your documents here, or click to upload'}
         </div>
-        <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, marginTop: 4, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, marginTop: 4, lineHeight: 1.5 }}>
           {conciergeReads
             ? 'We’ll read the consumption figures automatically — you confirm before anything’s saved. PDF or photo (JPG, PNG) — large phone photos are fine.'
             : hasConcierge
@@ -2857,18 +2857,18 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-brand)' }}>ThemisIQ read</span>
                     <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{p.value != null ? `${p.value.toLocaleString()} ${p.unit ?? ''}` : '—'}</span>
-                    <span style={{ fontSize: 11, color: '#888784' }}>{p.fuelType.replace('_', ' ')}</span>
-                    {(p.periodStart || p.periodEnd) && <span style={{ fontSize: 11, color: '#888784' }}>· {p.periodStart ?? '?'} → {p.periodEnd ?? '?'}</span>}
+                    <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{p.fuelType.replace('_', ' ')}</span>
+                    {(p.periodStart || p.periodEnd) && <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>· {p.periodStart ?? '?'} → {p.periodEnd ?? '?'}</span>}
                     <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: p.status === 'needs_manual_review' ? '#FEF3E2' : '#E1F5EE', color: p.status === 'needs_manual_review' ? 'var(--color-module-climate)' : '#0F6E56' }}>
                       {p.status === 'needs_manual_review' ? 'NEEDS REVIEW' : p.confidence.toUpperCase()}
                     </span>
                   </div>
-                  {p.sourceQuote && <div style={{ fontSize: 11, color: '#888784', fontStyle: 'italic', marginTop: 2 }}>“{p.sourceQuote}”</div>}
+                  {p.sourceQuote && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontStyle: 'italic', marginTop: 2 }}>“{p.sourceQuote}”</div>}
                   {p.conversionNote && <div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>{p.conversionNote}</div>}
                   {editing === `${doc.id}:${pi}` ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
                       <input type="number" value={editVal} onChange={e => setEditVal(e.target.value)} placeholder="corrected value" style={{ fontSize: 12, padding: '4px 8px', border: '0.5px solid #e8e7e4', borderRadius: 6, width: 130 }} />
-                      <span style={{ fontSize: 11, color: '#888784' }}>{p.unit ?? ''}</span>
+                      <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{p.unit ?? ''}</span>
                       <button onClick={() => { const v = Number(editVal); if (Number.isFinite(v)) { onUpdateProposal(locIdx, doc.id, pi, { value: v, status: 'confirmed' }); setEditing(null) } }} style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#0F6E56', color: '#fff', border: 'none', cursor: 'pointer' }}>Save</button>
                       <button onClick={() => setEditing(null)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#f8f7f5', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Cancel</button>
                     </div>
@@ -2904,7 +2904,7 @@ function QuestionCard({ question, hint, checked, onToggle, children }: { questio
         </div>
         <div>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }}>{question}</div>
-          <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.5 }}>{hint}</div>
+          <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.5 }}>{hint}</div>
         </div>
       </div>
       {checked && children && <div style={{ padding: '0 1.25rem 1.25rem', borderTop: '0.5px solid #e8e7e4' }}><div style={{ paddingTop: '1rem' }}>{children}</div></div>}
@@ -2916,7 +2916,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   return (
     <div>
       <label style={{ fontSize: 12, fontWeight: 500, color: '#0d0d0d', display: 'block', marginBottom: hint ? 4 : 6 }}>{label}</label>
-      {hint && <div style={{ fontSize: 11, color: '#888784', marginBottom: 6, lineHeight: 1.5 }}>{hint}</div>}
+      {hint && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 6, lineHeight: 1.5 }}>{hint}</div>}
       {children}
     </div>
   )
@@ -2926,10 +2926,10 @@ const unitBtn = (active: boolean): React.CSSProperties => ({ fontSize: 12, paddi
 const inputStyle: React.CSSProperties = { width: '100%', fontSize: 13, padding: '9px 12px', border: '0.5px solid #e8e7e4', borderRadius: 8, outline: 'none', boxSizing: 'border-box', background: '#fff' }
 const sectionSub: React.CSSProperties = { fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.7, marginBottom: '2rem' }
 const wTd: React.CSSProperties = { padding: '6px 10px', borderBottom: '0.5px solid #e8e7e4', color: '#555553', fontSize: 11, verticalAlign: 'top' }
-const qHint: React.CSSProperties = { fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '0.75rem' }
+const qHint: React.CSSProperties = { fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.6, marginBottom: '0.75rem' }
 export default function Page() {
   return (
-    <Suspense fallback={<div style={{ padding: '4rem', textAlign: 'center', color: '#888784' }}>Loading…</div>}>
+    <Suspense fallback={<div style={{ padding: '4rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>Loading…</div>}>
       <GHGPage />
     </Suspense>
   )
@@ -3022,7 +3022,7 @@ function AuditTrail({ inventoryId, step }: { inventoryId: string | null; step: n
         <div style={{ fontSize: 11, color: 'var(--color-ink-2)' }}>ISO 14064-3 / ISAE 3410 traceability</div>
       </div>
 
-      {loading && <div style={{ textAlign: 'center', padding: '2rem', color: '#888784', fontSize: 13 }}>Loading history…</div>}
+      {loading && <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-ink-muted)', fontSize: 13 }}>Loading history…</div>}
 
       {!loading && rows.length === 0 && (
         <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '2rem', textAlign: 'center', fontSize: 13, color: '#555553' }}>No entries recorded yet.</div>
@@ -3048,15 +3048,15 @@ function AuditTrail({ inventoryId, step }: { inventoryId: string | null; step: n
                   <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color, background: bg, padding: '3px 10px', borderRadius: 99 }}>{actionLabel}</span>
                   <span style={{ fontSize: 12, color: '#555553' }}>{row.user_email || 'System'}</span>
                 </div>
-                <span style={{ fontSize: 11, color: '#888784' }}>{new Date(row.created_at).toLocaleString()}</span>
+                <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{new Date(row.created_at).toLocaleString()}</span>
               </div>
               {changes.length > 0 && (
                 <div style={{ borderTop: '0.5px solid #f0efed', paddingTop: 10 }}>
                   {changes.map((c, j) => (
                     <div key={j} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 8, alignItems: 'center', fontSize: 12, padding: '3px 0' }}>
                       <span style={{ color: '#555553' }}>{c.label}</span>
-                      <span style={{ color: '#888784', textDecoration: 'line-through' }}>{c.from}</span>
-                      <span style={{ color: '#888784' }}>→</span>
+                      <span style={{ color: 'var(--color-ink-muted)', textDecoration: 'line-through' }}>{c.from}</span>
+                      <span style={{ color: 'var(--color-ink-muted)' }}>→</span>
                       <span style={{ color: '#0d0d0d', fontWeight: 500 }}>{c.to}</span>
                     </div>
                   ))}
@@ -3163,7 +3163,7 @@ function VerifierInvite({ inventoryId }: { inventoryId: string | null }) {
       </div>
 
       {active.length === 0 && (
-        <div style={{ fontSize: 12, color: '#888784', fontStyle: 'italic' }}>No active verifier links yet.</div>
+        <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontStyle: 'italic' }}>No active verifier links yet.</div>
       )}
 
       {active.map(g => (
@@ -3171,14 +3171,14 @@ function VerifierInvite({ inventoryId }: { inventoryId: string | null }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{g.verifier_name || 'Verifier'}{g.verifier_email ? ` · ${g.verifier_email}` : ''}</div>
-              <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>Expires {new Date(g.expires_at).toLocaleDateString()}</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>Expires {new Date(g.expires_at).toLocaleDateString()}</div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => copy(g.token, g.id)} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 6, background: '#fff', border: '0.5px solid #e8e7e4', cursor: 'pointer', color: '#555553' }}>{copiedId === g.id ? '✓ Copied' : 'Copy link'}</button>
               <button onClick={() => revoke(g.id)} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 6, background: 'none', border: '0.5px solid #e8e7e4', cursor: 'pointer', color: '#B91C1C' }}>Revoke</button>
             </div>
           </div>
-          <div style={{ marginTop: 8, fontSize: 11, color: '#888784', wordBreak: 'break-all', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 6, padding: '6px 10px' }}>{linkFor(g.token)}</div>
+          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--color-ink-muted)', wordBreak: 'break-all', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 6, padding: '6px 10px' }}>{linkFor(g.token)}</div>
         </div>
       ))}
     </div>

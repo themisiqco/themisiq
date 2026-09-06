@@ -25,7 +25,7 @@ import { NO_VISIBILITY_LABEL, type ScaleDefinition } from '../../lib/materiality
 const PURPLE = '#7425e3'
 const INK = '#0d0d0d'
 const MID = '#555553'
-const MUTE = '#888784'
+const MUTE = 'var(--color-ink-muted)'
 const LINE = '#e8e7e4'
 const PAPER = '#f8f7f5'
 

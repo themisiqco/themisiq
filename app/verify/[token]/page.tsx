@@ -251,7 +251,7 @@ function SourceDocRow({ doc, token }: { doc: VerifierDoc; token: string }) {
         {/* Labelled at RENDER, not in flattenSourceDocs: document_type is the join key the rest of
             the system runs on, so the shape that crosses the wire keeps the token and only the
             surface a person reads swaps it for a name. */}
-        <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{doc.location} · {docTypeLabel(doc.document_type)}</div>
+        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>{doc.location} · {docTypeLabel(doc.document_type)}</div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         {failed && <span style={{ fontSize: 11, color: '#B91C1C' }}>Couldn&rsquo;t open — try again</span>}
@@ -269,7 +269,7 @@ function SourceDocRow({ doc, token }: { doc: VerifierDoc; token: string }) {
           // A document stored before uploads carried an id. It cannot be resolved to a file, so we
           // say that rather than offer a button certain to fail. The document is still listed: a
           // verifier needs to know the evidence exists even when this page cannot serve it.
-          <span style={{ fontSize: 11, color: '#888784' }}>Not available here — ask the company for a copy</span>
+          <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Not available here — ask the company for a copy</span>
         )}
       </div>
     </div>
@@ -367,7 +367,7 @@ export default function VerifierPage() {
     return () => window.removeEventListener('resize', measure)
   }, [data, accepted, docs])
 
-  if (loading) return <Shell><div style={{ padding: '4rem', textAlign: 'center', color: '#888784' }}>Loading verification review…</div></Shell>
+  if (loading) return <Shell><div style={{ padding: '4rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>Loading verification review…</div></Shell>
 
   if (!data || data.error || !data.inventory) {
     return (
@@ -409,14 +409,14 @@ export default function VerifierPage() {
     return (
       <Shell>
         <div style={{ maxWidth: 540, margin: '3.5rem auto', padding: '0 1.5rem' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Independent Verification Review</div>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }}>Independent Verification Review</div>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.6rem,3vw,2rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>Confirm your details to continue</h1>
           <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.7, marginBottom: '1.75rem' }}>
             You&rsquo;ve been invited to review {gateCompany ? <>the GHG inventory for <strong style={{ fontWeight: 500, color: '#0d0d0d' }}>{gateCompany}</strong></> : 'a GHG inventory'} for independent assurance. Please confirm your email and agree to the Terms and Privacy Policy to proceed.
           </p>
 
           <div style={{ marginBottom: '1.25rem' }}>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#888784', marginBottom: 6 }}>Your email</label>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 6 }}>Your email</label>
             <input
               type="email"
               value={email}
@@ -439,10 +439,15 @@ export default function VerifierPage() {
             onClick={handleAccept}
             disabled={submitting || !tosChecked || !privacyChecked || !email.trim()}
             style={{
-              width: '100%', fontSize: 14, fontWeight: 500, padding: '12px 20px', borderRadius: 8, border: 'none',
-              background: '#0d0d0d', color: '#fff',
+              width: '100%', fontSize: 14, fontWeight: 500, padding: '12px 20px', borderRadius: 8,
+              // ⚠️ NOT opacity. Group opacity composites the whole button over the page, so at 0.45
+              // the label rendered as #FFFFFF on #929292 — 3.11:1, below AA, at the exact moment the
+              // button has to explain why it will not respond. An explicit disabled palette keeps
+              // the label readable: ink-muted on sunken is 5.00:1.
+              background: (submitting || !tosChecked || !privacyChecked || !email.trim()) ? 'var(--color-sunken)' : '#0d0d0d',
+              color: (submitting || !tosChecked || !privacyChecked || !email.trim()) ? 'var(--color-ink-muted)' : '#fff',
+              border: `1px solid ${(submitting || !tosChecked || !privacyChecked || !email.trim()) ? 'var(--color-line)' : 'transparent'}`,
               cursor: (submitting || !tosChecked || !privacyChecked || !email.trim()) ? 'not-allowed' : 'pointer',
-              opacity: (submitting || !tosChecked || !privacyChecked || !email.trim()) ? 0.45 : 1,
             }}
           >
             {submitting ? 'Confirming…' : 'Accept & view inventory'}
@@ -488,7 +493,7 @@ export default function VerifierPage() {
           Read-only verifier view · You are reviewing a GHG inventory shared for independent assurance{data.expires_at ? ` · Access expires ${new Date(data.expires_at).toLocaleDateString()}` : ''}
         </div>
 
-        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Independent Verification Review</div>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }}>Independent Verification Review</div>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem,3vw,2.4rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{inv.company_name || 'GHG Inventory'}</h1>
         {/* GWP basis sits with the other inventory-level qualifiers, above the figures it qualifies.
             ISO 14064-3 7.1.4.9(b) requires the verifier to confirm the GWP set used, so its ABSENCE
@@ -563,7 +568,7 @@ export default function VerifierPage() {
             ) : (
               <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
                 <div>
-                  <div style={{ fontSize: 11, color: '#888784', marginBottom: 4 }}>Shown to the company when they answered</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 4 }}>Shown to the company when they answered</div>
                   {/* Only in this group: `basis` is the basis AS AT THE ANSWER, and no recomputed
                       basis is stored. Repeating these against the current figures would assert
                       something about them that was never computed. */}
@@ -575,7 +580,7 @@ export default function VerifierPage() {
                   ))}
                 </div>
                 <div>
-                  <div style={{ fontSize: 11, color: '#888784', marginBottom: 4 }}>What the figures say now</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 4 }}>What the figures say now</div>
                   {(inv.comparability_disclosure.observationsAtSave ?? []).map((line, i) => (
                     <div key={i} style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{line}</div>
                   ))}
@@ -678,7 +683,7 @@ export default function VerifierPage() {
                   <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                       <thead><tr>{['Jurisdiction', 'Factor family', 'Source', 'Edition'].map(h => (
-                        <th key={h} style={{ background: '#f8f7f5', padding: '6px 10px', textAlign: 'left', fontSize: 10, fontWeight: 600, color: '#888784', borderBottom: '0.5px solid #e8e7e4', whiteSpace: 'nowrap' }}>{h}</th>
+                        <th key={h} style={{ background: '#f8f7f5', padding: '6px 10px', textAlign: 'left', fontSize: 10, fontWeight: 600, color: 'var(--color-ink-muted)', borderBottom: '0.5px solid #e8e7e4', whiteSpace: 'nowrap' }}>{h}</th>
                       ))}</tr></thead>
                       <tbody>
                         {Object.entries(inv.factor_editions).flatMap(([juris, families]) =>
@@ -699,7 +704,7 @@ export default function VerifierPage() {
                       tables change. Without this line a verifier could read a recorded edition as a
                       statement about the factor tables TODAY. See the report for why this sentence
                       sits here rather than being inferred. */}
-                  <p style={{ fontSize: 11, color: '#888784', lineHeight: 1.6, margin: '12px 0 0' }}>
+                  <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, margin: '12px 0 0' }}>
                     These editions describe the calculation that produced the figures on this page, not the
                     factor tables currently held by the platform. They were recorded at the same time as the
                     calculation workings above, so the two describe the same calculation.
@@ -728,7 +733,7 @@ export default function VerifierPage() {
         </div>
 
         <SectionHead>Calculation Workings</SectionHead>
-        <p style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1rem' }}>
+        <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.6, marginBottom: '1rem' }}>
           Per-source breakdown as calculated at save time. Each line shows the activity data, emission factor, and GWP basis used — enabling independent recalculation under ISO 14064-3.
         </p>
         {(inv.workings && inv.workings.length > 0) ? (
@@ -772,10 +777,10 @@ export default function VerifierPage() {
                         <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: '#7425e3', background: 'rgba(116,37,227,0.08)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Bill-sourced</span>
                       )}
                       {w.entry_method === 'concierge-extrapolated' && (
-                        <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: '#888784', background: '#efeeec', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Estimated</span>
+                        <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: 'var(--color-ink-muted)', background: '#efeeec', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Estimated</span>
                       )}
                       {w.source_quotes && w.source_quotes.length > 0 && (
-                        <div style={{ marginTop: 4, fontSize: 11, fontStyle: 'italic', fontWeight: 400, color: '#888784' }}>From source: {w.source_quotes.map((q, qi) => {
+                        <div style={{ marginTop: 4, fontSize: 11, fontStyle: 'italic', fontWeight: 400, color: 'var(--color-ink-muted)' }}>From source: {w.source_quotes.map((q, qi) => {
                           const p = w.source_file_paths?.[qi]
                           const docId = p ? pathToDocId[p] : undefined
                           return (
@@ -787,7 +792,7 @@ export default function VerifierPage() {
                         })}</div>
                       )}
                       {w.extrapolation_note && (
-                        <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: '#888784' }}>Estimated — {w.extrapolation_note}</div>
+                        <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-ink-muted)' }}>Estimated — {w.extrapolation_note}</div>
                       )}
                       {/* Written for a verifier, not reused from the operator's wizard. The operator
                           is being told what to do next; a verifier is deciding what they can rely on,
@@ -796,7 +801,7 @@ export default function VerifierPage() {
                       {w.declaration === 'attested_absent' && (
                         <>
                           <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: '#555553', background: '#e8e7e4', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Confirmed absent</span>
-                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: '#888784' }}>
+                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-ink-muted)' }}>
                             The operator has confirmed this location has none of this. Nothing is omitted here.
                           </div>
                         </>
@@ -875,10 +880,10 @@ export default function VerifierPage() {
                           disclosure in ef_source, and this is where it belongs — beside the figure
                           it qualifies, not under the Factor source heading. */}
                       {rowNoteOf(w) && (
-                        <div style={{ marginTop: 3, fontSize: 11, fontWeight: 400, color: '#888784', lineHeight: 1.4 }}>{rowNoteOf(w)}</div>
+                        <div style={{ marginTop: 3, fontSize: 11, fontWeight: 400, color: 'var(--color-ink-muted)', lineHeight: 1.4 }}>{rowNoteOf(w)}</div>
                       )}
                     </td>
-                    <td style={{ padding: '8px 10px', color: '#888784', fontSize: 11 }}>{w.emission_factor}</td>
+                    <td style={{ padding: '8px 10px', color: 'var(--color-ink-muted)', fontSize: 11 }}>{w.emission_factor}</td>
                     {/* WIDTH-CAPPED, WRAPPED, NEVER TRUNCATED. The longest citation on file runs to
                         349 characters (Green-e residual mix, with vintage and note appended), so the
                         row grows tall rather than the citation being cut — a shortened citation is
@@ -899,7 +904,7 @@ export default function VerifierPage() {
                     <td style={{ padding: '8px 10px', color: '#555553' }}>
                       <div style={{ maxWidth: 200, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{w.gwp_basis}</div>
                       {w.quantification_method && (
-                        <div style={{ marginTop: 3, fontSize: 10, color: '#888784', lineHeight: 1.4 }}>{w.quantification_method}</div>
+                        <div style={{ marginTop: 3, fontSize: 10, color: 'var(--color-ink-muted)', lineHeight: 1.4 }}>{w.quantification_method}</div>
                       )}
                     </td>
                     <td style={{ padding: '8px 10px', color: '#7425e3', fontWeight: 600, whiteSpace: 'nowrap' }}>{w.result_tco2e == null ? '—' : w.result_tco2e.toFixed(3)}</td>
@@ -915,20 +920,20 @@ export default function VerifierPage() {
                 It is not rebuilt from the rows because the real citations run to ~1,000 characters
                 on a multi-country inventory, and shortening a published citation would be the same
                 mistake in a new form. Each row already names its own source; this points there. */}
-            <div style={{ fontSize: 11, color: '#888784', marginTop: 8 }}>Each row above names the emission factor source it used, in the Factor source column — sources differ by country and by fuel, so read them per row rather than assuming one set applies throughout. Verifier should confirm each sampled line independently.</div>
+            <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 8 }}>Each row above names the emission factor source it used, in the Factor source column — sources differ by country and by fuel, so read them per row rather than assuming one set applies throughout. Verifier should confirm each sampled line independently.</div>
           </div>
           </>
         ) : (
-          <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.5rem', textAlign: 'center', fontSize: 13, color: '#888784', marginBottom: '2rem' }}>No calculation workings recorded for this inventory yet.</div>
+          <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.5rem', textAlign: 'center', fontSize: 13, color: 'var(--color-ink-muted)', marginBottom: '2rem' }}>No calculation workings recorded for this inventory yet.</div>
         )}
 
         <SectionHead>Source Documents</SectionHead>
-        <p style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1rem' }}>
+        <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.6, marginBottom: '1rem' }}>
           Supporting evidence uploaded for this inventory — trace each activity-data figure back to its source document. {VERIFIER_DOC_LINK_NOTICE}
         </p>
-        {docsLoading && <div style={{ fontSize: 13, color: '#888784', marginBottom: '2rem' }}>Loading documents…</div>}
+        {docsLoading && <div style={{ fontSize: 13, color: 'var(--color-ink-muted)', marginBottom: '2rem' }}>Loading documents…</div>}
         {!docsLoading && docs.length === 0 && (
-          <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.5rem', textAlign: 'center', fontSize: 13, color: '#888784', marginBottom: '2rem' }}>No source documents have been uploaded for this inventory.</div>
+          <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.5rem', textAlign: 'center', fontSize: 13, color: 'var(--color-ink-muted)', marginBottom: '2rem' }}>No source documents have been uploaded for this inventory.</div>
         )}
         {!docsLoading && docs.length > 0 && (
           <div style={{ marginBottom: '2rem' }}>
@@ -956,11 +961,11 @@ export default function VerifierPage() {
                   <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color, background: `color-mix(in srgb, ${color} 9%, transparent)`, padding: '3px 10px', borderRadius: 99 }}>{label}</span>
                   <span style={{ fontSize: 12, color: '#555553' }}>{row.user_email || 'System'}</span>
                 </div>
-                <span style={{ fontSize: 11, color: '#888784' }}>{new Date(row.created_at).toLocaleString()}</span>
+                <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{new Date(row.created_at).toLocaleString()}</span>
               </div>
               {changed.length > 0 && (
                 <div style={{ borderTop: '0.5px solid #f0efed', paddingTop: 10 }}>
-                  <div style={{ fontSize: 11, color: '#888784', marginBottom: 4 }}>Fields changed in this revision</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 4 }}>Fields changed in this revision</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {changed.map((key, j) => (
                       <span key={j} style={{ fontSize: 12, color: '#555553', background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 99, padding: '3px 10px' }}>
@@ -974,7 +979,7 @@ export default function VerifierPage() {
           )
         })}
 
-        <div style={{ marginTop: '2.5rem', padding: '1rem 1.25rem', background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, fontSize: 11, color: '#888784', lineHeight: 1.6 }}>
+        <div style={{ marginTop: '2.5rem', padding: '1rem 1.25rem', background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6 }}>
           This review is generated by the ThemisIQ platform to support independent verification under ISO 14064-3 / ISAE 3410. Data is read-only. This page does not itself constitute assurance, legal advice, or a regulatory filing.
         </div>
       </div>
@@ -999,7 +1004,7 @@ function Stat({ label, value, color }: { label: string; value: string; color: st
   return (
     <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '14px', textAlign: 'center' }}>
       <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', color, marginBottom: 2 }}>{value}</div>
-      <div style={{ fontSize: 10, color: '#888784' }}>{label}</div>
+      <div style={{ fontSize: 10, color: 'var(--color-ink-muted)' }}>{label}</div>
     </div>
   )
 }

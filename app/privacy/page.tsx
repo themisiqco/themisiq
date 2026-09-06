@@ -29,13 +29,13 @@ export default function PrivacyPage() {
       {/* HERO */}
       <div style={{ background: '#f8f7f5', borderBottom: '0.5px solid #e8e7e4', padding: '3.5rem 2.5rem 3rem' }}>
         <div style={{ maxWidth: 920, margin: '0 auto' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>ThemisIQ Compliance Inc.</div>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: 8 }}>ThemisIQ Compliance Inc.</div>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }}>
             Privacy <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Policy</span>
           </h1>
           <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' as const, marginBottom: '1rem' }}>
             {['Effective: May 17, 2026', 'TIQ-PRV-001 · v2.0', 'ThemisIQ Compliance Inc. · Canada', 'privacy@themisiq.co'].map(item => (
-              <span key={item} style={{ fontSize: 12, color: '#888784' }}>{item}</span>
+              <span key={item} style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>{item}</span>
             ))}
           </div>
           <div className="tq-callout tq-callout-note" style={{ '--tq-state': '#7425e3', '--tq-state-wash': 'rgba(116,37,227,0.05)' } as React.CSSProperties}>
@@ -50,7 +50,7 @@ export default function PrivacyPage() {
 
         {/* TOC */}
         <div style={{ position: 'sticky', top: 80 }}>
-          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.09em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 12 }}>Contents</div>
+          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.09em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: 12 }}>Contents</div>
           {sections.map(s => (
             <a key={s.id} href={`#${s.id}`} onClick={() => setActive(s.id)} style={{ display: 'block', fontSize: 12, color: s.highlight ? '#7425e3' : active === s.id ? '#7425e3' : '#555553', padding: '5px 0 5px 10px', borderLeft: `2px solid ${active === s.id || s.highlight ? '#7425e3' : 'transparent'}`, textDecoration: 'none', fontWeight: s.highlight ? 500 : 400, marginBottom: 2 }}>
               {s.title} {s.highlight && <span style={{ fontSize: 9, fontWeight: 600, color: '#7425e3', background: 'rgba(116,37,227,0.1)', borderRadius: 4, padding: '1px 5px', marginLeft: 4 }}>NEW</span>}

@@ -44,23 +44,44 @@ export default function DisclosureQuestion({
     onChange(value === target ? null : target)
   }
 
-  const btn = (selected: boolean): React.CSSProperties => ({
-    fontSize: 12,
-    padding: '6px 14px',
-    borderRadius: 8,
-    background: selected ? '#7425e3' : '#f8f7f5',
-    color: selected ? '#fff' : '#555553',
-    border: `0.5px solid ${selected ? '#7425e3' : '#e8e7e4'}`,
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    opacity: disabled ? 0.6 : 1,
-  })
+  /**
+   * The Yes/No pair. Twin of attestBtn in ../disclosures/page.tsx, and it had the same three
+   * defects: the retired violet #7425e3, a saturated selected fill where this system marks
+   * selection with var(--color-brand-wash) and a brand edge, and opacity: 0.6 as the disabled
+   * cue — which composited to 3.06:1 selected and 2.74:1 unselected. See the DISABLED AND
+   * INACTIVE STATE block in app/styles/themisiq-tokens.css.
+   *
+   * ⚠️ THE ANSWER SURVIVES BEING DISABLED. A flat disabled face would render Yes and No
+   * identically while the row saves, hiding the answer just given. Fill and label recede; the
+   * brand edge on the selected side stays.
+   */
+  const btn = (selected: boolean): React.CSSProperties => {
+    if (disabled) return {
+      fontSize: 12,
+      padding: '6px 14px',
+      borderRadius: 8,
+      background: 'var(--color-sunken)',
+      color: 'var(--color-ink-muted)',
+      border: `0.5px solid ${selected ? 'var(--color-brand)' : 'var(--color-line)'}`,
+      cursor: 'not-allowed',
+    }
+    return {
+      fontSize: 12,
+      padding: '6px 14px',
+      borderRadius: 8,
+      background: selected ? 'var(--color-brand-wash)' : '#f8f7f5',
+      color: selected ? 'var(--color-ink)' : '#555553',
+      border: `0.5px solid ${selected ? 'var(--color-brand)' : '#e8e7e4'}`,
+      cursor: 'pointer',
+    }
+  }
 
   return (
-    <div style={{ background: '#fff', border: `0.5px solid ${answered ? '#7425e3' : '#e8e7e4'}`, borderRadius: 12, overflow: 'hidden' }}>
+    <div style={{ background: '#fff', border: `0.5px solid ${answered ? 'var(--color-brand)' : '#e8e7e4'}`, borderRadius: 12, overflow: 'hidden' }}>
       <div style={{ padding: '1.25rem', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }}>{question}</div>
-          <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.5 }}>{hint}</div>
+          <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.5 }}>{hint}</div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginTop: 1 }}>
           <button
@@ -84,7 +105,7 @@ export default function DisclosureQuestion({
         </div>
       </div>
       {value === null && (
-        <div style={{ padding: '0 1.25rem 0.85rem', fontSize: 11, color: '#888784', fontWeight: 400 }}>Not yet answered</div>
+        <div style={{ padding: '0 1.25rem 0.85rem', fontSize: 11, color: 'var(--color-ink-muted)', fontWeight: 400 }}>Not yet answered</div>
       )}
       {value === true && children && (
         <div style={{ padding: '0 1.25rem 1.25rem', borderTop: '0.5px solid #e8e7e4' }}>
@@ -109,7 +130,7 @@ export function CbamField({ label, hint, children }: { label: string; hint?: Rea
   return (
     <div>
       <label style={{ fontSize: 12, fontWeight: 500, color: '#0d0d0d', display: 'block', marginBottom: hint ? 4 : 6 }}>{label}</label>
-      {hint && <div style={{ fontSize: 11, color: '#888784', marginBottom: 6, lineHeight: 1.5 }}>{hint}</div>}
+      {hint && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 6, lineHeight: 1.5 }}>{hint}</div>}
       {children}
     </div>
   )

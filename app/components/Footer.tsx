@@ -21,7 +21,7 @@ export default function Footer() {
       <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '2.2fr 1fr 1fr 1fr', gap: '3rem' }}>
         <div>
           <Logo size={130} />
-          <p style={{ fontSize: 13, color: '#888784', lineHeight: 1.65, fontWeight: 400, marginTop: '1rem', maxWidth: 270 }}>
+          <p style={{ fontSize: 13, color: 'var(--color-ink-muted)', lineHeight: 1.65, fontWeight: 400, marginTop: '1rem', maxWidth: 270 }}>
             Compliance Intelligence for Sustainable Business. GHG emissions, climate risk, supply chain, M&A diligence, AI governance, people & workforce, and cybersecurity — one platform.
           </p>
         </div>
@@ -48,7 +48,7 @@ export default function Footer() {
           ] },
         ].map(col => (
           <div key={col.heading}>
-            <div style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#888784', marginBottom: '1rem' }}>{col.heading}</div>
+            <div style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: '1rem' }}>{col.heading}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {col.links.map(l => <a key={l.label} href={l.href} style={{ fontSize: 13, color: '#555553', textDecoration: 'none' }}>{l.label}</a>)}
             </div>
@@ -56,8 +56,8 @@ export default function Footer() {
         ))}
       </div>
       <div style={{ maxWidth: 1100, margin: '2.5rem auto 0', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: 12, color: '#888784' }}>© 2026 ThemisIQ Compliance Inc. · www.themisiq.co · All rights reserved</div>
-        <div style={{ fontSize: 12, color: '#888784' }}>Compliance Intelligence for Sustainable Business</div>
+        <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>© 2026 ThemisIQ Compliance Inc. · www.themisiq.co · All rights reserved</div>
+        <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Compliance Intelligence for Sustainable Business</div>
       </div>
     </footer>
   )

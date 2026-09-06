@@ -138,7 +138,7 @@ export default function DealsListPage() {
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '2rem 2.5rem' }}>
-        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '3rem', textAlign: 'center', color: '#888784', fontSize: 13 }}>
+        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '3rem', textAlign: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>
           Loading your deals…
         </div>
       </div>
@@ -159,14 +159,14 @@ export default function DealsListPage() {
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Deals &amp; Investment</div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 4 }}>Deals &amp; Investment</div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>Your targets</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
             {/* Hidden until there is something to export — an export button on an empty list
                 promises a file it cannot produce. */}
             {rows.length > 0 && (
-              <button onClick={downloadPipeline} disabled={exporting} style={{ fontSize: 13, fontWeight: 500, padding: '10px 20px', borderRadius: 8, background: '#fff', border: '1px solid #e8e7e4', color: exporting ? '#888784' : '#0d0d0d', cursor: exporting ? 'wait' : 'pointer' }}>
+              <button onClick={downloadPipeline} disabled={exporting} style={{ fontSize: 13, fontWeight: 500, padding: '10px 20px', borderRadius: 8, background: exporting ? 'var(--color-sunken)' : '#fff', border: `1px solid ${exporting ? 'var(--color-line)' : '#e8e7e4'}`, color: exporting ? 'var(--color-ink-muted)' : '#0d0d0d', cursor: exporting ? 'wait' : 'pointer' }}>
                 {exporting ? 'Building spreadsheet…' : '↓ Export all targets (Excel)'}
               </button>
             )}
@@ -188,7 +188,7 @@ export default function DealsListPage() {
         )}
 
         {loading && (
-          <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '3rem', textAlign: 'center', color: '#888784', fontSize: 13 }}>
+          <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '3rem', textAlign: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>
             Loading your deals…
           </div>
         )}
@@ -202,7 +202,7 @@ export default function DealsListPage() {
         {!loading && !error && rows.length === 0 && (
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '3rem 2rem', textAlign: 'center' }}>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 8 }}>No deals yet</div>
-            <p style={{ fontSize: 13, color: '#888784', lineHeight: 1.6, maxWidth: 460, margin: '0 auto 20px' }}>
+            <p style={{ fontSize: 13, color: 'var(--color-ink-muted)', lineHeight: 1.6, maxWidth: 460, margin: '0 auto 20px' }}>
               Start a deal to screen a target company: tell us its sector, where it operates and how big it is,
               and you&rsquo;ll get the ESG risks to raise, the reporting rules that apply to it, and an estimate
               of what compliance would cost. Each target you screen is saved here so you can come back to it.
@@ -217,7 +217,7 @@ export default function DealsListPage() {
           <>
             {/* The two links do different things, so say which is which once, here, rather than
                 loading the distinction into a link label. */}
-            <p style={{ fontSize: 13, color: '#888784', lineHeight: 1.6, marginBottom: 16 }}>
+            <p style={{ fontSize: 13, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginBottom: 16 }}>
               {rows.length} {rows.length === 1 ? 'target' : 'targets'}. Open a target by name to keep working on it.
               View report opens the finished document, ready to print or save as a PDF.
             </p>
@@ -231,7 +231,7 @@ export default function DealsListPage() {
                       <a href={`/dashboard/deals?id=${d.id}`} style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', textDecoration: 'none' }}>
                         {displayName(d)}
                       </a>
-                      <div style={{ fontSize: 12, color: '#888784', marginTop: 4 }}>
+                      <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 4 }}>
                         {meta && <>{meta} · </>}
                         {fw.count > 0
                           ? <>{fw.count} {fw.count === 1 ? 'rule applies' : 'rules apply'} · </>
@@ -253,7 +253,7 @@ export default function DealsListPage() {
             </div>
             {/* The rules shown per row are the ones saved with the deal. Opening a target
                 re-works them out from the figures, so a row can lag the deal it points at. */}
-            <p style={{ fontSize: 11, color: '#888784', lineHeight: 1.6, marginTop: 16 }}>
+            <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 16 }}>
               The rules listed against each target are the ones saved when you last worked on it.
               Opening a target works them out again from its current figures.
             </p>

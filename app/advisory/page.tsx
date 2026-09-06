@@ -29,7 +29,7 @@ export default function AdvisoryPage() {
             {[['30 min', 'Free initial consultation'], ['Fixed fees', 'No billable hours surprises'], ['Named advisor', 'Same person throughout']].map(([val, label]) => (
               <div key={label} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem', textAlign: 'center' as const }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 400, color: 'var(--color-brand)', marginBottom: 4 }}>{val}</div>
-                <div style={{ fontSize: 11, color: '#888784' }}>{label}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{label}</div>
               </div>
             ))}
           </div>
@@ -44,11 +44,11 @@ export default function AdvisoryPage() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
           <div style={{ background: '#fff', padding: '2.5rem' }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#888784', marginBottom: '1.5rem', letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>Traditional consultants</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-ink-muted)', marginBottom: '1.5rem', letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>Traditional consultants</div>
             {['Junior associates do the work, partner signs off', 'Billable hours — costs grow unpredictably', 'Generalist teams learning your sector on your budget', 'Months to mobilise, weeks to deliver', 'Deliverable is a report. Implementation is extra.', 'No platform — findings live in a PDF'].map((item, i) => (
               <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
                 <span style={{ color: '#B91C1C', flexShrink: 0 }}>✗</span>
-                <span style={{ fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.5 }}>{item}</span>
+                <span style={{ fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.5 }}>{item}</span>
               </div>
             ))}
           </div>
@@ -153,6 +153,6 @@ export default function AdvisoryPage() {
 
 const navLink: React.CSSProperties = { fontSize: 11, color: '#555553', textDecoration: 'none' }
 const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'var(--color-brand)', color: '#fff', textDecoration: 'none', display: 'inline-block' }
-const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
+const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }
 const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, margin: '0 auto', lineHeight: 1.75, fontWeight: 400 }
  

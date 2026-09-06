@@ -85,12 +85,12 @@ export default function HomePricing() {
       <div style={{ maxWidth: 1100, margin: '0 auto' }}>
 
         {/* Header */}
-        <p style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }}>Pricing</p>
+        <p style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }}>Pricing</p>
         <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }}>Simple, honest pricing.</h2>
         <p style={{ fontSize: 15, color: '#555553', maxWidth: 540, lineHeight: 1.75, fontWeight: 400, marginBottom: '0.5rem' }}>
           Whether your driver is a regulator, a board, an investor, or a customer — ThemisIQ is your sustainability compliance reporting solution.
         </p>
-        <p style={{ fontSize: 12, color: '#9ca3af', fontWeight: 400, marginBottom: '2rem' }}>All prices in USD</p>
+        <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, marginBottom: '2rem' }}>All prices in USD</p>
 
         {/* Interactive prompt */}
         <div style={{ background: GRAD, borderRadius: 12, padding: 1, marginBottom: 20 }}>
@@ -120,7 +120,7 @@ export default function HomePricing() {
         )}
 
         {/* Custom / more organizations note */}
-        <div style={{ textAlign: 'center', fontSize: 11, color: '#888784', lineHeight: 1.6, marginBottom: 16, maxWidth: 600, marginLeft: 'auto', marginRight: 'auto' }}>
+        <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginBottom: 16, maxWidth: 600, marginLeft: 'auto', marginRight: 'auto' }}>
           * Need more than 10 organizations or have additional subsidiaries? <a href="/advisory" style={{ color: 'var(--color-brand)', textDecoration: 'none' }}>Contact us for custom pricing.</a>
         </div>
 
@@ -128,8 +128,8 @@ export default function HomePricing() {
         {NEW_PRICING_ACTIVE && (
           <div id="build-your-stack" style={{ border: '1px solid #e8e7e4', borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', background: '#f8f7f5', padding: '10px 16px', borderBottom: '1px solid #e8e7e4', alignItems: 'center' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784' }}>Select your compliance modules</div>
-              <div style={{ fontSize: 10, color: '#888784', fontWeight: 400 }}>Click any row to add or remove</div>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-ink-muted)' }}>Select your compliance modules</div>
+              <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', fontWeight: 400 }}>Click any row to add or remove</div>
             </div>
             {MODULES.map((mod, i) => {
               const isSelected = selected.has(mod.id)
@@ -143,11 +143,11 @@ export default function HomePricing() {
                     </div>
                     <div>
                       <a href={mod.href} onClick={e => e.stopPropagation()} style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', textDecoration: 'none' }}>{mod.name} ↗</a>
-                      <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{mod.frameworks}</div>
+                      <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>{mod.frameworks}</div>
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: isSelected ? '#0d0d0d' : '#888784' }}>{isGhg ? `from $${(GHG_TIERS.starter.priceUSD as number).toLocaleString()}` : `$${(price as number).toLocaleString()}`}</div>
-                      <div style={{ fontSize: 10, color: '#888784' }}>/yr</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: isSelected ? '#0d0d0d' : 'var(--color-ink-muted)' }}>{isGhg ? `from $${(GHG_TIERS.starter.priceUSD as number).toLocaleString()}` : `$${(price as number).toLocaleString()}`}</div>
+                      <div style={{ fontSize: 10, color: 'var(--color-ink-muted)' }}>/yr</div>
                     </div>
                   </div>
                   {isGhg && isSelected && (
@@ -211,8 +211,8 @@ export default function HomePricing() {
             { label: '−20%', sub: '3 or more modules', active: count >= 3 },
           ].map(h => (
             <div key={h.label} style={{ background: h.active ? '#fff' : '#f8f7f5', border: h.active ? '1.5px solid #0d0d0d' : '1px solid #e8e7e4', borderRadius: 10, padding: 10, textAlign: 'center', transition: 'all 0.2s' }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: h.active ? '#0d0d0d' : '#888784' }}>{h.label}</div>
-              <div style={{ fontSize: 10, color: '#888784', marginTop: 2 }}>{h.sub}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: h.active ? '#0d0d0d' : 'var(--color-ink-muted)' }}>{h.label}</div>
+              <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 2 }}>{h.sub}</div>
             </div>
           ))}
         </div>

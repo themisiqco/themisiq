@@ -96,7 +96,7 @@ export default function SupplierPortalDashboard() {
   const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
   const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
 
-  const statusColor = (s: string) => s === 'active' ? '#0F6E56' : s === 'closed' ? '#888784' : 'var(--color-module-climate)'
+  const statusColor = (s: string) => s === 'active' ? '#0F6E56' : s === 'closed' ? 'var(--color-ink-muted)' : 'var(--color-module-climate)'
   const statusBg = (s: string) => s === 'active' ? '#E1F5EE' : s === 'closed' ? '#f8f7f5' : '#FEF3E2'
 
   if (!isPaid) return <PaywallCard title="Unlock the Supply Chain module" body="The Supplier Portal is part of the Supply Chain module. Unlock it to create campaigns, invite suppliers, and review responses." href="/pricing?modules=supply" />
@@ -108,7 +108,7 @@ export default function SupplierPortalDashboard() {
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
         <div style={{ maxWidth: 1000, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Supply Chain & Scope 3</div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 4 }}>Supply Chain & Scope 3</div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d' }}>Supplier Portal</div>
           </div>
           <button onClick={() => setShowNew(true)} style={{ fontSize: 13, fontWeight: 500, padding: '10px 20px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>
@@ -153,7 +153,7 @@ export default function SupplierPortalDashboard() {
                         <div style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${newCampaign.questionnaire_template === t.id ? t.color : '#e8e7e4'}`, background: newCampaign.questionnaire_template === t.id ? t.color : '#fff', flexShrink: 0 }} />
                         <div>
                           <div style={{ fontSize: 12, fontWeight: 600, color: newCampaign.questionnaire_template === t.id ? t.color : '#0d0d0d' }}>{t.label}</div>
-                          <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.4 }}>{t.desc}</div>
+                          <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.4 }}>{t.desc}</div>
                         </div>
                       </div>
                     ))}
@@ -172,11 +172,11 @@ export default function SupplierPortalDashboard() {
 
         {/* Campaigns list */}
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '4rem', color: '#888784' }}>Loading campaigns...</div>
+          <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-ink-muted)' }}>Loading campaigns...</div>
         ) : campaigns.length === 0 ? (
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '4rem', textAlign: 'center' }}>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>No campaigns yet</div>
-            <div style={{ fontSize: 14, color: '#888784', marginBottom: 24, lineHeight: 1.6 }}>Create your first supplier campaign to start collecting sustainability data from your supply chain.</div>
+            <div style={{ fontSize: 14, color: 'var(--color-ink-muted)', marginBottom: 24, lineHeight: 1.6 }}>Create your first supplier campaign to start collecting sustainability data from your supply chain.</div>
             <button onClick={() => setShowNew(true)} style={{ fontSize: 13, fontWeight: 500, padding: '11px 22px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>
               + Create your first campaign
             </button>
@@ -200,10 +200,10 @@ export default function SupplierPortalDashboard() {
                           </span>
                         )}
                       </div>
-                      {c.description && <div style={{ fontSize: 13, color: '#888784' }}>{c.description}</div>}
+                      {c.description && <div style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>{c.description}</div>}
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: 11, color: '#888784' }}>Reporting year</div>
+                      <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Reporting year</div>
                       <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d' }}>{c.reporting_year}</div>
                     </div>
                   </div>
@@ -214,7 +214,7 @@ export default function SupplierPortalDashboard() {
                       { label: 'Completion rate', val: `${pct}%` },
                     ].map(({ label, val }) => (
                       <div key={label}>
-                        <div style={{ fontSize: 11, color: '#888784', marginBottom: 2 }}>{label}</div>
+                        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 2 }}>{label}</div>
                         <div style={{ fontSize: 16, fontWeight: 600, color: '#0d0d0d' }}>{val}</div>
                       </div>
                     ))}
@@ -223,7 +223,7 @@ export default function SupplierPortalDashboard() {
                     <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? '#0F6E56' : GRAD, borderRadius: 99, transition: 'width 0.3s' }} />
                   </div>
                   {c.deadline && (
-                    <div style={{ fontSize: 11, color: '#888784', marginTop: 8 }}>
+                    <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 8 }}>
                       Deadline: {new Date(c.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
                     </div>
                   )}

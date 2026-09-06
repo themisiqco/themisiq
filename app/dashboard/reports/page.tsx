@@ -90,7 +90,7 @@ export default function ReportsPage() {
 
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Your account</div>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 4 }}>Your account</div>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>Saved reports</div>
         </div>
       </div>
@@ -98,7 +98,7 @@ export default function ReportsPage() {
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '2rem 2.5rem' }}>
 
         {loading && (
-          <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '3rem', textAlign: 'center', color: '#888784', fontSize: 13 }}>
+          <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '3rem', textAlign: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>
             Loading your reports…
           </div>
         )}
@@ -112,7 +112,7 @@ export default function ReportsPage() {
         {!loading && !error && rows.length === 0 && (
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '3rem 2rem', textAlign: 'center' }}>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 8 }}>No saved reports yet</div>
-            <p style={{ fontSize: 13, color: '#888784', lineHeight: 1.6, maxWidth: 420, margin: '0 auto 20px' }}>
+            <p style={{ fontSize: 13, color: 'var(--color-ink-muted)', lineHeight: 1.6, maxWidth: 420, margin: '0 auto 20px' }}>
               Run an assessment to generate your first report. Once generated, it will appear here so you can reopen or re-download it any time.
             </p>
             <a href="/dashboard/materiality" style={{ display: 'inline-block', fontSize: 13, fontWeight: 500, padding: '11px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', textDecoration: 'none' }}>
@@ -123,7 +123,7 @@ export default function ReportsPage() {
 
         {!loading && !error && rows.length > 0 && (
           <>
-            <p style={{ fontSize: 13, color: '#888784', lineHeight: 1.6, marginBottom: 16 }}>
+            <p style={{ fontSize: 13, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginBottom: 16 }}>
               {rows.length} saved {rows.length === 1 ? 'report' : 'reports'}. These reopen the full report exactly as generated — reopen to view or re-download as PDF.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -140,7 +140,7 @@ export default function ReportsPage() {
                           <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 9px', borderRadius: 99, background: '#FEF3E2', color: 'var(--color-module-climate)' }}>{String(r.status).toUpperCase()}</span>
                         )}
                       </div>
-                      <div style={{ fontSize: 12, color: '#888784' }}>
+                      <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>
                         {modeLabel(r.mode)} · {r.regionCount} region{r.regionCount === 1 ? '' : 's'} · {r.jurisdictionCount} jurisdiction{r.jurisdictionCount === 1 ? '' : 's'} · {r.horizon} term · {fmtDate(r.createdAt)}
                       </div>
                     </div>

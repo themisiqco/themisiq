@@ -44,7 +44,7 @@ export default function Page() {
             <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px 20px', background: i % 2 === 0 ? '#fff' : '#f8f7f5', borderBottom: '0.5px solid #e8e7e4' }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 2 }}>{name}</div>
-                <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>{detail}</div>
+                <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>{detail}</div>
               </div>
               <span style={{ fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 99, background: badge === 'green' ? '#E1F5EE' : '#FEF3E2', color: badge === 'green' ? '#085041' : '#633806', whiteSpace: 'nowrap' as const, flexShrink: 0 }}>{status}</span>
             </div>
@@ -188,4 +188,4 @@ export default function Page() {
 
 const navLink: React.CSSProperties = { fontSize: 11, color: '#555553', textDecoration: 'none' }
 const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'var(--color-brand)', color: '#fff', textDecoration: 'none', display: 'inline-block' }
-const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
+const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }

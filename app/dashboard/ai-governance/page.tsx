@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useEntitlement } from '../../../lib/useEntitlement'
 import Nav from '../../components/Nav'
 import { sectionHead } from '@/app/components/headingStyles'
+import { btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
 import {
   AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED, AI_ACT_CITATION,
 } from '../../../lib/aiAct'
@@ -166,14 +167,14 @@ const fromLibrary = (lib: typeof AI_SYSTEM_LIBRARY[0]): AISystem => {
 const GRAD = 'var(--color-brand)'
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
-const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
+const sectionSub: React.CSSProperties = { fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
 
 const RISK_CONFIG: Record<RiskLevel, { label: string; color: string; bg: string; border: string }> = {
   prohibited:   { label: 'PROHIBITED', color: '#fff', bg: '#B91C1C', border: '#B91C1C' },
   high_risk:    { label: 'HIGH RISK', color: '#B91C1C', bg: '#FCEBEB', border: '#B91C1C' },
   limited_risk: { label: 'LIMITED RISK', color: 'var(--color-module-climate)', bg: '#FEF3E2', border: 'var(--color-module-climate)' },
   minimal_risk: { label: 'MINIMAL RISK', color: '#0F6E56', bg: '#E1F5EE', border: '#0F6E56' },
-  unclassified: { label: 'NOT CLASSIFIED', color: '#888784', bg: '#f8f7f5', border: '#e8e7e4' },
+  unclassified: { label: 'NOT CLASSIFIED', color: 'var(--color-ink-muted)', bg: '#f8f7f5', border: '#e8e7e4' },
 }
 
 const STEP_NAMES = ['Setup', 'AI Systems', 'Classification', 'Requirements', 'Export']
@@ -328,11 +329,11 @@ export default function AIGovernanceDashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: '1.5rem' }}>
           <button onClick={() => setAddMode('library')} style={{ padding: '1rem', borderRadius: 12, background: 'color-mix(in srgb, var(--color-brand) 5%, transparent)', border: '1.5px solid #7425e3', cursor: 'pointer', textAlign: 'left' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#7425e3', marginBottom: 4 }}>Choose from library →</div>
-            <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.5 }}>34 common AI systems with auto-classification. Pick yours in seconds.</div>
+            <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.5 }}>34 common AI systems with auto-classification. Pick yours in seconds.</div>
           </button>
           <button onClick={addManual} style={{ padding: '1rem', borderRadius: 12, background: '#f8f7f5', border: '1px solid #e8e7e4', cursor: 'pointer', textAlign: 'left' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', marginBottom: 4 }}>Add custom system →</div>
-            <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.5 }}>Describe your own AI system and we'll classify it automatically.</div>
+            <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.5 }}>Describe your own AI system and we'll classify it automatically.</div>
           </button>
         </div>
       )}
@@ -366,17 +367,17 @@ export default function AIGovernanceDashboard() {
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = '#fff'}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 2 }}>{lib.name}</div>
-                    <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.4 }}>{lib.purpose}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.4 }}>{lib.purpose}</div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                     <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: cfg.bg, color: cfg.color, border: `0.5px solid ${cfg.border}`, whiteSpace: 'nowrap' }}>{cfg.label}</span>
-                    <span style={{ fontSize: 12, color: '#888784' }}>+ Add</span>
+                    <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>+ Add</span>
                   </div>
                 </div>
               )
             })}
             {filteredLibrary.length === 0 && (
-              <div style={{ padding: '2rem', textAlign: 'center', color: '#888784', fontSize: 13 }}>No systems found — try a different search or category</div>
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>No systems found — try a different search or category</div>
             )}
           </div>
           <div style={{ padding: '10px 16px', background: '#f8f7f5', borderTop: '0.5px solid #e8e7e4' }}>
@@ -459,8 +460,8 @@ export default function AIGovernanceDashboard() {
 
       {inventory.systems.length === 0 && addMode === null && (
         <div style={{ background: '#f8f7f5', border: '1px dashed #e8e7e4', borderRadius: 12, padding: '2rem', textAlign: 'center' }}>
-          <div style={{ fontSize: 14, color: '#888784', marginBottom: 8 }}>No AI systems added yet</div>
-          <div style={{ fontSize: 12, color: '#9ca3af' }}>Use the buttons above to add your first AI system</div>
+          <div style={{ fontSize: 14, color: 'var(--color-ink-muted)', marginBottom: 8 }}>No AI systems added yet</div>
+          <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Use the buttons above to add your first AI system</div>
         </div>
       )}
     </div>
@@ -471,7 +472,7 @@ export default function AIGovernanceDashboard() {
       <h2 style={sectionHead}>Risk classification</h2>
       <p style={sectionSub}>ThemisIQ has automatically classified each system under the EU AI Act. Review and confirm.</p>
       {inventory.systems.length === 0 ? (
-        <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: '#888784' }}>No systems added yet — go back to Step 2 to add your AI systems.</div>
+        <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>No systems added yet — go back to Step 2 to add your AI systems.</div>
       ) : (
         <>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -484,7 +485,7 @@ export default function AIGovernanceDashboard() {
                     <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: s.risk_level === 'prohibited' ? 'rgba(255,255,255,0.2)' : cfg.border, color: '#fff' }}>{cfg.label}</span>
                   </div>
                   <div style={{ padding: '1rem 16px' }}>
-                    <div style={{ fontSize: 11, color: '#888784', marginBottom: 2 }}>{s.annex_category}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 2 }}>{s.annex_category}</div>
                     <div style={{ fontSize: 12, color: '#555553', marginTop: 4 }}>{s.purpose}</div>
                     {s.risk_level === 'high_risk' && <div style={{ fontSize: 11, fontWeight: 600, color: '#B91C1C', marginTop: 6 }}>⚠ Conformity assessment required from {HIGH_RISK_BOTH_DATES}</div>}
                     {s.risk_level === 'prohibited' && <div style={{ fontSize: 11, fontWeight: 600, color: '#B91C1C', marginTop: 6 }}>🚨 Must be discontinued or redesigned immediately</div>}
@@ -532,7 +533,7 @@ export default function AIGovernanceDashboard() {
                 </span>
               </div>
               <div style={{ padding: '1.25rem' }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Required actions</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Required actions</div>
                 {s.requirements.map((req, i) => (
                   <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8, alignItems: 'flex-start' }}>
                     <div style={{ width: 18, height: 18, borderRadius: 4, border: '1.5px solid #e8e7e4', background: '#fff', flexShrink: 0, marginTop: 1 }} />
@@ -575,7 +576,7 @@ export default function AIGovernanceDashboard() {
               <span style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>I confirm that the AI systems listed are accurate to the best of my knowledge. I understand this report is for planning purposes and does not constitute legal advice.</span>
             </label>
           </div>
-          <button onClick={() => dataConfirmed && generateExport()} style={{ fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: dataConfirmed ? 'pointer' : 'not-allowed', opacity: dataConfirmed ? 1 : 0.4 }}>
+          <button onClick={() => dataConfirmed && generateExport()} style={{ ...(dataConfirmed ? btnStepPrimary : btnStepPrimaryDisabled) }}>
             ⬇ Download AI Inventory & Gap Assessment (CSV)
           </button>
         </div>
@@ -602,16 +603,16 @@ export default function AIGovernanceDashboard() {
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>AI Governance</div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 4 }}>AI Governance</div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>EU AI Act Inventory & Gap Assessment</div>
           </div>
-          <div style={{ fontSize: 12, color: '#888784' }}>{inventory.company && <span style={{ fontWeight: 500, color: '#0d0d0d' }}>{inventory.company} · </span>}Regulation (EU) 2024/1689</div>
+          <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>{inventory.company && <span style={{ fontWeight: 500, color: '#0d0d0d' }}>{inventory.company} · </span>}Regulation (EU) 2024/1689</div>
         </div>
       </div>
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2.5rem', overflowX: 'auto' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex' }}>
           {STEP_NAMES.map((name, i) => (
-            <button key={i} onClick={() => setStep(i)} style={{ padding: '14px 16px', fontSize: 12, fontWeight: step === i ? 600 : 400, color: step === i ? '#0d0d0d' : '#888784', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? '#7425e3' : 'transparent'}`, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <button key={i} onClick={() => setStep(i)} style={{ padding: '14px 16px', fontSize: 12, fontWeight: step === i ? 600 : 400, color: step === i ? '#0d0d0d' : 'var(--color-ink-muted)', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? '#7425e3' : 'transparent'}`, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               {i + 1}. {name}
             </button>
           ))}
@@ -622,7 +623,7 @@ export default function AIGovernanceDashboard() {
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '2rem' }}>
             {steps[step]()}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
-              <button onClick={() => setStep(s => Math.max(0, s - 1))} style={{ fontSize: 13, padding: '9px 20px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: step === 0 ? 'not-allowed' : 'pointer', opacity: step === 0 ? 0.4 : 1 }}>← Back</button>
+              <button onClick={() => setStep(s => Math.max(0, s - 1))} style={{ ...(step === 0 ? btnStepDisabled : btnStep) }}>← Back</button>
               {step < STEP_NAMES.length - 1 && <button onClick={() => setStep(s => Math.min(STEP_NAMES.length - 1, s + 1))} style={{ fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>Next →</button>}
             </div>
           </div>

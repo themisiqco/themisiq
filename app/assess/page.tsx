@@ -572,9 +572,9 @@ const OBLIGATION_GROUPS: { key: Obligation['group']; title: string; sub: string 
   { key: 'market',     title: 'Market-driven',           sub: 'What your customers, investors and lenders are asking for. Often because they have a reporting obligation of their own: a large customer’s Scope 3 is your Scope 1 and 2.' },
 ]
 
-const URGENCY_COLOR: Record<string, string> = { critical: '#B91C1C', high: 'var(--color-module-climate)', medium: '#0C447C', monitor: '#888784' }
+const URGENCY_COLOR: Record<string, string> = { critical: '#B91C1C', high: 'var(--color-module-climate)', medium: '#0C447C', monitor: 'var(--color-ink-muted)' }
 const URGENCY_BG: Record<string, string> = { critical: '#FCEBEB', high: '#FEF3E2', medium: '#E6F1FB', monitor: '#f8f7f5' }
-const URGENCY_TEXT: Record<string, string> = { critical: '#501313', high: '#633806', medium: '#0C447C', monitor: '#888784' }
+const URGENCY_TEXT: Record<string, string> = { critical: '#501313', high: '#633806', medium: '#0C447C', monitor: 'var(--color-ink-muted)' }
 
 export default function AssessPage() {
   const [step, setStep] = useState(0)
@@ -675,7 +675,7 @@ export default function AssessPage() {
     if (step === RESULTS_STEP) return (
       <div>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, background: '#f8f7f5', border: '0.5px solid #e8e7e4', padding: '4px 14px', borderRadius: 99, marginBottom: 12, color: '#888784' }}>Your Compliance Obligation Map</div>
+          <div style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, background: '#f8f7f5', border: '0.5px solid #e8e7e4', padding: '4px 14px', borderRadius: 99, marginBottom: 12, color: 'var(--color-ink-muted)' }}>Your Compliance Obligation Map</div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, marginBottom: 8, lineHeight: 1.2, color: '#0d0d0d' }}>
             We identified <span style={{ color: 'var(--color-brand)', fontStyle: 'italic' }}>{obligations.length} {obligations.length === 1 ? 'obligation' : 'obligations'}</span> that apply to your company.
           </h2>
@@ -721,7 +721,7 @@ export default function AssessPage() {
           {[{ val: critical, label: 'Immediate action', color: '#B91C1C' }, { val: high, label: 'High priority', color: 'var(--color-module-climate)' }, { val: obligations.length - critical - high, label: 'Monitor / annual', color: '#1fb1ff' }].map(({ val, label, color }) => (
             <div key={label} style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px', textAlign: 'center' as const }}>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color, marginBottom: 2 }}>{val}</div>
-              <div style={{ fontSize: 11, color: '#888784' }}>{label}</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{label}</div>
             </div>
           ))}
         </div>
@@ -734,7 +734,7 @@ export default function AssessPage() {
           return (
             <div key={g.key} style={{ marginBottom: '1.5rem' }}>
               <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{g.title}</h3>
-              <p style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: 10 }}>{g.sub}</p>
+              <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.6, marginBottom: 10 }}>{g.sub}</p>
               <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
                 {rows.map(ob => (
                   /* Keyed on `name`, not on the index within the group — two groups both start at 0,
@@ -746,12 +746,12 @@ export default function AssessPage() {
                         <div style={{ width: 8, height: 8, borderRadius: '50%', background: URGENCY_COLOR[ob.urgency], flexShrink: 0 }} />
                         <div>
                           <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{ob.name}</div>
-                          <div style={{ fontSize: 11, color: '#888784', marginTop: 1 }}>{ob.jurisdiction} · {ob.timing}</div>
+                          <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 1 }}>{ob.jurisdiction} · {ob.timing}</div>
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                         <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 99, background: URGENCY_BG[ob.urgency], color: URGENCY_TEXT[ob.urgency] }}>{ob.urgency_label}</span>
-                        <span style={{ color: '#888784', fontSize: 12 }}>{expanded[ob.name] ? '▲' : '▼'}</span>
+                        <span style={{ color: 'var(--color-ink-muted)', fontSize: 12 }}>{expanded[ob.name] ? '▲' : '▼'}</span>
                       </div>
                     </div>
                     {expanded[ob.name] && (
@@ -765,7 +765,7 @@ export default function AssessPage() {
                             and will answer this entry, and a link that lands on a page which cannot
                             sell what the label names is worse than no link at all. */}
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' as const, marginBottom: 10 }}>
-                          <span style={{ fontSize: 11, color: '#888784', flexShrink: 0 }}>Answered by</span>
+                          <span style={{ fontSize: 11, color: 'var(--color-ink-muted)', flexShrink: 0 }}>Answered by</span>
                           {ob.obligationId ? (
                             <a href={obligationHref(ob.obligationId)} style={{ fontSize: 12, fontWeight: 500, color: '#7425e3', textDecoration: 'none' }}>
                               {obligationModuleLabel(ob.obligationId)} · {priceLabel(obligationPrice(ob.obligationId))} →
@@ -800,7 +800,7 @@ export default function AssessPage() {
           </div>
         </div>
         <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-          <button onClick={() => { setStep(0); setAnswers(EMPTY_ANSWERS) }} style={{ fontSize: 12, color: '#888784', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Start over</button>
+          <button onClick={() => { setStep(0); setAnswers(EMPTY_ANSWERS) }} style={{ fontSize: 12, color: 'var(--color-ink-muted)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Start over</button>
         </div>
       </div>
     )
@@ -809,7 +809,7 @@ export default function AssessPage() {
     if (step === EMAIL_STEP) return (
       <div>
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>Almost there</div>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: 8 }}>Almost there</div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 400, marginBottom: 8, lineHeight: 1.2, color: '#0d0d0d' }}>Your compliance map is ready.</h2>
           <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.6 }}>Enter your details to see what applies to you — each with its timing, what it requires, and the ThemisIQ module that addresses it.</p>
         </div>
@@ -849,7 +849,7 @@ export default function AssessPage() {
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '1.5rem', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#0d0d0d', color: '#fff', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{step + 1}</div>
-            <div style={{ fontSize: 11, color: '#888784' }}>Question {step + 1} of {EMAIL_STEP}</div>
+            <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Question {step + 1} of {EMAIL_STEP}</div>
           </div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.35rem', fontWeight: 400, lineHeight: 1.25, marginBottom: 6, color: '#0d0d0d' }}>{q.title}</h2>
           <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.25rem' }}>{q.sub}</p>
@@ -868,7 +868,7 @@ export default function AssessPage() {
                   the honest response is to record nothing rather than to invent an index whose
                   REVENUE_VALUES lookup is undefined. */}
               <input type="range" min={0} max={REVENUE_INDICES.length - 1} value={val as number ?? 5} onChange={e => { const i = asRevenueIndex(Number(e.target.value)); if (i === null) return; setAnswers(a => ({ ...a, revenue: i })) }} style={{ width: '100%', accentColor: '#7425e3' }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#888784', marginTop: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4 }}>
                 <span>Under $50M</span><span>$10B+</span>
               </div>
             </div>
@@ -883,7 +883,7 @@ export default function AssessPage() {
                   </div>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{opt.label}</div>
-                    <div style={{ fontSize: 11, color: '#888784', marginTop: 1 }}>{opt.sub}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 1 }}>{opt.sub}</div>
                   </div>
                 </div>
               ))}
@@ -900,7 +900,7 @@ export default function AssessPage() {
                       {isSel && <span style={{ color: '#fff', fontSize: 11 }}>✓</span>}
                     </div>
                     <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 3, paddingRight: 24 }}>{opt.label}</div>
-                    <div style={{ fontSize: 11, color: '#888784' }}>{opt.sub}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{opt.sub}</div>
                   </div>
                 )
               })}
@@ -909,7 +909,7 @@ export default function AssessPage() {
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <button onClick={goBack} disabled={step === 0} style={{ ...backBtn, opacity: step === 0 ? 0.3 : 1 }}>← Back</button>
-          <button onClick={goNext} disabled={!canProceed} style={{ fontSize: 13, fontWeight: 500, padding: '10px 28px', borderRadius: 8, background: canProceed ? '#0d0d0d' : '#e8e7e4', color: canProceed ? '#fff' : '#888784', border: 'none', cursor: canProceed ? 'pointer' : 'not-allowed' }}>Continue →</button>
+          <button onClick={goNext} disabled={!canProceed} style={{ fontSize: 13, fontWeight: 500, padding: '10px 28px', borderRadius: 8, background: canProceed ? '#0d0d0d' : '#e8e7e4', color: canProceed ? '#fff' : 'var(--color-ink-muted)', border: 'none', cursor: canProceed ? 'pointer' : 'not-allowed' }}>Continue →</button>
         </div>
       </div>
     )
@@ -924,7 +924,7 @@ export default function AssessPage() {
           <div style={{ flex: 1, height: 4, background: '#e8e7e4', borderRadius: 99, overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${pct}%`, background: 'var(--color-brand)', borderRadius: 99, transition: 'width 0.4s ease' }} />
           </div>
-          <div style={{ fontSize: 12, color: '#888784', whiteSpace: 'nowrap' as const }}>
+          <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', whiteSpace: 'nowrap' as const }}>
             {step < EMAIL_STEP ? `Step ${step + 1} of ${EMAIL_STEP}` : 'Almost done'}
           </div>
         </div>
@@ -944,7 +944,7 @@ export default function AssessPage() {
           {/* Intro text — only on step 0 */}
           {step === 0 && (
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 12 }}>Free · 3 minutes · Instant results</div>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: 12 }}>Free · 3 minutes · Instant results</div>
               <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '0.75rem', color: '#0d0d0d' }}>
                 Which compliance regulations<br />apply to <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>your company?</span>
               </h1>

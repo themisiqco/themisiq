@@ -40,7 +40,7 @@ export default function LoginPage() {
         <a href="/" style={{ textDecoration: 'none' }}>
           <img src="/logo.png" alt="ThemisIQ" style={{ height: 24, width: 'auto', display: 'block' }} />
         </a>
-        <span style={{ fontSize: 12, color: '#888784' }}>Don't have an account? <a href={`/signup?next=${encodeURIComponent(nextUrl)}`} style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Create an account →</a></span>
+        <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Don't have an account? <a href={`/signup?next=${encodeURIComponent(nextUrl)}`} style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Create an account →</a></span>
       </nav>
 
       {/* MAIN */}
@@ -50,7 +50,7 @@ export default function LoginPage() {
           {/* HEADER */}
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Welcome back</h1>
-            <p style={{ fontSize: 14, color: '#888784', fontWeight: 400 }}>Sign in to your ThemisIQ account</p>
+            <p style={{ fontSize: 14, color: 'var(--color-ink-muted)', fontWeight: 400 }}>Sign in to your ThemisIQ account</p>
           </div>
 
           {/* FORM */}
@@ -92,7 +92,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                style={{ fontSize: 14, fontWeight: 500, padding: '11px', borderRadius: 8, background: loading ? '#e8e7e4' : 'var(--color-brand)', color: loading ? '#888784' : '#0d0d0d', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', marginTop: 4 }}
+                style={{ fontSize: 14, fontWeight: 500, padding: '11px', borderRadius: 8, background: loading ? '#e8e7e4' : 'var(--color-brand)', color: loading ? 'var(--color-ink-muted)' : '#0d0d0d', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', marginTop: 4 }}
               >
                 {loading ? 'Signing in...' : 'Sign in →'}
               </button>
@@ -100,12 +100,12 @@ export default function LoginPage() {
 
             <div style={{ height: '0.5px', background: '#e8e7e4', margin: '1.5rem 0' }} />
 
-            <p style={{ fontSize: 12, color: '#888784', textAlign: 'center', margin: 0 }}>
+            <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', textAlign: 'center', margin: 0 }}>
               By signing in you agree to our <a href="/terms" style={{ color: '#555553', textDecoration: 'underline' }}>Terms of Service</a> and <a href="/privacy" style={{ color: '#555553', textDecoration: 'underline' }}>Privacy Policy</a>
             </p>
           </div>
 
-          <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: 13, color: '#888784' }}>
+          <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: 13, color: 'var(--color-ink-muted)' }}>
 Don't have an account? <a href={`/signup?next=${encodeURIComponent(nextUrl)}`} style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Create your account →</a>
           </p>
 

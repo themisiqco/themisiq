@@ -76,7 +76,7 @@ export default function ResetPasswordPage() {
         <a href="/" style={{ textDecoration: 'none' }}>
           <img src="/logo.png" alt="ThemisIQ" style={{ height: 24, width: 'auto', display: 'block' }} />
         </a>
-        <span style={{ fontSize: 12, color: '#888784' }}><a href="/login" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Back to sign in →</a></span>
+        <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}><a href="/login" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Back to sign in →</a></span>
       </nav>
 
       {/* MAIN */}
@@ -86,14 +86,14 @@ export default function ResetPasswordPage() {
           {/* HEADER */}
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Set a new password</h1>
-            <p style={{ fontSize: 14, color: '#888784', fontWeight: 400 }}>Choose a new password for your account</p>
+            <p style={{ fontSize: 14, color: 'var(--color-ink-muted)', fontWeight: 400 }}>Choose a new password for your account</p>
           </div>
 
           {/* CARD */}
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '2rem' }}>
 
             {status === 'checking' && (
-              <p style={{ fontSize: 14, color: '#888784', textAlign: 'center', fontWeight: 400, margin: 0 }}>Verifying your reset link…</p>
+              <p style={{ fontSize: 14, color: 'var(--color-ink-muted)', textAlign: 'center', fontWeight: 400, margin: 0 }}>Verifying your reset link…</p>
             )}
 
             {status === 'invalid' && (
@@ -149,7 +149,7 @@ export default function ResetPasswordPage() {
                   <button
                     type="submit"
                     disabled={loading}
-                    style={{ fontSize: 14, fontWeight: 500, padding: '11px', borderRadius: 8, background: loading ? '#e8e7e4' : 'var(--color-brand)', color: loading ? '#888784' : '#0d0d0d', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', marginTop: 4 }}
+                    style={{ fontSize: 14, fontWeight: 500, padding: '11px', borderRadius: 8, background: loading ? '#e8e7e4' : 'var(--color-brand)', color: loading ? 'var(--color-ink-muted)' : '#0d0d0d', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', marginTop: 4 }}
                   >
                     {loading ? 'Updating...' : 'Update password →'}
                   </button>
@@ -159,7 +159,7 @@ export default function ResetPasswordPage() {
 
           </div>
 
-          <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: 13, color: '#888784' }}>
+          <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: 13, color: 'var(--color-ink-muted)' }}>
             <a href="/login" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Back to sign in →</a>
           </p>
 

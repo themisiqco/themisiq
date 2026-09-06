@@ -12,13 +12,14 @@ import { describeYearStatus } from '../../../lib/ghg/series'
 import { VERSION_DATES, NET_ZERO } from '../../../lib/sbti/params'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { sectionHead } from '@/app/components/headingStyles'
+import { btnStep, btnStepDisabled } from '@/app/components/buttonStyles'
 
 // ─── Design tokens (mirroring the climate-risk dashboard) ─────────────────────
 const GRAD = 'var(--color-brand)'
-const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
+const sectionSub: React.CSSProperties = { fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
-const eyebrow: React.CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
+const eyebrow: React.CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }
 
 // ─── Input parsing: empty string → undefined (categorize treats missing as not-met) ──
 const numOrU = (s: string): number | undefined => {
@@ -611,8 +612,8 @@ export default function SbtiDashboard() {
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e8e7e4" />
-            <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#888784' }} />
-            <YAxis tick={{ fontSize: 11, fill: '#888784' }} width={52} tickFormatter={(val) => Number(val).toLocaleString(undefined, { maximumFractionDigits: 0 })} />
+            <XAxis dataKey="year" tick={{ fontSize: 11, fill: 'var(--color-ink-muted)' }} />
+            <YAxis tick={{ fontSize: 11, fill: 'var(--color-ink-muted)' }} width={52} tickFormatter={(val) => Number(val).toLocaleString(undefined, { maximumFractionDigits: 0 })} />
             <Line type="monotone" dataKey="required" stroke="#7425e3" strokeWidth={2} dot={false} />
             <Line type="monotone" dataKey="actual" stroke="#1fb1ff" strokeWidth={2} dot={true} connectNulls={false} />
           </LineChart>
@@ -623,7 +624,7 @@ export default function SbtiDashboard() {
     const mutedCard = (sc: Scope, note: string) => (
       <div key={sc} style={cardStyle}>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', fontWeight: 400, marginBottom: 6 }}>{scopeLabel(sc)}</div>
-        <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>{note}</div>
+        <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>{note}</div>
       </div>
     )
 
@@ -752,7 +753,7 @@ export default function SbtiDashboard() {
             actually chosen. Three distinct states: no companies at all → onboarding; companies
             exist but none selected (2+ and no ?companyId=) → "select a company"; else summary/wizard. */}
         {loading ? (
-          <div style={{ fontSize: 13, color: '#888784', fontWeight: 400 }}>Loading…</div>
+          <div style={{ fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400 }}>Loading…</div>
         ) : allSeries.length === 0 ? (
           <div style={{ background: '#f8f7f5', border: '1px solid #e8e7e4', borderRadius: 14, padding: '2.5rem 2rem', textAlign: 'center' }}>
             <div style={eyebrow}>No inventory yet</div>
@@ -776,7 +777,7 @@ export default function SbtiDashboard() {
                 <button
                   key={s}
                   onClick={() => setStep(i)}
-                  style={{ fontSize: 12, padding: '12px 16px', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? '#7425e3' : 'transparent'}`, color: step === i ? '#7425e3' : '#888784', cursor: 'pointer', fontWeight: step === i ? 500 : 400, whiteSpace: 'nowrap' as const }}
+                  style={{ fontSize: 12, padding: '12px 16px', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? '#7425e3' : 'transparent'}`, color: step === i ? '#7425e3' : 'var(--color-ink-muted)', cursor: 'pointer', fontWeight: step === i ? 500 : 400, whiteSpace: 'nowrap' as const }}
                 >
                   {i + 1}. {s}
                 </button>
@@ -820,7 +821,7 @@ export default function SbtiDashboard() {
 
                 <div style={{ marginTop: 18 }}>
                   <label style={labelStyle}>Is your ultimate-parent company headquartered in a World Bank high-income country?</label>
-                  <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.5, marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.5, marginBottom: 8 }}>
                     Gates the high-income categorisation route (Route 2 — the emissions / two-of-three thresholds).
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -836,7 +837,7 @@ export default function SbtiDashboard() {
                   </div>
                   <div style={{ fontSize: 13, color: '#555553', fontWeight: 400, marginTop: 6 }}>{basisLabel(result.matchedRoute)}</div>
                   {highIncome === null && (
-                    <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, marginTop: 10 }}>
+                    <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, marginTop: 10 }}>
                       Declare high-income status to evaluate the high-income route.
                     </div>
                   )}
@@ -868,14 +869,14 @@ export default function SbtiDashboard() {
                     <button onClick={() => pickStandard('v2_0')} style={toggleBtn(standardVersion === 'v2_0')}>Corporate Net-Zero V2.0</button>
                     <button onClick={() => pickStandard('v1_3_1')} style={toggleBtn(standardVersion === 'v1_3_1')}>V1.3.1</button>
                   </div>
-                  <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.5 }}>
                     V2.0 is effective {VERSION_DATES.v2_0EffectiveDate}, mandatory {VERSION_DATES.v2_0MandatoryDate}; V1.3.1 accepted through {VERSION_DATES.v1_3_1AcceptedUntil}.
                   </div>
                 </div>
 
                 <div style={{ marginBottom: 18 }}>
                   <label style={labelStyle}>Scopes to set targets for</label>
-                  <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, lineHeight: 1.5, marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.5, marginBottom: 8 }}>
                     Under V2.0, Scope 1 and Scope 2 are set as separate targets.
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
@@ -899,7 +900,7 @@ export default function SbtiDashboard() {
                   </div>
                 )}
 
-                <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, marginTop: 18 }}>Targets are created in the next step.</div>
+                <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, marginTop: 18 }}>Targets are created in the next step.</div>
               </>
             )}
 
@@ -951,7 +952,7 @@ export default function SbtiDashboard() {
                 )}
 
                 {selectedScopes.length === 0 ? (
-                  <div style={{ fontSize: 13, color: '#888784', fontWeight: 400 }}>No scopes selected — go back to Step 2 to choose scopes.</div>
+                  <div style={{ fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400 }}>No scopes selected — go back to Step 2 to choose scopes.</div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     {selectedScopes.map(sc => {
@@ -984,7 +985,7 @@ export default function SbtiDashboard() {
                         <div key={sc} style={cardStyle}>
                           <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', fontWeight: 400, marginBottom: 6 }}>{SCOPE_LABEL[sc]}</div>
                           {base != null && (
-                            <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, marginBottom: 14 }}>
+                            <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, marginBottom: 14 }}>
                               Base: {base.toLocaleString(undefined, { maximumFractionDigits: 1 })} tCO₂e{baselineYear != null ? ` (${baselineYear})` : ''}
                             </div>
                           )}
@@ -1002,7 +1003,7 @@ export default function SbtiDashboard() {
                               <input style={inputStyle} type="number" value={d.reductionPct} onChange={e => updateDraft(sc, 'reductionPct', Number(e.target.value))} />
                             </div>
                           </div>
-                          <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, marginTop: 8 }}>
+                          <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, marginTop: 8 }}>
                             ACA-suggested: {suggested}%
                             {Math.abs(d.reductionPct - suggested) > 0.05 && (
                               <button onClick={() => resetToSuggested(sc)} style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: '#7425e3', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>reset to suggested</button>
@@ -1027,13 +1028,13 @@ export default function SbtiDashboard() {
                               <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={traj} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                                   <CartesianGrid strokeDasharray="3 3" stroke="#e8e7e4" />
-                                  <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#888784' }} />
-                                  <YAxis tick={{ fontSize: 11, fill: '#888784' }} width={52} tickFormatter={(val) => Number(val).toLocaleString(undefined, { maximumFractionDigits: 0 })} />
+                                  <XAxis dataKey="year" tick={{ fontSize: 11, fill: 'var(--color-ink-muted)' }} />
+                                  <YAxis tick={{ fontSize: 11, fill: 'var(--color-ink-muted)' }} width={52} tickFormatter={(val) => Number(val).toLocaleString(undefined, { maximumFractionDigits: 0 })} />
                                   <Line type="monotone" dataKey="emissions" stroke="#7425e3" strokeWidth={2} dot={false} />
                                 </LineChart>
                               </ResponsiveContainer>
                             ) : (
-                              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#888784', fontWeight: 400, background: '#f8f7f5', borderRadius: 8 }}>
+                              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, background: '#f8f7f5', borderRadius: 8 }}>
                                 Fix the target to preview the trajectory.
                               </div>
                             )}
@@ -1055,7 +1056,7 @@ export default function SbtiDashboard() {
                     </button>
                   </div>
                 )}
-                <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, marginTop: 12 }}>Targets save to your account here; the trajectory previews update live as you edit.</div>
+                <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, marginTop: 12 }}>Targets save to your account here; the trajectory previews update live as you edit.</div>
               </>
             )}
 
@@ -1100,7 +1101,7 @@ export default function SbtiDashboard() {
                               <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#7425e3', background: '#EDE9FE', borderRadius: 99, padding: '2px 8px' }}>Net-zero</span>
                             </div>
                             {base != null && (
-                              <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, marginBottom: 14 }}>
+                              <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, marginBottom: 14 }}>
                                 Base: {base.toLocaleString(undefined, { maximumFractionDigits: 1 })} tCO₂e{baselineYear != null ? ` (${baselineYear})` : ''}
                               </div>
                             )}
@@ -1118,7 +1119,7 @@ export default function SbtiDashboard() {
                                 <input style={inputStyle} type="number" value={d.reductionPct} onChange={e => updateNetZeroDraft(sc, 'reductionPct', Number(e.target.value))} />
                               </div>
                             </div>
-                            <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, marginTop: 8 }}>
+                            <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, marginTop: 8 }}>
                               Net-zero requires ≥{NET_ZERO.minAbsoluteReductionPct}% reduction by ≤{NET_ZERO.latestNetZeroYear}, absolute method.
                             </div>
                             <div style={{ marginTop: 12, fontSize: 13 }}>
@@ -1140,13 +1141,13 @@ export default function SbtiDashboard() {
                                 <ResponsiveContainer width="100%" height="100%">
                                   <LineChart data={traj} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#e8e7e4" />
-                                    <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#888784' }} />
-                                    <YAxis tick={{ fontSize: 11, fill: '#888784' }} width={52} tickFormatter={(val) => Number(val).toLocaleString(undefined, { maximumFractionDigits: 0 })} />
+                                    <XAxis dataKey="year" tick={{ fontSize: 11, fill: 'var(--color-ink-muted)' }} />
+                                    <YAxis tick={{ fontSize: 11, fill: 'var(--color-ink-muted)' }} width={52} tickFormatter={(val) => Number(val).toLocaleString(undefined, { maximumFractionDigits: 0 })} />
                                     <Line type="monotone" dataKey="emissions" stroke="#7425e3" strokeWidth={2} dot={false} />
                                   </LineChart>
                                 </ResponsiveContainer>
                               ) : (
-                                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#888784', fontWeight: 400, background: '#f8f7f5', borderRadius: 8 }}>
+                                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, background: '#f8f7f5', borderRadius: 8 }}>
                                   Fix the target to preview the trajectory.
                                 </div>
                               )}
@@ -1172,7 +1173,7 @@ export default function SbtiDashboard() {
                         {savingNetZero ? 'Saving…' : savedNetZero ? '✓ Saved' : 'Save net-zero targets'}
                       </button>
                     </div>
-                    <div style={{ fontSize: 12, color: '#888784', fontWeight: 400, marginTop: 12 }}>Net-zero targets save to your account here, alongside your near-term targets.</div>
+                    <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, marginTop: 12 }}>Net-zero targets save to your account here, alongside your near-term targets.</div>
                   </>
                 )}
               </>
@@ -1183,7 +1184,7 @@ export default function SbtiDashboard() {
               <button
                 onClick={() => setStep(s => Math.max(0, s - 1))}
                 disabled={step === 0}
-                style={{ fontSize: 13, padding: '10px 24px', borderRadius: 8, background: 'none', border: '0.5px solid #e8e7e4', cursor: step === 0 ? 'not-allowed' : 'pointer', color: '#555553', opacity: step === 0 ? 0.4 : 1 }}
+                style={{ ...(step === 0 ? btnStepDisabled : btnStep) }}
               >← Back</button>
               {step < STEPS.length - 1 && (
                 <button

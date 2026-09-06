@@ -303,7 +303,7 @@ export default function RespondentImport() {
 
   if (loading) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
-      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: '#888784' }}>Loading…</div></div>
+      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-ink-muted)' }}>Loading…</div></div>
   )
 
   if (loadError) return (
@@ -333,9 +333,9 @@ export default function RespondentImport() {
             the round was called — "Shaped fixture" on a test round — as though it were the page's
             identity. The company name is the thing that means something to a customer; the round
             name is useful but needs saying what it is. */}
-        <div style={{ fontSize: 13, color: '#888784', marginTop: 4, marginBottom: 20 }}>
+        <div style={{ fontSize: 13, color: 'var(--color-ink-muted)', marginTop: 4, marginBottom: 20 }}>
           {round?.company_name || 'This survey'}
-          {round?.name ? <span style={{ color: '#b8b7b4' }}> · round: {round.name}</span> : null}
+          {round?.name ? <span style={{ color: 'var(--color-ink-muted)' }}> · round: {round.name}</span> : null}
         </div>
 
         {closed && (
@@ -376,7 +376,7 @@ export default function RespondentImport() {
               {tplBusy ? 'Building…' : 'Download the template (.xlsx)'}
             </button>
             {/* A disabled control with no reason beside it reads as a broken button. */}
-            {closed && <span style={{ fontSize: 11.5, color: '#888784' }}>Unavailable — this round is closed.</span>}
+            {closed && <span style={{ fontSize: 11.5, color: 'var(--color-ink-muted)' }}>Unavailable — this round is closed.</span>}
           </div>
           {/* ⚠️ THE TWO BOXES ARE A SEQUENCE FOR A TEMPLATE USER, NOT ALTERNATIVES. Without this the
               second box reads as a different route for a different kind of file, and someone who
@@ -406,7 +406,7 @@ export default function RespondentImport() {
                   <code style={{ minWidth: 190, color: '#0d0d0d' }}>{r.code}</code>
                   <span style={{ minWidth: 200 }}>{r.label}</span>
                   <strong style={{ minWidth: 90, color: '#0d0d0d' }}>{r.asked} questions</strong>
-                  <span style={{ color: '#888784' }}>{r.note}</span>
+                  <span style={{ color: 'var(--color-ink-muted)' }}>{r.note}</span>
                 </div>
               ))}
             </div>
@@ -433,7 +433,7 @@ export default function RespondentImport() {
             style={{ ...btn, fontWeight: 600, background: GRAD, color: 'var(--color-on-dark)', border: 'none' }}>
             Choose a file
           </button>
-          {fileName && <span style={{ fontSize: 12, color: '#888784', marginLeft: 10 }}>{fileName}</span>}
+          {fileName && <span style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginLeft: 10 }}>{fileName}</span>}
 
           {parseError && (
             <div style={{ background: FAIL_BG, border: `0.5px solid ${FAIL}`, borderRadius: 10, padding: '10px 12px', marginTop: 12, fontSize: 12, color: '#555553', lineHeight: 1.7 }}>
@@ -460,7 +460,7 @@ export default function RespondentImport() {
             {/* Selection chips. These SELECT and never assign — see the module header. */}
             {domains.length > 0 && (
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center' }}>
-                <span style={{ fontSize: 11, color: '#888784' }}>Select:</span>
+                <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Select:</span>
                 {domains.slice(0, 6).map(d => (
                   <button key={d.domain} onClick={() => setSelected(new Set(d.keys))}
                     style={{ ...btn, padding: '4px 10px', fontSize: 11.5, borderRadius: 99 }}>
@@ -529,11 +529,11 @@ export default function RespondentImport() {
                           <input type="checkbox" checked={selected.has(r.key)}
                             onChange={e => setSelected(prev => { const n = new Set(prev); e.target.checked ? n.add(r.key) : n.delete(r.key); return n })} />
                         )}
-                        <span style={{ minWidth: 160, fontSize: 13, color: blocked || dup ? '#888784' : '#0d0d0d' }}>{r.name || '—'}</span>
-                        <span style={{ flex: 1, fontSize: 12, color: '#888784', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.email || '—'}</span>
+                        <span style={{ minWidth: 160, fontSize: 13, color: blocked || dup ? 'var(--color-ink-muted)' : '#0d0d0d' }}>{r.name || '—'}</span>
+                        <span style={{ flex: 1, fontSize: 12, color: 'var(--color-ink-muted)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.email || '—'}</span>
 
                         {blocked || dup ? (
-                          <span style={{ fontSize: 11.5, color: '#888784' }}>{problemText(r.problems[0], r)}</span>
+                          <span style={{ fontSize: 11.5, color: 'var(--color-ink-muted)' }}>{problemText(r.problems[0], r)}</span>
                         ) : openPicker === r.key ? (
                           // The select mounts only for the row being edited — 200 live selects is a
                           // heavy DOM for no benefit.
@@ -590,7 +590,7 @@ export default function RespondentImport() {
                   title={unassigned.length > 0 ? `${unassigned.length} rows still need a category` : undefined}
                   style={{ fontSize: 13, fontWeight: 600, padding: '9px 20px', borderRadius: 8, border: 'none',
                     background: ready.length && !unassigned.length && !closed ? '#0d0d0d' : '#e8e7e4',
-                    color: ready.length && !unassigned.length && !closed ? '#fff' : '#b8b7b4',
+                    color: ready.length && !unassigned.length && !closed ? '#fff' : 'var(--color-ink-muted)',
                     cursor: ready.length && !unassigned.length && !closed && !creating ? 'pointer' : 'not-allowed' }}>
                   {creating ? 'Creating…'
                     : unassigned.length > 0 ? `${unassigned.length} ${unassigned.length === 1 ? 'row still needs' : 'rows still need'} a category`

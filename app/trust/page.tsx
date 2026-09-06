@@ -91,7 +91,7 @@ export default function TrustPage() {
       {/* Hero */}
       <section style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '4rem 2.5rem 3rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 12 }}>ThemisIQ · Trust & Data</div>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: 12 }}>ThemisIQ · Trust & Data</div>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1.25rem', color: '#0d0d0d' }}>
             We know trust is everything.<br />
             <em style={{ background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Here is exactly how we earn it.</em>
@@ -99,7 +99,7 @@ export default function TrustPage() {
           <p style={{ fontSize: 16, color: '#555553', maxWidth: 620, lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
             You are entering sensitive compliance data into ThemisIQ — emissions figures, workforce data, supplier relationships, AI systems. We take that responsibility seriously. This page explains exactly what we do with your data, what we never do, and what rights you have.
           </p>
-          <p style={{ fontSize: 13, color: '#888784', fontWeight: 400 }}>
+          <p style={{ fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400 }}>
             Questions? Contact us at <a href="mailto:privacy@themisiq.co" style={{ color: '#7425e3', textDecoration: 'none' }}>privacy@themisiq.co</a>
           </p>
         </div>
@@ -109,7 +109,7 @@ export default function TrustPage() {
 
         {/* Core principles */}
         <div style={{ marginBottom: '3rem' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: '1.5rem' }}>Our core data principles</div>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: '1.5rem' }}>Our core data principles</div>
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
             {PRINCIPLES.map((p, i) => (
               <div key={p.title} style={{ background: '#fff', border: '1px solid var(--color-line)', borderRadius: 12, padding: '1.25rem 1.5rem', display: 'grid', gridTemplateColumns: '24px 1fr', gap: 16, alignItems: 'flex-start' }}>
@@ -127,7 +127,7 @@ export default function TrustPage() {
         <div style={{ marginBottom: '3rem' }}>
           {DATA_SECTIONS.map(section => (
             <div key={section.title} style={{ marginBottom: '2rem' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: '1rem' }}>{section.title}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: '1rem' }}>{section.title}</div>
               <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, overflow: 'hidden' }}>
                 {section.items.map((item, i) => (
                   <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 24, padding: '1rem 1.5rem', borderBottom: i < section.items.length - 1 ? '0.5px solid #f3f4f6' : 'none', alignItems: 'flex-start' }}>
@@ -142,12 +142,12 @@ export default function TrustPage() {
 
         {/* Regulatory compliance */}
         <div style={{ marginBottom: '3rem' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: '1rem' }}>Regulatory compliance</div>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: '1rem' }}>Regulatory compliance</div>
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, overflow: 'hidden' }}>
             {COMPLIANCE.map((c, i) => (
               <div key={c.law} style={{ display: 'grid', gridTemplateColumns: '120px 180px 1fr', gap: 24, padding: '1rem 1.5rem', borderBottom: i < COMPLIANCE.length - 1 ? '0.5px solid #f3f4f6' : 'none', alignItems: 'flex-start' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#0d0d0d' }}>{c.law}</div>
-                <div style={{ fontSize: 12, color: '#888784' }}>{c.jurisdiction}</div>
+                <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>{c.jurisdiction}</div>
                 <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{c.note}</div>
               </div>
             ))}
@@ -156,7 +156,7 @@ export default function TrustPage() {
 
         {/* Infrastructure */}
         <div style={{ marginBottom: '3rem', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.5rem' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: '1rem' }}>Infrastructure & security</div>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: '1rem' }}>Infrastructure & security</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             {[
               { label: 'Hosting', val: 'Supabase on AWS (us-east-1) · SOC 2 Type II certified' },
@@ -169,7 +169,7 @@ export default function TrustPage() {
               { label: 'Frontend', val: 'Vercel · SOC 2 Type II certified' },
             ].map(({ label, val }) => (
               <div key={label} style={{ display: 'flex', flexDirection: 'column' as const, gap: 4 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>{label}</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>{label}</div>
                 <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.5 }}>{val}</div>
               </div>
             ))}

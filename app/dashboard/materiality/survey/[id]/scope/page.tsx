@@ -309,7 +309,7 @@ export default function SurveyScope() {
   if (loading) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
-      <div style={{ textAlign: 'center', padding: '4rem', color: '#888784' }}>Loading the question set…</div>
+      <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-ink-muted)' }}>Loading the question set…</div>
     </div>
   )
 
@@ -419,7 +419,7 @@ export default function SurveyScope() {
             <div key={group.code} id={`scope-group-${gi}`} style={{ marginBottom: 26, scrollMarginTop: 150 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10, paddingBottom: 8, borderBottom: '0.5px solid #e8e7e4' }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', color: '#0d0d0d' }}>{group.label}</div>
-                <div style={{ fontSize: 11.5, color: inc === group.questions.length ? '#888784' : AMBER }}>
+                <div style={{ fontSize: 11.5, color: inc === group.questions.length ? 'var(--color-ink-muted)' : AMBER }}>
                   {inc} of {group.questions.length} included
                 </div>
               </div>
@@ -438,18 +438,18 @@ export default function SurveyScope() {
                       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: 14, fontWeight: 500, color: excluded ? '#888784' : '#0d0d0d' }}>{q.short_name}</span>
+                            <span style={{ fontSize: 14, fontWeight: 500, color: excluded ? 'var(--color-ink-muted)' : '#0d0d0d' }}>{q.short_name}</span>
                             {/* The only thing distinguishing the twelve labour rows: short_name is
                                 identical across each pair by design (20260818). */}
                             {q.question_framing && (
                               <span style={{ fontSize: 10.5, fontWeight: 600, color: GREEN, background: GREEN_BG, borderRadius: 99, padding: '2px 8px' }}>{q.question_framing}</span>
                             )}
                             {excluded && (
-                              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: '#888784', background: '#e8e7e4', borderRadius: 99, padding: '2px 8px' }}>EXCLUDED</span>
+                              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--color-ink-muted)', background: '#e8e7e4', borderRadius: 99, padding: '2px 8px' }}>EXCLUDED</span>
                             )}
                           </div>
                           {q.subtopic_code && contextOf[q.subtopic_code] && (
-                            <div style={{ fontSize: 12.5, color: '#888784', lineHeight: 1.6, marginTop: 4 }}>{contextOf[q.subtopic_code]}</div>
+                            <div style={{ fontSize: 12.5, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 4 }}>{contextOf[q.subtopic_code]}</div>
                           )}
                           {excluded && q.exclusion_reason && (
                             <div style={{ fontSize: 12.5, color: '#555553', lineHeight: 1.6, marginTop: 8, paddingLeft: 10, borderLeft: `2px solid #e8e7e4` }}>
@@ -471,7 +471,7 @@ export default function SurveyScope() {
                                 onClick={() => { setEditing(q.id); setDraftReason('') }}
                                 disabled={state === 'saving' || lastIncluded}
                                 title={lastIncluded ? 'At least one sub-topic must stay in scope' : undefined}
-                                style={{ fontSize: 12, fontWeight: 500, padding: '6px 14px', borderRadius: 8, border: '1px solid #e8e7e4', background: '#fff', color: lastIncluded ? '#b8b7b4' : '#555553', cursor: lastIncluded ? 'not-allowed' : 'pointer' }}>
+                                style={{ fontSize: 12, fontWeight: 500, padding: '6px 14px', borderRadius: 8, border: `1px solid ${lastIncluded ? 'var(--color-line)' : '#e8e7e4'}`, background: lastIncluded ? 'var(--color-sunken)' : '#fff', color: lastIncluded ? 'var(--color-ink-muted)' : '#555553', cursor: lastIncluded ? 'not-allowed' : 'pointer' }}>
                                 Exclude
                               </button>
                             )
@@ -480,7 +480,7 @@ export default function SurveyScope() {
                       </div>
 
                       {lastIncluded && !isEditing && (
-                        <div style={{ fontSize: 11.5, color: '#888784', marginTop: 8, lineHeight: 1.6 }}>
+                        <div style={{ fontSize: 11.5, color: 'var(--color-ink-muted)', marginTop: 8, lineHeight: 1.6 }}>
                           This is the last sub-topic in scope. A survey with none would show a
                           respondent an empty form, so it cannot be excluded.
                         </div>
@@ -511,7 +511,7 @@ export default function SurveyScope() {
                           {/* Examples live HERE, above the field, so they read as illustrations. Ghost
                               text inside the box would be a specific factual claim the customer is
                               invited to accept whether or not it is true of them. */}
-                          <div style={{ fontSize: 11.5, color: '#888784', lineHeight: 1.6, marginBottom: 8 }}>
+                          <div style={{ fontSize: 11.5, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginBottom: 8 }}>
                             For example: no manufacturing operations · no sites near protected habitats ·
                             nothing sold directly to consumers.
                           </div>
@@ -527,7 +527,7 @@ export default function SurveyScope() {
 
                           {/* Spec v9 §3.2. The customer is writing a disclosure, and saying so is what
                               stops "n/a" reaching a verifier. */}
-                          <div style={{ fontSize: 11.5, color: '#888784', lineHeight: 1.6, marginTop: 6 }}>
+                          <div style={{ fontSize: 11.5, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 6 }}>
                             This is printed in your report as the reason this topic was considered and
                             excluded. It is your disclosure, in your own words, and appears exactly as
                             written — including “n/a”.
@@ -541,7 +541,7 @@ export default function SurveyScope() {
                             <button
                               onClick={() => confirmExclude(q)}
                               disabled={!draftReason.trim() || state === 'saving'}
-                              style={{ fontSize: 12.5, fontWeight: 600, padding: '7px 16px', borderRadius: 8, border: 'none', background: draftReason.trim() ? '#0d0d0d' : '#e8e7e4', color: draftReason.trim() ? '#fff' : '#b8b7b4', cursor: draftReason.trim() ? 'pointer' : 'not-allowed' }}>
+                              style={{ fontSize: 12.5, fontWeight: 600, padding: '7px 16px', borderRadius: 8, border: 'none', background: draftReason.trim() ? '#0d0d0d' : '#e8e7e4', color: draftReason.trim() ? '#fff' : 'var(--color-ink-muted)', cursor: draftReason.trim() ? 'pointer' : 'not-allowed' }}>
                               {state === 'saving' ? 'Saving…' : 'Exclude topic'}
                             </button>
                           </div>
@@ -563,7 +563,7 @@ export default function SurveyScope() {
           )
         })}
 
-        <div style={{ marginTop: 24, textAlign: 'center', fontSize: 12, color: '#888784', lineHeight: 1.7 }}>
+        <div style={{ marginTop: 24, textAlign: 'center', fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.7 }}>
           Changes save as you make them. Excluded topics and their reasons appear in the report as
           considered and excluded.
         </div>

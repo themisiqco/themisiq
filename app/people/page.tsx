@@ -84,7 +84,7 @@ export default function Page() {
       <section style={{ padding: '4rem 2.5rem', background: '#fff', borderBottom: '0.5px solid #e8e7e4' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-            <div style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>How we compare</div>
+            <div style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: 8 }}>How we compare</div>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, color: '#0d0d0d' }}>The gap we fill.</h2>
           </div>
           <div style={{ border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
@@ -120,7 +120,7 @@ export default function Page() {
               )
             })}
           </div>
-          <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: '#888784', fontWeight: 400 }}>
+          <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>
             Big HR platforms = Workday, SAP SuccessFactors · Pay equity specialists = Syndio, Trusaic, Visier
           </div>
         </div>
@@ -225,7 +225,7 @@ export default function Page() {
               <div key={ref} style={{ background: '#fff', padding: '1.25rem' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: '#7425e3', letterSpacing: '0.06em', marginBottom: 4 }}>{ref}</div>
                 <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>{title}</div>
-                <div style={{ fontSize: 11, color: '#888784', fontWeight: 400, lineHeight: 1.4 }}>{desc}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.4 }}>{desc}</div>
               </div>
             ))}
           </div>
@@ -237,7 +237,7 @@ export default function Page() {
       <section style={{ padding: '5rem 2.5rem', background: '#fff', borderBottom: '0.5px solid #e8e7e4' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <div style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>Framework coverage</div>
+            <div style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: 8 }}>Framework coverage</div>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>Every requirement. One platform.</h2>
             <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, maxWidth: 540, margin: '0 auto', lineHeight: 1.75 }}>One workforce data set generates every report automatically — regulators, investors, customers, and boards all answered from a single source of truth.</p>
           </div>
@@ -298,7 +298,7 @@ export default function Page() {
                 output: 'SASB human capital metrics table',
               },
             ].map(({ name, ref, deadline, urgency, who, what, output }) => {
-              const urgencyColor = urgency === 'critical' ? '#B91C1C' : urgency === 'high' ? 'var(--color-module-climate)' : '#888784'
+              const urgencyColor = urgency === 'critical' ? '#B91C1C' : urgency === 'high' ? 'var(--color-module-climate)' : 'var(--color-ink-muted)'
               const urgencyBg = urgency === 'critical' ? '#FCEBEB' : urgency === 'high' ? '#FEF3E2' : '#f8f7f5'
               return (
                 <div key={name} style={{ border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '1.5rem', background: '#fff', display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
@@ -310,9 +310,9 @@ export default function Page() {
                     <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#555553' }}>{ref}</span>
                     <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: urgencyBg, color: urgencyColor, border: `0.5px solid color-mix(in srgb, ${urgencyColor} 20%, transparent)` }}>{deadline}</span>
                   </div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>Who</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>Who</div>
                   <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>{who}</div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>What ThemisIQ collects</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>What ThemisIQ collects</div>
                   <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.5, flex: 1 }}>{what}</div>
                   <div style={{ borderTop: '0.5px solid #e8e7e4', paddingTop: 10, marginTop: 4 }}>
                     <div style={{ fontSize: 11, fontWeight: 600, color: '#0F6E56', marginBottom: 2 }}>Output</div>
@@ -353,4 +353,4 @@ export default function Page() {
 const navLink: React.CSSProperties = { fontSize: 11, color: '#555553', textDecoration: 'none' }
 const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'var(--color-brand)', color: '#fff', textDecoration: 'none', display: 'inline-block' }
 const btnOutline: React.CSSProperties = { fontSize: 13, fontWeight: 400, padding: '8px 18px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', textDecoration: 'none', display: 'inline-block' }
-const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
+const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }

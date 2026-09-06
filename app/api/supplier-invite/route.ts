@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthedClient, bearerFrom, AuthError } from '../../../lib/supabaseAuthed'
+import { INK_MUTED } from '@/lib/brand'
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY!
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'noreply@themisiq.co'
@@ -79,9 +80,9 @@ const inviteEmailHtml = ({
 
       <!-- Campaign box -->
       <div style="background:#f8f7f5;border:0.5px solid #e8e7e4;border-radius:12px;padding:20px;margin:0 0 24px;">
-        <div style="font-size:11px;font-weight:700;color:#888784;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Campaign details</div>
+        <div style="font-size:11px;font-weight:700;color:${INK_MUTED};text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Campaign details</div>
         <div style="font-size:14px;font-weight:600;color:#0d0d0d;margin-bottom:4px;">${campaignLabel}</div>
-        <div style="font-size:12px;color:#888784;">${templateLabel}</div>
+        <div style="font-size:12px;color:${INK_MUTED};">${templateLabel}</div>
       </div>
 
       ${deadlineText}
@@ -97,13 +98,13 @@ const inviteEmailHtml = ({
         </a>
       </div>
 
-      <p style="margin:0 0 8px;color:#888784;font-size:12px;line-height:1.6;">
+      <p style="margin:0 0 8px;color:${INK_MUTED};font-size:12px;line-height:1.6;">
         Or copy this link into your browser:
       </p>
       <p style="margin:0 0 24px;font-size:11px;color:#7425e3;word-break:break-all;">${portalUrl}</p>
 
       <div style="border-top:0.5px solid #e8e7e4;padding-top:20px;">
-        <p style="margin:0;color:#9ca3af;font-size:11px;line-height:1.6;">
+        <p style="margin:0;color:${INK_MUTED};font-size:11px;line-height:1.6;">
           This invitation was sent on behalf of ${buyer} via ThemisIQ. If you have questions about this request, please contact ${buyer} directly. Your responses are stored securely and only shared with ${buyer}.
         </p>
       </div>
@@ -111,7 +112,7 @@ const inviteEmailHtml = ({
 
     <!-- Footer -->
     <div style="background:#f8f7f5;border-top:0.5px solid #e8e7e4;padding:16px 32px;text-align:center;">
-      <div style="font-size:11px;color:#888784;">Powered by <a href="https://www.themisiq.co" style="color:#7425e3;text-decoration:none;">ThemisIQ</a> · Sustainability Compliance Platform</div>
+      <div style="font-size:11px;color:${INK_MUTED};">Powered by <a href="https://www.themisiq.co" style="color:#7425e3;text-decoration:none;">ThemisIQ</a> · Sustainability Compliance Platform</div>
     </div>
   </div>
 </body>
@@ -162,7 +163,7 @@ const reminderEmailHtml = ({
         </a>
       </div>
       <div style="border-top:0.5px solid #e8e7e4;padding-top:20px;">
-        <p style="margin:0;color:#9ca3af;font-size:11px;line-height:1.6;">Powered by ThemisIQ · www.themisiq.co</p>
+        <p style="margin:0;color:${INK_MUTED};font-size:11px;line-height:1.6;">Powered by ThemisIQ · www.themisiq.co</p>
       </div>
     </div>
   </div>

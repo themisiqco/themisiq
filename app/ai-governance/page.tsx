@@ -209,7 +209,7 @@ export default function Page() {
             <div key={date} style={{ background: '#fff', padding: '2rem', borderTop: `4px solid ${color}` }}>
               <span style={{ fontSize: 10, fontWeight: 700, color, background: bg, padding: '2px 8px', borderRadius: 99 }}>{status}</span>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 400, color: '#0d0d0d', margin: '10px 0 4px' }}>{label}</div>
-              <div style={{ fontSize: 11, color: '#888784', marginBottom: 10 }}>{date}</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 10 }}>{date}</div>
               <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{desc}</div>
             </div>
           ))}
@@ -246,4 +246,4 @@ export default function Page() {
 const navLink: React.CSSProperties = { fontSize: 11, color: '#555553', textDecoration: 'none' }
 const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'var(--color-brand)', color: '#fff', textDecoration: 'none', display: 'inline-block' }
 const btnOutline: React.CSSProperties = { fontSize: 13, fontWeight: 400, padding: '8px 18px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', textDecoration: 'none', display: 'inline-block' }
-const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
+const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }

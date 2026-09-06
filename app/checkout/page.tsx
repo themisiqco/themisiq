@@ -20,12 +20,12 @@ function CheckoutResume() {
     }).catch(() => setMsg('Could not start checkout. Redirecting…'))
   }, [params, router])
 
-  return <div style={{ padding: '4rem', textAlign: 'center', color: '#888784' }}>{msg}</div>
+  return <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>{msg}</div>
 }
 
 export default function CheckoutPage() {
   return (
-    <Suspense fallback={<div style={{ padding: '4rem', textAlign: 'center', color: '#888784' }}>Loading…</div>}>
+    <Suspense fallback={<div style={{ padding: '4rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>Loading…</div>}>
       <CheckoutResume />
     </Suspense>
   )

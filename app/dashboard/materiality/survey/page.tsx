@@ -201,7 +201,7 @@ export default function SurveyRounds() {
                 <label style={labelStyle}>Round name <span style={{ color: FAIL }}>*</span></label>
                 <input style={inputStyle} value={name} onChange={e => setName(e.target.value)}
                   placeholder="FY2026 stakeholder survey" />
-                <div style={{ fontSize: 11, color: '#888784', marginTop: 5, lineHeight: 1.6 }}>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 5, lineHeight: 1.6 }}>
                   Your reference for this round. Respondents see it at the top of the survey.
                 </div>
               </div>
@@ -216,7 +216,7 @@ export default function SurveyRounds() {
                     becomes "your organisation is a customer of the organisation you work for", which
                     is nonsense to the one respondent who most needs the sentence to land. The column
                     is nullable at the database on purpose; the requirement belongs here. */}
-                <div style={{ fontSize: 11, color: '#888784', marginTop: 5, lineHeight: 1.6 }}>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 5, lineHeight: 1.6 }}>
                   Used throughout the survey — “What strategic priority should <em>{company.trim() || 'Acme Foods Ltd'}</em> assign
                   to this topic?” Respondents outside your organisation need it to know who is asking.
                 </div>
@@ -225,7 +225,7 @@ export default function SurveyRounds() {
               <div>
                 <label style={labelStyle}>Deadline</label>
                 <input style={inputStyle} type="date" value={deadline} onChange={e => setDeadline(e.target.value)} />
-                <div style={{ fontSize: 11, color: '#888784', marginTop: 5, lineHeight: 1.6 }}>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 5, lineHeight: 1.6 }}>
                   Optional. Shown to respondents and in the invitation email.
                 </div>
               </div>
@@ -236,7 +236,7 @@ export default function SurveyRounds() {
                   onChange={e => setFloor(Math.max(1, Number(e.target.value) || 1))} />
                 {/* Immutable once the first response arrives (20260825), so this is the only moment
                     it can be set. */}
-                <div style={{ fontSize: 11, color: '#888784', marginTop: 5, lineHeight: 1.6 }}>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 5, lineHeight: 1.6 }}>
                   Results are never broken down by group where fewer than this many people answered,
                   so no individual can be identified. Fixed once the first response arrives.
                 </div>
@@ -289,17 +289,17 @@ export default function SurveyRounds() {
               </button>
               <button onClick={create} disabled={!nameOk || !companyOk || saving}
                 title={!companyOk ? 'A company name is required — the survey copy names it throughout' : undefined}
-                style={{ fontSize: 13, fontWeight: 600, padding: '9px 20px', borderRadius: 8, border: 'none', background: nameOk && companyOk ? '#0d0d0d' : '#e8e7e4', color: nameOk && companyOk ? '#fff' : '#b8b7b4', cursor: nameOk && companyOk && !saving ? 'pointer' : 'not-allowed' }}>
+                style={{ fontSize: 13, fontWeight: 600, padding: '9px 20px', borderRadius: 8, border: 'none', background: nameOk && companyOk ? '#0d0d0d' : '#e8e7e4', color: nameOk && companyOk ? '#fff' : 'var(--color-ink-muted)', cursor: nameOk && companyOk && !saving ? 'pointer' : 'not-allowed' }}>
                 {saving ? 'Creating…' : 'Create and choose topics'}
               </button>
             </div>
-            <div style={{ fontSize: 11, color: '#888784', marginTop: 10, textAlign: 'right', lineHeight: 1.6 }}>
+            <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 10, textAlign: 'right', lineHeight: 1.6 }}>
               All 37 ESRS sub-topics are included to begin with. You choose what to exclude next.
             </div>
           </div>
         )}
 
-        {loading && <div style={{ padding: '3rem', textAlign: 'center', color: '#888784' }}>Loading survey rounds…</div>}
+        {loading && <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>Loading survey rounds…</div>}
 
         {loadError && (
           <div style={{ background: FAIL_BG, border: `0.5px solid ${FAIL}`, borderRadius: 12, padding: '14px 16px', marginTop: 20 }}>
@@ -311,7 +311,7 @@ export default function SurveyRounds() {
         {!loading && !loadError && rounds.length === 0 && !showNew && (
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '2.5rem', textAlign: 'center', marginTop: 20 }}>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: '#0d0d0d', marginBottom: 8 }}>No survey rounds yet</div>
-            <div style={{ fontSize: 13, color: '#888784', lineHeight: 1.7, maxWidth: 460, margin: '0 auto' }}>
+            <div style={{ fontSize: 13, color: 'var(--color-ink-muted)', lineHeight: 1.7, maxWidth: 460, margin: '0 auto' }}>
               A round is one survey sent to one group of people. Most companies run several — staff
               first, then suppliers, then communities — and use them together.
             </div>
@@ -331,10 +331,10 @@ export default function SurveyRounds() {
                         <span style={{ fontSize: 14.5, fontWeight: 500, color: '#0d0d0d' }}>{r.name}</span>
                         <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: s.color, background: s.bg, borderRadius: 99, padding: '2px 9px' }}>{s.label}</span>
                         {r.frozen_at && (
-                          <span style={{ fontSize: 10, fontWeight: 600, color: '#888784', background: '#f8f7f5', borderRadius: 99, padding: '2px 9px' }}>RESPONSES IN</span>
+                          <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-ink-muted)', background: '#f8f7f5', borderRadius: 99, padding: '2px 9px' }}>RESPONSES IN</span>
                         )}
                       </div>
-                      <div style={{ fontSize: 12, color: '#888784', marginTop: 4 }}>
+                      <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 4 }}>
                         {r.company_name}
                         {sc && ` · ${sc.included} of ${sc.total} topics in scope`}
                         {r.deadline && ` · deadline ${new Date(r.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`}
@@ -348,7 +348,7 @@ export default function SurveyRounds() {
           </div>
         )}
 
-        <div style={{ marginTop: 28, textAlign: 'center', fontSize: 12, color: '#888784', lineHeight: 1.7 }}>
+        <div style={{ marginTop: 28, textAlign: 'center', fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.7 }}>
           <Link href="/dashboard/climate-risk" style={{ color: '#7425e3', textDecoration: 'none' }}>← Climate Risk &amp; Materiality</Link>
         </div>
       </div>

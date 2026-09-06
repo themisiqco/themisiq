@@ -46,11 +46,11 @@ function Shell({ children }: { children: React.ReactNode }) {
           It also has to match the same wordmark in email HTML, which cannot resolve a
           custom property or rely on a web font loading. See app/components/headingStyles.ts. */}
           <a href="/" style={{ textDecoration: 'none', fontFamily: 'Georgia, serif', fontSize: '1.35rem', fontWeight: 400, background: GRAD }}>ThemisIQ</a>
-          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784' }}>ESG compliance assessment</span>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)' }}>ESG compliance assessment</span>
         </div>
       </div>
       <div style={{ maxWidth: 860, margin: '0 auto', padding: '1.5rem 1.5rem 4rem' }}>{children}</div>
-      <div style={{ borderTop: '0.5px solid #e8e7e4', padding: '1.5rem', textAlign: 'center', fontSize: 11, color: '#888784' }}>
+      <div style={{ borderTop: '0.5px solid #e8e7e4', padding: '1.5rem', textAlign: 'center', fontSize: 11, color: 'var(--color-ink-muted)' }}>
         Prepared via ThemisIQ · <a href="/" style={{ color: '#7425e3', textDecoration: 'none' }}>themisiq.co</a> · Indicative assessment — requires specialist confirmation.
       </div>
     </div>
@@ -159,10 +159,10 @@ export default function DealAssessmentPage() {
     <Shell>
       {/* Hero */}
       <div style={{ marginBottom: 28 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 6 }}>ESG compliance assessment</div>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 6 }}>ESG compliance assessment</div>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.15, margin: '0 0 8px' }}>{data.target_name || 'Target company'}</h1>
         {sectorJur && <div style={{ fontSize: 14, color: '#555553' }}>{sectorJur}</div>}
-        <div style={{ fontSize: 12, color: '#888784', marginTop: 6 }}>Prepared via ThemisIQ — the ESG compliance platform for deals.</div>
+        <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 6 }}>Prepared via ThemisIQ — the ESG compliance platform for deals.</div>
       </div>
 
       {/* Dates the snapshot. Placed BEFORE any finding or figure, because it governs all of them —
@@ -204,7 +204,7 @@ export default function DealAssessmentPage() {
                   <div style={{ background: risk.severity === 'critical' ? cfg.bg : '#fff', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderBottom: `0.5px solid color-mix(in srgb, ${cfg.border} 13%, transparent)`, flexWrap: 'wrap' }}>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{risk.risk}</div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                      <span style={{ fontSize: 10, color: '#888784' }}>{regimeLabel(mapFramework(risk.framework))}</span>
+                      <span style={{ fontSize: 10, color: 'var(--color-ink-muted)' }}>{regimeLabel(mapFramework(risk.framework))}</span>
                       {risk.scope === 'conditional' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#FEF3E2', color: 'var(--color-module-climate)', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 35%, transparent)' }}>CONDITIONAL</span>}
                       <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: cfg.bg, color: cfg.color, border: `0.5px solid ${cfg.border}` }}>{cfg.label}</span>
                     </div>
@@ -243,7 +243,7 @@ export default function DealAssessmentPage() {
             Priced like sustainability software, scoped like a consultant&rsquo;s engagement. The difference is automation, not depth: traditional fees are dominated by manual data-collection and review hours — the platform handles those directly, without cutting the deliverable.
           </div>
         </div>
-        <div style={{ fontSize: 11, color: '#888784', marginTop: 8, marginBottom: 16, lineHeight: 1.6 }}>Benchmark figures shown in USD. <strong style={{ fontWeight: 600 }}>How we benchmark:</strong> per-obligation market ranges for standalone ESG due-diligence workstreams, scaled by number of locations and sector intensity — indicative, not a quote.</div>
+        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 8, marginBottom: 16, lineHeight: 1.6 }}>Benchmark figures shown in USD. <strong style={{ fontWeight: 600 }}>How we benchmark:</strong> per-obligation market ranges for standalone ESG due-diligence workstreams, scaled by number of locations and sector intensity — indicative, not a quote.</div>
 
         {/* Included for this deal */}
         <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.25)', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: 16 }}>
@@ -252,7 +252,7 @@ export default function DealAssessmentPage() {
             <div key={i} style={{ marginBottom: 6 }}>
               <div style={{ fontSize: 13 }}>✓ {o.label}</div>
               {o.scopeNote && (
-                <div style={{ fontSize: 11, color: '#888784', marginLeft: 18, marginTop: 1, lineHeight: 1.5 }}>{o.scopeNote}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginLeft: 18, marginTop: 1, lineHeight: 1.5 }}>{o.scopeNote}</div>
               )}
             </div>
           ))}
@@ -262,12 +262,12 @@ export default function DealAssessmentPage() {
         {obligations.recommended.map((o, i) => (
           <div key={i} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '0.85rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Also recommended</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Also recommended</div>
               <div style={{ fontSize: 13, color: '#555553' }}>{o.label}</div>
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 600 }}>{o.themisIqPrice != null ? `+ ${fmt(o.themisIqPrice)}` : '+ Custom'}</div>
-              <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>consultant USD {Math.round(o.consultantLow / 1000)}k–{Math.round(o.consultantHigh / 1000)}k</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>consultant USD {Math.round(o.consultantLow / 1000)}k–{Math.round(o.consultantHigh / 1000)}k</div>
             </div>
           </div>
         ))}
@@ -277,7 +277,7 @@ export default function DealAssessmentPage() {
           <div key={i} style={{ background: '#FBF3E2', border: '0.5px solid rgba(146,102,10,0.25)', borderRadius: 10, padding: '0.85rem 1.25rem', marginBottom: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: '#92660A', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Covered via SBTi target-setting</div>
             <div style={{ fontSize: 13, color: '#555553' }}>{o.label}</div>
-            {o.scopeNote && <div style={{ fontSize: 11, color: '#888784', marginTop: 3, lineHeight: 1.5 }}>{o.scopeNote}</div>}
+            {o.scopeNote && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 3, lineHeight: 1.5 }}>{o.scopeNote}</div>}
           </div>
         ))}
       </section>

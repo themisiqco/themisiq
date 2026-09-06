@@ -11,7 +11,7 @@ const GRAD = 'var(--color-brand)'
 const INK = '#0d0d0d'
 const PAPER = '#f8f7f5'
 const LINE = '#e8e7e4'
-const MUTE = '#888784'
+const MUTE = 'var(--color-ink-muted)'
 const BODY = '#555553'
 
 export type StepState = 'complete' | 'in-progress' | 'locked'

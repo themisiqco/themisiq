@@ -79,7 +79,7 @@ export default function Nav() {
   const moduleRow = (m: typeof MODULES_NAV[number]) => (
     <a key={m.href} href={m.href} onClick={() => setPlatformOpen(false)} style={platformItemStyle}>
       <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>{m.label}</div>
-      <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{m.sub}</div>
+      <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>{m.sub}</div>
     </a>
   )
 
@@ -157,7 +157,7 @@ export default function Nav() {
                     borderRadius: 12, boxShadow: '0 8px 28px rgba(0,0,0,0.10)',
                     padding: 8, zIndex: 200,
                   }}>
-                    {userEmail && <div style={{ fontSize: 11, color: '#888784', padding: '4px 12px 8px', wordBreak: 'break-all' }}>{userEmail}</div>}
+                    {userEmail && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', padding: '4px 12px 8px', wordBreak: 'break-all' }}>{userEmail}</div>}
                     <div style={{ height: '0.5px', background: '#e8e7e4', margin: '0 4px 6px' }} />
                     <button
                       onClick={() => { setAvatarOpen(false); supabase.auth.signOut() }}
@@ -213,7 +213,7 @@ export default function Nav() {
               textDecoration: 'none',
             }}>
               <div style={{ fontSize: 15, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }}>{label}</div>
-              <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>{sub}</div>
+              <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>{sub}</div>
             </a>
           ))}
           {isAuthed && (
@@ -223,7 +223,7 @@ export default function Nav() {
               textDecoration: 'none',
             }}>
               <div style={{ fontSize: 15, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }}>Dashboard</div>
-              <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>Your platform home</div>
+              <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>Your platform home</div>
             </a>
           )}
           <a
@@ -239,7 +239,7 @@ export default function Nav() {
             }}
           >
             <div style={{ fontSize: 15, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }}>{isAuthed ? 'Log out' : 'Log in'}</div>
-            <div style={{ fontSize: 12, color: '#888784', fontWeight: 400 }}>{isAuthed ? 'Sign out of your account' : 'Access your dashboard'}</div>
+            <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>{isAuthed ? 'Sign out of your account' : 'Access your dashboard'}</div>
           </a>
           <div style={{ marginTop: '1rem' }}>
             <a href="/pricing" style={{

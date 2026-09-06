@@ -12,7 +12,7 @@ import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 // ── Palette (matches app/cbam/page.tsx) ──
 const ink = '#0d0d0d'
 const muted = '#555553'
-const faint = '#888784'
+const faint = 'var(--color-ink-muted)'
 const canvas = '#f8f7f5'
 const hair = '#e8e7e4'
 const violet = '#7425e3'

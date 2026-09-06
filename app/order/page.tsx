@@ -53,7 +53,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           It also has to match the same wordmark in email HTML, which cannot resolve a
           custom property or rely on a web font loading. See app/components/headingStyles.ts. */}
           <a href="/" style={{ textDecoration: 'none', fontFamily: 'Georgia, serif', fontSize: '1.35rem', fontWeight: 400, background: GRAD }}>ThemisIQ</a>
-          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784' }}>Secure checkout</span>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)' }}>Secure checkout</span>
         </div>
       </div>
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '2rem 1.5rem 4rem' }}>{children}</div>
@@ -142,7 +142,7 @@ function OrderInner() {
   return (
     <Shell>
       <div data-ref={ref ?? undefined}>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 6 }}>Pre-configured order</div>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 6 }}>Pre-configured order</div>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.7rem, 5vw, 2.3rem)', fontWeight: 400, lineHeight: 1.15, margin: '0 0 20px' }}>Your ThemisIQ order</h1>
 
         {/* Order summary */}
@@ -151,7 +151,7 @@ function OrderInner() {
             <div key={li.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, padding: '10px 0', borderBottom: i < lineItems.length - 1 ? '0.5px solid #f3f4f6' : 'none' }}>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d' }}>{li.label}</div>
-                <div style={{ fontSize: 12, color: '#888784', marginTop: 2 }}>{li.detail}</div>
+                <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 2 }}>{li.detail}</div>
               </div>
               <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', flexShrink: 0 }}>{li.price != null ? `${usd(li.price)}/yr` : 'Custom quote'}</div>
             </div>
@@ -204,7 +204,7 @@ function OrderInner() {
                 <input value={q.email} onChange={e => setQ(v => ({ ...v, email: e.target.value }))} placeholder="you@company.com" type="email" style={orderInput} />
                 <label style={orderLabel}>Company</label>
                 <input value={q.company} onChange={e => setQ(v => ({ ...v, company: e.target.value }))} placeholder="Acme Industries Inc." style={orderInput} />
-                <label style={orderLabel}>Phone <span style={{ color: '#888784', fontWeight: 400 }}>(optional)</span></label>
+                <label style={orderLabel}>Phone <span style={{ color: 'var(--color-ink-muted)', fontWeight: 400 }}>(optional)</span></label>
                 <input value={q.phone} onChange={e => setQ(v => ({ ...v, phone: e.target.value }))} placeholder="+1 555 000 0000" style={orderInput} />
                 {/* Honeypot — visually hidden; real users never fill it, bots do → server silently drops. */}
                 <div aria-hidden="true" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', left: '-9999px' }}>
@@ -227,7 +227,7 @@ function OrderInner() {
           </div>
         )}
 
-        <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.6, marginTop: 16, textAlign: 'center' }}>
+        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 16, textAlign: 'center' }}>
           Prices in USD. Payment is processed securely by Stripe. You&rsquo;ll create or sign in to your ThemisIQ account as part of checkout.
         </div>
       </div>
@@ -237,7 +237,7 @@ function OrderInner() {
 
 export default function OrderPage() {
   return (
-    <Suspense fallback={<Shell><div style={{ padding: '3rem', textAlign: 'center', color: '#888784' }}>Loading your order…</div></Shell>}>
+    <Suspense fallback={<Shell><div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>Loading your order…</div></Shell>}>
       <OrderInner />
     </Suspense>
   )

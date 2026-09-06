@@ -111,7 +111,7 @@ export default function SupplierResponseViewer() {
   if (loading) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
-      <div style={{ textAlign: 'center', padding: '4rem', color: '#888784' }}>Loading responses...</div>
+      <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-ink-muted)' }}>Loading responses...</div>
     </div>
   )
 
@@ -123,12 +123,12 @@ export default function SupplierResponseViewer() {
       {/* Header */}
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
-          <button onClick={() => router.push(`/dashboard/supply-chain/portal/${campaignId}`)} style={{ fontSize: 12, color: '#888784', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 8 }}>← Back to campaign</button>
+          <button onClick={() => router.push(`/dashboard/supply-chain/portal/${campaignId}`)} style={{ fontSize: 12, color: 'var(--color-ink-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 8 }}>← Back to campaign</button>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
             <div>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{supplier?.supplier_name}</div>
-              <div style={{ fontSize: 13, color: '#888784' }}>{supplier?.supplier_email}</div>
-              {supplier?.contact_name && <div style={{ fontSize: 13, color: '#888784' }}>{supplier.contact_name}</div>}
+              <div style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>{supplier?.supplier_email}</div>
+              {supplier?.contact_name && <div style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>{supplier.contact_name}</div>}
             </div>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
               <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 99, background: supplier?.status === 'completed' ? '#E1F5EE' : '#FEF3E2', color: supplier?.status === 'completed' ? '#0F6E56' : 'var(--color-module-climate)' }}>
@@ -182,7 +182,7 @@ export default function SupplierResponseViewer() {
             return (
               <button key={sec.id} onClick={() => setActiveSection(i)} style={{ padding: '0.75rem', borderRadius: 10, border: `1.5px solid ${isActive ? sec.color : '#e8e7e4'}`, background: isActive ? sec.bg : '#fff', cursor: 'pointer', textAlign: 'left' }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: isActive ? sec.color : '#0d0d0d', marginBottom: 3 }}>{sec.title}</div>
-                <div style={{ fontSize: 10, color: '#888784' }}>{secAnswered}/{sec.questions.length} answered</div>
+                <div style={{ fontSize: 10, color: 'var(--color-ink-muted)' }}>{secAnswered}/{sec.questions.length} answered</div>
               </button>
             )
           })}
@@ -195,7 +195,7 @@ export default function SupplierResponseViewer() {
           </div>
           {sections[activeSection]?.questions.map((q, i) => {
             const response = responses[q.id]
-            const responseColor = response ? getResponseColor(response) : '#888784'
+            const responseColor = response ? getResponseColor(response) : 'var(--color-ink-muted)'
             return (
               <div key={q.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, padding: '14px 20px', borderBottom: i < sections[activeSection].questions.length - 1 ? '0.5px solid #f3f4f6' : 'none', alignItems: 'center' }}>
                 <div style={{ fontSize: 13, color: '#555553', fontWeight: 400 }}>{q.label}</div>
@@ -205,7 +205,7 @@ export default function SupplierResponseViewer() {
                       {response}
                     </span>
                   ) : (
-                    <span style={{ fontSize: 12, color: '#9ca3af', fontStyle: 'italic' }}>Not answered</span>
+                    <span style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontStyle: 'italic' }}>Not answered</span>
                   )}
                 </div>
               </div>

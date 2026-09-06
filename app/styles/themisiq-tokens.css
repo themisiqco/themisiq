@@ -403,6 +403,46 @@ h3 { font-size: var(--text-xl); }
 }
 
 /* ================================================================
+   DISABLED AND INACTIVE STATE — opacity is not a contrast-preserving device.
+
+   ⚠️ NEVER opacity ON ANYTHING CONTAINING TEXT.
+   Group opacity composites the whole element over the page, label and fill
+   together, so the gap between them always shrinks toward 1:1. It cannot
+   preserve a ratio; it can only reduce one. #555553 on #fff breaks AA at
+   α≈0.79; #fff on #0d0d0d at α≈0.62. Every value found in this codebase when
+   the rule was written — 0.4, 0.45, 0.5, 0.6, 0.7 — is below both, and 42 of
+   the 43 measurable controls using it were under 4.5:1 once composited.
+
+   Worst case is a light fill on a light page: the fill cannot move, so the
+   whole loss lands on the label. #555553 on #fff at 0.4 reads 1.92:1.
+
+   A DISABLED CONTROL TAKES AN EXPLICIT PALETTE — .tq-disabled below:
+     fill    var(--color-sunken)
+     border  var(--color-line)
+     label   var(--color-ink-muted)        5.00:1 on sunken
+   The state is legible because the colours are chosen, not faded.
+
+   opacity IS acceptable for:
+     - non-text elements with no label — a decorative icon, a rule, a dot,
+       where nothing has to be read
+     - motion and transitions, where the end state is full opacity
+     - hover or press feedback that is not the sole indicator of state
+
+   ⚠️ THE DISABLED LABEL IS OFTEN THE EXPLANATION. "3 rows still need a
+   category", "Accept & view inventory" — the text says why the control will
+   not respond. Fading it hides the answer at the moment it is needed. WCAG
+   exempts disabled controls from contrast, which is why this passes review;
+   the exemption assumes the control is not the thing explaining itself.
+   ================================================================ */
+
+.tq-disabled {
+  background: var(--color-sunken);
+  border: 1px solid var(--color-line);
+  color: var(--color-ink-muted);
+  cursor: not-allowed;
+}
+
+/* ================================================================
    Status — deliberately NOT hue-coded
    Eight module hues use up the colour wheel, so a red/amber/green
    status set would collide with Cyber, People and AI Governance.

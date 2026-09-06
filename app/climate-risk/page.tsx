@@ -22,7 +22,7 @@ export default function Page() {
       <section style={{ padding: '5rem 2.5rem 4rem', borderBottom: '0.5px solid #e8e7e4' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>ThemisIQ Climate</div>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: 8 }}>ThemisIQ Climate</div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
               Climate Risk<br />
               <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Intelligence</span>
@@ -55,7 +55,7 @@ export default function Page() {
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color, marginTop: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{unit}</div>
                 <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{label}</div>
-                {source && <div style={{ fontSize: 11, color: '#888784', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{source}</div>}
+                {source && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{source}</div>}
               </div>
             ))}
           </div>
@@ -122,7 +122,7 @@ export default function Page() {
           <p style={sectionSub}>IFRS S2 and CSRD/ESRS ask for resilience across a diverse range of climate futures — and for the judgment behind it to be documented. ThemisIQ produces exactly that, with every figure traceable to its basis.</p>
         </div>
 
-        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 12, textAlign: 'center' }}>Tested across a diverse trio of scenarios</div>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: 12, textAlign: 'center' }}>Tested across a diverse trio of scenarios</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: '2.5rem' }}>
           {[
             { role: 'Paris-aligned', warming: '~1.8°C', src: 'IPCC SSP1-2.6', color: '#0F6E56', bg: '#E1F5EE' },
@@ -132,12 +132,12 @@ export default function Page() {
             <div key={scn.role} style={{ background: scn.bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid color-mix(in srgb, ${scn.color} 13%, transparent)` }}>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 400, color: scn.color, lineHeight: 1 }}>{scn.warming}</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', marginTop: 8 }}>{scn.role}</div>
-              <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{scn.src}</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>{scn.src}</div>
             </div>
           ))}
         </div>
 
-        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 12, textAlign: 'center' }}>Documented for assurance, not just generated</div>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: 12, textAlign: 'center' }}>Documented for assurance, not just generated</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: '2.5rem' }}>
           {[
             ['Resilience conclusion', 'A rules-based read of how exposure shifts across the trio — persistent, warming-driven, or policy-driven.'],
@@ -226,7 +226,7 @@ export default function Page() {
             ))}
           </tbody>
         </table>
-        <div style={{ fontSize: 11, color: '#888784', marginTop: 14, lineHeight: 1.6, fontWeight: 400 }}>
+        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 14, lineHeight: 1.6, fontWeight: 400 }}>
           Regulatory timing and scope are evolving: the EU Omnibus reform is in force with its scope simplified, UK SRS rules are expected, and enforcement of California&apos;s SB 261 is barred pending appeal. Confirm your specific obligations with qualified counsel. ThemisIQ keeps framework mappings current as rules are finalised.
         </div>
       </section>
@@ -287,7 +287,7 @@ export default function Page() {
             </div>
           </div>
         </div>
-        <p style={{ fontSize: 12, color: '#888784', lineHeight: 1.7, marginTop: 16, fontStyle: 'italic' }}>
+        <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.7, marginTop: 16, fontStyle: 'italic' }}>
           Samples are illustrative outputs from the live tool, generated for a fictional entity. Your own report would be specific to your inputs and saved to your private account.
         </p>
       </section>
@@ -355,8 +355,8 @@ export default function Page() {
               { plan: 'Climate Risk', price: '$' + FLAT_MODULE_PRICES['climate-risk'].toLocaleString(), cadence: '/ reporting year', features: ['Physical & transition risk assessment', 'Materiality screening — both axes, ten ESRS topics (IFRS S2 · CSRD/ESRS)', '3 IPCC scenario pathways', 'TCFD-aligned report structure', 'IFRS S2 · CSRD ESRS E1 · SB 261 mapping'], featured: true },
             ].map(({ plan, price, cadence, features, featured }) => (
               <div key={plan} style={{ background: featured ? '#0d0d0d' : '#fff', borderRadius: 12, padding: '2rem', border: featured ? 'none' : '0.5px solid #e8e7e4' }}>
-                <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: featured ? 'rgba(255,255,255,0.4)' : '#888784', marginBottom: 8 }}>{plan}</div>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.4rem', fontWeight: 400, color: featured ? '#fff' : '#0d0d0d' }}>{price}<span style={{ fontSize: 14, fontWeight: 400, color: featured ? 'rgba(255,255,255,0.4)' : '#888784' }}>{cadence}</span></div>
+                <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: featured ? 'rgba(255,255,255,0.4)' : 'var(--color-ink-muted)', marginBottom: 8 }}>{plan}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.4rem', fontWeight: 400, color: featured ? '#fff' : '#0d0d0d' }}>{price}<span style={{ fontSize: 14, fontWeight: 400, color: featured ? 'rgba(255,255,255,0.4)' : 'var(--color-ink-muted)' }}>{cadence}</span></div>
                 <div style={{ height: '0.5px', background: featured ? 'rgba(255,255,255,0.1)' : '#e8e7e4', margin: '1.25rem 0' }} />
                 {features.map((f, i) => (
                   <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
@@ -405,7 +405,7 @@ const ghostBtn: React.CSSProperties = {
   color: '#0d0d0d', background: '#fff', border: '1px solid #e8e7e4',
   cursor: 'pointer', whiteSpace: 'nowrap', textDecoration: 'none', display: 'inline-block',
 }
-const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 8 }
+const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }
 const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, margin: '0 auto', lineHeight: 1.75, fontWeight: 400 }
 // ⚠️ COPIED VERBATIM FROM app/materiality/page.tsx WITH THE CROSS-SELL SECTION ON 27 Aug 2026 —
 // the same move ghostBtn made with the sample cards on 26 Aug, and for the same reason. This page

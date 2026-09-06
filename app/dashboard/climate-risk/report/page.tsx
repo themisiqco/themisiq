@@ -51,7 +51,7 @@ const GRAD = 'var(--color-brand)'
 const SEV = {
   high: { color: '#B91C1C', bg: '#FCEBEB', border: '#B91C1C' },
   med:  { color: 'var(--color-module-climate)', bg: '#FEF3E2', border: 'var(--color-module-climate)' },
-  low:  { color: '#888784', bg: '#f8f7f5', border: '#e8e7e4' },
+  low:  { color: 'var(--color-ink-muted)', bg: '#f8f7f5', border: '#e8e7e4' },
 } as const
 
 // ─── Page wrapper ─────────────────────────────────────────────────────────────
@@ -146,7 +146,7 @@ function H({ children }: { children: any }) {
 function Row({ k, v }: { k: string; v: string }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 12, padding: '6px 0', fontSize: 13 }}>
-      <span style={{ color: '#888784' }}>{k}</span>
+      <span style={{ color: 'var(--color-ink-muted)' }}>{k}</span>
       <span style={{ color: '#0d0d0d' }}>{v}</span>
     </div>
   )
@@ -169,7 +169,7 @@ function Centered({ children }: { children: any }) {
 function TextStat({ label, v }: { label: string; v: string }) {
   return (
     <div style={{ background: '#f8f7f5', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#888784', letterSpacing: '0.04em' }}>{label}</div>
+      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-ink-muted)', letterSpacing: '0.04em' }}>{label}</div>
       <div style={{ fontSize: 13, color: '#0d0d0d', marginTop: 4 }}>{v}</div>
     </div>
   )
@@ -211,7 +211,7 @@ function ResilienceMap({ items }: { items: any[] }) {
     })
   }
 
-  const axis = '#888784', grid = '#e8e7e4', muted = '#555553', ink = '#0d0d0d', hint = '#a8a6a1'
+  const axis = 'var(--color-ink-muted)', grid = '#e8e7e4', muted = '#555553', ink = '#0d0d0d', hint = '#a8a6a1'
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10 }} role="img" aria-label="Resilience scenario-response map: risks plotted by exposure under a rapid-policy future versus a high-warming future">
       <line x1={px(0.5)} y1={padT} x2={px(0.5)} y2={padT + plotH} stroke={grid} strokeDasharray="3 4" />
@@ -282,7 +282,7 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
   }
 
   const trendCell = (it: any) => (
-    <span style={{ fontSize: 11, color: '#888784' }}>{it.horizonTrend === 'rises' ? 'rises toward 2050' : 'stable over time'}</span>
+    <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{it.horizonTrend === 'rises' ? 'rises toward 2050' : 'stable over time'}</span>
   )
 
   const channelTable = (list: any[], kind: string) => (
@@ -306,7 +306,7 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
               </td>
               {trio.map((t: any) => {
                 const c = byRole(t.role)
-                return <td key={t.role} style={td}>{c ? <span><Pill band={c.band} /> <span style={{ fontSize: 11, color: '#888784' }}>{c.score}</span></span> : '—'}</td>
+                return <td key={t.role} style={td}>{c ? <span><Pill band={c.band} /> <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{c.score}</span></span> : '—'}</td>
               })}
               <td style={td}>{clsLabel[it.classification] || it.classification}</td>
               <td style={td}>{trendCell(it)}</td>
@@ -398,15 +398,15 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
         {/* PER-CHANNEL DETAIL */}
         <section className="page" style={{ marginTop: 48 }}>
           <H>Physical risks across scenarios</H>
-          {physical.length ? (<>{channelTable(physical, 'physical')}<p style={{ ...p, fontStyle: 'italic' }}>{channelSummary('physical', physical)}</p>{channelNarrative(physical)}</>) : <p style={{ ...p, color: '#888784' }}>No material physical risks at this intersection.</p>}
+          {physical.length ? (<>{channelTable(physical, 'physical')}<p style={{ ...p, fontStyle: 'italic' }}>{channelSummary('physical', physical)}</p>{channelNarrative(physical)}</>) : <p style={{ ...p, color: 'var(--color-ink-muted)' }}>No material physical risks at this intersection.</p>}
         </section>
         <section className="page" style={{ marginTop: 48 }}>
           <H>Transition risks across scenarios</H>
-          {transition.length ? (<>{channelTable(transition, 'transition')}<p style={{ ...p, fontStyle: 'italic' }}>{channelSummary('transition', transition)}</p>{channelNarrative(transition)}</>) : <p style={{ ...p, color: '#888784' }}>None flagged.</p>}
+          {transition.length ? (<>{channelTable(transition, 'transition')}<p style={{ ...p, fontStyle: 'italic' }}>{channelSummary('transition', transition)}</p>{channelNarrative(transition)}</>) : <p style={{ ...p, color: 'var(--color-ink-muted)' }}>None flagged.</p>}
         </section>
         <section className="page" style={{ marginTop: 48 }}>
           <H>Opportunities across scenarios</H>
-          {opportunity.length ? (<>{channelTable(opportunity, 'opportunity')}<p style={{ ...p, fontStyle: 'italic' }}>{channelSummary('opportunity', opportunity)}</p>{channelNarrative(opportunity)}</>) : <p style={{ ...p, color: '#888784' }}>No opportunity profile available for this industry yet.</p>}
+          {opportunity.length ? (<>{channelTable(opportunity, 'opportunity')}<p style={{ ...p, fontStyle: 'italic' }}>{channelSummary('opportunity', opportunity)}</p>{channelNarrative(opportunity)}</>) : <p style={{ ...p, color: 'var(--color-ink-muted)' }}>No opportunity profile available for this industry yet.</p>}
         </section>
 
         {/* METHODOLOGY — credibility register 2 (provenance) */}
@@ -484,11 +484,11 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
         <section className="page" style={{ marginTop: 48 }}>
           <H>Important Notice</H>
           {disclaimerParas('screening').map((para, i) => (
-            <p key={'disc' + i} style={{ ...p, fontSize: 11, color: '#888784' }}>{para}</p>
+            <p key={'disc' + i} style={{ ...p, fontSize: 11, color: 'var(--color-ink-muted)' }}>{para}</p>
           ))}
         </section>
 
-        <div style={{ marginTop: 32, paddingTop: 16, borderTop: '0.5px solid #e8e7e4', fontSize: 11, color: '#888784', textAlign: 'center' }}>
+        <div style={{ marginTop: 32, paddingTop: 16, borderTop: '0.5px solid #e8e7e4', fontSize: 11, color: 'var(--color-ink-muted)', textAlign: 'center' }}>
           ThemisIQ Compliance Inc. · www.themisiq.co · Report ID {String(a.id).slice(0, 8)}… · Assessment date {reportDate}
         </div>
       </div>

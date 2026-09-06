@@ -73,7 +73,7 @@ export default function SignupPage() {
         <a href="/" style={{ textDecoration: 'none' }}>
           <img src="/logo.png" alt="ThemisIQ" style={{ height: 24, width: 'auto', display: 'block' }} />
         </a>
-        <span style={{ fontSize: 12, color: '#888784' }}>Already have an account? <a href="/login" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Sign in →</a></span>
+        <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Already have an account? <a href="/login" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Sign in →</a></span>
       </nav>
 
       {/* MAIN */}
@@ -82,9 +82,9 @@ export default function SignupPage() {
 
           {/* HEADER */}
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#888784', marginBottom: 8 }}>Your sustainability compliance platform</div>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: 8 }}>Your sustainability compliance platform</div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Countless compliance requirements. One Intelligent Platform.</h1>
-            <p style={{ fontSize: 14, color: '#888784', fontWeight: 400 }}>Whether your driver is a regulator, a board, an investor, or a customer — ThemisIQ is your sustainability compliance reporting solution.</p>
+            <p style={{ fontSize: 14, color: 'var(--color-ink-muted)', fontWeight: 400 }}>Whether your driver is a regulator, a board, an investor, or a customer — ThemisIQ is your sustainability compliance reporting solution.</p>
           </div>
 
           {/* FORM */}
@@ -130,18 +130,18 @@ export default function SignupPage() {
               <button
                 type="submit"
                 disabled={loading}
-                style={{ fontSize: 14, fontWeight: 500, padding: '11px', borderRadius: 8, background: loading ? '#e8e7e4' : 'var(--color-brand)', color: loading ? '#888784' : '#0d0d0d', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', marginTop: 4 }}
+                style={{ fontSize: 14, fontWeight: 500, padding: '11px', borderRadius: 8, background: loading ? '#e8e7e4' : 'var(--color-brand)', color: loading ? 'var(--color-ink-muted)' : '#0d0d0d', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', marginTop: 4 }}
               >
                 {loading ? 'Setting up your account...' : 'Create my account →'}
               </button>
 
-              <p style={{ fontSize: 11, color: '#888784', textAlign: 'center', margin: 0 }}>
+              <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', textAlign: 'center', margin: 0 }}>
                 By signing up you agree to our <a href="/terms" style={{ color: '#555553', textDecoration: 'underline' }}>Terms of Service</a> and <a href="/privacy" style={{ color: '#555553', textDecoration: 'underline' }}>Privacy Policy</a>
               </p>
             </form>
           </div>
 
-          <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: 13, color: '#888784' }}>
+          <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: 13, color: 'var(--color-ink-muted)' }}>
             Already have an account? <a href="/login" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Sign in →</a>
           </p>
 

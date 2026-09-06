@@ -8,6 +8,7 @@ import { EMISSION_FACTORS, DEFAULT_SPEND_EF } from '../../../lib/emissionFactors
 import { resolvePcafResult, assessAsset } from '../../../lib/pcaf/engine'
 import type { PcafPortfolioAsset, PcafAssetClass, EmissionInputs } from '../../../lib/pcaf/types'
 import { sectionHead } from '@/app/components/headingStyles'
+import { btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
 
 // ─── Scope 3 Category Definitions ────────────────────────────────────────────
 
@@ -72,7 +73,7 @@ const PCAF_ASSET_CLASSES: { value: PcafAssetClass; label: string; denominatorLab
 const GRAD = 'var(--color-brand)'
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
-const sectionSub: React.CSSProperties = { fontSize: 13, color: '#888784', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
+const sectionSub: React.CSSProperties = { fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
 
 const STEP_NAMES = ['Setup', 'Materiality', 'Calculate', 'Results', 'Export']
 
@@ -491,7 +492,7 @@ export default function Scope3Dashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={labelStyle}>Company name</label>
-          <input style={boundInventoryId ? { ...inputStyle, background: '#f8f7f5', color: '#888784', cursor: 'not-allowed' } : inputStyle} value={company} onChange={e => setCompany(e.target.value)} placeholder="Acme Corporation" readOnly={!!boundInventoryId} />
+          <input style={boundInventoryId ? { ...inputStyle, background: '#f8f7f5', color: 'var(--color-ink-muted)', cursor: 'not-allowed' } : inputStyle} value={company} onChange={e => setCompany(e.target.value)} placeholder="Acme Corporation" readOnly={!!boundInventoryId} />
           {boundInventoryId && <div style={{ fontSize: 11, color: '#0F6E56', marginTop: 6 }}>🔗 Linked to your {company || 'GHG'} {reportingYear} GHG inventory — company and year are set there.</div>}
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
@@ -503,7 +504,7 @@ export default function Scope3Dashboard() {
         </div>
         <div>
           <label style={labelStyle}>Reporting year</label>
-          <select style={boundInventoryId ? { ...inputStyle, background: '#f8f7f5', color: '#888784', cursor: 'not-allowed' } : inputStyle} value={reportingYear} onChange={e => setReportingYear(Number(e.target.value))} disabled={!!boundInventoryId}>
+          <select style={boundInventoryId ? { ...inputStyle, background: '#f8f7f5', color: 'var(--color-ink-muted)', cursor: 'not-allowed' } : inputStyle} value={reportingYear} onChange={e => setReportingYear(Number(e.target.value))} disabled={!!boundInventoryId}>
             {[2022, 2023, 2024, 2025].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
@@ -534,7 +535,7 @@ export default function Scope3Dashboard() {
       </div>
 
       {!sector ? (
-        <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: '#888784' }}>Select your sector in Step 1 first.</div>
+        <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>Select your sector in Step 1 first.</div>
       ) : (
         <>
           <button onClick={autoDetect} style={{ fontSize: 12, fontWeight: 500, padding: '8px 16px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer', marginBottom: 20 }}>
@@ -543,7 +544,7 @@ export default function Scope3Dashboard() {
 
           {['Upstream', 'Downstream'].map(stream => (
             <div key={stream} style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888784', marginBottom: 10 }}>{stream}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 10 }}>{stream}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {CATEGORIES.filter(c => c.stream === stream).map(cat => {
                   const included = catData[cat.id]?.included ?? materialCats.includes(cat.num)
@@ -555,7 +556,7 @@ export default function Scope3Dashboard() {
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: 10, fontWeight: 700, color: '#888784', minWidth: 40 }}>Cat {cat.num}</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-ink-muted)', minWidth: 40 }}>Cat {cat.num}</span>
                           <span style={{ fontSize: 13, fontWeight: included ? 600 : 400, color: included ? '#7425e3' : '#0d0d0d' }}>{cat.name}</span>
                           {isMaterial && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: '#E1F5EE', color: '#0F6E56' }}>LIKELY MATERIAL</span>}
                           {cat.num === 15 && (() => {
@@ -570,7 +571,7 @@ export default function Scope3Dashboard() {
                             )
                           })()}
                         </div>
-                        <div style={{ fontSize: 11, color: '#888784', marginTop: 2 }}>{cat.desc}</div>
+                        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>{cat.desc}</div>
                       </div>
                     </div>
                   )
@@ -591,7 +592,7 @@ export default function Scope3Dashboard() {
         <p style={sectionSub}>Enter data for each material category. ThemisIQ will calculate emissions using the best available method.</p>
 
         {activeCats.length === 0 ? (
-          <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: '#888784' }}>No categories selected — go back to Step 2 to select material categories.</div>
+          <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>No categories selected — go back to Step 2 to select material categories.</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {activeCats.map(cat => (
@@ -609,7 +610,7 @@ export default function Scope3Dashboard() {
                   <div style={{ borderBottom: '0.5px solid #e8e7e4' }}>
                     <button onClick={() => setOpenInfo(p => ({ ...p, [cat.id]: !p[cat.id] }))} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 16px', background: '#fafafa', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
                       <span style={{ fontSize: 11, fontWeight: 600, color: '#7425e3', display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 15, borderRadius: '50%', border: '1px solid #7425e3', fontSize: 9, fontWeight: 700 }}>i</span> What this is &amp; where to find the data</span>
-                      <span style={{ fontSize: 11, color: '#888784' }}>{openInfo[cat.id] ? '▲' : '▼'}</span>
+                      <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{openInfo[cat.id] ? '▲' : '▼'}</span>
                     </button>
                     {openInfo[cat.id] && (
                       <div style={{ padding: '0 16px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -650,9 +651,9 @@ export default function Scope3Dashboard() {
                     </>}
                     <div style={{ gridColumn: '1 / -1', background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
                       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 6 }}>Pull from Supplier Portal</div>
-                      <div style={{ fontSize: 11, color: '#888784', lineHeight: 1.6, marginBottom: 10 }}>Bring in primary Cat 1 data you collected from suppliers. Supplier-allocated emissions are used directly; suppliers without an allocated figure are estimated from the spend you recorded (sector default). You review the full breakdown before it is applied.</div>
+                      <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginBottom: 10 }}>Bring in primary Cat 1 data you collected from suppliers. Supplier-allocated emissions are used directly; suppliers without an allocated figure are estimated from the spend you recorded (sector default). You review the full breakdown before it is applied.</div>
                       {campaigns.length === 0 ? (
-                        <div style={{ fontSize: 11, color: '#888784' }}>No supplier campaigns found. <a href="/dashboard/supply-chain/portal" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 600 }}>Create one in the Supplier Portal →</a></div>
+                        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>No supplier campaigns found. <a href="/dashboard/supply-chain/portal" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 600 }}>Create one in the Supplier Portal →</a></div>
                       ) : (
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                           {campaigns.length > 1 && (
@@ -672,7 +673,7 @@ export default function Scope3Dashboard() {
                         <div style={{ marginTop: 12, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '0.9rem' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
                             <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{catOneResult.total_mt.toFixed(2)} mt CO₂e</div>
-                            <div style={{ fontSize: 10, color: '#888784' }}>{catOneResult.counts.supplier_specific} primary · {catOneResult.counts.spend_based} spend-based · {catOneResult.counts.uncovered} uncovered</div>
+                            <div style={{ fontSize: 10, color: 'var(--color-ink-muted)' }}>{catOneResult.counts.supplier_specific} primary · {catOneResult.counts.spend_based} spend-based · {catOneResult.counts.uncovered} uncovered</div>
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
                             {catOneResult.lines.map(l => (
@@ -684,7 +685,7 @@ export default function Scope3Dashboard() {
                             ))}
                           </div>
                           {catOneResult.uncovered.length > 0 && (
-                            <div style={{ fontSize: 10, color: '#888784', marginBottom: 8, lineHeight: 1.5 }}>
+                            <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginBottom: 8, lineHeight: 1.5 }}>
                               <strong style={{ color: 'var(--color-module-climate)' }}>Not included:</strong> {catOneResult.uncovered.map(u => `${u.supplier_name} (${u.reason})`).join('; ')}
                             </div>
                           )}
@@ -693,11 +694,11 @@ export default function Scope3Dashboard() {
                               ⚠ Currency: {catOneResult.currency_flags.map(c => `${c.supplier_name}: ${c.spend} ${c.currency} — convert to USD before including`).join('; ')}
                             </div>
                           )}
-                          <div style={{ fontSize: 9, color: '#888784', marginBottom: 10, lineHeight: 1.5, fontStyle: 'italic' }}>{catOneResult.method_note}</div>
+                          <div style={{ fontSize: 9, color: 'var(--color-ink-muted)', marginBottom: 10, lineHeight: 1.5, fontStyle: 'italic' }}>{catOneResult.method_note}</div>
                           <button onClick={() => useCatOneFigure(catOneResult.total_mt)} style={{ fontSize: 12, fontWeight: 500, padding: '8px 16px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', cursor: 'pointer' }}>
                             Use {catOneResult.total_mt.toFixed(2)} mt as Cat 1 →
                           </button>
-                          <div style={{ fontSize: 10, color: '#888784', marginTop: 6 }}>You can still edit the figure after applying it.</div>
+                          <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6 }}>You can still edit the figure after applying it.</div>
                         </div>
                       )}
                     </div>
@@ -785,7 +786,7 @@ export default function Scope3Dashboard() {
                       const c15 = catData['cat15']
                       const dq = c15 ? cat15PcafResult(c15).weightedDataQualityScore : 5
                       return (
-                        <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#888784', lineHeight: 1.5, marginTop: 2 }}>
+                        <div style={{ gridColumn: '1 / -1', fontSize: 10, color: 'var(--color-ink-muted)', lineHeight: 1.5, marginTop: 2 }}>
                           This estimate: PCAF data quality {dq} of 5 ({dq === 2 ? 'reported, unverified' : 'spend-based proxy'}).<br />
                           PCAF-aligned methodology · not PCAF-certified · estimates use non-PCAF sector factors.<br />
                           PCAF data quality: 1 = verified (best) … 5 = spend estimate (weakest).
@@ -804,13 +805,13 @@ export default function Scope3Dashboard() {
                           )
                         })}
                       </div>
-                      <div style={{ fontSize: 10, color: '#888784', marginTop: 6, lineHeight: 1.5 }}>Itemise holdings to raise data quality above the tier-5 spend proxy.</div>
+                      <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.5 }}>Itemise holdings to raise data quality above the tier-5 spend proxy.</div>
                     </div>
 
                     {/* Detailed mode — per-asset PCAF rows (Option-2 emissions paths: reported + economic) */}
                     {catData['cat15']?.pcafMode === 'detailed' && <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 10 }}>
                       {cat15Assets().length === 0 && (
-                        <div style={{ fontSize: 11, color: '#888784', background: '#f8f7f5', borderRadius: 8, padding: '0.75rem', lineHeight: 1.5 }}>No holdings yet — add your first to itemise the portfolio by asset class.</div>
+                        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', background: '#f8f7f5', borderRadius: 8, padding: '0.75rem', lineHeight: 1.5 }}>No holdings yet — add your first to itemise the portfolio by asset class.</div>
                       )}
                       {cat15Assets().map((row, idx) => {
                         const meta = PCAF_ASSET_CLASSES.find(c => c.value === row.assetClass) ?? PCAF_ASSET_CLASSES[0]
@@ -835,7 +836,7 @@ export default function Scope3Dashboard() {
                               <label style={labelStyle}>{meta.denominatorLabel} ({currency})</label>
                               <input style={inputStyle} type="number" value={row.denominator || ''} onChange={e => updatePcafAsset(idx, { denominator: Number(e.target.value) })} placeholder="0" />
                             </div>
-                            <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#888784', lineHeight: 1.5 }}>Enter the investee&apos;s reported emissions where available (best data quality). Otherwise provide revenue + sector for an estimate.</div>
+                            <div style={{ gridColumn: '1 / -1', fontSize: 10, color: 'var(--color-ink-muted)', lineHeight: 1.5 }}>Enter the investee&apos;s reported emissions where available (best data quality). Otherwise provide revenue + sector for an estimate.</div>
                             <div>
                               <label style={labelStyle}>Investee emissions (tCO₂e)</label>
                               <input style={inputStyle} type="number" value={row.emissions.reportedEmissions ?? ''} onChange={e => updatePcafEmissions(idx, { reportedEmissions: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="Reported" />
@@ -858,7 +859,7 @@ export default function Scope3Dashboard() {
                                   const a = assessAsset(row)
                                   return <div style={{ fontSize: 11, color: '#0F6E56', fontWeight: 600 }}>Financed: {a.financedEmissions.toFixed(1)} tCO₂e · PCAF DQ {a.dqScore}</div>
                                 } catch {
-                                  return <div style={{ fontSize: 11, color: '#888784' }}>Complete this row to compute</div>
+                                  return <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Complete this row to compute</div>
                                 }
                               })()}
                             </div>
@@ -890,12 +891,12 @@ export default function Scope3Dashboard() {
                                   <span key={t} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#555553', fontWeight: 600 }}>DQ{t} · {r.coverageByScore[t]}</span>
                                 ))}
                               </div>
-                              <div style={{ fontSize: 10, color: '#888784', marginTop: 6, lineHeight: 1.5 }}>Distribution across holdings — a low weighted score can hide high-tier outliers, so the spread is shown alongside.</div>
+                              <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.5 }}>Distribution across holdings — a low weighted score can hide high-tier outliers, so the spread is shown alongside.</div>
                             </div>
                             {/* 2. Financed emissions by asset class (descending) */}
                             <div style={{ border: '0.5px solid #e8e7e4', borderRadius: 10, overflow: 'hidden' }}>
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', background: '#f8f7f5', padding: '8px 12px', borderBottom: '0.5px solid #e8e7e4' }}>
-                                {['Asset class', 'Financed'].map(h => <div key={h} style={{ fontSize: 10, fontWeight: 700, color: '#888784', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>)}
+                                {['Asset class', 'Financed'].map(h => <div key={h} style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-ink-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>)}
                               </div>
                               {classRows.map(([key, val], i) => (
                                 <div key={key} style={{ display: 'grid', gridTemplateColumns: '1fr 120px', padding: '8px 12px', borderBottom: i < classRows.length - 1 ? '0.5px solid #f3f4f6' : 'none', alignItems: 'center' }}>
@@ -970,7 +971,7 @@ export default function Scope3Dashboard() {
         <div style={{ border: '0.5px solid #e8e7e4', borderRadius: 12, overflow: 'hidden' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 100px 100px 80px', background: '#f8f7f5', padding: '10px 16px', borderBottom: '0.5px solid #e8e7e4' }}>
             {['#', 'Category', 'mt CO₂e', '% of total', 'Method'].map(h => (
-              <div key={h} style={{ fontSize: 10, fontWeight: 700, color: '#888784', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
+              <div key={h} style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-ink-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
             ))}
           </div>
           {activeCats.map((cat, i) => {
@@ -980,10 +981,10 @@ export default function Scope3Dashboard() {
             const ccfg = confidenceConfig[conf]
             return (
               <div key={cat.id} style={{ display: 'grid', gridTemplateColumns: '40px 1fr 100px 100px 80px', padding: '12px 16px', borderBottom: i < activeCats.length - 1 ? '0.5px solid #f3f4f6' : 'none', alignItems: 'center', background: i === 0 ? '#fafafa' : '#fff' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#888784' }}>{cat.num}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-ink-muted)' }}>{cat.num}</div>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{cat.name}</div>
-                  <div style={{ fontSize: 10, color: '#888784' }}>{cat.stream}</div>
+                  <div style={{ fontSize: 10, color: 'var(--color-ink-muted)' }}>{cat.stream}</div>
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{emissions.toFixed(2)}</div>
                 <div>
@@ -999,15 +1000,15 @@ export default function Scope3Dashboard() {
             )
           })}
           {activeCats.length === 0 && (
-            <div style={{ padding: '2rem', textAlign: 'center', color: '#888784', fontSize: 13 }}>No data entered yet — go back to Step 3 to enter your data.</div>
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>No data entered yet — go back to Step 3 to enter your data.</div>
           )}
         </div>
 
         {/* Excluded categories */}
         {CATEGORIES.filter(c => !catData[c.id]?.included).length > 0 && (
           <div style={{ marginTop: 16, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: '#888784', marginBottom: 6 }}>EXCLUDED CATEGORIES (not material)</div>
-            <div style={{ fontSize: 12, color: '#888784' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', marginBottom: 6 }}>EXCLUDED CATEGORIES (not material)</div>
+            <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>
               {CATEGORIES.filter(c => !catData[c.id]?.included).map(c => `Cat ${c.num} (${c.name})`).join(' · ')}
             </div>
           </div>
@@ -1060,10 +1061,10 @@ export default function Scope3Dashboard() {
               <span style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>I confirm that the data entered is accurate to the best of my knowledge. I understand that spend-based estimates carry inherent uncertainty and should be disclosed as such in external reports.</span>
             </label>
           </div>
-          <button onClick={() => dataConfirmed && saveScope3()} disabled={!dataConfirmed || !boundInventoryId || saving} style={{ fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', marginRight: 12, cursor: (dataConfirmed && boundInventoryId && !saving) ? 'pointer' : 'not-allowed', opacity: (dataConfirmed && boundInventoryId && !saving) ? 1 : 0.4 }}>
+          <button onClick={() => dataConfirmed && saveScope3()} disabled={!dataConfirmed || !boundInventoryId || saving} style={{ ...((dataConfirmed && boundInventoryId && !saving) ? btnStepPrimary : btnStepPrimaryDisabled), marginRight: 12 }}>
             {saving ? 'Saving…' : saved ? '✓ Saved to your inventory' : 'Save Scope 3 to inventory'}
           </button>
-          <button onClick={() => dataConfirmed && generateExport()} style={{ fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: dataConfirmed ? 'pointer' : 'not-allowed', opacity: dataConfirmed ? 1 : 0.4 }}>
+          <button onClick={() => dataConfirmed && generateExport()} style={{ ...(dataConfirmed ? btnStepPrimary : btnStepPrimaryDisabled) }}>
             ⬇ Download Scope 3 Inventory (CSV)
           </button>
         </div>
@@ -1134,26 +1135,26 @@ export default function Scope3Dashboard() {
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888784', marginBottom: 4 }}>Climate — GHG Inventory</div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 4 }}>Climate — GHG Inventory</div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>Scope 3 Complete Calculator</div>
           </div>
           {totalScope3 > 0 && (
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 10, color: '#888784', marginBottom: 2 }}>Total Scope 3</div>
+              <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginBottom: 2 }}>Total Scope 3</div>
               <div style={{ fontSize: 18, fontWeight: 700, color: '#0F6E56' }}>{totalScope3.toFixed(1)} mt CO₂e</div>
             </div>
           )}
         </div>
       </div>
       {!bindChecked ? (
-        <div style={{ maxWidth: 900, margin: '0 auto', padding: '4rem 2.5rem', textAlign: 'center', color: '#888784', fontSize: 13 }}>Loading your inventory…</div>
+        <div style={{ maxWidth: 900, margin: '0 auto', padding: '4rem 2.5rem', textAlign: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>Loading your inventory…</div>
       ) : !boundInventoryId ? (
         renderPicker()
       ) : (<>
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2.5rem', overflowX: 'auto' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex' }}>
           {STEP_NAMES.map((name, i) => (
-            <button key={i} onClick={() => setStep(i)} style={{ padding: '14px 16px', fontSize: 12, fontWeight: step === i ? 600 : 400, color: step === i ? '#0d0d0d' : '#888784', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? '#0F6E56' : 'transparent'}`, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <button key={i} onClick={() => setStep(i)} style={{ padding: '14px 16px', fontSize: 12, fontWeight: step === i ? 600 : 400, color: step === i ? '#0d0d0d' : 'var(--color-ink-muted)', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? '#0F6E56' : 'transparent'}`, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               {i + 1}. {name}
             </button>
           ))}
@@ -1164,7 +1165,7 @@ export default function Scope3Dashboard() {
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '2rem' }}>
             {steps[step]()}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
-              <button onClick={() => setStep(s => Math.max(0, s - 1))} style={{ fontSize: 13, padding: '9px 20px', borderRadius: 8, background: 'none', border: '1px solid #e8e7e4', color: '#555553', cursor: step === 0 ? 'not-allowed' : 'pointer', opacity: step === 0 ? 0.4 : 1 }}>← Back</button>
+              <button onClick={() => setStep(s => Math.max(0, s - 1))} style={{ ...(step === 0 ? btnStepDisabled : btnStep) }}>← Back</button>
               {step < STEP_NAMES.length - 1 && <button onClick={() => setStep(s => Math.min(STEP_NAMES.length - 1, s + 1))} style={{ fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>Next →</button>}
             </div>
           </div>
