@@ -157,16 +157,28 @@ export default function TrustPage() {
         {/* Infrastructure */}
         <div style={{ marginBottom: '3rem', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.5rem' }}>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: '1rem' }}>Infrastructure & security</div>
+          {/* ⚠️ THIS NOTE IS WHY THE TABLE BELOW IS SAFE TO READ. Four of its rows name a
+              certification held by a SUBPROCESSOR. Without this note the page showed three
+              "SOC 2 Type II" lines and one "PCI DSS Level 1" line, in a table of ThemisIQ's own
+              properties, on a page called Trust — and said nothing at all about ThemisIQ's own
+              certification status. A reader could leave believing ThemisIQ was SOC 2 certified.
+              The amber state matches the "In progress" badge those same three certifications carry
+              on /security, so the two pages say the same thing in the same colour. Keep them in
+              step: if a target date moves on /security, it moves here. */}
+          <div className="tq-callout tq-callout-note" style={{ '--tq-state': 'var(--color-module-climate)', '--tq-state-wash': '#FEF3E2', marginBottom: '1.25rem' } as React.CSSProperties}>
+            <div className="tq-callout-heading">ThemisIQ holds neither SOC 2 nor ISO 27001 today</div>
+            <div className="tq-callout-text">The certifications named below are held by our subprocessors, not by ThemisIQ. Our own SOC 2 Type I, SOC 2 Type II and ISO 27001:2022 are in progress — <a href="/security" style={{ color: 'var(--color-brand)' }}>current status and target dates</a>.</div>
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             {[
-              { label: 'Hosting', val: 'Supabase on AWS (us-east-1) · SOC 2 Type II certified' },
+              { label: 'Hosting', val: 'Supabase on AWS (us-east-1) — Supabase holds SOC 2 Type II certification' },
               { label: 'Encryption in transit', val: 'TLS 1.2+ on all connections' },
               { label: 'Encryption at rest', val: 'AES-256 on all stored data' },
               { label: 'Authentication', val: 'Supabase Auth with email verification · MFA available' },
               { label: 'Access control', val: 'Row-level security — data isolated at database level' },
-              { label: 'Payment processing', val: 'Stripe · PCI DSS Level 1 certified' },
-              { label: 'Email', val: 'Resend · SOC 2 Type II certified' },
-              { label: 'Frontend', val: 'Vercel · SOC 2 Type II certified' },
+              { label: 'Payment processing', val: 'Stripe — Stripe holds PCI DSS Level 1 certification' },
+              { label: 'Email', val: 'Resend — Resend holds SOC 2 Type II certification' },
+              { label: 'Frontend', val: 'Vercel — Vercel holds SOC 2 Type II certification' },
             ].map(({ label, val }) => (
               <div key={label} style={{ display: 'flex', flexDirection: 'column' as const, gap: 4 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>{label}</div>

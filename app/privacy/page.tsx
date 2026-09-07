@@ -128,7 +128,7 @@ export default function PrivacyPage() {
                   ['Vercel', 'Application traffic', 'Hosting and CDN', 'Global'],
                   ['Stripe', 'Billing data', 'Payment processing', 'USA'],
                   ['Resend', 'Name, email', 'Transactional email', 'USA'],
-                  ['Anthropic', 'Structured prompts only', 'AI-assisted features', 'USA'],
+                  ['Anthropic', 'Structured prompts; uploaded source documents (Concierge)', 'AI-assisted features', 'USA'],
                 ].map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} style={{ ...tdStyle, background: i % 2 === 0 ? '#fff' : '#f8f7f5' }}>{cell}</td>)}</tr>)}
               </tbody>
             </table>
@@ -161,7 +161,7 @@ export default function PrivacyPage() {
                   ['Account and contact data', '7 years from last activity', 'Canada Revenue Agency'],
                   ['Marketing consent records', '3 years from last interaction', 'CASL'],
                   ['Assessment / lead data', '3 years from collection', 'PIPEDA / CASL'],
-                  ['Security and audit logs', '5 years', 'ISO 27001 / SOC 2'],
+                  ['Security and audit logs', '5 years', 'Legitimate interest — security'],
                   ['Billing records', '7 years', 'Canada Revenue Agency'],
                 ].map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} style={{ ...tdStyle, background: i % 2 === 0 ? '#fff' : '#f8f7f5' }}>{cell}</td>)}</tr>)}
               </tbody>
