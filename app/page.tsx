@@ -112,71 +112,76 @@ export default function Home() {
         </div>
 
         {/* Advisory — full-width closing band below the 4×2 module grid (moved out of the grid) */}
-        <a href="/advisory" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '2rem', flexWrap: 'wrap', marginTop: '1.25rem', background: '#0d0d0d', borderRadius: 16, padding: '2.5rem', textDecoration: 'none', transition: 'opacity 0.15s' }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.9' }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1' }}>
-          <div style={{ maxWidth: 640 }}>
-            {/* ⚠️ INTERIM. This eyebrow wants var(--color-brand) like every other flattened
-            gradient span on this page — but this one sits inside the dark advisory band
-            (background '#0d0d0d' on the <a> above), where brand teal measures 2.55:1.
-            on-dark is 6.40:1 and holds until the band itself converts; at that point put
-            brand back and delete this note. */}
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-on-dark)', marginBottom: 8 }}>Advisory Services</div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: 8 }}>Available across all modules</div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, fontWeight: 400 }}>Expert advisory services — sector-specific guidance, assurance prep, and board-ready narratives from practitioners who speak your language.</div>
-          </div>
-          <span style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', background: 'var(--color-brand)', padding: '12px 24px', borderRadius: 8, whiteSpace: 'nowrap', flexShrink: 0 }}>Talk to a specialist →</span>
-        </a>
+        <CrossLinkBand
+          href="/advisory"
+          label="Advisory Services"
+          title="Available across all modules"
+          body="Expert advisory services — sector-specific guidance, assurance prep, and board-ready narratives from practitioners who speak your language."
+          cta="Talk to a specialist"
+          style={{ marginTop: '1.25rem' }}
+        />
       </section>
 
       {/* ── MATERIALITY CAPABILITY STRIP ── */}
       <section style={{ padding: '0 2.5rem', marginTop: '-1rem' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-          <a href="/materiality" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem', flexWrap: 'wrap', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '1.5rem 2rem', textDecoration: 'none', transition: 'background 0.15s' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f8f7f5' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff' }}>
-            <div style={{ flex: '1 1 420px' }}>
-              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 6 }}>Single or double · which one applies to you</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.2, marginBottom: 6 }}>The Materiality Assessment</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>Single materiality for IFRS S2, double materiality for CSRD — the methodology your auditor expects. See two sample reports for the same entity.</div>
-            </div>
-            <span style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', background: 'var(--color-brand)', padding: '11px 22px', borderRadius: 8, whiteSpace: 'nowrap' }}>See sample reports →</span>
-          </a>
+          <CrossLinkBand
+            href="/materiality"
+            label="Single or double · which one applies to you"
+            title="The Materiality Assessment"
+            body="Single materiality for IFRS S2, double materiality for CSRD — the methodology your auditor expects. See two sample reports for the same entity."
+            cta="See sample reports"
+          />
         </div>
       </section>
 
-      {/* ── FLAGSHIP: CLIMATE RESILIENCE REPORT SHOWCASE ── */}
-      <section style={{ background: '#0d0d0d', padding: '5rem 2.5rem' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+      {/* ── FLAGSHIP: CLIMATE RESILIENCE REPORT SHOWCASE ──
+      ⚠️ A SECTION ON THE PAGE, NOT A BAND. It was a full-bleed '#0d0d0d' block. A dark band and a
+      tinted band both read as "marketing"; a 2px ink rule and a heading read as "next section",
+      which is what this is. The change is also forced, not stylistic: the scenario ramp below needs
+      white beneath it — var(--color-module-climate) measures 4.29:1 on the teal band, under AA. */}
+      <section style={{ padding: '4rem 2.5rem 5rem' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', borderTop: '2px solid var(--color-ink)', paddingTop: '2.25rem' }}>
           <div style={{ maxWidth: 640, marginBottom: '2.5rem' }}>
-            <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>Flagship output · Climate Risk &amp; Materiality</p>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
+            <p style={{ ...eyebrow, marginBottom: 8 }}>Flagship output · Climate Risk &amp; Materiality</p>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.2, marginBottom: '1rem' }}>
               A climate resilience report that holds up under scrutiny.
             </h2>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', lineHeight: 1.75, fontWeight: 400 }}>
+            <p style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.75, fontWeight: 400 }}>
               IFRS S2 and CSRD/ESRS don&apos;t just ask you to run a scenario — they ask you to show resilience across a <em>diverse range</em> of climate futures, and to document the judgment behind it. ThemisIQ produces exactly that: a multi-scenario resilience report, generated from your assessment, with every figure traceable to its basis.
             </p>
           </div>
 
-          {/* The diverse trio */}
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Tested across a diverse trio of scenarios</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: '2rem' }}>
+          {/* The diverse trio — the ONE tier that stays cards: three parallel, comparable things
+          with figures. Colour is on the 4px TOP rule and the figure, never the fill, per the EDGE
+          VOCABULARY in app/styles/themisiq-tokens.css. Cool to warm across the module hues, which
+          measure 6.50 / 5.55 / 7.53 on white; on the retired dark band their predecessors were
+          lime, sky and amber, which fall to 1.33 / 2.39 / 3.72 the moment the ground goes light. */}
+          <div style={subHead}>Tested across a diverse trio of scenarios</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: '2.5rem' }}>
             {[
-              { role: 'Paris-aligned', warming: '~1.8°C', src: 'IPCC SSP1-2.6', color: '#64fe3e' },
-              { role: 'Current trajectory', warming: '~2.7°C', src: 'IPCC SSP2-4.5', color: '#1fb1ff' },
-              { role: 'High warming', warming: '~4.4°C', src: 'IPCC SSP5-8.5', color: '#ba7517' },
+              { role: 'Paris-aligned', warming: '~1.8°C', src: 'IPCC SSP1-2.6', tone: 'var(--color-module-cbam)' },
+              { role: 'Current trajectory', warming: '~2.7°C', src: 'IPCC SSP2-4.5', tone: 'var(--color-module-climate)' },
+              { role: 'High warming', warming: '~4.4°C', src: 'IPCC SSP5-8.5', tone: 'var(--color-module-cyber)' },
             ].map(s => (
-              <div key={s.role} style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '1.25rem' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: s.color, lineHeight: 1 }}>{s.warming}</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginTop: 8 }}>{s.role}</div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>{s.src}</div>
+              <div key={s.role} style={{ background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderTop: `4px solid ${s.tone}`, borderRadius: 6, padding: '1.25rem' }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.75rem', fontWeight: 400, color: s.tone, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{s.warming}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-ink)', marginTop: 8 }}>{s.role}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>{s.src}</div>
               </div>
             ))}
           </div>
 
-          {/* What the report documents — the credibility registers */}
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Documented for assurance, not just generated</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: '2.5rem' }}>
+          {/* What the report documents — the credibility registers.
+          ⚠️ NOT CARDS ANY MORE, AND THE REASON IS MEASURED. These were six panels with their own
+          fill, i.e. a second light tier on top of the section's own light ground — but paper reads
+          1.07:1 against that ground and sunken 1.08:1, so no light fill can announce itself as a
+          separate surface. A tier that cannot be seen is not a tier. Six unlike statements are a
+          definition list, so that is what they are now: a hairline rule between rows, label left,
+          text right. The 2px left border went with the card — by then it was brand teal, not the
+          old violet (task 21 converted it), so it was removed on the edge vocabulary, not colour. */}
+          <div style={subHead}>Documented for assurance, not just generated</div>
+          <dl style={{ margin: '0 0 2.5rem', borderTop: '1px solid var(--color-line-strong)' }}>
             {[
               ['Resilience conclusion', 'A rules-based read of how exposure shifts across the trio — persistent, warming-driven, or policy-driven.'],
               ['Scenario rationale', 'Why these pathways, including a Paris-aligned scenario as IFRS S2 requires — the choice itself is disclosable.'],
@@ -185,17 +190,17 @@ export default function Home() {
               ['Data lineage', 'A clear boundary between your inputs and platform reference defaults — what assurance needs to see.'],
               ['Limitations & notice', 'Where the screening ends and formal assessment begins, with a formal Important Notice on every report.'],
             ].map(([title, desc]) => (
-              <div key={title} style={{ background: 'rgba(255,255,255,0.03)', borderLeft: '2px solid color-mix(in srgb, var(--color-brand) 60%, transparent)', borderRadius: '0 10px 10px 0', padding: '1rem 1.25rem' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginBottom: 4 }}>{title}</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, fontWeight: 400 }}>{desc}</div>
+              <div key={title} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 230px) 1fr', gap: '1.5rem', padding: '15px 0', borderBottom: '1px solid var(--color-line)' }}>
+                <dt style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-ink)', margin: 0 }}>{title}</dt>
+                <dd style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.6, fontWeight: 400, margin: 0, maxWidth: '62ch' }}>{desc}</dd>
               </div>
             ))}
-          </div>
+          </dl>
 
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' as const }}>
-            <a href="/dashboard/climate-risk" style={{ fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: 'var(--color-brand)', color: '#0d0d0d', textDecoration: 'none' }}>Assess your climate risk →</a>
-            <a href="/climate-risk" style={{ fontSize: 13, fontWeight: 500, padding: '11px 24px', borderRadius: 8, border: '0.5px solid rgba(255,255,255,0.3)', color: '#fff', textDecoration: 'none' }}>See how it works</a>
-            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Also produces the CSRD double-materiality matrix across all ten ESRS topics.</span>
+            <a href="/dashboard/climate-risk" style={{ ...btnPrimary, textDecoration: 'none' }}>Assess your climate risk</a>
+            <a href="/climate-risk" style={{ ...btnSecondary, textDecoration: 'none' }}>See how it works</a>
+            <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Also produces the CSRD double-materiality matrix across all ten ESRS topics.</span>
           </div>
         </div>
       </section>
@@ -321,7 +326,46 @@ const modules = [
   { family: 'ThemisIQ', name: 'CBAM', desc: 'Carbon Border Adjustment Mechanism. Specific embedded emissions for goods entering the EU — installation-level actuals, direct and indirect, with an Annex IV §1.2 summary you can hand to a verifier.', tags: ['Non-EU exporters', '(EU) 2023/956', 'Annex IV §1.2 summary'], href: '/cbam', dark: false },
 ]
 
+/**
+ * The two cross-link bands — Advisory and The Materiality Assessment — as ONE component.
+ *
+ * ⚠️ THEY WERE ALWAYS THE SAME COMPONENT IN TWO COLOURS. Identical shape: a flex row with an
+ * eyebrow, a display heading, a supporting line, and a button held right. One was '#0d0d0d' with
+ * white text, the other '#fff' with ink. That is why converting either one alone would have made
+ * them disagree — the shape said "these are a pair" while the colour said "these are unrelated".
+ * They are one treatment now, so a change lands on both by construction rather than by memory.
+ *
+ * ⚠️ PLAIN 1px BORDER, DEFINITELY NOT A LEFT BAR. The EDGE VOCABULARY in
+ * app/styles/themisiq-tokens.css reserves a 6px left edge for module identity and a 4px top edge
+ * for semantic state; everything else takes a 1px border. A cross-link to Advisory is neither, and
+ * the two bands share this component, so a module-identity edge here would assert that Advisory is
+ * a module. The mockup drew a 6px brand left edge; the instruction overrides it, and this comment
+ * is the record of why.
+ *
+ * ⚠️ HOVER CHANGES BACKGROUND, NEVER opacity. The dark band used `opacity: 0.9`, which composites
+ * the whole element — label included — toward the page. See the DISABLED AND INACTIVE STATE block
+ * in the token file: opacity is never applied to anything containing text.
+ */
+function CrossLinkBand({ href, label, title, body, cta, style }: {
+  href: string; label: string; title: string; body: string; cta: string; style?: React.CSSProperties
+}) {
+  return (
+    <a href={href} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem', flexWrap: 'wrap', background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderRadius: 6, padding: '1.5rem 2rem', textDecoration: 'none', transition: 'background 0.15s', ...style }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-ground)' }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-paper)' }}>
+      <div style={{ flex: '1 1 420px' }}>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-brand)', marginBottom: 6 }}>{label}</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.2, marginBottom: 6 }}>{title}</div>
+        <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.6, fontWeight: 400, maxWidth: '60ch' }}>{body}</div>
+      </div>
+      <span style={{ ...btnPrimary, flexShrink: 0, whiteSpace: 'nowrap' }}>{cta}</span>
+    </a>
+  )
+}
+
 // ── STYLES ──────────────────────────────────────────────────────────
+/** Sub-heading inside the flagship section, ruled off from the rows beneath it. */
+const subHead: React.CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 12, paddingBottom: 10, borderBottom: '1px solid var(--color-line-strong)' }
 const navLink: React.CSSProperties = { fontSize: 13, color: '#555553', textDecoration: 'none' }
 const btnOutline: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', cursor: 'pointer' }
 const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'var(--color-brand)', color: '#fff', border: 'none', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }
