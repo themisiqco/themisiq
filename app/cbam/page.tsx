@@ -4,7 +4,8 @@ import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
 import { FLAT_MODULE_PRICES } from '../../lib/pricing'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
-import { sectionTitle } from '@/app/components/headingStyles'
+import { sectionTitle, ruledSectionTitle } from '@/app/components/headingStyles'
+import { ruledSection, ruledSectionInner, ruledSectionSplit, listGroup, listRow } from '@/app/components/sectionStyles'
 export default function Page() {
   // Countdown removed 28 Jul 2026. The Sep-2027 date is the IMPORTER's filing deadline,
   // not the exporter's — counting down to it invited prospects to defer. The banner now
@@ -89,44 +90,54 @@ export default function Page() {
         </div>
       </section>
 
-      {/* SECTOR COVERAGE — the one honest scope block */}
-      <section style={{ background: '#0d0d0d', padding: '4rem 2.5rem' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>Sector coverage</div>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
-              What computes today.
-            </h2>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
-              From setup to a verifier&apos;s inbox. Enter your installation and its production processes, record the fuels and materials each process consumes, declare any CBAM precursors that go into your goods, and the module calculates the specific embedded emissions per tonne. It then builds the Annex IV §1.2 emissions summary your customer needs, as a downloadable spreadsheet, and gives you a secure read-only link to send your verifier.
-            </p>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
-              Available now: iron and steel (CN 72–73) and aluminium (CN 76). More CBAM sectors — cement, fertilisers, and hydrogen — are in active development. We show you what is live so you always know exactly what the module computes.
-            </p>
-          </div>
-          <div style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: '2rem' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 12 }}>Available now</div>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 0', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#64fe3e', flexShrink: 0, marginTop: 5 }} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 500, color: '#fff', marginBottom: 2 }}>Iron & steel</div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>CN 72–73 · computing now</div>
-              </div>
+      {/* SECTOR COVERAGE — the one honest scope block
+      ⚠️ A SECTION ON THE PAGE, NOT A BAND. It was a full-bleed '#0d0d0d' block with a nested
+      rgba(255,255,255,0.05) card. That card was never a surface: on black it renders #191919, a
+      1.11:1 separation that reads only because everything around it is black, and it has no light
+      equivalent — which is why this is a rebuild and not a recolour. The card becomes a ruled list,
+      the same move the six credibility cards made on the homepage in task 22.
+      ⚠️ FIVE OF THE EIGHT TEXT COLOURS HERE WERE BELOW AA IN PRODUCTION. Every
+      rgba(255,255,255,0.4) — the eyebrow, both group headings and both "computing now" lines —
+      composited to 3.81:1 on the black ground. The status they carried was failing before the
+      colour ever changed. */}
+      <section style={ruledSection}>
+        <div style={ruledSectionInner}>
+          <div style={ruledSectionSplit}>
+            <div>
+              <div style={{ ...eyebrow, marginBottom: 8 }}>Sector coverage</div>
+              <h2 style={ruledSectionTitle}>
+                What computes today.
+              </h2>
+              <p style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
+                From setup to a verifier&apos;s inbox. Enter your installation and its production processes, record the fuels and materials each process consumes, declare any CBAM precursors that go into your goods, and the engine computes specific embedded emissions per CN code — direct and indirect, with an Annex IV §1.2 summary a verifier can follow.
+              </p>
+              <p style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
+                Available now: iron and steel (CN 72–73) and aluminium (CN 76). More CBAM sectors — cement, fertilisers, and hydrogen — are in active development. We show you what is live so you always know what you are buying.
+              </p>
             </div>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 0', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#64fe3e', flexShrink: 0, marginTop: 5 }} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 500, color: '#fff', marginBottom: 2 }}>Aluminium</div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>CN 76 · computing now</div>
-              </div>
+            {/* ⚠️ NO STATUS DOTS. Live rows were a #64fe3e dot and development rows a #888784 dot,
+                so status was carried by hue alone — unavailable to a colourblind reader, invisible
+                to a screen reader, and 1.33:1 / 3.59:1 once the ground goes light. The status is in
+                the text instead: the group heading names it, and the live rows keep the
+                "· computing now" the copy already had. Nothing was invented to replace a dot. */}
+            <div>
+              <div style={listGroup}>Available now</div>
+              {[
+                { name: 'Iron & steel', meta: 'CN 72–73 · computing now' },
+                { name: 'Aluminium', meta: 'CN 76 · computing now' },
+              ].map(({ name, meta }) => (
+                <div key={name} style={listRow}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-ink)', marginBottom: 2 }}>{name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{meta}</div>
+                </div>
+              ))}
+              <div style={{ ...listGroup, marginTop: 28 }}>In active development</div>
+              {['Cement', 'Fertilisers', 'Hydrogen'].map(sector => (
+                <div key={sector} style={listRow}>
+                  <div style={{ fontSize: 13, color: 'var(--color-ink-2)', fontWeight: 400 }}>{sector}</div>
+                </div>
+              ))}
             </div>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', margin: '16px 0 4px' }}>In active development</div>
-            {['Cement', 'Fertilisers', 'Hydrogen'].map(sector => (
-              <div key={sector} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#888784', flexShrink: 0, marginTop: 5 }} />
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 400 }}>{sector}</div>
-              </div>
-            ))}
           </div>
         </div>
       </section>
@@ -142,7 +153,7 @@ export default function Page() {
           <thead>
             <tr>
               {['Instrument', 'Reference', 'Role'].map(h => (
-                <th key={h} style={{ background: '#0d0d0d', color: '#fff', padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 500 }}>{h}</th>
+                <th key={h} style={{ background: 'var(--color-sunken)', color: 'var(--color-ink)', borderBottom: '2px solid var(--color-ink)', padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 500 }}>{h}</th>
               ))}
             </tr>
           </thead>

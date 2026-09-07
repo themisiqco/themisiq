@@ -97,3 +97,23 @@ export const groupHeading: CSSProperties = {
   color: '#0d0d0d',
   marginBottom: 6,
 }
+
+/**
+ * The h2 of a ruled feature section — app/cbam, app/deals, app/ai-governance, and the homepage
+ * flagship. Byte-identical in all four before extraction.
+ *
+ * Kept separate from `sectionTitle` because the clamp genuinely differs: this is
+ * clamp(1.8rem, 3vw, 2.4rem) against sectionTitle's clamp(1.9rem, 3.5vw, 2.6rem). These sections
+ * put the heading in a half-width column beside a list, where sectionTitle's upper bound overshoots
+ * — the same reason sectionHeadFixed exists alongside sectionHead.
+ *
+ * Pairs with ruledSection / ruledSectionInner in ./sectionStyles.
+ */
+export const ruledSectionTitle: CSSProperties = {
+  fontFamily: 'var(--font-display)',
+  fontSize: 'clamp(1.8rem, 3vw, 2.4rem)',
+  fontWeight: 400,
+  color: 'var(--color-ink)',
+  lineHeight: 1.2,
+  marginBottom: '1rem',
+}

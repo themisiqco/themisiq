@@ -339,9 +339,9 @@ function ProcessesField({ f }: { f: ReportField<ProcessSummary[]> }) {
     <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', minWidth: 480, borderCollapse: 'collapse', fontSize: 12 }}>
         <thead>
-          <tr style={{ background: '#0d0d0d' }}>
+          <tr style={{ background: 'var(--color-sunken)', color: 'var(--color-ink)', borderBottom: '2px solid var(--color-ink)' }}>
             {['Process', 'Route', 'Goods (CN)'].map(h => (
-              <th key={h} style={{ color: '#fff', textAlign: 'left', padding: '8px 10px', fontWeight: 500, fontSize: 11, whiteSpace: 'nowrap' }}>{h}</th>
+              <th key={h} style={{ textAlign: 'left', padding: '8px 10px', fontWeight: 500, fontSize: 11, whiteSpace: 'nowrap' }}>{h}</th>
             ))}
           </tr>
         </thead>

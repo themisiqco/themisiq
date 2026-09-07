@@ -198,7 +198,7 @@ export default function Page() {
           <thead>
             <tr>
               {['Framework', 'Jurisdiction', 'Who it applies to', 'Status', 'ThemisIQ coverage'].map(h => (
-                <th key={h} style={{ background: '#0d0d0d', color: '#fff', padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 500 }}>{h}</th>
+                <th key={h} style={{ background: 'var(--color-sunken)', color: 'var(--color-ink)', borderBottom: '2px solid var(--color-ink)', padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 500 }}>{h}</th>
               ))}
             </tr>
           </thead>

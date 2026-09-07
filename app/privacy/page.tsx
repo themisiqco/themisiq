@@ -197,9 +197,9 @@ export default function PrivacyPage() {
           <div id="s11" style={sectionStyle}>
             <div style={eyebrow}>Section 11</div>
             <h2 style={sectionHead}>Contact & complaints</h2>
-            <div style={{ background: '#0d0d0d', borderRadius: 10, padding: '1.25rem 1.5rem', margin: '1rem 0' }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 400, color: '#fff', marginBottom: 8 }}>Privacy Officer — ThemisIQ Compliance Inc.</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>Email: privacy@themisiq.co · Response: 30 days (Canada/EU) · 45 days (US)</div>
+            <div className="tq-callout tq-callout-note" style={{ '--tq-state': 'var(--color-brand)', '--tq-state-wash': 'color-mix(in srgb, var(--color-brand) 5%, transparent)' } as React.CSSProperties}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 400, marginBottom: 8 }}>Privacy Officer — ThemisIQ Compliance Inc.</div>
+              <div className="tq-callout-text">Email: privacy@themisiq.co · Response: 30 days (Canada/EU) · 45 days (US)</div>
             </div>
           </div>
 
@@ -220,5 +220,5 @@ const body: React.CSSProperties = { fontSize: 13.5, color: '#555553', lineHeight
 const divider: React.CSSProperties = { height: '0.5px', background: '#e8e7e4', margin: '2rem 0' }
 const link: React.CSSProperties = { color: 'var(--color-brand)', textDecoration: 'none' }
 const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse', margin: '0.8rem 0', fontSize: 12 }
-const thStyle: React.CSSProperties = { background: '#0d0d0d', color: '#fff', padding: '8px 12px', textAlign: 'left', fontWeight: 500, fontSize: 11 }
+const thStyle: React.CSSProperties = { background: 'var(--color-sunken)', color: 'var(--color-ink)', borderBottom: '2px solid var(--color-ink)', padding: '8px 12px', textAlign: 'left', fontWeight: 500, fontSize: 11 }
 const tdStyle: React.CSSProperties = { padding: '8px 12px', borderBottom: '0.5px solid #e8e7e4', color: '#555553', verticalAlign: 'top', lineHeight: 1.5 }

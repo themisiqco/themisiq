@@ -745,14 +745,14 @@ export default function VerifierPage() {
             <div style={{ minWidth: 720 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
-                <tr style={{ background: '#0d0d0d' }}>
+                <tr style={{ background: 'var(--color-sunken)', color: 'var(--color-ink)', borderBottom: '2px solid var(--color-ink)' }}>
                   {/* 'Factor source' sits after 'Emission factor', matching the operator's own
                       workings table (dashboard/ghg/page.tsx). The two surfaces show the same rows;
                       differing column order between them would make a reconciliation harder than it
                       needs to be. Until now this column existed there and not here, so ef_source was
                       stored on every row and shown to the operator but never to the verifier. */}
                   {['Location', 'Source', 'Scope', 'Activity data', 'Emission factor', 'Factor source', 'Factor vintage', 'Scope 2 method', 'GWP basis', 'Result (tCO₂e)'].map(h => (
-                    <th key={h} style={{ color: '#fff', textAlign: 'left', padding: '8px 10px', fontWeight: 500, fontSize: 11, whiteSpace: 'nowrap' }}>{h}</th>
+                    <th key={h} style={{ textAlign: 'left', padding: '8px 10px', fontWeight: 500, fontSize: 11, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -944,7 +944,12 @@ export default function VerifierPage() {
         )}
 
         <SectionHead>Audit Trail</SectionHead>
-        <div style={{ background: '#0d0d0d', borderRadius: 10, padding: '12px 16px', marginBottom: '1.25rem', fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
+        {/* ⚠️ NOT THE SAME BOX AS THE THREE LEGAL CONTACT PANELS, despite sharing a fill. Those
+            are '1.25rem 1.5rem' contact blocks with a display heading; this is a single 13px
+            caption strip stating a property of the record beneath it. It takes the GREEN state,
+            which in this system means an assurance kept — the register of "we do not sell personal
+            data" on /privacy — not the brand note the contact panels use. */}
+        <div className="tq-callout tq-callout-note" style={{ '--tq-state': '#1D9E75', '--tq-state-wash': '#E1F5EE', marginBottom: '1.25rem', fontSize: 13 } as React.CSSProperties}>
           {audit.length} change{audit.length !== 1 ? 's' : ''} logged · append-only, tamper-evident record
         </div>
         {audit.map((row, i) => {

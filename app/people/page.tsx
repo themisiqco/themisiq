@@ -89,9 +89,9 @@ export default function Page() {
           </div>
           <div style={{ border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
             {/* Header */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', background: '#0d0d0d' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', background: 'var(--color-sunken)', color: 'var(--color-ink)', borderBottom: '2px solid var(--color-ink)' }}>
               {['', 'Big HR platforms', 'Pay equity specialists', 'ThemisIQ'].map((h, i) => (
-                <div key={i} style={{ padding: '14px 16px', fontSize: 11, fontWeight: 700, color: i === 3 ? '#64fe3e' : 'rgba(255,255,255,0.5)', letterSpacing: '0.06em', textTransform: 'uppercase' as const, textAlign: i === 0 ? 'left' : 'center' as const }}>{h}</div>
+                <div key={i} style={{ padding: '14px 16px', fontSize: 11, fontWeight: 700, color: i === 3 ? 'var(--color-module-people)' : 'var(--color-ink-muted)', letterSpacing: '0.06em', textTransform: 'uppercase' as const, textAlign: i === 0 ? 'left' : 'center' as const }}>{h}</div>
               ))}
             </div>
             {/* Rows */}

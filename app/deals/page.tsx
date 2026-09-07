@@ -6,7 +6,8 @@ import { IFRS_S2_ADOPTION_COUNT, IFRS_S2_ADOPTION_SOURCE } from '../../lib/ifrsS
 import { SB253_STATUTE } from '../../lib/sb253'
 import { THRESHOLD_TESTS } from '../../lib/deals/assessment'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
-import { sectionTitle } from '@/app/components/headingStyles'
+import { sectionTitle, ruledSectionTitle } from '@/app/components/headingStyles'
+import { ruledSection, ruledSectionInner, ruledSectionSplit, listGroup, listRow } from '@/app/components/sectionStyles'
 
 export default function Page() {
   // Price from the single source of truth, formatted as app/cbam/page.tsx does.
@@ -162,14 +163,19 @@ export default function Page() {
       </section>
 
       {/* SB 253 M&A CALLOUT */}
-      <section style={{ background: '#0d0d0d', padding: '4rem 2.5rem' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
+      {/* ⚠️ A SECTION ON THE PAGE, NOT A BAND — see app/components/sectionStyles.ts for why the
+          nested rgba(255,255,255,0.05) card could not be recoloured and had to become a list.
+          Three of this section's text colours were below AA in production: the eyebrow, the list
+          heading and every "scope" line were rgba(255,255,255,0.4), compositing to 3.81:1. */}
+      <section style={ruledSection}>
+        <div style={ruledSectionInner}>
+          <div style={ruledSectionSplit}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>SB 253 — M&A liability</div>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
+            <div style={{ ...eyebrow, marginBottom: 8 }}>SB 253 — M&A liability</div>
+            <h2 style={ruledSectionTitle}>
               Acquiring a California company?<br />You inherit their SB 253 obligations.
             </h2>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
               A target with California nexus and revenue over ${sb253Bn}bn is a reporting entity in its own right, and stays one after you buy it. The screen tests that threshold against the figures you enter and prints the limb, the figure and the provision — so the obligation is priced into your deal rather than discovered after it.
             </p>
             {[
@@ -178,15 +184,19 @@ export default function Page() {
               'The gap list you hand the target as a condition of proceeding',
             ].map((item, i) => (
               <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
-                <span style={{ color: '#64fe3e', flexShrink: 0, marginTop: 2 }}>✓</span>
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 400, lineHeight: 1.5 }}>{item}</span>
+                <span style={{ color: 'var(--color-brand)', flexShrink: 0, marginTop: 2 }}>✓</span>
+                <span style={{ fontSize: 13, color: 'var(--color-ink-2)', fontWeight: 400, lineHeight: 1.5 }}>{item}</span>
               </div>
             ))}
           </div>
-          <div style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: '2rem' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 16 }}>Climate diligence frameworks</div>
+          <div>
+            <div style={listGroup}>Climate diligence frameworks</div>
             {/* Every row here is a regime the threshold engine actually tests. No urgency ranking:
                 the copy supplies none, and inventing one would rank regimes we have not ranked. */}
+            {/* ⚠️ THE BULLET IS GONE. It was rgba(255,255,255,0.35) — white-alpha, so on a light
+                ground it does not merely lose contrast, it composites to the page and disappears.
+                It carried no information the row did not already carry, and in a ruled list the
+                hairline is what delimits a row. */}
             {[
               { fw: 'SB 253', scope: `Tested on revenue over $${sb253Bn}bn with California nexus` },
               { fw: 'CSRD / ESRS E1', scope: 'EU disclosure obligations, tested limb by limb' },
@@ -194,14 +204,12 @@ export default function Page() {
               { fw: 'CS3D', scope: 'Post-Omnibus size test, reported as unresolved where the route is not met' },
               { fw: 'Canada S-211', scope: 'Two-of-three test on assets, revenue and employees' },
             ].map(({ fw, scope }) => (
-              <div key={fw} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '0.5px solid rgba(255,255,255,0.07)' }}>
-                <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'rgba(255,255,255,0.35)', flexShrink: 0, marginTop: 5 }} />
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: '#fff', marginBottom: 2 }}>{fw}</div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{scope}</div>
-                </div>
+              <div key={fw} style={listRow}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-ink)', marginBottom: 2 }}>{fw}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{scope}</div>
               </div>
             ))}
+          </div>
           </div>
         </div>
       </section>
@@ -225,6 +233,23 @@ export default function Page() {
               <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
             </div>
           ))}
+          {/* ⚠️ THE SIXTH CELL EXISTS TO CLOSE THE ROW, AND IT IS NOT A SIXTH USE CASE.
+              Five cells in a repeat(3,1fr) grid leave the last slot uncovered, and hairlineGrid3
+              paints '#e8e7e4' behind its cells so the 1px `gap` reads as a hairline — so an
+              uncovered slot shows that hairline colour at full cell size: a grey rectangle. The
+              fix is a cell, not a background change; the grey is the seam doing its job.
+              It takes the sunken fill and a brand heading so it reads as the END of the set
+              rather than another structure in it.
+              ⚠️ BUTTON LABEL AND DESTINATION ARE PROVISIONAL pending confirmation.
+              /dashboard/deals is recommended because that route never redirects an unentitled
+              visitor: resolveWizardGate returns { kind: 'open' } for everyone except a signed-in
+              user who has ALREADY saved their one free deal. Sending a first-timer to /pricing
+              would ask them to buy what they can have free. */}
+          <div style={{ ...hairlineCell, background: 'var(--color-sunken)', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-brand)', marginBottom: 8 }}>Another structure?</div>
+            <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.65, fontWeight: 400, marginBottom: 16 }}>Every screen runs the same threshold test, whatever the deal shape. Self-directed and done in five minutes.</div>
+            <a href="/dashboard/deals" style={{ ...btnPrimary, fontSize: 13, padding: '9px 18px', textDecoration: 'none', marginTop: 'auto' }}>Screen a target</a>
+          </div>
         </div>
       </section>
 

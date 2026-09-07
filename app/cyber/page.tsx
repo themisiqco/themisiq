@@ -3,7 +3,8 @@ import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
 import { FLAT_MODULE_PRICES } from '../../lib/pricing'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
-import { sectionTitle } from '@/app/components/headingStyles'
+import { sectionTitle, ruledSectionTitle } from '@/app/components/headingStyles'
+import { ruledSection, ruledSectionInner } from '@/app/components/sectionStyles'
 
 export default function Page() {
   // Price from the single source of truth, formatted as app/cbam/page.tsx does.
@@ -62,13 +63,23 @@ export default function Page() {
       </section>
 
       {/* THREE FRAMEWORKS */}
-      <section style={{ background: '#0d0d0d', padding: '4rem 2.5rem' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+      {/* ⚠️ A SECTION ON THE PAGE, NOT A BAND — see app/components/sectionStyles.ts.
+          This one is NOT the cbam/deals/ai-governance shape: a centred header over a 3-up grid,
+          not a 1fr 1fr prose/list split, so it takes ruledSection + ruledSectionInner but not
+          ruledSectionSplit. */}
+      <section style={ruledSection}>
+        <div style={ruledSectionInner}>
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>Three active frameworks</div>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2 }}>NIS2. DORA. SEC cyber. All active. All enforced.</h2>
+            <div style={{ ...eyebrow, marginBottom: 8 }}>Three active frameworks</div>
+            <h2 style={{ ...ruledSectionTitle, marginBottom: 0 }}>NIS2. DORA. SEC cyber. All active. All enforced.</h2>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, background: 'rgba(255,255,255,0.1)', borderRadius: 16, overflow: 'hidden' }}>
+          {/* ⚠️ THE CELL BORDERS WERE FAKED AND COULD NOT BE RECOLOURED. This grid used `gap: 1`
+              over a rgba(255,255,255,0.1) background: the GAP was the border, showing the panel
+              through a 1px seam. That renders #252525 on black — a 1.27:1 separation that reads
+              only because the surround is black — and there is no light value that works the same
+              way. Each cell now draws a real 1px var(--color-line) border and the gap is a real
+              gap, so the three read as three cards rather than one segmented block. */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
             {[
               {
                 name: 'EU NIS2 Directive',
@@ -92,14 +103,14 @@ export default function Page() {
                 color: '#0C447C',
               },
             ].map(({ name, active, who, key, color }) => (
-              <div key={name} style={{ background: 'rgba(255,255,255,0.04)', padding: '2rem', borderTop: `3px solid ${color}` }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', marginBottom: 4 }}>{name}</div>
+              <div key={name} style={{ background: 'var(--color-paper)', padding: '2rem', border: '1px solid var(--color-line)', borderRadius: 12, borderTop: `3px solid ${color}` }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-ink)', marginBottom: 4 }}>{name}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color, marginBottom: 12, background: `color-mix(in srgb, ${color} 13%, transparent)`, padding: '2px 8px', borderRadius: 99, display: 'inline-block' }}>{active}</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>{who}</div>
+                <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>{who}</div>
                 {key.map((item, i) => (
                   <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                     <span style={{ color, flexShrink: 0, marginTop: 1 }}>→</span>
-                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: 400, lineHeight: 1.5 }}>{item}</span>
+                    <span style={{ fontSize: 12, color: 'var(--color-ink-2)', fontWeight: 400, lineHeight: 1.5 }}>{item}</span>
                   </div>
                 ))}
               </div>
@@ -167,7 +178,7 @@ export default function Page() {
           <thead>
             <tr>
               {['Framework', 'Jurisdiction', 'Applies to', 'Status', 'ThemisIQ coverage'].map(h => (
-                <th key={h} style={{ background: '#0d0d0d', color: '#fff', padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 500 }}>{h}</th>
+                <th key={h} style={{ background: 'var(--color-sunken)', color: 'var(--color-ink)', borderBottom: '2px solid var(--color-ink)', padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 500 }}>{h}</th>
               ))}
             </tr>
           </thead>

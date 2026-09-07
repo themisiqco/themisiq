@@ -6,7 +6,8 @@ import {
   AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED, AI_ACT_CITATION,
 } from '../../lib/aiAct'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
-import { sectionTitle } from '@/app/components/headingStyles'
+import { sectionTitle, ruledSectionTitle } from '@/app/components/headingStyles'
+import { ruledSection, ruledSectionInner, ruledSectionSplit, listGroup, listRow } from '@/app/components/sectionStyles'
 
 // NO COUNTDOWN. This page ran `Math.max(0, days until 2026-08-02)`, so once the date passed the
 // headline read "0 days to the EU AI Act deadline" rather than reading as broken — and it kept
@@ -79,54 +80,61 @@ export default function Page() {
       </section>
 
       {/* EU AI ACT CALLOUT */}
-      <section style={{ background: '#0d0d0d', padding: '4rem 2.5rem' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>EU AI Act — {AI_ACT_CITATION}</div>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#fff', lineHeight: 1.2, marginBottom: '1rem' }}>
-              The high-risk dates<br />moved. The scope did not.
-            </h2>
-            {/* The deferral is ENACTED. This copy previously argued the opposite — "not yet enacted law",
-                "treat any deferral as a bonus, not a plan" — which was true when written and false from
-                27 July 2026. What moved is the application date; what a company is in scope FOR is
-                unchanged, which is the distinction this paragraph has to carry. */}
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
-              If your company uses AI for HR decisions, hiring, credit scoring, or education in the EU, you are in scope for the EU AI Act Annex III high-risk provisions. Regulation (EU) 2026/1744 — published 24 July 2026, in force 27 July 2026 — deferred those obligations to {AI_ACT_HIGH_RISK_STANDALONE} for stand-alone systems, and to {AI_ACT_HIGH_RISK_EMBEDDED} where the AI is built into a product already covered by EU product-safety law. Nothing else moved: the Article 5 prohibitions have applied since February 2025, GPAI obligations since August 2025, and the Article 50 transparency duties keep their original schedule. Classification, technical documentation and registration are unchanged in substance — only the date by which they must be done.
-            </p>
-            {[
-              'AI system inventory and Annex III risk classification',
-              'Article 11 technical documentation generation',
-              'Conformity assessment workflow and evidence pack',
-              'EU AI database registration preparation',
-              'Transparency notice templates for affected individuals',
-              'Board AI oversight framework and governance documentation',
-            ].map((item, i) => (
-              <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
-                <span style={{ color: '#64fe3e', flexShrink: 0, marginTop: 2 }}>✓</span>
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 400, lineHeight: 1.5 }}>{item}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* ANNEX III TABLE */}
-          <div style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: '2rem' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 16 }}>EU AI Act Annex III — High-risk categories</div>
-            {[
-              { cat: 'Employment & HR', examples: 'CV screening, candidate ranking, performance management, task allocation', deadline: AI_ACT_HIGH_RISK_STANDALONE },
-              { cat: 'Credit & finance', examples: 'Credit scoring, loan approval, insurance risk assessment', deadline: AI_ACT_HIGH_RISK_STANDALONE },
-              { cat: 'Education', examples: 'Student assessment, admissions, monitoring during exams', deadline: AI_ACT_HIGH_RISK_STANDALONE },
-              { cat: 'Essential services', examples: 'Access to public benefits, emergency services dispatch', deadline: AI_ACT_HIGH_RISK_STANDALONE },
-              { cat: 'Law enforcement', examples: 'Polygraphs, risk assessment, evidence evaluation', deadline: AI_ACT_HIGH_RISK_STANDALONE },
-              { cat: 'Migration & border', examples: 'Risk assessment, document verification, applications', deadline: AI_ACT_HIGH_RISK_STANDALONE },
-            ].map(({ cat, examples, deadline }) => (
-              <div key={cat} style={{ padding: '10px 0', borderBottom: '0.5px solid rgba(255,255,255,0.07)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 3 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>{cat}</div>
-                  <span style={{ fontSize: 10, fontWeight: 600, color: '#B91C1C', background: '#FCEBEB', padding: '2px 8px', borderRadius: 99, flexShrink: 0, marginLeft: 8 }}>{deadline}</span>
+      {/* ⚠️ A SECTION ON THE PAGE, NOT A BAND — see app/components/sectionStyles.ts for why the
+          nested rgba(255,255,255,0.05) card could not be recoloured and had to become a list.
+          Three of this section's text colours were below AA in production: the eyebrow, the list
+          heading and every "examples" line were rgba(255,255,255,0.4), which composites to 3.81:1
+          on the black ground. */}
+      <section style={ruledSection}>
+        <div style={ruledSectionInner}>
+          <div style={ruledSectionSplit}>
+            <div>
+              <div style={{ ...eyebrow, marginBottom: 8 }}>EU AI Act — {AI_ACT_CITATION}</div>
+              <h2 style={ruledSectionTitle}>
+                The high-risk dates<br />moved. The scope did not.
+              </h2>
+              {/* The deferral is ENACTED. This copy previously argued the opposite — "not yet enacted law",
+                  "treat any deferral as a bonus, not a plan" — which was true when written and false from
+                  27 July 2026. What moved is the application date; what a company is in scope FOR is
+                  unchanged, which is the distinction this paragraph has to carry. */}
+              <p style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
+                If your company uses AI for HR decisions, hiring, credit scoring, or education in the EU, you are in scope for the EU AI Act Annex III high-risk provisions. Regulation (EU) 2026/1744 — published 24 July 2026, in force 27 July 2026 — deferred those obligations to {AI_ACT_HIGH_RISK_STANDALONE} for stand-alone systems, and to {AI_ACT_HIGH_RISK_EMBEDDED} where the AI is built into a product already covered by EU product-safety law. Nothing else moved: the Article 5 prohibitions have applied since February 2025, GPAI obligations since August 2025, and the Article 50 transparency duties keep their original schedule. Classification, technical documentation and registration are unchanged in substance — only the date by which they must be done.
+              </p>
+              {[
+                'AI system inventory and Annex III risk classification',
+                'Article 11 technical documentation generation',
+                'Conformity assessment workflow and evidence pack',
+                'EU AI database registration preparation',
+                'Transparency notice templates for affected individuals',
+                'Board AI oversight framework and governance documentation',
+              ].map((item, i) => (
+                <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+                  <span style={{ color: 'var(--color-brand)', flexShrink: 0, marginTop: 2 }}>✓</span>
+                  <span style={{ fontSize: 13, color: 'var(--color-ink-2)', fontWeight: 400, lineHeight: 1.5 }}>{item}</span>
                 </div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>{examples}</div>
-              </div>
-            ))}
+              ))}
+            </div>
+
+            {/* ANNEX III TABLE */}
+            <div>
+              <div style={listGroup}>EU AI Act Annex III — High-risk categories</div>
+              {[
+                { cat: 'Employment & HR', examples: 'CV screening, candidate ranking, performance management, task allocation', deadline: AI_ACT_HIGH_RISK_STANDALONE },
+                { cat: 'Credit & finance', examples: 'Credit scoring, loan approval, insurance risk assessment', deadline: AI_ACT_HIGH_RISK_STANDALONE },
+                { cat: 'Education', examples: 'Student assessment, admissions, monitoring during exams', deadline: AI_ACT_HIGH_RISK_STANDALONE },
+                { cat: 'Essential services', examples: 'Access to public benefits, emergency services dispatch', deadline: AI_ACT_HIGH_RISK_STANDALONE },
+                { cat: 'Law enforcement', examples: 'Polygraphs, risk assessment, evidence evaluation', deadline: AI_ACT_HIGH_RISK_STANDALONE },
+                { cat: 'Migration & border', examples: 'Risk assessment, document verification, applications', deadline: AI_ACT_HIGH_RISK_STANDALONE },
+              ].map(({ cat, examples, deadline }) => (
+                <div key={cat} style={listRow}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 3 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-ink)' }}>{cat}</div>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: '#B91C1C', background: '#FCEBEB', padding: '2px 8px', borderRadius: 99, flexShrink: 0, marginLeft: 8 }}>{deadline}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.4 }}>{examples}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -166,7 +174,7 @@ export default function Page() {
             <thead>
               <tr>
                 {['Framework', 'Jurisdiction', 'Applies to', 'Key requirement', 'ThemisIQ coverage'].map(h => (
-                  <th key={h} style={{ background: '#0d0d0d', color: '#fff', padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 500 }}>{h}</th>
+                  <th key={h} style={{ background: 'var(--color-sunken)', color: 'var(--color-ink)', borderBottom: '2px solid var(--color-ink)', padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 500 }}>{h}</th>
                 ))}
               </tr>
             </thead>
