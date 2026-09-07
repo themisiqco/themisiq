@@ -91,7 +91,7 @@ export default function AdvisoryPage() {
                 <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 5 }}>
                   {tags.map(tag => <span key={tag} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#555553' }}>{tag}</span>)}
                 </div>
-                <a href="mailto:advisory@themisiq.co" style={{ fontSize: 12, fontWeight: 500, color: '#7425e3', textDecoration: 'none' }}>Enquire →</a>
+                <a href="mailto:advisory@themisiq.co" style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-brand)', textDecoration: 'none' }}>Enquire →</a>
               </div>
             ))}
           </div>
@@ -107,7 +107,7 @@ export default function AdvisoryPage() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
           {[
-            { name: 'Sarah Redmond', title: 'CDP & Climate Disclosure', bg: '#EDE9FE', color: '#7425e3', initials: 'SR', exp: 'Former CDP scoring analyst. 12 years CDP response advisory across FTSE 350. SB 253 and ESRS E1 specialist.' },
+            { name: 'Sarah Redmond', title: 'CDP & Climate Disclosure', bg: 'var(--color-brand-wash)', color: 'var(--color-brand)', initials: 'SR', exp: 'Former CDP scoring analyst. 12 years CDP response advisory across FTSE 350. SB 253 and ESRS E1 specialist.' },
             { name: 'Marcus Klein', title: 'M&A Climate Diligence', bg: '#E6F1FB', color: '#0C447C', initials: 'MK', exp: 'Former KPMG Deal Advisory. 200+ M&A climate due diligence engagements. TCFD and IFRS S2 transaction risk expert.' },
             { name: 'Adaeze Nwosu', title: 'EU Regulatory (CSRD · AI Act)', bg: '#E1F5EE', color: '#0F6E56', initials: 'AN', exp: 'Former EU Commission policy advisor. CSRD implementation specialist. EU AI Act high-risk system compliance.' },
             { name: 'James Park', title: 'Cyber Governance (NIS2 · DORA)', bg: '#FEF3E2', color: '#633806', initials: 'JP', exp: 'Former NCSC cyber resilience lead. NIS2 gap assessments across 40+ organisations. DORA implementation specialist.' },

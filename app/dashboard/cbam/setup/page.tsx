@@ -2248,9 +2248,9 @@ function StepTab({ n, label, sub, active, onClick, muted }: { n: number; label: 
       onClick={onClick}
       style={{
         textAlign: 'left',
-        background: active ? '#7425e3' : '#fff',
+        background: active ? 'var(--color-brand)' : '#fff',
         color: active ? '#fff' : (muted ? 'var(--color-ink-muted)' : '#0d0d0d'),
-        border: `0.5px solid ${active ? '#7425e3' : '#e8e7e4'}`,
+        border: `0.5px solid ${active ? 'var(--color-brand)' : '#e8e7e4'}`,
         borderRadius: 10,
         padding: '8px 14px',
         cursor: 'pointer',
@@ -2301,5 +2301,5 @@ const primaryBtn = (disabled: boolean): React.CSSProperties => ({
   opacity: disabled ? 0.6 : 1,
 })
 const ghostBtn: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '11px 18px', borderRadius: 10, background: 'transparent', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' }
-const linkBtn: React.CSSProperties = { fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, background: '#fff', color: '#7425e3', border: '0.5px solid #7425e3', cursor: 'pointer' }
-const linkAnchor: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: '#7425e3', textDecoration: 'underline' }
+const linkBtn: React.CSSProperties = { fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, background: '#fff', color: 'var(--color-brand)', border: '0.5px solid var(--color-brand)', cursor: 'pointer' }
+const linkAnchor: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'underline' }

@@ -5,7 +5,7 @@ import { disclaimerParas } from '../../../../lib/disclaimer'
 // places and let a cached page email a link nothing could audit. The route resolves label, href and
 // price from the same accessors /assess renders, so the two cannot quote different figures.
 import { OBLIGATIONS, obligationHref, obligationPrice, modulesLabel, priceLabel } from '../../../../lib/obligations'
-import { INK_MUTED } from '@/lib/brand'
+import { BRAND, INK_MUTED } from '@/lib/brand'
 
 const RESEND_API_KEY   = process.env.RESEND_API_KEY!
 const FROM_EMAIL       = process.env.RESEND_FROM_EMAIL || 'noreply@themisiq.co'
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
       const known = id as keyof typeof OBLIGATIONS
       const label = modulesLabel(OBLIGATIONS[known].modules)
       // SITE_URL prefix: obligationHref is relative for the page's benefit and is dead in an inbox.
-      return `<a href="${SITE_URL}${obligationHref(known)}" style="color:#7425e3;text-decoration:none;">${label} · ${priceLabel(obligationPrice(known))} →</a>`
+      return `<a href="${SITE_URL}${obligationHref(known)}" style="color:${BRAND};text-decoration:none;">${label} · ${priceLabel(obligationPrice(known))} →</a>`
     }
     const row = (ob: any, i: number) => `
       <tr style="background:${i % 2 === 0 ? '#fff' : '#f8f7f5'}">
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
           <span style="font-size:10px;font-weight:700;color:${URGENCY_TEXT[ob.urgency]};background:${URGENCY_BG[ob.urgency]};padding:3px 8px;border-radius:99px;white-space:nowrap;">${ob.urgency_label}</span>
         </td>
         <td style="padding:10px 14px;border-bottom:1px solid #e8e7e4;font-size:12px;color:#555553;vertical-align:top;">${ob.timing}</td>
-        <td style="padding:10px 14px;border-bottom:1px solid #e8e7e4;font-size:12px;color:#7425e3;font-weight:600;vertical-align:top;">${moduleCell(ob)}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #e8e7e4;font-size:12px;color:${BRAND};font-weight:600;vertical-align:top;">${moduleCell(ob)}</td>
       </tr>`
     // 'Obligation', not 'Regulation'. This one headerRow is rendered above BOTH group tables, so
     // under Market-driven it sat directly over EcoVadis and 'Customer Supplier Questionnaire' —
@@ -262,7 +262,7 @@ export async function POST(req: NextRequest) {
       <tr><td width="140" style="font-size:12px;color:#888;font-weight:600;padding:4px 0;">Name</td><td style="font-size:12px;color:#0d0d0d;font-weight:600;">${leadName || NOT_GIVEN}</td></tr>
       <tr><td style="font-size:12px;color:#888;font-weight:600;padding:4px 0;">Company</td><td style="font-size:12px;color:#0d0d0d;">${leadCompany || NOT_GIVEN}</td></tr>
       <tr><td style="font-size:12px;color:#888;font-weight:600;padding:4px 0;">Role</td><td style="font-size:12px;color:#0d0d0d;">${leadRole || NOT_GIVEN}</td></tr>
-      <tr><td style="font-size:12px;color:#888;font-weight:600;padding:4px 0;">Email</td><td style="font-size:12px;color:#7425e3;">${leadEmail}</td></tr>
+      <tr><td style="font-size:12px;color:#888;font-weight:600;padding:4px 0;">Email</td><td style="font-size:12px;color:${BRAND};">${leadEmail}</td></tr>
     </table>
     <div style="background:#FCEBEB;border-radius:6px;padding:10px 14px;margin-bottom:16px;">
       <span style="font-size:13px;font-weight:700;color:#501313;">${total} obligations identified · ${critical} requiring immediate action</span>

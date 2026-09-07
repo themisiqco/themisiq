@@ -36,7 +36,7 @@ export default function ForgotPasswordPage() {
         <a href="/" style={{ textDecoration: 'none' }}>
           <img src="/logo.png" alt="ThemisIQ" style={{ height: 24, width: 'auto', display: 'block' }} />
         </a>
-        <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Remember your password? <a href="/login" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Sign in →</a></span>
+        <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Remember your password? <a href="/login" style={{ color: 'var(--color-brand)', textDecoration: 'none', fontWeight: 500 }}>Sign in →</a></span>
       </nav>
 
       {/* MAIN */}
@@ -94,7 +94,7 @@ export default function ForgotPasswordPage() {
           </div>
 
           <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: 13, color: 'var(--color-ink-muted)' }}>
-            Remember your password? <a href="/login" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Sign in →</a>
+            Remember your password? <a href="/login" style={{ color: 'var(--color-brand)', textDecoration: 'none', fontWeight: 500 }}>Sign in →</a>
           </p>
 
         </div>

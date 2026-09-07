@@ -309,12 +309,12 @@ export default function SupplyChainDashboard() {
         {(Object.entries(FRAMEWORK_CONFIG) as [Framework, typeof FRAMEWORK_CONFIG[Framework]][]).map(([fw, cfg]) => {
           const selected = inventory.frameworks.includes(fw)
           return (
-            <div key={fw} onClick={() => toggleFramework(fw)} style={{ border: `1.5px solid ${selected ? '#7425e3' : '#e8e7e4'}`, borderRadius: 10, padding: '0.75rem', cursor: 'pointer', background: selected ? '#fff' : '#f8f7f5', transition: 'all 0.15s' }}>
+            <div key={fw} onClick={() => toggleFramework(fw)} style={{ border: `1.5px solid ${selected ? 'var(--color-brand)' : '#e8e7e4'}`, borderRadius: 10, padding: '0.75rem', cursor: 'pointer', background: selected ? '#fff' : '#f8f7f5', transition: 'all 0.15s' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                <div style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${selected ? '#7425e3' : '#e8e7e4'}`, background: selected ? '#7425e3' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <div style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${selected ? 'var(--color-brand)' : '#e8e7e4'}`, background: selected ? 'var(--color-brand)' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   {selected && <span style={{ color: '#fff', fontSize: 8, fontWeight: 700 }}>✓</span>}
                 </div>
-                <span style={{ fontSize: 12, fontWeight: 600, color: selected ? '#7425e3' : 'var(--color-ink-muted)' }}>{cfg.label}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: selected ? 'var(--color-brand)' : 'var(--color-ink-muted)' }}>{cfg.label}</span>
               </div>
               <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.4 }}>{cfg.desc}</div>
             </div>
@@ -353,7 +353,7 @@ export default function SupplyChainDashboard() {
               </button>
             )
           })}
-          <button onClick={addSupplier} style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, background: 'none', border: '0.5px solid #7425e3', color: '#7425e3', cursor: 'pointer' }}>+ Add supplier</button>
+          <button onClick={addSupplier} style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, background: 'none', border: '0.5px solid var(--color-brand)', color: 'var(--color-brand)', cursor: 'pointer' }}>+ Add supplier</button>
         </div>
       )}
 
@@ -424,7 +424,7 @@ export default function SupplyChainDashboard() {
                   <div key={i} style={{ fontSize: 11, color: '#555553', marginBottom: 3 }}>• {f}</div>
                 ))}
                 {inventory.suppliers[activeSupplier].scope3_emissions > 0 && (
-                  <div style={{ fontSize: 11, color: '#7425e3', marginTop: 6, fontWeight: 500 }}>Estimated Scope 3 Cat.1: {inventory.suppliers[activeSupplier].scope3_emissions.toFixed(2)} mt CO₂e</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-brand)', marginTop: 6, fontWeight: 500 }}>Estimated Scope 3 Cat.1: {inventory.suppliers[activeSupplier].scope3_emissions.toFixed(2)} mt CO₂e</div>
                 )}
               </div>
             )}

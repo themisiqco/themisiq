@@ -57,7 +57,7 @@ export default function Page() {
               {
                 val: 'IFRS S2', unit: 'per jurisdiction',
                 label: IFRS_S2_ADOPTION_COUNT,
-                source: IFRS_S2_ADOPTION_SOURCE, color: '#7425e3', bg: '#EDE9FE',
+                source: IFRS_S2_ADOPTION_SOURCE, color: 'var(--color-brand)', bg: 'var(--color-brand-wash)',
               },
               {
                 val: 'Four outcomes', unit: 'every threshold test',

@@ -131,7 +131,7 @@ export default function Frameworks() {
                   <div style={fwBody}>{item.body}</div>
                   <div style={fwMaps}>{item.maps}</div>
                   <div style={linkRow}>
-                    <a href={item.module} style={{ ...fwLink, color: '#7425e3' }}>How we cover it →</a>
+                    <a href={item.module} style={{ ...fwLink, color: 'var(--color-brand)' }}>How we cover it →</a>
                     <a href={item.href} target="_blank" rel="noopener noreferrer" style={fwLink}>Official source ↗</a>
                   </div>
                 </div>

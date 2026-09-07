@@ -43,7 +43,7 @@ import { valueChainLabel, timeHorizonLabel }
 // lead-only assessment has none — and the heading rendered "E1.1 E1.1". See the resolver's header.
 import { subtopicHeading } from '../../../../../../lib/materiality/subtopicName'
 
-const PURPLE = '#7425e3'
+const BRAND = 'var(--color-brand)'
 const GREEN = '#0F6E56'
 const GREEN_BG = '#E1F5EE'
 const AMBER = 'var(--color-module-climate)'
@@ -310,9 +310,9 @@ export default function Determinations() {
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: '2rem' }}>
 
         <div style={{ marginBottom: 16, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          <Link href="/dashboard/materiality/worksheet" style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>← All worksheets</Link>
-          <Link href={`/dashboard/materiality/worksheet/${assessmentId}`} style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>Assign and chase</Link>
-          <Link href={`/dashboard/materiality/worksheet/${assessmentId}/determine`} style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>Your own determinations</Link>
+          <Link href="/dashboard/materiality/worksheet" style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>← All worksheets</Link>
+          <Link href={`/dashboard/materiality/worksheet/${assessmentId}`} style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>Assign and chase</Link>
+          <Link href={`/dashboard/materiality/worksheet/${assessmentId}/determine`} style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>Your own determinations</Link>
         </div>
 
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: INK }}>
@@ -380,7 +380,7 @@ export default function Determinations() {
             </div>
             <div style={{ fontSize: 13, color: MID, lineHeight: 1.8 }}>
               Determinations appear here as they are made. Start by dividing the sub-topics on the{' '}
-              <Link href={`/dashboard/materiality/worksheet/${assessmentId}`} style={{ color: PURPLE }}>assign screen</Link>.
+              <Link href={`/dashboard/materiality/worksheet/${assessmentId}`} style={{ color: BRAND }}>assign screen</Link>.
             </div>
           </div>
         )}
@@ -467,11 +467,11 @@ function DeterminationRow({ dir, d, prior, category, contributor, onOverride }: 
         <div style={{ display: 'flex', gap: 14, alignItems: 'baseline', flexWrap: 'wrap',
                       marginBottom: 10 }}>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem',
-                        color: sev.material ? PURPLE : INK }}>
+                        color: sev.material ? BRAND : INK }}>
             {sev.severity.toFixed(2)}
           </div>
           <div style={{ fontSize: 12, color: MID, lineHeight: 1.7, flex: 1, minWidth: 220 }}>
-            <strong style={{ color: sev.material ? PURPLE : MID }}>
+            <strong style={{ color: sev.material ? BRAND : MID }}>
               {sev.material ? 'Material' : 'Below the threshold'}
             </strong>{' — '}{RULE_TEXT[sev.rule] || sev.rule}
           </div>
@@ -661,8 +661,8 @@ function OverridePanel({ state, setState, contributor, saving, error, onSave, on
                 return (
                   <button key={p.value} onClick={() => set(k, p.value)} title={p.body}
                           style={{ fontSize: 12, padding: '7px 13px', borderRadius: 8,
-                                   border: `1px solid ${on ? PURPLE : LINE}`,
-                                   background: on ? '#f4ecfe' : '#fff', color: on ? PURPLE : MID,
+                                   border: `1px solid ${on ? BRAND : LINE}`,
+                                   background: on ? 'var(--color-brand-wash)' : '#fff', color: on ? BRAND : MID,
                                    cursor: 'pointer', fontWeight: on ? 600 : 400 }}>
                     {p.value}{p.label && ` · ${p.label}`}
                   </button>
@@ -670,9 +670,9 @@ function OverridePanel({ state, setState, contributor, saving, error, onSave, on
               })}
               <button onClick={() => set(k, null)}
                       style={{ fontSize: 12, padding: '7px 13px', borderRadius: 8,
-                               border: `1px solid ${(merged.abstained_dimensions || []).includes(k) ? PURPLE : LINE}`,
-                               background: (merged.abstained_dimensions || []).includes(k) ? '#f4ecfe' : '#fff',
-                               color: (merged.abstained_dimensions || []).includes(k) ? PURPLE : MID,
+                               border: `1px solid ${(merged.abstained_dimensions || []).includes(k) ? BRAND : LINE}`,
+                               background: (merged.abstained_dimensions || []).includes(k) ? 'var(--color-brand-wash)' : '#fff',
+                               color: (merged.abstained_dimensions || []).includes(k) ? BRAND : MID,
                                cursor: 'pointer' }}>
                 — {NO_VISIBILITY_LABEL}
               </button>

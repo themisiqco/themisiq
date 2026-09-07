@@ -24,7 +24,7 @@ const muted = '#555553'
 const faint = 'var(--color-ink-muted)'
 const canvas = '#f8f7f5'
 const hair = '#e8e7e4'
-const violet = '#7425e3'
+const BRAND = 'var(--color-brand)'
 
 const cardStyle: React.CSSProperties = { background: '#fff', border: `0.5px solid ${hair}`, borderRadius: 10, padding: '14px 18px', marginBottom: 12 }
 
@@ -40,7 +40,7 @@ const cardStyle: React.CSSProperties = { background: '#fff', border: `0.5px soli
 // 1 and 5, three groups apart, so the repeat does not read as an error.
 const GROUP_ACCENT: Record<HolderGroup, string> = {
   company_records:     '#0C447C',
-  customs:             '#7425e3',
+  customs:             'var(--color-brand)',
   plant_operations:    '#0F6E56',
   finance_procurement: '#92400e',
   suppliers:           '#0C447C',
@@ -60,7 +60,7 @@ export default function Page() {
       {/* HERO */}
       <section style={{ padding: '4rem 2.5rem 2.5rem', borderBottom: `0.5px solid ${hair}`, background: canvas }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
-          <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: violet, background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.25)', borderRadius: 99, padding: '4px 12px', marginBottom: 16 }}>Free · No account needed</span>
+          <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: BRAND, background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 25%, transparent)', borderRadius: 99, padding: '4px 12px', marginBottom: 16 }}>Free · No account needed</span>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1rem', color: ink }}>
             What you&rsquo;ll need before you can file
           </h1>

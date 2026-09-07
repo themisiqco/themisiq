@@ -258,7 +258,7 @@ function SourceDocRow({ doc, token }: { doc: VerifierDoc; token: string }) {
         {manualUrl && (
           <span style={{ fontSize: 11, color: '#92400e' }}>
             {VERIFIER_DOC_TAB_DID_NOT_OPEN}{' '}
-            <a href={manualUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#7425e3', textDecoration: 'underline' }}>Open document</a>
+            <a href={manualUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-brand)', textDecoration: 'underline' }}>Open document</a>
           </span>
         )}
         {doc.id ? (
@@ -281,7 +281,7 @@ function SourceDocRow({ doc, token }: { doc: VerifierDoc; token: string }) {
 function SourceQuoteLink({ quote, docId, token }: { quote: string; docId: string; token: string }) {
   const { busy, failed, manualUrl, open } = useDocOpener(token)
   const linkStyle: React.CSSProperties = {
-    color: '#7425e3', textDecoration: 'underline', textDecorationThickness: '0.5px', textUnderlineOffset: 2,
+    color: 'var(--color-brand)', textDecoration: 'underline', textDecorationThickness: '0.5px', textUnderlineOffset: 2,
     background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: busy ? 'wait' : 'pointer',
   }
   // Same state as the document list's fallback, and it must SAY so. This used to swap the button
@@ -428,11 +428,11 @@ export default function VerifierPage() {
 
           <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: '#555553', lineHeight: 1.6, marginBottom: 12, cursor: 'pointer' }}>
             <input type="checkbox" checked={tosChecked} onChange={e => setTosChecked(e.target.checked)} style={{ marginTop: 3, flexShrink: 0 }} />
-            <span>I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: '#7425e3', textDecoration: 'underline' }}>Terms of Service</a></span>
+            <span>I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-brand)', textDecoration: 'underline' }}>Terms of Service</a></span>
           </label>
           <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: '#555553', lineHeight: 1.6, marginBottom: '1.5rem', cursor: 'pointer' }}>
             <input type="checkbox" checked={privacyChecked} onChange={e => setPrivacyChecked(e.target.checked)} style={{ marginTop: 3, flexShrink: 0 }} />
-            <span>I agree to the <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#7425e3', textDecoration: 'underline' }}>Privacy Policy</a></span>
+            <span>I agree to the <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-brand)', textDecoration: 'underline' }}>Privacy Policy</a></span>
           </label>
 
           <button
@@ -489,7 +489,7 @@ export default function VerifierPage() {
   return (
     <Shell>
       <div style={{ maxWidth: 920, minWidth: 0, margin: '0 auto', padding: '2.5rem 1.5rem 4rem' }}>
-        <div style={{ background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.25)', borderRadius: 10, padding: '10px 16px', marginBottom: '1.5rem', fontSize: 12, color: '#7425e3', fontWeight: 500 }}>
+        <div style={{ background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 25%, transparent)', borderRadius: 10, padding: '10px 16px', marginBottom: '1.5rem', fontSize: 12, color: 'var(--color-brand)', fontWeight: 500 }}>
           Read-only verifier view · You are reviewing a GHG inventory shared for independent assurance{data.expires_at ? ` · Access expires ${new Date(data.expires_at).toLocaleDateString()}` : ''}
         </div>
 
@@ -739,7 +739,7 @@ export default function VerifierPage() {
         {(inv.workings && inv.workings.length > 0) ? (
           <>
           {isScrollable && (
-            <div style={{ fontSize: 11, color: '#7425e3', fontWeight: 500, marginBottom: 6 }}>Scroll horizontally to see all columns →</div>
+            <div style={{ fontSize: 11, color: 'var(--color-brand)', fontWeight: 500, marginBottom: 6 }}>Scroll horizontally to see all columns →</div>
           )}
           <div ref={workingsScrollRef} style={{ overflowX: 'auto', marginBottom: '2rem' }}>
             <div style={{ minWidth: 720 }}>
@@ -774,7 +774,7 @@ export default function VerifierPage() {
                     <td style={{ padding: '8px 10px', color: '#0d0d0d', fontWeight: 500 }}>
                       <span>{w.source}</span>
                       {w.entry_method === 'concierge' && (
-                        <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: '#7425e3', background: 'rgba(116,37,227,0.08)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Bill-sourced</span>
+                        <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: 'var(--color-brand)', background: 'color-mix(in srgb, var(--color-brand) 8%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Bill-sourced</span>
                       )}
                       {w.entry_method === 'concierge-extrapolated' && (
                         <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: 'var(--color-ink-muted)', background: '#efeeec', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Estimated</span>
@@ -907,7 +907,7 @@ export default function VerifierPage() {
                         <div style={{ marginTop: 3, fontSize: 10, color: 'var(--color-ink-muted)', lineHeight: 1.4 }}>{w.quantification_method}</div>
                       )}
                     </td>
-                    <td style={{ padding: '8px 10px', color: '#7425e3', fontWeight: 600, whiteSpace: 'nowrap' }}>{w.result_tco2e == null ? '—' : w.result_tco2e.toFixed(3)}</td>
+                    <td style={{ padding: '8px 10px', color: 'var(--color-brand)', fontWeight: 600, whiteSpace: 'nowrap' }}>{w.result_tco2e == null ? '—' : w.result_tco2e.toFixed(3)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -952,13 +952,23 @@ export default function VerifierPage() {
           // WHICH fields changed, not what they changed to. The before/after values are no longer
           // sent, so this reports the shape of a revision without disclosing the figures behind it.
           const changed = row.action === 'UPDATE' ? (row.changed_fields ?? []) : []
-          const color = isCreate ? '#0F6E56' : isDelete ? '#B91C1C' : '#7425e3'
+          // ⚠️ UPDATE IS NEUTRAL, NOT BRANDED. Create is green and delete is red because both are
+          // outcomes; update is simply the third case. The brand colour means "an action you can
+          // take" everywhere else in this system, and spending it on the most common row made the
+          // quietest event in the log read as the loudest. Same ruling as the GHG audit log in
+          // app/dashboard/ghg/page.tsx, which this screen mirrors for the verifier.
+          const color = isCreate ? '#0F6E56' : isDelete ? '#B91C1C' : 'var(--color-ink-2)'
+          // The two outcome pills keep their 9% tint of their own colour; the neutral takes the
+          // named sunken well rather than a 9% wash of a grey, which would be invisible.
+          const pillBg = isCreate || isDelete
+            ? `color-mix(in srgb, ${color} 9%, transparent)`
+            : 'var(--color-sunken)'
           const label = isCreate ? 'Created' : isDelete ? 'Deleted' : 'Updated'
           return (
             <div key={row.id || i} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px', marginBottom: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: changed.length ? 10 : 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color, background: `color-mix(in srgb, ${color} 9%, transparent)`, padding: '3px 10px', borderRadius: 99 }}>{label}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color, background: pillBg, padding: '3px 10px', borderRadius: 99 }}>{label}</span>
                   <span style={{ fontSize: 12, color: '#555553' }}>{row.user_email || 'System'}</span>
                 </div>
                 <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{new Date(row.created_at).toLocaleString()}</span>

@@ -40,7 +40,7 @@ import { resolveSubtopicName, subtopicHeading } from '../../../../../lib/materia
 import { finalisationStamp, type Readiness }
   from '../../../../../lib/materiality/finalisation'
 
-const PURPLE = '#7425e3'
+const BRAND = 'var(--color-brand)'
 const GREEN = '#0F6E56'
 const GREEN_BG = '#E1F5EE'
 const AMBER = 'var(--color-module-climate)'
@@ -745,7 +745,7 @@ export default function WorksheetAssign() {
               {/* This read "There is no way to change this from the application yet. Contact us and
                   we will set it." until 22 Aug 2026, when the edit screen made it false. */}
               <Link href={`/dashboard/materiality/assessment/${assessmentId}/edit`}
-                    style={{ color: PURPLE }}>State it on this assessment</Link>, then finalise.
+                    style={{ color: BRAND }}>State it on this assessment</Link>, then finalise.
             </p>
           </>
         )
@@ -799,11 +799,11 @@ export default function WorksheetAssign() {
       <div style={{ maxWidth: 1040, margin: '0 auto', padding: '2rem' }}>
 
         <div style={{ marginBottom: 16, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          <Link href="/dashboard/materiality/worksheet" style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>← All worksheets</Link>
-          <Link href={`/dashboard/materiality/worksheet/${assessmentId}/determine`} style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>Your own determinations</Link>
-          <Link href={`/dashboard/materiality/worksheet/${assessmentId}/determinations`} style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>All determinations</Link>
-          <Link href={`/dashboard/materiality/worksheet/${assessmentId}/iro-1`} style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>IRO-1 disclosure</Link>
-          {round && <Link href={`/dashboard/materiality/survey/${round.id}/results`} style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>Survey results</Link>}
+          <Link href="/dashboard/materiality/worksheet" style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>← All worksheets</Link>
+          <Link href={`/dashboard/materiality/worksheet/${assessmentId}/determine`} style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>Your own determinations</Link>
+          <Link href={`/dashboard/materiality/worksheet/${assessmentId}/determinations`} style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>All determinations</Link>
+          <Link href={`/dashboard/materiality/worksheet/${assessmentId}/iro-1`} style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>IRO-1 disclosure</Link>
+          {round && <Link href={`/dashboard/materiality/survey/${round.id}/results`} style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>Survey results</Link>}
         </div>
 
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: INK }}>
@@ -825,7 +825,7 @@ export default function WorksheetAssign() {
               {/* Until 22 Aug 2026 this sentence ended here, telling a customer to do something the
                   application gave them no way to do. */}
               <Link href={`/dashboard/materiality/assessment/${assessmentId}/edit`}
-                    style={{ color: PURPLE }}>State the version on this assessment</Link>{' '}
+                    style={{ color: BRAND }}>State the version on this assessment</Link>{' '}
               and the sub-topics appear.
             </div>
           </div>
@@ -910,7 +910,7 @@ export default function WorksheetAssign() {
                   You have not created a survey round yet. An assessment does not need one — the
                   list below is then every sub-topic for this standard version — but a round is what
                   brings stakeholder answers into it.{' '}
-                  <Link href="/dashboard/materiality/survey" style={{ color: PURPLE }}>Surveys</Link>
+                  <Link href="/dashboard/materiality/survey" style={{ color: BRAND }}>Surveys</Link>
                 </div>
               ) : (
                 <div style={{ display: 'grid', gap: 8 }}>
@@ -986,7 +986,7 @@ export default function WorksheetAssign() {
                             /* Only what is specific to this row. The why is in the intro. */
                             <>This round is {statusWord(r.status)}.{' '}
                             <Link href={`/dashboard/materiality/survey/${r.id}`}
-                                  style={{ color: PURPLE }}>Open this round</Link></>
+                                  style={{ color: BRAND }}>Open this round</Link></>
                           ) : !versionMatches ? (
                             versionLabel(r.standard_version) && versionLabel(assessment.standard_version) ? (
                               <>This round was built against {versionLabel(r.standard_version)}, and
@@ -1257,7 +1257,7 @@ export default function WorksheetAssign() {
                     <label key={s.subtopic_code}
                            style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '9px 10px',
                                     borderRadius: 8, cursor: 'pointer',
-                                    background: isSel ? '#f6f1fe' : 'transparent' }}>
+                                    background: isSel ? 'var(--color-brand-wash)' : 'transparent' }}>
                       <input type="checkbox" checked={isSel}
                              onChange={() => toggle(s.subtopic_code)} />
                       <span style={{ flex: 1, fontSize: 13, color: INK, minWidth: 0 }}>

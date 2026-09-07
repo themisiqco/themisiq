@@ -96,6 +96,6 @@ const consentLabel: React.CSSProperties = { fontSize: 11, fontWeight: 600, color
 const consentInput: React.CSSProperties = { width: '100%', fontSize: 13, padding: '9px 12px', border: '1px solid #e8e7e4', borderRadius: 8, outline: 'none', boxSizing: 'border-box' }
 const consentCheckRow: React.CSSProperties = { display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer' }
 const consentCheckText: React.CSSProperties = { fontSize: 12, color: '#555553', lineHeight: 1.6 }
-const consentLink: React.CSSProperties = { color: '#7425e3', textDecoration: 'underline' }
+const consentLink: React.CSSProperties = { color: 'var(--color-brand)', textDecoration: 'underline' }
 const primaryBtn: React.CSSProperties = { padding: '10px 20px', borderRadius: 8, fontSize: 12, fontWeight: 600, color: 'var(--color-on-dark)', background: GRAD, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', textDecoration: 'none', display: 'inline-block' }
 const ghostBtn: React.CSSProperties = { padding: '10px 20px', borderRadius: 8, fontSize: 12, fontWeight: 500, color: '#0d0d0d', background: '#fff', border: '1px solid #e8e7e4', cursor: 'pointer', whiteSpace: 'nowrap', textDecoration: 'none', display: 'inline-block' }

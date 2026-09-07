@@ -114,7 +114,7 @@ function ItemSection({ n, title, children }: { n: string; title: string; childre
   return (
     <div style={{ marginTop: '2rem', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
       <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', marginBottom: 10 }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: '#7425e3', flexShrink: 0 }}>{n}</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-brand)', flexShrink: 0 }}>{n}</span>
         <span style={itemHead}>{title}</span>
       </div>
       {children}
@@ -255,7 +255,7 @@ export default function CbamReportPage() {
           <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>No installations yet</div>
           <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, fontWeight: 400 }}>
             A report covers one installation and reporting period, so you&rsquo;ll need to add an installation and its production processes first. You can do that in{' '}
-            <a href="/dashboard/cbam/setup" style={{ color: '#7425e3', textDecoration: 'underline' }}>setup</a>, then come back here.
+            <a href="/dashboard/cbam/setup" style={{ color: 'var(--color-brand)', textDecoration: 'underline' }}>setup</a>, then come back here.
           </div>
         </div>
       </div>
@@ -327,7 +327,7 @@ export default function CbamReportPage() {
               type="button"
               onClick={downloadXlsx}
               disabled={exporting}
-              style={{ fontSize: 13, fontWeight: 600, padding: '9px 18px', borderRadius: 8, border: '0.5px solid #7425e3', background: '#fff', color: '#7425e3', cursor: exporting ? 'wait' : 'pointer', opacity: exporting ? 0.6 : 1 }}
+              style={{ fontSize: 13, fontWeight: 600, padding: '9px 18px', borderRadius: 8, border: '0.5px solid var(--color-brand)', background: '#fff', color: 'var(--color-brand)', cursor: exporting ? 'wait' : 'pointer', opacity: exporting ? 0.6 : 1 }}
             >
               {exporting ? 'Preparing .xlsx…' : 'Download .xlsx'}
             </button>
@@ -752,7 +752,7 @@ function AttestationBanner({ declaredAt }: { declaredAt: string | null }) {
   return (
     <div style={{ marginTop: '1rem', fontSize: 12, color: '#555553', background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 8, padding: '10px 14px', lineHeight: 1.6 }}>
       Installation-level totals (items 5 and 6) cannot be reported until you attest that the process set is complete. Make the attestation on the{' '}
-      <a href="/dashboard/cbam/disclosures" style={{ color: '#7425e3', textDecoration: 'underline' }}>disclosures page</a>, then regenerate this report.
+      <a href="/dashboard/cbam/disclosures" style={{ color: 'var(--color-brand)', textDecoration: 'underline' }}>disclosures page</a>, then regenerate this report.
     </div>
   )
 }
@@ -776,7 +776,7 @@ function ErrorPanel({ err }: { err: ErrState }) {
             link. The reader matches the CN codes to the process list themselves. */}
         <div style={{ fontSize: 13, color: '#92400e', lineHeight: 1.7, fontWeight: 400, marginTop: 8 }}>
           Go to{' '}
-          <a href="/dashboard/cbam/setup" style={{ color: '#7425e3', textDecoration: 'underline' }}>setup</a> to declare them.
+          <a href="/dashboard/cbam/setup" style={{ color: 'var(--color-brand)', textDecoration: 'underline' }}>setup</a> to declare them.
         </div>
       </div>
     )
@@ -798,7 +798,7 @@ function ErrorPanel({ err }: { err: ErrState }) {
     return (
       <div style={{ marginTop: '1.5rem', background: '#FEF3E2', border: '0.5px solid #f5d9ad', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: '#92400e', marginBottom: 4 }}>Session expired (401)</div>
-        <div style={{ fontSize: 13, color: '#92400e', lineHeight: 1.6, fontWeight: 400 }}>{err.message} <a href="/login" style={{ color: '#7425e3', textDecoration: 'underline' }}>Sign in again</a>.</div>
+        <div style={{ fontSize: 13, color: '#92400e', lineHeight: 1.6, fontWeight: 400 }}>{err.message} <a href="/login" style={{ color: 'var(--color-brand)', textDecoration: 'underline' }}>Sign in again</a>.</div>
       </div>
     )
   }

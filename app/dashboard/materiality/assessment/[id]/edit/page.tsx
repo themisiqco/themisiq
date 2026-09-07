@@ -23,7 +23,7 @@ import {
   type VersionLock,
 } from '../../../../../../lib/materiality/versionAgreement'
 
-const PURPLE = '#7425e3'
+const BRAND = 'var(--color-brand)'
 const INK = '#0d0d0d'
 const MID = '#555553'
 const LINE = '#e8e7e4'
@@ -176,8 +176,8 @@ export default function EditAssessmentPage() {
   return (
     <Shell>
       <div style={{ marginBottom: 16, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-        <Link href="/dashboard/materiality/worksheet" style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>← All worksheets</Link>
-        <Link href={`/dashboard/materiality/worksheet/${assessmentId}`} style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>Assign and chase</Link>
+        <Link href="/dashboard/materiality/worksheet" style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>← All worksheets</Link>
+        <Link href={`/dashboard/materiality/worksheet/${assessmentId}`} style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>Assign and chase</Link>
       </div>
       <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: INK }}>
         Edit this assessment

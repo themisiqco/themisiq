@@ -281,7 +281,7 @@ export default function PackFlow({ slug }: { slug: string }) {
       <div style={{ minHeight: '100vh', background: PAPER, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, sans-serif' }}>
         <div style={{ textAlign: 'center' }}>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, color: INK }}>Pack not found</h1>
-          <a href="/pricing" style={{ color: '#7425e3', fontSize: 13, textDecoration: 'none' }}>See all packs →</a>
+          <a href="/pricing" style={{ color: 'var(--color-brand)', fontSize: 13, textDecoration: 'none' }}>See all packs →</a>
         </div>
       </div>
     )
@@ -364,8 +364,8 @@ export default function PackFlow({ slug }: { slug: string }) {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 14, fontWeight: 700,
                   background: state === 'complete' ? GRAD : '#fff',
-                  border: state === 'complete' ? 'none' : `2px solid ${state === 'in-progress' ? '#7425e3' : LINE}`,
-                  color: state === 'complete' ? '#0d0d0d' : state === 'in-progress' ? '#7425e3' : MUTE,
+                  border: state === 'complete' ? 'none' : `2px solid ${state === 'in-progress' ? 'var(--color-brand)' : LINE}`,
+                  color: state === 'complete' ? '#0d0d0d' : state === 'in-progress' ? 'var(--color-brand)' : MUTE,
                 }}>
                   {state === 'complete' ? '✓' : i + 1}
                 </div>

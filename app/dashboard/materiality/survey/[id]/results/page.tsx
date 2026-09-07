@@ -53,7 +53,7 @@ const BLUE = '#0C447C'
 const BLUE_BG = '#E6F1FB'
 const FAIL = '#b42318'
 const FAIL_BG = '#fef3f2'
-const PURPLE = '#7425e3'
+const BRAND = 'var(--color-brand)'
 const INK = '#0d0d0d'
 const MID = '#555553'
 const MUTE = 'var(--color-ink-muted)'
@@ -160,7 +160,7 @@ function Disclosure({ summary, children, tone = 'plain' }:
                     { summary: string; children: React.ReactNode; tone?: 'plain' | 'quiet' }) {
   return (
     <details style={{ marginTop: 10 }}>
-      <summary style={{ cursor: 'pointer', fontSize: 12, color: tone === 'quiet' ? MUTE : PURPLE,
+      <summary style={{ cursor: 'pointer', fontSize: 12, color: tone === 'quiet' ? MUTE : BRAND,
                         listStyle: 'revert' }}>{summary}</summary>
       <div style={{ marginTop: 10 }}>{children}</div>
     </details>
@@ -288,9 +288,9 @@ export default function SurveyResults() {
 
         {/* ── 0 · header ────────────────────────────────────────────────────────────────────── */}
         <div style={{ marginBottom: 16, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          <Link href="/dashboard/materiality/survey" style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>← All survey rounds</Link>
-          <Link href={`/dashboard/materiality/survey/${roundId}`} style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>Progress and invitations</Link>
-          <Link href={`/dashboard/materiality/survey/${roundId}/scope`} style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>Topics in scope</Link>
+          <Link href="/dashboard/materiality/survey" style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>← All survey rounds</Link>
+          <Link href={`/dashboard/materiality/survey/${roundId}`} style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>Progress and invitations</Link>
+          <Link href={`/dashboard/materiality/survey/${roundId}/scope`} style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>Topics in scope</Link>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
@@ -361,7 +361,7 @@ export default function SurveyResults() {
                 survey, so there is nothing on this page to be wrong yet.
                 {p.invited === 0
                   ? <> No one has been invited — start on the{' '}
-                      <Link href={`/dashboard/materiality/survey/${roundId}/respondents`} style={{ color: PURPLE }}>respondents screen</Link>.</>
+                      <Link href={`/dashboard/materiality/survey/${roundId}/respondents`} style={{ color: BRAND }}>respondents screen</Link>.</>
                   : <> {p.invited} {p.invited === 1 ? 'invitation is' : 'invitations are'} out.</>}
               </div>
             </div>
@@ -401,8 +401,8 @@ export default function SurveyResults() {
                       (b.gap ?? -1) - (a.gap ?? -1))
                     .map(e => (
                     <div key={e.s1_subtopic_code}
-                         style={{ border: `0.5px solid ${e.flagged ? PURPLE : LINE}`, borderRadius: 12,
-                                  padding: '14px 16px', background: e.flagged ? '#fbf8ff' : '#fff' }}>
+                         style={{ border: `0.5px solid ${e.flagged ? BRAND : LINE}`, borderRadius: 12,
+                                  padding: '14px 16px', background: e.flagged ? 'var(--color-brand-wash)' : '#fff' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12,
                                     alignItems: 'baseline', marginBottom: 10, flexWrap: 'wrap' }}>
                         <div style={{ fontSize: 13.5, fontWeight: 600, color: INK }}>
@@ -411,7 +411,7 @@ export default function SurveyResults() {
                             {e.s1_subtopic_code} / {e.s2_subtopic_code}
                           </span>
                         </div>
-                        {e.flagged && <Chip text={`GAP ${pct(e.gap)}`} fg={PURPLE} bg="#f1e7fd" />}
+                        {e.flagged && <Chip text={`GAP ${pct(e.gap)}`} fg={BRAND} bg="var(--color-brand-wash)" />}
                       </div>
 
                       {e.comparable ? (
@@ -482,7 +482,7 @@ export default function SurveyResults() {
                                     flexWrap: 'wrap', marginBottom: 10 }}>
                         <div style={{ fontSize: 13.5, fontWeight: 600, color: INK }}>{e.short_name}</div>
                         <span style={{ fontSize: 11, color: MUTE }}>{e.subtopic_code} · {e.topic_label}</span>
-                        {e.triggers.includes('polarised') && <Chip text="SPLIT ROOM" fg={PURPLE} bg="#f1e7fd" />}
+                        {e.triggers.includes('polarised') && <Chip text="SPLIT ROOM" fg={BRAND} bg="var(--color-brand-wash)" />}
                         {e.triggers.includes('between_group_top_box_gap') && <Chip text="GROUPS DIFFER" fg={AMBER} bg={AMBER_BG} />}
                       </div>
 
@@ -708,7 +708,7 @@ function SubTopicRow({ s, catName, floor }:
           {s.short_name}
         </span>
         <span style={{ fontSize: 11, color: MUTE }}>{s.subtopic_code}</span>
-        {o?.polarised && <Chip text="SPLIT ROOM" fg={PURPLE} bg="#f1e7fd" />}
+        {o?.polarised && <Chip text="SPLIT ROOM" fg={BRAND} bg="var(--color-brand-wash)" />}
         {abstentionLed && <Chip text="NO VISIBILITY" fg={AMBER} bg={AMBER_BG} />}
       </div>
 

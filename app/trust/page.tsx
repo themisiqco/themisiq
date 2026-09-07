@@ -100,7 +100,7 @@ export default function TrustPage() {
             You are entering sensitive compliance data into ThemisIQ — emissions figures, workforce data, supplier relationships, AI systems. We take that responsibility seriously. This page explains exactly what we do with your data, what we never do, and what rights you have.
           </p>
           <p style={{ fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400 }}>
-            Questions? Contact us at <a href="mailto:privacy@themisiq.co" style={{ color: '#7425e3', textDecoration: 'none' }}>privacy@themisiq.co</a>
+            Questions? Contact us at <a href="mailto:privacy@themisiq.co" style={{ color: 'var(--color-brand)', textDecoration: 'none' }}>privacy@themisiq.co</a>
           </p>
         </div>
       </section>

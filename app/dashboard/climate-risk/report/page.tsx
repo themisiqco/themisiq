@@ -207,7 +207,7 @@ function ResilienceMap({ items }: { items: any[] }) {
     const baseX = px(frac(xb)), baseY = py(frac(yb))
     const n = arr.length
     arr.forEach((it: any, i: number) => {
-      placed.push({ it, cx: baseX, cy: baseY + (i - (n - 1) / 2) * 24, color: it.kind === 'physical' ? '#C2410C' : '#7425e3' })
+      placed.push({ it, cx: baseX, cy: baseY + (i - (n - 1) / 2) * 24, color: it.kind === 'physical' ? '#C2410C' : 'var(--color-brand)' })
     })
   }
 
@@ -335,7 +335,7 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
         {/* COVER */}
         <section className="page">
           <div style={{ height: 6, background: GRAD, marginBottom: 32, borderRadius: 2 }} />
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 12 }}>Prepared by ThemisIQ Compliance Inc.</div>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--color-brand)', marginBottom: 12 }}>Prepared by ThemisIQ Compliance Inc.</div>
           <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '2.2rem', fontWeight: 400, lineHeight: 1.2, margin: '0 0 16px' }}>Climate Resilience Analysis Report</h1>
           <p style={{ fontSize: 15, color: '#555553', marginBottom: 36, lineHeight: 1.6 }}>
             Multi-scenario resilience assessment of climate-related risks and opportunities across a diverse range of climate futures, as required for {isCsrd ? 'CSRD / ESRS E1' : 'IFRS S2'} resilience disclosure.

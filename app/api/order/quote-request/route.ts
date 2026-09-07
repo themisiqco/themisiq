@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { checkAndRecordRateLimit, ipFromHeaders } from '../../../../lib/rateLimit'
 import { createDraftInvoiceForOrder } from '../../../../lib/order/invoice'
 import type { Tier } from '../../../../lib/pricing'
-import { INK_MUTED } from '@/lib/brand'
+import { BRAND, BRAND_WASH, INK_MUTED } from '@/lib/brand'
 
 // Quote-request capture for /order carts that exceed the card threshold (>$10k) or are
 // GHG Advisory. Email-only — NO payment, NO DB table. Clones the /api/assessment/submit
@@ -88,11 +88,11 @@ export async function POST(req: NextRequest) {
     <table width="100%" style="margin-bottom:16px;">
       <tr><td width="140" style="font-size:12px;color:#888;font-weight:600;padding:4px 0;">Name</td><td style="font-size:12px;color:#0d0d0d;font-weight:600;">${name}</td></tr>
       <tr><td style="font-size:12px;color:#888;font-weight:600;padding:4px 0;">Company</td><td style="font-size:12px;color:#0d0d0d;">${company}</td></tr>
-      <tr><td style="font-size:12px;color:#888;font-weight:600;padding:4px 0;">Email</td><td style="font-size:12px;color:#7425e3;">${email}</td></tr>
+      <tr><td style="font-size:12px;color:#888;font-weight:600;padding:4px 0;">Email</td><td style="font-size:12px;color:${BRAND};">${email}</td></tr>
       <tr><td style="font-size:12px;color:#888;font-weight:600;padding:4px 0;">Phone</td><td style="font-size:12px;color:#0d0d0d;">${phone}</td></tr>
     </table>
-    <div style="background:#EDE9FE;border-radius:6px;padding:12px 14px;">
-      <div style="font-size:11px;font-weight:700;color:#7425e3;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Requested configuration</div>
+    <div style="background:${BRAND_WASH};border-radius:6px;padding:12px 14px;">
+      <div style="font-size:11px;font-weight:700;color:${BRAND};text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Requested configuration</div>
       <table width="100%">
         <tr><td width="120" style="font-size:12px;color:#888;padding:3px 0;">Modules</td><td style="font-size:12px;color:#0d0d0d;font-weight:600;">${modules}</td></tr>
         <tr><td style="font-size:12px;color:#888;padding:3px 0;">GHG tier</td><td style="font-size:12px;color:#0d0d0d;">${tier}</td></tr>
@@ -155,13 +155,13 @@ export async function POST(req: NextRequest) {
   <div style="padding:20px;">
     <table width="100%" style="margin-bottom:14px;">
       <tr><td width="120" style="font-size:12px;color:#888;padding:3px 0;">Customer</td><td style="font-size:12px;color:#0d0d0d;font-weight:600;">${name} · ${company}</td></tr>
-      <tr><td style="font-size:12px;color:#888;padding:3px 0;">Email</td><td style="font-size:12px;color:#7425e3;">${email}</td></tr>
+      <tr><td style="font-size:12px;color:#888;padding:3px 0;">Email</td><td style="font-size:12px;color:${BRAND};">${email}</td></tr>
       <tr><td style="font-size:12px;color:#888;padding:3px 0;">Modules</td><td style="font-size:12px;color:#0d0d0d;">${modules}</td></tr>
       <tr><td style="font-size:12px;color:#888;padding:3px 0;">Amount</td><td style="font-size:12px;color:#0d0d0d;font-weight:600;">$${inv.amount.toLocaleString()}</td></tr>
       <tr><td style="font-size:12px;color:#888;padding:3px 0;">Invoice</td><td style="font-size:12px;color:#0d0d0d;">${esc(inv.invoiceId)}</td></tr>
       ${ref ? `<tr><td style="font-size:12px;color:#888;padding:3px 0;">Referral</td><td style="font-size:12px;color:#0d0d0d;">${ref}</td></tr>` : ''}
     </table>
-    <div style="background:#EDE9FE;border-radius:6px;padding:12px 14px;font-size:12px;color:#555;line-height:1.6;margin-bottom:14px;">
+    <div style="background:${BRAND_WASH};border-radius:6px;padding:12px 14px;font-size:12px;color:#555;line-height:1.6;margin-bottom:14px;">
       A <strong>draft</strong> invoice has been created (nothing sent). Review it in Stripe and click <strong>Send</strong> to bill the customer. On payment, their modules unlock automatically.
     </div>
     <a href="${link}" style="display:inline-block;font-size:13px;font-weight:600;color:#0d0d0d;background:linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e);padding:10px 22px;border-radius:8px;text-decoration:none;">Review &amp; send in Stripe →</a>

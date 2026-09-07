@@ -40,7 +40,7 @@ export default function LoginPage() {
         <a href="/" style={{ textDecoration: 'none' }}>
           <img src="/logo.png" alt="ThemisIQ" style={{ height: 24, width: 'auto', display: 'block' }} />
         </a>
-        <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Don't have an account? <a href={`/signup?next=${encodeURIComponent(nextUrl)}`} style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Create an account →</a></span>
+        <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Don't have an account? <a href={`/signup?next=${encodeURIComponent(nextUrl)}`} style={{ color: 'var(--color-brand)', textDecoration: 'none', fontWeight: 500 }}>Create an account →</a></span>
       </nav>
 
       {/* MAIN */}
@@ -85,7 +85,7 @@ export default function LoginPage() {
                   style={{ width: '100%', fontSize: 14, padding: '10px 12px', border: '0.5px solid #e8e7e4', borderRadius: 8, outline: 'none', boxSizing: 'border-box' as const }}
                 />
                 <div style={{ textAlign: 'right', marginTop: 6 }}>
-                  <a href="/forgot-password" style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none' }}>Forgot password?</a>
+                  <a href="/forgot-password" style={{ fontSize: 12, color: 'var(--color-brand)', textDecoration: 'none' }}>Forgot password?</a>
                 </div>
               </div>
 
@@ -106,7 +106,7 @@ export default function LoginPage() {
           </div>
 
           <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: 13, color: 'var(--color-ink-muted)' }}>
-Don't have an account? <a href={`/signup?next=${encodeURIComponent(nextUrl)}`} style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Create your account →</a>
+Don't have an account? <a href={`/signup?next=${encodeURIComponent(nextUrl)}`} style={{ color: 'var(--color-brand)', textDecoration: 'none', fontWeight: 500 }}>Create your account →</a>
           </p>
 
         </div>

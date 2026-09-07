@@ -404,7 +404,7 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
         {/* 1 ── COVER */}
         <section className="page">
           <div style={{ height: 6, background: GRAD, marginBottom: 32, borderRadius: 2 }} />
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 12 }}>Prepared by ThemisIQ Compliance Inc.</div>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--color-brand)', marginBottom: 12 }}>Prepared by ThemisIQ Compliance Inc.</div>
           <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '2.2rem', fontWeight: 400, lineHeight: 1.2, margin: '0 0 16px' }}>ESG Deal Due Diligence Report</h1>
           <p style={{ fontSize: 15, color: '#555553', marginBottom: 36, lineHeight: 1.6 }}>
             Sustainability-regulation screening of {deal.target_name || 'the target company'} for deal, investment-committee and LP reporting: which disclosure regimes reach the target, which statutory size tests were applied, and what compliance is estimated to cost.

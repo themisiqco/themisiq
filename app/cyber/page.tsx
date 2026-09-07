@@ -47,7 +47,7 @@ export default function Page() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {[
               { val: '72h', unit: 'NIS2 report', label: 'full incident report to national authority after significant cyber incident', color: '#B91C1C', bg: '#FCEBEB' },
-              { val: '€10M', unit: 'or 2%', label: 'maximum NIS2 fine for essential entity non-compliance', color: '#7425e3', bg: '#EDE9FE' },
+              { val: '€10M', unit: 'or 2%', label: 'maximum NIS2 fine for essential entity non-compliance', color: 'var(--color-brand)', bg: 'var(--color-brand-wash)' },
               { val: '4 days', unit: 'SEC 8-K', label: 'to disclose material cybersecurity incidents as a US public company', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
               { val: 'Art. 20', unit: 'NIS2', label: 'board members personally accountable for cyber risk management', color: '#0F6E56', bg: '#E1F5EE' },
             ].map(({ val, unit, label, color, bg }) => (
@@ -82,7 +82,7 @@ export default function Page() {
                 active: 'Active since January 2025',
                 who: 'Financial entities with EU operations — banks, insurers, investment firms, crypto-asset service providers, and their critical ICT third-party providers',
                 key: ['ICT risk management framework — policies, procedures, controls', 'Digital operational resilience testing — including TLPT', 'ICT-related incident classification and reporting', 'Third-party ICT risk management and CTPP oversight'],
-                color: '#7425e3',
+                color: 'var(--color-brand)',
               },
               {
                 name: 'SEC Cyber Rules',
@@ -142,7 +142,7 @@ export default function Page() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
             {[
-              { time: 'Hour 1', title: 'Contain & assess', desc: 'Isolate affected systems. Assign incident commander. Open ThemisIQ incident record. Determine severity classification.', color: '#7425e3' },
+              { time: 'Hour 1', title: 'Contain & assess', desc: 'Isolate affected systems. Assign incident commander. Open ThemisIQ incident record. Determine severity classification.', color: 'var(--color-brand)' },
               { time: 'Hour 24', title: 'NIS2 early warning', desc: 'Submit early warning to national competent authority. Indicate whether incident is suspected to be malicious. Customer notification if data breach confirmed.', color: 'var(--color-module-climate)' },
               { time: 'Hour 72', title: 'Full report + SEC 8-K', desc: 'NIS2 full incident notification. DORA ICT incident report. US public companies: assess 8-K materiality and file if material. GDPR Article 33 if personal data involved.', color: '#B91C1C' },
               { time: 'Day 30', title: 'Final report', desc: 'NIS2 final report with root cause, impact assessment, cross-border effects, and measures taken. Post-incident review completion. Corrective action verification.', color: '#0F6E56' },

@@ -22,7 +22,7 @@ import {
   standardVersionOffer, unavailableVersionMessage,
 } from '../../../../../lib/materiality/versionAgreement'
 
-const PURPLE = '#7425e3'
+const BRAND = 'var(--color-brand)'
 const INK = '#0d0d0d'
 const MID = '#555553'
 const MUTE = 'var(--color-ink-muted)'
@@ -95,7 +95,7 @@ export default function NewAssessmentPage() {
   return (
     <Shell>
       <div style={{ marginBottom: 16 }}>
-        <Link href="/dashboard/materiality/worksheet" style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>← Impact worksheet</Link>
+        <Link href="/dashboard/materiality/worksheet" style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>← Impact worksheet</Link>
       </div>
       <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: INK }}>
         New materiality assessment

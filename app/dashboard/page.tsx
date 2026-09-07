@@ -315,7 +315,7 @@ export default function Dashboard() {
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             {activePack && (
-              <span style={{ fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 99, background: '#EDE9FE', color: '#7425e3', border: '0.5px solid rgba(116,37,227,0.2)' }}>
+              <span style={{ fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 99, background: 'var(--color-brand-wash)', color: 'var(--color-brand)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 20%, transparent)' }}>
                 {PACK_CONFIG[activePack]?.label}
               </span>
             )}
@@ -333,7 +333,7 @@ export default function Dashboard() {
           {[
             { label: 'Modules active', val: activeModuleCount, color: activeModuleCount > 0 ? '#0F6E56' : 'var(--color-ink-muted)', bg: activeModuleCount > 0 ? '#E1F5EE' : '#f8f7f5' },
             { label: 'Modules available', val: MODULES.length - activeModuleCount, color: 'var(--color-ink-muted)', bg: '#f8f7f5' },
-            { label: 'Frameworks covered', val: activeModuleCount > 0 ? unlockedModuleIds.flatMap(id => MODULES.find(m => m.id === id)?.frameworks || []).length : 0, color: '#7425e3', bg: '#EDE9FE' },
+            { label: 'Frameworks covered', val: activeModuleCount > 0 ? unlockedModuleIds.flatMap(id => MODULES.find(m => m.id === id)?.frameworks || []).length : 0, color: 'var(--color-brand)', bg: 'var(--color-brand-wash)' },
             { label: 'AI Act high-risk from', val: AI_ACT_HIGH_RISK_STANDALONE, color: '#B91C1C', bg: '#FCEBEB' },
           ].map(({ label, val, color, bg }) => (
             <div key={label} style={{ background: bg, borderRadius: 12, padding: '1rem', textAlign: 'center', border: '0.5px solid #e8e7e4' }}>
@@ -425,7 +425,7 @@ export default function Dashboard() {
                           // does not give is worse than saying nothing.
                           const lead = mod.previewable ? 'Preview free' : 'Locked'
                           return (
-                            <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{lead}{price !== null && <> · <span style={{ color: '#7425e3', fontWeight: 500 }}>unlock for ${price.toLocaleString('en-US')}/yr</span></>}</span>
+                            <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{lead}{price !== null && <> · <span style={{ color: 'var(--color-brand)', fontWeight: 500 }}>unlock for ${price.toLocaleString('en-US')}/yr</span></>}</span>
                           )
                         })()
                       )}

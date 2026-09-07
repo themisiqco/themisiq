@@ -642,8 +642,8 @@ function DealsDashboardInner() {
           <label style={labelStyle}>Deal type</label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
             {DEAL_TYPES.map(dt => (
-              <div key={dt.id} onClick={() => update('deal_type', dt.id)} style={{ border: `1.5px solid ${deal.deal_type === dt.id ? '#7425e3' : '#e8e7e4'}`, borderRadius: 10, padding: '0.75rem', cursor: 'pointer', background: deal.deal_type === dt.id ? '#EDE9FE' : '#f8f7f5' }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: deal.deal_type === dt.id ? '#7425e3' : '#0d0d0d', marginBottom: 3 }}>{dt.label}</div>
+              <div key={dt.id} onClick={() => update('deal_type', dt.id)} style={{ border: `1.5px solid ${deal.deal_type === dt.id ? 'var(--color-brand)' : '#e8e7e4'}`, borderRadius: 10, padding: '0.75rem', cursor: 'pointer', background: deal.deal_type === dt.id ? 'var(--color-brand-wash)' : '#f8f7f5' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: deal.deal_type === dt.id ? 'var(--color-brand)' : '#0d0d0d', marginBottom: 3 }}>{dt.label}</div>
                 <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{dt.desc}</div>
               </div>
             ))}
@@ -817,13 +817,13 @@ function DealsDashboardInner() {
             We keep a set of common ESG risks for each sector, and &ldquo;{deal.sector}&rdquo; isn&rsquo;t one of them, so
             there is nothing pre-written to show here. <strong style={{ fontWeight: 600 }}>That is not a finding that this target has no
             ESG risks.</strong> If one of the listed sectors is close to what it does, choosing it in{' '}
-            <button onClick={() => setStep(0)} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: '#7425e3', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Deal setup</button>
+            <button onClick={() => setStep(0)} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'var(--color-brand)', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Deal setup</button>
             {' '}will bring up the risks that usually apply.
           </div>
         ) : (
           <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)', fontSize: 13, lineHeight: 1.7 }}>
             Choose a sector in{' '}
-            <button onClick={() => setStep(0)} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: '#7425e3', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Deal setup</button>
+            <button onClick={() => setStep(0)} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'var(--color-brand)', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Deal setup</button>
             {' '}to see the ESG risks that usually come with it.
           </div>
         )
@@ -959,7 +959,7 @@ function DealsDashboardInner() {
               wrong audience). Reuses the already-computed consultant range × DEFAULT_PIPELINE_TARGETS
               and the annual themisIqFigure — no new numbers. */}
           <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#7425e3', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Across your pipeline</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-brand)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Across your pipeline</div>
             {obligations.locationUnset ? (
               <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6 }}>Enter a location count to see your annual ThemisIQ price — one subscription covers your whole screening pipeline, not one deal.</div>
             ) : (
@@ -1026,8 +1026,8 @@ function DealsDashboardInner() {
             </div>
           </div>
 
-          <div style={{ background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.2)', borderRadius: 10, padding: '1rem' }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#7425e3', marginBottom: 4 }}>Deal structuring note</div>
+          <div style={{ background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 20%, transparent)', borderRadius: 10, padding: '1rem' }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', marginBottom: 4 }}>Deal structuring note</div>
             <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
               Consider including ESG compliance costs in purchase price adjustment mechanics, or structuring an escrow/holdback for regulatory compliance. ThemisIQ Advisory can provide a detailed compliance roadmap for IC approval. If the deal proceeds, ThemisIQ can complete the target&rsquo;s compliance work directly — share this assessment with the target from the Export step.
             </div>
@@ -1134,7 +1134,7 @@ function DealsDashboardInner() {
                     <div style={{ fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>Anyone opening this link right now sees an empty assessment</div>
                     This deal has no sector saved, so there are no reporting rules or risk findings to show.
                     Either turn the link off below, or{' '}
-                    <button onClick={() => setStep(0)} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: '#7425e3', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>add a sector in Deal setup</button>
+                    <button onClick={() => setStep(0)} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'var(--color-brand)', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>add a sector in Deal setup</button>
                     {' '}and save the deal.
                   </div>
                 )}
@@ -1159,7 +1159,7 @@ function DealsDashboardInner() {
                 ) : (
                   <>Without a sector there are no reporting rules or risk findings to show, so the target would open
                   the link to an empty assessment.{' '}
-                  <button onClick={() => setStep(0)} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: '#7425e3', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Go to Deal setup</button></>
+                  <button onClick={() => setStep(0)} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'var(--color-brand)', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Go to Deal setup</button></>
                 )}
               </div>
             ) : (
@@ -1299,7 +1299,7 @@ function DealsDashboardInner() {
                 from the list, from a bookmark, and bare for a new deal, and only the arrow is true in
                 all three. "Your targets" is the list page's own heading, so the link says where it
                 lands. Same treatment as GHG trends' "← Back to GHG inventory". */}
-            <a href="/dashboard/deals/list" style={{ fontSize: 13, fontWeight: 600, color: '#7425e3', textDecoration: 'none', display: 'inline-block', marginBottom: 8 }}>← Your targets</a>
+            <a href="/dashboard/deals/list" style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none', display: 'inline-block', marginBottom: 8 }}>← Your targets</a>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 4 }}>Deals & Investment</div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>ESG Deal Due Diligence</div>
           </div>

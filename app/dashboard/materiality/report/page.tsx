@@ -521,7 +521,7 @@ function ReportInner() {
         {/* ── COVER ───────────────────────────────────────────────────────── */}
         <section className="page">
           <div style={{ height: 6, background: GRAD, marginBottom: 32, borderRadius: 2 }} />
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--color-brand)', marginBottom: 12 }}>
             Prepared by ThemisIQ Compliance Inc.
           </div>
           <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '2.2rem', fontWeight: 400, lineHeight: 1.2, margin: '0 0 16px', color: '#0d0d0d' }}>
@@ -599,7 +599,7 @@ function ReportInner() {
           <div style={{ display: 'grid', gridTemplateColumns: isCsrd ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)', gap: 12, margin: '18px 0' }}>
             <Stat label="High physical risks" val={result.summary?.physicalHigh ?? 0} color="#B91C1C" bg="#FCEBEB" />
             <Stat label="High transition risks" val={result.summary?.transitionHigh ?? 0} color="var(--color-module-climate)" bg="#FEF3E2" />
-            {isCsrd && <Stat label="Topics material on both axes" val={result.summary?.topicsBothAxes ?? 0} color="#7425e3" bg="#EDE9FE" />}
+            {isCsrd && <Stat label="Topics material on both axes" val={result.summary?.topicsBothAxes ?? 0} color="var(--color-brand)" bg="var(--color-brand-wash)" />}
           </div>
           <h3 style={h3}>Key findings</h3>
           <ul style={ul}>

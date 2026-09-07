@@ -232,9 +232,9 @@ export default function PeopleDashboard() {
           const urgencyColor = fw.urgency === 'critical' ? '#B91C1C' : fw.urgency === 'high' ? 'var(--color-module-climate)' : 'var(--color-ink-muted)'
           const urgencyBg = fw.urgency === 'critical' ? '#FCEBEB' : fw.urgency === 'high' ? '#FEF3E2' : '#f8f7f5'
           return (
-            <div key={fw.id} onClick={() => toggleJurisdiction(fw.id)} style={{ border: `2px solid ${selected ? '#7425e3' : '#e8e7e4'}`, borderRadius: 12, padding: '1.25rem', cursor: 'pointer', background: selected ? '#fff' : '#f8f7f5', transition: 'all 0.15s' }}>
+            <div key={fw.id} onClick={() => toggleJurisdiction(fw.id)} style={{ border: `2px solid ${selected ? 'var(--color-brand)' : '#e8e7e4'}`, borderRadius: 12, padding: '1.25rem', cursor: 'pointer', background: selected ? '#fff' : '#f8f7f5', transition: 'all 0.15s' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                <div style={{ width: 18, height: 18, borderRadius: 4, border: `1.5px solid ${selected ? '#7425e3' : '#e8e7e4'}`, background: selected ? '#7425e3' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                <div style={{ width: 18, height: 18, borderRadius: 4, border: `1.5px solid ${selected ? 'var(--color-brand)' : '#e8e7e4'}`, background: selected ? 'var(--color-brand)' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
                   {selected && <span style={{ color: '#fff', fontSize: 10, fontWeight: 700 }}>✓</span>}
                 </div>
                 <div>
@@ -299,7 +299,7 @@ export default function PeopleDashboard() {
             {b.name || `Band ${i + 1}`}
           </button>
         ))}
-        <button onClick={addBand} style={{ fontSize: 12, padding: '7px 14px', borderRadius: 8, background: 'none', border: '0.5px solid #7425e3', color: '#7425e3', cursor: 'pointer' }}>+ Add band</button>
+        <button onClick={addBand} style={{ fontSize: 12, padding: '7px 14px', borderRadius: 8, background: 'none', border: '0.5px solid var(--color-brand)', color: 'var(--color-brand)', cursor: 'pointer' }}>+ Add band</button>
       </div>
       <div style={{ border: '1px solid #e8e7e4', borderRadius: 12, padding: '1.5rem' }}>
         <div style={{ marginBottom: 12 }}>
@@ -548,7 +548,7 @@ export default function PeopleDashboard() {
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2.5rem', overflowX: 'auto' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex' }}>
           {STEP_NAMES.map((name, i) => (
-            <button key={i} onClick={() => setStep(i)} style={{ padding: '14px 16px', fontSize: 12, fontWeight: step === i ? 600 : 400, color: step === i ? '#0d0d0d' : 'var(--color-ink-muted)', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? '#7425e3' : 'transparent'}`, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s' }}>
+            <button key={i} onClick={() => setStep(i)} style={{ padding: '14px 16px', fontSize: 12, fontWeight: step === i ? 600 : 400, color: step === i ? '#0d0d0d' : 'var(--color-ink-muted)', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? 'var(--color-brand)' : 'transparent'}`, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s' }}>
               {i + 1}. {name}
             </button>
           ))}

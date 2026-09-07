@@ -48,7 +48,7 @@ import {
   type Overall, type RegisterSubTopic,
 } from '../../../../../../lib/materiality/register'
 
-const PURPLE = '#7425e3'
+const BRAND = 'var(--color-brand)'
 const GREEN = '#0F6E56'
 const GREEN_BG = '#E1F5EE'
 const AMBER = 'var(--color-module-climate)'
@@ -85,7 +85,7 @@ function Disclosure({ summary, children, tone = 'plain' }:
                     { summary: string; children: React.ReactNode; tone?: 'plain' | 'quiet' }) {
   return (
     <details style={{ marginTop: 10 }}>
-      <summary style={{ cursor: 'pointer', fontSize: 12, color: tone === 'quiet' ? MUTE : PURPLE,
+      <summary style={{ cursor: 'pointer', fontSize: 12, color: tone === 'quiet' ? MUTE : BRAND,
                         listStyle: 'revert' }}>{summary}</summary>
       <div style={{ marginTop: 10 }}>{children}</div>
     </details>
@@ -479,10 +479,10 @@ export default function WorksheetRegister() {
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: '2rem' }}>
 
         <div style={{ marginBottom: 16, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          <Link href="/dashboard/materiality/worksheet" style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>← All worksheets</Link>
-          <Link href={`/dashboard/materiality/worksheet/${assessmentId}`} style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>Assign and chase</Link>
-          <Link href={`/dashboard/materiality/worksheet/${assessmentId}/determinations`} style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>Determinations</Link>
-          <Link href={`/dashboard/materiality/worksheet/${assessmentId}/iro-1`} style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>IRO-1 disclosure</Link>
+          <Link href="/dashboard/materiality/worksheet" style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>← All worksheets</Link>
+          <Link href={`/dashboard/materiality/worksheet/${assessmentId}`} style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>Assign and chase</Link>
+          <Link href={`/dashboard/materiality/worksheet/${assessmentId}/determinations`} style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>Determinations</Link>
+          <Link href={`/dashboard/materiality/worksheet/${assessmentId}/iro-1`} style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>IRO-1 disclosure</Link>
         </div>
 
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: INK }}>
@@ -547,7 +547,7 @@ export default function WorksheetRegister() {
 
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
                 {register.triggers_active.map(t => (
-                  <Chip key={t} text={TRIGGER_LABEL[t] || t} fg={PURPLE} bg="#f1e7fd" />
+                  <Chip key={t} text={TRIGGER_LABEL[t] || t} fg={BRAND} bg="var(--color-brand-wash)" />
                 ))}
               </div>
 
@@ -595,8 +595,8 @@ export default function WorksheetRegister() {
                           </span>
                           <Chip text={e.kind === 'stakeholder_high' ? 'Respondents flagged it'
                                                                    : 'Your assessment flagged it'}
-                                fg={e.kind === 'stakeholder_high' ? PURPLE : GREEN}
-                                bg={e.kind === 'stakeholder_high' ? '#f1e7fd' : GREEN_BG} />
+                                fg={e.kind === 'stakeholder_high' ? BRAND : GREEN}
+                                bg={e.kind === 'stakeholder_high' ? 'var(--color-brand-wash)' : GREEN_BG} />
                         </div>
 
                         {/* ⚠️ TWO FACTS, SIDE BY SIDE. No verdict, no adjective, and no third

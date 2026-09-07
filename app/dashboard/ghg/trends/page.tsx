@@ -212,7 +212,7 @@ export default function TrendsPage() {
 
   return (
     <div style={{ padding: '2rem', maxWidth: 960, margin: '0 auto' }}>
-      <a href="/dashboard/ghg?view=list" style={{ fontSize: 13, fontWeight: 600, color: '#7425e3', textDecoration: 'none', display: 'inline-block', marginBottom: 12 }}>← Back to GHG inventory</a>
+      <a href="/dashboard/ghg?view=list" style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none', display: 'inline-block', marginBottom: 12 }}>← Back to GHG inventory</a>
       <h1 style={{ fontFamily: 'var(--font-display)', marginBottom: 4 }}>GHG Trends</h1>
       <p style={{ color: '#666', fontSize: 13, marginBottom: 20 }}>
         Emissions over time by scope. Location-based Scope 2.
@@ -228,7 +228,7 @@ export default function TrendsPage() {
 
       {!loading && result && !result.error && result.series.length === 0 && (
         <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.5rem', color: '#555553', fontSize: 14 }}>
-          No inventories yet — <a href="/dashboard/ghg?view=list" style={{ color: '#7425e3', fontWeight: 600, textDecoration: 'none' }}>create a GHG inventory</a> to see trends.
+          No inventories yet — <a href="/dashboard/ghg?view=list" style={{ color: 'var(--color-brand)', fontWeight: 600, textDecoration: 'none' }}>create a GHG inventory</a> to see trends.
         </div>
       )}
 

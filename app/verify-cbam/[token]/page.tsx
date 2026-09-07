@@ -199,11 +199,11 @@ export default function CbamVerifierPage() {
 
           <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: '#555553', lineHeight: 1.6, marginBottom: 12, cursor: 'pointer' }}>
             <input type="checkbox" checked={tosChecked} onChange={e => setTosChecked(e.target.checked)} style={{ marginTop: 3, flexShrink: 0 }} />
-            <span>I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: '#7425e3', textDecoration: 'underline' }}>Terms of Service</a></span>
+            <span>I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-brand)', textDecoration: 'underline' }}>Terms of Service</a></span>
           </label>
           <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: '#555553', lineHeight: 1.6, marginBottom: '1.5rem', cursor: 'pointer' }}>
             <input type="checkbox" checked={privacyChecked} onChange={e => setPrivacyChecked(e.target.checked)} style={{ marginTop: 3, flexShrink: 0 }} />
-            <span>I agree to the <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#7425e3', textDecoration: 'underline' }}>Privacy Policy</a></span>
+            <span>I agree to the <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-brand)', textDecoration: 'underline' }}>Privacy Policy</a></span>
           </label>
 
           <button
@@ -455,7 +455,7 @@ function DocRow({ doc, token }: { doc: { id: string; file_name: string; document
         {manualUrl && (
           <span style={{ fontSize: 11, color: '#92400e' }}>
             {VERIFIER_DOC_TAB_DID_NOT_OPEN}{' '}
-            <a href={manualUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#7425e3', textDecoration: 'underline' }}>Open document</a>
+            <a href={manualUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-brand)', textDecoration: 'underline' }}>Open document</a>
           </span>
         )}
         <button
@@ -802,7 +802,7 @@ function ReportBody({ data, token, history, historyLoading }: { data: VerifierRe
 // "Access expires" clause is deliberately omitted (no date fabricated).
 function ReadOnlyBanner() {
   return (
-    <div style={{ background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.25)', borderRadius: 10, padding: '10px 16px', marginBottom: '1.5rem', fontSize: 12, color: '#7425e3', fontWeight: 500 }}>
+    <div style={{ background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 25%, transparent)', borderRadius: 10, padding: '10px 16px', marginBottom: '1.5rem', fontSize: 12, color: 'var(--color-brand)', fontWeight: 500 }}>
       Read-only verifier view · You are reviewing a CBAM Specific Embedded Emissions (SEE) summary shared for independent verification
     </div>
   )

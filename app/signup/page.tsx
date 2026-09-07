@@ -59,7 +59,7 @@ export default function SignupPage() {
           <p style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, fontWeight: 400, marginBottom: '1.5rem' }}>
             We've sent a confirmation link to <strong>{form.email}</strong>. Click the link to activate your account and start your free assessment.
           </p>
-          <a href="/login" style={{ fontSize: 13, color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Back to sign in →</a>
+          <a href="/login" style={{ fontSize: 13, color: 'var(--color-brand)', textDecoration: 'none', fontWeight: 500 }}>Back to sign in →</a>
         </div>
       </div>
     )
@@ -73,7 +73,7 @@ export default function SignupPage() {
         <a href="/" style={{ textDecoration: 'none' }}>
           <img src="/logo.png" alt="ThemisIQ" style={{ height: 24, width: 'auto', display: 'block' }} />
         </a>
-        <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Already have an account? <a href="/login" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Sign in →</a></span>
+        <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Already have an account? <a href="/login" style={{ color: 'var(--color-brand)', textDecoration: 'none', fontWeight: 500 }}>Sign in →</a></span>
       </nav>
 
       {/* MAIN */}
@@ -142,7 +142,7 @@ export default function SignupPage() {
           </div>
 
           <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: 13, color: 'var(--color-ink-muted)' }}>
-            Already have an account? <a href="/login" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Sign in →</a>
+            Already have an account? <a href="/login" style={{ color: 'var(--color-brand)', textDecoration: 'none', fontWeight: 500 }}>Sign in →</a>
           </p>
 
         </div>

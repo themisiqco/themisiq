@@ -192,7 +192,7 @@ function BulletItem({ text }: { text: string }) {
   const parts = text.split(':')
   return (
     <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-      <span style={{ color: '#7425e3', flexShrink: 0, marginTop: 2 }}>•</span>
+      <span style={{ color: 'var(--color-brand)', flexShrink: 0, marginTop: 2 }}>•</span>
       <span style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.65 }}>
         {parts.length > 1 ? <><strong style={{ color: '#0d0d0d', fontWeight: 500 }}>{parts[0]}:</strong>{parts.slice(1).join(':')}</> : text}
       </span>
@@ -200,5 +200,5 @@ function BulletItem({ text }: { text: string }) {
   )
 }
 
-const eyebrow: React.CSSProperties = { fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 5 }
+const eyebrow: React.CSSProperties = { fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-brand)', marginBottom: 5 }
 const body: React.CSSProperties = { fontSize: 13.5, color: '#555553', lineHeight: 1.8, fontWeight: 400, marginBottom: '0.9rem' }

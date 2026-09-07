@@ -519,8 +519,8 @@ export default function Scope3Dashboard() {
           <input style={inputStyle} type="number" value={revenue || ''} onChange={e => setRevenue(Number(e.target.value))} placeholder="0" />
         </div>
       </div>
-      <div style={{ marginTop: 20, background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.2)', borderRadius: 10, padding: '1rem' }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#7425e3', marginBottom: 4 }}>GHG Protocol Scope 3 Standard</div>
+      <div style={{ marginTop: 20, background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 20%, transparent)', borderRadius: 10, padding: '1rem' }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', marginBottom: 4 }}>GHG Protocol Scope 3 Standard</div>
         <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>ThemisIQ follows the GHG Protocol Corporate Value Chain (Scope 3) Accounting and Reporting Standard. You must report all material categories and explain exclusions.</div>
       </div>
     </div>
@@ -530,7 +530,7 @@ export default function Scope3Dashboard() {
     <div>
       <h2 style={sectionHead}>Materiality screening</h2>
       <p style={sectionSub}>ThemisIQ has identified the Scope 3 categories likely to be material for a {sector || 'company'} based on GHG Protocol guidance. Review and confirm.</p>
-      <div style={{ background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.2)', borderRadius: 10, padding: '0.75rem 1rem', marginBottom: 16, fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
+      <div style={{ background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 20%, transparent)', borderRadius: 10, padding: '0.75rem 1rem', marginBottom: 16, fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
         These are suggestions, not limits — <strong>click any category to add or remove it</strong>. Under the GHG Protocol you may include any category you judge material, and you must briefly justify any you exclude. Tap a category in the Calculate step for what it means and where to find the data.
       </div>
 
@@ -550,14 +550,14 @@ export default function Scope3Dashboard() {
                   const included = catData[cat.id]?.included ?? materialCats.includes(cat.num)
                   const isMaterial = (SECTOR_MATERIAL[sector] || []).includes(cat.num)
                   return (
-                    <div key={cat.id} onClick={() => toggleCat(cat.num)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', border: `1.5px solid ${included ? '#7425e3' : '#e8e7e4'}`, borderRadius: 10, cursor: 'pointer', background: included ? '#EDE9FE' : '#f8f7f5', transition: 'all 0.15s' }}>
-                      <div style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${included ? '#7425e3' : '#e8e7e4'}`, background: included ? '#7425e3' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div key={cat.id} onClick={() => toggleCat(cat.num)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', border: `1.5px solid ${included ? 'var(--color-brand)' : '#e8e7e4'}`, borderRadius: 10, cursor: 'pointer', background: included ? 'var(--color-brand-wash)' : '#f8f7f5', transition: 'all 0.15s' }}>
+                      <div style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${included ? 'var(--color-brand)' : '#e8e7e4'}`, background: included ? 'var(--color-brand)' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         {included && <span style={{ color: '#fff', fontSize: 9, fontWeight: 700 }}>✓</span>}
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-ink-muted)', minWidth: 40 }}>Cat {cat.num}</span>
-                          <span style={{ fontSize: 13, fontWeight: included ? 600 : 400, color: included ? '#7425e3' : '#0d0d0d' }}>{cat.name}</span>
+                          <span style={{ fontSize: 13, fontWeight: included ? 600 : 400, color: included ? 'var(--color-brand)' : '#0d0d0d' }}>{cat.name}</span>
                           {isMaterial && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: '#E1F5EE', color: '#0F6E56' }}>LIKELY MATERIAL</span>}
                           {cat.num === 15 && (() => {
                             const c15 = catData['cat15']
@@ -609,7 +609,7 @@ export default function Scope3Dashboard() {
                 {(cat as any).guidance && (
                   <div style={{ borderBottom: '0.5px solid #e8e7e4' }}>
                     <button onClick={() => setOpenInfo(p => ({ ...p, [cat.id]: !p[cat.id] }))} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 16px', background: '#fafafa', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: '#7425e3', display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 15, borderRadius: '50%', border: '1px solid #7425e3', fontSize: 9, fontWeight: 700 }}>i</span> What this is &amp; where to find the data</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-brand)', display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 15, borderRadius: '50%', border: '1px solid var(--color-brand)', fontSize: 9, fontWeight: 700 }}>i</span> What this is &amp; where to find the data</span>
                       <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{openInfo[cat.id] ? '▲' : '▼'}</span>
                     </button>
                     {openInfo[cat.id] && (
@@ -650,10 +650,10 @@ export default function Scope3Dashboard() {
                       </div>
                     </>}
                     <div style={{ gridColumn: '1 / -1', background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 6 }}>Pull from Supplier Portal</div>
+                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--color-brand)', marginBottom: 6 }}>Pull from Supplier Portal</div>
                       <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginBottom: 10 }}>Bring in primary Cat 1 data you collected from suppliers. Supplier-allocated emissions are used directly; suppliers without an allocated figure are estimated from the spend you recorded (sector default). You review the full breakdown before it is applied.</div>
                       {campaigns.length === 0 ? (
-                        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>No supplier campaigns found. <a href="/dashboard/supply-chain/portal" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 600 }}>Create one in the Supplier Portal →</a></div>
+                        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>No supplier campaigns found. <a href="/dashboard/supply-chain/portal" style={{ color: 'var(--color-brand)', textDecoration: 'none', fontWeight: 600 }}>Create one in the Supplier Portal →</a></div>
                       ) : (
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                           {campaigns.length > 1 && (
@@ -866,7 +866,7 @@ export default function Scope3Dashboard() {
                           </div>
                         )
                       })}
-                      <button onClick={addPcafAsset} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: 'none', border: '0.5px solid #7425e3', color: '#7425e3', cursor: 'pointer', alignSelf: 'flex-start' }}>+ Add holding</button>
+                      <button onClick={addPcafAsset} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: 'none', border: '0.5px solid var(--color-brand)', color: 'var(--color-brand)', cursor: 'pointer', alignSelf: 'flex-start' }}>+ Add holding</button>
                       {(() => {
                         const c15 = catData['cat15']
                         if (!c15) return null
@@ -1191,7 +1191,7 @@ export default function Scope3Dashboard() {
                 <div style={{ fontSize: 11, color: '#0F6E56', lineHeight: 1.6 }}><strong>GHG Protocol Scope 3 Standard</strong><br />All 15 categories · Spend-based + activity-based + primary data</div>
               </div>
               <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '0.75rem' }}>
-                <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.6 }}>Need supplier emissions data? <a href="/dashboard/supply-chain/portal" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 600 }}>Use the Supplier Portal →</a></div>
+                <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.6 }}>Need supplier emissions data? <a href="/dashboard/supply-chain/portal" style={{ color: 'var(--color-brand)', textDecoration: 'none', fontWeight: 600 }}>Use the Supplier Portal →</a></div>
               </div>
             </div>
           )}

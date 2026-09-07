@@ -15,7 +15,7 @@ const muted = '#555553'
 const faint = 'var(--color-ink-muted)'
 const canvas = '#f8f7f5'
 const hair = '#e8e7e4'
-const violet = '#7425e3'
+const BRAND = 'var(--color-brand)'
 const green = '#0F6E56'
 
 // ── Illustrative sample data — a plausible non-EU steel installation ──
@@ -120,7 +120,7 @@ function ItemSection({ n, title, children }: { n: string; title: string; childre
   return (
     <div style={{ marginBottom: '2.25rem' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: '0.75rem' }}>
-        <span style={{ fontFamily: 'Georgia, serif', fontSize: 13, color: violet }}>{n}</span>
+        <span style={{ fontFamily: 'Georgia, serif', fontSize: 13, color: BRAND }}>{n}</span>
         <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 400, color: ink }}>{title}</h3>
       </div>
       {children}
@@ -137,7 +137,7 @@ export default function Page() {
       {/* SAMPLE FRAMING — unmistakable that this is illustrative */}
       <section style={{ padding: '4rem 2.5rem 2.5rem', borderBottom: `0.5px solid ${hair}`, background: canvas }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
-          <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: violet, background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.25)', borderRadius: 99, padding: '4px 12px', marginBottom: 16 }}>Sample report · Illustrative example</span>
+          <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: BRAND, background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 25%, transparent)', borderRadius: 99, padding: '4px 12px', marginBottom: 16 }}>Sample report · Illustrative example</span>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1rem', color: ink }}>
             What your verified CBAM report looks like
           </h1>
@@ -241,8 +241,8 @@ export default function Page() {
                 {/* SEE RESULT — the headline figure the block builds to. Direct intensity
                     only: for an Annex II good, indirect is reported separately and is not
                     part of the certificate obligation (matches the engine + §1.2 report). */}
-                <div style={{ background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.2)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: violet, marginBottom: 4 }}>Specific embedded emissions (SEE)</div>
+                <div style={{ background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 20%, transparent)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: BRAND, marginBottom: 4 }}>Specific embedded emissions (SEE)</div>
                   <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.9rem', fontWeight: 400, color: ink, lineHeight: 1 }}>{n3(g.specificDirect)} <span style={{ fontSize: 13, color: faint }}>tCO₂e / tonne</span></div>
                   <div style={{ fontSize: 12, color: muted, marginTop: 10, lineHeight: 1.55 }}>
                     Indirect emissions: not applicable — Annex II good, direct emissions only.
@@ -266,7 +266,7 @@ export default function Page() {
             ))}
             <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 12, padding: '10px 0', fontSize: 13, alignItems: 'baseline', marginTop: 2 }}>
               <div style={{ color: ink, fontWeight: 600 }}>Installation total (tCO₂e)</div>
-              <div style={{ color: violet, fontWeight: 600 }}>{n0(installationDirectTotal)}</div>
+              <div style={{ color: BRAND, fontWeight: 600 }}>{n0(installationDirectTotal)}</div>
             </div>
           </ItemSection>
 

@@ -705,7 +705,7 @@ export default function AssessPage() {
             return (
               <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, marginTop: 10 }}>
                 Start with{' '}
-                <a href={modulesHref(start)} style={{ color: '#7425e3', fontWeight: 500, textDecoration: 'none' }}>
+                <a href={modulesHref(start)} style={{ color: 'var(--color-brand)', fontWeight: 500, textDecoration: 'none' }}>
                   {modulesLabel(start)}{priced ? ` · ${priceLabel(modulesPrice(start))}` : ''} →
                 </a>
               </p>
@@ -767,7 +767,7 @@ export default function AssessPage() {
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' as const, marginBottom: 10 }}>
                           <span style={{ fontSize: 11, color: 'var(--color-ink-muted)', flexShrink: 0 }}>Answered by</span>
                           {ob.obligationId ? (
-                            <a href={obligationHref(ob.obligationId)} style={{ fontSize: 12, fontWeight: 500, color: '#7425e3', textDecoration: 'none' }}>
+                            <a href={obligationHref(ob.obligationId)} style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-brand)', textDecoration: 'none' }}>
                               {obligationModuleLabel(ob.obligationId)} · {priceLabel(obligationPrice(ob.obligationId))} →
                             </a>
                           ) : (
@@ -867,7 +867,7 @@ export default function AssessPage() {
                   which is why refusing is right — if it ever does, something upstream is wrong, and
                   the honest response is to record nothing rather than to invent an index whose
                   REVENUE_VALUES lookup is undefined. */}
-              <input type="range" min={0} max={REVENUE_INDICES.length - 1} value={val as number ?? 5} onChange={e => { const i = asRevenueIndex(Number(e.target.value)); if (i === null) return; setAnswers(a => ({ ...a, revenue: i })) }} style={{ width: '100%', accentColor: '#7425e3' }} />
+              <input type="range" min={0} max={REVENUE_INDICES.length - 1} value={val as number ?? 5} onChange={e => { const i = asRevenueIndex(Number(e.target.value)); if (i === null) return; setAnswers(a => ({ ...a, revenue: i })) }} style={{ width: '100%', accentColor: 'var(--color-brand)' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4 }}>
                 <span>Under $50M</span><span>$10B+</span>
               </div>
@@ -877,8 +877,8 @@ export default function AssessPage() {
           {q.type === 'options' && (
             <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
               {q.options?.map(opt => (
-                <div key={opt.value} onClick={() => setAnswers(a => ({ ...a, [q.id]: opt.value }))} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', border: `0.5px solid ${val === opt.value ? '#7425e3' : '#e8e7e4'}`, borderRadius: 10, cursor: 'pointer', background: val === opt.value ? 'rgba(116,37,227,0.04)' : '#fff' }}>
-                  <div style={{ width: 18, height: 18, borderRadius: '50%', border: `1.5px solid ${val === opt.value ? '#7425e3' : '#e8e7e4'}`, background: val === opt.value ? '#7425e3' : 'none', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div key={opt.value} onClick={() => setAnswers(a => ({ ...a, [q.id]: opt.value }))} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', border: `0.5px solid ${val === opt.value ? 'var(--color-brand)' : '#e8e7e4'}`, borderRadius: 10, cursor: 'pointer', background: val === opt.value ? 'color-mix(in srgb, var(--color-brand) 4%, transparent)' : '#fff' }}>
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', border: `1.5px solid ${val === opt.value ? 'var(--color-brand)' : '#e8e7e4'}`, background: val === opt.value ? 'var(--color-brand)' : 'none', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {val === opt.value && <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff' }} />}
                   </div>
                   <div>
@@ -895,8 +895,8 @@ export default function AssessPage() {
               {q.options?.map(opt => {
                 const isSel = multiVal.includes(opt.value)
                 return (
-                  <div key={opt.value} onClick={() => { const cur = (answers[q.id] as string[] | undefined) || []; setAnswers(a => ({ ...a, [q.id]: cur.includes(opt.value) ? cur.filter(v => v !== opt.value) : [...cur, opt.value] })) }} style={{ padding: '12px 14px', border: `0.5px solid ${isSel ? '#7425e3' : '#e8e7e4'}`, borderRadius: 10, cursor: 'pointer', background: isSel ? 'rgba(116,37,227,0.04)' : '#fff', position: 'relative' as const }}>
-                    <div style={{ position: 'absolute' as const, top: 10, right: 10, width: 18, height: 18, borderRadius: 4, border: `1.5px solid ${isSel ? '#7425e3' : '#e8e7e4'}`, background: isSel ? '#7425e3' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div key={opt.value} onClick={() => { const cur = (answers[q.id] as string[] | undefined) || []; setAnswers(a => ({ ...a, [q.id]: cur.includes(opt.value) ? cur.filter(v => v !== opt.value) : [...cur, opt.value] })) }} style={{ padding: '12px 14px', border: `0.5px solid ${isSel ? 'var(--color-brand)' : '#e8e7e4'}`, borderRadius: 10, cursor: 'pointer', background: isSel ? 'color-mix(in srgb, var(--color-brand) 4%, transparent)' : '#fff', position: 'relative' as const }}>
+                    <div style={{ position: 'absolute' as const, top: 10, right: 10, width: 18, height: 18, borderRadius: 4, border: `1.5px solid ${isSel ? 'var(--color-brand)' : '#e8e7e4'}`, background: isSel ? 'var(--color-brand)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       {isSel && <span style={{ color: '#fff', fontSize: 11 }}>✓</span>}
                     </div>
                     <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 3, paddingRight: 24 }}>{opt.label}</div>

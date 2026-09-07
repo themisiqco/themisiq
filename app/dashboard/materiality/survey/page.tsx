@@ -340,7 +340,7 @@ export default function SurveyRounds() {
                         {r.deadline && ` · deadline ${new Date(r.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`}
                       </div>
                     </div>
-                    <div style={{ fontSize: 12, color: '#7425e3', flexShrink: 0 }}>Open →</div>
+                    <div style={{ fontSize: 12, color: 'var(--color-brand)', flexShrink: 0 }}>Open →</div>
                   </div>
                 </Link>
               )
@@ -349,7 +349,7 @@ export default function SurveyRounds() {
         )}
 
         <div style={{ marginTop: 28, textAlign: 'center', fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.7 }}>
-          <Link href="/dashboard/climate-risk" style={{ color: '#7425e3', textDecoration: 'none' }}>← Climate Risk &amp; Materiality</Link>
+          <Link href="/dashboard/climate-risk" style={{ color: 'var(--color-brand)', textDecoration: 'none' }}>← Climate Risk &amp; Materiality</Link>
         </div>
       </div>
     </div>

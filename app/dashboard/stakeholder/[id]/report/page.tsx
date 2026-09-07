@@ -62,7 +62,7 @@ import { buildBoardReport, standardVersionLabel,
 import type { Determination, Overall, RegisterSubTopic }
   from '../../../../../lib/materiality/register'
 
-const PURPLE = '#7425e3'
+const BRAND = 'var(--color-brand)'
 const AMBER = 'var(--color-module-climate)'
 const AMBER_BG = '#FEF3E2'
 const BLUE = '#0C447C'
@@ -676,9 +676,9 @@ export default function StakeholderBoardReport() {
     <Shell>
       <div style={{ marginBottom: 16, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
         <Link href={`/dashboard/materiality/worksheet/${assessmentId}`}
-              style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>← Worksheet</Link>
+              style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>← Worksheet</Link>
         <Link href={`/dashboard/materiality/worksheet/${assessmentId}/register`}
-              style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>Where views differ</Link>
+              style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>Where views differ</Link>
       </div>
 
       <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: INK }}>

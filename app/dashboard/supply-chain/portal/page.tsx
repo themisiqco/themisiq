@@ -187,7 +187,7 @@ export default function SupplierPortalDashboard() {
               const pct = c.supplier_count ? Math.round(((c.completed_count || 0) / c.supplier_count) * 100) : 0
               return (
                 <div key={c.id} onClick={() => router.push(`/dashboard/supply-chain/portal/${c.id}`)} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '1.5rem', cursor: 'pointer', transition: 'all 0.15s' }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = '#7425e3'}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--color-brand)'}
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = '#e8e7e4'}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 12 }}>
                     <div>

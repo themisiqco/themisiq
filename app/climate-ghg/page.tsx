@@ -117,7 +117,7 @@ export default function Page() {
       <section style={{ background: '#f8f7f5', borderBottom: '0.5px solid #e8e7e4', padding: '2.5rem' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', flexWrap: 'wrap' as const, alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
           <div style={{ maxWidth: 640 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: '#7425e3', marginBottom: 6 }}>Just been asked for your carbon footprint?</div>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-brand)', marginBottom: 6 }}>Just been asked for your carbon footprint?</div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.3 }}>See exactly how it works — from your bills to a submittable report.</div>
             <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginTop: 8 }}>A step-by-step walkthrough, transparent pricing, and answers to every question — whether the request comes from a customer, an investor, your board, or a regulator.</p>
           </div>

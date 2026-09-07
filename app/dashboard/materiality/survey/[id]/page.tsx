@@ -268,10 +268,10 @@ export default function SurveyProgress() {
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '2rem' }}>
 
         <div style={{ marginBottom: 16, display: 'flex', gap: 16 }}>
-          <Link href="/dashboard/materiality/survey" style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none' }}>← All survey rounds</Link>
-          <Link href={`/dashboard/materiality/survey/${roundId}/scope`} style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none' }}>Topics in scope</Link>
-          <Link href={`/dashboard/materiality/survey/${roundId}/respondents`} style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none' }}>Respondents</Link>
-          <Link href={`/dashboard/materiality/survey/${roundId}/results`} style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none' }}>Results</Link>
+          <Link href="/dashboard/materiality/survey" style={{ fontSize: 12, color: 'var(--color-brand)', textDecoration: 'none' }}>← All survey rounds</Link>
+          <Link href={`/dashboard/materiality/survey/${roundId}/scope`} style={{ fontSize: 12, color: 'var(--color-brand)', textDecoration: 'none' }}>Topics in scope</Link>
+          <Link href={`/dashboard/materiality/survey/${roundId}/respondents`} style={{ fontSize: 12, color: 'var(--color-brand)', textDecoration: 'none' }}>Respondents</Link>
+          <Link href={`/dashboard/materiality/survey/${roundId}/results`} style={{ fontSize: 12, color: 'var(--color-brand)', textDecoration: 'none' }}>Results</Link>
         </div>
 
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: '#0d0d0d' }}>{round?.name}</div>

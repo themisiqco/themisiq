@@ -22,7 +22,7 @@
 
 import { NO_VISIBILITY_LABEL, type ScaleDefinition } from '../../lib/materiality/severityScale'
 
-const PURPLE = '#7425e3'
+const BRAND = 'var(--color-brand)'
 const INK = '#0d0d0d'
 const MID = '#555553'
 const MUTE = 'var(--color-ink-muted)'
@@ -80,12 +80,12 @@ export function Option({ selected, onClick, badge, label, body }: {
     <button type="button" onClick={onClick}
             style={{ display: 'flex', gap: 12, alignItems: 'flex-start', textAlign: 'left',
                      width: '100%', padding: '11px 14px', borderRadius: 10,
-                     border: `1px solid ${selected ? PURPLE : LINE}`,
-                     background: selected ? '#f4ecfe' : '#fff', cursor: 'pointer' }}>
+                     border: `1px solid ${selected ? BRAND : LINE}`,
+                     background: selected ? 'var(--color-brand-wash)' : '#fff', cursor: 'pointer' }}>
       <span style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 6, fontSize: 11.5,
                      fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                     background: selected ? PURPLE : PAPER, color: selected ? '#fff' : MID,
-                     border: `1px solid ${selected ? PURPLE : LINE}` }}>{badge}</span>
+                     background: selected ? BRAND : PAPER, color: selected ? '#fff' : MID,
+                     border: `1px solid ${selected ? BRAND : LINE}` }}>{badge}</span>
       <span style={{ fontSize: 12.5, color: INK, lineHeight: 1.7 }}>
         {label && <strong>{label}. </strong>}{body}
       </span>

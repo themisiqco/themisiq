@@ -325,7 +325,7 @@ export default function RespondentImport() {
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '2rem' }}>
 
         <div style={{ marginBottom: 16, display: 'flex', gap: 16 }}>
-          <Link href={`/dashboard/materiality/survey/${roundId}/respondents`} style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none' }}>← Respondents</Link>
+          <Link href={`/dashboard/materiality/survey/${roundId}/respondents`} style={{ fontSize: 12, color: 'var(--color-brand)', textDecoration: 'none' }}>← Respondents</Link>
         </div>
 
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: '#0d0d0d' }}>Import a list</div>
@@ -388,7 +388,7 @@ export default function RespondentImport() {
                 uploadBoxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
                 setTimeout(() => chooseBtnRef.current?.focus(), 400)
               }}
-              style={{ marginTop: 10, fontSize: 12, color: '#7425e3', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+              style={{ marginTop: 10, fontSize: 12, color: 'var(--color-brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
               Filled it in? Upload it below ↓
             </button>
           )}
@@ -399,7 +399,7 @@ export default function RespondentImport() {
           )}
 
           <details style={{ marginTop: 14 }}>
-            <summary style={{ fontSize: 12, color: '#7425e3', cursor: 'pointer' }}>The {reference.length} stakeholder categories, and what each is asked</summary>
+            <summary style={{ fontSize: 12, color: 'var(--color-brand)', cursor: 'pointer' }}>The {reference.length} stakeholder categories, and what each is asked</summary>
             <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
               {reference.map(r => (
                 <div key={r.code} style={{ display: 'flex', gap: 10, fontSize: 12, color: '#555553', padding: '4px 0', borderBottom: '0.5px solid #f3f2f0' }}>
@@ -582,7 +582,7 @@ export default function RespondentImport() {
                 <button onClick={() => { setRows(null); setSelected(new Set()); setLastBulk(null); setFileName('') }} style={btn}>Start over</button>
                 {unassigned.length > 0 && ready.length > 0 && !closed && (
                   <button onClick={confirm} disabled={creating}
-                    style={{ fontSize: 12, color: '#7425e3', background: 'none', border: 'none', padding: '0 6px', cursor: creating ? 'not-allowed' : 'pointer', textDecoration: 'underline' }}>
+                    style={{ fontSize: 12, color: 'var(--color-brand)', background: 'none', border: 'none', padding: '0 6px', cursor: creating ? 'not-allowed' : 'pointer', textDecoration: 'underline' }}>
                     Create the {ready.length} that {ready.length === 1 ? 'is' : 'are'} ready and come back for the {unassigned.length}
                   </button>
                 )}

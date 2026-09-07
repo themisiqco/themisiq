@@ -54,7 +54,7 @@ export default function Home() {
           <div key={i} style={{ padding: '1.75rem 1rem', textAlign: 'center', borderRight: i < 4 ? '0.5px solid #e8e7e4' : 'none' }}>
             {val === 'deadlines' ? (
               <a href="/assess" style={{ textDecoration: 'none', display: 'block' }}>
-                <div style={{ fontSize: 12, color: '#7425e3', fontWeight: 600, lineHeight: 1.4, marginBottom: 4 }}>Check your compliance deadlines →</div>
+                <div style={{ fontSize: 12, color: 'var(--color-brand)', fontWeight: 600, lineHeight: 1.4, marginBottom: 4 }}>Check your compliance deadlines →</div>
                 <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{label}</div>
               </a>
             ) : (
@@ -185,7 +185,7 @@ export default function Home() {
               ['Data lineage', 'A clear boundary between your inputs and platform reference defaults — what assurance needs to see.'],
               ['Limitations & notice', 'Where the screening ends and formal assessment begins, with a formal Important Notice on every report.'],
             ].map(([title, desc]) => (
-              <div key={title} style={{ background: 'rgba(255,255,255,0.03)', borderLeft: '2px solid rgba(116,37,227,0.6)', borderRadius: '0 10px 10px 0', padding: '1rem 1.25rem' }}>
+              <div key={title} style={{ background: 'rgba(255,255,255,0.03)', borderLeft: '2px solid color-mix(in srgb, var(--color-brand) 60%, transparent)', borderRadius: '0 10px 10px 0', padding: '1rem 1.25rem' }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginBottom: 4 }}>{title}</div>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, fontWeight: 400 }}>{desc}</div>
               </div>

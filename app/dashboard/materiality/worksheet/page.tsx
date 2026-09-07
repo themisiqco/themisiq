@@ -21,7 +21,7 @@ import { PAYWALL_HREF, PAYWALL_TITLE, PAYWALL_WORKSHEET_INDEX } from '@/lib/payw
 import { supabase } from '../../../../lib/supabase'
 import { useEntitlement } from '../../../../lib/useEntitlement'
 
-const PURPLE = '#7425e3'
+const BRAND = 'var(--color-brand)'
 const GREEN = '#0F6E56'
 const GREEN_BG = '#E1F5EE'
 const AMBER = 'var(--color-module-climate)'
@@ -121,8 +121,8 @@ export default function WorksheetIndex() {
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '2rem' }}>
 
         <div style={{ marginBottom: 16, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          <Link href="/dashboard/climate-risk" style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>← Climate Risk &amp; Materiality</Link>
-          <Link href="/dashboard/materiality/survey" style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>Stakeholder surveys</Link>
+          <Link href="/dashboard/climate-risk" style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>← Climate Risk &amp; Materiality</Link>
+          <Link href="/dashboard/materiality/survey" style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>Stakeholder surveys</Link>
         </div>
 
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: INK }}>Impact worksheet</div>
@@ -143,7 +143,7 @@ export default function WorksheetIndex() {
         {rows.length > 0 && (
           <div style={{ marginBottom: 16 }}>
             <Link href="/dashboard/materiality/assessment/new"
-                  style={{ fontSize: 12.5, fontWeight: 600, color: PURPLE, textDecoration: 'none' }}>
+                  style={{ fontSize: 12.5, fontWeight: 600, color: BRAND, textDecoration: 'none' }}>
               + New assessment
             </Link>
           </div>
@@ -194,7 +194,7 @@ export default function WorksheetIndex() {
                       {/* Beside the version label deliberately: this is where a customer notices it
                           is wrong, and until 22 Aug 2026 there was nowhere to go from here. */}
                       <Link href={`/dashboard/materiality/assessment/${r.id}/edit`}
-                            style={{ color: PURPLE, textDecoration: 'none' }}>Edit</Link>
+                            style={{ color: BRAND, textDecoration: 'none' }}>Edit</Link>
                     </div>
                   </div>
 

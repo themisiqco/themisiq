@@ -37,7 +37,7 @@ import {
 // form asks the identical question with the identical controls. See the component's header.
 import { ScaleField, Question, Options, Option } from '../../components/severityFields'
 
-const PURPLE = '#7425e3'
+const BRAND = 'var(--color-brand)'
 const GREEN = '#0F6E56'
 const GREEN_BG = '#E1F5EE'
 const AMBER = 'var(--color-module-climate)'
@@ -633,8 +633,8 @@ function Block({ code, dir, draft, saving, error, note, onNature, onChange, onEd
                         onClick={() => onChange(code, dir, {
                           vcp: on ? draft.vcp.filter(x => x !== v.code) : [...draft.vcp, v.code] })}
                         style={{ fontSize: 12.5, padding: '8px 14px', borderRadius: 999,
-                                 border: `1px solid ${on ? PURPLE : LINE}`,
-                                 background: on ? '#f4ecfe' : '#fff', color: on ? PURPLE : MID,
+                                 border: `1px solid ${on ? BRAND : LINE}`,
+                                 background: on ? 'var(--color-brand-wash)' : '#fff', color: on ? BRAND : MID,
                                  cursor: 'pointer', fontWeight: on ? 600 : 400 }}>
                   {v.label}
                 </button>
@@ -662,8 +662,8 @@ function Block({ code, dir, draft, saving, error, note, onNature, onChange, onEd
                 <button key={h.code} type="button"
                         onClick={() => onChange(code, dir, { horizon: on ? null : h.code })}
                         style={{ fontSize: 12.5, padding: '8px 14px', borderRadius: 999,
-                                 border: `1px solid ${on ? PURPLE : LINE}`,
-                                 background: on ? '#f4ecfe' : '#fff', color: on ? PURPLE : MID,
+                                 border: `1px solid ${on ? BRAND : LINE}`,
+                                 background: on ? 'var(--color-brand-wash)' : '#fff', color: on ? BRAND : MID,
                                  cursor: 'pointer', fontWeight: on ? 600 : 400 }}>
                   {h.label}
                 </button>

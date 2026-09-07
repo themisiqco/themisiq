@@ -191,8 +191,8 @@ const METHODOLOGIES = [
   },
   {
     module: 'Climate Risk & Materiality',
-    color: '#7425e3',
-    bg: '#EDE9FE',
+    color: 'var(--color-brand)',
+    bg: 'var(--color-brand-wash)',
     standard: 'IFRS S2 single materiality · CSRD ESRS double materiality · IPCC AR6 · TCFD',
     sections: [
       {
@@ -232,8 +232,8 @@ const METHODOLOGIES = [
   },
   {
     module: 'Supply Chain & Sustainable Procurement',
-    color: '#7425e3',
-    bg: '#EDE9FE',
+    color: 'var(--color-brand)',
+    bg: 'var(--color-brand-wash)',
     standard: 'GHG Protocol Scope 3 · CS3D · EcoVadis Framework',
     sections: [
       {

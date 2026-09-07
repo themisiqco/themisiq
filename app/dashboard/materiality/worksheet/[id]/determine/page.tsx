@@ -47,7 +47,7 @@ import { ScaleField, Question, Options, Option } from '../../../../../components
 import { DistBar, Counters, pct, medianText, type Overall }
   from '../../../../../components/surveyEvidence'
 
-const PURPLE = '#7425e3'
+const BRAND = 'var(--color-brand)'
 const GREEN = '#0F6E56'
 const AMBER = 'var(--color-module-climate)'
 const AMBER_BG = '#FEF3E2'
@@ -567,8 +567,8 @@ export default function LeadDetermine() {
       <div style={{ maxWidth: 1080, margin: '0 auto', padding: '2rem' }}>
 
         <div style={{ marginBottom: 16, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          <Link href={`/dashboard/materiality/worksheet/${assessmentId}`} style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>← Assign and chase</Link>
-          <Link href={`/dashboard/materiality/worksheet/${assessmentId}/determinations`} style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>All determinations</Link>
+          <Link href={`/dashboard/materiality/worksheet/${assessmentId}`} style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>← Assign and chase</Link>
+          <Link href={`/dashboard/materiality/worksheet/${assessmentId}/determinations`} style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>All determinations</Link>
         </div>
 
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: INK }}>
@@ -637,7 +637,7 @@ export default function LeadDetermine() {
                     {/* Only a NAMED IRO is labelled. The sub-topic's own row is titled above it
                         already, and labelling it a second time would read as a second thing. */}
                     {u.iro_key !== '' && (
-                      <div style={{ fontSize: 13, fontWeight: 600, color: PURPLE, margin: '14px 0 8px' }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: BRAND, margin: '14px 0 8px' }}>
                         {u.name}
                         <span style={{ fontSize: 11, color: MUTE, fontWeight: 400 }}>
                           {' '}· IRO under {headingFor(s.subtopic_code).code || s.subtopic_code}
@@ -727,7 +727,7 @@ export default function LeadDetermine() {
             <div style={{ fontSize: 13, color: MID, lineHeight: 1.8 }}>
               Every sub-topic in scope is assigned to a colleague. What they conclude appears on{' '}
               <Link href={`/dashboard/materiality/worksheet/${assessmentId}/determinations`}
-                    style={{ color: PURPLE }}>the determinations screen</Link>.
+                    style={{ color: BRAND }}>the determinations screen</Link>.
             </div>
           </div>
         )}
@@ -904,7 +904,7 @@ function EvidencePanel({ ev, contrast, hasRound, aggFailed, floor, contrastCavea
             <strong style={{ color: INK }}>{pct(o.top_box.share)}</strong> of those who answered say
             this needs significant focus ({o.top_box.numerator} of {o.top_box.denominator})
             {' · '}median {medianText(o)}
-            {o.polarised && <> · <strong style={{ color: PURPLE }}>the room is split</strong></>}
+            {o.polarised && <> · <strong style={{ color: BRAND }}>the room is split</strong></>}
           </div>
         </>
       )}
@@ -1068,9 +1068,9 @@ const Pills = ({ items, on, onClick }: {
     {items.map(i => (
       <button key={i.code} type="button" onClick={() => onClick(i.code)}
               style={{ fontSize: 12.5, padding: '8px 14px', borderRadius: 999,
-                       border: `1px solid ${on(i.code) ? PURPLE : LINE}`,
-                       background: on(i.code) ? '#f4ecfe' : '#fff',
-                       color: on(i.code) ? PURPLE : MID, cursor: 'pointer',
+                       border: `1px solid ${on(i.code) ? BRAND : LINE}`,
+                       background: on(i.code) ? 'var(--color-brand-wash)' : '#fff',
+                       color: on(i.code) ? BRAND : MID, cursor: 'pointer',
                        fontWeight: on(i.code) ? 600 : 400 }}>{i.label}</button>
     ))}
   </div>

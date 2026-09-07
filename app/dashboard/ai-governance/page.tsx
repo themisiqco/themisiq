@@ -297,8 +297,8 @@ export default function AIGovernanceDashboard() {
           </select>
         </div>
       </div>
-      <div style={{ marginTop: 20, background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.2)', borderRadius: 10, padding: '1rem' }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#7425e3', marginBottom: 4 }}>EU AI Act — global scope</div>
+      <div style={{ marginTop: 20, background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 20%, transparent)', borderRadius: 10, padding: '1rem' }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', marginBottom: 4 }}>EU AI Act — global scope</div>
         <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>The EU AI Act applies to any organisation whose AI systems affect EU residents — regardless of where the company is based. A US company using CV screening for EU job applicants is in scope.</div>
       </div>
     </div>
@@ -327,8 +327,8 @@ export default function AIGovernanceDashboard() {
       {/* Add system buttons */}
       {addMode === null && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: '1.5rem' }}>
-          <button onClick={() => setAddMode('library')} style={{ padding: '1rem', borderRadius: 12, background: 'color-mix(in srgb, var(--color-brand) 5%, transparent)', border: '1.5px solid #7425e3', cursor: 'pointer', textAlign: 'left' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#7425e3', marginBottom: 4 }}>Choose from library →</div>
+          <button onClick={() => setAddMode('library')} style={{ padding: '1rem', borderRadius: 12, background: 'color-mix(in srgb, var(--color-brand) 5%, transparent)', border: '1.5px solid var(--color-brand)', cursor: 'pointer', textAlign: 'left' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-brand)', marginBottom: 4 }}>Choose from library →</div>
             <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.5 }}>34 common AI systems with auto-classification. Pick yours in seconds.</div>
           </button>
           <button onClick={addManual} style={{ padding: '1rem', borderRadius: 12, background: '#f8f7f5', border: '1px solid #e8e7e4', cursor: 'pointer', textAlign: 'left' }}>
@@ -340,7 +340,7 @@ export default function AIGovernanceDashboard() {
 
       {/* Library picker */}
       {addMode === 'library' && (
-        <div style={{ border: '1.5px solid #7425e3', borderRadius: 14, overflow: 'hidden', marginBottom: '1.5rem' }}>
+        <div style={{ border: '1.5px solid var(--color-brand)', borderRadius: 14, overflow: 'hidden', marginBottom: '1.5rem' }}>
           <div style={{ background: 'var(--color-brand)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>AI System Library</div>
             <button onClick={() => setAddMode(null)} style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', background: 'none', border: 'none', cursor: 'pointer' }}>✕ Close</button>
@@ -381,7 +381,7 @@ export default function AIGovernanceDashboard() {
             )}
           </div>
           <div style={{ padding: '10px 16px', background: '#f8f7f5', borderTop: '0.5px solid #e8e7e4' }}>
-            <button onClick={addManual} style={{ fontSize: 12, color: '#7425e3', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}>Can't find yours? Add a custom system →</button>
+            <button onClick={addManual} style={{ fontSize: 12, color: 'var(--color-brand)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}>Can't find yours? Add a custom system →</button>
           </div>
         </div>
       )}
@@ -452,7 +452,7 @@ export default function AIGovernanceDashboard() {
               {inventory.systems.length > 0 && (
                 <button onClick={() => removeSystem(activeSystem)} style={{ fontSize: 11, color: '#B91C1C', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Remove this system</button>
               )}
-              <button onClick={() => setAddMode('library')} style={{ fontSize: 11, color: '#7425e3', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 500 }}>+ Add another system from library</button>
+              <button onClick={() => setAddMode('library')} style={{ fontSize: 11, color: 'var(--color-brand)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 500 }}>+ Add another system from library</button>
             </div>
           </div>
         </div>
@@ -612,7 +612,7 @@ export default function AIGovernanceDashboard() {
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2.5rem', overflowX: 'auto' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex' }}>
           {STEP_NAMES.map((name, i) => (
-            <button key={i} onClick={() => setStep(i)} style={{ padding: '14px 16px', fontSize: 12, fontWeight: step === i ? 600 : 400, color: step === i ? '#0d0d0d' : 'var(--color-ink-muted)', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? '#7425e3' : 'transparent'}`, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <button key={i} onClick={() => setStep(i)} style={{ padding: '14px 16px', fontSize: 12, fontWeight: step === i ? 600 : 400, color: step === i ? '#0d0d0d' : 'var(--color-ink-muted)', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? 'var(--color-brand)' : 'transparent'}`, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               {i + 1}. {name}
             </button>
           ))}
@@ -652,8 +652,8 @@ export default function AIGovernanceDashboard() {
                   <div style={{ fontSize: 11, color: '#B91C1C', lineHeight: 1.6 }}>{highRisk} high-risk system{highRisk > 1 ? 's' : ''} require conformity assessment from {HIGH_RISK_BOTH_DATES}</div>
                 </div>
               )}
-              <div style={{ background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.15)', borderRadius: 10, padding: '0.75rem' }}>
-                <div style={{ fontSize: 11, color: '#7425e3', lineHeight: 1.6 }}><strong>EU AI Act · {AI_ACT_CITATION}</strong><br />High-risk obligations from {HIGH_RISK_BOTH_DATES}</div>
+              <div style={{ background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 15%, transparent)', borderRadius: 10, padding: '0.75rem' }}>
+                <div style={{ fontSize: 11, color: 'var(--color-brand)', lineHeight: 1.6 }}><strong>EU AI Act · {AI_ACT_CITATION}</strong><br />High-risk obligations from {HIGH_RISK_BOTH_DATES}</div>
               </div>
             </div>
           )}

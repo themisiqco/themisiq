@@ -29,14 +29,14 @@ import type { CSSProperties } from 'react'
 export const EV_BLUE = '#0C447C'
 export const EV_AMBER = 'var(--color-module-climate)'
 export const EV_AMBER_BG = '#FEF3E2'
-export const EV_PURPLE = '#7425e3'
+export const EV_BRAND = 'var(--color-brand)'
 export const EV_INK = '#0d0d0d'
 export const EV_MID = '#555553'
 export const EV_MUTE = 'var(--color-ink-muted)'
 export const EV_LINE = '#e8e7e4'
 export const EV_PAPER = '#f8f7f5'
 
-const PURPLE = EV_PURPLE
+const BRAND = EV_BRAND
 const BLUE = EV_BLUE
 const AMBER = EV_AMBER
 const INK = EV_INK
@@ -57,7 +57,7 @@ export const BANDS = [
     full: 'Existing programs are sufficient; continuous improvement is appropriate' },
   { v: '2' as const, short: 'Improvements help', bg: '#fae3c0', fg: '#8a5510',
     full: 'Existing programs are sufficient, but improvements would strengthen performance or reduce risk' },
-  { v: '3' as const, short: 'Significant focus', bg: PURPLE,    fg: '#fff',
+  { v: '3' as const, short: 'Significant focus', bg: BRAND,    fg: '#fff',
     full: 'Existing programs need significant strategic focus to close gaps, reduce risk or capture opportunity' },
 ]
 

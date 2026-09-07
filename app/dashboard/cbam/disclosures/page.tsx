@@ -278,7 +278,7 @@ export default function CbamDisclosuresPage() {
           <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>No installations yet</div>
           <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, fontWeight: 400 }}>
             Disclosures are recorded for each installation and reporting period, so you&rsquo;ll need to add an installation first. You can do that in{' '}
-            <a href="/dashboard/cbam/setup" style={{ color: '#7425e3', textDecoration: 'underline' }}>setup</a>, then come back here.
+            <a href="/dashboard/cbam/setup" style={{ color: 'var(--color-brand)', textDecoration: 'underline' }}>setup</a>, then come back here.
           </div>
         </div>
       </div>
@@ -469,8 +469,8 @@ export default function CbamDisclosuresPage() {
       )}
 
       {/* ── The attestation — visually distinct, NOT a DisclosureQuestion ── */}
-      <div style={{ marginTop: '2.5rem', border: '1.5px solid #7425e3', borderRadius: 12, padding: '1.5rem', background: '#faf7ff' }}>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#7425e3', marginBottom: 8 }}>Declaration — legal weight</div>
+      <div style={{ marginTop: '2.5rem', border: '1.5px solid var(--color-brand)', borderRadius: 12, padding: '1.5rem', background: 'var(--color-brand-wash)' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-brand)', marginBottom: 8 }}>Declaration — legal weight</div>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 10 }}>Process-set completeness attestation</div>
         <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, fontWeight: 400, marginBottom: '1rem' }}>
           This is a declaration, not a factual disclosure. Attesting that the process set is complete is an assertion — under the reasonable-assurance standard — that the production processes recorded for <strong>this installation and reporting period</strong> are the complete set. It gates §1.2 items 5 and 6 (installation-level total direct and indirect emissions): <strong>those totals cannot be reported without this attestation</strong>, because a partial sum must never be presented as an installation-level total. It is unset until you act — never pre-selected.

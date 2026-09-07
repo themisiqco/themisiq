@@ -76,7 +76,7 @@ export default function ResetPasswordPage() {
         <a href="/" style={{ textDecoration: 'none' }}>
           <img src="/logo.png" alt="ThemisIQ" style={{ height: 24, width: 'auto', display: 'block' }} />
         </a>
-        <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}><a href="/login" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Back to sign in →</a></span>
+        <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}><a href="/login" style={{ color: 'var(--color-brand)', textDecoration: 'none', fontWeight: 500 }}>Back to sign in →</a></span>
       </nav>
 
       {/* MAIN */}
@@ -101,7 +101,7 @@ export default function ResetPasswordPage() {
                 <div style={{ background: '#FCEBEB', border: '0.5px solid rgba(185,28,28,0.2)', borderRadius: 8, padding: '12px 16px', marginBottom: '1rem' }}>
                   <p style={{ fontSize: 13, color: '#B91C1C', margin: 0 }}>This reset link is invalid or has expired.</p>
                 </div>
-                <a href="/forgot-password" style={{ fontSize: 14, color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Request a new link →</a>
+                <a href="/forgot-password" style={{ fontSize: 14, color: 'var(--color-brand)', textDecoration: 'none', fontWeight: 500 }}>Request a new link →</a>
               </div>
             )}
 
@@ -160,7 +160,7 @@ export default function ResetPasswordPage() {
           </div>
 
           <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: 13, color: 'var(--color-ink-muted)' }}>
-            <a href="/login" style={{ color: '#7425e3', textDecoration: 'none', fontWeight: 500 }}>Back to sign in →</a>
+            <a href="/login" style={{ color: 'var(--color-brand)', textDecoration: 'none', fontWeight: 500 }}>Back to sign in →</a>
           </p>
 
         </div>

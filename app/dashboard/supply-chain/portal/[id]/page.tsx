@@ -362,7 +362,7 @@ export default function CampaignDetail() {
                     <div style={{ fontSize: 13, fontWeight: 500 }}>
                       <Link
                         href={`/dashboard/supply-chain/portal/${id}/supplier/${s.id}`}
-                        style={{ color: '#7425e3', textDecoration: 'none', cursor: 'pointer' }}
+                        style={{ color: 'var(--color-brand)', textDecoration: 'none', cursor: 'pointer' }}
                         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.textDecoration = 'underline' }}
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.textDecoration = 'none' }}
                       >

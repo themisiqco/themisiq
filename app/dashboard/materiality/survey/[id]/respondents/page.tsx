@@ -263,8 +263,8 @@ export default function SurveyRespondents() {
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '2rem' }}>
 
         <div style={{ marginBottom: 18, display: 'flex', gap: 16 }}>
-          <Link href="/dashboard/materiality/survey" style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none' }}>← All survey rounds</Link>
-          <Link href={`/dashboard/materiality/survey/${roundId}/scope`} style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none' }}>Topics in scope</Link>
+          <Link href="/dashboard/materiality/survey" style={{ fontSize: 12, color: 'var(--color-brand)', textDecoration: 'none' }}>← All survey rounds</Link>
+          <Link href={`/dashboard/materiality/survey/${roundId}/scope`} style={{ fontSize: 12, color: 'var(--color-brand)', textDecoration: 'none' }}>Topics in scope</Link>
         </div>
 
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: '#0d0d0d' }}>Who is being asked</div>
@@ -303,7 +303,7 @@ export default function SurveyRespondents() {
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#0d0d0d' }}>Add a respondent</div>
             {/* The one-at-a-time form below is unchanged; this only points at the bulk paths. */}
             <Link href={`/dashboard/materiality/survey/${roundId}/respondents/import`}
-              style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none' }}>
+              style={{ fontSize: 12, color: 'var(--color-brand)', textDecoration: 'none' }}>
               Import a list instead →
             </Link>
           </div>
@@ -338,7 +338,7 @@ export default function SurveyRespondents() {
             </select>
             {!showAll && hiddenCount > 0 && (
               <button onClick={() => setShowAll(true)}
-                style={{ marginLeft: 10, fontSize: 12, color: '#7425e3', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                style={{ marginLeft: 10, fontSize: 12, color: 'var(--color-brand)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                 Show {hiddenCount} more categories
               </button>
             )}

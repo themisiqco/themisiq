@@ -192,7 +192,14 @@ const STYLES = `
     --serif: Georgia, 'Times New Roman', serif;
     --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --ink:#0d0d0d; --mid:#555553; --light:var(--color-ink-muted); --surface:#f8f7f5; --border:#e8e7e4;
-    --violet:#7425e3; --sky:#1fb1ff; --lime:#64fe3e;
+    /* --sky:#1fb1ff and --lime:#64fe3e were declared here with zero consumers. They were the
+       cyan and green stops of the retired violet→cyan→green brand gradient, left behind when
+       --violet (now --brand) became the only one anything used. Deleted rather than kept
+       "in case", for the GRADIENT_STOPS reason in lib/pdf/layout.ts: an unused declaration in
+       the old palette is a loaded gun — the next person to want an accent here reaches for the
+       named variable that already exists, and re-seeds the retired brand without deciding to.
+       Both are also illegible as type on white (2.23:1 and 1.24:1). */
+    --brand:var(--color-brand);
     --green:#0F6E56; --green-tint:#E1F5EE;
     --grad: var(--color-brand);
     font-family:var(--sans); font-weight:400; color:var(--ink);
@@ -258,7 +265,7 @@ const STYLES = `
   .tiq .trigger-card{
     background:#fff; border:0.5px solid var(--border); border-radius:14px; padding:24px;
   }
-  .tiq .trigger-card .tag{font-size:11px; font-weight:500; letter-spacing:.1em; text-transform:uppercase; color:var(--violet);}
+  .tiq .trigger-card .tag{font-size:11px; font-weight:500; letter-spacing:.1em; text-transform:uppercase; color:var(--brand);}
   .tiq .trigger-card h3{font-size:18px; margin:10px 0 8px;}
   .tiq .trigger-card p{font-size:14px; color:var(--mid);}
 
@@ -287,7 +294,7 @@ const STYLES = `
   .tiq .vstep:first-child .vnum{background:var(--ink); color:#fff; border-color:var(--ink);}
   .tiq .vstep:first-child .vnum::after{
     content:''; position:absolute; inset:-4px; border-radius:50%;
-    border:1.5px solid rgba(116,37,227,.32);
+    border:1.5px solid color-mix(in srgb, var(--color-brand) 32%, transparent);
   }
   .tiq .vstep-body{padding-top:4px;}
   .tiq .vstep-title{font-family:var(--serif); font-size:20px; color:var(--ink); margin-bottom:6px;}
@@ -295,11 +302,11 @@ const STYLES = `
   .tiq .vstep-desc strong{font-weight:500; color:var(--ink);}
   .tiq .vstep .hint{
     display:inline-flex; align-items:center; gap:6px; margin-top:12px;
-    font-size:12px; color:var(--violet); background:#fff;
+    font-size:12px; color:var(--brand); background:#fff;
     border:0.5px solid var(--border); border-radius:999px; padding:5px 12px;
   }
   .tiq .vstep .hint a{color:inherit; text-decoration:underline; text-underline-offset:2px;}
-  .tiq .vstep-desc a{color:var(--violet); text-decoration:underline; text-underline-offset:2px;}
+  .tiq .vstep-desc a{color:var(--brand); text-decoration:underline; text-underline-offset:2px;}
   .tiq .how-cta{display:flex; gap:12px; margin-top:44px; flex-wrap:wrap;}
   /* live-calc mini visual */
   .tiq .calcchips{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:14px;}
@@ -342,7 +349,7 @@ const STYLES = `
   .tiq details.qa[open] summary::after{content:'\\2013'; transform:translateY(1px);}
   .tiq details.qa .qa-body{padding:0 40px 24px 0; font-size:15px; color:var(--mid); max-width:72ch;}
   .tiq details.qa .qa-body strong{font-weight:500; color:var(--ink);}
-  .tiq details.qa .qa-body a{color:var(--violet); text-decoration:underline; text-underline-offset:2px;}
+  .tiq details.qa .qa-body a{color:var(--brand); text-decoration:underline; text-underline-offset:2px;}
   .tiq details.qa .qa-body a:hover{color:var(--ink);}
   .tiq .qa-body p{margin:12px 0 0;}
   .tiq .qa-body .qa-subhead{font-family:var(--serif); font-size:16px; color:var(--ink); margin:18px 0 2px;}
@@ -375,7 +382,7 @@ const STYLES = `
     .tiq .btn:hover{transform:none;}
     .tiq details.qa summary::after{transition:none;}
   }
-  .tiq :focus-visible{outline:2px solid var(--violet); outline-offset:3px; border-radius:4px;}
+  .tiq :focus-visible{outline:2px solid var(--brand); outline-offset:3px; border-radius:4px;}
 
   /* hero footnote */
   .tiq .hero-foot{font-size:12px; color:var(--light); margin-top:14px; max-width:66ch; line-height:1.5;}

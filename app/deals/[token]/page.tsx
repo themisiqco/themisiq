@@ -51,7 +51,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       </div>
       <div style={{ maxWidth: 860, margin: '0 auto', padding: '1.5rem 1.5rem 4rem' }}>{children}</div>
       <div style={{ borderTop: '0.5px solid #e8e7e4', padding: '1.5rem', textAlign: 'center', fontSize: 11, color: 'var(--color-ink-muted)' }}>
-        Prepared via ThemisIQ · <a href="/" style={{ color: '#7425e3', textDecoration: 'none' }}>themisiq.co</a> · Indicative assessment — requires specialist confirmation.
+        Prepared via ThemisIQ · <a href="/" style={{ color: 'var(--color-brand)', textDecoration: 'none' }}>themisiq.co</a> · Indicative assessment — requires specialist confirmation.
       </div>
     </div>
   )
@@ -184,7 +184,7 @@ export default function DealAssessmentPage() {
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, marginBottom: 10 }}>Applicable frameworks</h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {frameworks.map(fw => (
-              <span key={fw} style={{ fontSize: 12, fontWeight: 500, padding: '5px 12px', borderRadius: 99, background: '#EDE9FE', color: '#7425e3', border: '0.5px solid rgba(116,37,227,0.2)' }}>{fw}</span>
+              <span key={fw} style={{ fontSize: 12, fontWeight: 500, padding: '5px 12px', borderRadius: 99, background: 'var(--color-brand-wash)', color: 'var(--color-brand)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 20%, transparent)' }}>{fw}</span>
             ))}
           </div>
         </section>

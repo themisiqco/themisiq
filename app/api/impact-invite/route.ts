@@ -36,7 +36,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthedClient, bearerFrom, AuthError } from '../../../lib/supabaseAuthed'
-import { INK_MUTED } from '@/lib/brand'
+import { BRAND, INK_MUTED } from '@/lib/brand'
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY!
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'noreply@themisiq.co'
@@ -75,7 +75,7 @@ const shell = (inner: string) => `<!DOCTYPE html>
     </div>
     <div style="padding:32px;">${inner}</div>
     <div style="background:#f8f7f5;border-top:0.5px solid #e8e7e4;padding:16px 32px;text-align:center;">
-      <div style="font-size:11px;color:${INK_MUTED};">Powered by <a href="https://www.themisiq.co" style="color:#7425e3;text-decoration:none;">ThemisIQ</a></div>
+      <div style="font-size:11px;color:${INK_MUTED};">Powered by <a href="https://www.themisiq.co" style="color:${BRAND};text-decoration:none;">ThemisIQ</a></div>
     </div>
   </div>
 </body></html>`
@@ -85,7 +85,7 @@ const cta = (url: string, label: string) => `
     <a href="${url}" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#7425e3,#1fb1ff);color:#fff;font-size:14px;font-weight:600;text-decoration:none;border-radius:10px;">${label} →</a>
   </div>
   <p style="margin:0 0 8px;color:${INK_MUTED};font-size:12px;line-height:1.6;">Or copy this link into your browser:</p>
-  <p style="margin:0 0 24px;font-size:11px;color:#7425e3;word-break:break-all;">${url}</p>`
+  <p style="margin:0 0 24px;font-size:11px;color:${BRAND};word-break:break-all;">${url}</p>`
 
 const asDate = (d: string) =>
   new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })

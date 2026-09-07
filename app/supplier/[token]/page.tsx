@@ -104,7 +104,7 @@ export default function SupplierQuestionnaire() {
         </div>
         <div style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>{campaignSupplier?.supplier_name} · {campaignSupplier?.supplier_email}</div>
         <div style={{ marginTop: 24, padding: '1rem', background: '#f8f7f5', borderRadius: 10, fontSize: 12, color: 'var(--color-ink-muted)' }}>
-          Powered by <a href="https://www.themisiq.co" style={{ color: '#7425e3', textDecoration: 'none' }}>ThemisIQ</a> · www.themisiq.co
+          Powered by <a href="https://www.themisiq.co" style={{ color: 'var(--color-brand)', textDecoration: 'none' }}>ThemisIQ</a> · www.themisiq.co
         </div>
       </div>
     </div>
@@ -259,7 +259,7 @@ export default function SupplierQuestionnaire() {
 
         <div style={{ marginTop: 24, textAlign: 'center', fontSize: 12, color: 'var(--color-ink-muted)' }}>
           Your responses are saved automatically as you go. You can return to this link to continue or update your responses.
-          <br />Powered by <a href="https://www.themisiq.co" style={{ color: '#7425e3', textDecoration: 'none' }}>ThemisIQ</a>
+          <br />Powered by <a href="https://www.themisiq.co" style={{ color: 'var(--color-brand)', textDecoration: 'none' }}>ThemisIQ</a>
         </div>
       </div>
     </div>

@@ -388,7 +388,7 @@ export default function SurveyScope() {
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '2rem' }}>
 
         <div style={{ marginBottom: 18 }}>
-          <Link href="/dashboard/materiality/survey" style={{ fontSize: 12, color: '#7425e3', textDecoration: 'none' }}>← All survey rounds</Link>
+          <Link href="/dashboard/materiality/survey" style={{ fontSize: 12, color: 'var(--color-brand)', textDecoration: 'none' }}>← All survey rounds</Link>
         </div>
 
         {/* ⚠️ THE FREEZE, SOFT-LOCKED AND EXPLAINED. Silent absence of a control is the failure mode

@@ -29,7 +29,7 @@ import {
   type Iro1Field, type Iro1FieldKey, type Iro1FieldState, type Iro1Row,
 } from '../../../../../../lib/materiality/iro1'
 
-const PURPLE = '#7425e3'
+const BRAND = 'var(--color-brand)'
 const GREEN = '#0F6E56'
 const GREEN_BG = '#E1F5EE'
 const BLUE = '#0C447C'
@@ -226,9 +226,9 @@ export default function Iro1Page() {
       <div style={{ maxWidth: 820, margin: '0 auto', padding: '2rem' }}>
 
         <div style={{ marginBottom: 16, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          <Link href="/dashboard/materiality/worksheet" style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>← All worksheets</Link>
-          <Link href={`/dashboard/materiality/worksheet/${assessmentId}`} style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>Assign and chase</Link>
-          <Link href={`/dashboard/materiality/worksheet/${assessmentId}/determinations`} style={{ fontSize: 12, color: PURPLE, textDecoration: 'none' }}>Determinations</Link>
+          <Link href="/dashboard/materiality/worksheet" style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>← All worksheets</Link>
+          <Link href={`/dashboard/materiality/worksheet/${assessmentId}`} style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>Assign and chase</Link>
+          <Link href={`/dashboard/materiality/worksheet/${assessmentId}/determinations`} style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>Determinations</Link>
         </div>
 
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: INK }}>
@@ -258,7 +258,7 @@ export default function Iro1Page() {
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12,
                             alignItems: 'baseline', flexWrap: 'wrap' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
-                              textTransform: 'uppercase', color: PURPLE }}>{f.limb}</div>
+                              textTransform: 'uppercase', color: BRAND }}>{f.limb}</div>
                 <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.06em',
                                color: chip.fg, background: chip.bg, border: `0.5px solid color-mix(in srgb, ${chip.fg} 20%, transparent)`,
                                borderRadius: 999, padding: '3px 10px' }}>{chip.text}</span>

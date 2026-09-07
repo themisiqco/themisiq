@@ -64,7 +64,7 @@ export default function Page() {
               { val: hrStatVal, unit: hrYear, label: `High-risk obligations for stand-alone systems; ${AI_ACT_HIGH_RISK_EMBEDDED} where the AI is inside a regulated product`, color: '#B91C1C', bg: '#FCEBEB' },
               // 'Stand-alone', not 'Annex III': this was the only annex citation on a public marketing
               // page, and the tile beside it already says "stand-alone systems". Same register.
-              { val: 'Stand-alone', unit: 'high-risk', label: 'HR, hiring, credit, education AI — full conformity assessment required', color: '#7425e3', bg: '#EDE9FE' },
+              { val: 'Stand-alone', unit: 'high-risk', label: 'HR, hiring, credit, education AI — full conformity assessment required', color: 'var(--color-brand)', bg: 'var(--color-brand-wash)' },
               { val: '€35M', unit: 'or 7%', label: 'maximum EU AI Act fine for prohibited AI practices', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
               { val: 'Feb 2025', unit: 'active', label: 'prohibited AI practices already banned — manipulation, social scoring, real-time biometrics', color: '#0F6E56', bg: '#E1F5EE' },
             ].map(({ val, unit, label, color, bg }) => (
@@ -200,7 +200,7 @@ export default function Page() {
           {[
             { date: 'Feb 2, 2025', status: 'Active', label: 'Prohibited AI', desc: 'Manipulation, social scoring, real-time biometric surveillance in public spaces, and emotion recognition in workplaces banned. Non-compliance: fines up to €35M or 7% global revenue.', color: '#B91C1C', bg: '#FCEBEB' },
             { date: 'May 2, 2025', status: 'Active', label: 'GPAI obligations', desc: 'General Purpose AI models (GPT-4-class and above) subject to transparency, copyright, and systemic risk provisions. GPAI providers must publish technical documentation.', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
-            { date: AI_ACT_HIGH_RISK_STANDALONE, status: 'Prepare now', label: 'High-risk AI (Annex III)', desc: 'Stand-alone high-risk systems under Article 6(2) — HR, hiring, credit, education, essential services AI. Full conformity assessment, Article 11 documentation, EU database registration required. Fines up to €15M or 3% global revenue.', color: '#7425e3', bg: '#EDE9FE' },
+            { date: AI_ACT_HIGH_RISK_STANDALONE, status: 'Prepare now', label: 'High-risk AI (Annex III)', desc: 'Stand-alone high-risk systems under Article 6(2) — HR, hiring, credit, education, essential services AI. Full conformity assessment, Article 11 documentation, EU database registration required. Fines up to €15M or 3% global revenue.', color: 'var(--color-brand)', bg: 'var(--color-brand-wash)' },
             // Annex I, not Annex III: the products limb is Article 6(1), which reaches AI as a safety
             // component of goods already covered by EU product-safety law and lists those instruments
             // in Annex I. The card previously said "Annex II" and described the obligations as Annex III.

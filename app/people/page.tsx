@@ -47,7 +47,7 @@ export default function Page() {
             {[
               { val: '5%', unit: 'gap trigger', label: 'EU Pay Transparency — gaps above 5% require mandatory joint pay assessment', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
 { val: 'Jun 2027', unit: 'first report', label: 'EU pay-gap reporting — employers 150+', color: '#B91C1C', bg: '#FCEBEB' },
-              { val: 'ESRS S1', unit: 'active now', label: 'large EU companies reporting on own workforce from FY2024', color: '#7425e3', bg: '#EDE9FE' },
+              { val: 'ESRS S1', unit: 'active now', label: 'large EU companies reporting on own workforce from FY2024', color: 'var(--color-brand)', bg: 'var(--color-brand-wash)' },
               { val: '100+', unit: 'CA employees', label: 'triggers California Pay Data Reporting Act — annual DFEH submission', color: '#0F6E56', bg: '#E1F5EE' },
             ].map(({ val, unit, label, color, bg }) => (
               <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid color-mix(in srgb, ${color} 13%, transparent)` }}>
@@ -115,7 +115,7 @@ export default function Page() {
                   <div style={{ padding: '12px 16px', fontSize: 13, color: '#0d0d0d', fontWeight: 400 }}>{feature}</div>
                   <div style={{ padding: '12px 16px', fontSize: 13, textAlign: 'center' as const }}>{renderVal(big)}</div>
                   <div style={{ padding: '12px 16px', fontSize: 13, textAlign: 'center' as const }}>{renderVal(specialist)}</div>
-                  <div style={{ padding: '12px 16px', fontSize: 13, textAlign: 'center' as const, background: 'rgba(116,37,227,0.04)' }}>{renderVal(themis)}</div>
+                  <div style={{ padding: '12px 16px', fontSize: 13, textAlign: 'center' as const, background: 'color-mix(in srgb, var(--color-brand) 4%, transparent)' }}>{renderVal(themis)}</div>
                 </div>
               )
             })}
@@ -223,7 +223,7 @@ export default function Page() {
               { ref: 'S1-16', title: 'Pay gap', desc: 'Gender pay gap — mean and median by category' },
             ].map(({ ref, title, desc }) => (
               <div key={ref} style={{ background: '#fff', padding: '1.25rem' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#7425e3', letterSpacing: '0.06em', marginBottom: 4 }}>{ref}</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-brand)', letterSpacing: '0.06em', marginBottom: 4 }}>{ref}</div>
                 <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>{title}</div>
                 <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.4 }}>{desc}</div>
               </div>

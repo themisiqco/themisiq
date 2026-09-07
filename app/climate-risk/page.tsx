@@ -47,7 +47,7 @@ export default function Page() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
             {[
               { val: '4', unit: 'stakeholders', label: 'investors · lenders · boards · regulators', source: null, color: '#0C447C', bg: '#E6F1FB' },
-              { val: 'IFRS S2', unit: 'per jurisdiction', label: IFRS_S2_ADOPTION_COUNT, source: IFRS_S2_ADOPTION_SOURCE, color: '#7425e3', bg: '#EDE9FE' },
+              { val: 'IFRS S2', unit: 'per jurisdiction', label: IFRS_S2_ADOPTION_COUNT, source: IFRS_S2_ADOPTION_SOURCE, color: 'var(--color-brand)', bg: 'var(--color-brand-wash)' },
               { val: '3', unit: 'scenarios', label: 'IPCC pathways modelled', source: null, color: 'var(--color-module-climate)', bg: '#FEF3E2' },
               { val: '2', unit: 'risk types', label: 'physical & transition', source: null, color: '#0F6E56', bg: '#E1F5EE' },
             ].map(({ val, unit, label, source, color, bg }) => (
@@ -169,7 +169,7 @@ export default function Page() {
               reader looking for downloads to the one page that no longer has any. /materiality is
               now the Materiality Assessment module page, and the label says that. */}
           <p style={{ fontSize: 13, color: '#555553', maxWidth: 460, margin: '14px auto 0', fontWeight: 400, lineHeight: 1.6 }}>Reporting under CSRD/ESRS? The same assessment scores all ten ESRS topics on both axes from industry baselines &mdash; a first pass that scopes the work rather than doing it. It does not include the stakeholder engagement ESRS requires on the impact side.</p>
-          <a href="/materiality" style={{ display: 'inline-block', marginTop: 12, fontSize: 14, fontWeight: 600, color: '#7425e3', borderBottom: '2px solid #7425e3', paddingBottom: 3, textDecoration: 'none' }}>The Materiality Assessment module →</a>
+          <a href="/materiality" style={{ display: 'inline-block', marginTop: 12, fontSize: 14, fontWeight: 600, color: 'var(--color-brand)', borderBottom: '2px solid var(--color-brand)', paddingBottom: 3, textDecoration: 'none' }}>The Materiality Assessment module →</a>
         </div>
       </section>
 

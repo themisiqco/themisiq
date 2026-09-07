@@ -114,7 +114,7 @@ const PILL: Record<'on_track' | 'off_track' | 'best_efforts' | 'no_actual' | 'ba
   // Base year materially changed since commitment — neither pass nor fail; the grade cannot be
   // computed until the user assesses recalculation. Amber, tied to the drift note beneath it.
   baseline_review: { label: 'Review baseline',  color: 'var(--color-module-climate)', bg: '#FDF6EC' },
-  long_term:       { label: 'Long-term target', color: '#555553', bg: '#f3f0ff' },
+  long_term:       { label: 'Long-term target', color: '#555553', bg: 'var(--color-brand-wash)' },
 }
 const pillStyle = (k: keyof typeof PILL): React.CSSProperties => ({
   fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
@@ -632,7 +632,7 @@ export default function SbtiDashboard() {
       <div>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 18 }}>
           <div style={eyebrow}>Your SBTi progress</div>
-          <button onClick={onEdit} style={{ fontSize: 13, fontWeight: 600, color: '#7425e3', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>Edit targets →</button>
+          <button onClick={onEdit} style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>Edit targets →</button>
         </div>
 
         {/* NEAR-TERM — required + actual + progress badge */}
@@ -777,7 +777,7 @@ export default function SbtiDashboard() {
                 <button
                   key={s}
                   onClick={() => setStep(i)}
-                  style={{ fontSize: 12, padding: '12px 16px', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? '#7425e3' : 'transparent'}`, color: step === i ? '#7425e3' : 'var(--color-ink-muted)', cursor: 'pointer', fontWeight: step === i ? 500 : 400, whiteSpace: 'nowrap' as const }}
+                  style={{ fontSize: 12, padding: '12px 16px', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? 'var(--color-brand)' : 'transparent'}`, color: step === i ? 'var(--color-brand)' : 'var(--color-ink-muted)', cursor: 'pointer', fontWeight: step === i ? 500 : 400, whiteSpace: 'nowrap' as const }}
                 >
                   {i + 1}. {s}
                 </button>
@@ -811,7 +811,7 @@ export default function SbtiDashboard() {
                     {ghgScope12 != null && (
                       <button
                         onClick={() => { setTotalEmissions(String(Math.round(ghgScope12 * 100) / 100)); setDirty(true) }}
-                        style={{ marginTop: 6, fontSize: 11, fontWeight: 600, color: '#7425e3', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                        style={{ marginTop: 6, fontSize: 11, fontWeight: 600, color: 'var(--color-brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
                       >
                         Use GHG figure ({ghgScope12.toLocaleString(undefined, { maximumFractionDigits: 1 })} tCO₂e)
                       </button>
@@ -1006,7 +1006,7 @@ export default function SbtiDashboard() {
                           <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, marginTop: 8 }}>
                             ACA-suggested: {suggested}%
                             {Math.abs(d.reductionPct - suggested) > 0.05 && (
-                              <button onClick={() => resetToSuggested(sc)} style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: '#7425e3', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>reset to suggested</button>
+                              <button onClick={() => resetToSuggested(sc)} style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: 'var(--color-brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>reset to suggested</button>
                             )}
                           </div>
                           <div style={{ marginTop: 12, fontSize: 13 }}>
@@ -1098,7 +1098,7 @@ export default function SbtiDashboard() {
                           <div key={sc} style={cardStyle}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', fontWeight: 400 }}>{SCOPE_LABEL[sc]}</div>
-                              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#7425e3', background: '#EDE9FE', borderRadius: 99, padding: '2px 8px' }}>Net-zero</span>
+                              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-brand)', background: 'var(--color-brand-wash)', borderRadius: 99, padding: '2px 8px' }}>Net-zero</span>
                             </div>
                             {base != null && (
                               <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, marginBottom: 14 }}>

@@ -33,7 +33,7 @@ import {
 /** The address on the board report's back cover (boardReportPdf.ts:964). One address, both places. */
 const CONTACT = 'lisa.foster@themisiq.co'
 
-const PURPLE = '#7425e3'
+const BRAND = 'var(--color-brand)'
 const AMBER = 'var(--color-module-climate)'
 const AMBER_BG = '#FEF3E2'
 const FAIL = '#b42318'
@@ -51,7 +51,7 @@ const input: React.CSSProperties = {
   borderRadius: 8, outline: 'none', boxSizing: 'border-box', background: '#fff',
 }
 const hint: React.CSSProperties = { fontSize: 11, color: MUTE, marginTop: 5, lineHeight: 1.6 }
-const LINK_STYLE: React.CSSProperties = { color: PURPLE, textDecoration: 'underline' }
+const LINK_STYLE: React.CSSProperties = { color: BRAND, textDecoration: 'underline' }
 const warn: React.CSSProperties = { fontSize: 11.5, color: AMBER, marginTop: 6, lineHeight: 1.6 }
 
 export type AssessmentFormValues = {
@@ -158,11 +158,11 @@ export function AssessmentForm({
             return (
               <div key={v}
                    onClick={() => { if (pick) set({ version: v }) }}
-                   style={{ border: `1.5px solid ${sel ? PURPLE : LINE}`, borderRadius: 8,
-                            padding: '9px 12px', background: sel ? '#f6f1fe' : '#fff',
+                   style={{ border: `1.5px solid ${sel ? BRAND : LINE}`, borderRadius: 8,
+                            padding: '9px 12px', background: sel ? 'var(--color-brand-wash)' : '#fff',
                             opacity: pick ? 1 : 0.5,
                             cursor: pick ? 'pointer' : 'not-allowed' }}>
-                <div style={{ fontSize: 12, fontWeight: sel ? 600 : 500, color: sel ? PURPLE : INK }}>
+                <div style={{ fontSize: 12, fontWeight: sel ? 600 : 500, color: sel ? BRAND : INK }}>
                   {copy.l}
                 </div>
                 <div style={{ fontSize: 10.5, color: MUTE, marginTop: 1, lineHeight: 1.4 }}>{copy.d}</div>

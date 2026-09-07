@@ -227,7 +227,7 @@ function ResilienceMap({ items }: { items: any[] }) {
     const baseX = px(frac(xb)), baseY = py(frac(yb))
     const n = arr.length
     arr.forEach((it: any, i: number) => {
-      placed.push({ it, cx: baseX, cy: baseY + (i - (n - 1) / 2) * 24, color: it.kind === 'physical' ? '#C2410C' : '#7425e3' })
+      placed.push({ it, cx: baseX, cy: baseY + (i - (n - 1) / 2) * 24, color: it.kind === 'physical' ? '#C2410C' : 'var(--color-brand)' })
     })
   }
 
@@ -493,9 +493,9 @@ export default function MaterialityWizard() {
               { m: 's2' as Mode, t: 'IFRS S2', sub: 'Single (financial) materiality · resilience', d: 'How climate-related risks affect your enterprise value. Produces the multi-scenario climate resilience report — screening-level support for the resilience analysis IFRS S2 (and CSRD) call for.', feat: false },
               { m: 'csrd' as Mode, t: 'CSRD / ESRS', sub: 'Double materiality', d: 'Financial materiality plus impact materiality across all ten ESRS topics, plotted on the double-materiality matrix.', feat: true },
             ].map(o => (
-              <div key={o.m} style={{ background: '#fff', border: o.feat ? '2px solid #7425e3' : '0.5px solid #e8e7e4', borderRadius: 16, padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+              <div key={o.m} style={{ background: '#fff', border: o.feat ? '2px solid var(--color-brand)' : '0.5px solid #e8e7e4', borderRadius: 16, padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ fontSize: 16, fontWeight: 600, color: '#0d0d0d', marginBottom: 2 }}>{o.t}</div>
-                <div style={{ fontSize: 13, color: '#7425e3', marginBottom: 10 }}>{o.sub}</div>
+                <div style={{ fontSize: 13, color: 'var(--color-brand)', marginBottom: 10 }}>{o.sub}</div>
                 <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, flex: 1, marginBottom: 16 }}>{o.d}</div>
 
                 {/* ── ESRS version, CSRD card only ────────────────────────────────────────
@@ -537,8 +537,8 @@ export default function MaterialityWizard() {
                           ? { pick: true, note: null as string | null }
                           : standardVersionOffer(opt.v, { kind: 'free' })
                         return (
-                          <div key={String(opt.v)} onClick={() => { if (pick) setStandardVersion(opt.v) }} style={{ border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, borderRadius: 8, padding: '7px 10px', cursor: pick ? 'pointer' : 'not-allowed', opacity: pick ? 1 : 0.5, background: sel ? '#EDE9FE' : '#fff' }}>
-                            <div style={{ fontSize: 12, fontWeight: sel ? 600 : 500, color: sel ? '#7425e3' : '#0d0d0d' }}>{opt.l}</div>
+                          <div key={String(opt.v)} onClick={() => { if (pick) setStandardVersion(opt.v) }} style={{ border: `1.5px solid ${sel ? 'var(--color-brand)' : '#e8e7e4'}`, borderRadius: 8, padding: '7px 10px', cursor: pick ? 'pointer' : 'not-allowed', opacity: pick ? 1 : 0.5, background: sel ? 'var(--color-brand-wash)' : '#fff' }}>
+                            <div style={{ fontSize: 12, fontWeight: sel ? 600 : 500, color: sel ? 'var(--color-brand)' : '#0d0d0d' }}>{opt.l}</div>
                             <div style={{ fontSize: 10.5, color: 'var(--color-ink-muted)', marginTop: 1, lineHeight: 1.4 }}>{opt.d}</div>
                             {/* Shown and closed, never removed — the same decision as the assessment
                                 form. A buyer should be able to see the product knows 2023 exists. */}
@@ -680,7 +680,7 @@ export default function MaterialityWizard() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
         {SECTORS.map(s => {
           const sel = industryCode === s.code
-          return <div key={s.code} onClick={() => setIndustryCode(s.code)} style={{ border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, borderRadius: 10, padding: '10px 14px', cursor: 'pointer', background: sel ? '#EDE9FE' : '#f8f7f5', fontSize: 13, fontWeight: sel ? 600 : 400, color: sel ? '#7425e3' : '#555553' }}>{s.label}</div>
+          return <div key={s.code} onClick={() => setIndustryCode(s.code)} style={{ border: `1.5px solid ${sel ? 'var(--color-brand)' : '#e8e7e4'}`, borderRadius: 10, padding: '10px 14px', cursor: 'pointer', background: sel ? 'var(--color-brand-wash)' : '#f8f7f5', fontSize: 13, fontWeight: sel ? 600 : 400, color: sel ? 'var(--color-brand)' : '#555553' }}>{s.label}</div>
         })}
       </div>
       {blockerAt('sector') && (
@@ -695,7 +695,7 @@ export default function MaterialityWizard() {
     <div>
       <h2 style={sectionHead}>Where do you operate?</h2>
       <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: -4, marginBottom: 12 }}>This step is about <strong style={{ color: '#555553' }}>physical location</strong> — where your assets sit, which drives weather and climate hazards. Whose climate laws apply comes in the next step.</p>
-      <p style={sectionSub}><strong style={{ color: '#7425e3', fontWeight: 600 }}>Click the ⓘ on any region to see the countries it covers and confirm your operations fall within it.</strong> These follow the IPCC AR6 climate reference regions — each carries a distinct hazard profile that drives your physical-risk results.</p>
+      <p style={sectionSub}><strong style={{ color: 'var(--color-brand)', fontWeight: 600 }}>Click the ⓘ on any region to see the countries it covers and confirm your operations fall within it.</strong> These follow the IPCC AR6 climate reference regions — each carries a distinct hazard profile that drives your physical-risk results.</p>
       {regionGroups.length === 0 && (
         <p style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Loading regions…</p>
       )}
@@ -707,13 +707,13 @@ export default function MaterialityWizard() {
               const sel = regionCodes.includes(r.code)
               const open = openCoverage === r.code
               return (
-                <div key={r.code} style={{ border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, borderRadius: 10, background: sel ? '#EDE9FE' : '#f8f7f5', overflow: 'hidden' }}>
+                <div key={r.code} style={{ border: `1.5px solid ${sel ? 'var(--color-brand)' : '#e8e7e4'}`, borderRadius: 10, background: sel ? 'var(--color-brand-wash)' : '#f8f7f5', overflow: 'hidden' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px' }}>
                     <div onClick={() => toggle(regionCodes, r.code, setRegionCodes)} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', flex: 1 }}>
-                      <div style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, background: sel ? '#7425e3' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{sel && <span style={{ color: '#fff', fontSize: 8, fontWeight: 700 }}>✓</span>}</div>
-                      <span style={{ fontSize: 12, fontWeight: sel ? 600 : 400, color: sel ? '#7425e3' : '#555553' }}>{r.label} <span style={{ color: '#aaa', fontSize: 11 }}>{r.code}</span></span>
+                      <div style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${sel ? 'var(--color-brand)' : '#e8e7e4'}`, background: sel ? 'var(--color-brand)' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{sel && <span style={{ color: '#fff', fontSize: 8, fontWeight: 700 }}>✓</span>}</div>
+                      <span style={{ fontSize: 12, fontWeight: sel ? 600 : 400, color: sel ? 'var(--color-brand)' : '#555553' }}>{r.label} <span style={{ color: '#aaa', fontSize: 11 }}>{r.code}</span></span>
                     </div>
-                    <button onClick={(e) => { e.stopPropagation(); setOpenCoverage(open ? null : r.code) }} title="What does this region cover?" style={{ width: 18, height: 18, borderRadius: '50%', border: `1px solid ${open ? '#7425e3' : '#c9c8c4'}`, background: open ? '#7425e3' : 'transparent', color: open ? '#fff' : 'var(--color-ink-muted)', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0, lineHeight: 1, padding: 0 }}>i</button>
+                    <button onClick={(e) => { e.stopPropagation(); setOpenCoverage(open ? null : r.code) }} title="What does this region cover?" style={{ width: 18, height: 18, borderRadius: '50%', border: `1px solid ${open ? 'var(--color-brand)' : '#c9c8c4'}`, background: open ? 'var(--color-brand)' : 'transparent', color: open ? '#fff' : 'var(--color-ink-muted)', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0, lineHeight: 1, padding: 0 }}>i</button>
                   </div>
                   {open && (
                     <div style={{ padding: '0 12px 10px 36px', fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.5 }}>
@@ -738,8 +738,8 @@ export default function MaterialityWizard() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
           {ASSET_PROFILES.map(a => {
             const sel = assetProfile === a.code
-            return <div key={a.code} onClick={() => setAssetProfile(a.code)} style={{ border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer', background: sel ? '#EDE9FE' : '#f8f7f5' }}>
-              <div style={{ fontSize: 13, fontWeight: sel ? 600 : 500, color: sel ? '#7425e3' : '#0d0d0d' }}>{a.label}</div>
+            return <div key={a.code} onClick={() => setAssetProfile(a.code)} style={{ border: `1.5px solid ${sel ? 'var(--color-brand)' : '#e8e7e4'}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer', background: sel ? 'var(--color-brand-wash)' : '#f8f7f5' }}>
+              <div style={{ fontSize: 13, fontWeight: sel ? 600 : 500, color: sel ? 'var(--color-brand)' : '#0d0d0d' }}>{a.label}</div>
               <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2, lineHeight: 1.5 }}>{a.desc}</div>
             </div>
           })}
@@ -761,10 +761,10 @@ export default function MaterialityWizard() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
         {JURISDICTIONS.map(j => {
           const sel = jurisdictionCodes.includes(j.code)
-          return <div key={j.code} onClick={() => toggle(jurisdictionCodes, j.code, setJurisdictionCodes)} style={{ border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer', background: sel ? '#EDE9FE' : '#f8f7f5', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-            <div style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, background: sel ? '#7425e3' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>{sel && <span style={{ color: '#fff', fontSize: 8, fontWeight: 700 }}>✓</span>}</div>
+          return <div key={j.code} onClick={() => toggle(jurisdictionCodes, j.code, setJurisdictionCodes)} style={{ border: `1.5px solid ${sel ? 'var(--color-brand)' : '#e8e7e4'}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer', background: sel ? 'var(--color-brand-wash)' : '#f8f7f5', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            <div style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${sel ? 'var(--color-brand)' : '#e8e7e4'}`, background: sel ? 'var(--color-brand)' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>{sel && <span style={{ color: '#fff', fontSize: 8, fontWeight: 700 }}>✓</span>}</div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, fontWeight: sel ? 600 : 500, color: sel ? '#7425e3' : '#0d0d0d' }}>{j.label}</div>
+              <div style={{ fontSize: 12, fontWeight: sel ? 600 : 500, color: sel ? 'var(--color-brand)' : '#0d0d0d' }}>{j.label}</div>
               <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2, lineHeight: 1.5 }}>{j.desc}</div>
             </div>
           </div>
@@ -783,29 +783,29 @@ export default function MaterialityWizard() {
         <div style={{ fontSize: 11, fontWeight: 600, color: '#0d0d0d', marginBottom: 4 }}>What's a climate scenario?</div>
         <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>A scenario is a plausible future used to stress-test your business — not a prediction. Each one describes how far the world warms and how fast climate policy tightens. Higher-warming futures raise physical risk (floods, heat, storms); faster-policy futures raise transition risk (carbon costs, market shifts). Good practice is to test more than one. We've picked a sensible default below — you can keep it.</div>
       </div>
-      <div style={{ background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.2)', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: '#7425e3', marginBottom: 4 }}>Why this default — and can I just keep it?</div>
+      <div style={{ background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 20%, transparent)', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-brand)', marginBottom: 4 }}>Why this default — and can I just keep it?</div>
         <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{SCENARIO_RATIONALE}</div>
       </div>
       <label style={labelStyle}>Scenario</label>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
         {SCENARIOS.map(s => {
           const sel = scenarioCode === s.code
-          return <div key={s.code} onClick={() => setScenarioCode(s.code)} style={{ border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer', background: sel ? '#EDE9FE' : '#f8f7f5' }}>
-            <div style={{ fontSize: 13, fontWeight: sel ? 600 : 500, color: sel ? '#7425e3' : '#0d0d0d' }}>{s.label}</div>
+          return <div key={s.code} onClick={() => setScenarioCode(s.code)} style={{ border: `1.5px solid ${sel ? 'var(--color-brand)' : '#e8e7e4'}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer', background: sel ? 'var(--color-brand-wash)' : '#f8f7f5' }}>
+            <div style={{ fontSize: 13, fontWeight: sel ? 600 : 500, color: sel ? 'var(--color-brand)' : '#0d0d0d' }}>{s.label}</div>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', marginTop: 2 }}>{s.descriptor}</div>
             <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4, lineHeight: 1.45 }}>{s.desc}</div>
           </div>
         })}
       </div>
       <label style={labelStyle}>Time horizon</label>
-      <div style={{ background: '#EDE9FE', border: '0.5px solid rgba(116,37,227,0.2)', borderRadius: 10, padding: '10px 14px', marginBottom: 10 }}>
+      <div style={{ background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 20%, transparent)', borderRadius: 10, padding: '10px 14px', marginBottom: 10 }}>
         <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{HORIZON_RATIONALE}</div>
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         {[{ v: 'short', l: 'To 2030' }, { v: 'medium', l: 'To 2040' }, { v: 'long', l: 'To 2050+' }].map(h => {
           const sel = horizon === h.v
-          return <div key={h.v} onClick={() => setHorizon(h.v)} style={{ border: `1.5px solid ${sel ? '#7425e3' : '#e8e7e4'}`, borderRadius: 10, padding: '9px 16px', cursor: 'pointer', background: sel ? '#EDE9FE' : '#f8f7f5', fontSize: 13, fontWeight: sel ? 600 : 400, color: sel ? '#7425e3' : '#555553' }}>{h.l}</div>
+          return <div key={h.v} onClick={() => setHorizon(h.v)} style={{ border: `1.5px solid ${sel ? 'var(--color-brand)' : '#e8e7e4'}`, borderRadius: 10, padding: '9px 16px', cursor: 'pointer', background: sel ? 'var(--color-brand-wash)' : '#f8f7f5', fontSize: 13, fontWeight: sel ? 600 : 400, color: sel ? 'var(--color-brand)' : '#555553' }}>{h.l}</div>
         })}
       </div>
     </div>
@@ -838,7 +838,7 @@ export default function MaterialityWizard() {
               <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                 {[{ l: 'low', v: 2 }, { l: 'med', v: 5 }, { l: 'high', v: 8 }].map(o => {
                   const sel = cur === o.v
-                  return <button key={o.l} onClick={() => setImpactOverrides(prev => ({ ...prev, [t.code]: o.v }))} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${sel ? '#7425e3' : '#e8e7e4'}`, background: sel ? '#7425e3' : '#fff', color: sel ? '#fff' : '#555553', fontWeight: sel ? 600 : 400 }}>{o.l}</button>
+                  return <button key={o.l} onClick={() => setImpactOverrides(prev => ({ ...prev, [t.code]: o.v }))} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${sel ? 'var(--color-brand)' : '#e8e7e4'}`, background: sel ? 'var(--color-brand)' : '#fff', color: sel ? '#fff' : '#555553', fontWeight: sel ? 600 : 400 }}>{o.l}</button>
                 })}
               </div>
             </div>
@@ -1030,7 +1030,7 @@ export default function MaterialityWizard() {
           <div style={{ background: '#FCEBEB', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color: '#B91C1C' }}>{s.physicalHigh ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>High physical risks</div></div>
           <div style={{ background: '#FEF3E2', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color: 'var(--color-module-climate)' }}>{s.transitionHigh ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>High transition risks</div></div>
           <div style={{ background: '#E1F5EE', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color: '#0F6E56' }}>{s.opportunitiesStrong ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>Strong opportunities</div></div>
-          {mode === 'csrd' && <div style={{ background: '#EDE9FE', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color: '#7425e3' }}>{s.topicsBothAxes ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>Topics material on both axes</div></div>}
+          {mode === 'csrd' && <div style={{ background: 'var(--color-brand-wash)', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color: 'var(--color-brand)' }}>{s.topicsBothAxes ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>Topics material on both axes</div></div>}
         </div>
 
         {isPaid ? (
@@ -1132,7 +1132,7 @@ export default function MaterialityWizard() {
     const clsColor: Record<string, { bg: string; color: string; border: string }> = {
       'persistent': { bg: '#FCEBEB', color: '#B91C1C', border: '#B91C1C' },
       'warming-contingent': { bg: '#FEF3E2', color: 'var(--color-module-climate)', border: 'var(--color-module-climate)' },
-      'policy-path-contingent': { bg: '#EDE9FE', color: '#7425e3', border: '#7425e3' },
+      'policy-path-contingent': { bg: 'var(--color-brand-wash)', color: 'var(--color-brand)', border: 'var(--color-brand)' },
       'low-across-futures': { bg: '#f8f7f5', color: 'var(--color-ink-muted)', border: '#e8e7e4' },
     }
     const cellBox = (band: Band, score: number, kind: string) => {
@@ -1211,7 +1211,7 @@ export default function MaterialityWizard() {
         </div>
 
         {/* resilience synthesis statement — the "so what" */}
-        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderTop: '4px solid #7425e3', borderRadius: 'var(--radius-panel)', padding: '1.25rem', marginBottom: 12 }}>
+        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderTop: '4px solid var(--color-brand)', borderRadius: 'var(--radius-panel)', padding: '1.25rem', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 8 }}>Resilience read</div>
           <p style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, margin: 0 }}>{syn.statement}</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, marginTop: 14 }}>
@@ -1322,7 +1322,7 @@ export default function MaterialityWizard() {
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2.5rem', overflowX: 'auto' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex' }}>
           {stepNames.map((name, i) => (
-            <div key={i} style={{ padding: '14px 16px', fontSize: 12, fontWeight: step === i ? 600 : 400, color: step === i ? '#0d0d0d' : 'var(--color-ink-muted)', borderBottom: `2px solid ${step === i ? '#7425e3' : 'transparent'}`, whiteSpace: 'nowrap' }}>{i + 1}. {name}</div>
+            <div key={i} style={{ padding: '14px 16px', fontSize: 12, fontWeight: step === i ? 600 : 400, color: step === i ? '#0d0d0d' : 'var(--color-ink-muted)', borderBottom: `2px solid ${step === i ? 'var(--color-brand)' : 'transparent'}`, whiteSpace: 'nowrap' }}>{i + 1}. {name}</div>
           ))}
         </div>
       </div>

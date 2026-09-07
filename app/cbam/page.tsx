@@ -51,7 +51,7 @@ export default function Page() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {[
               { val: '30 Sep', unit: '2027', label: 'first importer CBAM declaration due', color: '#B91C1C', bg: '#FCEBEB' },
-              { val: '10→20→30%', unit: 'mark-up by 2028', label: 'what the default adds on top of your country figure', color: '#7425e3', bg: '#EDE9FE' },
+              { val: '10→20→30%', unit: 'mark-up by 2028', label: 'what the default adds on top of your country figure', color: 'var(--color-brand)', bg: 'var(--color-brand-wash)' },
               { val: 'Actuals', unit: 'not defaults', label: 'installation-level figures, with the evidence attached', color: '#0F6E56', bg: '#E1F5EE' },
               { val: 'Steel + Al', unit: 'available now', label: 'iron, steel & aluminium live; more sectors coming', color: '#0C447C', bg: '#E6F1FB' },
             ].map(({ val, unit, label, color, bg }) => (
@@ -164,7 +164,7 @@ export default function Page() {
           </tbody>
         </table>
         <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
-          <a href="/methodology" style={{ fontSize: 13, fontWeight: 500, color: '#7425e3', textDecoration: 'none' }}>Full methodology →</a>
+          <a href="/methodology" style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-brand)', textDecoration: 'none' }}>Full methodology →</a>
         </div>
       </section>
 
