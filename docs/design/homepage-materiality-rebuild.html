@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Homepage — materiality section rebuilt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600;7..72,700&family=Atkinson+Hyperlegible+Next:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FFFFFF; --ground:#F7F8F8; --surface:#FCFCFC; --sunken:#EDEFF0;
+  --ink:#151A1D; --ink-2:#3B474D; --ink-muted:#5A686E;
+  --brand:#095C6B; --brand-wash:#D7EFF6; --brand-line:#9FCBD6;
+  --band:#CCE7EF; --band-line:#A8D2DD;
+  --s18:#1C5EAA; --s27:#A94E0D; --s44:#A41A3B;
+  --on-dark:#EAEDEE; --line:#D7DDDF; --line-strong:#AAB4B8;
+  --display:'Literata',Georgia,serif; --ui:'Atkinson Hyperlegible Next',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--ui);
+  font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px;margin:0 auto;padding:52px 40px 88px}
+.tnum{font-variant-numeric:tabular-nums lining-nums}
+.eyebrow{font-size:13px;font-weight:600;color:var(--ink-muted);letter-spacing:.06em;
+  text-transform:uppercase}
+
+/* ---------- the two cross-link bands, now one component ---------- */
+.xlink{display:flex;justify-content:space-between;align-items:center;gap:28px;
+  background:var(--paper);border:1px solid var(--line);border-left:6px solid var(--brand);
+  border-radius:2px 6px 6px 2px;padding:22px 26px;text-decoration:none;color:inherit}
+.xlink + .xlink{margin-top:14px}
+.xlink .lab{font-size:13px;font-weight:700;color:var(--brand);letter-spacing:.012em}
+.xlink h3{font-family:var(--display);font-size:23px;font-weight:600;margin:4px 0 0;
+  letter-spacing:-.014em;line-height:1.2}
+.xlink p{margin:6px 0 0;font-size:15px;color:var(--ink-2);max-width:60ch}
+.btn{font-family:var(--ui);font-size:16px;font-weight:600;padding:12px 22px;
+  border-radius:3px;border:1px solid var(--brand);background:var(--brand);
+  color:var(--on-dark);white-space:nowrap;cursor:pointer}
+
+/* ---------- the section ---------- */
+section{margin-top:64px;padding-top:36px;border-top:2px solid var(--ink)}
+h2{font-family:var(--display);font-size:37px;font-weight:600;line-height:1.12;
+  letter-spacing:-.02em;margin:12px 0 0;max-width:20ch}
+.lede{font-size:18px;line-height:1.55;color:var(--ink-2);max-width:62ch;margin:18px 0 0}
+.lede em{font-style:italic}
+
+/* scenario trio — the one tier that stays cards */
+.sub-head{display:flex;align-items:baseline;gap:14px;margin:44px 0 16px;
+  padding-bottom:10px;border-bottom:1px solid var(--line-strong)}
+.sub-head h3{font-family:var(--display);font-size:21px;font-weight:600;margin:0;
+  letter-spacing:-.012em}
+.sub-head span{font-size:14px;font-weight:500;color:var(--ink-muted)}
+.scen{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:6px;
+  padding:20px 22px;border-top:4px solid var(--tone)}
+.card .deg{font-family:var(--display);font-size:33px;font-weight:600;line-height:1;
+  color:var(--tone);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.card .nm{font-size:14px;font-weight:700;color:var(--tone);margin-top:8px;
+  letter-spacing:.01em}
+.card .note{font-size:15px;color:var(--ink-2);margin-top:8px;line-height:1.45}
+
+/* credibility — a ruled list, not a card grid. This removes the second tier. */
+.proof{margin-top:44px}
+.proof dl{margin:0;border-top:1px solid var(--line-strong)}
+.proof .row{display:grid;grid-template-columns:230px 1fr;gap:24px;
+  padding:15px 0;border-bottom:1px solid var(--line)}
+.proof dt{font-size:16px;font-weight:600;margin:0}
+.proof dd{margin:0;font-size:16px;color:var(--ink-2);max-width:62ch}
+.placeholder{color:var(--s44);font-weight:600}
+
+.note-box{margin-top:56px;padding:22px 26px;background:var(--paper);
+  border:1px solid var(--line-strong);border-left:4px solid var(--brand)}
+.note-box h3{font-family:var(--display);font-size:19px;font-weight:600;margin:0 0 10px}
+.note-box ul{margin:0;padding-left:20px}
+.note-box li{font-size:16px;color:var(--ink-2);margin-bottom:8px;max-width:78ch}
+@media(max-width:820px){
+  .wrap{padding:32px 18px 64px}
+  h2{font-size:28px}
+  .scen{grid-template-columns:1fr}
+  .proof .row{grid-template-columns:1fr;gap:4px}
+  .xlink{flex-direction:column;align-items:flex-start}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <a class="xlink" href="#">
+    <div>
+      <div class="lab">Advisory services</div>
+      <h3>Available across all modules</h3>
+      <p>Sector-specific guidance, assurance prep and board-ready narratives from
+      practitioners who speak your language.</p>
+    </div>
+    <button class="btn">Talk to a specialist</button>
+  </a>
+
+  <a class="xlink" href="#">
+    <div>
+      <div class="lab">Single or double · which applies to you</div>
+      <h3>The Materiality Assessment</h3>
+      <p>Single materiality for IFRS S2, double materiality for CSRD — the
+      methodology your auditor expects. Two sample reports for the same entity.</p>
+    </div>
+    <button class="btn">See sample reports</button>
+  </a>
+
+  <section>
+    <div class="eyebrow">Flagship output · Climate risk &amp; materiality</div>
+    <h2>A climate resilience report that holds up under scrutiny.</h2>
+    <p class="lede">IFRS S2 and CSRD/ESRS don't just ask you to run a scenario —
+    they ask you to show resilience across a <em>diverse range</em> of climate
+    futures, and to document the judgment behind it. ThemisIQ produces exactly
+    that: a multi-scenario resilience report, generated from your assessment, with
+    every figure traceable to its basis.</p>
+
+    <div class="sub-head">
+      <h3>Tested across a diverse trio of scenarios</h3>
+      <span>IPCC pathways, modelled end-to-end</span>
+    </div>
+
+    <div class="scen">
+      <div class="card" style="--tone:var(--s18)">
+        <div class="deg">~1.8°C</div>
+        <div class="nm">Paris-aligned</div>
+        <div class="note"><span class="placeholder">[source real copy]</span> —
+        the low-warming pathway, where transition risk dominates.</div>
+      </div>
+      <div class="card" style="--tone:var(--s27)">
+        <div class="deg">~2.7°C</div>
+        <div class="nm">Current trajectory</div>
+        <div class="note"><span class="placeholder">[source real copy]</span> —
+        stated policies, the middle case.</div>
+      </div>
+      <div class="card" style="--tone:var(--s44)">
+        <div class="deg">~4.4°C</div>
+        <div class="nm">High warming</div>
+        <div class="note"><span class="placeholder">[source real copy]</span> —
+        the pathway where physical risk dominates.</div>
+      </div>
+    </div>
+
+    <div class="proof">
+      <div class="sub-head">
+        <h3>Why it holds up</h3>
+        <span>Six things a reviewer checks</span>
+      </div>
+      <dl>
+        <div class="row"><dt>[Point 1 title]</dt>
+          <dd><span class="placeholder">Source the six credibility cards' real copy from page.tsx:181</span></dd></div>
+        <div class="row"><dt>[Point 2 title]</dt><dd>—</dd></div>
+        <div class="row"><dt>[Point 3 title]</dt><dd>—</dd></div>
+        <div class="row"><dt>[Point 4 title]</dt><dd>—</dd></div>
+        <div class="row"><dt>[Point 5 title]</dt><dd>—</dd></div>
+        <div class="row"><dt>[Point 6 title]</dt><dd>—</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <div class="note-box">
+    <h3>The four decisions, resolved</h3>
+    <ul>
+      <li><strong>Two tiers became one.</strong> Paper against the band measures
+      1.29:1 and sunken 1.12:1 — neither reads as a distinct surface, so there was
+      no way to keep two tiers with light fills. Instead the six credibility cards
+      stop being cards. Scenarios stay cards because they are three parallel,
+      comparable things with figures; the credibility points are a ruled
+      definition list, which is what six unlike statements actually are.</li>
+      <li><strong>The violet left border is gone with the cards.</strong> It was
+      the card's only accent, and once the card becomes a list row a hairline rule
+      does the same job without needing a colour at all.</li>
+      <li><strong>The scenario ramp is blue → rust → crimson</strong> —
+      #1C5EAA, #A94E0D, #A41A3B, all already in the palette as the CBAM, Climate
+      and Cyber module hues. It reads cool to warm, which is the sequence the
+      content needs, and measures 6.50 / 5.55 / 7.53 on white. The colour is on
+      the top rule and the figure, not the fill, so the three cards stay legible
+      and the ramp is visible at a glance. Note this only works on white — rust
+      drops to 4.29:1 on the teal band, so this section must not sit on one.</li>
+      <li><strong>The two bands are now one component.</strong> Same markup, same
+      treatment, brand left edge. They were previously the same shape in two
+      colours, one dark and one white, which is why converting either alone would
+      have made them disagree.</li>
+      <li><strong>The section sits on the page, not in a panel.</strong> A 2px ink
+      rule opens it. Full-bleed dark sections and full-bleed tinted sections both
+      say "marketing band"; a rule and a heading say "next section".</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>
