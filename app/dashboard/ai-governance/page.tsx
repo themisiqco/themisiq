@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useEntitlement } from '../../../lib/useEntitlement'
 import Nav from '../../components/Nav'
 import { sectionHead } from '@/app/components/headingStyles'
-import { btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
+import { btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
 import {
   AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED, AI_ACT_CITATION,
 } from '../../../lib/aiAct'
@@ -315,7 +315,7 @@ export default function AIGovernanceDashboard() {
           {inventory.systems.map((s, i) => {
             const cfg = RISK_CONFIG[s.risk_level]
             return (
-              <button key={s.id} onClick={() => setActiveSystem(i)} style={{ fontSize: 12, padding: '7px 14px', borderRadius: 8, background: activeSystem === i ? '#0d0d0d' : '#f8f7f5', color: activeSystem === i ? '#fff' : '#555553', border: `0.5px solid ${activeSystem === i ? '#0d0d0d' : '#e8e7e4'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button key={s.id} onClick={() => setActiveSystem(i)} style={{ fontSize: 12, padding: '7px 14px', borderRadius: 8, ...(activeSystem === i ? toggleOn : toggleOff), cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
                 {s.name || `System ${i + 1}`}
                 {s.risk_level !== 'unclassified' && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 99, background: cfg.bg, color: cfg.color, border: `0.5px solid ${cfg.border}` }}>{cfg.label}</span>}
               </button>
@@ -350,7 +350,7 @@ export default function AIGovernanceDashboard() {
             <input style={{ ...inputStyle, marginBottom: 10 }} placeholder="Search systems..." value={librarySearch} onChange={e => setLibrarySearch(e.target.value)} />
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {LIBRARY_CATEGORIES.map(cat => (
-                <button key={cat} onClick={() => setLibraryCategory(cat)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 99, background: libraryCategory === cat ? '#0d0d0d' : '#f8f7f5', color: libraryCategory === cat ? '#fff' : '#555553', border: `0.5px solid ${libraryCategory === cat ? '#0d0d0d' : '#e8e7e4'}`, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                <button key={cat} onClick={() => setLibraryCategory(cat)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 99, ...(libraryCategory === cat ? toggleOn : toggleOff), cursor: 'pointer', whiteSpace: 'nowrap' }}>
                   {cat}
                 </button>
               ))}
@@ -389,15 +389,15 @@ export default function AIGovernanceDashboard() {
       {/* Selected system editor */}
       {inventory.systems.length > 0 && inventory.systems[activeSystem] && (
         <div style={{ border: '1px solid #e8e7e4', borderRadius: 14, overflow: 'hidden' }}>
-          <div style={{ background: '#0d0d0d', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{inventory.systems[activeSystem].name || `System ${activeSystem + 1}`}</div>
+          <div style={{ background: 'var(--color-sunken)', color: 'var(--color-ink)', borderBottom: '2px solid var(--color-ink)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 12, fontWeight: 600 }}>{inventory.systems[activeSystem].name || `System ${activeSystem + 1}`}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               {inventory.systems[activeSystem].risk_level !== 'unclassified' && (
                 <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: RISK_CONFIG[inventory.systems[activeSystem].risk_level].bg, color: RISK_CONFIG[inventory.systems[activeSystem].risk_level].color }}>
                   {RISK_CONFIG[inventory.systems[activeSystem].risk_level].label}
                 </span>
               )}
-              {inventory.systems[activeSystem].from_library && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>From library</span>}
+              {inventory.systems[activeSystem].from_library && <span style={{ fontSize: 10, color: 'var(--color-ink-muted)' }}>From library</span>}
             </div>
           </div>
           <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -418,7 +418,7 @@ export default function AIGovernanceDashboard() {
                 <label style={labelStyle}>Deployed or used in the EU?</label>
                 <div style={{ display: 'flex', gap: 8 }}>
                   {[{ label: 'Yes', val: true }, { label: 'No', val: false }].map(opt => (
-                    <button key={String(opt.val)} onClick={() => updateSystem(activeSystem, 'eu_deployment', opt.val)} style={{ flex: 1, padding: '8px', borderRadius: 8, fontSize: 12, fontWeight: 500, background: inventory.systems[activeSystem].eu_deployment === opt.val ? '#0d0d0d' : '#f8f7f5', color: inventory.systems[activeSystem].eu_deployment === opt.val ? '#fff' : '#555553', border: `0.5px solid ${inventory.systems[activeSystem].eu_deployment === opt.val ? '#0d0d0d' : '#e8e7e4'}`, cursor: 'pointer' }}>
+                    <button key={String(opt.val)} onClick={() => updateSystem(activeSystem, 'eu_deployment', opt.val)} style={{ flex: 1, padding: '8px', borderRadius: 8, fontSize: 12, ...(inventory.systems[activeSystem].eu_deployment === opt.val ? toggleOn : toggleOff), cursor: 'pointer' }}>
                       {opt.label}
                     </button>
                   ))}
@@ -428,7 +428,7 @@ export default function AIGovernanceDashboard() {
                 <label style={labelStyle}>Affects individuals directly?</label>
                 <div style={{ display: 'flex', gap: 8 }}>
                   {[{ label: 'Yes', val: true }, { label: 'No', val: false }].map(opt => (
-                    <button key={String(opt.val)} onClick={() => updateSystem(activeSystem, 'affects_individuals', opt.val)} style={{ flex: 1, padding: '8px', borderRadius: 8, fontSize: 12, fontWeight: 500, background: inventory.systems[activeSystem].affects_individuals === opt.val ? '#0d0d0d' : '#f8f7f5', color: inventory.systems[activeSystem].affects_individuals === opt.val ? '#fff' : '#555553', border: `0.5px solid ${inventory.systems[activeSystem].affects_individuals === opt.val ? '#0d0d0d' : '#e8e7e4'}`, cursor: 'pointer' }}>
+                    <button key={String(opt.val)} onClick={() => updateSystem(activeSystem, 'affects_individuals', opt.val)} style={{ flex: 1, padding: '8px', borderRadius: 8, fontSize: 12, ...(inventory.systems[activeSystem].affects_individuals === opt.val ? toggleOn : toggleOff), cursor: 'pointer' }}>
                       {opt.label}
                     </button>
                   ))}
@@ -478,11 +478,18 @@ export default function AIGovernanceDashboard() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {inventory.systems.map((s, i) => {
               const cfg = RISK_CONFIG[s.risk_level]
+              /* ⚠️ STATE IS A 4px TOP RULE, NOT A FLOODED HEADER. The card used to invert
+                 completely for `prohibited` — red fill, white label, a translucent-white badge —
+                 while every other level got a light risk tint. Two states of one control that
+                 shared no treatment, so the alarm read as a different component rather than as
+                 the same component alarmed. Per the EDGE VOCABULARY in
+                 app/styles/themisiq-tokens.css, semantic state takes the top edge; the fill and
+                 the label stay put and only the rule and the badge change. */
               return (
-                <div key={s.id} style={{ border: `1.5px solid ${cfg.border}`, borderRadius: 14, overflow: 'hidden' }}>
-                  <div style={{ background: s.risk_level === 'prohibited' ? '#B91C1C' : cfg.bg, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: s.risk_level === 'prohibited' ? '#fff' : '#0d0d0d' }}>{s.name || `System ${i + 1}`}</div>
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: s.risk_level === 'prohibited' ? 'rgba(255,255,255,0.2)' : cfg.border, color: '#fff' }}>{cfg.label}</span>
+                <div key={s.id} className="tq-callout" style={{ overflow: 'hidden', '--tq-state': s.risk_level === 'prohibited' ? '#B91C1C' : s.risk_level === 'high_risk' ? 'var(--color-module-climate)' : 'var(--color-line)' } as React.CSSProperties}>
+                  <div style={{ background: 'var(--color-sunken)', color: 'var(--color-ink)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{s.name || `System ${i + 1}`}</div>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: cfg.bg, color: cfg.color, border: `0.5px solid ${cfg.border}` }}>{cfg.label}</span>
                   </div>
                   <div style={{ padding: '1rem 16px' }}>
                     <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 2 }}>{s.annex_category}</div>
@@ -525,9 +532,9 @@ export default function AIGovernanceDashboard() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {inventory.systems.filter(s => s.risk_level === 'prohibited' || s.risk_level === 'high_risk').map(s => (
-            <div key={s.id} style={{ border: '1px solid #e8e7e4', borderRadius: 14, overflow: 'hidden' }}>
-              <div style={{ background: s.risk_level === 'prohibited' ? '#B91C1C' : '#0d0d0d', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{s.name}</div>
+            <div key={s.id} className="tq-callout" style={{ overflow: 'hidden', '--tq-state': s.risk_level === 'prohibited' ? '#B91C1C' : s.risk_level === 'high_risk' ? 'var(--color-module-climate)' : 'var(--color-line)' } as React.CSSProperties}>
+              <div style={{ background: 'var(--color-sunken)', color: 'var(--color-ink)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{s.name}</div>
                 <span style={{ fontSize: 10, fontWeight: 700, color: '#B91C1C', background: '#FCEBEB', padding: '2px 8px', borderRadius: 99 }}>
                   {s.risk_level === 'prohibited' ? 'IMMEDIATE ACTION' : `From ${HIGH_RISK_BOTH_DATES}`}
                 </span>
@@ -552,8 +559,9 @@ export default function AIGovernanceDashboard() {
     <div>
       <h2 style={sectionHead}>Export & next steps</h2>
       <p style={sectionSub}>Your EU AI Act inventory and gap assessment is ready.</p>
-      <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.5rem', marginBottom: 20 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Inventory summary — {inventory.company || 'Your company'}</div>
+      <div className="tq-summary" data-module="ai" style={{ marginBottom: 20 }}>
+        <div style={{ flex: 1, padding: '20px 24px' }}>
+        <div className="tq-summary-label" style={{ marginBottom: 12 }}>Inventory summary — {inventory.company || 'Your company'}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           {[
             { label: 'Total systems', val: inventory.systems.length },
@@ -562,10 +570,11 @@ export default function AIGovernanceDashboard() {
             { label: 'Framework', val: 'EU AI Act 2024/1689' },
           ].map(({ label, val, urgent }) => (
             <div key={label}>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>{label}</div>
-              <div style={{ fontSize: typeof val === 'number' ? '1.6rem' : '0.85rem', fontFamily: typeof val === 'number' ? 'var(--font-display)' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 500, color: urgent ? '#64fe3e' : '#fff', lineHeight: 1.2 }}>{val}</div>
+              <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginBottom: 4 }}>{label}</div>
+              <div style={{ fontSize: typeof val === 'number' ? '1.6rem' : '0.85rem', fontFamily: typeof val === 'number' ? 'var(--font-display)' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 500, color: urgent ? 'var(--color-module-climate)' : 'var(--color-ink)', lineHeight: 1.2 }}>{val}</div>
             </div>
           ))}
+        </div>
         </div>
       </div>
       {isPaid ? (
@@ -629,8 +638,9 @@ export default function AIGovernanceDashboard() {
           </div>
           {step < 4 && (
             <div style={{ position: 'sticky', top: 80 }}>
-              <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.25rem', marginBottom: 12 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Live summary</div>
+              <div className="tq-summary" data-module="ai" style={{ marginBottom: 12 }}>
+                <div style={{ flex: 1, padding: '20px 24px' }}>
+                <div className="tq-summary-label" style={{ marginBottom: 12 }}>Live summary</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {[
                     { label: 'Company', val: inventory.company || '—' },
@@ -640,10 +650,11 @@ export default function AIGovernanceDashboard() {
                     { label: 'High-risk from', val: AI_ACT_HIGH_RISK_STANDALONE, urgent: true },
                   ].map(({ label, val, urgent }) => (
                     <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{label}</span>
-                      <span style={{ fontSize: 12, color: urgent && val ? '#64fe3e' : '#fff', fontWeight: 500 }}>{val}</span>
+                      <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{label}</span>
+                      <span style={{ fontSize: 12, color: urgent && val ? 'var(--color-module-climate)' : 'var(--color-ink)', fontWeight: 500 }}>{val}</span>
                     </div>
                   ))}
+                </div>
                 </div>
               </div>
               {highRisk > 0 && (

@@ -6,7 +6,7 @@ import Papa from 'papaparse'
 import { useEntitlement } from '../../../lib/useEntitlement'
 import { CS3D_APPLIES_FROM } from '../../../lib/cs3d'
 import { sectionHead } from '@/app/components/headingStyles'
-import { btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
+import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -337,7 +337,7 @@ export default function SupplyChainDashboard() {
         </div>
         <div style={{ flexShrink: 0 }}>
           <input ref={fileRef} type="file" accept=".csv" onChange={handleCSV} style={{ display: 'none' }} />
-          <button onClick={() => fileRef.current?.click()} style={{ fontSize: 12, fontWeight: 500, padding: '8px 16px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>Upload CSV →</button>
+          <button onClick={() => fileRef.current?.click()} style={{ ...btnPrimary, fontSize: 12, padding: '8px 16px', whiteSpace: 'nowrap' }}>Upload CSV →</button>
         </div>
       </div>
 
@@ -347,7 +347,7 @@ export default function SupplyChainDashboard() {
           {inventory.suppliers.map((s, i) => {
             const cfg = RISK_CONFIG[s.risk_level]
             return (
-              <button key={s.id} onClick={() => setActiveSupplier(i)} style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, background: activeSupplier === i ? '#0d0d0d' : '#f8f7f5', color: activeSupplier === i ? '#fff' : '#555553', border: `0.5px solid ${activeSupplier === i ? '#0d0d0d' : '#e8e7e4'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button key={s.id} onClick={() => setActiveSupplier(i)} style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, ...(activeSupplier === i ? toggleOn : toggleOff), cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
                 {s.name || `Supplier ${i + 1}`}
                 {s.risk_level && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 99, background: cfg.bg, color: cfg.color, border: `0.5px solid ${cfg.border}` }}>{cfg.label}</span>}
               </button>
@@ -365,8 +365,8 @@ export default function SupplyChainDashboard() {
         </div>
       ) : inventory.suppliers[activeSupplier] && (
         <div style={{ border: '1px solid #e8e7e4', borderRadius: 14, overflow: 'hidden' }}>
-          <div style={{ background: '#0d0d0d', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{inventory.suppliers[activeSupplier].name || `Supplier ${activeSupplier + 1}`}</div>
+          <div style={{ background: 'var(--color-sunken)', color: 'var(--color-ink)', borderBottom: '2px solid var(--color-ink)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 12, fontWeight: 600 }}>{inventory.suppliers[activeSupplier].name || `Supplier ${activeSupplier + 1}`}</div>
             {inventory.suppliers[activeSupplier].risk_level && (
               <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: RISK_CONFIG[inventory.suppliers[activeSupplier].risk_level].bg, color: RISK_CONFIG[inventory.suppliers[activeSupplier].risk_level].color }}>
                 {RISK_CONFIG[inventory.suppliers[activeSupplier].risk_level].label} RISK
@@ -407,7 +407,7 @@ export default function SupplyChainDashboard() {
               <label style={labelStyle}>Sustainability assessment on file?</label>
               <div style={{ display: 'flex', gap: 8 }}>
                 {[{ label: 'Yes — EcoVadis, audit, or questionnaire', val: true }, { label: 'No assessment', val: false }].map(opt => (
-                  <button key={String(opt.val)} onClick={() => updateSupplier(activeSupplier, 'has_assessment', opt.val)} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, background: inventory.suppliers[activeSupplier].has_assessment === opt.val ? '#0d0d0d' : '#f8f7f5', color: inventory.suppliers[activeSupplier].has_assessment === opt.val ? '#fff' : '#555553', border: `0.5px solid ${inventory.suppliers[activeSupplier].has_assessment === opt.val ? '#0d0d0d' : '#e8e7e4'}`, cursor: 'pointer' }}>
+                  <button key={String(opt.val)} onClick={() => updateSupplier(activeSupplier, 'has_assessment', opt.val)} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 12, ...(inventory.suppliers[activeSupplier].has_assessment === opt.val ? toggleOn : toggleOff), cursor: 'pointer' }}>
                     {opt.label}
                   </button>
                 ))}
@@ -467,7 +467,7 @@ export default function SupplyChainDashboard() {
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
             <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Sort by:</span>
             {[{ val: 'risk', label: 'Risk level' }, { val: 'spend', label: 'Spend' }, { val: 'name', label: 'Name' }].map(s => (
-              <button key={s.val} onClick={() => setSortBy(s.val as any)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 99, background: sortBy === s.val ? '#0d0d0d' : '#f8f7f5', color: sortBy === s.val ? '#fff' : '#555553', border: `0.5px solid ${sortBy === s.val ? '#0d0d0d' : '#e8e7e4'}`, cursor: 'pointer' }}>{s.label}</button>
+              <button key={s.val} onClick={() => setSortBy(s.val as any)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 99, ...(sortBy === s.val ? toggleOn : toggleOff), cursor: 'pointer' }}>{s.label}</button>
             ))}
           </div>
 
@@ -514,17 +514,16 @@ export default function SupplyChainDashboard() {
       ) : (
         <>
           {/* Total */}
-          <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.5rem', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="tq-summary" data-module="supply" style={{ marginBottom: 20 }}>
+            <div className="tq-summary-body">
             <div>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>Total Scope 3 Category 1 (spend-based estimate)</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', lineHeight: 1.6 }}>
+              <div className="tq-summary-label" style={{ marginBottom: 8 }}>Total Scope 3 Category 1 (spend-based estimate)</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>
                 GHG Protocol spend-based method · DEFRA/Exiobase sector emission factors<br />
                 This is an estimate only — primary data collection from suppliers is the gold standard
               </div>
             </div>
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', fontWeight: 400, color: '#64fe3e', lineHeight: 1 }}>{totalScope3.toFixed(1)}</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>mt CO₂e</div>
+            <div className="tq-summary-figure">{totalScope3.toFixed(1)}<small>mt CO₂e</small></div>
             </div>
           </div>
 
@@ -561,8 +560,9 @@ export default function SupplyChainDashboard() {
       <h2 style={sectionHead}>Export your assessment</h2>
       <p style={sectionSub}>Download your supplier risk register and spend-based Scope 3 Category 1 estimate.</p>
 
-      <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.5rem', marginBottom: 20 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Programme summary — {inventory.company || 'Your company'}</div>
+      <div className="tq-summary" data-module="supply" style={{ marginBottom: 20 }}>
+        <div style={{ flex: 1, padding: '20px 24px' }}>
+        <div className="tq-summary-label" style={{ marginBottom: 12 }}>Programme summary — {inventory.company || 'Your company'}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           {[
             { label: 'Suppliers', val: inventory.suppliers.length },
@@ -571,10 +571,11 @@ export default function SupplyChainDashboard() {
             { label: 'Need assessment', val: needsAssessment, urgent: needsAssessment > 0 },
           ].map(({ label, val, urgent }) => (
             <div key={label}>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>{label}</div>
-              <div style={{ fontSize: typeof val === 'number' ? '1.6rem' : '1rem', fontFamily: typeof val === 'number' ? 'var(--font-display)' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 600, color: urgent ? '#64fe3e' : '#fff', lineHeight: 1.2 }}>{val}</div>
+              <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginBottom: 4 }}>{label}</div>
+              <div style={{ fontSize: typeof val === 'number' ? '1.6rem' : '1rem', fontFamily: typeof val === 'number' ? 'var(--font-display)' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 600, color: urgent ? 'var(--color-module-climate)' : 'var(--color-ink)', lineHeight: 1.2 }}>{val}</div>
             </div>
           ))}
+        </div>
         </div>
       </div>
 
@@ -643,8 +644,9 @@ export default function SupplyChainDashboard() {
           </div>
           {step < 4 && (
             <div style={{ position: 'sticky', top: 80 }}>
-              <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.25rem', marginBottom: 12 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Live summary</div>
+              <div className="tq-summary" data-module="supply" style={{ marginBottom: 12 }}>
+                <div style={{ flex: 1, padding: '20px 24px' }}>
+                <div className="tq-summary-label" style={{ marginBottom: 12 }}>Live summary</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {[
                     { label: 'Suppliers', val: inventory.suppliers.length },
@@ -654,10 +656,11 @@ export default function SupplyChainDashboard() {
                     { label: 'Total spend', val: totalSpend > 0 ? `${inventory.currency} ${(totalSpend / 1000000).toFixed(1)}M` : '—' },
                   ].map(({ label, val, urgent }) => (
                     <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{label}</span>
-                      <span style={{ fontSize: 12, color: urgent && val ? '#64fe3e' : '#fff', fontWeight: 500 }}>{val}</span>
+                      <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{label}</span>
+                      <span style={{ fontSize: 12, color: urgent && val ? 'var(--color-module-climate)' : 'var(--color-ink)', fontWeight: 500 }}>{val}</span>
                     </div>
                   ))}
+                </div>
                 </div>
               </div>
               {(critical + high) > 0 && (

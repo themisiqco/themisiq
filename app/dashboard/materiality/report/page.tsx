@@ -1047,7 +1047,14 @@ function Matrix({ topics }: { topics: any[] }) {
       <text x={W / 2} y={H - 10} textAnchor="middle" fontSize="12" fill="#555553">Impact materiality →</text>
       {placed.map(pp => (
         <g key={pp.code}>
-          <circle cx={pp.cx} cy={pp.cy} r={15} fill={color(pp.q)} opacity={0.88} />
+          {/* ⚠️ SOLID DOT. `opacity={0.88}` here was a contrast defect at one remove: it never
+              touched the <text>, which is a sibling, but it lightened the ground that white label
+              is read against. Material-on-one-axis fell 5.55 -> 4.44:1 and lower-priority
+              5.77 -> 4.42:1, both under AA, while the label's own colour never changed — so a scan
+              looking for opacity ON text finds nothing here. The twin of this is in
+              app/dashboard/climate-risk/page.tsx. This one is worse than a screen bug: this
+              component renders the materiality report a verifier reads. */}
+          <circle cx={pp.cx} cy={pp.cy} r={15} fill={color(pp.q)} />
           <text x={pp.cx} y={pp.cy + 4} textAnchor="middle" fontSize="11" fontWeight="700" fill="#fff">{pp.code}</text>
         </g>
       ))}

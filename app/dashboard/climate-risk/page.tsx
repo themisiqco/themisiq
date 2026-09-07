@@ -31,6 +31,24 @@ import {
 
 // ─── Design tokens (matching the live climate page) ───────────────────────────
 const GRAD = 'var(--color-brand)'
+
+/**
+ * The four submit / advance faces on this screen.
+ *
+ * ⚠️ NEVER opacity FOR THE OFF STATE. All four carried `opacity: 0.5`, which composites the whole
+ * button — label and fill together — over the page: the filled ones read 2.26:1 and the outline
+ * 3.72:1, all four below AA while claiming to be readable. See the DISABLED AND INACTIVE STATE
+ * block in app/styles/themisiq-tokens.css. `runOff` changes fill, border and label explicitly and
+ * holds 5.00:1.
+ *
+ * Kept local rather than taken from app/components/buttonStyles.ts: these are 9px/20px and 9px/24px
+ * against btnStep's 9px/20px + btnStepPrimary's 12px/28px, and this screen's submit row is not the
+ * module wizard's back/next pair. The off face is the same palette, which is the part that matters.
+ */
+const runFilled: React.CSSProperties = { fontSize: 13, fontWeight: 600, padding: '9px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none' }
+const runOutline: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: '#fff', color: '#0d0d0d', border: '1px solid #e8e7e4' }
+const runOff: React.CSSProperties = { background: 'var(--color-sunken)', color: 'var(--color-ink-muted)', border: '1px solid var(--color-line)' }
+
 const sectionSub: React.CSSProperties = { fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
@@ -537,8 +555,8 @@ export default function MaterialityWizard() {
                           ? { pick: true, note: null as string | null }
                           : standardVersionOffer(opt.v, { kind: 'free' })
                         return (
-                          <div key={String(opt.v)} onClick={() => { if (pick) setStandardVersion(opt.v) }} style={{ border: `1.5px solid ${sel ? 'var(--color-brand)' : '#e8e7e4'}`, borderRadius: 8, padding: '7px 10px', cursor: pick ? 'pointer' : 'not-allowed', opacity: pick ? 1 : 0.5, background: sel ? 'var(--color-brand-wash)' : '#fff' }}>
-                            <div style={{ fontSize: 12, fontWeight: sel ? 600 : 500, color: sel ? 'var(--color-brand)' : '#0d0d0d' }}>{opt.l}</div>
+                          <div key={String(opt.v)} onClick={() => { if (pick) setStandardVersion(opt.v) }} style={{ border: `1.5px solid ${sel ? 'var(--color-brand)' : pick ? '#e8e7e4' : 'var(--color-line)'}`, borderRadius: 8, padding: '7px 10px', cursor: pick ? 'pointer' : 'not-allowed', background: !pick ? 'var(--color-sunken)' : sel ? 'var(--color-brand-wash)' : '#fff' }}>
+                            <div style={{ fontSize: 12, fontWeight: sel ? 600 : 500, color: !pick ? 'var(--color-ink-muted)' : sel ? 'var(--color-brand)' : '#0d0d0d' }}>{opt.l}</div>
                             <div style={{ fontSize: 10.5, color: 'var(--color-ink-muted)', marginTop: 1, lineHeight: 1.4 }}>{opt.d}</div>
                             {/* Shown and closed, never removed — the same decision as the assessment
                                 form. A buyer should be able to see the product knows 2023 exists. */}
@@ -854,7 +872,11 @@ export default function MaterialityWizard() {
     const c = SEV[band]
     return (
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: c.bg, color: c.color, fontSize: 12, padding: '4px 10px', borderRadius: 99, margin: '0 6px 6px 0', border: `0.5px solid ${c.border}` }}>
-        {label}{sub && <span style={{ fontSize: 10, opacity: 0.75 }}>{sub}</span>}<span style={{ fontSize: 10, fontWeight: 700 }}>{c.label}</span>
+        {/* ⚠️ NO opacity ON THE SUB-LABEL. It was `opacity: 0.75`, which composites the span over
+            the pill and dragged it to 3.01–3.82:1 depending on which band it landed in — every
+            one of the seven below AA, on a pill whose own colour pair clears it. The hierarchy it
+            was buying is already carried by weight: the band label beside it is 700, this is not. */}
+        {label}{sub && <span style={{ fontSize: 10 }}>{sub}</span>}<span style={{ fontSize: 10, fontWeight: 700 }}>{c.label}</span>
       </span>
     )
   }
@@ -916,7 +938,13 @@ export default function MaterialityWizard() {
           {/* dots */}
           {placed.map(p => (
             <g key={p.code}>
-              <circle cx={p.cx} cy={p.cy} r={13} fill={dotColor(p.q)} opacity={0.85} />
+              {/* ⚠️ THE DOT IS SOLID, AND THE OPACITY THAT WAS HERE WAS A CONTRAST BUG AT ONE
+                  REMOVE. `opacity={0.85}` did not fade the label — the <text> is a sibling, not a
+                  child — but it lightened the ground that white label sits on, which is the same
+                  damage by a longer route: material-on-one-axis fell 5.55 -> 4.16:1 and lower-
+                  priority 5.77 -> 4.12:1, both under AA, while the label's own colour never moved.
+                  A scan looking for opacity on the text would not have found this. */}
+              <circle cx={p.cx} cy={p.cy} r={13} fill={dotColor(p.q)} />
               <text x={p.cx} y={p.cy + 4} textAnchor="middle" fontSize="11" fontWeight="600" fill="#fff">{p.code}</text>
             </g>
           ))}
@@ -1140,7 +1168,9 @@ export default function MaterialityWizard() {
       return (
         <div style={{ background: c.bg, color: c.color, border: `0.5px solid ${c.border}`, borderRadius: 6, padding: '4px 8px', fontSize: 11, textAlign: 'center', minWidth: 64 }}>
           <div style={{ fontWeight: 700 }}>{c.label}</div>
-          <div style={{ fontSize: 10, opacity: 0.8 }}>{score}</div>
+          {/* ⚠️ NO opacity. Was `opacity: 0.8`, compositing the score over the cell to 3.27–4.20:1
+              across the seven bands. Weight already separates it from the label above. */}
+          <div style={{ fontSize: 10 }}>{score}</div>
         </div>
       )
     }
@@ -1339,14 +1369,14 @@ export default function MaterialityWizard() {
                 mode === 'csrd' ? (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                      <button onClick={submitResilience} disabled={submitting || !canAdvance()} style={{ fontSize: 13, fontWeight: 500, padding: '9px 20px', borderRadius: 8, background: '#fff', color: '#0d0d0d', border: '1px solid #e8e7e4', cursor: submitting ? 'wait' : 'pointer', opacity: (submitting || !canAdvance()) ? 0.5 : 1 }}>{submitting ? 'Running…' : 'Run resilience analysis →'}</button>
-                      <button onClick={submit} disabled={submitting || !canAdvance()} style={{ fontSize: 13, fontWeight: 600, padding: '9px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: submitting ? 'wait' : 'pointer', opacity: (submitting || !canAdvance()) ? 0.5 : 1 }}>{submitting ? 'Running…' : 'Run double materiality screening →'}</button>
+                      <button onClick={submitResilience} disabled={submitting || !canAdvance()} style={{ ...runOutline, ...((submitting || !canAdvance()) ? runOff : null), cursor: submitting ? 'wait' : (canAdvance() ? 'pointer' : 'not-allowed') }}>{submitting ? 'Running…' : 'Run resilience analysis →'}</button>
+                      <button onClick={submit} disabled={submitting || !canAdvance()} style={{ ...runFilled, ...((submitting || !canAdvance()) ? runOff : null), cursor: submitting ? 'wait' : (canAdvance() ? 'pointer' : 'not-allowed') }}>{submitting ? 'Running…' : 'Run double materiality screening →'}</button>
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', textAlign: 'right', maxWidth: 400, lineHeight: 1.5 }}>Double materiality plots all ten ESRS topics on the financial × impact matrix using your inputs above. Resilience tests three diverse climate futures (Paris-aligned, current trajectory, high warming). Both are pre-mapped to CSRD/ESRS disclosure requirements and support that reporting — neither, by itself, satisfies it. Each is saved as its own report.</div>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-                    <button onClick={submitResilience} disabled={submitting || !canAdvance()} style={{ fontSize: 13, fontWeight: 600, padding: '9px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: submitting ? 'wait' : 'pointer', opacity: (submitting || !canAdvance()) ? 0.5 : 1 }}>{submitting ? 'Running…' : 'Run resilience analysis →'}</button>
+                    <button onClick={submitResilience} disabled={submitting || !canAdvance()} style={{ ...runFilled, ...((submitting || !canAdvance()) ? runOff : null), cursor: submitting ? 'wait' : (canAdvance() ? 'pointer' : 'not-allowed') }}>{submitting ? 'Running…' : 'Run resilience analysis →'}</button>
                     <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', textAlign: 'right', maxWidth: 320, lineHeight: 1.5 }}>Recommended. Tests three diverse climate futures (Paris-aligned, current trajectory, high warming) — screening-level support for the scenario analysis IFRS S2 and CSRD ask for.</div>
                   </div>
                 )
@@ -1363,7 +1393,7 @@ export default function MaterialityWizard() {
                   <button
                     onClick={() => { if (canAdvance()) setStep(s => s + 1); else setNudged(true) }}
                     aria-disabled={!canAdvance()}
-                    style={{ fontSize: 13, fontWeight: 500, padding: '9px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: canAdvance() ? 'pointer' : 'not-allowed', opacity: canAdvance() ? 1 : 0.5 }}>Next →</button>
+                    style={{ ...runFilled, fontWeight: 500, ...(canAdvance() ? null : runOff), cursor: canAdvance() ? 'pointer' : 'not-allowed' }}>Next →</button>
                   {/* ⚠️ ONE LINE NAMING EVERYTHING OUTSTANDING, not a stack and not the first
                       problem only — a message that reports one requirement at a time sends the
                       user round the loop once per requirement, which is a slower version of the

@@ -102,3 +102,37 @@ export const btnStepPrimaryDisabled: CSSProperties = {
   border: '1px solid var(--color-line)',
   cursor: 'not-allowed',
 }
+
+/**
+ * Selected / unselected faces for a toggle, segmented choice, entity tab or filter pill.
+ * Twelve sites across five module dashboards: scope3, deals, supply-chain, ai-governance, people.
+ *
+ * ⚠️ COLOUR ONLY — NO GEOMETRY, DELIBERATELY. Unlike btnPrimary and btnStep, these twelve are NOT
+ * one shape. They are four: a segmented choice (flex:1, radius 8), an entity tab (radius 8, no
+ * flex), a filter pill (radius 99, 11px) and one lone 5px-padded row control in deals. Folding
+ * their padding together would move nine sites' geometry to make a name fit, which is the opposite
+ * of what the btnPrimary consolidation was for. What genuinely WAS identical in all twelve is the
+ * colour triple, and that is the part that must never drift, so that is the part shared here.
+ * Each call site keeps its own fontSize, padding, borderRadius and flex.
+ *
+ * ⚠️ THE DARK SELECTED FILL IS GONE AND THE STATE NEEDED REINFORCING. All twelve were
+ * `sel ? '#0d0d0d' : '#f8f7f5'` with the label inverting to '#fff'. On a light selected fill the
+ * fill cue alone drops from ΔE 93.6 to 10.5 — brand-wash against the off-white is a quiet
+ * difference. It is carried instead by four cues at once: the wash, a brand border (ΔE 60.8), an
+ * ink label (ΔE 27.5) and weight. The weight is why `fontWeight` is here rather than left to the
+ * call sites: on the Yes/No controls the selected face IS the recorded answer, and a hairline
+ * 0.5px border should not be the main thing distinguishing one compliance answer from another.
+ */
+export const toggleOn: CSSProperties = {
+  background: 'var(--color-brand-wash)',
+  color: 'var(--color-ink)',
+  border: '0.5px solid var(--color-brand)',
+  fontWeight: 600,
+}
+
+export const toggleOff: CSSProperties = {
+  background: '#f8f7f5',
+  color: '#555553',
+  border: '0.5px solid #e8e7e4',
+  fontWeight: 500,
+}

@@ -145,16 +145,13 @@ export default function SupplierResponseViewer() {
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '2rem 2.5rem' }}>
 
         {/* Completion summary */}
-        <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.25rem 1.5rem', marginBottom: 20, display: 'flex', alignItems: 'center', gap: '2rem' }}>
-          <div style={{ textAlign: 'center', flexShrink: 0 }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', fontWeight: 400, color: pct >= 80 ? '#64fe3e' : pct >= 50 ? '#fde68a' : '#f87171', lineHeight: 1 }}>{pct}%</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>complete</div>
-          </div>
+        <div className="tq-summary" data-module="supply" style={{ marginBottom: 20 }}>
+          <div className="tq-summary-body">
           <div style={{ flex: 1 }}>
-            <div style={{ height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 99, overflow: 'hidden', marginBottom: 10 }}>
+            <div style={{ height: 6, background: 'var(--color-sunken)', borderRadius: 99, overflow: 'hidden', marginBottom: 10 }}>
               <div style={{ height: '100%', width: `${pct}%`, background: GRAD, borderRadius: 99 }} />
             </div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+            <div style={{ fontSize: 12, color: 'var(--color-ink-2)' }}>
               {answeredQuestions} of {totalQuestions} questions answered
               {supplier?.completed_at && ` · Submitted ${new Date(supplier.completed_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`}
             </div>
@@ -167,10 +164,15 @@ export default function SupplierResponseViewer() {
               return (
                 <div key={sec.id} style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: sec.color }}>{secPct}%</div>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>{sec.title.split(' ')[0]}</div>
+                  <div style={{ fontSize: 9, color: 'var(--color-ink-muted)', marginTop: 2 }}>{sec.title.split(' ')[0]}</div>
                 </div>
               )
             })}
+          </div>
+          {/* ⚠️ THE TRAFFIC LIGHT WAS TUNED AGAINST BLACK AND NONE OF IT SURVIVES ON WHITE:
+              #64fe3e 14.61 -> 1.33:1, #fde68a 15.61 -> 1.25:1, #f87171 7.03 -> 2.77:1. Re-picked
+              from the palette the rest of the app already uses for the same three meanings. */}
+          <div className="tq-summary-figure" style={{ color: pct >= 80 ? '#0F6E56' : pct >= 50 ? 'var(--color-module-climate)' : '#B91C1C' }}>{pct}%<small>complete</small></div>
           </div>
         </div>
 

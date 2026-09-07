@@ -12,7 +12,7 @@ import { describeYearStatus } from '../../../lib/ghg/series'
 import { VERSION_DATES, NET_ZERO } from '../../../lib/sbti/params'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { sectionHead } from '@/app/components/headingStyles'
-import { btnStep, btnStepDisabled } from '@/app/components/buttonStyles'
+import { btnPrimary, btnStep, btnStepDisabled } from '@/app/components/buttonStyles'
 
 // ─── Design tokens (mirroring the climate-risk dashboard) ─────────────────────
 const GRAD = 'var(--color-brand)'
@@ -761,7 +761,7 @@ export default function SbtiDashboard() {
             <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, maxWidth: 460, margin: '0 auto 18px' }}>
               SBTi categorisation reads from your GHG company. Create a GHG inventory, then come back to set targets.
             </p>
-            <a href="/dashboard/ghg" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: '#0d0d0d', color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Go to GHG inventory →</a>
+            <a href="/dashboard/ghg" style={{ ...btnPrimary, padding: '11px 24px', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Go to GHG inventory →</a>
           </div>
         ) : !companyId ? (
           <div style={{ background: '#f8f7f5', border: '1px solid #e8e7e4', borderRadius: 14, padding: '2.5rem 2rem', textAlign: 'center' }}>
@@ -966,7 +966,7 @@ export default function SbtiDashboard() {
                             <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: 12 }}>
                               To set a Scope 3 target, complete your Scope 3 inventory first. Your near-term submission can proceed on Scope 1 + 2 alone.
                             </p>
-                            <a href="/dashboard/scope3" onClick={() => { navIntentRef.current = true }} style={{ display: 'inline-block', padding: '9px 18px', borderRadius: 8, background: '#0d0d0d', color: '#fff', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>Go to Scope 3 Calculator →</a>
+                            <a href="/dashboard/scope3" onClick={() => { navIntentRef.current = true }} style={{ ...btnPrimary, padding: '9px 18px', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>Go to Scope 3 Calculator →</a>
                           </div>
                         )
                       }
@@ -1072,7 +1072,7 @@ export default function SbtiDashboard() {
                     <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, maxWidth: 460, margin: '0 auto 18px' }}>
                       Net-zero builds on your near-term targets. Save at least one near-term target, then come back.
                     </p>
-                    <button onClick={() => setStep(2)} style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: '#0d0d0d', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer' }}>← Back to near-term targets</button>
+                    <button onClick={() => setStep(2)} style={{ ...btnPrimary, padding: '11px 24px', fontSize: 13, fontWeight: 600 }}>← Back to near-term targets</button>
                   </div>
                 ) : (
                   <>
@@ -1189,7 +1189,7 @@ export default function SbtiDashboard() {
               {step < STEPS.length - 1 && (
                 <button
                   onClick={() => setStep(s => s + 1)}
-                  style={{ fontSize: 13, fontWeight: 500, padding: '10px 28px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none' }}
+                  style={{ ...btnPrimary, fontSize: 13, padding: '10px 28px' }}
                 >Continue →</button>
               )}
             </div>

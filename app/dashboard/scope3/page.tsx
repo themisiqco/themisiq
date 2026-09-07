@@ -8,7 +8,7 @@ import { EMISSION_FACTORS, DEFAULT_SPEND_EF } from '../../../lib/emissionFactors
 import { resolvePcafResult, assessAsset } from '../../../lib/pcaf/engine'
 import type { PcafPortfolioAsset, PcafAssetClass, EmissionInputs } from '../../../lib/pcaf/types'
 import { sectionHead } from '@/app/components/headingStyles'
-import { btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
+import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
 
 // ─── Scope 3 Category Definitions ────────────────────────────────────────────
 
@@ -597,13 +597,13 @@ export default function Scope3Dashboard() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {activeCats.map(cat => (
               <div key={cat.id} style={{ border: '1px solid #e8e7e4', borderRadius: 14, overflow: 'hidden' }}>
-                <div style={{ background: '#0d0d0d', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ background: 'var(--color-sunken)', color: 'var(--color-ink)', borderBottom: '2px solid var(--color-ink)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginRight: 10 }}>Cat {cat.num}</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{cat.name}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-ink-muted)', marginRight: 10 }}>Cat {cat.num}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{cat.name}</span>
                   </div>
                   {getCatEmissions(cat.id) > 0 && (
-                    <span style={{ fontSize: 11, fontWeight: 600, color: '#64fe3e' }}>{getCatEmissions(cat.id).toFixed(2)} mt CO₂e</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-module-ghg)' }}>{getCatEmissions(cat.id).toFixed(2)} mt CO₂e</span>
                   )}
                 </div>
                 {(cat as any).guidance && (
@@ -628,7 +628,7 @@ export default function Scope3Dashboard() {
                       <label style={labelStyle}>Do you have supplier-specific emissions data?</label>
                       <div style={{ display: 'flex', gap: 8 }}>
                         {[{ label: 'Yes — I have actual data', val: true }, { label: 'No — use spend-based estimate', val: false }].map(opt => (
-                          <button key={String(opt.val)} onClick={() => updateCat('cat1', 'has_supplier_data', opt.val)} style={{ flex: 1, padding: '8px', borderRadius: 8, fontSize: 12, fontWeight: 500, background: catData['cat1']?.has_supplier_data === opt.val ? '#0d0d0d' : '#f8f7f5', color: catData['cat1']?.has_supplier_data === opt.val ? '#fff' : '#555553', border: `0.5px solid ${catData['cat1']?.has_supplier_data === opt.val ? '#0d0d0d' : '#e8e7e4'}`, cursor: 'pointer' }}>{opt.label}</button>
+                          <button key={String(opt.val)} onClick={() => updateCat('cat1', 'has_supplier_data', opt.val)} style={{ flex: 1, padding: '8px', borderRadius: 8, fontSize: 12, ...(catData['cat1']?.has_supplier_data === opt.val ? toggleOn : toggleOff), cursor: 'pointer' }}>{opt.label}</button>
                         ))}
                       </div>
                     </div>
@@ -695,7 +695,7 @@ export default function Scope3Dashboard() {
                             </div>
                           )}
                           <div style={{ fontSize: 9, color: 'var(--color-ink-muted)', marginBottom: 10, lineHeight: 1.5, fontStyle: 'italic' }}>{catOneResult.method_note}</div>
-                          <button onClick={() => useCatOneFigure(catOneResult.total_mt)} style={{ fontSize: 12, fontWeight: 500, padding: '8px 16px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', cursor: 'pointer' }}>
+                          <button onClick={() => useCatOneFigure(catOneResult.total_mt)} style={{ ...btnPrimary, fontSize: 12, padding: '8px 16px' }}>
                             Use {catOneResult.total_mt.toFixed(2)} mt as Cat 1 →
                           </button>
                           <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6 }}>You can still edit the figure after applying it.</div>
@@ -801,7 +801,7 @@ export default function Scope3Dashboard() {
                         {[{ mode: 'proxy' as const, label: 'Portfolio proxy (quick)' }, { mode: 'detailed' as const, label: 'Itemise by asset (PCAF)' }].map(opt => {
                           const active = (catData['cat15']?.pcafMode ?? 'proxy') === opt.mode
                           return (
-                            <button key={opt.mode} onClick={() => updateCat('cat15', 'pcafMode', opt.mode)} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, background: active ? '#0d0d0d' : '#f8f7f5', color: active ? '#fff' : '#555553', border: `0.5px solid ${active ? '#0d0d0d' : '#e8e7e4'}`, cursor: 'pointer' }}>{opt.label}</button>
+                            <button key={opt.mode} onClick={() => updateCat('cat15', 'pcafMode', opt.mode)} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 12, ...(active ? toggleOn : toggleOff), cursor: 'pointer' }}>{opt.label}</button>
                           )
                         })}
                       </div>
@@ -951,19 +951,21 @@ export default function Scope3Dashboard() {
           <div style={!isPaid ? { filter: 'blur(7px)', pointerEvents: 'none', userSelect: 'none' } : undefined}>
 
         {/* Total */}
-        <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.5rem', marginBottom: 20, display: 'flex', alignItems: 'center', gap: '2rem' }}>
-          <div style={{ textAlign: 'center', flexShrink: 0 }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '3rem', fontWeight: 400, color: '#64fe3e', lineHeight: 1 }}>{totalScope3.toFixed(1)}</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>mt CO₂e total Scope 3</div>
-          </div>
+        <div className="tq-summary" data-module="ghg" style={{ marginBottom: 20 }}>
+          <div className="tq-summary-body">
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Data quality</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div className="tq-summary-label">Data quality</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
               {highCount > 0 && <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, background: '#E1F5EE', color: '#0F6E56', fontWeight: 600 }}>{highCount} primary data</span>}
               {medCount > 0 && <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, background: '#E6F1FB', color: '#0C447C', fontWeight: 600 }}>{medCount} activity data</span>}
               {lowCount > 0 && <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, background: '#FEF3E2', color: 'var(--color-module-climate)', fontWeight: 600 }}>{lowCount} spend-based</span>}
             </div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>{company} · {reportingYear} · GHG Protocol Scope 3 Standard</div>
+            <div className="tq-summary-sub">{company} · {reportingYear} · GHG Protocol Scope 3 Standard</div>
+          </div>
+          {/* The figure moves to the right, which is where .tq-summary-figure puts it. Its colour
+              is var(--tq-mod) from the class — it was '#64fe3e', a retired-gradient lime that
+              measured 14.61:1 on the black panel and 1.33:1 on a white one. */}
+          <div className="tq-summary-figure">{totalScope3.toFixed(1)}<small>mt CO₂e total Scope 3</small></div>
           </div>
         </div>
 
@@ -1036,8 +1038,9 @@ export default function Scope3Dashboard() {
       <h2 style={sectionHead}>Export Scope 3 inventory</h2>
       <p style={sectionSub}>Download your GHG Protocol-aligned Scope 3 inventory for CSRD, CDP, SBTi and SB 253 reporting.</p>
 
-      <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.5rem', marginBottom: 20 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Inventory summary — {company || 'Your company'}</div>
+      <div className="tq-summary" data-module="ghg" style={{ marginBottom: 20 }}>
+        <div style={{ flex: 1, padding: '20px 24px' }}>
+        <div className="tq-summary-label" style={{ marginBottom: 12 }}>Inventory summary — {company || 'Your company'}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           {[
             { label: 'Total Scope 3', val: `${totalScope3.toFixed(1)} mt` },
@@ -1046,10 +1049,11 @@ export default function Scope3Dashboard() {
             { label: 'Standard', val: 'GHG Protocol' },
           ].map(({ label, val }) => (
             <div key={label}>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>{label}</div>
-              <div style={{ fontSize: typeof val === 'number' ? '1.4rem' : '0.9rem', fontFamily: typeof val === 'number' ? 'var(--font-display)' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 600, color: '#fff', lineHeight: 1.2 }}>{val}</div>
+              <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginBottom: 4 }}>{label}</div>
+              <div style={{ fontSize: typeof val === 'number' ? '1.4rem' : '0.9rem', fontFamily: typeof val === 'number' ? 'var(--font-display)' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 600, color: 'var(--color-ink)', lineHeight: 1.2 }}>{val}</div>
             </div>
           ))}
+        </div>
         </div>
       </div>
 
@@ -1171,8 +1175,9 @@ export default function Scope3Dashboard() {
           </div>
           {step < 4 && (
             <div style={{ position: 'sticky', top: 80 }}>
-              <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.25rem', marginBottom: 12 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Live summary</div>
+              <div className="tq-summary" data-module="ghg" style={{ marginBottom: 12 }}>
+                <div style={{ flex: 1, padding: '20px 24px' }}>
+                <div className="tq-summary-label" style={{ marginBottom: 12 }}>Live summary</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {[
                     { label: 'Company', val: company || '—' },
@@ -1181,10 +1186,11 @@ export default function Scope3Dashboard() {
                     { label: 'Total Scope 3', val: totalScope3 > 0 ? `${totalScope3.toFixed(1)} mt` : '—' },
                   ].map(({ label, val }) => (
                     <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{label}</span>
-                      <span style={{ fontSize: 12, color: '#fff', fontWeight: 500 }}>{val}</span>
+                      <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{label}</span>
+                      <span style={{ fontSize: 12, color: 'var(--color-ink)', fontWeight: 500 }}>{val}</span>
                     </div>
                   ))}
+                </div>
                 </div>
               </div>
               <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.2)', borderRadius: 10, padding: '0.75rem', marginBottom: 8 }}>

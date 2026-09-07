@@ -25,6 +25,7 @@ import PaywallCard from '../../../components/PaywallCard'
 // their next insert. The pipeline export below is a paid deliverable and must follow the term.
 import { useEntitlementAccess } from '../../../../lib/useEntitlement'
 import { exportPipelineXlsx, PIPELINE_SELECT, type PipelineDealRow } from '../../../../lib/deals/exportPipelineXlsx'
+import { btnPrimary } from '@/app/components/buttonStyles'
 
 const GRAD = 'var(--color-brand)'
 
@@ -172,7 +173,7 @@ export default function DealsListPage() {
             )}
             {/* A plain link, not a button that resets state. Loading /dashboard/deals with no id
                 starts a blank deal, and the page load is what clears the previous one. */}
-            <a href="/dashboard/deals" style={{ fontSize: 13, fontWeight: 500, padding: '10px 20px', borderRadius: 8, background: '#0d0d0d', color: '#fff', textDecoration: 'none' }}>
+            <a href="/dashboard/deals" style={{ ...btnPrimary, fontSize: 13, padding: '10px 20px', textDecoration: 'none' }}>
               + New deal
             </a>
           </div>

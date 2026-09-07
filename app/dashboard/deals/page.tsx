@@ -15,7 +15,7 @@ import { supabase } from '../../../lib/supabase'
 import { resolveWizardGate, type FreeTierDeal, type SessionState } from '../../../lib/deals/gates'
 import { saveDealDraft, takeDealDraft } from '../../../lib/deals/draft'
 import { sectionHead } from '@/app/components/headingStyles'
-import { btnStep, btnStepDisabled } from '@/app/components/buttonStyles'
+import { btnStep, btnStepDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
 import {
   getObligations, getApplicableFrameworks, getFrameworkApplicability, getComplianceCost,
   sectorRisks, DEFAULT_PIPELINE_TARGETS, DEAL_CURRENCIES, JURISDICTIONS,
@@ -775,7 +775,7 @@ function DealsDashboardInner() {
               <div style={{ fontSize: 13, color: '#555553' }}>{label}</div>
               <div style={{ display: 'flex', gap: 6 }}>
                 {[{ label: 'Yes', val: true }, { label: 'No', val: false }].map(opt => (
-                  <button key={String(opt.val)} onClick={() => update(field, opt.val)} style={{ padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, background: (deal as any)[field] === opt.val ? '#0d0d0d' : '#f8f7f5', color: (deal as any)[field] === opt.val ? '#fff' : '#555553', border: `0.5px solid ${(deal as any)[field] === opt.val ? '#0d0d0d' : '#e8e7e4'}`, cursor: 'pointer' }}>
+                  <button key={String(opt.val)} onClick={() => update(field, opt.val)} style={{ padding: '5px 12px', borderRadius: 8, fontSize: 12, ...((deal as any)[field] === opt.val ? toggleOn : toggleOff), cursor: 'pointer' }}>
                     {opt.label}
                   </button>
                 ))}
@@ -935,22 +935,24 @@ function DealsDashboardInner() {
       ) : (
         <>
           {/* Black hero — consultant vs ThemisIQ, summed over the INCLUDED obligations only */}
-          <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.5rem', marginBottom: 20 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 16 }}>Estimated ESG compliance cost — {deal.target_name || 'Target'}</div>
+          <div className="tq-summary" data-module="deals" style={{ marginBottom: 20 }}>
+            <div style={{ flex: 1, padding: '20px 24px' }}>
+            <div className="tq-summary-label" style={{ marginBottom: 16 }}>Estimated ESG compliance cost — {deal.target_name || 'Target'}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>Traditional consultant</div>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.9rem', fontWeight: 400, color: '#fff', lineHeight: 1.1 }}>{consultantRange}</div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>first-year, billed by the hour</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 4 }}>Traditional consultant</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.9rem', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.1 }}>{consultantRange}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4 }}>first-year, billed by the hour</div>
               </div>
-              <div style={{ borderLeft: '0.5px solid rgba(255,255,255,0.12)', paddingLeft: 16 }}>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>With ThemisIQ</div>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.9rem', fontWeight: 400, color: '#64fe3e', lineHeight: 1.1 }}>{themisIqFigure}</div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>{includedModulesLabel}</div>
+              <div style={{ borderLeft: '1px solid var(--color-line)', paddingLeft: 16 }}>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 4 }}>With ThemisIQ</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.9rem', fontWeight: 400, color: 'var(--tq-mod)', lineHeight: 1.1 }}>{themisIqFigure}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4 }}>{includedModulesLabel}</div>
               </div>
             </div>
-            <div style={{ marginTop: 16, paddingTop: 14, borderTop: '0.5px solid rgba(255,255,255,0.1)', fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+            <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--color-line)', fontSize: 11, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>
               Priced like sustainability software, scoped like a consultant&rsquo;s engagement. The difference is automation, not depth: traditional fees are dominated by manual data-collection and review hours — the platform handles those directly, without cutting the deliverable.
+            </div>
             </div>
           </div>
           <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: -8, marginBottom: 16, lineHeight: 1.6 }}>Benchmark figures shown in USD. <strong style={{ fontWeight: 600 }}>How we benchmark:</strong> per-obligation market ranges for standalone ESG due-diligence workstreams, scaled by number of locations and sector intensity — indicative, not a quote.</div>
@@ -992,7 +994,7 @@ function DealsDashboardInner() {
 
           {/* Also recommended — NOT summed into the headline */}
           {obligations.recommended.map((o, i) => (
-            <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '0.85rem 1.25rem', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+            <div key={i} style={{ border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '0.85rem 1.25rem', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Also recommended</div>
                 <div style={{ fontSize: 13, color: '#555553' }}>{o.label}</div>
@@ -1043,8 +1045,9 @@ function DealsDashboardInner() {
       <h2 style={sectionHead}>Your diligence report</h2>
       <p style={sectionSub}>The finished write-up of this deal, for your deal memo or IC pack. You can also share the findings with the target company.</p>
 
-      <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.5rem', marginBottom: 20 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Report summary</div>
+      <div className="tq-summary" data-module="deals" style={{ marginBottom: 20 }}>
+        <div style={{ flex: 1, padding: '20px 24px' }}>
+        <div className="tq-summary-label" style={{ marginBottom: 12 }}>Report summary</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           {[
             { label: 'Target', val: deal.target_name || '—' },
@@ -1055,10 +1058,11 @@ function DealsDashboardInner() {
             { label: 'ThemisIQ est.', val: themisIqFigure },
           ].map(({ label, val, urgent }) => (
             <div key={label}>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>{label}</div>
-              <div style={{ fontSize: typeof val === 'number' ? '1.6rem' : '1rem', fontFamily: typeof val === 'number' ? 'var(--font-display)' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 600, color: urgent ? '#64fe3e' : '#fff', lineHeight: 1.2 }}>{val}</div>
+              <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginBottom: 4 }}>{label}</div>
+              <div style={{ fontSize: typeof val === 'number' ? '1.6rem' : '1rem', fontFamily: typeof val === 'number' ? 'var(--font-display)' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 600, color: urgent ? 'var(--color-module-climate)' : 'var(--color-ink)', lineHeight: 1.2 }}>{val}</div>
             </div>
           ))}
+        </div>
         </div>
       </div>
 
@@ -1221,20 +1225,20 @@ function DealsDashboardInner() {
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '3rem 1.5rem' }}>
-        <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 10 }}>Deals &amp; Investment</div>
+        <div className="tq-band" style={{ padding: '2rem', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-2)', marginBottom: 10 }}>Deals &amp; Investment</div>
           {/* ⚠️ THREE POPULATIONS, THREE MESSAGES — the same split enforce_deals_free_tier_cap()
               already makes in its two RAISE EXCEPTION branches. Until this gate became term-aware
               an expired customer never reached this wall at all; now they do, and showing them the
               never-purchased copy would invite them to buy a module they already own. 'unknown' gets
               neither claim: the entitlement read failed, so nothing about their account was
               established and an error that guesses at a cause eventually names the wrong one. */}
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 400, color: '#fff', marginBottom: 10 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 400, marginBottom: 10 }}>
             {gate.reason === 'free-deal-used' ? 'You have used your free deal'
               : gate.reason === 'expired' ? 'Your Deals access has expired.'
               : 'We could not confirm your access.'}
           </div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 20, lineHeight: 1.6 }}>
+          <div style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: 20, lineHeight: 1.6 }}>
             {gate.reason === 'free-deal-used' ? (
               <>
                 Screening one target is free. To screen another — and to keep a pipeline of them, with the
@@ -1331,8 +1335,9 @@ function DealsDashboardInner() {
           </div>
           {step < 4 && (
             <div style={{ position: 'sticky', top: 80 }}>
-              <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.25rem', marginBottom: 12 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Deal summary</div>
+              <div className="tq-summary" data-module="deals" style={{ marginBottom: 12 }}>
+                <div style={{ flex: 1, padding: '20px 24px' }}>
+                <div className="tq-summary-label" style={{ marginBottom: 12 }}>Deal summary</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {[
                     { label: 'Target', val: deal.target_name || '—' },
@@ -1343,10 +1348,11 @@ function DealsDashboardInner() {
                     { label: 'ThemisIQ est.', val: themisIqFigure },
                   ].map(({ label, val, urgent }) => (
                     <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{label}</span>
-                      <span style={{ fontSize: 12, color: urgent && val ? '#64fe3e' : '#fff', fontWeight: 500 }}>{val}</span>
+                      <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{label}</span>
+                      <span style={{ fontSize: 12, color: urgent && val ? 'var(--color-module-climate)' : 'var(--color-ink)', fontWeight: 500 }}>{val}</span>
                     </div>
                   ))}
+                </div>
                 </div>
               </div>
               {criticalRisks.length > 0 && (

@@ -9,6 +9,7 @@ import { useEntitlement } from '../../../../../lib/useEntitlement'
 import PaywallCard from '../../../../components/PaywallCard'
 import Papa from 'papaparse'
 import { labelForQuestionId } from '../../../../../lib/supply-chain/templates'
+import { btnPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
 
 interface CampaignSupplier {
   id: string
@@ -264,7 +265,7 @@ export default function CampaignDetail() {
               <input ref={fileRef} type="file" accept=".csv" onChange={handleCSVImport} style={{ display: 'none' }} />
               <button onClick={() => fileRef.current?.click()} style={{ fontSize: 12, padding: '8px 14px', borderRadius: 8, background: '#f8f7f5', border: '1px solid #e8e7e4', color: '#555553', cursor: 'pointer' }}>Import CSV</button>
               {suppliers.filter(s => s.status === 'completed').length > 0 && (
-                <button onClick={exportAllResponses} disabled={exporting} style={{ fontSize: 12, fontWeight: 500, padding: '8px 14px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', cursor: 'pointer', opacity: exporting ? 0.6 : 1 }}>
+                <button onClick={exportAllResponses} disabled={exporting} style={{ ...btnPrimary, ...(exporting ? btnStepPrimaryDisabled : null), fontSize: 12, padding: '8px 14px', cursor: exporting ? 'wait' : 'pointer' }}>
                   {exporting ? 'Exporting...' : `⬇ Export all (${suppliers.filter(s => s.status === 'completed').length})`}
                 </button>
               )}

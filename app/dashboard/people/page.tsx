@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import Nav from '../../components/Nav'
 import Papa from 'papaparse'
 import { useEntitlement } from '../../../lib/useEntitlement'
-import { btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
+import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -295,7 +295,7 @@ export default function PeopleDashboard() {
       <p style={sectionSub}>Add each job level or pay band in your organisation. You'll enter headcount and salary data for each in the next step.</p>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: '1.5rem' }}>
         {inventory.bands.map((b, i) => (
-          <button key={b.id} onClick={() => setActiveBand(i)} style={{ fontSize: 12, padding: '7px 14px', borderRadius: 8, background: activeBand === i ? '#0d0d0d' : '#f8f7f5', color: activeBand === i ? '#fff' : '#555553', border: `0.5px solid ${activeBand === i ? '#0d0d0d' : '#e8e7e4'}`, cursor: 'pointer' }}>
+          <button key={b.id} onClick={() => setActiveBand(i)} style={{ fontSize: 12, padding: '7px 14px', borderRadius: 8, ...(activeBand === i ? toggleOn : toggleOff), cursor: 'pointer' }}>
             {b.name || `Band ${i + 1}`}
           </button>
         ))}
@@ -335,7 +335,7 @@ export default function PeopleDashboard() {
         </div>
         <div style={{ flexShrink: 0 }}>
           <input ref={fileRef} type="file" accept=".csv" onChange={handleCSV} style={{ display: 'none' }} />
-          <button onClick={() => fileRef.current?.click()} style={{ fontSize: 12, fontWeight: 500, padding: '8px 16px', borderRadius: 8, background: '#0d0d0d', color: '#fff', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          <button onClick={() => fileRef.current?.click()} style={{ ...btnPrimary, fontSize: 12, padding: '8px 16px', whiteSpace: 'nowrap' }}>
             Upload CSV →
           </button>
         </div>
@@ -344,7 +344,7 @@ export default function PeopleDashboard() {
       {/* Band selector */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: '1rem' }}>
         {inventory.bands.map((b, i) => (
-          <button key={b.id} onClick={() => setActiveBand(i)} style={{ fontSize: 12, padding: '7px 14px', borderRadius: 8, background: activeBand === i ? '#0d0d0d' : '#f8f7f5', color: activeBand === i ? '#fff' : '#555553', border: `0.5px solid ${activeBand === i ? '#0d0d0d' : '#e8e7e4'}`, cursor: 'pointer' }}>
+          <button key={b.id} onClick={() => setActiveBand(i)} style={{ fontSize: 12, padding: '7px 14px', borderRadius: 8, ...(activeBand === i ? toggleOn : toggleOff), cursor: 'pointer' }}>
             {b.name || `Band ${i + 1}`}
           </button>
         ))}
@@ -353,8 +353,8 @@ export default function PeopleDashboard() {
       {/* Pay data entry */}
       {inventory.bands[activeBand] && (
         <div style={{ border: '1px solid #e8e7e4', borderRadius: 12, overflow: 'hidden' }}>
-          <div style={{ background: '#0d0d0d', padding: '12px 16px' }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{inventory.bands[activeBand].name || `Band ${activeBand + 1}`}</div>
+          <div style={{ background: 'var(--color-sunken)', color: 'var(--color-ink)', borderBottom: '2px solid var(--color-ink)', padding: '12px 16px' }}>
+            <div style={{ fontSize: 12, fontWeight: 600 }}>{inventory.bands[activeBand].name || `Band ${activeBand + 1}`}</div>
           </div>
           <div style={{ padding: '1.25rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
@@ -579,8 +579,9 @@ export default function PeopleDashboard() {
           {/* Right panel — live summary */}
           {step < 5 && (
             <div style={{ position: 'sticky', top: 80 }}>
-              <div style={{ background: '#0d0d0d', borderRadius: 14, padding: '1.25rem', marginBottom: 12 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Live summary</div>
+              <div className="tq-summary" data-module="people" style={{ marginBottom: 12 }}>
+                <div style={{ flex: 1, padding: '20px 24px' }}>
+                <div className="tq-summary-label" style={{ marginBottom: 12 }}>Live summary</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {[
                     { label: 'Company', val: inventory.company || '—' },
@@ -590,10 +591,11 @@ export default function PeopleDashboard() {
                     { label: 'Frameworks', val: inventory.jurisdictions.length > 0 ? inventory.jurisdictions.length : '—' },
                   ].map(({ label, val }) => (
                     <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{label}</span>
-                      <span style={{ fontSize: 12, color: '#fff', fontWeight: 500 }}>{val}</span>
+                      <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{label}</span>
+                      <span style={{ fontSize: 12, color: 'var(--color-ink)', fontWeight: 500 }}>{val}</span>
                     </div>
                   ))}
+                </div>
                 </div>
               </div>
 
