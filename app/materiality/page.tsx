@@ -68,7 +68,7 @@ import { sectionTitle } from '@/app/components/headingStyles'
 // single treatment (PURPLE_TINT ground, PURPLE 2px edge) deliberately, so the two diagrams
 // read as one system rather than as two separately-coloured pictures.
 const PURPLE_TINT  = '#FAF9FE'  // lens + summary-box ground — SOLID, never an opacity
-const PURPLE       = '#7425e3'  // brand purple (CLAUDE.md)
+const PURPLE       = '#7425e3'  // legacy category colour, retired as brand — pending the chart series palette work
 const PURPLE_MID   = '#534AB7'  // mid indigo — left/lens body copy, heavier container strokes
 const PURPLE_SLATE = '#3C3489'  // right-circle body copy and its divider only
 const PURPLE_INK   = '#26215C'  // darkest — every title in both diagrams
