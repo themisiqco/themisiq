@@ -10,6 +10,7 @@ import type {
   Item4Good, Item12DefaultPrecursor, Item13ActualPrecursor, Item16PrecursorOrigin,
 } from '../../../lib/cbam/report/types'
 import type { SefaBenchmarkWorkings } from '../../../lib/cbam/sefaCompute'
+import ThemisIQLogo from '../../components/ThemisIQLogo'
 
 // CBAM verifier portal — skeleton + state machine + consent gate (Part 1) and the
 // §1.2 report render (Part 2).
@@ -885,7 +886,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ background: '#fff', minHeight: '100vh', minWidth: 0, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
       <div style={{ borderBottom: '0.5px solid #e8e7e4', padding: '1rem 1.5rem' }}>
-        <span style={{ fontWeight: 700, fontSize: 18, color: '#0d0d0d' }}>Themis<span style={{ color: '#7425e3' }}>IQ</span></span>
+        <ThemisIQLogo size={18} />
       </div>
       {children}
     </div>

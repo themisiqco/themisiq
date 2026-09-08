@@ -36,6 +36,7 @@ import {
 import { disclaimerParas } from '../../../lib/disclaimer'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
 import { sectionHeadFixed as auditSectionHead, sectionHeadFixed as sectionHead } from '@/app/components/headingStyles'
+import ThemisIQLogo from '../../components/ThemisIQLogo'
 import type {
   GwpVersion, Location, Inventory, SourceDoc, ExtractedProposal,
   ConciergeStatus, CoveragePeriod, CoverageResolution, DeclarableStream, UnpriceableLocation,
@@ -311,7 +312,7 @@ function GhgEntryWall({ access }: { access: Extract<EntitlementAccess, 'expired'
   return (
     <div style={{ background: '#fff', minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
       <nav style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2rem', height: 56, display: 'flex', alignItems: 'center', gap: '1rem', position: 'sticky', top: 0, zIndex: 100 }}>
-        <a href="/dashboard" style={{ textDecoration: 'none' }}><img src="/logo.png" alt="ThemisIQ" style={{ height: 24, width: 'auto', display: 'block' }} /></a>
+        <a href="/dashboard" style={{ textDecoration: 'none' }}><ThemisIQLogo size={19} /></a>
         <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>/ GHG Inventory</span>
       </nav>
       <div style={{ maxWidth: 560, margin: '0 auto', padding: '4rem 1.5rem' }}>
@@ -2573,7 +2574,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
       <div style={{ background: '#fff', minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
         <nav style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2rem', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <a href="/dashboard" style={{ textDecoration: 'none' }}><img src="/logo.png" alt="ThemisIQ" style={{ height: 24, width: 'auto', display: 'block' }} /></a>
+            <a href="/dashboard" style={{ textDecoration: 'none' }}><ThemisIQLogo size={19} /></a>
             <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>/ GHG Inventory</span>
           </div>
         </nav>
@@ -2633,7 +2634,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
       <nav style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2rem', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <a href="/dashboard" style={{ textDecoration: 'none' }}>
-            <img src="/logo.png" alt="ThemisIQ" style={{ height: 24, width: 'auto', display: 'block' }} />
+            <ThemisIQLogo size={19} />
           </a>
           <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>/ GHG Inventory</span>
           {activeFrameworks.length > 0 && <span style={{ fontSize: 11, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 99, padding: '2px 10px', color: '#555553' }}>{activeFrameworks.map(f => f.name).join(' · ')}</span>}

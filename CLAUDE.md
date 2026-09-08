@@ -203,8 +203,35 @@ Found 5 Aug 2026 while testing the unpriceable-location isolation.
 
 ## Brand constants
 
-- **Headings:** Georgia serif.
-- **Brand gradient:** `linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)`.
+- **`app/styles/themisiq-tokens.css` IS THE AUTHORITY.** Do not price a colour from this file.
+  `lib/brand.ts` mirrors it as literal hex for the only two contexts that cannot read a custom
+  property — email HTML and jsPDF — and nothing keeps the two in sync but the person editing them.
+- **Brand:** `--color-brand: #095C6B` (deep teal, 7.6:1 on white).
+- **Headings:** Literata via `--font-display`, Georgia tail.
+- **⚠️ THERE IS NO BRAND GRADIENT.** This file documented
+  `linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e)` as the brand until 8 Sep 2026, months after the
+  token layer had moved to flat teal — a stale line in the file every session reads, which is the
+  worst place for one. The purple/blue/lime gradient is retired. It survives in two places only:
+  as flat category colours in charts and module accents, and in the transactional email templates
+  under `app/api/*`, which have not been migrated (see the note in the logo section below).
+- **Logo:** `app/components/ThemisIQLogo.tsx` — live Archivo 700 text plus a drawn Q, no image
+  file. It began as a copy of `logo/ThemisIQLogo.tsx` (the handoff package) and **is no longer
+  identical to it. Do not re-copy the package file over it.**
+  ⚠️ **The repo copy adds `display: "inline"` to the svg's inline style, and that one line is
+  load-bearing.** Tailwind 4's Preflight sets `img, svg, video, … { display: block }`
+  (`node_modules/tailwindcss/preflight.css:209`), so without it the Q becomes a block element,
+  takes its own line, and the lockup renders as "ThemisI" with the mark stranded underneath — on
+  every surface, at every size. `white-space: nowrap` on the parent does not prevent it; a
+  block-level child breaks the line regardless. `inline`, not `inline-block`: the `-0.163em`
+  baseline offset is calibrated for an inline replaced element.
+  **This fails visually, not at `tsc`** — the build passes, the tests pass, and the mark is broken
+  on the homepage. It was caught by a screenshot, which is the only thing that catches it.
+  `size` is a FONT-SIZE, not a height: cap height is
+  ~0.72 × size, so match an existing mark by measuring its cap height and dividing by 0.72. Never
+  below 18 for the full lockup; use `logo/themisiq-mark.svg` alone instead. Two flat teals, split
+  along the leaf's vein — `#12849A` and `#2AA5BC` are logo-internal, NOT tokens, and must not be
+  used for UI. Never reintroduce a gradient in the mark. The PDF path uses the raster twin in
+  `lib/pdf/logo.ts`; regenerate it from `logo/themisiq-logo.png`, never by rasterising the SVG.
 - **Neutrals:** `#0d0d0d` / `#555553` / `#888784` / `#f8f7f5` / `#e8e7e4`.
 - **Green accent:** `#0F6E56` on `#E1F5EE`.
 

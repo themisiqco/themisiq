@@ -1,26 +1,15 @@
+
+import ThemisIQLogo from './ThemisIQLogo'
 // app/components/Footer.tsx
 // Shared site footer for ThemisIQ.
 // Self-contained: import and drop in as <Footer /> on any page.
-
-function Logo({ size = 130 }: { size?: number }) {
-  const height = Math.round(size * 0.29)
-  return (
-    <img
-      src="/logo.png"
-      alt="ThemisIQ"
-      width={size}
-      height={height}
-      style={{ display: 'block' }}
-    />
-  )
-}
 
 export default function Footer() {
   return (
     <footer style={{ background: '#f8f7f5', borderTop: '0.5px solid #e8e7e4', padding: '3.5rem 2.5rem 2rem' }}>
       <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '2.2fr 1fr 1fr 1fr', gap: '3rem' }}>
         <div>
-          <Logo size={130} />
+          <ThemisIQLogo size={30} />
           <p style={{ fontSize: 13, color: 'var(--color-ink-muted)', lineHeight: 1.65, fontWeight: 400, marginTop: '1rem', maxWidth: 270 }}>
             Compliance Intelligence for Sustainable Business. GHG emissions, climate risk, supply chain, M&A diligence, AI governance, people & workforce, and cybersecurity — one platform.
           </p>

@@ -17,6 +17,7 @@ import { CS3D_APPLIES_FROM } from '../../lib/cs3d'
 import { SB253_SHORT } from '../../lib/sb253'
 import { SB261_SHORT } from '../../lib/sb261'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
+import ThemisIQLogo from '../components/ThemisIQLogo'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -447,7 +448,7 @@ function PricingPageInner() {
       <nav style={s.nav}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <Link href="/dashboard">
-            <img src="/logo.png" alt="ThemisIQ" style={{ height: 24, width: 'auto', display: 'block' }} />
+            <ThemisIQLogo size={19} />
           </Link>
           <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>/ Pricing</span>
         </div>

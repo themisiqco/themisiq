@@ -19,8 +19,9 @@ export default function Page() {
             Security at{' '}
             {/* ⚠️ NOT A WORDMARK, AND THE HOLD ON IT WAS WITHDRAWN ON EVIDENCE.
                 This was held in tasks 15b and 16b as a logotype that had to match the mark in
-                email. Both halves were wrong. The real wordmark is <img src="/logo.png"> in
-                app/components/Nav.tsx and Footer.tsx; the email mark is plain
+                email. Both halves were wrong. The real wordmark is <ThemisIQLogo /> in
+                app/components/Nav.tsx and Footer.tsx (it was <img src="/logo.png"> until the
+                8 Sep 2026 redesign); the email mark is plain
                 `font-family: Georgia, serif; color: #fff` and has NEVER carried a gradient. This is
                 an italic emphasis span inside an <h1> — the same construct as the homepage's
                 <em style={gradText}>One Intelligent Platform.</em>, flattened in task 16b.

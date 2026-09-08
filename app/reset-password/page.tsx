@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import ThemisIQLogo from '../components/ThemisIQLogo'
 
 type Status = 'checking' | 'ready' | 'invalid' | 'done'
 
@@ -74,7 +75,7 @@ export default function ResetPasswordPage() {
       {/* NAV */}
       <nav style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2rem', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <a href="/" style={{ textDecoration: 'none' }}>
-          <img src="/logo.png" alt="ThemisIQ" style={{ height: 24, width: 'auto', display: 'block' }} />
+          <ThemisIQLogo size={19} />
         </a>
         <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}><a href="/login" style={{ color: 'var(--color-brand)', textDecoration: 'none', fontWeight: 500 }}>Back to sign in →</a></span>
       </nav>

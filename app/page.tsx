@@ -9,6 +9,7 @@ import Nav from './components/Nav'
 import Footer from './components/Footer'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 import { sectionTitle } from '@/app/components/headingStyles'
+import ThemisIQLogo from './components/ThemisIQLogo'
 
 export default function Home() {
   return (
@@ -19,7 +20,7 @@ export default function Home() {
       <section style={{ padding: '7rem 2.5rem 5rem', borderBottom: '0.5px solid #e8e7e4', textAlign: 'center' }}>
         <div style={{ maxWidth: 860, margin: '0 auto' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', marginBottom: '3.5rem' }}>
-            <Logo size={320} />
+            <ThemisIQLogo size={76} />
             <p style={{ fontSize: 15, color: 'var(--color-ink-muted)', letterSpacing: '0.02em', fontWeight: 400 }}>
               Compliance Intelligence for Sustainable Business
             </p>
@@ -297,20 +298,6 @@ export default function Home() {
         a { cursor: pointer; }
       `}</style>
     </div>
-  )
-}
-
-// ── LOGO COMPONENT ──────────────────────────────────────────────────
-function Logo({ size = 130 }: { size?: number }) {
-  const height = Math.round(size * 0.29)
-  return (
-    <img
-      src="/logo.png"
-      alt="ThemisIQ"
-      width={size}
-      height={height}
-      style={{ display: 'block' }}
-    />
   )
 }
 

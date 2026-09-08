@@ -7,6 +7,7 @@ import { docTypeLabel } from '../../../lib/ghg/conciergeDocTypes'
 import type { ComparabilityRecord } from '../../../lib/ghg/comparability'
 import { anyPublishedFactorApplied } from '../../../lib/ghg/factorEditions'
 import type { FactorEditions } from '../../../lib/ghg/factorEditions'
+import ThemisIQLogo from '../../components/ThemisIQLogo'
 
 // METADATA ONLY — no old_values / new_values. The RPC used to return full before/after row
 // snapshots of ghg_inventories, which put every column back within reach of a verifier regardless of
@@ -1093,7 +1094,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ background: '#fff', minHeight: '100vh', minWidth: 0, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
       <div style={{ borderBottom: '0.5px solid #e8e7e4', padding: '1rem 1.5rem' }}>
-        <span style={{ fontWeight: 700, fontSize: 18, color: '#0d0d0d' }}>Themis<span style={{ color: '#7425e3' }}>IQ</span></span>
+        <ThemisIQLogo size={18} />
       </div>
       {children}
     </div>

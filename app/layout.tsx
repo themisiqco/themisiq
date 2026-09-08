@@ -4,6 +4,7 @@ import {
   Geist_Mono,
   Literata,
   Atkinson_Hyperlegible_Next,
+  Archivo,
 } from "next/font/google";
 import "./globals.css";
 
@@ -34,6 +35,20 @@ const atkinson = Atkinson_Hyperlegible_Next({
   subsets: ["latin"],
 });
 
+/* The wordmark's typeface, and ONLY the wordmark's — app/components/ThemisIQLogo.tsx reads
+   --font-archivo and nothing else does. Loaded here rather than via a <link> so it goes through the
+   same pipeline as the other three: self-hosted, preloaded, and size-adjusted against the fallback.
+   ⚠️ `weight: ["700"]` IS THE POINT. Archivo is a variable font, so omitting weight ships the whole
+   wght axis for one string of six letters. The lockup is 700 and nothing else.
+   ⚠️ NOT `display: 'swap'`. Next's default here is 'optional' with a size-adjusted fallback metric,
+   which is what stops the mark reflowing when the face swaps in — the nav logo is above the fold on
+   every page, so a swap would move it after paint. */
+const archivo = Archivo({
+  variable: "--font-archivo",
+  subsets: ["latin"],
+  weight: ["700"],
+});
+
 export const metadata: Metadata = {
   title: "ThemisIQ — Countless Compliance Requirements. One Intelligent Platform.",
   description: "ThemisIQ — your sustainability compliance reporting solution.",
@@ -47,7 +62,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${literata.variable} ${atkinson.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${literata.variable} ${atkinson.variable} ${archivo.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

@@ -16,6 +16,7 @@ import { CS3D_APPLIES_FROM, CS3D_CITATION, CS3D_EMPLOYEE_THRESHOLD, CS3D_TURNOVE
 // threshold is never restated in another currency. FX_AS_OF/FX_SOURCE are printed in the copy so a
 // reader can see which fixing a borderline call was made on.
 import { convertCurrency, FX_AS_OF } from '../../lib/deals/assessment'
+import ThemisIQLogo from '../components/ThemisIQLogo'
 // The obligation → module mapping, its link vocabulary and its prices. NONE of this is restated
 // here: the shorthand comes from obligationModulesParam (which inverts LEGACY_PRICING_PAGE_ID, so a
 // module the cart would silently drop is a type error rather than a lost purchase), and the figure
@@ -937,7 +938,7 @@ export default function AssessPage() {
           {/* Logo — always visible at top */}
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <a href="/" style={{ display: "block", textAlign: "center" }}>
-              <img src="/logo.png" alt="ThemisIQ" style={{ height: 64, width: "auto", mixBlendMode: "multiply", display: "block", margin: "0 auto" }} />
+              <ThemisIQLogo size={51} style={{ display: 'block', margin: '0 auto' }} />
             </a>
           </div>
 

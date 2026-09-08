@@ -38,3 +38,4 @@ app/concierge-test/
 public/data/
 supabase/.temp/
 .venv-sql/
+logo/CLAUDE-CODE-PROMPT*.md

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
+import ThemisIQLogo from './ThemisIQLogo'
 
 // Single source of truth for the header's module links — consumed by BOTH the
 // desktop Platform ▾ dropdown (full `label` + `sub`) and the mobile overlay
@@ -96,7 +97,7 @@ export default function Nav() {
         {/* LEFT GROUP: logo · Platform ▾ · Pricing */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
           <a href="/" style={{ textDecoration: 'none', flexShrink: 0 }}>
-            <img src="/logo.png" alt="ThemisIQ" style={{ height: 44, width: 'auto', display: 'block' }} />
+            <ThemisIQLogo size={35} />
           </a>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }} className="desktop-nav">
