@@ -310,8 +310,14 @@ export default function VerifierPage() {
   const token = params.token as string
   const [data, setData] = useState<VerifierPayload | null>(null)
   const [loading, setLoading] = useState(true)
+  // Non-null means the record could not be READ. That is not the same fact as a token the RPC has
+  // judged invalid, and the two must not share a screen — see the guards below.
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [docs, setDocs] = useState<VerifierDoc[]>([])
   const [docsLoading, setDocsLoading] = useState(false)
+  // Non-null means the document LIST could not be read. Not the same state as a list that is
+  // empty, and on this page the difference is the difference between a finding and a defect.
+  const [docsError, setDocsError] = useState<string | null>(null)
   // Workings table is min-width:720 inside an overflow-x:auto wrapper; show a scroll hint
   // only when it actually overflows (narrow screens), never when the whole table fits.
   const workingsScrollRef = useRef<HTMLDivElement | null>(null)
@@ -326,10 +332,24 @@ export default function VerifierPage() {
 
   useEffect(() => {
     if (!token) return
-    supabase.rpc('get_verifier_inventory', { p_token: token }).then((res: { data: VerifierPayload | null }) => {
-      setData(res.data)
-      setLoading(false)
-    })
+    supabase.rpc('get_verifier_inventory', { p_token: token }).then(
+      (res: { data: VerifierPayload | null; error: { message: string } | null }) => {
+        // A FAILURE TO READ THE TOKEN IS NOT A VERDICT ON THE TOKEN. Previously the error was
+        // discarded and `data` set to null, which fell into the guard below and told the verifier
+        // their link was invalid or expired — naming a cause that had not been established, and
+        // sending them to the operator for a replacement link that would fail identically. Worse,
+        // it made a revoked grant and a database outage indistinguishable to everyone involved.
+        // Only the RPC's own 'invalid_or_expired' verdict may produce that screen now.
+        if (res.error) setLoadError(res.error.message)
+        else if (!res.data) setLoadError('The request returned neither data nor an error.')
+        else setData(res.data)
+        setLoading(false)
+      },
+      (err: unknown) => {
+        setLoadError(err instanceof Error ? err.message : 'The request did not complete.')
+        setLoading(false)
+      },
+    )
   }, [token])
 
   // Seed the consent-gate email from the grant's stored verifier email, once,
@@ -350,10 +370,37 @@ export default function VerifierPage() {
     const hasAccess = !!data?.accepted_at || accepted
     if (!hasAccess) return
     setDocsLoading(true)
+    setDocsError(null)
+    // ⚠️ A FAILED READ IS NOT AN EMPTY EVIDENCE FILE. This used to map a non-ok response to
+    // `{ documents: [] }` — synthesising an empty list out of a failure — and swallow network
+    // errors in a bare .catch(). Either rendered "No source documents have been uploaded for this
+    // inventory" to an external verifier, under a heading instructing them to trace every figure
+    // to its source. Absent metadata is a gap; absent EVIDENCE is a basis on which a verifier
+    // qualifies or refuses an opinion (ISO 14064-3). The page must never assert it without having
+    // read it. Report the observed status only — never a guess at the cause (CLAUDE.md).
     fetch('/api/verifier-documents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) })
-      .then(r => r.ok ? r.json() : { documents: [] })
-      .then((d: { documents?: VerifierDoc[] }) => { setDocs(d.documents || []); setDocsLoading(false) })
-      .catch(() => setDocsLoading(false))
+      .then(async r => {
+        if (!r.ok) {
+          let code = ''
+          try { const b = await r.json(); if (b && typeof b.error === 'string') code = ` (${b.error})` } catch { /* non-JSON body */ }
+          setDocsError(`HTTP ${r.status}${code}`)
+          setDocsLoading(false)
+          return
+        }
+        const d = (await r.json()) as { documents?: VerifierDoc[] }
+        // A 200 carrying no list is a malformed success, not an empty one.
+        if (!Array.isArray(d.documents)) {
+          setDocsError('The request succeeded but returned no document list.')
+          setDocsLoading(false)
+          return
+        }
+        setDocs(d.documents)
+        setDocsLoading(false)
+      })
+      .catch((err: unknown) => {
+        setDocsError(err instanceof Error ? err.message : 'The request did not complete.')
+        setDocsLoading(false)
+      })
   }, [token, data?.accepted_at, accepted])
 
   // Measure whether the workings table overflows its wrapper; re-measure on resize.
@@ -369,6 +416,29 @@ export default function VerifierPage() {
 
   if (loading) return <Shell><div style={{ padding: '4rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>Loading verification review…</div></Shell>
 
+  // Ordered before the invalid-link guard: a read that did not complete has established nothing
+  // about the link, so it may not borrow that screen's verdict.
+  if (loadError) {
+    return (
+      <Shell>
+        <div style={{ maxWidth: 540, margin: '4rem auto', textAlign: 'center', padding: '0 1.5rem' }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>This review could not be loaded</h1>
+          <p style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, fontWeight: 400 }}>
+            The verification record could not be read. This is a failure to load it and says nothing
+            about your link, which may well be valid — nothing about the inventory has changed.
+            Reported as:{' '}
+            <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12, color: '#0d0d0d' }}>{loadError}</span>
+          </p>
+          <p style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, fontWeight: 400 }}>
+            Please reload the page. If it keeps happening, contact the company that shared this link,
+            or email <a href="mailto:security@themisiq.co" style={{ color: 'var(--color-brand)' }}>security@themisiq.co</a> with that message.
+          </p>
+        </div>
+      </Shell>
+    )
+  }
+
+  // Reachable only on the RPC's own verdict — see the effect above.
   if (!data || data.error || !data.inventory) {
     return (
       <Shell>
@@ -932,10 +1002,27 @@ export default function VerifierPage() {
           Supporting evidence uploaded for this inventory — trace each activity-data figure back to its source document. {VERIFIER_DOC_LINK_NOTICE}
         </p>
         {docsLoading && <div style={{ fontSize: 13, color: 'var(--color-ink-muted)', marginBottom: '2rem' }}>Loading documents…</div>}
-        {!docsLoading && docs.length === 0 && (
+        {!docsLoading && docsError && (
+          <div className="tq-callout tq-callout-note" style={{ '--tq-state': '#B91C1C', '--tq-state-wash': '#FCEBEB', marginBottom: '2rem' } as React.CSSProperties}>
+            <div className="tq-callout-heading">The source document list could not be read</div>
+            <div className="tq-callout-text">
+              This is a failure to read the list, not a statement about the evidence. Source documents
+              may well have been uploaded for this inventory; any that exist are held in storage and
+              are unaffected. This section must not be taken as evidence that none exist, and no
+              conclusion about evidence sufficiency should be drawn from it. The figures and workings
+              above are unaffected. Reported as:{' '}
+              <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12, color: '#0d0d0d' }}>{docsError}</span>
+              {' '}Please reload the page. If it keeps happening, contact the company that shared this
+              link, or email <a href="mailto:security@themisiq.co" style={{ color: 'var(--color-brand)' }}>security@themisiq.co</a> with that message.
+            </div>
+          </div>
+        )}
+        {/* `!docsError` is what makes the sentence below a finding rather than an assertion: it can
+            now only be reached by a read that actually returned a list, and the list was empty. */}
+        {!docsLoading && !docsError && docs.length === 0 && (
           <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.5rem', textAlign: 'center', fontSize: 13, color: 'var(--color-ink-muted)', marginBottom: '2rem' }}>No source documents have been uploaded for this inventory.</div>
         )}
-        {!docsLoading && docs.length > 0 && (
+        {!docsLoading && !docsError && docs.length > 0 && (
           <div style={{ marginBottom: '2rem' }}>
             {docs.map((d, i) => (
               <SourceDocRow key={d.id ?? `no-id-${i}`} doc={d} token={token} />

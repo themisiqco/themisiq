@@ -89,6 +89,9 @@ export default function CbamVerifierPage() {
   // Change history (Part 2) — same access gate as the report.
   const [history, setHistory] = useState<AuditHistoryEntry[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  // Non-null means the read did not succeed. It is NOT the same state as an empty history and the
+  // render must not collapse the two — see the effect below.
+  const [historyError, setHistoryError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!token) return
@@ -125,18 +128,44 @@ export default function CbamVerifierPage() {
   }, [token, result?.status, accepted])
 
   // Change-history fetch — same access gate as the report. Anon-client RPC,
-  // matching validate/accept (NOT routed through the documents API). Only a
-  // 'valid' status carries history; we're already past consent here, so treat
-  // consent_required/invalid/absent as an empty trail rather than an error.
+  // matching validate/accept (NOT routed through the documents API).
+  //
+  // ⚠️ A FAILED READ IS NOT AN EMPTY HISTORY, AND ON THIS PAGE THE DISTINCTION IS THE POINT.
+  // This previously coerced every non-'valid' outcome to [], reasoning that consent is already
+  // granted by the time it runs so the other statuses could not arise. Two of them can:
+  //   • The RPC re-checks the grant itself (status='active', expires_at > now(), revoked_at is
+  //     null). A token that expires or is revoked between the validate call and this one returns
+  //     'invalid' to a verifier sitting in front of a fully rendered report.
+  //   • An RPC-level failure — function absent, EXECUTE revoked, request refused — arrives as
+  //     res.error with data null. The old handler's type named only `data`, so the error was not
+  //     merely discarded, it was unnameable.
+  // All three rendered "No changes recorded." to an external verifier: an assertion about the
+  // operator's record, made by a page that had just failed to read it. Every outcome now resolves
+  // to either history or an error.
   useEffect(() => {
     const hasAccess = result?.status === 'valid' || accepted
     if (!token || !hasAccess) return
     setHistoryLoading(true)
-    supabase.rpc('cbam_verifier_audit_history', { p_token: token }).then((res: { data: AuditHistoryResult | null }) => {
-      const d = res.data
-      setHistory(d && d.status === 'valid' ? (d.history ?? []) : [])
-      setHistoryLoading(false)
-    }, () => { setHistory([]); setHistoryLoading(false) })
+    setHistoryError(null)
+    supabase.rpc('cbam_verifier_audit_history', { p_token: token }).then(
+      (res: { data: AuditHistoryResult | null; error: { message: string } | null }) => {
+        // State what was observed, never a guess at the cause (CLAUDE.md, empty-result rule).
+        if (res.error) {
+          setHistoryError(res.error.message)
+        } else if (!res.data) {
+          setHistoryError('The change-history request returned neither data nor an error.')
+        } else if (res.data.status !== 'valid') {
+          setHistoryError(`The change-history request returned status "${res.data.status}" instead of the history.`)
+        } else {
+          setHistory(res.data.history ?? [])
+        }
+        setHistoryLoading(false)
+      },
+      (err: unknown) => {
+        setHistoryError(err instanceof Error ? err.message : 'The change-history request did not complete.')
+        setHistoryLoading(false)
+      },
+    )
   }, [token, result?.status, accepted])
 
   // ── Loading ────────────────────────────────────────────────────────────────
@@ -273,7 +302,7 @@ export default function CbamVerifierPage() {
           </div>
         )}
 
-        <ReportBody data={report} token={token} history={history} historyLoading={historyLoading} />
+        <ReportBody data={report} token={token} history={history} historyLoading={historyLoading} historyError={historyError} />
       </div>
       <Footer />
     </Shell>
@@ -546,7 +575,7 @@ function auditChanges(entry: AuditHistoryEntry): { label: string; from: string |
   return rows
 }
 
-function ReportBody({ data, token, history, historyLoading }: { data: VerifierReportResponse; token: string; history: AuditHistoryEntry[]; historyLoading: boolean }) {
+function ReportBody({ data, token, history, historyLoading, historyError }: { data: VerifierReportResponse; token: string; history: AuditHistoryEntry[]; historyLoading: boolean; historyError: string | null }) {
   const { report: r, completeness, documents, coverage } = data
   return (
     <>
@@ -752,9 +781,26 @@ function ReportBody({ data, token, history, historyLoading }: { data: VerifierRe
       {/* Change history — operator edits to this tuple's disclosures & processes. */}
       <div style={{ marginTop: '2rem' }}>
         <SectionHead>Change history</SectionHead>
+        {/* Order is load-bearing: error is tested BEFORE emptiness, so the empty state below can
+            only be reached by a read that actually succeeded. */}
         {historyLoading ? (
           <div style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>Loading change history…</div>
+        ) : historyError ? (
+          <div style={{ background: '#FCEBEB', border: '0.5px solid rgba(185,28,28,0.2)', borderRadius: 10, padding: '14px 16px' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#B91C1C', marginBottom: 6 }}>The change history could not be read</div>
+            <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7 }}>
+              This is a failure to display the record, not a statement about it — the entries are held in
+              the database and are unaffected. Until the read succeeds this section cannot show what it
+              contains, so it must not be taken as evidence that no changes were made to this
+              installation and period. The rest of this report is unaffected. Reported as:{' '}
+              <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12, color: '#0d0d0d' }}>{historyError}</span>
+              {' '}Please contact the company that sent you this link, or email{' '}
+              <a href="mailto:security@themisiq.co" style={{ color: 'var(--color-brand)' }}>security@themisiq.co</a> with that message.
+            </div>
+          </div>
         ) : history.length === 0 ? (
+          // Reachable ONLY after a successful read that genuinely returned nothing. The
+          // historyError arm above is what makes this a finding rather than an assertion.
           <div style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>No changes recorded.</div>
         ) : (
           history.map((entry, i) => {
