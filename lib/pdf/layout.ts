@@ -154,7 +154,10 @@ export type Layout = {
  * lib/fonts/charis.ts.
  */
 export function createLayout(): Layout {
-  const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' })
+  // compress: true deflates the content and image streams. The wordmark raster is RGB plus an
+  // alpha plane stored uncompressed — ~3.4 MB of a report that is otherwise mostly text — and
+  // flat-colour artwork deflates hard. Costs a little CPU per document, once, at generation.
+  const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait', compress: true })
   registerCharis(doc)
 
   const pageWidth = doc.internal.pageSize.getWidth()

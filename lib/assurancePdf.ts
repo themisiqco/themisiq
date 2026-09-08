@@ -94,7 +94,10 @@ export function generateAssurancePDF(
   }
   const auditRows = audit.rows
 
-  const doc = new jsPDF({ unit: 'pt', format: 'letter' })
+  // compress: true deflates the content streams and the embedded Charis subset. This document
+  // carries no raster — it draws no wordmark — so the saving is smaller than the board report's,
+  // but it is a package a verifier receives by email and the cost is CPU once, at generation.
+  const doc = new jsPDF({ unit: 'pt', format: 'letter', compress: true })
   const W = doc.internal.pageSize.getWidth()
   const M = 48
   const refId = `TIQ-GHG-${inventory.reporting_year}-${Date.now().toString().slice(-6)}`
