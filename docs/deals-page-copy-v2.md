@@ -178,9 +178,10 @@ You inherit their SB 253 obligations.
 
 **Body** — replaces the "group level / global consolidated revenue" sentence
 A target with California nexus and revenue over $1bn is a reporting entity in
-its own right, and stays one after you buy it. The screen tests that threshold
-against the figures you enter and prints the limb, the figure and the provision
-— so the obligation is priced into your deal rather than discovered after it.
+its own right, whether it knows or not, and stays one after you buy it. The
+screen tests that threshold against the figures you enter and prints the limb,
+the figure and the provision — so the obligation is priced into your deal
+rather than discovered after it.
 
 > The current sentence asserts that SB 253 applies at group level on global
 > consolidated revenue. That is an interpretive question CARB's regulations

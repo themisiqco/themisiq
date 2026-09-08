@@ -176,7 +176,7 @@ export default function Page() {
               Acquiring a California company?<br />You inherit their SB 253 obligations.
             </h2>
             <p style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
-              A target with California nexus and revenue over ${sb253Bn}bn is a reporting entity in its own right, and stays one after you buy it. The screen tests that threshold against the figures you enter and prints the limb, the figure and the provision — so the obligation is priced into your deal rather than discovered after it.
+              A target with California nexus and revenue over ${sb253Bn}bn is a reporting entity in its own right, whether it knows or not, and stays one after you buy it. The screen tests that threshold against the figures you enter and prints the limb, the figure and the provision — so the obligation is priced into your deal rather than discovered after it.
             </p>
             {[
               'SB 253 tested against the target’s own revenue, with the provision cited',
