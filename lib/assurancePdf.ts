@@ -24,6 +24,25 @@ export interface PdfTotals { s1_total: number; s2_location: number; s2_market: n
 export interface PdfFramework { id: string; name: string; full: string; gwp: string; deadline: string }
 export interface PdfAuditRow { action: string; old_values: any; new_values: any; user_email: string | null; created_at: string }
 
+/**
+ * ⚠️ THE AUDIT TRAIL ARRIVES AS A RESULT, NOT AS AN ARRAY, AND THAT IS THE WHOLE POINT.
+ *
+ * This package is read by a verifier under ISO 14064-3 / ISAE 3410. It previously took
+ * `auditRows: PdfAuditRow[]`, and its only caller passed `(auditRows as any) || []` — so a FAILED
+ * READ and a GENUINELY EMPTY TRAIL arrived as the same value, and the document printed
+ * "0 change(s) logged" and a table row reading "No entries" for both. For an inventory with live
+ * verifier links against it, that is not a missing section: it is a false statement about the
+ * customer's record, in the artefact whose entire purpose is to be trusted.
+ *
+ * A union makes the two facts impossible to conflate. There is no `[]` a caller can pass that
+ * means "the read failed" — it must say so, and generateAssurancePDF then REFUSES TO GENERATE
+ * rather than emit a document making a claim it cannot support. Same discipline as
+ * lib/ghg/conciergeDocTypes.ts: structurally prevented, not asked for in a comment.
+ */
+export type PdfAuditTrail =
+  | { ok: true; rows: PdfAuditRow[] }
+  | { ok: false; reason: string }
+
 
 
 // The formal Important Notice is rendered as a dedicated final page. This is IN ADDITION to
@@ -59,10 +78,22 @@ export function generateAssurancePDF(
   totalsAR5: PdfTotals,
   totalsAR6: PdfTotals,
   frameworks: PdfFramework[],
-  auditRows: PdfAuditRow[],
+  audit: PdfAuditTrail,
   efSources: { combustion: string; electricity: string; gwp_ar4: string; gwp_ar5: string; gwp_ar6?: string },
   residualRows: string[][] = []
 ) {
+  // ⚠️ REFUSE, DO NOT DEGRADE. A package missing its audit trail is recoverable — the user retries.
+  // A package ASSERTING an empty audit trail is not: it goes to a verifier as evidence. Throwing
+  // here is what stops the second thing happening, and the caller surfaces the reason.
+  if (!audit.ok) {
+    throw new Error(
+      `Assurance package not generated: the audit trail could not be read (${audit.reason}). ` +
+      'The package is not produced without it, because a verifier would otherwise receive a ' +
+      'document stating this inventory has no recorded history.'
+    )
+  }
+  const auditRows = audit.rows
+
   const doc = new jsPDF({ unit: 'pt', format: 'letter' })
   const W = doc.internal.pageSize.getWidth()
   const M = 48
@@ -244,7 +275,9 @@ export function generateAssurancePDF(
       changeText,
     ])
   })
-  if (auditBody.length === 0) auditBody.push(['—', 'No entries', '—', '—'])
+  // Reachable only on a SUCCESSFUL read that returned nothing, which is a true statement about
+  // a saved-but-never-edited inventory. A failed read cannot reach this line — see the throw above.
+  if (auditBody.length === 0) auditBody.push(['—', 'No entries recorded', '—', '—'])
   autoTable(doc, {
     startY: 98,
     head: [['Timestamp', 'Action', 'User', 'Change']],

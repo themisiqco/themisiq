@@ -2446,7 +2446,25 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
   }
 
   const generateAssurance = async () => {
-    const { data: auditRows } = await supabase.from('audit_log').select('*').eq('table_name', 'ghg_inventories').eq('record_id', inventoryId).order('created_at', { ascending: false })
+    // ⚠️ THE ERROR IS READ, NOT DISCARDED. This previously destructured `data` only and passed
+    // `auditRows || []` onward, so a REFUSED READ became an empty trail and the package printed
+    // "0 change(s) logged" for an inventory with live verifier links against it. The read was
+    // failing in production because `authenticated` holds no SELECT grant on audit_log, so
+    // PostgREST refused it before RLS was ever consulted — a failure the client never saw.
+    const { data: auditRows, error: auditErr } = await supabase
+      .from('audit_log').select('*')
+      .eq('table_name', 'ghg_inventories').eq('record_id', inventoryId)
+      .order('created_at', { ascending: false })
+    if (auditErr) {
+      // State what was observed. Do not guess at a cause — see the empty-result rule in CLAUDE.md.
+      alert(
+        'The assurance package was not generated.\n\n' +
+        `The audit trail could not be read: ${auditErr.message}\n\n` +
+        'The package is not produced without it, because it would otherwise state that this ' +
+        'inventory has no recorded history. Nothing has been downloaded.'
+      )
+      return
+    }
     // Per-location residual-mix citation for the PDF (only when a market-based framework is in scope).
     const needsMkt = activeFrameworks.some(f => f.id === 'esrs' || f.id === 'gri')
     const residualRows: string[][] = needsMkt
@@ -2460,7 +2478,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           ]
         })
       : []
-    generateAssurancePDF(inventory as any, totals_ar4 as any, totals_ar5 as any, totals_ar6 as any, activeFrameworks as any, (auditRows as any) || [], EF_SOURCES, residualRows)
+    // ⚠️ NOT `as any`. Every other argument here is cast, and that is why changing the audit
+    // parameter's TYPE did not break this call site on its own — `as any` defeats the check that
+    // would have caught it. This one argument is passed typed so the union actually binds.
+    generateAssurancePDF(inventory as any, totals_ar4 as any, totals_ar5 as any, totals_ar6 as any, activeFrameworks as any, { ok: true, rows: auditRows ?? [] }, EF_SOURCES, residualRows)
   }
 
   const generateExport = async (frameworkId: string) => {
@@ -2980,18 +3001,32 @@ function diffRow(oldV: any, newV: any): { label: string; from: string; to: strin
 function AuditTrail({ inventoryId, step }: { inventoryId: string | null; step: number }) {
   const [rows, setRows] = useState<AuditRow[]>([])
   const [loading, setLoading] = useState(false)
+  // ⚠️ THREE STATES, NOT TWO. Loading / failed / loaded — and "loaded with nothing" is a FOURTH
+  // fact that only exists once the read succeeded. This component previously had two states and
+  // coerced `res.data || []`, so a refused read rendered as "0 changes logged" and "No entries
+  // recorded yet" beneath an ISO 14064-3 / ISAE 3410 heading. That is an assertion about the
+  // customer's record, not a placeholder, and it was false in production.
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!inventoryId) return
     setLoading(true)
+    setError(null)
     supabase
       .from('audit_log')
       .select('*')
       .eq('table_name', 'ghg_inventories')
       .eq('record_id', inventoryId)
       .order('created_at', { ascending: false })
-      .then((res: { data: AuditRow[] | null }) => {
-        setRows(res.data || [])
+      .then((res: { data: AuditRow[] | null; error: { message: string } | null }) => {
+        if (res.error) {
+          // Report what was observed. Naming a probable cause here is how the last four of these
+          // hid real defects for months — see the empty-result rule in CLAUDE.md.
+          setError(res.error.message)
+          setRows([])
+        } else {
+          setRows(res.data || [])
+        }
         setLoading(false)
       })
   }, [inventoryId, step])
@@ -3014,17 +3049,38 @@ function AuditTrail({ inventoryId, step }: { inventoryId: string | null; step: n
       <h2 style={auditSectionHead}>Audit trail</h2>
       <p style={auditSectionSub}>Every change to this inventory is recorded automatically — who, what, and when — in a tamper-evident log. This is the record your verifier reviews.</p>
 
-      <div className="tq-summary" style={{ padding: '1.25rem 1.5rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }} className="tq-summary-label">Append-only record</div>
-          <div style={{ fontSize: 13, color: 'var(--color-ink-2)', fontWeight: 400 }}>{rows.length} change{rows.length !== 1 ? 's' : ''} logged · entries cannot be edited or deleted</div>
+      {/* ⚠️ THE ISO STRIP RENDERS ONLY ON A SUCCESSFUL READ. "N changes logged · entries cannot be
+          edited or deleted · ISO 14064-3 / ISAE 3410 traceability" is a claim about the record. It
+          must not appear when we do not know what the record contains — the count would be zero
+          because the read failed, not because nothing happened. */}
+      {!error && (
+        <div className="tq-summary" style={{ padding: '1.25rem 1.5rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }} className="tq-summary-label">Append-only record</div>
+            <div style={{ fontSize: 13, color: 'var(--color-ink-2)', fontWeight: 400 }}>{loading ? 'Reading the record…' : `${rows.length} change${rows.length !== 1 ? 's' : ''} logged · entries cannot be edited or deleted`}</div>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--color-ink-2)' }}>ISO 14064-3 / ISAE 3410 traceability</div>
         </div>
-        <div style={{ fontSize: 11, color: 'var(--color-ink-2)' }}>ISO 14064-3 / ISAE 3410 traceability</div>
-      </div>
+      )}
+
+      {error && (
+        <div className="tq-callout tq-callout-note" style={{ '--tq-state': '#B91C1C', '--tq-state-wash': '#FCEBEB', marginBottom: '1.5rem' } as React.CSSProperties}>
+          <div className="tq-callout-heading">The audit trail could not be read</div>
+          <div className="tq-callout-text">
+            This is a display failure, not a statement about your record — the entries are held in the
+            database and are unaffected. Until it loads, this screen cannot show you what it contains,
+            and the assurance package will not be generated. Reported by the database as:{' '}
+            <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12 }}>{error}</span>
+            {' '}Please send that message to <a href="mailto:security@themisiq.co" style={{ color: 'var(--color-brand)' }}>security@themisiq.co</a>.
+          </div>
+        </div>
+      )}
 
       {loading && <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-ink-muted)', fontSize: 13 }}>Loading history…</div>}
 
-      {!loading && rows.length === 0 && (
+      {/* `!error` is what makes this a placeholder rather than an assertion: it can now only be
+          reached when the read SUCCEEDED and genuinely returned nothing. */}
+      {!loading && !error && rows.length === 0 && (
         <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '2rem', textAlign: 'center', fontSize: 13, color: '#555553' }}>No entries recorded yet.</div>
       )}
 
