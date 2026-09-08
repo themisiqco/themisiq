@@ -359,3 +359,43 @@ function, and the migration aborted at install on a file with nothing wrong with
 it. Both of its assertions now list names. Prefer a name list wherever the
 population is knowable at write time.
 
+
+## Verified 8 Sep 2026
+
+### Security artefacts and questionnaire readiness
+
+Raised while correcting `app/security/page.tsx:222`, which offered *"Penetration
+test reports, SOC 2 bridge letters, and full security questionnaire responses …
+available on request"*. Two of the three artefacts do not exist: no independent
+penetration test has been performed, and a SOC 2 bridge letter is issued by an
+auditor to cover the gap after a report period ends — offering one implies an
+audit that has not happened. The offer is now narrowed to the questionnaire.
+
+⚠️ **This class is sharper than the assertions corrected in tasks 33–39, and that
+is the reusable lesson.** An assertion is checked only if someone chooses to
+check it. **An OFFER invites the request that reveals the gap** — and it does so
+during a sales process, from the buyer who cares most, at the moment the answer
+costs the most. Audit offers before assertions.
+
+- **Complete a CAIQ or SIG Lite proactively.** Doing it once, in advance, means a
+  completed questionnaire can be sent on the day it is asked for, instead of each
+  buyer's own form being filled from scratch under deal pressure. It also surfaces
+  the gaps on our own timetable rather than a prospect's. CAIQ (CSA) is the usual
+  choice for SaaS; SIG Lite is more common in financial services — pick for the
+  buyers we expect. This is the work that makes the narrowed offer honourable.
+
+- **Add `SECURITY.md` to the repository.** GitHub flags it as missing. It is also
+  how the 24-hour response promise (`app/security/page.tsx`, disclosure section,
+  audit row 24) becomes a real process rather than a sentence on a marketing page:
+  a reporter gets a documented channel and scope, and GitHub surfaces it on the
+  repo and in the advisory flow. Pair it with whoever actually monitors
+  `security@themisiq.co` — nothing in the codebase routes or watches that inbox
+  today (verified task 37).
+
+- **Restore the artefact offer if and when the artefacts exist.** A pen test
+  report or a SOC 2 report makes the original sentence true. Until then it is an
+  invitation to ask for something we cannot send.
+  ⚠️ Restoring it is a THREE-place change: this offer, the certifications table
+  (`:57–63`), and `docs/security-claims-audit.md` row 17, which records the pen
+  test as deleted rather than deferred.
+

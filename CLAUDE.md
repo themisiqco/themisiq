@@ -80,6 +80,32 @@ The engine is pure calc (no React/Supabase): all factor tables, coverage analysi
 
 ---
 
+## RLS policy rules
+
+- **Every new RLS policy referencing `auth.uid()` must wrap it in a scalar subselect:
+  `(select auth.uid())`, never a bare `auth.uid()`.** `auth.uid()` is STABLE, so inside a policy
+  predicate Postgres may re-evaluate it once per row; `(select auth.uid())` has no outer reference,
+  so the planner hoists it to an InitPlan and evaluates it once per query. Supabase's linter reports
+  the bare form as `auth_rls_initplan` — 63 policies carried it before the September 2026 sweep
+  (`supabase/migrations/20260908_*_rls_initplan.sql`, batched by module).
+  **The result set is identical either way** — STABLE means the value cannot change within a
+  statement — so this is a planning fix, not a semantic one. Which is exactly why it is easy to
+  reintroduce without noticing.
+  ⚠️ **Five tables currently have RLS ENABLED WITH NO POLICY** — `ghg_entries`,
+  `materiality_survey_closing_comments`, `materiality_survey_responses`, `organizations`,
+  `rate_limits`. That is fail-closed today, but it means the first policy written for any of them
+  is a NEW policy on an old table, which is precisely where this rule gets forgotten.
+
+- **`ghg_conversation_starters` is deliberately world-readable. Do not re-triage it.**
+  It holds twelve seeded prompt suggestions for the GHG assistant — no user data, no writes, no
+  foreign keys to customer rows. Its single policy is `USING (true)` granted to `anon` because the
+  GHG bot reads it with the public anon key before a session exists. Supabase's Security Advisor
+  will keep listing it under the public-read heading; that is the advisor describing the
+  configuration correctly, not a finding. This note exists because the table appears in no
+  migration and is referenced nowhere in application code, so every future linter review rediscovers
+  it and has to establish the intent from scratch.
+  If it ever gains a column carrying anything customer-specific, the policy must be revisited.
+
 ## Methodology integrity rules
 
 - Preserve **verbatim source values** where a verifier may cross-check against the source document (e.g. bill period end dates — do not silently normalize "May 01" to "Apr 30").

@@ -143,11 +143,9 @@ export default function Page() {
             <div style={eyebrow}>Access control</div>
             <h2 style={sectionTitle}>Who can access your data.</h2>
             {[
-              ['You control access', 'You manage user access within your organisation via ThemisIQ\'s role-based access control (RBAC). User roles: Administrator, Editor, Viewer.'],
-              ['ThemisIQ staff access', 'ThemisIQ employees do not have routine access to customer platform data. Support access requires a documented request, approval, and is logged.'],
-              ['MFA mandatory', 'Multi-factor authentication is mandatory for all ThemisIQ staff accessing production systems. We recommend enabling MFA for all customer accounts.'],
-              ['Least privilege', 'ThemisIQ staff access follows least-privilege principles. Privileged access is reviewed quarterly.'],
-              ['Offboarding', 'All system access is revoked within 1 hour of any staff termination — voluntary or involuntary.'],
+              ['Account-level access', 'Your data belongs to the account that created it, and access is per account \u2014 signing in with your own credentials is what reaches your data, and no other account can. ThemisIQ does not offer shared team accounts or per-user permissions within an organisation.'],
+              ['Who operates ThemisIQ', 'ThemisIQ is operated by its founder, with one named deputy for continuity. Production access is held by those two accounts and no others. There is no support organisation with standing access to customer data, and no third party administers the platform on our behalf.'],
+              ['Multi-factor authentication', 'Every account with production access \u2014 Supabase, Vercel and GitHub \u2014 has multi-factor authentication enrolled via authenticator app. We recommend enabling MFA on your own ThemisIQ account as well.'],
             ].map(([title, body], i) => (
               <div key={i} style={{ borderBottom: '0.5px solid #e8e7e4', padding: '14px 0' }}>
                 <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>{title}</div>
@@ -165,7 +163,7 @@ export default function Page() {
           <h2 style={sectionTitle}>What happens if something goes wrong.</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 12, overflow: 'hidden', marginTop: '1.5rem' }}>
             {[
-              { step: '01', title: 'Detect', body: 'We monitor all production systems 24/7 for anomalies, security events, and unauthorised access attempts.' },
+              { step: '01', title: 'Detect', body: 'Detection is by notification from the providers that run our infrastructure \u2014 Supabase, Vercel, GitHub and Stripe \u2014 and by reports to security@themisiq.co, which is monitored with push notification. Automated alerting on our own systems is not configured.' },
               { step: '02', title: 'Contain', body: 'P1 incidents are contained within 1 hour of detection. Affected systems are isolated immediately.' },
               { step: '03', title: 'Notify', body: 'You are notified within 24 hours of a confirmed data breach affecting your data. Regulatory notifications within 72 hours.' },
               { step: '04', title: 'Review', body: 'Every P1 and P2 incident has a mandatory post-incident review within 14 days. Findings shared with affected customers on request.' },
@@ -187,12 +185,10 @@ export default function Page() {
             <div style={eyebrow}>Vulnerability management</div>
             <h2 style={sectionTitle}>Keeping the platform secure.</h2>
             {[
-              ['Weekly scanning', 'Automated vulnerability scanning across all production systems every week'],
-              ['Critical patches', 'Applied within 7 days of discovery'],
-              ['Annual penetration test', 'By an independent third-party security firm. Findings tracked to closure.'],
-              ['Dependency scanning', 'All third-party code dependencies scanned for known vulnerabilities in the CI/CD pipeline on every build'],
-              ['Code review', 'All code changes require peer review before merging to production'],
-              ['Secrets management', 'API keys and credentials managed via secure environment variable injection — never committed to source code'],
+              ['Dependency monitoring', 'Third-party dependencies are monitored continuously by GitHub Dependabot, which raises an alert and opens a pull request with the patched version when a known vulnerability is published. The infrastructure beneath the application is operated by Vercel and Supabase, whose certifications cover it.'],
+              ['Patching', 'Dependabot opens a pull request for each patched version automatically. Merging is a manual review step gated on the full test suite passing, so a fix reaches production once it has been reviewed and the build is green. A fixed remediation window is not published.'],
+              ['Build gate', 'Every deploy runs the full test suite and a strict TypeScript check before the application is built \u2014 a failing test or type error stops the deploy.'],
+              ['Secrets management', 'API keys and credentials are held in environment variables and are never committed to source code. GitHub secret scanning is enabled on the repository and covers the full commit history, not only the files currently checked in.'],
             ].map(([title, body], i) => (
               <div key={i} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '0.5px solid #e8e7e4' }}>
                 <span style={{ color: '#0F6E56', flexShrink: 0, fontWeight: 600, marginTop: 1 }}>✓</span>
@@ -221,7 +217,7 @@ export default function Page() {
             </div>
             <div className="tq-callout tq-callout-note" style={{ '--tq-state': '#1D9E75', '--tq-state-wash': '#E1F5EE' } as React.CSSProperties}>
               <div className="tq-callout-heading">Enterprise security reviews</div>
-              <div className="tq-callout-text">Penetration test reports, SOC 2 bridge letters, and full security questionnaire responses are available on request for enterprise customers conducting security due diligence.</div>
+              <div className="tq-callout-text">If you are conducting security due diligence, send your questionnaire to security@themisiq.co and we will complete it. ThemisIQ does not yet hold a SOC 2 report or an independent penetration test report, so those artefacts are not available; the certification table above gives the current position and target dates.</div>
             </div>
           </div>
         </div>
