@@ -2687,7 +2687,12 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
         )}
         {step === 4 && renderStep4()}
         {step === 5 && renderStep5()}
-        {step === 6 && <><AuditTrail inventoryId={inventoryId} step={step} /><VerifierInvite inventoryId={inventoryId} /></>}
+        {/* ACTIVE ONLY, and it must not read isPaid — that is true for 'expired' by contract.
+            Minting a grant is a WRITE the term should withdraw: verifier_access RLS checks only
+            customer_user_id = auth.uid(), there is no trigger on the table, and a minted token then
+            reads the inventory for its own 90 days with no entitlement check anywhere downstream.
+            The audit trail stays: reading is not withdrawn by expiry (see the ENTRY GATE note). */}
+        {step === 6 && <><AuditTrail inventoryId={inventoryId} step={step} />{ghgAccess === 'active' && <VerifierInvite inventoryId={inventoryId} />}</>}
 
         {step === 2 && !gridReady && (
           <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 8, padding: '12px 16px', marginTop: '1.5rem', fontSize: 12, fontWeight: 600, color: 'var(--color-module-climate)' }}>⚠ {unresolvedGridLocations.length} location{unresolvedGridLocations.length > 1 ? 's' : ''} need{unresolvedGridLocations.length > 1 ? '' : 's'} a grid region before you can continue: {unresolvedGridLocations.map(l => l.name).join(', ')}</div>
