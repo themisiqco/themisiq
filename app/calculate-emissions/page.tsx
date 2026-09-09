@@ -19,6 +19,7 @@
 
 import type { Metadata } from "next";
 import { SB253_SHORT, SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_SCOPE3_FROM } from '../../lib/sb253';
+import { GHG_TIERS } from '../../lib/pricing';
 import Link from "next/link";
 
 // --- CONFIG ------------------------------------------------------
@@ -37,6 +38,12 @@ const CONFIG = {
   TRUST_URL: "/trust",
   PRICING_URL: "/pricing",
 };
+
+// GHG entry price from the single source of truth, not a literal. Declared ABOVE
+// FAQ_LD so the cost answer can interpolate it. Same pattern as
+// app/climate-ghg/page.tsx:16.
+const ghgFrom = GHG_TIERS.starter.priceUSD?.toLocaleString('en-US');
+const ghgPro = GHG_TIERS.professional.priceUSD?.toLocaleString('en-US');
 
 // --- SEO ---------------------------------------------------------
 export const metadata: Metadata = {
@@ -124,7 +131,7 @@ const FAQ_LD = {
       name: "What does it cost?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Calculating and previewing your Scope 1 and 2 emissions is free. The GHG module is $4,900 USD; Concierge from $799; Verification Readiness $1,499; Advisory is custom; Scope 3 (all 15 categories) is included in the GHG module; the Supply Chain module adds primary supplier data collection for Category 1. All prices in USD.",
+        text: `Calculating and previewing your Scope 1 and 2 emissions is free. The GHG module starts at $${ghgFrom} USD and is priced by number of locations; Concierge from $799; Advisory is custom; Scope 3 (all 15 categories) is included in the GHG module; the Supply Chain module adds primary supplier data collection for Category 1. All prices in USD.`,
       },
     },
     {
@@ -552,21 +559,15 @@ export default function CalculateEmissionsPage() {
             <div className="tier-grid">
               <div className="tier">
                 <div className="tier-name">GHG Module</div>
-                <div className="tier-price">$4,900*</div>
-                <p>The core, self-serve product. Calculate your Scope 1 &amp; 2 emissions and download a report ready for SB 253 &mdash; or any global GHG framework &mdash; built on the GHG Protocol and methodology that holds up to a verifier.</p>
-                <div className="tier-when">Start here &mdash; the core Scope 1 &amp; 2 report. Everything else is an optional add-on.</div>
+                <div className="tier-price">from ${ghgFrom}*</div>
+                <p>The core, self-serve product. Calculate your Scope 1, 2 and 3 emissions and download a report ready for SB 253 &mdash; or any global GHG framework &mdash; built on the GHG Protocol and methodology that holds up to a verifier.</p>
+                <div className="tier-when">Start here &mdash; the core report, covering Scope 1, 2 and 3.</div>
               </div>
               <div className="tier">
                 <div className="tier-name">Concierge</div>
                 <div className="tier-price">from $799</div>
                 <p>Missing invoices, or not comfortable tabulating the annual totals? Our Concierge add-on does the heavy lifting &mdash; we extract and total the data from your statements for you.</p>
                 <div className="tier-when">Best when your bills are scattered or you&rsquo;d rather not key in numbers.</div>
-              </div>
-              <div className="tier">
-                <div className="tier-name">Verification Readiness</div>
-                <div className="tier-price">$1,499</div>
-                <p>Need your GHG emissions verified by a third party? Verification Readiness opens full audit-trail access with a unique verifier log-in to the back end, so they can validate your numbers against our GHG-Protocol methodology &mdash; the gold standard for emissions accounting.</p>
-                <div className="tier-when">Best when a customer, investor, or regulator requires independent verification.</div>
               </div>
               <div className="tier">
                 <div className="tier-name">Advisory</div>
@@ -576,7 +577,7 @@ export default function CalculateEmissionsPage() {
               </div>
             </div>
 
-            <p className="usd-note">* All prices shown in USD.</p>
+            <p className="usd-note">* All prices in USD. The GHG module is priced by number of locations: from ${ghgFrom} for up to {GHG_TIERS.starter.locationAllowance} locations, ${ghgPro} for up to {GHG_TIERS.professional.locationAllowance}. More than that, or unusual cases, are quoted.</p>
 
             <div className="support-cta">
               <Link className="btn btn-primary" href={CONFIG.TRY_URL}>Ready to start? See your emissions instantly</Link>
@@ -639,7 +640,7 @@ export default function CalculateEmissionsPage() {
               <details className="qa">
                 <summary>How accurate is it? Will it hold up to a verifier?</summary>
                 <div className="qa-body">
-                  Every calculation runs on the <strong>GHG Protocol Corporate Accounting and Reporting Standard</strong> &mdash; the basis required by SB&nbsp;253, CDP, ESRS&nbsp;E1, GRI&nbsp;305, and IFRS&nbsp;S2. We apply IPCC&nbsp;AR6 global warming potentials by default (AR4 for SB&nbsp;253, to match CARB&rsquo;s program) and country-matched emission factors &mdash; US&nbsp;EPA, Canada&rsquo;s ECCC, UK&nbsp;DEFRA, and IPCC and EEA factors for the EU &mdash; all versioned, vintage-stamped, and cited in every export. Scope&nbsp;2 supports both location-based and market-based (residual-mix) accounting per the GHG Protocol Scope&nbsp;2 Guidance, and workings are documented per source and aligned with ISO&nbsp;14064-3 and ISAE&nbsp;3410, so your numbers hold up under limited or reasonable assurance. For requests that require independent sign-off, the <strong>Verification Readiness</strong> add-on gives a third-party verifier their own log-in and a full audit trail. Full detail is on our <Link href={CONFIG.METHODOLOGY_URL}>methodology page</Link>.
+                  Every calculation runs on the <strong>GHG Protocol Corporate Accounting and Reporting Standard</strong> &mdash; the basis required by SB&nbsp;253, CDP, ESRS&nbsp;E1, GRI&nbsp;305, and IFRS&nbsp;S2. We apply IPCC&nbsp;AR6 global warming potentials by default (AR4 for SB&nbsp;253, to match CARB&rsquo;s program) and country-matched emission factors &mdash; US&nbsp;EPA, Canada&rsquo;s ECCC, UK&nbsp;DEFRA, and IPCC and EEA factors for the EU &mdash; all versioned, vintage-stamped, and cited in every export. Scope&nbsp;2 supports both location-based and market-based (residual-mix) accounting per the GHG Protocol Scope&nbsp;2 Guidance, and workings are documented per source and aligned with ISO&nbsp;14064-3 and ISAE&nbsp;3410, so your numbers hold up under limited or reasonable assurance. For requests that require independent sign-off, the GHG module lets you invite a third-party verifier to a read-only view of your inventory and its full audit trail, by secure link. Full detail is on our <Link href={CONFIG.METHODOLOGY_URL}>methodology page</Link>.
                 </div>
               </details>
 
@@ -671,13 +672,12 @@ export default function CalculateEmissionsPage() {
                   A fraction of what consultants and legacy platforms charge. Seeing your emissions is free &mdash; you only pay when you&rsquo;re ready to download a report or add support:
                   <ul className="price-list">
                     <li><span className="pl-name">Calculate &amp; preview your Scope 1 &amp; 2 emissions</span><span className="pl-price">Free</span></li>
-                    <li><span className="pl-name">GHG module &mdash; Scope 1 &amp; 2 report, any framework</span><span className="pl-price">$4,900*</span></li>
+                    <li><span className="pl-name">GHG module &mdash; Scope 1, 2 and 3 report, any framework</span><span className="pl-price">from ${ghgFrom}*</span></li>
                     <li><span className="pl-name">Concierge &mdash; we tabulate the data from your bills</span><span className="pl-price">from $799</span></li>
-                    <li><span className="pl-name">Verification Readiness &mdash; third-party verifier access</span><span className="pl-price">$1,499</span></li>
                     <li><span className="pl-name">Advisory &mdash; dedicated specialists guide you</span><span className="pl-price">Custom</span></li>
                     <li><span className="pl-name">Scope 3 &mdash; full value chain, included in the GHG module</span><span className="pl-price"><Link href={CONFIG.CLIMATE_GHG_URL}>See module &rarr;</Link></span></li>
                   </ul>
-                  <p className="usd-note">* All prices shown in USD.</p>
+                  <p className="usd-note">* All prices in USD. The GHG module is priced by number of locations: from ${ghgFrom} for up to {GHG_TIERS.starter.locationAllowance} locations, ${ghgPro} for up to {GHG_TIERS.professional.locationAllowance}. More than that, or unusual cases, are quoted.</p>
                 </div>
               </details>
 
