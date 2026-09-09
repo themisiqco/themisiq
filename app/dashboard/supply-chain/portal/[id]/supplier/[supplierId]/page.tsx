@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Nav from '../../../../../../components/Nav'
 import { supabase } from '../../../../../../../lib/supabase'
-import { useEntitlement } from '../../../../../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../../../../../lib/useEntitlement'
 import PaywallCard from '../../../../../../components/PaywallCard'
 import { TEMPLATES } from '../../../../../../../lib/supply-chain/templates'
 
@@ -31,7 +31,7 @@ const getResponseColor = (response: string): string => {
 const GRAD = 'var(--color-brand)'
 
 export default function SupplierResponseViewer() {
-  const isPaid = useEntitlement('supply-chain')
+  const { isPaid, loading: entLoading } = useEntitlementState('supply-chain')
   const router = useRouter()
   const params = useParams()
   const campaignId = params.id as string
@@ -108,7 +108,7 @@ export default function SupplierResponseViewer() {
     a.click()
   }
 
-  if (loading) return (
+  if (loading || entLoading) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
       <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-ink-muted)' }}>Loading responses...</div>

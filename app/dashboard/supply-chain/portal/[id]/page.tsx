@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import Nav from '../../../../components/Nav'
 import { supabase } from '../../../../../lib/supabase'
-import { useEntitlement } from '../../../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../../../lib/useEntitlement'
 import PaywallCard from '../../../../components/PaywallCard'
 import Papa from 'papaparse'
 import { labelForQuestionId } from '../../../../../lib/supply-chain/templates'
@@ -46,7 +46,7 @@ const STATUS_CONFIG = {
 }
 
 export default function CampaignDetail() {
-  const isPaid = useEntitlement('supply-chain')
+  const { isPaid, loading: entLoading } = useEntitlementState('supply-chain')
   const router = useRouter()
   const params = useParams()
   const id = params.id as string
@@ -232,7 +232,7 @@ export default function CampaignDetail() {
   const invited = suppliers.filter(s => s.status === 'invited').length
   const pct = suppliers.length ? Math.round((completed / suppliers.length) * 100) : 0
 
-  if (loading) return (
+  if (loading || entLoading) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
       <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-ink-muted)' }}>Loading...</div>

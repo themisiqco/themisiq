@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react'
 import Nav from '../../components/Nav'
 import Papa from 'papaparse'
-import { useEntitlement } from '../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../lib/useEntitlement'
 import { CS3D_APPLIES_FROM } from '../../../lib/cs3d'
 import { sectionHead } from '@/app/components/headingStyles'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
@@ -158,7 +158,7 @@ const STEP_NAMES = ['Setup', 'Suppliers', 'Risk Scoring', 'Scope 3', 'Export']
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function SupplyChainDashboard() {
-  const isPaid = useEntitlement('supply-chain')
+  const { isPaid, loading: entLoading } = useEntitlementState('supply-chain')
   const [step, setStep] = useState(0)
   const [inventory, setInventory] = useState<SupplyChainInventory>({
     company: '', reporting_year: 2024,
@@ -579,7 +579,11 @@ export default function SupplyChainDashboard() {
         </div>
       </div>
 
-      {isPaid ? (
+      {entLoading ? (
+        <div className="tq-band" style={{ borderRadius: 14, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-2)', fontSize: 13 }}>
+          Supplier risk register...
+        </div>
+      ) : isPaid ? (
         <div>
           <div style={{ background: '#fff', border: '1px solid #e8e7e4', borderRadius: 10, padding: '1rem', marginBottom: 16 }}>
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
