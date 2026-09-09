@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useEntitlement } from '../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../lib/useEntitlement'
 import Nav from '../../components/Nav'
 import { sectionHead } from '@/app/components/headingStyles'
 import { btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
@@ -183,7 +183,7 @@ const SECTORS = ['Financial services', 'Healthcare', 'Technology', 'Retail & e-c
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function AIGovernanceDashboard() {
-  const isPaid = useEntitlement('ai-governance')
+  const { isPaid, loading: entLoading } = useEntitlementState('ai-governance')
   const [step, setStep] = useState(0)
   const [inventory, setInventory] = useState<AIInventory>({ company: '', reporting_year: 2025, jurisdiction: 'EU', sector: '', systems: [] })
   const [activeSystem, setActiveSystem] = useState(0)
@@ -577,7 +577,11 @@ export default function AIGovernanceDashboard() {
         </div>
         </div>
       </div>
-      {isPaid ? (
+      {entLoading ? (
+        <div className="tq-band" style={{ borderRadius: 14, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-2)', fontSize: 13 }}>
+          AI inventory and gap assessment...
+        </div>
+      ) : isPaid ? (
         <div>
           <div style={{ background: '#fff', border: '1px solid #e8e7e4', borderRadius: 10, padding: '1rem', marginBottom: 16 }}>
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>

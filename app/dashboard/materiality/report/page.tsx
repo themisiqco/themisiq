@@ -12,7 +12,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { supabase } from '../../../../lib/supabase'
-import { useEntitlement } from '../../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../../lib/useEntitlement'
 import { useReportTitle, reportTitle } from '../../../../lib/useReportTitle'
 import PaywallCard from '../../../components/PaywallCard'
 import { REGION_LABEL } from '../../../../lib/climate/regions'
@@ -424,7 +424,7 @@ function ReportInner() {
   // the wizard produces.
   // The inconsistency is in the URL, not in the gate. Fix it by moving the route if it ever
   // matters; do not fix it by moving the entitlement.
-  const isPaid = useEntitlement('climate-risk')
+  const { isPaid, loading: entLoading } = useEntitlementState('climate-risk')
   const id = params.get('id')
   const router = useRouter()
   const [loading, setLoading] = useState(true)
@@ -472,6 +472,7 @@ function ReportInner() {
   // word for word. Spelling it out changes nothing a customer sees; it makes the wording a choice
   // this page made rather than one it happened to receive, which is the whole point of removing
   // the default. `risk` is the shorthand slug for climate-risk on /pricing (LEGACY_PRICING_PAGE_ID).
+  if (loading || entLoading) return <Centered>Loading report…</Centered>
   if (!isPaid) return (
     <PaywallCard
       title="Unlock the Climate Risk module"
@@ -479,7 +480,6 @@ function ReportInner() {
       href="/pricing?modules=risk"
     />
   )
-  if (loading) return <Centered>Loading report…</Centered>
   if (error) return <Centered>{error}</Centered>
   if (!a) return <Centered>No assessment data.</Centered>
 

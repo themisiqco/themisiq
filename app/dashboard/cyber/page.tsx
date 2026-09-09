@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Nav from '../../components/Nav'
-import { useEntitlement } from '../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../lib/useEntitlement'
 import { sectionHead } from '@/app/components/headingStyles'
 import { btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
 
@@ -128,7 +128,7 @@ const getTop5 = (gaps: typeof CONTROLS, frameworks: Framework[]) => {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function CyberDashboard() {
-  const isPaid = useEntitlement('cyber')
+  const { isPaid, loading: entLoading } = useEntitlementState('cyber')
   const [step, setStep] = useState(0)
   const [inventory, setInventory] = useState<CyberInventory>({
     company: '', reporting_year: 2025, sector: '',
@@ -462,7 +462,11 @@ export default function CyberDashboard() {
           ))}
         </div>
       </div>
-      {isPaid ? (
+      {entLoading ? (
+        <div className="tq-band" style={{ borderRadius: 14, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-2)', fontSize: 13 }}>
+          Cyber gap assessment...
+        </div>
+      ) : isPaid ? (
         <div>
           <div style={{ background: '#fff', border: '1px solid #e8e7e4', borderRadius: 10, padding: '1rem', marginBottom: 16 }}>
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>

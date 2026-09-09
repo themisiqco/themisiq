@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '../../../lib/supabase'
-import { useEntitlement } from '../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../lib/useEntitlement'
 import { stepBlockers, canAdvanceStep, outstandingText, type BlockerField }
   from '../../../lib/climate/wizardSteps'
 import Nav from '../../components/Nav'
@@ -286,7 +286,7 @@ function ResilienceMap({ items }: { items: any[] }) {
 }
 
 export default function MaterialityWizard() {
-  const isPaid = useEntitlement('climate-risk')
+  const { isPaid, loading: entLoading } = useEntitlementState('climate-risk')
   const [mode, setMode] = useState<Mode | null>(null)
   const [step, setStep] = useState(0)
   // Which ESRS version this assessment is prepared under. NULL is a REAL state — "not stated" —
@@ -1061,7 +1061,11 @@ export default function MaterialityWizard() {
           {mode === 'csrd' && <div style={{ background: 'var(--color-brand-wash)', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color: 'var(--color-brand)' }}>{s.topicsBothAxes ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>Topics material on both axes</div></div>}
         </div>
 
-        {isPaid ? (
+        {entLoading ? (
+          <div className="tq-band" style={{ borderRadius: 16, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-2)', fontSize: 13 }}>
+            Full assessment...
+          </div>
+        ) : isPaid ? (
           <>
             {mode === 'csrd' && renderMatrix()}
             {mode === 'csrd' && renderMatrixTable()}

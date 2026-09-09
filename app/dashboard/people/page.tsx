@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react'
 import Nav from '../../components/Nav'
 import Papa from 'papaparse'
-import { useEntitlement } from '../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../lib/useEntitlement'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -111,7 +111,7 @@ export default function PeopleDashboard() {
   const [dataConfirmed, setDataConfirmed] = useState(false)
   const [activeBand, setActiveBand] = useState(0)
   const fileRef = useRef<HTMLInputElement>(null)
-  const isPaid = useEntitlement('people')
+  const { isPaid, loading: entLoading } = useEntitlementState('people')
 
   const update = (field: keyof PeopleInventory, value: any) =>
     setInventory(prev => ({ ...prev, [field]: value }))
@@ -499,7 +499,11 @@ export default function PeopleDashboard() {
         )}
 
         {/* Confirmation + export */}
-        {isPaid ? (
+        {entLoading ? (
+          <div className="tq-band" style={{ borderRadius: 14, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-2)', fontSize: 13 }}>
+            Gender pay gap report...
+          </div>
+        ) : isPaid ? (
           <div>
             <div style={{ background: '#fff', border: '1px solid #e8e7e4', borderRadius: 10, padding: '1rem', marginBottom: 16 }}>
               <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>

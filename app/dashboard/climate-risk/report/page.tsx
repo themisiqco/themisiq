@@ -21,7 +21,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabase'
-import { useEntitlement } from '../../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../../lib/useEntitlement'
 import { useReportTitle, reportTitle } from '../../../../lib/useReportTitle'
 import PaywallCard from '../../../components/PaywallCard'
 import { REGION_LABEL } from '../../../../lib/climate/regions'
@@ -66,7 +66,7 @@ export default function ClimateRiskResilienceReportPage() {
 
 function ResilienceReportInner() {
   const params = useSearchParams()
-  const isPaid = useEntitlement('climate-risk')
+  const { isPaid, loading: entLoading } = useEntitlementState('climate-risk')
   const id = params.get('id')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -108,6 +108,7 @@ function ResilienceReportInner() {
   // scenarios", "Transition risks across scenarios", "Opportunities across scenarios", and
   // "Scenario selection and rationale". A reader who unlocks it should meet the words they were
   // sold, in the order they were sold them.
+  if (loading || entLoading) return <Centered>Loading report…</Centered>
   if (!isPaid) return (
     <PaywallCard
       title="Unlock the Climate Risk module"
@@ -115,7 +116,6 @@ function ResilienceReportInner() {
       href="/pricing?modules=risk"
     />
   )
-  if (loading) return <Centered>Loading report…</Centered>
   if (error) return <Centered>{error}</Centered>
   if (!a) return <Centered>No assessment data.</Centered>
 
