@@ -208,7 +208,7 @@ const STYLES = `
        Both are also illegible as type on white (2.23:1 and 1.24:1). */
     --brand:var(--color-brand);
     --green:#0F6E56; --green-tint:#E1F5EE;
-    --grad: var(--color-brand);
+    --rule: var(--color-brand);
     font-family:var(--sans); font-weight:400; color:var(--ink);
     background:#fff; line-height:1.6;
     -webkit-font-smoothing:antialiased;
@@ -233,12 +233,9 @@ const STYLES = `
     transition:transform .15s ease, opacity .15s ease;
   }
   .tiq .btn:hover{transform:translateY(-1px);}
-  .tiq .btn-primary{background:var(--ink); color:#fff; border-color:var(--ink);}
-  .tiq .btn-ghost{background:#fff; color:var(--ink); border-color:var(--border);}
-  .tiq .btn-ghost:hover{border-color:var(--ink);}
-  .tiq .btn-light{background:#fff; color:var(--ink); border-color:#fff;}
-  .tiq .btn-outline-light{background:transparent; color:#fff; border-color:rgba(255,255,255,.4);}
-  .tiq .btn-outline-light:hover{border-color:#fff;}
+  .tiq .btn-primary{background:var(--color-brand); color:var(--color-on-dark); border-color:var(--color-brand);}
+  .tiq .btn-ghost{background:#fff; color:var(--ink); border:1px solid var(--color-line-strong);}
+  .tiq .btn-ghost:hover{border-color:var(--color-brand);}
 
   /* hero */
   .tiq .hero{padding:40px 0 64px;}
@@ -261,8 +258,8 @@ const STYLES = `
   .tiq .hero .cta-row{display:flex; flex-wrap:wrap; gap:12px; margin-top:34px;}
   .tiq .hero .reassure{font-size:13px; color:var(--light); margin-top:18px;}
 
-  /* gradient rule */
-  .tiq .grad-rule{height:2px; background:var(--grad); border:0; margin:0;}
+  /* brand rule */
+  .tiq .rule-line{height:2px; background:var(--rule); border:0; margin:0;}
 
   /* trigger band */
   .tiq .triggers{background:var(--surface); padding:60px 0;}
@@ -298,7 +295,7 @@ const STYLES = `
     font-family:var(--serif); font-size:1.15rem; color:var(--ink);
     position:relative; z-index:1;
   }
-  .tiq .vstep:first-child .vnum{background:var(--ink); color:#fff; border-color:var(--ink);}
+  .tiq .vstep:first-child .vnum{background:var(--color-brand); color:#fff; border-color:var(--color-brand);}
   .tiq .vstep:first-child .vnum::after{
     content:''; position:absolute; inset:-4px; border-radius:50%;
     border:1.5px solid color-mix(in srgb, var(--color-brand) 32%, transparent);
@@ -372,11 +369,11 @@ const STYLES = `
   .tiq .qa-body ul.scope-list strong{color:var(--ink); font-weight:500;}
 
   /* dark CTA */
-  .tiq .cta-dark{background:var(--ink); border-radius:16px; padding:56px 40px; text-align:center; color:#fff; position:relative; overflow:hidden;}
-  .tiq .cta-dark::before{content:''; position:absolute; left:0; right:0; top:0; height:2px; background:var(--grad);}
-  .tiq .cta-dark h2{font-size:clamp(26px,3.6vw,38px); color:#fff; max-width:20ch; margin:0 auto;}
-  .tiq .cta-dark p{font-size:15px; color:rgba(255,255,255,.7); margin:16px auto 0; max-width:48ch;}
-  .tiq .cta-dark .cta-row{display:flex; flex-wrap:wrap; gap:12px; justify-content:center; margin-top:30px;}
+  .tiq .cta-band{background:var(--color-band); border-radius:16px; padding:56px 40px; text-align:center; position:relative; overflow:hidden;}
+  .tiq .cta-band::before{content:''; position:absolute; left:0; right:0; top:0; height:2px; background:var(--color-band-line);}
+  .tiq .cta-band h2{font-size:clamp(26px,3.6vw,38px); max-width:20ch; margin:0 auto;}
+  .tiq .cta-band p{font-size:15px; color:var(--color-ink-2); margin:16px auto 0; max-width:48ch;}
+  .tiq .cta-band .cta-row{display:flex; flex-wrap:wrap; gap:12px; justify-content:center; margin-top:30px;}
   .tiq .cta-section{padding:0 0 80px;}
 
   /* responsive */
@@ -438,7 +435,7 @@ export default function CalculateEmissionsPage() {
           </div>
         </section>
 
-        <hr className="grad-rule" />
+        <hr className="rule-line" />
 
         {/* TRIGGER BAND */}
         <section className="triggers">
@@ -736,12 +733,12 @@ export default function CalculateEmissionsPage() {
         {/* DARK CTA */}
         <section className="cta-section">
           <div className="wrap">
-            <div className="cta-dark">
+            <div className="cta-band">
               <h2>Your customer is waiting. The deadline isn&rsquo;t moving.</h2>
               <p>{ctaText}</p>
               <div className="cta-row">
-                <Link className="btn btn-light" href={CONFIG.TRY_URL}>See your emissions instantly</Link>
-                <a className="btn btn-outline-light" href={CONFIG.CONTACT_HREF}>Get in touch</a>
+                <Link className="btn btn-primary" href={CONFIG.TRY_URL}>See your emissions instantly</Link>
+                <a className="btn btn-ghost" href={CONFIG.CONTACT_HREF}>Get in touch</a>
               </div>
             </div>
           </div>
