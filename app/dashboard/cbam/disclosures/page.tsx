@@ -31,7 +31,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../../lib/supabase'
-import { useEntitlement } from '../../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../../lib/useEntitlement'
 import DisclosureQuestion, { cbamInputStyle, CbamField } from '../components/DisclosureQuestion'
 import { itemHead, sectionHeadFixed as sectionHead } from '@/app/components/headingStyles'
 
@@ -100,7 +100,7 @@ function pickDisclosures(row: Record<string, unknown>): Disclosures {
 }
 
 export default function CbamDisclosuresPage() {
-  const isPaid = useEntitlement('cbam')
+  const { isPaid, loading: entLoading } = useEntitlementState('cbam')
 
   const [loadingInstallations, setLoadingInstallations] = useState(true)
   const [installations, setInstallations] = useState<Installation[]>([])
@@ -244,6 +244,14 @@ export default function CbamDisclosuresPage() {
   }
 
   // ── Unpaid → paywall (same treatment as other dashboard pages) ──
+  if (entLoading) {
+    return (
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '3rem 2rem' }}>
+        <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-ink-muted)' }}>CBAM installation disclosures...</div>
+      </div>
+    )
+  }
+
   if (!isPaid) {
     return (
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '3rem 2rem' }}>

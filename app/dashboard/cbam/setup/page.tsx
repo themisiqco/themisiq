@@ -20,7 +20,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../../../lib/supabase'
-import { useEntitlement } from '../../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../../lib/useEntitlement'
 import { cbamInputStyle, CbamField } from '../components/DisclosureQuestion'
 import { massBalance } from '../../../../lib/cbam/engine'
 import { assessCnCategory, suggestCategory, normalizeCn } from '../../../../lib/cbam/cn'
@@ -229,7 +229,7 @@ function nullify(s: string): string | null {
 }
 
 export default function CbamSetupPage() {
-  const isPaid = useEntitlement('cbam')
+  const { isPaid, loading: entLoading } = useEntitlementState('cbam')
 
   const [step, setStep] = useState<Step>(1)
 
@@ -1296,6 +1296,14 @@ export default function CbamSetupPage() {
   }
 
   // ── Unpaid → paywall (same treatment as the disclosures page) ──
+  if (entLoading) {
+    return (
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '3rem 2rem' }}>
+        <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-ink-muted)' }}>CBAM setup...</div>
+      </div>
+    )
+  }
+
   if (!isPaid) {
     return (
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '3rem 2rem' }}>

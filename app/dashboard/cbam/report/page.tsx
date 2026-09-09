@@ -27,7 +27,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../../lib/supabase'
-import { useEntitlement } from '../../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../../lib/useEntitlement'
 import { cbamInputStyle, CbamField } from '../components/DisclosureQuestion'
 import { exportReportXlsx } from './exportXlsx'
 import type {
@@ -128,7 +128,7 @@ function AbsentPart2({ what }: { what: string }) {
 }
 
 export default function CbamReportPage() {
-  const isPaid = useEntitlement('cbam')
+  const { isPaid, loading: entLoading } = useEntitlementState('cbam')
 
   const [loadingInstallations, setLoadingInstallations] = useState(true)
   const [installations, setInstallations] = useState<{ id: string; name: string; country: string; company_id: string }[]>([])
@@ -224,6 +224,14 @@ export default function CbamReportPage() {
   }
 
   // ── Unpaid → paywall (same treatment as the disclosures page) ──
+  if (entLoading) {
+    return (
+      <div style={{ maxWidth: 960, margin: '0 auto', padding: '3rem 2rem' }}>
+        <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-ink-muted)' }}>CBAM §1.2 summary report...</div>
+      </div>
+    )
+  }
+
   if (!isPaid) {
     return (
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '3rem 2rem' }}>
