@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Nav from '../../components/Nav'
 import { supabase } from '../../../lib/supabase'
-import { useEntitlement } from '../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../lib/useEntitlement'
 import { EMISSION_FACTORS, DEFAULT_SPEND_EF } from '../../../lib/emissionFactors'
 import { resolvePcafResult, assessAsset } from '../../../lib/pcaf/engine'
 import type { PcafPortfolioAsset, PcafAssetClass, EmissionInputs } from '../../../lib/pcaf/types'
@@ -116,7 +116,7 @@ interface CategoryData {
 }
 
 export default function Scope3Dashboard() {
-  const isPaid = useEntitlement('ghg')
+  const { isPaid, loading: entLoading } = useEntitlementState('ghg')
   const [step, setStep] = useState(0)
   const [company, setCompany] = useState('')
   const [sector, setSector] = useState('')
@@ -942,6 +942,16 @@ export default function Scope3Dashboard() {
     const medCount = activeCats.filter(c => getConfidence(c.id) === 'medium').length
     const lowCount = activeCats.filter(c => getConfidence(c.id) === 'low').length
 
+    if (entLoading) return (
+      <div>
+        <h2 style={sectionHead}>Scope 3 results</h2>
+        <p style={sectionSub}>Your total Scope 3 inventory across all material categories — GHG Protocol aligned.</p>
+        <div className="tq-band" style={{ borderRadius: 16, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-2)', fontSize: 13 }}>
+          Scope 3 results...
+        </div>
+      </div>
+    )
+
     return (
       <div>
         <h2 style={sectionHead}>Scope 3 results</h2>
@@ -1057,7 +1067,11 @@ export default function Scope3Dashboard() {
         </div>
       </div>
 
-      {isPaid ? (
+      {entLoading ? (
+        <div className="tq-band" style={{ borderRadius: 14, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-2)', fontSize: 13 }}>
+          Scope 3 inventory...
+        </div>
+      ) : isPaid ? (
         <div>
           <div style={{ background: '#fff', border: '1px solid #e8e7e4', borderRadius: 10, padding: '1rem', marginBottom: 16 }}>
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>

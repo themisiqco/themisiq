@@ -22,7 +22,7 @@ import { FACTOR_EDITION_DISCLOSURE } from '../../../../lib/ghg/factorEditions'
 import { supabase } from '../../../../lib/supabase'
 import { computeTrajectory } from '../../../../lib/sbti'
 import { loadMonthly, type LoadMonthlyResult } from '../../../../lib/ghg/loadMonthly'
-import { useEntitlement } from '../../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../../lib/useEntitlement'
 
 // Brand palette for the three scopes.
 const COLORS = { scope1: '#7425e3', scope2: '#22ACFE', scope3: '#64FE3E' }
@@ -76,7 +76,7 @@ function buildCombinedTargetSeries(rows: TargetRow[]): { year: number; target: n
 }
 
 export default function TrendsPage() {
-  const isPaid = useEntitlement('ghg')
+  const { isPaid, loading: entLoading } = useEntitlementState('ghg')
   const [result, setResult] = useState<LoadSeriesResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null)
@@ -133,6 +133,14 @@ export default function TrendsPage() {
       })
     return () => { cancelled = true }
   }, [selectedSeries?.companyId])
+
+  if (entLoading) {
+    return (
+      <div style={{ padding: '2rem', maxWidth: 720, margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-ink-muted)' }}>GHG Trends...</div>
+      </div>
+    )
+  }
 
   if (!isPaid) {
     return (

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import Nav from '../../components/Nav'
 import { supabase } from '../../../lib/supabase'
-import { useEntitlement } from '../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../lib/useEntitlement'
 import PaywallCard from '../../components/PaywallCard'
 import { categorize, validateTargetConfig, acaSuggestedReductionPct, computeTrajectory, progressForTarget, scopeActualField, resolveCommittedBaseline, baseYearDriftForSeries, type CategoryResult, type Scope, type TargetConfig, type TargetProgress, type Point } from '../../../lib/sbti'
 import { loadCompanySeries } from '../../../lib/ghg/loadSeries'
@@ -124,7 +124,7 @@ const pillStyle = (k: keyof typeof PILL): React.CSSProperties => ({
 export default function SbtiDashboard() {
   // Gated on the GHG entitlement — SBTi is part of the GHG module (same precedent
   // as the Scope 3 Calculator, which is also unlocked by 'ghg').
-  const isPaid = useEntitlement('ghg')
+  const { isPaid, loading: entLoading } = useEntitlementState('ghg')
 
   // ─── Wizard shell (GHG STEPS pattern) ───────────────────────────────────────
   const STEPS = ['Company profile', 'Standard & scope', 'Near-term targets', 'Net-zero targets']
@@ -701,6 +701,14 @@ export default function SbtiDashboard() {
             })}
           </div>
         )}
+      </div>
+    )
+  }
+
+  if (entLoading) {
+    return (
+      <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>
+        SBTi Targets...
       </div>
     )
   }
