@@ -38,7 +38,7 @@ import Nav from '../../../../../components/Nav'
 import PaywallCard from '../../../../../components/PaywallCard'
 import { PAYWALL_HREF, PAYWALL_SURVEY_RESULTS, PAYWALL_TITLE } from '@/lib/paywallCopy'
 import { supabase } from '../../../../../../lib/supabase'
-import { useEntitlement } from '../../../../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../../../../lib/useEntitlement'
 // ⚠️ ONE RENDERER. These used to be defined in this file; they were extracted so the
 // preparer's determination form draws the same evidence from the same code. See the
 // component file's header for why a second renderer is the defect and not the convenience.
@@ -181,7 +181,7 @@ function ServerNote({ children, bg = PAPER, fg = MID }:
 // ── page ─────────────────────────────────────────────────────────────────────────────────────────
 
 export default function SurveyResults() {
-  const isPaid = useEntitlement('double-materiality')
+  const { isPaid, loading: entLoading } = useEntitlementState('double-materiality')
   const params = useParams()
   const roundId = params.id as string
 
@@ -248,6 +248,12 @@ export default function SurveyResults() {
       s.status === 'included' && s.overall && s.overall.n_abstained > s.overall.n_answered
                               && s.overall.n_abstained > 0), [agg])
 
+  if (loading || entLoading) return (
+    <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
+      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: MUTE }}>Loading results…</div>
+    </div>
+  )
+
   if (isPaid === false) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
       <Nav />
@@ -256,12 +262,6 @@ export default function SurveyResults() {
           body={PAYWALL_SURVEY_RESULTS}
           href={PAYWALL_HREF} />
       </div>
-    </div>
-  )
-
-  if (loading) return (
-    <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
-      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: MUTE }}>Loading results…</div>
     </div>
   )
 

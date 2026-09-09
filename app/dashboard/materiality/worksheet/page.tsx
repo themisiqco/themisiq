@@ -19,7 +19,7 @@ import Nav from '../../../components/Nav'
 import PaywallCard from '../../../components/PaywallCard'
 import { PAYWALL_HREF, PAYWALL_TITLE, PAYWALL_WORKSHEET_INDEX } from '@/lib/paywallCopy'
 import { supabase } from '../../../../lib/supabase'
-import { useEntitlement } from '../../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../../lib/useEntitlement'
 
 const BRAND = 'var(--color-brand)'
 const GREEN = '#0F6E56'
@@ -58,7 +58,7 @@ const versionLabel = (v: string | null) =>
     : 'No standard version stated'
 
 export default function WorksheetIndex() {
-  const isPaid = useEntitlement('double-materiality')
+  const { isPaid, loading: entLoading } = useEntitlementState('double-materiality')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [rows, setRows] = useState<Row[]>([])
@@ -97,6 +97,12 @@ export default function WorksheetIndex() {
     setLoading(false)
   }
 
+  if (loading || entLoading) return (
+    <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
+      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: MUTE }}>Loading assessments…</div>
+    </div>
+  )
+
   if (isPaid === false) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
       <Nav />
@@ -105,12 +111,6 @@ export default function WorksheetIndex() {
           body={PAYWALL_WORKSHEET_INDEX}
           href={PAYWALL_HREF} />
       </div>
-    </div>
-  )
-
-  if (loading) return (
-    <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
-      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: MUTE }}>Loading assessments…</div>
     </div>
   )
 

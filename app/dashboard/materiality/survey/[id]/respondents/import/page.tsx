@@ -31,7 +31,7 @@ import Nav from '../../../../../../components/Nav'
 import PaywallCard from '../../../../../../components/PaywallCard'
 import { PAYWALL_HREF, PAYWALL_SURVEY, PAYWALL_TITLE } from '@/lib/paywallCopy'
 import { supabase } from '../../../../../../../lib/supabase'
-import { useEntitlement } from '../../../../../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../../../../../lib/useEntitlement'
 import {
   buildRows, groupByDomain, isBlocked, isDuplicate, isReady, needsCategory,
   problemText, questionsFor, categoryReference,
@@ -50,7 +50,7 @@ const FAIL_BG = '#fef3f2'
 type Round = { id: string; name: string; company_name: string | null; status: string; questionnaire_version: number; standard_version: string }
 
 export default function RespondentImport() {
-  const isPaid = useEntitlement('double-materiality')
+  const { isPaid, loading: entLoading } = useEntitlementState('double-materiality')
   const params = useParams()
   const roundId = params.id as string
   const fileRef = useRef<HTMLInputElement>(null)
@@ -291,6 +291,11 @@ export default function RespondentImport() {
   // ── Screens ─────────────────────────────────────────────────────────────────
   const btn: React.CSSProperties = { fontSize: 12.5, padding: '7px 14px', borderRadius: 8, border: '1px solid #e8e7e4', background: '#fff', color: '#555553', cursor: 'pointer' }
 
+  if (loading || entLoading) return (
+    <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
+      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-ink-muted)' }}>Loading…</div></div>
+  )
+
   if (isPaid === false) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav /><div style={{ maxWidth: 760, margin: '0 auto', padding: '2rem' }}>
@@ -299,11 +304,6 @@ export default function RespondentImport() {
           href={PAYWALL_HREF} />
       </div>
     </div>
-  )
-
-  if (loading) return (
-    <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
-      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-ink-muted)' }}>Loading…</div></div>
   )
 
   if (loadError) return (

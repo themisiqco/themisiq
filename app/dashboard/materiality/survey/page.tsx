@@ -26,7 +26,7 @@ import Nav from '../../../components/Nav'
 import PaywallCard from '../../../components/PaywallCard'
 import { PAYWALL_HREF, PAYWALL_SURVEY, PAYWALL_TITLE } from '@/lib/paywallCopy'
 import { supabase } from '../../../../lib/supabase'
-import { useEntitlement } from '../../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../../lib/useEntitlement'
 
 const GRAD = 'var(--color-brand)'
 const GREEN = '#0F6E56'
@@ -55,7 +55,7 @@ const STATUS = {
 } as const
 
 export default function SurveyRounds() {
-  const isPaid = useEntitlement('double-materiality')
+  const { isPaid, loading: entLoading } = useEntitlementState('double-materiality')
   const router = useRouter()
 
   const [loading, setLoading] = useState(true)
@@ -154,6 +154,12 @@ export default function SurveyRounds() {
 
   const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
   const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
+
+  if (entLoading) return (
+    <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
+      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-ink-muted)' }}>Loading survey rounds…</div>
+    </div>
+  )
 
   if (isPaid === false) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>

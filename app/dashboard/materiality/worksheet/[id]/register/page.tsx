@@ -38,7 +38,7 @@ import Nav from '../../../../../components/Nav'
 import PaywallCard from '../../../../../components/PaywallCard'
 import { PAYWALL_HREF, PAYWALL_TITLE, PAYWALL_WORKSHEET } from '@/lib/paywallCopy'
 import { supabase } from '../../../../../../lib/supabase'
-import { useEntitlement } from '../../../../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../../../../lib/useEntitlement'
 import { subtopicHeading, resolveSubtopicName } from '../../../../../../lib/materiality/subtopicName'
 import type { TopicCategory } from '../../../../../../lib/materiality/severity'
 import {
@@ -201,7 +201,7 @@ const isCategory = (v: unknown): v is TopicCategory =>
   v === 'env' || v === 'soc' || v === 'gov'
 
 export default function WorksheetRegister() {
-  const isPaid = useEntitlement('double-materiality')
+  const { isPaid, loading: entLoading } = useEntitlementState('double-materiality')
   const params = useParams()
   const assessmentId = params.id as string
 
@@ -454,15 +454,15 @@ export default function WorksheetRegister() {
     }
   }, [agg, threshold, dets, topicOf, categoryOf, sources])
 
+  if (loading || entLoading) return (
+    <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
+      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: MUTE }}>Loading…</div>
+    </div>
+  )
   if (isPaid === false) return (
     <Shell><PaywallCard title={PAYWALL_TITLE}
       body={PAYWALL_WORKSHEET}
       href={PAYWALL_HREF} /></Shell>
-  )
-  if (loading) return (
-    <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
-      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: MUTE }}>Loading…</div>
-    </div>
   )
   if (loadError) return (
     <Shell><div style={CARD}>

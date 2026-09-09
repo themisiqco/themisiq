@@ -41,7 +41,7 @@ import Nav from '../../../../../components/Nav'
 import PaywallCard from '../../../../../components/PaywallCard'
 import { PAYWALL_HREF, PAYWALL_SURVEY, PAYWALL_TITLE } from '@/lib/paywallCopy'
 import { supabase } from '../../../../../../lib/supabase'
-import { useEntitlement } from '../../../../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../../../../lib/useEntitlement'
 // The SAME pure function /api/materiality and the climate-risk wizard use. Imported rather than
 // reimplemented so a fourth surface cannot resolve topic names its own way.
 import { resolveTopicLabels, isStandardVersion, type EsrsTopic } from '../../../../../../lib/materiality'
@@ -80,7 +80,7 @@ type Round = {
 type Group = { code: string; label: string; questions: Question[] }
 
 export default function SurveyScope() {
-  const isPaid = useEntitlement('double-materiality')
+  const { isPaid, loading: entLoading } = useEntitlementState('double-materiality')
   const params = useParams()
   const roundId = params.id as string
 
@@ -293,6 +293,13 @@ export default function SurveyScope() {
   const reinclude = (q: Question) => write(q.id, { status: 'included', exclusion_reason: null })
 
   // ── Screens ─────────────────────────────────────────────────────────────────
+  if (loading || entLoading) return (
+    <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
+      <Nav />
+      <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-ink-muted)' }}>Loading the question set…</div>
+    </div>
+  )
+
   if (isPaid === false) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
@@ -303,13 +310,6 @@ export default function SurveyScope() {
           href={PAYWALL_HREF}
         />
       </div>
-    </div>
-  )
-
-  if (loading) return (
-    <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
-      <Nav />
-      <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-ink-muted)' }}>Loading the question set…</div>
     </div>
   )
 

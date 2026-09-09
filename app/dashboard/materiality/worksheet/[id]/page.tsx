@@ -31,7 +31,7 @@ import Nav from '../../../../components/Nav'
 import PaywallCard from '../../../../components/PaywallCard'
 import { PAYWALL_HREF, PAYWALL_TITLE, PAYWALL_WORKSHEET } from '@/lib/paywallCopy'
 import { supabase } from '../../../../../lib/supabase'
-import { useEntitlement } from '../../../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../../../lib/useEntitlement'
 import { resolveTopicLabels, isStandardVersion, type EsrsTopic } from '../../../../../lib/materiality'
 // ⚠️ This screen reads names for sub-topics that are not yet assigned — which by definition have no
 // snapshot — and it also WRITES the snapshot when one is assigned. Both go through the same chain,
@@ -144,7 +144,7 @@ const input: React.CSSProperties = {
 }
 
 export default function WorksheetAssign() {
-  const isPaid = useEntitlement('double-materiality')
+  const { isPaid, loading: entLoading } = useEntitlementState('double-materiality')
   const params = useParams()
   const assessmentId = params.id as string
 
@@ -648,16 +648,16 @@ export default function WorksheetAssign() {
     !a ? 'a contributor' : (a.contributor_name || a.contributor_email || 'an unnamed contributor')
 
   // ── render ─────────────────────────────────────────────────────────────────────────────────
+  if (loading || entLoading) return (
+    <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
+      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: MUTE }}>Loading worksheet…</div>
+    </div>
+  )
+
   if (isPaid === false) return (
     <Shell><PaywallCard title={PAYWALL_TITLE}
       body={PAYWALL_WORKSHEET}
       href={PAYWALL_HREF} /></Shell>
-  )
-
-  if (loading) return (
-    <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
-      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: MUTE }}>Loading worksheet…</div>
-    </div>
   )
 
   if (loadError || !assessment) return (

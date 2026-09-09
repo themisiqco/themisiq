@@ -28,7 +28,7 @@ import Nav from '../../../../../components/Nav'
 import PaywallCard from '../../../../../components/PaywallCard'
 import { PAYWALL_HREF, PAYWALL_TITLE, PAYWALL_WORKSHEET } from '@/lib/paywallCopy'
 import { supabase } from '../../../../../../lib/supabase'
-import { useEntitlement } from '../../../../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../../../../lib/useEntitlement'
 import { resolveTopicLabels, isStandardVersion, type EsrsTopic } from '../../../../../../lib/materiality'
 import { computeSeverity, type SeverityInput, type TopicCategory } from '../../../../../../lib/materiality/severity'
 // ⚠️ dimensionScale(dim, direction) — the single resolver. This screen renders STORED values back
@@ -113,7 +113,7 @@ const RULE_TEXT: Record<string, string> = {
 }
 
 export default function Determinations() {
-  const isPaid = useEntitlement('double-materiality')
+  const { isPaid, loading: entLoading } = useEntitlementState('double-materiality')
   const params = useParams()
   const assessmentId = params.id as string
 
@@ -282,15 +282,15 @@ export default function Determinations() {
     await load()
   }
 
+  if (loading || entLoading) return (
+    <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
+      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: MUTE }}>Loading determinations…</div>
+    </div>
+  )
   if (isPaid === false) return (
     <Shell><PaywallCard title={PAYWALL_TITLE}
       body={PAYWALL_WORKSHEET}
       href={PAYWALL_HREF} /></Shell>
-  )
-  if (loading) return (
-    <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
-      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: MUTE }}>Loading determinations…</div>
-    </div>
   )
   if (loadError) return (
     <Shell><div style={CARD}>

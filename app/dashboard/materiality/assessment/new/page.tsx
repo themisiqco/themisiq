@@ -16,7 +16,7 @@ import Nav from '../../../../components/Nav'
 import PaywallCard from '../../../../components/PaywallCard'
 import { PAYWALL_ASSESSMENT_NEW, PAYWALL_HREF, PAYWALL_TITLE } from '@/lib/paywallCopy'
 import { supabase } from '../../../../../lib/supabase'
-import { useEntitlement } from '../../../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../../../lib/useEntitlement'
 import { AssessmentForm, type AssessmentFormValues } from '../AssessmentForm'
 import {
   standardVersionOffer, unavailableVersionMessage,
@@ -38,7 +38,7 @@ const Shell = ({ children }: { children: React.ReactNode }) => (
 
 export default function NewAssessmentPage() {
   const router = useRouter()
-  const isPaid = useEntitlement('double-materiality')
+  const { isPaid, loading: entLoading } = useEntitlementState('double-materiality')
 
   const [values, setValues] = useState<AssessmentFormValues>({
     companyName: '', version: null, periodStart: '', periodEnd: '',
@@ -85,6 +85,12 @@ export default function NewAssessmentPage() {
     if (!data) { setError('Nothing was created, and the server gave no reason.'); return }
     router.push(`/dashboard/materiality/worksheet/${data.id}`)
   }
+
+  if (entLoading) return (
+    <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
+      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: MID }}>Loading…</div>
+    </div>
+  )
 
   if (isPaid === false) return (
     <Shell><PaywallCard title={PAYWALL_TITLE}

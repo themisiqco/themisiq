@@ -29,7 +29,7 @@ import Nav from '../../../../components/Nav'
 import PaywallCard from '../../../../components/PaywallCard'
 import { PAYWALL_HREF, PAYWALL_SURVEY, PAYWALL_TITLE } from '@/lib/paywallCopy'
 import { supabase } from '../../../../../lib/supabase'
-import { useEntitlement } from '../../../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../../../lib/useEntitlement'
 
 const GRAD = 'var(--color-brand)'
 const GREEN = '#0F6E56'
@@ -51,7 +51,7 @@ type Respondent = {
 type Progress = { n_asked: number; n_answered: number; n_abstained: number; n_skipped: number; last_activity: string | null }
 
 export default function SurveyProgress() {
-  const isPaid = useEntitlement('double-materiality')
+  const { isPaid, loading: entLoading } = useEntitlementState('double-materiality')
   const params = useParams()
   const roundId = params.id as string
 
@@ -231,6 +231,12 @@ export default function SurveyProgress() {
 
   const fmt = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'
 
+  if (loading || entLoading) return (
+    <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
+      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-ink-muted)' }}>Loading progress…</div>
+    </div>
+  )
+
   if (isPaid === false) return (
     <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
@@ -239,12 +245,6 @@ export default function SurveyProgress() {
           body={PAYWALL_SURVEY}
           href={PAYWALL_HREF} />
       </div>
-    </div>
-  )
-
-  if (loading) return (
-    <div style={{ fontFamily: '-apple-system, sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
-      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-ink-muted)' }}>Loading progress…</div>
     </div>
   )
 

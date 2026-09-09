@@ -15,7 +15,7 @@ import Nav from '../../../../../components/Nav'
 import PaywallCard from '../../../../../components/PaywallCard'
 import { PAYWALL_ASSESSMENT_EDIT, PAYWALL_HREF, PAYWALL_TITLE } from '@/lib/paywallCopy'
 import { supabase } from '../../../../../../lib/supabase'
-import { useEntitlement } from '../../../../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../../../../lib/useEntitlement'
 import { isStandardVersion, type StandardVersion } from '../../../../../../lib/materiality'
 import { AssessmentForm, type AssessmentFormValues } from '../../AssessmentForm'
 import {
@@ -40,7 +40,7 @@ export default function EditAssessmentPage() {
   const params = useParams()
   const router = useRouter()
   const assessmentId = String(params?.id ?? '')
-  const isPaid = useEntitlement('double-materiality')
+  const { isPaid, loading: entLoading } = useEntitlementState('double-materiality')
 
   const [values, setValues] = useState<AssessmentFormValues | null>(null)
   const [versionLock, setVersionLock] = useState<VersionLock>({ kind: 'free' })
@@ -155,15 +155,15 @@ export default function EditAssessmentPage() {
     router.push(`/dashboard/materiality/worksheet/${assessmentId}`)
   }
 
+  if (loading || entLoading) return (
+    <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
+      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: MID }}>Loading…</div>
+    </div>
+  )
   if (isPaid === false) return (
     <Shell><PaywallCard title={PAYWALL_TITLE}
       body={PAYWALL_ASSESSMENT_EDIT}
       href={PAYWALL_HREF} /></Shell>
-  )
-  if (loading) return (
-    <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
-      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: MID }}>Loading…</div>
-    </div>
   )
   if (loadError || !values) return (
     <Shell><div style={{ background: '#fff', border: `0.5px solid ${LINE}`, borderRadius: 16, padding: '1.5rem' }}>
