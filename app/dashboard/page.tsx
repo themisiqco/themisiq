@@ -48,8 +48,8 @@ const MODULES: DashboardModule[] = [
   {
     id: 'ghg',
     name: 'GHG Inventory',
-    sub: 'Scope 1, 2 & 3',
-    desc: 'Calculate your full GHG inventory — Scope 1, 2 and 3 — across all locations and frameworks.',
+    sub: 'Scope 1 & 2',
+    desc: 'Calculate Scope 1 and Scope 2 emissions across all your locations and frameworks. Includes the Scope 3 Calculator.',
     href: '/dashboard/ghg',
     color: 'var(--color-module-ghg)',
     bg: 'var(--color-module-ghg-wash)',
@@ -60,8 +60,8 @@ const MODULES: DashboardModule[] = [
   {
     id: 'scope3',
     name: 'Scope 3 Calculator',
-    sub: 'All 15 categories',
-    desc: 'Calculate your full Scope 3 footprint across all 15 GHG Protocol categories.',
+    sub: 'Included with GHG Inventory',
+    desc: 'All 15 GHG Protocol categories, including financed emissions. Builds on a saved GHG inventory.',
     href: '/dashboard/scope3',
     color: 'var(--color-module-ghg)',
     bg: 'var(--color-module-ghg-wash)',

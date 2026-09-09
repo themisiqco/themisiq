@@ -41,7 +41,6 @@ const MODULES: Module[] = [
     name: 'Climate — GHG Inventory · Scope 1, 2 & 3',
     description: 'Scope 1, 2 & 3 · SB 253 · CDP · ESRS E1 · GRI 305 · IFRS S2 · EcoVadis · GHG Protocol · SBTi · RE100',
     tags: [
-      { label: 'Scope 1, 2 & 3', color: 'blue' },
       { label: 'Live now', color: 'green' },
       { label: SB253_SHORT, color: 'orange' },
     ],
