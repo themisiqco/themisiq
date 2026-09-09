@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'auth_failed' }, { status: 500 })
   }
 
-  // ── 2. Entitlement. Mirrors useEntitlement('ghg'): no user_id filter, because RLS scopes the
+  // ── 2. Entitlement. Mirrors useEntitlementAccess('ghg'): no user_id filter, because RLS scopes the
   // read to this user's own rows. FAILS CLOSED — unlike the rate limiter, which fails open, a fault
   // here must not hand out use of the API key. A paying customer sees a retryable message. ──
   const { data: ent, error: entErr } = await supabase

@@ -30,7 +30,7 @@
 //
 // ⚠️ NO SAMPLE IS PROMISED, AND THAT IS DELIBERATE — carried from the merged page. The two PDFs in
 // public/samples are BOTH climate-risk outputs, emitted by a screen gated on
-// useEntitlement('climate-risk'), so pointing this page at them would show the buyer the OTHER
+// useEntitlementState('climate-risk'), so pointing this page at them would show the buyer the OTHER
 // module's deliverable. This module's artefact is the board report built by
 // lib/materiality/boardReportPdf.ts. Until a sample of THAT exists, section 7 states that none is
 // published and promises nothing. The hero button that used to say "See the sample reports" went

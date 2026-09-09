@@ -117,8 +117,8 @@ describe('accessFromRow — the derivation', () => {
 })
 
 describe('isPaid keeps its contract', () => {
-  // isPaid is `active || expired` — "a row exists" — because seventeen callers were written
-  // against that meaning. This pins the projection so a later edit to accessFromRow cannot
+  // isPaid is `active || expired` — "a row exists" — because its callers are written against
+  // that meaning. This pins the projection so a later edit to accessFromRow cannot
   // silently start walling lapsed customers on all of them at once.
   const isPaid = (a: ResolvedAccess) => a === 'active' || a === 'expired'
 

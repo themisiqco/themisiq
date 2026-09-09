@@ -104,7 +104,7 @@ const MODULES: Module[] = [
       btn: 'Start your assessment →',
       // ⚠️ NOT /dashboard/materiality — that path is a server redirect INTO the climate-risk
       // wizard (app/dashboard/materiality/page.tsx:20). The worksheet index is this module's own
-      // entry point and the one gated on useEntitlement('double-materiality').
+      // entry point and the one gated on useEntitlementState('double-materiality').
       href: '/dashboard/materiality/worksheet',
     },
   },

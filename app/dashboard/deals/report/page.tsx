@@ -32,7 +32,7 @@ import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabase'
 // useEntitlementAccess, NOT useEntitlementState — the state form's `isPaid` is TRUE for an expired
-// customer by contract with its seventeen callers, and this page needs to tell 'expired' from
+// customer by contract, and this page needs to tell 'expired' from
 // 'never purchased' to choose which upsell to show (and 'unknown' to show neither).
 import { useEntitlementAccess } from '../../../../lib/useEntitlement'
 // Decided in lib/deals/gates.ts; this page renders the outcome and holds no second copy of the rule.

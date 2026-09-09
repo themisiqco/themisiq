@@ -29,7 +29,7 @@ const MODULE_CTA: Record<ModuleId, { headline: string; btn: string; href: string
   risk:   { headline: 'Ready to assess your climate risk?', btn: 'Assess your climate risk →', href: '/dashboard/climate-risk' },
   // ⚠️ NOT /dashboard/materiality — that path is a server redirect INTO the climate-risk wizard
   // (app/dashboard/materiality/page.tsx:20). The worksheet index is this module's own entry
-  // point and the one gated on useEntitlement('double-materiality').
+  // point and the one gated on useEntitlementState('double-materiality').
   impact: { headline: 'Ready to run your materiality assessment?', btn: 'Start your assessment →', href: '/dashboard/materiality/worksheet' },
   supply: { headline: 'Ready to map your supply chain?', btn: 'Map your supply chain →', href: '/supply-chain' },
   people: { headline: 'Do you know your gender pay gap?', btn: 'Calculate your pay gap →', href: '/people' },

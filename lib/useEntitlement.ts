@@ -139,9 +139,9 @@ export function useEntitlementAccess(moduleKey: ModuleKey): EntitlementAccess {
 // differently.
 //
 // ⚠️ TERM-BLIND BY CONTRACT. `isPaid` is TRUE for an expired customer, because it means "a row
-// exists" and that is exactly what its seventeen callers were written against. Changing it to
-// mean "active" would silently start walling lapsed customers on seventeen surfaces at once, with
-// copy written for people who never purchased. REACH FOR useEntitlementAccess IN ANYTHING THAT
+// exists" and that is what every caller of this projection is written against. Changing it to
+// mean "active" would silently start walling lapsed customers across every surface that reads it,
+// with copy written for people who never purchased. REACH FOR useEntitlementAccess IN ANYTHING THAT
 // NEEDS TO TELL EXPIRED FROM NEVER-BOUGHT; migrating the existing callers is its own task.
 export function useEntitlementState(moduleKey: ModuleKey): { isPaid: boolean; loading: boolean } {
   const access = useEntitlementAccess(moduleKey)
@@ -151,16 +151,6 @@ export function useEntitlementState(moduleKey: ModuleKey): { isPaid: boolean; lo
   }
 }
 
-// Boolean form. ONE fetch implementation — this is a projection of the hook above, not a second
-// copy of the query, so the two can never answer differently.
-//
-// ⚠️ THIS FORM CANNOT TELL "not entitled" FROM "not yet known", and every caller that renders a
-// wall from it will flash that wall at a paying customer. It is kept because seventeen callers
-// read it and changing their behaviour is not in scope here. REACH FOR useEntitlementState IN
-// ANYTHING THAT GATES A RENDER.
-export function useEntitlement(moduleKey: ModuleKey): boolean {
-  return useEntitlementState(moduleKey).isPaid
-}
 // Concierge is sold as three tier-specific add-on entitlements
 // (concierge-basic / -standard / -enterprise). The wizard only needs to know
 // whether the customer holds ANY of them, so this checks for any matching row.

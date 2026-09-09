@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Nav from '../../components/Nav'
 import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS } from '../../../lib/sb253'
 // useEntitlementAccess, NOT useEntitlementState. The state form's `isPaid` is TRUE for an expired
-// customer by contract with its seventeen callers, so reading it here made the client disagree with
+// customer by contract, so reading it here made the client disagree with
 // enforce_deals_free_tier_cap(), whose first test is `term_end > now()`. See resolveWizardGate.
 import { useEntitlementAccess } from '../../../lib/useEntitlement'
 import { supabase } from '../../../lib/supabase'

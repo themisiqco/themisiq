@@ -294,10 +294,12 @@ describe('S. the surfaces defer to the resolver', () => {
     expect(read(REPORT)).toContain('resolveReportGate({')
   })
 
-  it('S2 no Deals surface reads the term-blind useEntitlementState', () => {
-    // THE REGRESSION THIS GUARDS. `isPaid` is TRUE for an expired customer by contract with its
-    // seventeen callers, so a surface that reverts to it silently stops agreeing with the trigger
-    // — which is the exact defect these three changes closed, and it compiles cleanly.
+  it('S2 no Deals surface reads useEntitlementState — Deals needs the term', () => {
+    // THE REGRESSION THIS GUARDS. `isPaid` is TRUE for an expired customer by contract, which is
+    // correct for surfaces that do not wall a lapsed customer — and wrong here:
+    // enforce_deals_free_tier_cap() tests `term_end > now()`, so a Deals surface reading `isPaid`
+    // silently stops agreeing with the trigger. That is the exact defect these three changes
+    // closed, and it compiles cleanly.
     for (const f of [WIZARD, REPORT, LIST]) {
       expect(read(f), `${f} must read useEntitlementAccess`).toContain('useEntitlementAccess')
       const src = read(f).split('\n').filter(l => !l.trim().startsWith('//') && !l.trim().startsWith('*'))

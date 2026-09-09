@@ -98,8 +98,8 @@ export type WizardGateInput = {
  * saw an unlocked screen and met the cap only when a save failed. `useEntitlementAccess` has
  * compared the term since it was written — with the same STRICT `>` — and it is
  * `useEntitlementState`'s `isPaid` projection that discards it, deliberately and by contract with
- * seventeen callers. So the fix is for Deals to read the richer hook, not for the projection to
- * change under the other fourteen surfaces.
+ * its callers. So the fix is for Deals to read the richer hook, not for the projection to change
+ * under every other surface that reads it.
  */
 const isEntitled = (access: EntitlementAccess): boolean => access === 'active'
 
