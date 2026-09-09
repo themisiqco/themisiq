@@ -1,10 +1,28 @@
-'use client'
+import type { Metadata } from 'next'
 import Nav from '../components/Nav'
 import { GHG_TIERS } from '@/lib/pricing'
 import Footer from '@/app/components/Footer'
 import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_STATUS_SENTENCE, SB253_SCOPE3_FROM } from '../../lib/sb253'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 import { sectionTitle } from '@/app/components/headingStyles'
+
+// --- SEO ---------------------------------------------------------
+// Shape follows app/calculate-emissions/page.tsx. No `revalidate` here: that page
+// sets one because it renders a live SB 253 countdown; this page reads only the
+// fixed strings in lib/sb253, so there is nothing to go stale between builds.
+export const metadata: Metadata = {
+  title: 'GHG Inventory Software — Scope 1, 2 and 3 | ThemisIQ',
+  description:
+    'Build a full GHG inventory under the GHG Protocol, with an audit trail your verifier can follow. Pre-filled CARB SB 253 export, plus CDP, ESRS E1 and EcoVadis from one inventory.',
+  alternates: { canonical: '/climate-ghg' },
+  openGraph: {
+    title: 'GHG Inventory Software — Scope 1, 2 and 3 | ThemisIQ',
+    description:
+      'Build a full GHG inventory under the GHG Protocol, with an audit trail your verifier can follow. Pre-filled CARB SB 253 export, plus CDP, ESRS E1 and EcoVadis from one inventory.',
+    url: '/climate-ghg',
+    type: 'website',
+  },
+}
 export default function Page() {
   // The stat card takes a large `val` and small `unit`, and the tables want a short date. DERIVED,
   // never retyped — a date split across two fields is invisible to a whole-string guard (see the

@@ -1,10 +1,28 @@
-'use client'
+import type { Metadata } from 'next'
 import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
 import { FLAT_MODULE_PRICES } from '../../lib/pricing'
 import { CS3D_APPLIES_FROM, CS3D_EMPLOYEE_THRESHOLD, CS3D_TURNOVER_THRESHOLD } from '../../lib/cs3d'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 import { sectionTitle } from '@/app/components/headingStyles'
+
+// --- SEO ---------------------------------------------------------
+// Shape follows app/calculate-emissions/page.tsx. No `revalidate` here: that page
+// sets one because it renders a live SB 253 countdown; this page reads only the
+// fixed thresholds in lib/cs3d, so there is nothing to go stale between builds.
+export const metadata: Metadata = {
+  title: 'Supplier Data Collection and Supply Chain Risk | ThemisIQ',
+  description:
+    'Collect sustainability data from your suppliers and score supply chain risk. Built for CS3D, EcoVadis, Modern Slavery and ESRS S2 reporting, without spreadsheets or consultants.',
+  alternates: { canonical: '/supply-chain' },
+  openGraph: {
+    title: 'Supplier Data Collection and Supply Chain Risk | ThemisIQ',
+    description:
+      'Collect sustainability data from your suppliers and score supply chain risk. Built for CS3D, EcoVadis, Modern Slavery and ESRS S2 reporting, without spreadsheets or consultants.',
+    url: '/supply-chain',
+    type: 'website',
+  },
+}
 
 export default function Page() {
   // Price from the single source of truth, formatted as app/cbam/page.tsx does.
