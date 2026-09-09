@@ -19,7 +19,6 @@ import {
   ALL_MODULE_KEYS,
   TIER_PRICING,
   locationAllowanceForTier,
-  PACKS,
   ADDONS,
   addOnRequirementsMet,
   configuratorPrice,
@@ -29,7 +28,6 @@ import {
   type ModuleKey,
   type Tier,
   type GhgTier,
-  type PackId,
   type AddOnKey,
 } from '../../../lib/pricing'
 
@@ -40,7 +38,6 @@ export const dynamic = 'force-dynamic'
 // Shape of the request body the browser sends. All fields optional; we validate
 // that at least one purchasable thing is present.
 interface CheckoutBody {
-  packId?: PackId
   tier?: Tier
   moduleKeys?: ModuleKey[]
   addOns?: AddOnKey[]
@@ -66,27 +63,6 @@ export async function POST(req: NextRequest) {
     const entitlementsToGrant = new Set<string>() // module keys + add-on keys
     let ghgAllowance: number | null = null // GHG location ceiling to write onto the ghg entitlement row
     const sources: string[] = []
-
-    // 2a) Fixed pack
-    if (body.packId) {
-      if (NEW_PRICING_ACTIVE) {
-        return NextResponse.json({ error: 'Packs are no longer sold directly — configure your modules instead.' }, { status: 400 })
-      }
-      const pack = PACKS[body.packId]
-      if (!pack) {
-        return NextResponse.json({ error: 'Unknown pack.' }, { status: 400 })
-      }
-      lineItems.push(priceLine(pack.label, pack.price))
-      pack.modules.forEach((m) => {
-        modulesInCart.add(m)
-        entitlementsToGrant.add(m)
-      })
-      sources.push(`pack:${body.packId}`)
-      // Packs have no tier, so they take the Starter/Essentials floor — same figure, now read
-      // through the same helper as the module path below rather than a literal 3, so both writers
-      // derive from GHG_TIERS. What a pack grants is unchanged.
-      if (pack.modules.includes('ghg')) ghgAllowance = locationAllowanceForTier('starter')
-    }
 
     // 2b) Build-your-own (tier + modules)
     if (body.tier || body.moduleKeys) {

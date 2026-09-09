@@ -1,8 +1,9 @@
 'use client'
 import HomePricing from './components/HomePricing'
 import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS } from '../lib/sb253'
-// PACKS dropped from this import with the old-model cards below — it is retired (see the note above
-// its declaration in lib/pricing.ts). NEW_PRICING_ACTIVE STAYS: the live cards still gate on it.
+// PACKS dropped from this import with the old-model cards below. It was retired, then DELETED from
+// lib/pricing.ts on 8 Sep 2026 together with PackId and app/get-started/_pack/PackFlow.tsx — there
+// is no declaration left to point at. NEW_PRICING_ACTIVE STAYS: the live cards still gate on it.
 import { NEW_PRICING_ACTIVE } from '../lib/pricing'
 import { PACK_SLUG_MODULES } from '../lib/packEntryPoints'
 import Nav from './components/Nav'
@@ -239,8 +240,10 @@ export default function Home() {
           {/* The OLD-model cards stood here — four priced pack tiles reading PACKS and routing to
               /get-started/*. Deleted, not left behind a flag: NEW_PRICING_ACTIVE has been true since
               the June 2026 rescope so they could not render, and every price they carried is 43-78%
-              under what cartQuote charges for the same modules (see the retirement note on PACKS in
-              lib/pricing.ts). A dead branch holding under-priced money is worth less than nothing —
+              under what cartQuote charges for the same modules. (PACKS carried a retirement note
+              recording those figures; both it and PackId were deleted from lib/pricing.ts on
+              8 Sep 2026, so the spread survives only in that commit.)
+              A dead branch holding under-priced money is worth less than nothing —
               it reads as a rollback that is still available, and it is not.
               The cards below are the live ones: same four use cases, no price, straight into the
               configurator. */}

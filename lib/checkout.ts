@@ -10,14 +10,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { supabase } from './supabase'
-import type { PackId, Tier, ModuleKey, AddOnKey } from './pricing'
+import type { Tier, ModuleKey, AddOnKey } from './pricing'
 
 // What the caller passes. Use any combination:
-//   { packId: 'supplier-readiness' }
 //   { tier: 'starter', moduleKeys: ['ghg', 'climate-risk'] }
 //   { tier: 'starter', moduleKeys: ['ghg'], addOns: ['concierge-basic'] }
 export interface CheckoutSelection {
-  packId?: PackId
   tier?: Tier
   moduleKeys?: ModuleKey[]
   addOns?: AddOnKey[]

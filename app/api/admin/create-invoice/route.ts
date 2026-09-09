@@ -37,7 +37,6 @@ import { getAuthedClient, bearerFrom, AuthError } from '../../../../lib/supabase
 import {
   ALL_MODULE_KEYS,
   TIER_PRICING,
-  PACKS,
   ADDONS,
   addOnRequirementsMet,
   configuratorPrice,
@@ -47,7 +46,6 @@ import {
   type Tier,
   type GhgTier,
   type ModuleKey,
-  type PackId,
   type AddOnKey,
 } from '../../../../lib/pricing'
 
@@ -56,7 +54,6 @@ export const dynamic = 'force-dynamic'
 
 interface CreateInvoiceBody {
   customerEmail?: string
-  packId?: PackId
   tier?: Tier
   moduleKeys?: ModuleKey[]
   addOns?: AddOnKey[]
@@ -103,17 +100,6 @@ export async function POST(req: NextRequest) {
     // GHG location ceiling for the ghg entitlement row. Mirrors app/api/checkout/route.ts:67 —
     // null means the metadata key is written EMPTY, which the webhook reads as uncapped.
     let ghgAllowance: number | null = null
-
-    if (body.packId) {
-      if (NEW_PRICING_ACTIVE) {
-        return NextResponse.json({ error: 'Packs are no longer sold directly — invoice the modules individually.' }, { status: 400 })
-      }
-      const pack = PACKS[body.packId]
-      if (!pack) return NextResponse.json({ error: 'Unknown pack.' }, { status: 400 })
-      lines.push({ label: pack.label, amount: pack.price })
-      pack.modules.forEach((m) => entitlements.add(m))
-      sources.push(`pack:${body.packId}`)
-    }
 
     if (body.tier || body.moduleKeys) {
       const tier = body.tier
