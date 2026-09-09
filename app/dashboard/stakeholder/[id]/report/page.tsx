@@ -34,7 +34,7 @@ import Nav from '../../../../components/Nav'
 import PaywallCard from '../../../../components/PaywallCard'
 import { PAYWALL_HREF, PAYWALL_STAKEHOLDER_REPORT, PAYWALL_TITLE } from '@/lib/paywallCopy'
 import { supabase } from '../../../../../lib/supabase'
-import { useEntitlement } from '../../../../../lib/useEntitlement'
+import { useEntitlementState } from '../../../../../lib/useEntitlement'
 import { resolveSubtopicName } from '../../../../../lib/materiality/subtopicName'
 import { formatPeriodSpan, formatReportDate } from '../../../../../lib/reportDates'
 import { finalisationStamp, type FinalisationLatest }
@@ -214,7 +214,7 @@ const participationOf = (people: Person[], label: (code: string) => string) => {
 export default function StakeholderBoardReport() {
   // See the header: inherited from the worksheet routes, expected to change when this module gets
   // its own entitlement.
-  const isPaid = useEntitlement('double-materiality')
+  const { isPaid, loading: entLoading } = useEntitlementState('double-materiality')
   const params = useParams()
   const assessmentId = params.id as string
 
@@ -633,15 +633,15 @@ export default function StakeholderBoardReport() {
     }
   }
 
+  if (loading || entLoading) return (
+    <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
+      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: MUTE }}>Loading…</div>
+    </div>
+  )
   if (isPaid === false) return (
     <Shell><PaywallCard title={PAYWALL_TITLE}
       body={PAYWALL_STAKEHOLDER_REPORT}
       href={PAYWALL_HREF} /></Shell>
-  )
-  if (loading) return (
-    <div style={{ fontFamily: '-apple-system, sans-serif', background: PAPER, minHeight: '100vh' }}>
-      <Nav /><div style={{ textAlign: 'center', padding: '4rem', color: MUTE }}>Loading…</div>
-    </div>
   )
   if (loadError) return (
     <Shell><div style={CARD}>
