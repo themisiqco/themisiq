@@ -2718,6 +2718,39 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
   )
 }
 
+// Badge label, from STATUS ALONE. It used to fall through to `p.confidence`, so a CONFIRMED
+// low-confidence figure rendered a green "LOW": the colour said settled, the word said doubtful,
+// and the two were describing different things. `confidence` is the model's read-certainty and is
+// already spent — it decides `needsReview` at the extraction site and has no meaning to a customer
+// once they have acted on the row. The badge answers "what state is this in", which is `status`.
+//
+// Record<ConciergeStatus, string> is EXHAUSTIVE BY TYPE: a member added to the union fails the
+// build here rather than rendering `undefined` in a pill.
+const PROPOSAL_BADGE: Record<ConciergeStatus, string> = {
+  confirmed:           'Confirmed',
+  extracted:           'To confirm',
+  needs_manual_review: 'Needs review',
+  rejected:            'Rejected',   // never set today — mapped only to keep the union exhaustive
+}
+
+// And the colour, from status too — same Record shape so the two cannot answer differently.
+// Shape `{ bg, color }` matches the confidenceConfig pill in app/dashboard/scope3/page.tsx.
+//
+// NEUTRAL IS THE TOKEN FILE'S OWN INACTIVE PALETTE, not a new pair. themisiq-tokens.css states it
+// under A DISABLED CONTROL TAKES AN EXPLICIT PALETTE — fill var(--color-sunken), label
+// var(--color-ink-muted), 5.00:1 on sunken — and app/components/buttonStyles.ts already uses that
+// exact pair for btnStepDisabled. 'extracted' means nobody has acted on the row yet, which is the
+// same register: present, legible, not asserting anything. Green would claim it was settled.
+//
+// Green and amber are UNCHANGED, kept as the literals that were already here rather than
+// re-derived — this change is about which states get which colour, not about repricing them.
+const PROPOSAL_BADGE_COLOUR: Record<ConciergeStatus, { bg: string; color: string }> = {
+  confirmed:           { bg: '#E1F5EE',              color: '#0F6E56' },
+  needs_manual_review: { bg: '#FEF3E2',              color: 'var(--color-module-climate)' },
+  extracted:           { bg: 'var(--color-sunken)',  color: 'var(--color-ink-muted)' },
+  rejected:            { bg: 'var(--color-sunken)',  color: 'var(--color-ink-muted)' },
+}
+
 function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateProposal, onAddCoverageResolution, uploading, reportingYear, fiscalYearEndMonth, locId, coverageResolutions, uploadError }: { label: string; locIdx: number; docType: string; uploadError?: string; docs: SourceDoc[]; onUpload: (f: FileList, i: number, t: string) => void; onRemove: (i: number, id: string, path: string) => void; onUpdateProposal: (locIdx: number, docId: string, propIdx: number, patch: Partial<ExtractedProposal>) => void; onAddCoverageResolution: (res: CoverageResolution) => void; uploading: boolean; reportingYear: number; fiscalYearEndMonth: number; locId: string; coverageResolutions: CoverageResolution[] }) {
   const ref = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState<string | null>(null)   // `${docId}:${propIdx}` being edited
@@ -2886,8 +2919,8 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
                     <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{p.value != null ? `${p.value.toLocaleString()} ${p.unit ?? ''}` : '—'}</span>
                     <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{p.fuelType.replace('_', ' ')}</span>
                     {(p.periodStart || p.periodEnd) && <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>· {p.periodStart ?? '?'} → {p.periodEnd ?? '?'}</span>}
-                    <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: p.status === 'needs_manual_review' ? '#FEF3E2' : '#E1F5EE', color: p.status === 'needs_manual_review' ? 'var(--color-module-climate)' : '#0F6E56' }}>
-                      {p.status === 'needs_manual_review' ? 'NEEDS REVIEW' : p.confidence.toUpperCase()}
+                    <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: PROPOSAL_BADGE_COLOUR[p.status].bg, color: PROPOSAL_BADGE_COLOUR[p.status].color }}>
+                      {PROPOSAL_BADGE[p.status]}
                     </span>
                   </div>
                   {p.sourceQuote && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontStyle: 'italic', marginTop: 2 }}>“{p.sourceQuote}”</div>}
