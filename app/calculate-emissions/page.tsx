@@ -163,7 +163,7 @@ const FAQ_LD = {
       name: "Is my data secure?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Your data belongs to you and is never sold or shared. It is encrypted in transit (TLS 1.2+) and at rest (AES-256) on infrastructure provided by Supabase on AWS, which holds SOC 2 Type II certification, with row-level security isolating it from every other customer at the database level. If you use the Concierge add-on, the bills you upload are sent to our AI provider, Anthropic, to read the figures off them; the GHG assistant sends structured prompts only. Payments run through Stripe (PCI DSS Level 1). We comply with PIPEDA, Quebec Law 25, GDPR and UK GDPR, and CCPA.",
+        text: "Your data belongs to you and is never sold or shared. It is encrypted in transit (TLS 1.2+) and at rest (AES-256) on infrastructure provided by Supabase on AWS, which holds SOC 2 Type II certification, with row-level security isolating it from every other customer at the database level. If you use the Concierge add-on, the bills you upload are sent to our AI provider, Anthropic, to read the figures off them; the GHG guide sends only the questions you type into it and which step you're on. Payments run through Stripe (PCI DSS Level 1). You can export your reports at any time and ask us to delete your data, and we comply with PIPEDA, Quebec Law 25, GDPR and UK GDPR, and CCPA.",
       },
     },
     {
@@ -702,7 +702,7 @@ export default function CalculateEmissionsPage() {
               <details className="qa">
                 <summary>Is my data secure?</summary>
                 <div className="qa-body">
-                  Security is foundational here. Your data belongs to you &mdash; we never sell or share it. Everything is encrypted in transit (TLS&nbsp;1.2+) and at rest (AES-256), hosted on infrastructure provided by Supabase on AWS, which holds SOC&nbsp;2 Type&nbsp;II certification, with row-level security that isolates your data from every other customer at the database level. If you use the Concierge add-on, the bills you upload are sent to our AI provider, Anthropic, to read the figures off them; the GHG assistant sends structured prompts only. Payments run through <strong>Stripe</strong> (PCI&nbsp;DSS Level&nbsp;1), so we never see your card details. You can export or delete your data at any time, and we comply with PIPEDA, Quebec Law&nbsp;25, GDPR and UK&nbsp;GDPR, and CCPA. Full detail is on our <Link href={CONFIG.TRUST_URL}>trust &amp; data page</Link>.
+                  Security is foundational here. Your data belongs to you &mdash; we never sell or share it. Everything is encrypted in transit (TLS&nbsp;1.2+) and at rest (AES-256), hosted on infrastructure provided by Supabase on AWS, which holds SOC&nbsp;2 Type&nbsp;II certification, with row-level security that isolates your data from every other customer at the database level. If you use the Concierge add-on, the bills you upload are sent to our AI provider, Anthropic, to read the figures off them; the GHG guide sends only the questions you type into it and which step you&rsquo;re on. Payments run through <strong>Stripe</strong> (PCI&nbsp;DSS Level&nbsp;1), so we never see your card details. You can export your reports at any time and ask us to delete your data, and we comply with PIPEDA, Quebec Law&nbsp;25, GDPR and UK&nbsp;GDPR, and CCPA. Full detail is on our <Link href={CONFIG.TRUST_URL}>trust &amp; data page</Link>.
                 </div>
               </details>
 

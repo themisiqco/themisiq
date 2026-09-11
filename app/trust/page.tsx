@@ -9,7 +9,7 @@ const PRINCIPLES = [
     title: 'Your data belongs to you',
     color: '#0F6E56',
     bg: '#E1F5EE',
-    content: 'Everything you enter into ThemisIQ — your emissions data, workforce figures, supplier information, AI systems, financial data — belongs to you. We are custodians of your data, not owners. You can export it, delete it, or correct it at any time.',
+    content: 'Everything you enter into ThemisIQ — your emissions data, workforce figures, supplier information, AI systems, financial data — belongs to you. We are custodians of your data, not owners. You can export or correct it at any time, and ask us to delete it.',
   },
   {
     title: 'We never sell or share your data',
@@ -59,16 +59,16 @@ const DATA_SECTIONS = [
     title: 'How long we keep your data',
     items: [
       { label: 'Active account data', detail: 'Kept for the duration of your subscription plus 12 months, to allow for year-on-year comparison reporting.' },
-      { label: 'Deleted account data', detail: 'When you delete your account, all compliance data is permanently deleted within 30 days. Account records are retained for 7 years for legal and tax purposes.' },
+      { label: 'Deleted account data', detail: 'When you ask us to delete your account, all compliance data is permanently deleted within 30 days. Account records are retained for 7 years for legal and tax purposes.' },
       { label: 'Support conversations', detail: 'Support emails and chat logs are retained for 2 years.' },
     ],
   },
   {
     title: 'Your rights',
     items: [
-      { label: 'Access', detail: 'You can request a full export of all data ThemisIQ holds about you at any time.' },
+      { label: 'Access', detail: 'Email privacy@themisiq.co to request a copy of all data ThemisIQ holds about you. We provide it within 30 days.' },
       { label: 'Correction', detail: 'You can correct any inaccurate data directly in the platform or by contacting us.' },
-      { label: 'Deletion', detail: 'You can delete your account and all associated compliance data at any time from your account settings.' },
+      { label: 'Deletion', detail: 'To delete your account and all associated compliance data, email privacy@themisiq.co. We complete the deletion within 30 days and confirm in writing when it is done.' },
       { label: 'Portability', detail: 'All compliance outputs are available as CSV exports — your data is never locked in a proprietary format.' },
       { label: 'Objection', detail: 'You can object to any processing of your data that is not strictly necessary to provide the service.' },
     ],

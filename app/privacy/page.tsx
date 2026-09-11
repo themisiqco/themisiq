@@ -34,7 +34,7 @@ export default function PrivacyPage() {
             Privacy <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Policy</span>
           </h1>
           <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' as const, marginBottom: '1rem' }}>
-            {['Effective: May 17, 2026', 'TIQ-PRV-001 · v2.0', 'ThemisIQ Compliance Inc. · Canada', 'privacy@themisiq.co'].map(item => (
+            {['Effective: September 10, 2026', 'TIQ-PRV-001 · v2.1', 'ThemisIQ Compliance Inc. · Canada', 'privacy@themisiq.co'].map(item => (
               <span key={item} style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>{item}</span>
             ))}
           </div>
@@ -157,7 +157,7 @@ export default function PrivacyPage() {
               <thead><tr>{['Data type', 'Retention period', 'Basis'].map(h => <th key={h} style={thStyle}>{h}</th>)}</tr></thead>
               <tbody>
                 {[
-                  ['Customer platform data', 'Subscription duration + 90 days', 'Contract'],
+                  ['Customer platform data', 'Subscription duration + 12 months', 'Contract'],
                   ['Account and contact data', '7 years from last activity', 'Canada Revenue Agency'],
                   ['Marketing consent records', '3 years from last interaction', 'CASL'],
                   ['Assessment / lead data', '3 years from collection', 'PIPEDA / CASL'],
