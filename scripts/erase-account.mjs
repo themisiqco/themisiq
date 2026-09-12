@@ -116,6 +116,64 @@ const DBURL = process.env.DBURL
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY
 
+// ── 1b. sslmode: libpq SEMANTICS, APPLIED HERE SO THE OPERATOR NEED NOT ──────
+//
+// THE PROBLEM. node-pg does not mean by `sslmode=require` what libpq means.
+// pg-connection-string treats 'prefer', 'require' and 'verify-ca' as aliases for
+// 'verify-full' (node_modules/pg-connection-string/index.js:142-152), so it leaves
+// ssl = {} and Node defaults rejectUnauthorized to true. Against the Supabase
+// pooler that fails with SELF_SIGNED_CERT_IN_CHAIN — while psql, using libpq,
+// connects on the same string, because libpq's `require` means ENCRYPT, DO NOT
+// VERIFY THE CHAIN. pg's own deprecation notice says this will flip in pg@9 and
+// tells you to opt in early with uselibpqcompat=true.
+//
+// WHY DO IT HERE AND NOT IN THE CONNECTION STRING. Asking the operator to add
+// &uselibpqcompat=true is asking them to remember a flag whose omission produces
+// a TLS error that reads like a server problem, at the start of the one procedure
+// where they should be thinking about the customer and not about node-pg. A flag
+// that must be typed correctly every time, under those conditions, is a defect
+// with a workaround rather than a fix.
+//
+// WHAT THIS DOES NOT DO: it does not weaken encryption. TLS is still required and
+// still negotiated; only chain verification changes, and only to what the operator
+// already asked for by writing sslmode=require. verify-full is untouched.
+//
+// ⚠️ IT MUST APPEND TO THE RAW STRING, NOT RE-SERIALISE THE URL. Round-tripping
+// through URL.toString() re-encodes the userinfo, which silently corrupts a
+// password containing reserved characters — an authentication failure whose cause
+// is invisible. The URL object is used to READ the parameters and nothing else.
+function applyLibpqSslSemantics(raw) {
+  let url
+  try {
+    url = new URL(raw, 'postgres://base')
+  } catch {
+    return { connectionString: raw, sslmode: null, applied: false, parsed: false }
+  }
+  if (url.hash) {
+    FAIL("DBURL contains a '#' fragment, which is not valid in a PostgreSQL connection URI. Check the quoting on the export line — an unquoted '#' in a shell is a comment, so the value may also be truncated.")
+  }
+  const sslmode = url.searchParams.get('sslmode')
+  const already = url.searchParams.get('uselibpqcompat') === 'true'
+
+  if (sslmode === 'disable') {
+    FAIL('DBURL sets sslmode=disable. This script reads and deletes an entire customer account over this connection; it will not do that unencrypted. Use sslmode=require (or verify-full with sslrootcert).')
+  }
+  if (!sslmode || already) return { connectionString: raw, sslmode, applied: false, parsed: true }
+
+  const sep = raw.endsWith('?') ? '' : raw.includes('?') ? '&' : '?'
+  return { connectionString: `${raw}${sep}uselibpqcompat=true`, sslmode, applied: true, parsed: true }
+}
+const SSL = DBURL ? applyLibpqSslSemantics(DBURL) : null
+
+// What each mode means once libpq semantics are in force, so the line printed at
+// connect time states the posture rather than echoing a keyword.
+const SSLMODE_MEANING = {
+  'prefer':      'TLS attempted, certificate chain NOT verified',
+  'require':     'TLS required, certificate chain NOT verified (libpq semantics)',
+  'verify-ca':   'TLS required, CA verified (needs sslrootcert, or pg refuses)',
+  'verify-full': 'TLS required, CA and hostname verified',
+}
+
 // ── 2. ARGUMENTS ─────────────────────────────────────────────────────────────
 function parseArgs(argv) {
   const a = { user: null, export: null, execute: false, confirm: null, requestedAt: null, performedBy: null }
@@ -566,7 +624,7 @@ async function listPrefix(admin, bucket, prefix) {
 }
 
 // ── 9. MAIN ──────────────────────────────────────────────────────────────────
-const client = new pg.Client({ connectionString: DBURL })
+const client = new pg.Client({ connectionString: SSL.connectionString })
 const summary = { tables: {}, storage: {}, notes: [] }
 let admin = null
 
@@ -574,6 +632,14 @@ async function main() {
   banner(`ThemisIQ account erasure — ${MODE}`)
   console.log(`  subject : ${UID}`)
   console.log(`  database: ${DBURL.replace(/:\/\/[^@]*@/, '://<redacted>@')}`)
+  if (!SSL.parsed) {
+    console.log('  tls     : DBURL is not a URL; passed to pg unchanged')
+  } else if (SSL.sslmode) {
+    console.log(`  tls     : sslmode=${SSL.sslmode} — ${SSLMODE_MEANING[SSL.sslmode] || 'unrecognised mode, passed through'}`
+      + (SSL.applied ? ' [libpq semantics applied by this script]' : ' [uselibpqcompat already set]'))
+  } else {
+    console.log('  tls     : ⚠ no sslmode in DBURL — the connection may be UNENCRYPTED unless PGSSLMODE is set. Add sslmode=require.')
+  }
   if (args.export) console.log(`  export  : ${resolve(args.export)}`)
 
   await client.connect()
