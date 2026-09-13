@@ -21,7 +21,7 @@ const PRINCIPLES = [
     title: 'Your data is never used to train AI models',
     color: '#7425e3',
     bg: '#EDE9FE',
-    content: 'ThemisIQ uses AI to power certain features (framework classification, risk scoring, guidance). Your data is never used to train, fine-tune, or improve any AI model — including the models that power ThemisIQ features. Each session is processed in isolation.',
+    content: 'ThemisIQ uses AI in exactly two places, both through our AI provider Anthropic: reading the figures off documents you upload to the Concierge add-on, and answering the questions you type into the GHG guide. Nothing else in the platform uses it — framework classification and risk scoring are rules-based, and the rules are published on our methodology page. Your data is never used to train, fine-tune, or improve any AI model, including the models behind those two features. Each session is processed in isolation.',
   },
   {
     title: 'Encrypted in transit and at rest',
@@ -179,6 +179,7 @@ export default function TrustPage() {
               { label: 'Payment processing', val: 'Stripe — Stripe holds PCI DSS Level 1 certification' },
               { label: 'Email', val: 'Resend — Resend holds SOC 2 Type II certification' },
               { label: 'Frontend', val: 'Vercel — Vercel holds SOC 2 Type II certification' },
+              { label: 'AI provider', val: 'Anthropic — Concierge document reading and the GHG guide only' },
             ].map(({ label, val }) => (
               <div key={label} style={{ display: 'flex', flexDirection: 'column' as const, gap: 4 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>{label}</div>

@@ -34,7 +34,7 @@ export default function PrivacyPage() {
             Privacy <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Policy</span>
           </h1>
           <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' as const, marginBottom: '1rem' }}>
-            {['Effective: September 10, 2026', 'TIQ-PRV-001 · v2.1', 'ThemisIQ Compliance Inc. · Canada', 'privacy@themisiq.co'].map(item => (
+            {['Effective: September 12, 2026', 'TIQ-PRV-001 · v2.2', 'ThemisIQ Compliance Inc. · Canada', 'privacy@themisiq.co'].map(item => (
               <span key={item} style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>{item}</span>
             ))}
           </div>
@@ -128,7 +128,7 @@ export default function PrivacyPage() {
                   ['Vercel', 'Application traffic', 'Hosting and CDN', 'Global'],
                   ['Stripe', 'Billing data', 'Payment processing', 'USA'],
                   ['Resend', 'Name, email', 'Transactional email', 'USA'],
-                  ['Anthropic', 'Structured prompts; uploaded source documents (Concierge)', 'AI-assisted features', 'USA'],
+                  ['Anthropic', 'Structured prompts; uploaded source documents (Concierge)', 'Reading figures off Concierge documents, answering GHG guide questions', 'USA'],
                 ].map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} style={{ ...tdStyle, background: i % 2 === 0 ? '#fff' : '#f8f7f5' }}>{cell}</td>)}</tr>)}
               </tbody>
             </table>

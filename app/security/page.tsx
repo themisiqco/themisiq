@@ -84,6 +84,10 @@ export default function Page() {
               { title: 'Database — Supabase (AWS)', via: 'Supabase', status: null, body: 'All customer platform data stored in Supabase on AWS infrastructure. Supabase holds SOC 2 Type II and ISO 27001 certifications. US-East region by default.' },
               { title: 'Application — Vercel', via: 'Vercel', status: null, body: 'ThemisIQ application hosted on Vercel with global CDN. Vercel holds SOC 2 Type II certification. HTTPS enforced on all endpoints; HSTS enabled.' },
               { title: 'Payments — Stripe', via: 'Stripe', status: null, body: 'All payment processing handled by Stripe, PCI DSS Level 1 certified. ThemisIQ never stores, processes, or transmits card numbers.' },
+              // via: null, for the reason the badge comment below gives — this card names no
+              // third-party certification, so there is nothing to attribute. It names a data
+              // flow, which is what a reader looking for subprocessors came here to find.
+              { title: 'AI processing — Anthropic', via: null, status: null, body: 'Two features send data to Anthropic. The Concierge add-on sends the source documents you upload, so the figures can be read off them; the GHG guide sends the questions you type and which step you are on. Nothing else in the platform uses AI — framework classification and risk scoring are rules-based. Customer data is never used to train or improve any model.' },
               { title: 'Backups — manual snapshots today', via: null, status: 'In progress', body: 'Supabase Free provides no point-in-time recovery. Backups today are manual pg_dump snapshots, held in two locations and verified by SHA-256 checksum. Continuous PITR arrives with the Supabase Pro upgrade — target September 2026. Retention window, cross-region replication and RTO/RPO figures will be stated here once Pro is live and a restore has been tested.' },
             ].map(({ title, via, status, body }) => (
               <div key={title} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.5rem', position: 'relative' as const, overflow: 'hidden' }}>
