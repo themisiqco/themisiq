@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 #
+# This script has never been run. age is not installed on this machine and no age identity has been
+# generated, so it would fail at the encryption step. The private key must be created and stored in a
+# password manager first. Before anything this produces is relied on as a backup, a decrypt and a
+# pg_restore into a scratch project must be carried out and seen to work.
+#
 # Take an encrypted, verified, off-machine backup of the ThemisIQ database.
 #
 # Usage:
