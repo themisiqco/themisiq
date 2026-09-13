@@ -33,6 +33,7 @@ export default function Footer() {
             { label: 'Privacy Policy', href: '/privacy' },
             { label: 'Terms of Service', href: '/terms' },
             { label: 'Security', href: '/security' },
+            { label: 'Trust & Data', href: '/trust' },
             { label: 'Contact', href: 'mailto:hello@themisiq.co' },
           ] },
         ].map(col => (
