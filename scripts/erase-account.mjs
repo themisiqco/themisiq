@@ -327,6 +327,76 @@ const EXPLICIT_OUTSIDE = new Set(['public.audit_log', 'public.erasure_log'])
 // classifies every table in public, whether or not it carries a known column name.
 const OWNER_COLUMNS = ['user_id', 'customer_user_id', 'buyer_id', 'owner_id', 'reviewer', 'extracted_by', 'updated_by']
 
+// ── STAFF-ID COLUMNS ─────────────────────────────────────────────────────────
+//
+// A staff-id column holds the ThemisIQ person who did something TO A CUSTOMER'S ROW.
+// It is the one shape where the owner-column model inverts: the id is the subject
+// of an erasure, and the row around it belongs to somebody else entirely.
+//
+// ⚠️ WHY THESE ARE BLANKED AND NOT DELETED. Erasing a departing reviewer must not
+// delete the jobs they reviewed — those rows are their customers' compliance
+// records, and a customer's inventory does not disappear because a member of staff
+// left. But the reviewer's id must not survive their erasure either. The row
+// belongs to the customer; the id belongs to the departing staff member; so THE
+// ROW STAYS AND THE ID GOES. Setting the column to null is the only operation that
+// honours both, and the audit trail still records that the change happened.
+//
+// Without this pass the residual check would count these columns, find the
+// departing person's id on other customers' rows, and roll the whole erasure back
+// — making a staff account permanently un-erasable. With it, the residual check
+// still counts them, and anything left is a real failure.
+const STAFF_ID_COLUMNS = [
+  { table: 'public.concierge_jobs',          column: 'reviewer' },
+  { table: 'public.concierge_proposals',     column: 'extracted_by' },
+  { table: 'public.concierge_job_documents', column: 'updated_by' },
+  { table: 'public.concierge_proposals',     column: 'updated_by' },
+]
+
+// ⚠️ STRUCTURAL DETECTION, NOT A SECOND LIST. The coverage check finds every column
+// in public whose NAME means "a person did this" — `reviewer`, or anything ending
+// `_by` — and fails if one is not declared above. A hand-maintained list checked
+// against itself proves nothing; this is checked against the live catalogue, so a
+// future `approved_by` or `signed_off_by` stops the script the first time it runs
+// rather than being silently left on other customers' rows.
+//
+// It costs nothing today: the 19 Aug dump contains ZERO columns matching this
+// pattern, so the four above are the entire population once the concierge
+// migration runs.
+//
+// ITS LIMIT, STATED: it matches names, not intent. A staff column called
+// `last_touched_admin` would pass unnoticed. The convention this enforces is
+// therefore part of the rule — name a staff-id column `<verb>_by` or `reviewer`,
+// or declare it here by hand.
+const STAFF_ID_NAME_SQL = "(a.attname = 'reviewer' or a.attname like '%\\_by')"
+// ── MATCHES THE PATTERN, DELIBERATELY NOT BLANKED ────────────────────────────
+//
+// The detector below matches NAMES, and a name can mean two different things. A
+// column here looks like a staff-id column and is not one: it is declared, with
+// its reason, so that "we looked at this and decided" is distinguishable from
+// "nobody has noticed it yet". A column in NEITHER list still stops the script.
+//
+// ⚠️ EXEMPT MEANS NEVER TOUCHED, NOT "SKIP THE CHECK". Nothing here is blanked,
+// counted, or written to erasure_log — the erasure leaves it exactly as it is.
+const STAFF_ID_EXEMPT = [
+  {
+    table: 'public.erasure_log',
+    column: 'performed_by',
+    // THE OPERATOR'S NAME ON THE ERASURE RECORD ITSELF — text, not a uuid, and not
+    // on a customer's row. Every other column the detector finds is a staff id
+    // sitting on somebody else's data, which is why blanking is right for them.
+    // This one is the record of WHO PERFORMED AN ERASURE, on the single row built
+    // to outlive the account it describes. Blanking it would destroy the only
+    // evidence this script leaves behind, in the name of erasing a person who,
+    // here, is the operator rather than the subject.
+    // erasure_log holds no customer data at all (see its migration header), so
+    // there is nothing on this row for an erasure to reach.
+    reason: "the operator's name on the erasure record, not a staff id on a customer row — it is the proof of who performed the erasure and must outlive it",
+  },
+]
+
+const isDeclaredStaffColumn = (t, c) => STAFF_ID_COLUMNS.some(x => x.table === t && x.column === c)
+const isExemptStaffColumn   = (t, c) => STAFF_ID_EXEMPT.some(x => x.table === t && x.column === c)
+
 // THE ONE EXEMPTION FROM THE OWNER-COLUMN GATE, keyed by table AND column rather
 // than by table. audit_log.user_id is the ACTOR who made a change, not the subject
 // the row is about, and the table is swept by the id-set logic in two passes
@@ -422,6 +492,20 @@ select n.nspname || '.' || c.relname                   as t,
 const SQL_CURRENT_ROLE = `
 select current_user as who, r.rolsuper, r.rolbypassrls
   from pg_roles r where r.rolname = current_user
+`
+
+// Every live column in public whose name means "a person did this". Deliberately
+// NOT filtered by OWNER_COLUMNS: a new `approved_by` would not be in that list,
+// and not being in it is exactly how it would be missed.
+const SQL_STAFF_ID_COLUMNS = `
+select n.nspname || '.' || c.relname as t, a.attname::text as col,
+       format_type(a.atttypid, a.atttypmod) as coltype
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace
+  join pg_attribute a on a.attrelid = c.oid and a.attnum > 0 and not a.attisdropped
+ where n.nspname = 'public' and c.relkind in ('r', 'p')
+   and ${STAFF_ID_NAME_SQL}
+ order by 1, 2
 `
 
 // Non-CASCADE FKs to auth.users OUTSIDE public. The live check on 10 Sep 2026 was
@@ -766,6 +850,69 @@ async function main() {
   }
   console.log(`  PASS — ${ownerTables.length} owner-column table(s) checked, ${Object.keys(OWNER_SCAN_EXEMPT).length} exemption(s) applied.`)
 
+  // ── THIRD CHECK: every staff-id column in public must be declared. FAILS CLOSED.
+  // Undeclared, a staff column is not blanked, so the residual check finds the
+  // departing person's id on other customers' rows and rolls the erasure back —
+  // an account that can never be erased, diagnosed as a mystery rather than as a
+  // missing line in this file. Failing here names the column instead.
+  const liveMatches = (await client.query(SQL_STAFF_ID_COLUMNS)).rows
+
+  // A column cannot be both blanked and left alone. Two lists mean two decisions,
+  // and a column in both is a contradiction, not a preference — same reasoning as
+  // the more-than-one-category failure in the classification gate above.
+  const both = liveMatches.filter(r => isDeclaredStaffColumn(r.t, r.col) && isExemptStaffColumn(r.t, r.col))
+  if (both.length) {
+    FAIL(`Staff-id check FAILED — ${both.length} column(s) appear in BOTH STAFF_ID_COLUMNS and STAFF_ID_EXEMPT:\n\n    ${both.map(r => `${r.t}.${r.col}`).join('\n    ')}\n\n  One says blank it, the other says never touch it. Decide which, and delete the other entry. Nothing was done.`)
+  }
+
+  const undeclared = liveMatches.filter(r => !isDeclaredStaffColumn(r.t, r.col) && !isExemptStaffColumn(r.t, r.col))
+  if (undeclared.length) {
+    FAIL(`Staff-id check FAILED — ${undeclared.length} column(s) in public match the staff-id naming pattern and are in NEITHER list:\n\n    ${undeclared.map(r => `${r.t}.${r.col}  (${r.coltype})`).join('\n    ')}\n\n  Decide for each, and record the decision:\n    • a ThemisIQ staff id sitting on a CUSTOMER'S row  -> STAFF_ID_COLUMNS, so the erasure blanks it\n    • matches the name but is not that                 -> STAFF_ID_EXEMPT, with the reason at the entry\n    • identifies the row's OWNER                       -> ROOT_PREDICATE, and the table must be reachable\n\n  Nothing was done.`)
+  }
+
+  // ── THE TWO OUTCOMES, PRINTED SEPARATELY ─────────────────────────────────
+  // 'blanked on erasure' and 'deliberately left' are different decisions with
+  // different consequences, and a single list of "declared" columns would hide
+  // which one each got. The type is shown because it is usually the tell: a staff
+  // id is a uuid, and erasure_log.performed_by being text is half the reason it is
+  // exempt.
+  const staffToBlank = liveMatches.filter(r => isDeclaredStaffColumn(r.t, r.col))
+  const staffExempt  = liveMatches.filter(r => isExemptStaffColumn(r.t, r.col))
+  console.log(`  ${liveMatches.length} column(s) match the staff-id naming pattern:`)
+  for (const r of staffToBlank) {
+    console.log(`    blanked on erasure   ${pad(`${r.t}.${r.col}`, 44)}${r.coltype}`)
+  }
+  for (const r of staffExempt) {
+    const d = STAFF_ID_EXEMPT.find(x => x.table === r.t && x.column === r.col)
+    console.log(`    DELIBERATELY LEFT    ${pad(`${r.t}.${r.col}`, 44)}${r.coltype}`)
+    console.log(`                         └─ ${d.reason}`)
+  }
+  // Declared but not yet created — the concierge migration may be unrun.
+  const absentStaff = STAFF_ID_COLUMNS.filter(d => !liveMatches.some(r => r.t === d.table && r.col === d.column))
+  if (absentStaff.length) {
+    console.log(`    not yet created      ${absentStaff.map(d => `${d.table}.${d.column}`).join(', ')}`)
+  }
+  // ── TYPE GUARD ON THE BLANKED COLUMNS, BEFORE THE TRANSACTION ────────────
+  // The blanking statement is `set <col> = null where <col> = $1::uuid`, so a
+  // non-uuid column does not produce a wrong answer — it produces an operator
+  // error (42883, no operator text = uuid) INSIDE the erasure transaction, after
+  // the deletes have run. Everything rolls back, correctly, but the failure
+  // surfaces as a type error deep in a half-finished erasure rather than as a
+  // wrong entry in a list at the top of this file.
+  //
+  // This is exactly how erasure_log.performed_by would have failed if it had been
+  // declared for blanking instead of exempted: text, matching the naming pattern,
+  // and unusable in the statement that would have been built for it.
+  //
+  // Exempt columns are deliberately NOT checked — nothing is ever built for them,
+  // so their type cannot break anything.
+  const misTyped = staffToBlank.filter(r => r.coltype !== 'uuid')
+  if (misTyped.length) {
+    FAIL(`Staff-id check FAILED — ${misTyped.length} column(s) declared in STAFF_ID_COLUMNS are not uuid:\n\n    ${misTyped.map(r => `${r.t}.${r.col}  is ${r.coltype}, expected uuid`).join('\n    ')}\n\n  A staff id is an auth.users id, so a non-uuid column is almost certainly not one — check whether it belongs in STAFF_ID_EXEMPT instead, with the reason at the entry. If it genuinely holds a staff id in another type, the blanking statement in this file has to be taught that type before it can be declared here. Nothing was done.`)
+  }
+
+  console.log(`  PASS — ${staffToBlank.length} to blank (all uuid), ${staffExempt.length} deliberately left, 0 undeclared.`)
+
   // ── PRE-FLIGHT: ROW-LEVEL SECURITY ─────────────────────────────────────────
   //
   // ⚠️ RLS DOES NOT REFUSE. IT FILTERS. A role that neither owns a table nor holds
@@ -888,6 +1035,28 @@ async function main() {
       console.log(`  ⚠ ${msg}`)
     }
 
+    // ── STAFF-ID COLUMNS: plan and count, in every mode ──────────────────────
+    // `and not (<reach>)` is what makes this a staff-erasure pass rather than a
+    // second delete: it excludes every row the closure is deleting anyway, leaving
+    // exactly the rows that belong to OTHER customers and happen to carry this
+    // person's id. The count is therefore identical before and after the deletes,
+    // which is why it can be taken here and applied later.
+    banner('Staff-id columns')
+    const staffPlan = []
+    for (const sc of staffToBlank) {
+      if (!closure.has(sc.t)) {
+        throw new Error(`${sc.t}.${sc.col} is a declared staff-id column on a table outside the cascade closure. Rows there are never deleted, so "not the ones the closure deletes" has no meaning and blanking would be unbounded. Declare the table's ownership first.`)
+      }
+      const where = reachOf(sc.t)
+      const p = where.includes('$2') ? [UID, accountEmail] : [UID]
+      const n = Number((await client.query(
+        `select count(*)::bigint as n from ${qTable(sc.t)} t
+          where t.${qIdent(sc.col)} = $1::uuid and not (${where})`, p)).rows[0].n)
+      staffPlan.push({ ...sc, where, p, n })
+      console.log(`  ${pad(`${sc.t}.${sc.col}`, 46)}${num(n)}   ${args.execute ? 'to blank' : 'would be blanked'}`)
+    }
+    if (!staffToBlank.length) console.log('  none to blank (nothing live, or all matching columns are exempt).')
+
     // ── audit_log ────────────────────────────────────────────────────────────
     banner('audit_log')
     const actorN = Number((await client.query(
@@ -946,6 +1115,36 @@ async function main() {
       const b = await client.query(`delete from public.audit_log al where ${AUDIT_CONTENT_WHERE}`, [UID])
       summary.tables['public.audit_log (pass b, content)'] = b.rowCount
       console.log(`  pass (b) content rows swept after the deletes: ${b.rowCount}`)
+
+      // ── STAFF-ID BLANKING — the row stays, the id goes ───────────────────
+      //
+      // Runs LAST among the writes and immediately before the residual check, so
+      // the check still counts these columns and anything left after this is a
+      // real failure rather than a known exception.
+      //
+      // ⚠️ THIS WRITES NEW audit_log ROWS, AFTER PASS (b) HAS SWEPT. Each UPDATE
+      // fires log_audit(), whose old_values carry the departing person's uuid. They
+      // are deliberately NOT swept: those rows are the audit trail of OTHER
+      // customers' records, and deleting them to tidy away an id would take part of
+      // a third party's compliance history with it. What remains is a uuid that no
+      // longer resolves to anything — the same property erasure_log.subject_user_id
+      // is built on, and the same reason it is safe there.
+      let staffBlanked = 0
+      for (const sp of staffPlan) {
+        const r = await client.query(
+          `update ${qTable(sp.t)} t set ${qIdent(sp.col)} = null
+            where t.${qIdent(sp.col)} = $1::uuid and not (${sp.where})`, sp.p)
+        // A DISTINCT KEY in table_counts. These rows were changed, not deleted, and
+        // folding them into the delete count for the same table would overstate what
+        // the erasure removed — in a record whose whole purpose is to say what it did.
+        summary.tables[`staff-id-blanked:${sp.t}.${sp.col}`] = r.rowCount
+        staffBlanked += r.rowCount
+        if (r.rowCount !== sp.n) summary.notes.push(`${sp.t}.${sp.col}: counted ${sp.n}, blanked ${r.rowCount}`)
+        console.log(`  blanked ${pad(`${sp.t}.${sp.col}`, 46)}${num(r.rowCount)}`)
+      }
+      if (staffBlanked > 0) {
+        summary.notes.push(`${staffBlanked} staff-id reference(s) blanked on rows belonging to other customers`)
+      }
 
       // ── RESIDUAL ASSERTION — the last thing before the record is written ──
       //
@@ -1076,9 +1275,17 @@ async function main() {
 
   // ── summary ────────────────────────────────────────────────────────────────
   banner(`Summary — ${MODE}`)
-  const totalRows = Object.values(summary.tables).reduce((a, b) => a + b, 0)
+  // Blanked rows were CHANGED, not removed; counting them as deleted rows would
+  // overstate the erasure in the line the operator reads back to the customer.
+  const totalRows = Object.entries(summary.tables)
+    .filter(([k]) => !k.startsWith('staff-id-blanked:'))
+    .reduce((a, [, v]) => a + v, 0)
+  const totalBlanked = Object.entries(summary.tables)
+    .filter(([k]) => k.startsWith('staff-id-blanked:'))
+    .reduce((a, [, v]) => a + v, 0)
   const totalFiles = Object.values(summary.storage).reduce((a, b) => a + b, 0)
-  console.log(`  ${Object.keys(summary.tables).filter(k => summary.tables[k] > 0).length} table(s) with rows · ${totalRows} row(s) · ${totalFiles} file(s)`)
+  console.log(`  ${Object.keys(summary.tables).filter(k => summary.tables[k] > 0 && !k.startsWith('staff-id-blanked:')).length} table(s) with rows · ${totalRows} row(s) deleted · ${totalFiles} file(s)`
+    + (totalBlanked ? ` · ${totalBlanked} staff-id reference(s) blanked on other customers' rows` : ''))
   for (const n of summary.notes) console.log(`  ⚠ ${n}`)
   if (!args.execute) console.log('\n  Nothing was changed. Add --execute --confirm <email> to erase.')
   console.log(`
