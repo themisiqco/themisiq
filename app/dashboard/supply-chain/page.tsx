@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import Nav from '../../components/Nav'
 import Papa from 'papaparse'
 import { useEntitlementState } from '../../../lib/useEntitlement'
+import { DRAFT_KEYS, readDraft, useDraftAutosave } from '../../../lib/drafts'
 import { CS3D_APPLIES_FROM } from '../../../lib/cs3d'
 import { sectionHead } from '@/app/components/headingStyles'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
@@ -157,18 +158,66 @@ const STEP_NAMES = ['Setup', 'Suppliers', 'Risk Scoring', 'Scope 3', 'Export']
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+// ── DRAFT VALIDATION ──────────────────────────────────────────────────────────
+// A draft is untrusted input even though this tab wrote it: it survives a full page load, an
+// older deploy may have written it, and localStorage is editable. Field by field, by type.
+//
+// ⚠️ THE FOUR DERIVED FIELDS ARE RECOMPUTED, NOT READ. risk_level, risk_score, risk_factors and
+// scope3_emissions all come out of scoreSupplier(), and that function's thresholds and country
+// table change. Trusting the stored copy would show a visitor a score this build would not
+// produce, next to inputs that say otherwise — and the export would carry it.
+function parseSupplyChainDraft(u: unknown): SupplyChainInventory | null {
+  if (!u || typeof u !== 'object' || Array.isArray(u)) return null
+  const o = u as Record<string, unknown>
+  const str = (v: unknown, fb: string) => (typeof v === 'string' ? v : fb)
+  const num = (v: unknown, fb: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fb)
+
+  const suppliers: Supplier[] = Array.isArray(o.suppliers)
+    ? o.suppliers.flatMap((raw): Supplier[] => {
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return []
+        const r = raw as Record<string, unknown>
+        const tier = r.tier === '1' || r.tier === '2' || r.tier === '3' ? r.tier : '1'
+        const base: Supplier = {
+          id: str(r.id, Math.random().toString(36).slice(2)),
+          name: str(r.name, ''), country: str(r.country, ''), sector: str(r.sector, ''),
+          annual_spend: num(r.annual_spend, 0), currency: str(r.currency, 'USD'), tier,
+          has_assessment: typeof r.has_assessment === 'boolean' ? r.has_assessment : false,
+          risk_level: 'low', risk_score: 0, risk_factors: [], scope3_emissions: 0,
+        }
+        const scored = scoreSupplier(base)
+        return [{ ...base, risk_level: scored.risk, risk_score: scored.score, risk_factors: scored.factors, scope3_emissions: scored.scope3 }]
+      })
+    : []
+
+  const frameworks = Array.isArray(o.frameworks) ? (o.frameworks.filter(f => typeof f === 'string') as Framework[]) : []
+  const inv: SupplyChainInventory = {
+    company: str(o.company, ''),
+    reporting_year: num(o.reporting_year, 2024),
+    frameworks: frameworks.length ? frameworks : ['cs3d', 'scope3', 'esrs_s2'],
+    currency: str(o.currency, 'USD'),
+    suppliers,
+  }
+  // Nothing worth restoring is nothing to restore. An empty company and no suppliers is the
+  // default form, and announcing a recovery of it would be a lie about what came back.
+  return inv.company.trim() === '' && inv.suppliers.length === 0 ? null : inv
+}
+
 export default function SupplyChainDashboard() {
   const { isPaid, loading: entLoading } = useEntitlementState('supply-chain')
   const [step, setStep] = useState(0)
-  const [inventory, setInventory] = useState<SupplyChainInventory>({
-    company: '', reporting_year: 2024,
-    frameworks: ['cs3d', 'scope3', 'esrs_s2'],
-    currency: 'USD', suppliers: [],
-  })
+  // Restored in the LAZY INITIALISER, never a useEffect: an effect would paint the empty form,
+  // let the visitor start typing, and then overwrite what they typed.
+  const [inventory, setInventory] = useState<SupplyChainInventory>(() =>
+    readDraft(DRAFT_KEYS.supplyChain, parseSupplyChainDraft) ?? {
+      company: '', reporting_year: 2024,
+      frameworks: ['cs3d', 'scope3', 'esrs_s2'],
+      currency: 'USD', suppliers: [],
+    })
   const [activeSupplier, setActiveSupplier] = useState(0)
   const [dataConfirmed, setDataConfirmed] = useState(false)
   const [sortBy, setSortBy] = useState<'risk' | 'spend' | 'name'>('risk')
   const fileRef = useRef<HTMLInputElement>(null)
+  useDraftAutosave(DRAFT_KEYS.supplyChain, inventory)
 
   const update = (field: keyof SupplyChainInventory, value: any) =>
     setInventory(prev => ({ ...prev, [field]: value }))

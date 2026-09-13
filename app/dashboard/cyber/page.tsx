@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Nav from '../../components/Nav'
 import { useEntitlementState } from '../../../lib/useEntitlement'
+import { DRAFT_KEYS, readDraft, useDraftAutosave } from '../../../lib/drafts'
 import { sectionHead } from '@/app/components/headingStyles'
 import { btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
 
@@ -127,15 +128,53 @@ const getTop5 = (gaps: typeof CONTROLS, frameworks: Framework[]) => {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+// ── DRAFT VALIDATION ──────────────────────────────────────────────────────────
+// Untrusted input, field by field. `responses` is keyed by control id, so a key this build no
+// longer has is dropped rather than carried into the score: a stale id would be counted by
+// neither the gap list nor the total, and a maturity value outside the union would be.
+function parseCyberDraft(u: unknown): CyberInventory | null {
+  if (!u || typeof u !== 'object' || Array.isArray(u)) return null
+  const o = u as Record<string, unknown>
+  const str = (v: unknown, fb: string) => (typeof v === 'string' ? v : fb)
+  const num = (v: unknown, fb: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fb)
+  const bool = (v: unknown, fb: boolean) => (typeof v === 'boolean' ? v : fb)
+
+  const known = new Set(CONTROLS.map(c => c.id))
+  const maturities: Maturity[] = ['none', 'partial', 'implemented', 'optimised']
+  const responses: Record<string, Maturity> = {}
+  if (o.responses && typeof o.responses === 'object' && !Array.isArray(o.responses)) {
+    for (const [k, v] of Object.entries(o.responses as Record<string, unknown>)) {
+      if (known.has(k) && typeof v === 'string' && (maturities as string[]).includes(v)) responses[k] = v as Maturity
+    }
+  }
+
+  const frameworks = Array.isArray(o.frameworks) ? (o.frameworks.filter(f => typeof f === 'string') as Framework[]) : []
+  const inv: CyberInventory = {
+    company: str(o.company, ''),
+    reporting_year: num(o.reporting_year, 2025),
+    sector: str(o.sector, ''),
+    frameworks: frameworks.length ? frameworks : ['nis2', 'iso27001', 'nist'],
+    employee_count: str(o.employee_count, ''),
+    eu_operations: bool(o.eu_operations, true),
+    us_listed: bool(o.us_listed, false),
+    financial_entity: bool(o.financial_entity, false),
+    responses,
+  }
+  return inv.company.trim() === '' && Object.keys(inv.responses).length === 0 ? null : inv
+}
+
 export default function CyberDashboard() {
   const { isPaid, loading: entLoading } = useEntitlementState('cyber')
   const [step, setStep] = useState(0)
-  const [inventory, setInventory] = useState<CyberInventory>({
-    company: '', reporting_year: 2025, sector: '',
-    frameworks: ['nis2', 'iso27001', 'nist'],
-    employee_count: '', eu_operations: true, us_listed: false, financial_entity: false,
-    responses: {},
-  })
+  // Lazy initialiser, never a useEffect — see lib/drafts.ts.
+  const [inventory, setInventory] = useState<CyberInventory>(() =>
+    readDraft(DRAFT_KEYS.cyber, parseCyberDraft) ?? {
+      company: '', reporting_year: 2025, sector: '',
+      frameworks: ['nis2', 'iso27001', 'nist'],
+      employee_count: '', eu_operations: true, us_listed: false, financial_entity: false,
+      responses: {},
+    })
+  useDraftAutosave(DRAFT_KEYS.cyber, inventory)
   const [activeDomain, setActiveDomain] = useState(DOMAINS[0])
   const [dataConfirmed, setDataConfirmed] = useState(false)
 

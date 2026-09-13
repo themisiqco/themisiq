@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import Nav from '../../components/Nav'
 import Papa from 'papaparse'
 import { useEntitlementState } from '../../../lib/useEntitlement'
+import { DRAFT_KEYS, readDraft, useDraftAutosave } from '../../../lib/drafts'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -105,9 +106,52 @@ const sectionSub: React.CSSProperties = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+// ── DRAFT VALIDATION ──────────────────────────────────────────────────────────
+// Untrusted input, field by field. Nothing here is derived — the pay gap is computed at render
+// from the counts and salaries, never stored — so every field is read back as given.
+function parsePeopleDraft(u: unknown): PeopleInventory | null {
+  if (!u || typeof u !== 'object' || Array.isArray(u)) return null
+  const o = u as Record<string, unknown>
+  const str = (v: unknown, fb: string) => (typeof v === 'string' ? v : fb)
+  const num = (v: unknown, fb: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fb)
+
+  const bands: JobBand[] = Array.isArray(o.bands)
+    ? o.bands.flatMap((raw): JobBand[] => {
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return []
+        const r = raw as Record<string, unknown>
+        return [{
+          id: str(r.id, Math.random().toString(36).slice(2)),
+          name: str(r.name, ''),
+          male_count: num(r.male_count, 0), female_count: num(r.female_count, 0), other_count: num(r.other_count, 0),
+          male_avg_salary: num(r.male_avg_salary, 0), female_avg_salary: num(r.female_avg_salary, 0), other_avg_salary: num(r.other_avg_salary, 0),
+        }]
+      })
+    : []
+
+  const m = (o.metrics && typeof o.metrics === 'object' && !Array.isArray(o.metrics)) ? o.metrics as Record<string, unknown> : {}
+  const inv: PeopleInventory = {
+    company: str(o.company, ''),
+    reporting_year: num(o.reporting_year, 2024),
+    jurisdictions: Array.isArray(o.jurisdictions) ? o.jurisdictions.filter((x): x is string => typeof x === 'string') : [],
+    total_employees: num(o.total_employees, 0),
+    currency: str(o.currency, 'USD'),
+    bands: bands.length ? bands : [newBand()],
+    metrics: {
+      ltifr: num(m.ltifr, 0), trir: num(m.trir, 0),
+      training_hours_male: num(m.training_hours_male, 0), training_hours_female: num(m.training_hours_female, 0),
+      collective_bargaining_pct: num(m.collective_bargaining_pct, 0),
+      parental_leave_male: num(m.parental_leave_male, 0), parental_leave_female: num(m.parental_leave_female, 0),
+    },
+  }
+  const anyBandFilled = inv.bands.some(b => b.name.trim() !== '' || b.male_count > 0 || b.female_count > 0)
+  return inv.company.trim() === '' && !anyBandFilled ? null : inv
+}
+
 export default function PeopleDashboard() {
   const [step, setStep] = useState(0)
-  const [inventory, setInventory] = useState<PeopleInventory>(DEFAULT_INVENTORY)
+  // Lazy initialiser, never a useEffect — see lib/drafts.ts.
+  const [inventory, setInventory] = useState<PeopleInventory>(() => readDraft(DRAFT_KEYS.people, parsePeopleDraft) ?? DEFAULT_INVENTORY)
+  useDraftAutosave(DRAFT_KEYS.people, inventory)
   const [dataConfirmed, setDataConfirmed] = useState(false)
   const [activeBand, setActiveBand] = useState(0)
   const fileRef = useRef<HTMLInputElement>(null)

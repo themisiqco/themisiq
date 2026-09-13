@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useEntitlementState } from '../../../lib/useEntitlement'
+import { DRAFT_KEYS, readDraft, useDraftAutosave } from '../../../lib/drafts'
 import Nav from '../../components/Nav'
 import { sectionHead } from '@/app/components/headingStyles'
 import { btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
@@ -182,10 +183,52 @@ const SECTORS = ['Financial services', 'Healthcare', 'Technology', 'Retail & e-c
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+// ── DRAFT VALIDATION ──────────────────────────────────────────────────────────
+// Untrusted input, field by field. risk_level, annex_category and requirements are RECOMPUTED
+// from classifySystem() rather than read: the classifier tracks EU AI Act guidance and its
+// output changes, so a stored classification can be one this build would not make.
+function parseAIDraft(u: unknown): AIInventory | null {
+  if (!u || typeof u !== 'object' || Array.isArray(u)) return null
+  const o = u as Record<string, unknown>
+  const str = (v: unknown, fb: string) => (typeof v === 'string' ? v : fb)
+  const num = (v: unknown, fb: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fb)
+  const bool = (v: unknown, fb: boolean) => (typeof v === 'boolean' ? v : fb)
+
+  const systems: AISystem[] = Array.isArray(o.systems)
+    ? o.systems.flatMap((raw): AISystem[] => {
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return []
+        const r = raw as Record<string, unknown>
+        const base: AISystem = {
+          id: str(r.id, Math.random().toString(36).slice(2)),
+          name: str(r.name, ''), purpose: str(r.purpose, ''), sector: str(r.sector, ''),
+          affects_individuals: bool(r.affects_individuals, false),
+          decision_type: str(r.decision_type, ''),
+          eu_deployment: bool(r.eu_deployment, true),
+          risk_level: 'unclassified', annex_category: '', requirements: [],
+          from_library: bool(r.from_library, false),
+        }
+        const c = classifySystem(base)
+        return [{ ...base, risk_level: c.risk, annex_category: c.category, requirements: c.requirements }]
+      })
+    : []
+
+  const inv: AIInventory = {
+    company: str(o.company, ''),
+    reporting_year: num(o.reporting_year, 2025),
+    jurisdiction: str(o.jurisdiction, 'EU'),
+    sector: str(o.sector, ''),
+    systems,
+  }
+  return inv.company.trim() === '' && inv.systems.length === 0 ? null : inv
+}
+
 export default function AIGovernanceDashboard() {
   const { isPaid, loading: entLoading } = useEntitlementState('ai-governance')
   const [step, setStep] = useState(0)
-  const [inventory, setInventory] = useState<AIInventory>({ company: '', reporting_year: 2025, jurisdiction: 'EU', sector: '', systems: [] })
+  // Lazy initialiser, never a useEffect — see lib/drafts.ts on the flash an effect would cause.
+  const [inventory, setInventory] = useState<AIInventory>(() =>
+    readDraft(DRAFT_KEYS.aiGovernance, parseAIDraft) ?? { company: '', reporting_year: 2025, jurisdiction: 'EU', sector: '', systems: [] })
+  useDraftAutosave(DRAFT_KEYS.aiGovernance, inventory)
   const [activeSystem, setActiveSystem] = useState(0)
   const [dataConfirmed, setDataConfirmed] = useState(false)
   const [showLibrary, setShowLibrary] = useState(false)
