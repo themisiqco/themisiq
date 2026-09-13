@@ -29,14 +29,16 @@ changing how the password is read — see the note at the end of this file.
 
 The script needs a database role that can see every row. On Supabase that is the
 `postgres` role in the connection string above, **not** a pooled application
-role. If you use the wrong one the script stops at the RLS pre-flight (§10) —
+role. If you use the wrong one the script stops at the RLS pre-flight (§11) —
 it will not run anyway and produce a wrong answer.
 
 ---
 
 ## 1. Where requests arrive, and the clock
 
-Requests come to **privacy@themisiq.co**.
+Requests come to **privacy@themisiq.co**, and two kinds arrive there. This runbook
+is the deletion procedure; a request for a **copy** of someone's data is a different,
+much shorter job — go to §14 and do not run anything else in this file.
 
 **The deadline is 30 days from the date of the request**, not from the date you
 start. This is what the trust page promises: *"When you ask us to delete your
@@ -80,6 +82,10 @@ there it is gone without a warning. Check the folder first, and never type a
 literal date in place of `$(date +%Y%m%d)`.
 
 Confirm the file exists and is not zero bytes before continuing.
+
+⚠️ **This dump will contain the data you are about to erase.** It is your route back
+today and a copy of the customer's account for as long as it exists. It is covered
+by the 30-day rule in §10 — note the filename now.
 
 ---
 
@@ -177,7 +183,7 @@ row still naming this user, and writes the `erasure_log` row. Any failure rolls 
 the commit does it remove the storage files, then list them again to confirm
 zero remain.
 
-**If it stops with an error, nothing has been erased.** Read §10, fix the cause,
+**If it stops with an error, nothing has been erased.** Read §11, fix the cause,
 run it again. Re-running after a partial failure is safe and expected — the
 script resumes and finishes the job.
 
@@ -222,11 +228,51 @@ to them, one to the monitor inbox. Search **Resend** and the **monitor inbox**
 for their address and delete what you find. Nothing in the script can reach
 these.
 
-**b. The confirmation email.** §11.
+**b. The confirmation email.** §13.
+
+A third obligation runs on a longer clock and is easy to forget precisely because
+it is not due today — the backups. See §10.
 
 ---
 
-## 10. The two conditions that stop the script
+## 10. Backups — the 30-day clock
+
+The trust page promises compliance data is **permanently deleted within 30 days**.
+That promise is only true if the backups holding it are gone within 30 days too. A
+`pg_dump` taken before the erasure contains every row the script deleted; the
+database being clean does not make the dump clean.
+
+**The rule: no backup containing erased data is kept longer than 30 days from the
+request date.** The simplest way to keep that true without tracking individual
+requests is to keep no dump longer than 30 days at all — then the promise holds for
+every customer automatically, including ones who have not asked yet.
+
+**Local dumps.** Everything in `~/themisiq-backups`, not only today's. Delete
+anything older than 30 days:
+
+```
+ls -lt ~/themisiq-backups
+```
+
+⚠️ **Deleting the local file is not enough.** These dumps are copied to iCloud Drive
+(`themisiq-backups/`) — `docs/backup-record.md` records a case where the local copy
+was lost and *only* the iCloud copy survived. Delete both, and empty the iCloud
+trash; a file in Recently Deleted is still a file.
+
+**Supabase's own backups.** After the Free → Pro upgrade, Supabase takes automated
+backups and keeps a point-in-time-recovery window of its own. **These fall under the
+same rule.** Check the retention setting in the Supabase dashboard and confirm
+nothing older than 30 days is retained — do not assume the default is within the
+promise. If the configured window is longer than 30 days, either shorten it or the
+trust page's wording has to change; those are the only two honest options.
+
+This section is the one part of the procedure with no same-day deadline, which is
+exactly why it is the part that gets skipped. Put a reminder 30 days out on the day
+you run the erasure.
+
+---
+
+## 11. The two conditions that stop the script
 
 These are the only two stops that mean "a person has to make a decision". Both
 happen before anything is touched.
@@ -264,7 +310,7 @@ The error message names each affected table and its owner.
 
 ---
 
-## 11. What is NOT erased, and why
+## 12. What is NOT erased, and why
 
 Say this to the customer. Do not imply the erasure is more complete than it is.
 
@@ -274,7 +320,7 @@ Say this to the customer. Do not imply the erasure is more complete than it is.
 | **Resend** | Delivered-message logs: recipient address, subject, body of every email we sent them | Held by the email provider; we cannot delete their server-side logs. |
 | **Vercel** | Request logs | Rotate out on Vercel's own schedule. |
 | **Anthropic** | Document text and questions sent by the concierge extractor and the GHG assistant | No retention control exists in the product. |
-| **Database backups** | Every row that was just deleted | Present in `~/themisiq-backups` dumps and the Supabase PITR window until those rotate out. Not restored except in a disaster. |
+| **Database backups** | Every row that was just deleted | Present in `~/themisiq-backups` dumps and in Supabase's own backups until they are deleted. **Not indefinite — they are covered by the 30-day rule in §10, and that section is what makes the trust page's "within 30 days" true.** Not restored except in a disaster. |
 
 The customer's **platform data** — inventories, entries, documents, suppliers,
 assessments, verifier grants, the audit trail and their uploaded files — is what
@@ -282,7 +328,7 @@ the script erases, and that is what "deleted" means in the confirmation below.
 
 ---
 
-## 12. Confirmation email
+## 13. Confirmation email
 
 Send from **privacy@themisiq.co**, to the address the request came from.
 
@@ -316,6 +362,72 @@ Send from **privacy@themisiq.co**, to the address the request came from.
 
 Fill in `<completion date>` from step 7 — the date you ran it, not the date of
 the request.
+
+---
+
+## 14. Access requests — a copy, not a deletion
+
+The trust page's **Access** right: *"Email privacy@themisiq.co to request a copy of
+all data ThemisIQ holds about you. We provide it within 30 days."*
+
+This is the export mode on its own. **Nothing is deleted.**
+
+Find the user id exactly as in §2, then:
+
+```
+node scripts/erase-account.mjs --user <UUID> --export ~/access-<UUID>
+```
+
+**No `--execute`, and no `--confirm`.** Without `--execute` the script opens a
+transaction, reads, writes the files, and rolls back — it changes nothing in the
+database. The two flags cannot be combined anyway; the script refuses.
+
+Then, exactly as in §5:
+
+1. Zip the folder and send it **to the address the request came from**, never to an
+   address supplied inside the request body.
+2. Confirm they have it.
+3. **Delete the folder and the zip from your machine**, including the iCloud copy if
+   one synced. It is a complete unencrypted copy of a customer's account, and the
+   request is answered — there is no reason for it to still exist.
+
+The clock is 30 days from the request date, the same as a deletion.
+
+**What you do not do here:** no `pg_dump` (§3 — nothing is being changed), no second
+dry run, and **not the §13 confirmation email** — that template says the data was
+deleted, which here it was not. Send the covering note below instead.
+
+### Covering note
+
+Goes in the body of the email the files are attached to. It accompanies the export;
+it does not stand in for it, so keep it to this.
+
+> Hello <name>,
+>
+> Attached is a copy of the data ThemisIQ holds about you. It contains one JSON file
+> per database table holding your data, plus any documents you uploaded to the
+> platform.
+>
+> This is everything we hold about you in the platform. Billing records — invoices
+> and payment history — are held by our payment processor, Stripe, and are available
+> from them.
+>
+> If anything is unclear, reply to this email.
+>
+> <your name>
+> ThemisIQ · privacy@themisiq.co
+
+Say *per database table*, not the table names: the filenames are already in the zip,
+and a list of them in the email is schema detail the reader has no use for.
+
+**What the export does and does not contain** is the same table as §12: it is what
+the database holds, plus their uploaded files. It is not their Stripe invoices or
+the emails we have sent them. If they ask for billing history, that is Stripe's
+customer portal, not this script.
+
+An access request from someone who then asks for deletion is two requests. Answer
+the access one first, in full, and only then start at §1 — once the account is
+erased the export is no longer possible.
 
 ---
 
