@@ -782,7 +782,7 @@ export default function AssessPage() {
                             conversation is this. It stays on every card, mapped or not, because for
                             the entries that map to nothing an advisor is the only honest next step. */}
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
-                          <a href="/advisory" style={{ fontSize: 12, padding: '6px 14px', borderRadius: 7, background: 'none', color: '#555553', border: '0.5px solid #e8e7e4', textDecoration: 'none' }}>Talk to an advisor</a>
+                          <a href="/advisory" style={{ fontSize: 12, padding: '6px 14px', borderRadius: 7, background: 'none', color: '#555553', border: '0.5px solid #e8e7e4', textDecoration: 'none' }}>Talk to a specialist</a>
                         </div>
                       </div>
                     )}
@@ -796,7 +796,7 @@ export default function AssessPage() {
           <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, marginBottom: 6 }}>Want help navigating all {obligations.length} obligations?</h3>
           <p style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: '1.25rem', fontWeight: 400 }}>A ThemisIQ advisor will review your results and tell you exactly what to do first. No charge for the initial call.</p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-            <a href="/advisory" style={{ fontSize: 13, fontWeight: 500, padding: '10px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none' }}>Book free consultation</a>
+            <a href="/advisory" style={{ fontSize: 13, fontWeight: 500, padding: '10px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none' }}>Talk to a specialist</a>
            <a href="/dashboard/ghg" style={{ fontSize: 13, padding: '10px 24px', borderRadius: 8, background: 'none', color: 'var(--color-brand)', border: '0.5px solid var(--color-brand)', textDecoration: 'none' }}>Calculate your emissions →</a>
           </div>
         </div>

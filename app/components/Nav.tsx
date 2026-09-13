@@ -126,6 +126,9 @@ export default function Nav() {
             </div>
 
             <a href="/pricing" style={navLinkStyle}>Pricing</a>
+            {/* Outside the Platform dropdown on purpose: that list is modules, and advisory is
+                not one. It sits beside Pricing as a peer destination. */}
+            <a href="/advisory" style={navLinkStyle}>Advisory</a>
           </div>
         </div>
 
@@ -206,6 +209,7 @@ export default function Nav() {
           {[
             ...MODULES_NAV,
             { href: '/pricing', label: 'Pricing', sub: 'Plans, tiers, and what each includes' },
+            { href: '/advisory', label: 'Advisory', sub: 'Expert judgment on your obligation' },
             { href: '/assess', label: 'Take the assessment →', sub: 'Check which regulations apply to you' },
           ].map(({ href, label, sub }) => (
             <a key={href} href={href} onClick={() => setMenuOpen(false)} style={{

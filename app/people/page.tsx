@@ -338,7 +338,7 @@ export default function Page() {
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
           <a href="/dashboard/people" style={{ ...btnPrimary, textDecoration: 'none' }}>Calculate your pay gap →</a>
           <a href="/order?modules=people" style={{ ...btnSecondary, textDecoration: 'none' }}>${peoplePrice}/yr</a>
-          <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Talk to a workforce advisor</a>
+          <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
         </div>
       </section>
 

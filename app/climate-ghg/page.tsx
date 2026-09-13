@@ -74,7 +74,7 @@ export default function Page() {
             {/* #build-your-stack is load-bearing: /pricing?modules=ghg alone lands
                 five sections above the tier picker. */}
             <a href="/pricing?modules=ghg#build-your-stack" style={{ ...btnSecondary, textDecoration: 'none' }}>From ${ghgFrom}/yr</a>
-            <a href="/advisory" style={{ fontSize: 16, color: 'var(--color-ink-muted)', textDecoration: 'underline', textUnderlineOffset: 3, marginLeft: 6 }}>Book a demo</a>
+            <a href="/advisory" style={{ fontSize: 16, color: 'var(--color-ink-muted)', textDecoration: 'underline', textUnderlineOffset: 3, marginLeft: 6 }}>Talk to a specialist</a>
           </div>
 
           {/* ── SPECIFICATION TABLE — replaces the 2×2 card grid ── */}
@@ -326,7 +326,7 @@ export default function Page() {
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
           <a href="/dashboard/ghg" style={{ ...btnPrimary, textDecoration: 'none' }}>See your emissions instantly →</a>
           <a href="/pricing?modules=ghg#build-your-stack" style={{ ...btnSecondary, textDecoration: 'none' }}>From ${ghgFrom}/yr</a>
-          <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Talk to an advisor</a>
+          <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
           <a href="/dashboard/ghg" style={{ ...btnSecondary, textDecoration: 'none' }}>Check if SB 253 applies to you →</a>
         </div>
       </section>
