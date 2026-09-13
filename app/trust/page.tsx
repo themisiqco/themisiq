@@ -1,6 +1,7 @@
 'use client'
 
 import Nav from '../components/Nav'
+import Footer from '../components/Footer'
 
 const GRAD = 'var(--color-brand)'
 
@@ -201,6 +202,7 @@ export default function TrustPage() {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   )
 }

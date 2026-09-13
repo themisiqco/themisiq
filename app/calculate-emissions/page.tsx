@@ -21,6 +21,7 @@ import type { Metadata } from "next";
 import { SB253_SHORT, SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_SCOPE3_FROM } from '../../lib/sb253';
 import { GHG_TIERS } from '../../lib/pricing';
 import Link from "next/link";
+import Footer from '../components/Footer'
 
 // --- CONFIG ------------------------------------------------------
 const CONFIG = {
@@ -744,6 +745,12 @@ export default function CalculateEmissionsPage() {
           </div>
         </section>
       </div>
+
+      {/* OUTSIDE .tiq, DELIBERATELY. STYLES is scoped under `.tiq` and includes `.tiq a`,
+          `.tiq p` and `.tiq div` rules; inside that wrapper the shared footer would be
+          restyled by this page alone. As a sibling it renders identically to every other
+          page that carries it. */}
+      <Footer />
     </>
   );
 }

@@ -18,6 +18,7 @@ import { SB253_SHORT } from '../../lib/sb253'
 import { SB261_SHORT } from '../../lib/sb261'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 import ThemisIQLogo from '../components/ThemisIQLogo'
+import Footer from '../components/Footer'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -769,8 +770,14 @@ function PricingPageInner() {
 
 export default function PricingPage() {
   return (
-    <Suspense fallback={<div style={{ padding: '4rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>Loading…</div>}>
-      <PricingPageInner />
-    </Suspense>
+    // PricingPageInner calls useSearchParams, so it suspends on first paint and the
+    // fallback below renders first. The footer sits outside the boundary so it is
+    // present during the fallback, not only once the configurator resolves.
+    <>
+      <Suspense fallback={<div style={{ padding: '4rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>Loading…</div>}>
+        <PricingPageInner />
+      </Suspense>
+      <Footer />
+    </>
   )
 }
