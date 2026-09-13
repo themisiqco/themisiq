@@ -30,6 +30,7 @@ export default function Footer() {
           ] },
           { heading: 'Company', links: [
             { label: 'Pricing', href: '/pricing' },
+            { label: 'Refund Policy', href: '/refund-policy' },
             { label: 'Privacy Policy', href: '/privacy' },
             { label: 'Terms of Service', href: '/terms' },
             { label: 'Security', href: '/security' },
