@@ -6,6 +6,11 @@ import Nav from '../../../components/Nav'
 import { supabase } from '../../../../lib/supabase'
 import { useEntitlementState } from '../../../../lib/useEntitlement'
 import PaywallCard from '../../../components/PaywallCard'
+import { reportingYearOptions, defaultReportingYear } from '../../../../lib/reportingYears'
+
+// Floor 2023, matching the register these campaigns feed. A campaign collecting supplier data for
+// a year the register cannot be built for would have nowhere to land.
+const YEAR_FLOOR = 2023
 
 interface Campaign {
   id: string
@@ -36,7 +41,7 @@ export default function SupplierPortalDashboard() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
   const [showNew, setShowNew] = useState(false)
-  const [newCampaign, setNewCampaign] = useState({ name: '', description: '', reporting_year: 2024, deadline: '', questionnaire_template: 'ecovadis' })
+  const [newCampaign, setNewCampaign] = useState({ name: '', description: '', reporting_year: defaultReportingYear(new Date(), YEAR_FLOOR), deadline: '', questionnaire_template: 'ecovadis' })
   const [saving, setSaving] = useState(false)
   const [user, setUser] = useState<any>(null)
 
@@ -87,7 +92,7 @@ export default function SupplierPortalDashboard() {
     const { data } = await res.json()
     if (data) {
       setShowNew(false)
-      setNewCampaign({ name: '', description: '', reporting_year: 2024, deadline: '', questionnaire_template: 'ecovadis' })
+      setNewCampaign({ name: '', description: '', reporting_year: defaultReportingYear(new Date(), YEAR_FLOOR), deadline: '', questionnaire_template: 'ecovadis' })
       router.push(`/dashboard/supply-chain/portal/${data.id}`)
     }
     setSaving(false)
@@ -144,7 +149,7 @@ export default function SupplierPortalDashboard() {
                   <div>
                     <label style={labelStyle}>Reporting year</label>
                     <select style={inputStyle} value={newCampaign.reporting_year} onChange={e => setNewCampaign(p => ({ ...p, reporting_year: Number(e.target.value) }))}>
-                      {[2023, 2024, 2025].map(y => <option key={y} value={y}>{y}</option>)}
+                      {reportingYearOptions(new Date(), YEAR_FLOOR).map(y => <option key={y} value={y}>{y}</option>)}
                     </select>
                   </div>
                   <div>

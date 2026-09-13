@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { CONCIERGE_UNREAD_DOC_TYPES, SUPPORTED_FUELS } from '../../../lib/ghg/conciergeDocTypes'
 import { WIZARD_STEP_NAMES } from '../../../lib/ghg/wizardSteps'
-import { reportingYearOptions, defaultReportingYear } from '../../../lib/ghg/reportingYears'
+import { reportingYearOptions, defaultReportingYear } from '../../../lib/reportingYears'
 import { supabase } from '../../../lib/supabase'
 import { buildMonthlyEmissions } from '../../../lib/ghg/monthlyEmissions'
 import { buildComparabilityDisclosure, buildComparabilityRecord, observationLines } from '../../../lib/ghg/comparability'

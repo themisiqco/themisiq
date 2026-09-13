@@ -6,6 +6,12 @@ import Papa from 'papaparse'
 import { useEntitlementState } from '../../../lib/useEntitlement'
 import { DRAFT_KEYS, readDraft, useDraftAutosave } from '../../../lib/drafts'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
+import { reportingYearOptions, defaultReportingYear } from '../../../lib/reportingYears'
+
+// Floor 2022, preserving the window this module already offered. No emission factors are involved:
+// the inputs are the customer's own payroll and safety figures, which they hold for as long as
+// their own retention policy says. Nothing in the code constrains how far back this can go.
+const YEAR_FLOOR = 2022
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -76,12 +82,14 @@ const STEP_NAMES = ['Frameworks', 'Company setup', 'Job bands', 'Pay data', 'Wor
 const GRAD = 'var(--color-brand)'
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD']
 
-const DEFAULT_INVENTORY: PeopleInventory = {
-  company: '', reporting_year: 2024,
+// A function, not a const: a module-level object would capture the year once at import, which is
+// the frozen-at-import defect lib/reportingYears.test.ts T5 exists to catch.
+const defaultInventory = (): PeopleInventory => ({
+  company: '', reporting_year: defaultReportingYear(new Date(), YEAR_FLOOR),
   jurisdictions: [], total_employees: 0, currency: 'USD',
   bands: [newBand()],
   metrics: { ltifr: 0, trir: 0, training_hours_male: 0, training_hours_female: 0, collective_bargaining_pct: 0, parental_leave_male: 0, parental_leave_female: 0 },
-}
+})
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
@@ -131,7 +139,7 @@ function parsePeopleDraft(u: unknown): PeopleInventory | null {
   const m = (o.metrics && typeof o.metrics === 'object' && !Array.isArray(o.metrics)) ? o.metrics as Record<string, unknown> : {}
   const inv: PeopleInventory = {
     company: str(o.company, ''),
-    reporting_year: num(o.reporting_year, 2024),
+    reporting_year: num(o.reporting_year, defaultReportingYear(new Date(), YEAR_FLOOR)),
     jurisdictions: Array.isArray(o.jurisdictions) ? o.jurisdictions.filter((x): x is string => typeof x === 'string') : [],
     total_employees: num(o.total_employees, 0),
     currency: str(o.currency, 'USD'),
@@ -150,7 +158,7 @@ function parsePeopleDraft(u: unknown): PeopleInventory | null {
 export default function PeopleDashboard() {
   const [step, setStep] = useState(0)
   // Lazy initialiser, never a useEffect — see lib/drafts.ts.
-  const [inventory, setInventory] = useState<PeopleInventory>(() => readDraft(DRAFT_KEYS.people, parsePeopleDraft) ?? DEFAULT_INVENTORY)
+  const [inventory, setInventory] = useState<PeopleInventory>(() => readDraft(DRAFT_KEYS.people, parsePeopleDraft) ?? defaultInventory())
   useDraftAutosave(DRAFT_KEYS.people, inventory)
   const [dataConfirmed, setDataConfirmed] = useState(false)
   const [activeBand, setActiveBand] = useState(0)
@@ -306,7 +314,7 @@ export default function PeopleDashboard() {
         <div>
           <label style={labelStyle}>Reporting year</label>
           <select style={inputStyle} value={inventory.reporting_year} onChange={e => update('reporting_year', Number(e.target.value))}>
-            {[2022, 2023, 2024, 2025].map(y => <option key={y} value={y}>{y}</option>)}
+            {reportingYearOptions(new Date(), YEAR_FLOOR).map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
         <div>

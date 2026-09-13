@@ -9,6 +9,13 @@ import { resolvePcafResult, assessAsset } from '../../../lib/pcaf/engine'
 import type { PcafPortfolioAsset, PcafAssetClass, EmissionInputs } from '../../../lib/pcaf/types'
 import { sectionHead } from '@/app/components/headingStyles'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
+import { reportingYearOptions, defaultReportingYear } from '../../../lib/reportingYears'
+
+// Floor 2023, the same as GHG's. This wizard's year selector is disabled and inherited whenever
+// the inventory is bound to a GHG inventory (`disabled={!!boundInventoryId}`), so a year no GHG
+// inventory can hold is a year this selector can never legitimately show. Its own spend factors
+// carry no year dimension; the parent module is the constraint.
+const YEAR_FLOOR = 2023
 
 // ─── Scope 3 Category Definitions ────────────────────────────────────────────
 
@@ -120,7 +127,7 @@ export default function Scope3Dashboard() {
   const [step, setStep] = useState(0)
   const [company, setCompany] = useState('')
   const [sector, setSector] = useState('')
-  const [reportingYear, setReportingYear] = useState(2024)
+  const [reportingYear, setReportingYear] = useState(defaultReportingYear(new Date(), YEAR_FLOOR))
   const [currency, setCurrency] = useState('USD')
   const [revenue, setRevenue] = useState(0)
   const [materialCats, setMaterialCats] = useState<number[]>([])
@@ -505,7 +512,7 @@ export default function Scope3Dashboard() {
         <div>
           <label style={labelStyle}>Reporting year</label>
           <select style={boundInventoryId ? { ...inputStyle, background: '#f8f7f5', color: 'var(--color-ink-muted)', cursor: 'not-allowed' } : inputStyle} value={reportingYear} onChange={e => setReportingYear(Number(e.target.value))} disabled={!!boundInventoryId}>
-            {[2022, 2023, 2024, 2025].map(y => <option key={y} value={y}>{y}</option>)}
+            {reportingYearOptions(new Date(), YEAR_FLOOR).map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
         <div>

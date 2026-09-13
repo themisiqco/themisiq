@@ -1,4 +1,4 @@
-// ── WHICH REPORTING YEARS A GHG INVENTORY MAY USE ────────────────────────────────────────────────
+// ── WHICH REPORTING YEARS A MODULE MAY OFFER ─────────────────────────────────────────────────────
 //
 // The wizard's year selector was the literal `[2023, 2024, 2025]`, and the new-inventory default was
 // the literal `2024`, written twice. Three hardcoded facts about "now", none of which moved when now
@@ -15,6 +15,21 @@
 //     test could not test anything;
 //   - callers that need a specific date (a backfill, a test) can pass one without stubbing globals.
 
+// ── THE FLOOR IS PER MODULE, AND ONLY ONE OF THEM HAS A PHYSICAL REASON ─────────────────────────
+// REPORTING_YEAR_FLOOR below is the GHG floor and the default for callers that do not pass one. It
+// is justified entirely by emission-factor coverage, which is a fact about GHG and about nothing
+// else. A supplier risk register has no factor tables; a cyber gap assessment has no factors at all.
+//
+// So both functions take an optional `floor`. Callers that have a real constraint state it and say
+// why at the call site. The floors in use, and their reasons:
+//   ghg           2023  factor-table coverage (this constant)
+//   scope3        2023  binds to a GHG inventory, so it cannot offer a year no inventory can have
+//   supply-chain  2023  no factor constraint; preserves the window the module already offered
+//   portal        2023  same window as the register it feeds
+//   people        2022  no factors; preserves the window the module already offered
+//   cyber         2024  NIS2 transposition deadline 17 Oct 2024 — no earlier gap to assess
+//   ai-governance 2024  EU AI Act entered into force 1 Aug 2024
+//
 // FLOOR — the earliest year the factor tables can price without resolving forward.
 // 2023 is the earliest ECCC applicability set seeded in EF_CA, and the US (eGRID2023) and EU (EEA
 // 2023) grid tables key on 2023 with no earlier row. Below 2023 every lookup hits the `years[0]`
@@ -30,10 +45,10 @@ export const REPORTING_YEAR_FLOOR = 2023
  * cannot be complete, and the wizard has no concept of a partial year. A customer reporting FY2026 in
  * January 2027 selects 2026, which is `defaultReportingYear` anyway.
  */
-export function reportingYearOptions(now: Date = new Date()): number[] {
-  const top = Math.max(now.getFullYear(), REPORTING_YEAR_FLOOR)
+export function reportingYearOptions(now: Date = new Date(), floor: number = REPORTING_YEAR_FLOOR): number[] {
+  const top = Math.max(now.getFullYear(), floor)
   const out: number[] = []
-  for (let y = top; y >= REPORTING_YEAR_FLOOR; y--) out.push(y)
+  for (let y = top; y >= floor; y--) out.push(y)
   return out
 }
 
@@ -44,8 +59,8 @@ export function reportingYearOptions(now: Date = new Date()): number[] {
  * selectable" is true by construction instead of by two functions agreeing. In the floor year itself
  * (current year 2023, so `current - 1` is 2022) it clamps up to the only option there is.
  */
-export function defaultReportingYear(now: Date = new Date()): number {
-  const options = reportingYearOptions(now)
+export function defaultReportingYear(now: Date = new Date(), floor: number = REPORTING_YEAR_FLOOR): number {
+  const options = reportingYearOptions(now, floor)
   const lastComplete = now.getFullYear() - 1
   return options.includes(lastComplete) ? lastComplete : options[0]
 }

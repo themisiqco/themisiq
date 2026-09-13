@@ -9,6 +9,12 @@ import { btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggl
 import {
   AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED, AI_ACT_CITATION,
 } from '../../../lib/aiAct'
+import { reportingYearOptions, defaultReportingYear } from '../../../lib/reportingYears'
+
+// Floor 2024, preserving the window this module already offered, and defensible on its own terms:
+// the EU AI Act entered into force on 1 August 2024, so an assessment against it cannot describe
+// an earlier year.
+const YEAR_FLOOR = 2024
 
 // This module records a system's risk level but NOT which high-risk limb it falls under: there is no
 // field distinguishing a stand-alone Article 6(2) system from AI embedded in a product already covered
@@ -214,7 +220,7 @@ function parseAIDraft(u: unknown): AIInventory | null {
 
   const inv: AIInventory = {
     company: str(o.company, ''),
-    reporting_year: num(o.reporting_year, 2025),
+    reporting_year: num(o.reporting_year, defaultReportingYear(new Date(), YEAR_FLOOR)),
     jurisdiction: str(o.jurisdiction, 'EU'),
     sector: str(o.sector, ''),
     systems,
@@ -227,7 +233,7 @@ export default function AIGovernanceDashboard() {
   const [step, setStep] = useState(0)
   // Lazy initialiser, never a useEffect — see lib/drafts.ts on the flash an effect would cause.
   const [inventory, setInventory] = useState<AIInventory>(() =>
-    readDraft(DRAFT_KEYS.aiGovernance, parseAIDraft) ?? { company: '', reporting_year: 2025, jurisdiction: 'EU', sector: '', systems: [] })
+    readDraft(DRAFT_KEYS.aiGovernance, parseAIDraft) ?? { company: '', reporting_year: defaultReportingYear(new Date(), YEAR_FLOOR), jurisdiction: 'EU', sector: '', systems: [] })
   useDraftAutosave(DRAFT_KEYS.aiGovernance, inventory)
   const [activeSystem, setActiveSystem] = useState(0)
   const [dataConfirmed, setDataConfirmed] = useState(false)
@@ -329,7 +335,7 @@ export default function AIGovernanceDashboard() {
         <div>
           <label style={labelStyle}>Reporting year</label>
           <select style={inputStyle} value={inventory.reporting_year} onChange={e => update('reporting_year', Number(e.target.value))}>
-            {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+            {reportingYearOptions(new Date(), YEAR_FLOOR).map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
         <div style={{ gridColumn: '1 / -1' }}>

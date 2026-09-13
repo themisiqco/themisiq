@@ -10,6 +10,12 @@ import { DRAFT_KEYS, readDraft, useDraftAutosave, clearDraft } from '../../../li
 import { CS3D_APPLIES_FROM } from '../../../lib/cs3d'
 import { sectionHead } from '@/app/components/headingStyles'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
+import { reportingYearOptions, defaultReportingYear } from '../../../lib/reportingYears'
+
+// Floor 2023, preserving the window this module already offered. There is no factor-table reason
+// here — SECTOR_RISK carries a flat spend factor with no year dimension — so this is a product
+// choice about how far back a supplier register is worth keeping, not a limit of the data.
+const YEAR_FLOOR = 2023
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -194,7 +200,7 @@ function parseSupplyChainDraft(u: unknown): SupplyChainInventory | null {
   const frameworks = Array.isArray(o.frameworks) ? (o.frameworks.filter(f => typeof f === 'string') as Framework[]) : []
   const inv: SupplyChainInventory = {
     company: str(o.company, ''),
-    reporting_year: num(o.reporting_year, 2024),
+    reporting_year: num(o.reporting_year, defaultReportingYear(new Date(), YEAR_FLOOR)),
     frameworks: frameworks.length ? frameworks : ['cs3d', 'scope3', 'esrs_s2'],
     currency: str(o.currency, 'USD'),
     suppliers,
@@ -248,7 +254,7 @@ function SupplyChainDashboardInner() {
   // asked to open.
   const [inventory, setInventory] = useState<SupplyChainInventory>(() =>
     (loadId ? null : readDraft(DRAFT_KEYS.supplyChain, parseSupplyChainDraft)) ?? {
-      company: '', reporting_year: 2024,
+      company: '', reporting_year: defaultReportingYear(new Date(), YEAR_FLOOR),
       frameworks: ['cs3d', 'scope3', 'esrs_s2'],
       currency: 'USD', suppliers: [],
     })
@@ -303,7 +309,7 @@ function SupplyChainDashboardInner() {
       setRegisterName(data.name || '')
       setInventory({
         company: data.company_name || '',
-        reporting_year: data.reporting_year || 2024,
+        reporting_year: data.reporting_year ?? defaultReportingYear(new Date(), YEAR_FLOOR),
         frameworks: Array.isArray(data.frameworks) && data.frameworks.length ? data.frameworks : ['cs3d', 'scope3', 'esrs_s2'],
         currency: data.currency || 'USD',
         suppliers,
@@ -315,7 +321,7 @@ function SupplyChainDashboardInner() {
     // No navigation: this button only renders in list mode, where there is no ?id to clear, and
     // routing would re-fire the mode effect and land back on the list.
     setRegisterId(null); setRegisterName(''); setSavedAt(null); setSaveError(null); setStep(0)
-    setInventory({ company: '', reporting_year: 2024, frameworks: ['cs3d', 'scope3', 'esrs_s2'], currency: 'USD', suppliers: [] })
+    setInventory({ company: '', reporting_year: defaultReportingYear(new Date(), YEAR_FLOOR), frameworks: ['cs3d', 'scope3', 'esrs_s2'], currency: 'USD', suppliers: [] })
     setMode('wizard')
   }
 
@@ -514,7 +520,7 @@ function SupplyChainDashboardInner() {
         <div>
           <label style={labelStyle}>Reporting year</label>
           <select style={inputStyle} value={inventory.reporting_year} onChange={e => update('reporting_year', Number(e.target.value))}>
-            {[2023, 2024, 2025].map(y => <option key={y} value={y}>{y}</option>)}
+            {reportingYearOptions(new Date(), YEAR_FLOOR).map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
         <div>

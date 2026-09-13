@@ -6,6 +6,12 @@ import { useEntitlementState } from '../../../lib/useEntitlement'
 import { DRAFT_KEYS, readDraft, useDraftAutosave } from '../../../lib/drafts'
 import { sectionHead } from '@/app/components/headingStyles'
 import { btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
+import { reportingYearOptions, defaultReportingYear } from '../../../lib/reportingYears'
+
+// Floor 2024, preserving the window this module already offered, and defensible on its own terms:
+// the NIS2 transposition deadline was 17 October 2024, so before that year there is no NIS2
+// obligation to hold a gap assessment against.
+const YEAR_FLOOR = 2024
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -151,7 +157,7 @@ function parseCyberDraft(u: unknown): CyberInventory | null {
   const frameworks = Array.isArray(o.frameworks) ? (o.frameworks.filter(f => typeof f === 'string') as Framework[]) : []
   const inv: CyberInventory = {
     company: str(o.company, ''),
-    reporting_year: num(o.reporting_year, 2025),
+    reporting_year: num(o.reporting_year, defaultReportingYear(new Date(), YEAR_FLOOR)),
     sector: str(o.sector, ''),
     frameworks: frameworks.length ? frameworks : ['nis2', 'iso27001', 'nist'],
     employee_count: str(o.employee_count, ''),
@@ -169,7 +175,7 @@ export default function CyberDashboard() {
   // Lazy initialiser, never a useEffect — see lib/drafts.ts.
   const [inventory, setInventory] = useState<CyberInventory>(() =>
     readDraft(DRAFT_KEYS.cyber, parseCyberDraft) ?? {
-      company: '', reporting_year: 2025, sector: '',
+      company: '', reporting_year: defaultReportingYear(new Date(), YEAR_FLOOR), sector: '',
       frameworks: ['nis2', 'iso27001', 'nist'],
       employee_count: '', eu_operations: true, us_listed: false, financial_entity: false,
       responses: {},
@@ -247,7 +253,7 @@ export default function CyberDashboard() {
         <div>
           <label style={labelStyle}>Reporting year</label>
           <select style={inputStyle} value={inventory.reporting_year} onChange={e => update('reporting_year', Number(e.target.value))}>
-            {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+            {reportingYearOptions(new Date(), YEAR_FLOOR).map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
         <div>
