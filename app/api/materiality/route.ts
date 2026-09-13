@@ -345,6 +345,18 @@ export async function POST(req: NextRequest) {
 
     if (saveErr) {
       console.error('Materiality save error:', saveErr)
+      // PT402 is the entitlement trigger's own refusal (20260913_module_entitlement_triggers.sql),
+      // and its message is customer-facing copy written to be read verbatim — it distinguishes an
+      // expired term from a module never bought, which is the only distinction the customer can act
+      // on. Passing it through is the whole point of giving that raise a distinct errcode: matching
+      // the default P0001 would also catch a future raise from any other trigger on this table, and
+      // matching the message text would break on a wording change.
+      //
+      // Everything else stays generic. A Postgres error is not customer copy, and an RLS denial in
+      // particular must not be echoed.
+      if (saveErr.code === 'PT402') {
+        return NextResponse.json({ error: saveErr.message }, { status: 402 })
+      }
       return NextResponse.json({ error: 'Failed to save assessment' }, { status: 500 })
     }
 
