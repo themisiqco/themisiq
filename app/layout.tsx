@@ -50,6 +50,7 @@ const archivo = Archivo({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://www.themisiq.co'),
   title: "ThemisIQ — Countless Compliance Requirements. One Intelligent Platform.",
   description: "ThemisIQ — your sustainability compliance reporting solution.",
 };
