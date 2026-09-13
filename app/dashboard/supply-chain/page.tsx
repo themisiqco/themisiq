@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Nav from '../../components/Nav'
 import Papa from 'papaparse'
-import { useEntitlementState } from '../../../lib/useEntitlement'
-import { DRAFT_KEYS, readDraft, useDraftAutosave } from '../../../lib/drafts'
+import { supabase } from '../../../lib/supabase'
+import { useEntitlementAccess } from '../../../lib/useEntitlement'
+import { DRAFT_KEYS, readDraft, useDraftAutosave, clearDraft } from '../../../lib/drafts'
 import { CS3D_APPLIES_FROM } from '../../../lib/cs3d'
 import { sectionHead } from '@/app/components/headingStyles'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
@@ -202,13 +204,50 @@ function parseSupplyChainDraft(u: unknown): SupplyChainInventory | null {
   return inv.company.trim() === '' && inv.suppliers.length === 0 ? null : inv
 }
 
-export default function SupplyChainDashboard() {
-  const { isPaid, loading: entLoading } = useEntitlementState('supply-chain')
+// ── SAVE REFUSAL COPY ─────────────────────────────────────────────────────────
+// The calculator is never gated. Anyone — logged out, unentitled, expired — runs it and sees real
+// supplier scores; the gates are on OUTPUT, which is the CSV export and now saving a register.
+//
+// These sentences are deliberately identical to what enforce_supply_chain_entitlement() raises for
+// the same two conditions. The check in handleSave saves a round trip; the trigger is the actual
+// enforcement. Two wordings for one refusal would be two things to keep in step, and the customer
+// would get different text depending on which layer caught it.
+const SAVE_REFUSAL: Record<'expired' | 'none' | 'unknown', string> = {
+  expired: 'Your Supply Chain access has expired. Renew to save a new register. Your existing registers are still here and still readable.',
+  none: 'Saving a register requires the Supply Chain module. Your suppliers are still on screen — purchase to save them.',
+  // States what was observed, not a guess at why. The read failed; naming a cause we cannot verify
+  // is how a wrong one ends up on screen for months.
+  unknown: 'We could not check your Supply Chain access, so nothing was saved. This is usually temporary — try again in a moment.',
+}
+
+function SupplyChainDashboardInner() {
+  // ONE entitlement read, two questions. `access === 'active'` gates creating a register, because
+  // that is what the database trigger requires; `isPaid` keeps its existing meaning for the export
+  // gate further down, which an expired customer still passes.
+  const access = useEntitlementAccess('supply-chain')
+  const entLoading = access === 'loading'
+  const isPaid = access === 'active' || access === 'expired'
+
+  const searchParams = useSearchParams()
+  const loadId = searchParams.get('id')
+
+  const [mode, setMode] = useState<'loading' | 'list' | 'wizard'>('loading')
+  const [registerId, setRegisterId] = useState<string | null>(null)
+  const [registerList, setRegisterList] = useState<Array<{ id: string; name: string; reporting_year: number; supplier_count: number; updated_at: string }>>([])
+  const [registerName, setRegisterName] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [savedAt, setSavedAt] = useState<string | null>(null)
+
   const [step, setStep] = useState(0)
   // Restored in the LAZY INITIALISER, never a useEffect: an effect would paint the empty form,
   // let the visitor start typing, and then overwrite what they typed.
+  //
+  // A ?id= load skips the draft entirely. The row is the record once one exists, and restoring a
+  // draft over it would show the customer work they did somewhere else on top of a register they
+  // asked to open.
   const [inventory, setInventory] = useState<SupplyChainInventory>(() =>
-    readDraft(DRAFT_KEYS.supplyChain, parseSupplyChainDraft) ?? {
+    (loadId ? null : readDraft(DRAFT_KEYS.supplyChain, parseSupplyChainDraft)) ?? {
       company: '', reporting_year: 2024,
       frameworks: ['cs3d', 'scope3', 'esrs_s2'],
       currency: 'USD', suppliers: [],
@@ -217,7 +256,140 @@ export default function SupplyChainDashboard() {
   const [dataConfirmed, setDataConfirmed] = useState(false)
   const [sortBy, setSortBy] = useState<'risk' | 'spend' | 'name'>('risk')
   const fileRef = useRef<HTMLInputElement>(null)
-  useDraftAutosave(DRAFT_KEYS.supplyChain, inventory)
+
+  // Autosave stops the moment a row exists. From then on the register is the record and the save
+  // button is how it changes; a draft written alongside it could later be restored over an edit
+  // made in another browser.
+  useDraftAutosave(DRAFT_KEYS.supplyChain, inventory, { enabled: !registerId })
+
+  // Decide the initial view: ?id -> wizard (the load effect fetches it); signed out -> wizard;
+  // rows exist -> list; none -> blank wizard.
+  useEffect(() => {
+    if (loadId) { setMode('wizard'); return }
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) { setMode('wizard'); return }
+      const { data } = await supabase
+        .from('supply_chain_registers')
+        .select('id, name, reporting_year, supplier_count, updated_at')
+        .order('updated_at', { ascending: false })
+      if (data && data.length > 0) { setRegisterList(data); setMode('list') } else { setMode('wizard') }
+    })
+  }, [loadId])
+
+  // Load one register. Suppliers are stored as INPUTS ONLY, so every row is put back through
+  // scoreSupplier() here — the same rule parseSupplyChainDraft() applies to a draft. Trusting a
+  // stored score would show a figure this build would not produce.
+  useEffect(() => {
+    if (!loadId) return
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) return
+      const { data, error } = await supabase
+        .from('supply_chain_registers').select('*').eq('id', loadId).maybeSingle()
+      if (error) { console.error('Register load failed:', error); return }
+      if (!data) return
+      const suppliers: Supplier[] = (Array.isArray(data.suppliers) ? data.suppliers : []).map((raw: any) => {
+        const base: Supplier = {
+          id: String(raw?.id ?? Math.random().toString(36).slice(2)),
+          name: String(raw?.name ?? ''), country: String(raw?.country ?? ''), sector: String(raw?.sector ?? ''),
+          annual_spend: Number(raw?.annual_spend) || 0, currency: String(raw?.currency ?? data.currency ?? 'USD'),
+          tier: (raw?.tier === '2' || raw?.tier === '3') ? raw.tier : '1',
+          has_assessment: raw?.has_assessment === true,
+          risk_level: 'low', risk_score: 0, risk_factors: [], scope3_emissions: 0,
+        }
+        const scored = scoreSupplier(base)
+        return { ...base, risk_level: scored.risk, risk_score: scored.score, risk_factors: scored.factors, scope3_emissions: scored.scope3 }
+      })
+      setRegisterId(data.id)
+      setRegisterName(data.name || '')
+      setInventory({
+        company: data.company_name || '',
+        reporting_year: data.reporting_year || 2024,
+        frameworks: Array.isArray(data.frameworks) && data.frameworks.length ? data.frameworks : ['cs3d', 'scope3', 'esrs_s2'],
+        currency: data.currency || 'USD',
+        suppliers,
+      })
+    })
+  }, [loadId])
+
+  const startNewRegister = () => {
+    // No navigation: this button only renders in list mode, where there is no ?id to clear, and
+    // routing would re-fire the mode effect and land back on the list.
+    setRegisterId(null); setRegisterName(''); setSavedAt(null); setSaveError(null); setStep(0)
+    setInventory({ company: '', reporting_year: 2024, frameworks: ['cs3d', 'scope3', 'esrs_s2'], currency: 'USD', suppliers: [] })
+    setMode('wizard')
+  }
+
+  const handleSave = async () => {
+    if (saving) return
+    setSaving(true); setSaveError(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setSaveError('Sign in to save this register. Your work is kept in this browser for two hours, so you will not lose it.')
+        return
+      }
+
+      // The gate is here, on the action, not on the wizard. A refusal leaves every score on screen
+      // and the draft intact; the customer loses a click, not their work.
+      //
+      // `&& !registerId` IS THE EDIT EXEMPTION, and it is what keeps this in step with the database.
+      // enforce_supply_chain_entitlement() is BEFORE INSERT only, so an unentitled — including an
+      // EXPIRED — customer's UPDATEs are permitted server-side. Refusing them here would have the
+      // client enforce a stricter rule than the thing that actually enforces, and would make the
+      // expired message a lie: it promises the existing registers are still readable and editable.
+      // Same shape as resolveWizardGate()'s `!dealIdParam` exemption in lib/deals/gates.ts.
+      if (access !== 'active' && !registerId) {
+        setSaveError(access === 'loading'
+          ? 'Still checking your access — try again in a moment.'
+          : SAVE_REFUSAL[access])
+        return
+      }
+      const trimmed = registerName.trim()
+      if (!trimmed) { setSaveError('Give this register a name so you can tell it from the others.'); return }
+
+      const payload = {
+        user_id: session.user.id,
+        name: trimmed,
+        company_name: inventory.company.trim() || null,
+        reporting_year: inventory.reporting_year,
+        currency: inventory.currency,
+        frameworks: inventory.frameworks,
+        // INPUTS ONLY. The four derived fields are recomputed on load; storing them would let a
+        // saved register assert a score this build would not produce.
+        suppliers: inventory.suppliers.map(s => ({
+          id: s.id, name: s.name, country: s.country, sector: s.sector,
+          annual_spend: s.annual_spend, currency: s.currency, tier: s.tier,
+          has_assessment: s.has_assessment,
+        })),
+        supplier_count: inventory.suppliers.length,
+        total_spend: totalSpend,
+        updated_at: new Date().toISOString(),
+      }
+
+      // No duplicate check. Several registers per reporting year is the design, which is why the
+      // table carries no unique constraint and why `name` is required above.
+      const { data, error } = registerId
+        ? await supabase.from('supply_chain_registers').update(payload).eq('id', registerId).select('id').single()
+        : await supabase.from('supply_chain_registers').insert(payload).select('id').single()
+
+      if (error) {
+        console.error('Register save failed:', error)
+        // PT402 is the entitlement trigger's own refusal. Its sentence is written to be read on
+        // its own, so it is surfaced unprefixed — 'Save failed:' in front of copy explaining that
+        // saving is unavailable reads as two messages disagreeing. Everything else stays generic:
+        // a Postgres error is not customer copy, and an RLS denial in particular must not be shown.
+        setSaveError(error.code === 'PT402' ? error.message : 'Could not save this register. Please try again.')
+        return
+      }
+      if (data) setRegisterId(data.id)
+      // The draft has been superseded by a row. Clearing it here is what stops a later mount
+      // restoring pre-save work over the register that replaced it.
+      clearDraft(DRAFT_KEYS.supplyChain)
+      setSavedAt(new Date().toLocaleTimeString())
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const update = (field: keyof SupplyChainInventory, value: any) =>
     setInventory(prev => ({ ...prev, [field]: value }))
@@ -656,6 +828,47 @@ export default function SupplyChainDashboard() {
 
   const steps = [renderStep0, renderStep1, renderStep2, renderStep3, renderStep4]
 
+  // ── LIST ──────────────────────────────────────────────────────────────────────────────────
+  if (mode === 'loading') {
+    return (
+      <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
+        <Nav />
+        <div style={{ padding: '5rem 2rem', textAlign: 'center' as const, color: 'var(--color-ink-muted)', fontSize: 14 }}>Loading…</div>
+      </div>
+    )
+  }
+
+  if (mode === 'list') {
+    return (
+      <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
+        <Nav />
+        <div style={{ maxWidth: 760, margin: '0 auto', padding: '3rem 1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap' as const, gap: 12 }}>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 400, color: '#0d0d0d', margin: 0 }}>Your registers</h1>
+            <button onClick={startNewRegister} style={{ ...btnPrimary, fontSize: 13, padding: '10px 20px' }}>+ New register</button>
+          </div>
+          {registerList.length === 0 ? (
+            <div style={{ textAlign: 'center' as const, padding: '3rem', color: 'var(--color-ink-muted)', fontSize: 14 }}>No registers yet. Click &ldquo;New register&rdquo; to begin.</div>
+          ) : (
+            registerList.map(r => (
+              <a key={r.id} href={`/dashboard/supply-chain?id=${r.id}`} style={{ textDecoration: 'none', display: 'block' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '16px 20px', marginBottom: 10, cursor: 'pointer', flexWrap: 'wrap' as const }}>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 500, color: '#0d0d0d' }}>{r.name || 'Untitled register'}</div>
+                    <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 3 }}>
+                      Reporting year {r.reporting_year} · {r.supplier_count} {r.supplier_count === 1 ? 'supplier' : 'suppliers'} · Updated {new Date(r.updated_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-brand)' }}>Open →</span>
+                </div>
+              </a>
+            ))
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
@@ -669,14 +882,34 @@ export default function SupplyChainDashboard() {
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 4 }}>Supply Chain & Scope 3</div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>Supplier Risk Register & Scope 3 Assessment</div>
           </div>
-          {inventory.suppliers.length > 0 && (
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginBottom: 2 }}>Suppliers assessed</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: '#0d0d0d' }}>{inventory.suppliers.length}</div>
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' as const }}>
+            {inventory.suppliers.length > 0 && (
+              <div style={{ textAlign: 'right' as const }}>
+                <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginBottom: 2 }}>Suppliers assessed</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#0d0d0d' }}>{inventory.suppliers.length}</div>
+              </div>
+            )}
+            {/* The name is required by the table and is what tells two registers for the same year
+                apart, so it sits beside the button rather than buried in step 1. */}
+            <input
+              value={registerName}
+              onChange={e => setRegisterName(e.target.value)}
+              placeholder="Register name"
+              style={{ ...inputStyle, width: 180, padding: '8px 10px', fontSize: 12 }}
+            />
+            <button onClick={handleSave} disabled={saving} style={{ ...btnPrimary, fontSize: 13, padding: '9px 18px', opacity: saving ? 0.6 : 1, cursor: saving ? 'wait' : 'pointer' }}>
+              {saving ? 'Saving…' : registerId ? 'Save changes' : 'Save register'}
+            </button>
+          </div>
         </div>
       </div>
+      {(saveError || savedAt) && (
+        <div style={{ background: saveError ? '#FCEBEB' : '#E1F5EE', borderBottom: '0.5px solid #e8e7e4', padding: '10px 2.5rem' }}>
+          <div style={{ maxWidth: 900, margin: '0 auto', fontSize: 13, color: saveError ? '#501313' : '#0F6E56', lineHeight: 1.6 }}>
+            {saveError ?? `Saved at ${savedAt}.`}
+          </div>
+        </div>
+      )}
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2.5rem', overflowX: 'auto' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex' }}>
           {STEP_NAMES.map((name, i) => (
@@ -734,5 +967,15 @@ export default function SupplyChainDashboard() {
       </div>
       <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
     </div>
+  )
+}
+
+// useSearchParams suspends on first paint, so the component that reads it sits inside a boundary.
+// Same shape as app/pricing/page.tsx.
+export default function SupplyChainDashboard() {
+  return (
+    <Suspense fallback={<div style={{ padding: '4rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>Loading…</div>}>
+      <SupplyChainDashboardInner />
+    </Suspense>
   )
 }

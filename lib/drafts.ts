@@ -138,7 +138,14 @@ export function clearDraft(key: string): void {
 // invocations see the same draft; removal is idempotent; a later mount finds storage already
 // empty and restores nothing. The read-and-remove GUARANTEE survives — a draft is consumed exactly
 // once — it is just spread across the render and the commit rather than crammed into the render.
-export function useDraftAutosave<T>(key: string, value: T): void {
+//
+// `enabled` exists for the moment a tool gains server-side persistence. Once work is saved to a
+// row the draft is no longer the record of it, and continuing to autosave would leave a stale copy
+// in localStorage that could later be restored over a register the customer has since edited
+// elsewhere. Pass false from the point the row exists; the clear-on-mount below still runs, so a
+// draft that was restored is still consumed exactly once.
+export function useDraftAutosave<T>(key: string, value: T, opts?: { enabled?: boolean }): void {
+  const enabled = opts?.enabled ?? true
   const anonRef = useRef(true)   // assume signed out until told otherwise: the shorter life is the safe default
   const firstRun = useRef(true)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -163,8 +170,9 @@ export function useDraftAutosave<T>(key: string, value: T): void {
   // serialising that on every keystroke is waste nobody asked for.
   useEffect(() => {
     if (firstRun.current) { firstRun.current = false; return }
+    if (!enabled) return
     if (timer.current) clearTimeout(timer.current)
     timer.current = setTimeout(() => saveDraft(key, value, { anon: anonRef.current }), 400)
     return () => { if (timer.current) clearTimeout(timer.current) }
-  }, [key, value])
+  }, [key, value, enabled])
 }
