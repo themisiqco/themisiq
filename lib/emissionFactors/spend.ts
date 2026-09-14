@@ -26,6 +26,27 @@ import { EPA_USEEIO_URL } from '../sources'
 export type SpendFactorUnit = 'kgCO2e_per_currency_unit'
 
 /**
+ * Which of EXIOBASE's two tables a factor was read from. Required, no default.
+ *
+ * EXIOBASE publishes both, and they answer different questions:
+ *   'industry' — the intensity of an INDUSTRY AS A WHOLE (the 163-industry ixi table). It prices
+ *                "a euro spent with a company of this kind", averaging everything that industry
+ *                makes. Correct for SUPPLIER-LEVEL SCREENING, where we know who the supplier is and
+ *                not what was bought: a supplier risk register is exactly this case.
+ *   'product'  — the intensity of a PRODUCT CATEGORY across every industry producing it (the
+ *                200-product pxp table). It prices "a euro spent on this thing". Correct for
+ *                CATEGORY 1 WHERE THE PURCHASE IS KNOWN — a line on an AP ledger naming what was
+ *                bought should be priced by what it is, not by who sold it.
+ *
+ * ⚠️ THEY ARE NOT INTERCHANGEABLE AND THE ERROR IS NOT SYMMETRIC. Pricing a known purchase with an
+ * industry factor attributes to it the average of everything that industry sells, which is wrong by
+ * however diversified the industry is. Pricing an unknown purchase with a product factor is worse:
+ * it requires picking a product nobody has established was bought. Where the purchase is not known,
+ * 'industry' is the honest answer; where it is, 'product' is the more accurate one.
+ */
+export type SpendFactorType = 'industry' | 'product'
+
+/**
  * The valuation the DENOMINATOR is quoted in. Required, no default.
  *
  * ⚠️ THE THREE SOURCES IN THIS MODULE PUBLISH ON THREE DIFFERENT BASES, AND THE DIFFERENCE BETWEEN
@@ -48,9 +69,24 @@ export type PriceBasis = 'basic' | 'producer' | 'purchaser'
 export interface SpendFactor {
   /** ISO 3166-1 alpha-2 ('US', 'GB', 'CA'), or a documented multi-country region code. */
   region: string
-  /** Our internal sector key. The codebase currently holds three disagreeing vocabularies; see the
-   *  task 2b B1 findings. Reconciling them is separate work and is NOT assumed here. */
+  /**
+   * AN EXIOBASE CODE. NOT one of our internal sector names.
+   *
+   * This changed deliberately. The codebase held three disagreeing internal vocabularies —
+   * SECTOR_RISK (14 keys), the scope3 SECTORS array (13) and EMISSION_FACTORS.spend (13), sharing
+   * only 8 keys between them — none of which corresponds to anything a publisher tabulates, so no
+   * factor could ever be traced to a published row. The vocabulary is now EXIOBASE's own, and our
+   * former keys become a DISPLAY GROUPING over it rather than the thing factors are keyed on.
+   *
+   * The value is the ExioCode for the factor_type:
+   *   factor_type 'industry' -> the ixi ExioCode, e.g. 'i01.a'   (163 of them)
+   *   factor_type 'product'  -> the pxp ExioCode, e.g. 'p01.a'   (200 of them)
+   * The two code spaces are parallel but NOT identical — 163 industries against 200 products — so a
+   * code is meaningless without the factor_type beside it. Never store one and infer the other.
+   */
   sector_key: string
+  /** Which EXIOBASE table this came from. See SpendFactorType — it changes what the number means. */
+  factor_type: SpendFactorType
   value: number
   unit: SpendFactorUnit
   /** ISO 4217 of the DENOMINATOR: the currency the spend must be expressed in for this factor. */
@@ -65,9 +101,15 @@ export interface SpendFactor {
   source_id: SpendSourceId
   /** Edition/version of that source as the publisher labels it. */
   source_version: string
-  /** The SOURCE'S OWN sector code the value was read off — a NAICS, EXIOBASE or BEA code. This is
-   *  what lets a verifier open the published table and find the exact row. Our sector_key is our
-   *  vocabulary; this is theirs. Never store one in place of the other. */
+  /**
+   * The source's own sector code, as the publisher labels it.
+   *
+   * For EXIOBASE this now DUPLICATES sector_key, and that is correct rather than redundant: the
+   * other two sources in this module do not use EXIOBASE codes, so a USEEIO factor carries a BEA
+   * code here and a StatCan factor a NAICS code, while sector_key still has to hold whatever key
+   * the resolver is indexed on. Keeping the field means a verifier can always find the published
+   * row without knowing which source a given factor came from.
+   */
   source_classification: string
 }
 
@@ -173,7 +215,11 @@ export const SPEND_EF_SOURCES: Record<SpendSourceId, SpendFactorSource> = {
 export interface SpendFactorQuery {
   /** ISO 3166-1 alpha-2, or a documented region code. */
   region: string
+  /** An EXIOBASE ExioCode matching factor_type below. See SpendFactor.sector_key. */
   sector_key: string
+  /** Industry or product. Required: the same query with the other value is a different question,
+   *  and the two code spaces do not overlap. See SpendFactorType. */
+  factor_type: SpendFactorType
   /** ISO 4217 the caller's spend is denominated in. */
   reporting_currency: string
   /** The inventory year the caller is pricing. */
