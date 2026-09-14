@@ -1,0 +1,3087 @@
+{
+  "metadata": {
+    "source": "EXIOBASE 3",
+    "version": "3.8.2",
+    "publisher": "EXIOBASE consortium",
+    "published": "2021-10-21",
+    "doi": "10.5281/zenodo.5589597",
+    "url": "https://zenodo.org/records/5589597",
+    "licence": "CC BY-SA 4.0",
+    "generated_on": "2026-09-14",
+    "generated_from": "pymrio 0.6.3 bundled classification (mrio_models/exio3_*/sectors.tsv)",
+    "generated_by": "scripts/generate-exiobase-sectors.py",
+    "isic_note": "The isic_code and isic_name fields are ISIC Rev. 3.1 style section labels, not Rev. 4: 'Electricity, gas and water supply' is one section E under Rev. 3.1 and is split across D and E under Rev. 4. That is consistent with the v3.8.2 readme, which states 'The database is under the NACE1 classification scheme' (NACE Rev. 1.1). They are SECTION level only - 12 distinct codes across 163 industries, three of them pre-aggregated multi-section buckets (ISIC_G_H, ISIC_J_K, ISIC_M_N_O) - so this is a grouping, not a crosswalk, and it cannot resolve an ISIC code back to an EXIOBASE industry.",
+    "scope_note": "Classification only. This file carries NO emission factors. Industry and product code spaces are parallel but not identical (163 against 200); a code is meaningless without knowing which table it came from. See lib/emissionFactors/spend.ts SpendFactorType."
+  },
+  "industries": [
+    {
+      "exio_number": 1,
+      "exio_name": "Cultivation of paddy rice",
+      "exio_code": "i01.a",
+      "exio_label": "A_PARI",
+      "isic_code": "ISIC_A",
+      "isic_name": "Agriculture, hunting and related service activities (01)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 2,
+      "exio_name": "Cultivation of wheat",
+      "exio_code": "i01.b",
+      "exio_label": "A_WHEA",
+      "isic_code": "ISIC_A",
+      "isic_name": "Agriculture, hunting and related service activities (01)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 3,
+      "exio_name": "Cultivation of cereal grains nec",
+      "exio_code": "i01.c",
+      "exio_label": "A_OCER",
+      "isic_code": "ISIC_A",
+      "isic_name": "Agriculture, hunting and related service activities (01)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 4,
+      "exio_name": "Cultivation of vegetables, fruit, nuts",
+      "exio_code": "i01.d",
+      "exio_label": "A_FVEG",
+      "isic_code": "ISIC_A",
+      "isic_name": "Agriculture, hunting and related service activities (01)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 5,
+      "exio_name": "Cultivation of oil seeds",
+      "exio_code": "i01.e",
+      "exio_label": "A_OILS",
+      "isic_code": "ISIC_A",
+      "isic_name": "Agriculture, hunting and related service activities (01)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 6,
+      "exio_name": "Cultivation of sugar cane, sugar beet",
+      "exio_code": "i01.f",
+      "exio_label": "A_SUGB",
+      "isic_code": "ISIC_A",
+      "isic_name": "Agriculture, hunting and related service activities (01)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 7,
+      "exio_name": "Cultivation of plant-based fibers",
+      "exio_code": "i01.g",
+      "exio_label": "A_FIBR",
+      "isic_code": "ISIC_A",
+      "isic_name": "Agriculture, hunting and related service activities (01)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 8,
+      "exio_name": "Cultivation of crops nec",
+      "exio_code": "i01.h",
+      "exio_label": "A_OTCR",
+      "isic_code": "ISIC_A",
+      "isic_name": "Agriculture, hunting and related service activities (01)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 9,
+      "exio_name": "Cattle farming",
+      "exio_code": "i01.i",
+      "exio_label": "A_CATL",
+      "isic_code": "ISIC_A",
+      "isic_name": "Agriculture, hunting and related service activities (01)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 10,
+      "exio_name": "Pigs farming",
+      "exio_code": "i01.j",
+      "exio_label": "A_PIGS",
+      "isic_code": "ISIC_A",
+      "isic_name": "Agriculture, hunting and related service activities (01)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 11,
+      "exio_name": "Poultry farming",
+      "exio_code": "i01.k",
+      "exio_label": "A_PLTR",
+      "isic_code": "ISIC_A",
+      "isic_name": "Agriculture, hunting and related service activities (01)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 12,
+      "exio_name": "Meat animals nec",
+      "exio_code": "i01.l",
+      "exio_label": "A_OMEA",
+      "isic_code": "ISIC_A",
+      "isic_name": "Agriculture, hunting and related service activities (01)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 13,
+      "exio_name": "Animal products nec",
+      "exio_code": "i01.m",
+      "exio_label": "A_OANP",
+      "isic_code": "ISIC_A",
+      "isic_name": "Agriculture, hunting and related service activities (01)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 14,
+      "exio_name": "Raw milk",
+      "exio_code": "i01.n",
+      "exio_label": "A_MILK",
+      "isic_code": "ISIC_A",
+      "isic_name": "Agriculture, hunting and related service activities (01)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 15,
+      "exio_name": "Wool, silk-worm cocoons",
+      "exio_code": "i01.o",
+      "exio_label": "A_WOOL",
+      "isic_code": "ISIC_A",
+      "isic_name": "Agriculture, hunting and related service activities (01)",
+      "consumption_category": "Clothing"
+    },
+    {
+      "exio_number": 16,
+      "exio_name": "Manure treatment (conventional), storage and land application",
+      "exio_code": "i01.w.1",
+      "exio_label": "A_MANC",
+      "isic_code": "ISIC_A",
+      "isic_name": "Agriculture, hunting and related service activities (01)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 17,
+      "exio_name": "Manure treatment (biogas), storage and land application",
+      "exio_code": "i01.w.2",
+      "exio_label": "A_MANB",
+      "isic_code": "ISIC_A",
+      "isic_name": "Agriculture, hunting and related service activities (01)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 18,
+      "exio_name": "Forestry, logging and related service activities (02)",
+      "exio_code": "i02",
+      "exio_label": "A_FORE",
+      "isic_code": "ISIC_A",
+      "isic_name": "Forestry, logging and related service activities (02)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 19,
+      "exio_name": "Fishing, operating of fish hatcheries and fish farms; service activities incidental to fishing (05)",
+      "exio_code": "i05",
+      "exio_label": "A_FISH",
+      "isic_code": "ISIC_B",
+      "isic_name": "Fishing (B)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 20,
+      "exio_name": "Mining of coal and lignite; extraction of peat (10)",
+      "exio_code": "i10",
+      "exio_label": "A_COAL",
+      "isic_code": "ISIC_C",
+      "isic_name": "Mining and quarrying (C)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 21,
+      "exio_name": "Extraction of crude petroleum and services related to crude oil extraction, excluding surveying",
+      "exio_code": "i11.a",
+      "exio_label": "A_COIL",
+      "isic_code": "ISIC_C",
+      "isic_name": "Mining and quarrying (C)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 22,
+      "exio_name": "Extraction of natural gas and services related to natural gas extraction, excluding surveying",
+      "exio_code": "i11.b",
+      "exio_label": "A_GASE",
+      "isic_code": "ISIC_C",
+      "isic_name": "Mining and quarrying (C)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 23,
+      "exio_name": "Extraction, liquefaction, and regasification of other petroleum and gaseous materials",
+      "exio_code": "i11.c",
+      "exio_label": "A_OGPL",
+      "isic_code": "ISIC_C",
+      "isic_name": "Mining and quarrying (C)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 24,
+      "exio_name": "Mining of uranium and thorium ores (12)",
+      "exio_code": "i12",
+      "exio_label": "A_ORAN",
+      "isic_code": "ISIC_C",
+      "isic_name": "Mining and quarrying (C)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 25,
+      "exio_name": "Mining of iron ores",
+      "exio_code": "i13.1",
+      "exio_label": "A_IRON",
+      "isic_code": "ISIC_C",
+      "isic_name": "Mining and quarrying (C)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 26,
+      "exio_name": "Mining of copper ores and concentrates",
+      "exio_code": "i13.20.11",
+      "exio_label": "A_COPO",
+      "isic_code": "ISIC_C",
+      "isic_name": "Mining and quarrying (C)",
+      "consumption_category": "Construction"
+    },
+    {
+      "exio_number": 27,
+      "exio_name": "Mining of nickel ores and concentrates",
+      "exio_code": "i13.20.12",
+      "exio_label": "A_NIKO",
+      "isic_code": "ISIC_C",
+      "isic_name": "Mining and quarrying (C)",
+      "consumption_category": "Construction"
+    },
+    {
+      "exio_number": 28,
+      "exio_name": "Mining of aluminium ores and concentrates",
+      "exio_code": "i13.20.13",
+      "exio_label": "A_ALUO",
+      "isic_code": "ISIC_C",
+      "isic_name": "Mining and quarrying (C)",
+      "consumption_category": "Construction"
+    },
+    {
+      "exio_number": 29,
+      "exio_name": "Mining of precious metal ores and concentrates",
+      "exio_code": "i13.20.14",
+      "exio_label": "A_PREO",
+      "isic_code": "ISIC_C",
+      "isic_name": "Mining and quarrying (C)",
+      "consumption_category": "Construction"
+    },
+    {
+      "exio_number": 30,
+      "exio_name": "Mining of lead, zinc and tin ores and concentrates",
+      "exio_code": "i13.20.15",
+      "exio_label": "A_LZTO",
+      "isic_code": "ISIC_C",
+      "isic_name": "Mining and quarrying (C)",
+      "consumption_category": "Construction"
+    },
+    {
+      "exio_number": 31,
+      "exio_name": "Mining of other non-ferrous metal ores and concentrates",
+      "exio_code": "i13.20.16",
+      "exio_label": "A_ONFO",
+      "isic_code": "ISIC_C",
+      "isic_name": "Mining and quarrying (C)",
+      "consumption_category": "Construction"
+    },
+    {
+      "exio_number": 32,
+      "exio_name": "Quarrying of stone",
+      "exio_code": "i14.1",
+      "exio_label": "A_STON",
+      "isic_code": "ISIC_C",
+      "isic_name": "Mining and quarrying (C)",
+      "consumption_category": "Construction"
+    },
+    {
+      "exio_number": 33,
+      "exio_name": "Quarrying of sand and clay",
+      "exio_code": "i14.2",
+      "exio_label": "A_SDCL",
+      "isic_code": "ISIC_C",
+      "isic_name": "Mining and quarrying (C)",
+      "consumption_category": "Construction"
+    },
+    {
+      "exio_number": 34,
+      "exio_name": "Mining of chemical and fertilizer minerals, production of salt, other mining and quarrying n.e.c.",
+      "exio_code": "i14.3",
+      "exio_label": "A_CHMF",
+      "isic_code": "ISIC_C",
+      "isic_name": "Mining and quarrying (C)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 35,
+      "exio_name": "Processing of meat cattle",
+      "exio_code": "i15.a",
+      "exio_label": "A_PCAT",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 36,
+      "exio_name": "Processing of meat pigs",
+      "exio_code": "i15.b",
+      "exio_label": "A_PPIG",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 37,
+      "exio_name": "Processing of meat poultry",
+      "exio_code": "i15.c",
+      "exio_label": "A_PPLT",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 38,
+      "exio_name": "Production of meat products nec",
+      "exio_code": "i15.d",
+      "exio_label": "A_POME",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 39,
+      "exio_name": "Processing vegetable oils and fats",
+      "exio_code": "i15.e",
+      "exio_label": "A_VOIL",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 40,
+      "exio_name": "Processing of dairy products",
+      "exio_code": "i15.f",
+      "exio_label": "A_DAIR",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 41,
+      "exio_name": "Processed rice",
+      "exio_code": "i15.g",
+      "exio_label": "A_RICE",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 42,
+      "exio_name": "Sugar refining",
+      "exio_code": "i15.h",
+      "exio_label": "A_SUGR",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 43,
+      "exio_name": "Processing of Food products nec",
+      "exio_code": "i15.i",
+      "exio_label": "A_OFOD",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 44,
+      "exio_name": "Manufacture of beverages",
+      "exio_code": "i15.j",
+      "exio_label": "A_BEVR",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 45,
+      "exio_name": "Manufacture of fish products",
+      "exio_code": "i15.k",
+      "exio_label": "A_FSHP",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 46,
+      "exio_name": "Manufacture of tobacco products (16)",
+      "exio_code": "i16",
+      "exio_label": "A_TOBC",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 47,
+      "exio_name": "Manufacture of textiles (17)",
+      "exio_code": "i17",
+      "exio_label": "A_TEXT",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Clothing"
+    },
+    {
+      "exio_number": 48,
+      "exio_name": "Manufacture of wearing apparel; dressing and dyeing of fur (18)",
+      "exio_code": "i18",
+      "exio_label": "A_GARM",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Clothing"
+    },
+    {
+      "exio_number": 49,
+      "exio_name": "Tanning and dressing of leather; manufacture of luggage, handbags, saddlery, harness and footwear (19)",
+      "exio_code": "i19",
+      "exio_label": "A_LETH",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Clothing"
+    },
+    {
+      "exio_number": 50,
+      "exio_name": "Manufacture of wood and of products of wood and cork, except furniture; manufacture of articles of straw and plaiting materials (20)",
+      "exio_code": "i20",
+      "exio_label": "A_WOOD",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 51,
+      "exio_name": "Re-processing of secondary wood material into new wood material",
+      "exio_code": "i20.w",
+      "exio_label": "A_WOOW",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 52,
+      "exio_name": "Pulp",
+      "exio_code": "i21.1",
+      "exio_label": "A_PULP",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 53,
+      "exio_name": "Re-processing of secondary paper into new pulp",
+      "exio_code": "i21.w.1",
+      "exio_label": "A_PAPR",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 54,
+      "exio_name": "Paper",
+      "exio_code": "i21.2",
+      "exio_label": "A_PAPE",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 55,
+      "exio_name": "Publishing, printing and reproduction of recorded media (22)",
+      "exio_code": "i22",
+      "exio_label": "A_MDIA",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Services"
+    },
+    {
+      "exio_number": 56,
+      "exio_name": "Manufacture of coke oven products",
+      "exio_code": "i23.1",
+      "exio_label": "A_COKE",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 57,
+      "exio_name": "Petroleum Refinery",
+      "exio_code": "i23.2",
+      "exio_label": "A_REFN",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Mobility"
+    },
+    {
+      "exio_number": 58,
+      "exio_name": "Processing of nuclear fuel",
+      "exio_code": "i23.3",
+      "exio_label": "A_NUCF",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 59,
+      "exio_name": "Plastics, basic",
+      "exio_code": "i24.a",
+      "exio_label": "A_PLAS",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 60,
+      "exio_name": "Re-processing of secondary plastic into new plastic",
+      "exio_code": "i24.a.w",
+      "exio_label": "A_PLAW",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 61,
+      "exio_name": "N-fertiliser",
+      "exio_code": "i24.b",
+      "exio_label": "A_NFER",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 62,
+      "exio_name": "P- and other fertiliser",
+      "exio_code": "i24.c",
+      "exio_label": "A_PFER",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Food"
+    },
+    {
+      "exio_number": 63,
+      "exio_name": "Chemicals nec",
+      "exio_code": "i24.d",
+      "exio_label": "A_CHEM",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 64,
+      "exio_name": "Manufacture of rubber and plastic products (25)",
+      "exio_code": "i25",
+      "exio_label": "A_RUBP",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 65,
+      "exio_name": "Manufacture of glass and glass products",
+      "exio_code": "i26.a",
+      "exio_label": "A_GLAS",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Construction"
+    },
+    {
+      "exio_number": 66,
+      "exio_name": "Re-processing of secondary glass into new glass",
+      "exio_code": "i26.a.w",
+      "exio_label": "A_GLAW",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Construction"
+    },
+    {
+      "exio_number": 67,
+      "exio_name": "Manufacture of ceramic goods",
+      "exio_code": "i26.b",
+      "exio_label": "A_CRMC",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Construction"
+    },
+    {
+      "exio_number": 68,
+      "exio_name": "Manufacture of bricks, tiles and construction products, in baked clay",
+      "exio_code": "i26.c",
+      "exio_label": "A_BRIK",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Construction"
+    },
+    {
+      "exio_number": 69,
+      "exio_name": "Manufacture of cement, lime and plaster",
+      "exio_code": "i26.d",
+      "exio_label": "A_CMNT",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Construction"
+    },
+    {
+      "exio_number": 70,
+      "exio_name": "Re-processing of ash into clinker",
+      "exio_code": "i26.d.w",
+      "exio_label": "A_ASHW",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Construction"
+    },
+    {
+      "exio_number": 71,
+      "exio_name": "Manufacture of other non-metallic mineral products n.e.c.",
+      "exio_code": "i26.e",
+      "exio_label": "A_ONMM",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Construction"
+    },
+    {
+      "exio_number": 72,
+      "exio_name": "Manufacture of basic iron and steel and of ferro-alloys and first products thereof",
+      "exio_code": "i27.a",
+      "exio_label": "A_STEL",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 73,
+      "exio_name": "Re-processing of secondary steel into new steel",
+      "exio_code": "i27.a.w",
+      "exio_label": "A_STEW",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 74,
+      "exio_name": "Precious metals production",
+      "exio_code": "i27.41",
+      "exio_label": "A_PREM",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 75,
+      "exio_name": "Re-processing of secondary preciuos metals into new preciuos metals",
+      "exio_code": "i27.41.w",
+      "exio_label": "A_PREW",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 76,
+      "exio_name": "Aluminium production",
+      "exio_code": "i27.42",
+      "exio_label": "A_ALUM",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 77,
+      "exio_name": "Re-processing of secondary aluminium into new aluminium",
+      "exio_code": "i27.42.w",
+      "exio_label": "A_ALUW",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 78,
+      "exio_name": "Lead, zinc and tin production",
+      "exio_code": "i27.43",
+      "exio_label": "A_LZTP",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 79,
+      "exio_name": "Re-processing of secondary lead into new lead, zinc and tin",
+      "exio_code": "i27.43.w",
+      "exio_label": "A_LZTW",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 80,
+      "exio_name": "Copper production",
+      "exio_code": "i27.44",
+      "exio_label": "A_COPP",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 81,
+      "exio_name": "Re-processing of secondary copper into new copper",
+      "exio_code": "i27.44.w",
+      "exio_label": "A_COPW",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 82,
+      "exio_name": "Other non-ferrous metal production",
+      "exio_code": "i27.45",
+      "exio_label": "A_ONFM",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 83,
+      "exio_name": "Re-processing of secondary other non-ferrous metals into new other non-ferrous metals",
+      "exio_code": "i27.45.w",
+      "exio_label": "A_ONFW",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 84,
+      "exio_name": "Casting of metals",
+      "exio_code": "i27.5",
+      "exio_label": "A_METC",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 85,
+      "exio_name": "Manufacture of fabricated metal products, except machinery and equipment (28)",
+      "exio_code": "i28",
+      "exio_label": "A_FABM",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 86,
+      "exio_name": "Manufacture of machinery and equipment n.e.c. (29)",
+      "exio_code": "i29",
+      "exio_label": "A_MACH",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 87,
+      "exio_name": "Manufacture of office machinery and computers (30)",
+      "exio_code": "i30",
+      "exio_label": "A_OFMA",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 88,
+      "exio_name": "Manufacture of electrical machinery and apparatus n.e.c. (31)",
+      "exio_code": "i31",
+      "exio_label": "A_ELMA",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 89,
+      "exio_name": "Manufacture of radio, television and communication equipment and apparatus (32)",
+      "exio_code": "i32",
+      "exio_label": "A_RATV",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 90,
+      "exio_name": "Manufacture of medical, precision and optical instruments, watches and clocks (33)",
+      "exio_code": "i33",
+      "exio_label": "A_MEIN",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 91,
+      "exio_name": "Manufacture of motor vehicles, trailers and semi-trailers (34)",
+      "exio_code": "i34",
+      "exio_label": "A_MOTO",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 92,
+      "exio_name": "Manufacture of other transport equipment (35)",
+      "exio_code": "i35",
+      "exio_label": "A_OTRE",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 93,
+      "exio_name": "Manufacture of furniture; manufacturing n.e.c. (36)",
+      "exio_code": "i36",
+      "exio_label": "A_FURN",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 94,
+      "exio_name": "Recycling of waste and scrap",
+      "exio_code": "i37",
+      "exio_label": "A_RYMS",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 95,
+      "exio_name": "Recycling of bottles by direct reuse",
+      "exio_code": "i37.w.1",
+      "exio_label": "A_BOTW",
+      "isic_code": "ISIC_D",
+      "isic_name": "Manufacturing (D)",
+      "consumption_category": "Manufactured_products"
+    },
+    {
+      "exio_number": 96,
+      "exio_name": "Production of electricity by coal",
+      "exio_code": "i40.11.a",
+      "exio_label": "A_POWC",
+      "isic_code": "ISIC_E",
+      "isic_name": "Electricity, gas and water supply (E)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 97,
+      "exio_name": "Production of electricity by gas",
+      "exio_code": "i40.11.b",
+      "exio_label": "A_POWG",
+      "isic_code": "ISIC_E",
+      "isic_name": "Electricity, gas and water supply (E)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 98,
+      "exio_name": "Production of electricity by nuclear",
+      "exio_code": "i40.11.c",
+      "exio_label": "A_POWN",
+      "isic_code": "ISIC_E",
+      "isic_name": "Electricity, gas and water supply (E)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 99,
+      "exio_name": "Production of electricity by hydro",
+      "exio_code": "i40.11.d",
+      "exio_label": "A_POWH",
+      "isic_code": "ISIC_E",
+      "isic_name": "Electricity, gas and water supply (E)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 100,
+      "exio_name": "Production of electricity by wind",
+      "exio_code": "i40.11.e",
+      "exio_label": "A_POWW",
+      "isic_code": "ISIC_E",
+      "isic_name": "Electricity, gas and water supply (E)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 101,
+      "exio_name": "Production of electricity by petroleum and other oil derivatives",
+      "exio_code": "i40.11.f",
+      "exio_label": "A_POWP",
+      "isic_code": "ISIC_E",
+      "isic_name": "Electricity, gas and water supply (E)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 102,
+      "exio_name": "Production of electricity by biomass and waste",
+      "exio_code": "i40.11.g",
+      "exio_label": "A_POWB",
+      "isic_code": "ISIC_E",
+      "isic_name": "Electricity, gas and water supply (E)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 103,
+      "exio_name": "Production of electricity by solar photovoltaic",
+      "exio_code": "i40.11.h",
+      "exio_label": "A_POWS",
+      "isic_code": "ISIC_E",
+      "isic_name": "Electricity, gas and water supply (E)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 104,
+      "exio_name": "Production of electricity by solar thermal",
+      "exio_code": "i40.11.i",
+      "exio_label": "A_POWE",
+      "isic_code": "ISIC_E",
+      "isic_name": "Electricity, gas and water supply (E)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 105,
+      "exio_name": "Production of electricity by tide, wave, ocean",
+      "exio_code": "i40.11.j",
+      "exio_label": "A_POWO",
+      "isic_code": "ISIC_E",
+      "isic_name": "Electricity, gas and water supply (E)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 106,
+      "exio_name": "Production of electricity by Geothermal",
+      "exio_code": "i40.11.k",
+      "exio_label": "A_POWM",
+      "isic_code": "ISIC_E",
+      "isic_name": "Electricity, gas and water supply (E)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 107,
+      "exio_name": "Production of electricity nec",
+      "exio_code": "i40.11.l",
+      "exio_label": "A_POWZ",
+      "isic_code": "ISIC_E",
+      "isic_name": "Electricity, gas and water supply (E)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 108,
+      "exio_name": "Transmission of electricity",
+      "exio_code": "i40.12",
+      "exio_label": "A_POWT",
+      "isic_code": "ISIC_E",
+      "isic_name": "Electricity, gas and water supply (E)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 109,
+      "exio_name": "Distribution and trade of electricity",
+      "exio_code": "i40.13",
+      "exio_label": "A_POWD",
+      "isic_code": "ISIC_E",
+      "isic_name": "Electricity, gas and water supply (E)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 110,
+      "exio_name": "Manufacture of gas; distribution of gaseous fuels through mains",
+      "exio_code": "i40.2",
+      "exio_label": "A_GASD",
+      "isic_code": "ISIC_E",
+      "isic_name": "Electricity, gas and water supply (E)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 111,
+      "exio_name": "Steam and hot water supply",
+      "exio_code": "i40.3",
+      "exio_label": "A_HWAT",
+      "isic_code": "ISIC_E",
+      "isic_name": "Electricity, gas and water supply (E)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 112,
+      "exio_name": "Collection, purification and distribution of water (41)",
+      "exio_code": "i41",
+      "exio_label": "A_WATR",
+      "isic_code": "ISIC_E",
+      "isic_name": "Electricity, gas and water supply (E)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 113,
+      "exio_name": "Construction (45)",
+      "exio_code": "i45",
+      "exio_label": "A_CONS",
+      "isic_code": "ISIC_F",
+      "isic_name": "Construction (F)",
+      "consumption_category": "Construction"
+    },
+    {
+      "exio_number": 114,
+      "exio_name": "Re-processing of secondary construction material into aggregates",
+      "exio_code": "i45.w",
+      "exio_label": "A_CONW",
+      "isic_code": "ISIC_F",
+      "isic_name": "Construction (F)",
+      "consumption_category": "Construction"
+    },
+    {
+      "exio_number": 115,
+      "exio_name": "Sale, maintenance, repair of motor vehicles, motor vehicles parts, motorcycles, motor cycles parts and accessoiries",
+      "exio_code": "i50.a",
+      "exio_label": "A_TDMO",
+      "isic_code": "ISIC_G_H",
+      "isic_name": "Wholesale retail trade, repair of motor vehicles, motorcycles, etc.; hotels and restaurants (G+H)",
+      "consumption_category": "Trade"
+    },
+    {
+      "exio_number": 116,
+      "exio_name": "Retail sale of automotive fuel",
+      "exio_code": "i50.b",
+      "exio_label": "A_TDFU",
+      "isic_code": "ISIC_G_H",
+      "isic_name": "Wholesale retail trade, repair of motor vehicles, motorcycles, etc.; hotels and restaurants (G+H)",
+      "consumption_category": "Trade"
+    },
+    {
+      "exio_number": 117,
+      "exio_name": "Wholesale trade and commission trade, except of motor vehicles and motorcycles (51)",
+      "exio_code": "i51",
+      "exio_label": "A_TDWH",
+      "isic_code": "ISIC_G_H",
+      "isic_name": "Wholesale retail trade, repair of motor vehicles, motorcycles, etc.; hotels and restaurants (G+H)",
+      "consumption_category": "Trade"
+    },
+    {
+      "exio_number": 118,
+      "exio_name": "Retail trade, except of motor vehicles and motorcycles; repair of personal and household goods (52)",
+      "exio_code": "i52",
+      "exio_label": "A_TDRT",
+      "isic_code": "ISIC_G_H",
+      "isic_name": "Wholesale retail trade, repair of motor vehicles, motorcycles, etc.; hotels and restaurants (G+H)",
+      "consumption_category": "Trade"
+    },
+    {
+      "exio_number": 119,
+      "exio_name": "Hotels and restaurants (55)",
+      "exio_code": "i55",
+      "exio_label": "A_HORE",
+      "isic_code": "ISIC_G_H",
+      "isic_name": "Wholesale retail trade, repair of motor vehicles, motorcycles, etc.; hotels and restaurants (G+H)",
+      "consumption_category": "Services"
+    },
+    {
+      "exio_number": 120,
+      "exio_name": "Transport via railways",
+      "exio_code": "i60.1",
+      "exio_label": "A_TRAI",
+      "isic_code": "ISIC_I",
+      "isic_name": "Transport, storage and communications (I)",
+      "consumption_category": "Mobility"
+    },
+    {
+      "exio_number": 121,
+      "exio_name": "Other land transport",
+      "exio_code": "i60.2",
+      "exio_label": "A_TLND",
+      "isic_code": "ISIC_I",
+      "isic_name": "Transport, storage and communications (I)",
+      "consumption_category": "Mobility"
+    },
+    {
+      "exio_number": 122,
+      "exio_name": "Transport via pipelines",
+      "exio_code": "i60.3",
+      "exio_label": "A_TPIP",
+      "isic_code": "ISIC_I",
+      "isic_name": "Transport, storage and communications (I)",
+      "consumption_category": "Mobility"
+    },
+    {
+      "exio_number": 123,
+      "exio_name": "Sea and coastal water transport",
+      "exio_code": "i61.1",
+      "exio_label": "A_TWAS",
+      "isic_code": "ISIC_I",
+      "isic_name": "Transport, storage and communications (I)",
+      "consumption_category": "Mobility"
+    },
+    {
+      "exio_number": 124,
+      "exio_name": "Inland water transport",
+      "exio_code": "i61.2",
+      "exio_label": "A_TWAI",
+      "isic_code": "ISIC_I",
+      "isic_name": "Transport, storage and communications (I)",
+      "consumption_category": "Mobility"
+    },
+    {
+      "exio_number": 125,
+      "exio_name": "Air transport (62)",
+      "exio_code": "i62",
+      "exio_label": "A_TAIR",
+      "isic_code": "ISIC_I",
+      "isic_name": "Transport, storage and communications (I)",
+      "consumption_category": "Mobility"
+    },
+    {
+      "exio_number": 126,
+      "exio_name": "Supporting and auxiliary transport activities; activities of travel agencies (63)",
+      "exio_code": "i63",
+      "exio_label": "A_TAUX",
+      "isic_code": "ISIC_I",
+      "isic_name": "Transport, storage and communications (I)",
+      "consumption_category": "Mobility"
+    },
+    {
+      "exio_number": 127,
+      "exio_name": "Post and telecommunications (64)",
+      "exio_code": "i64",
+      "exio_label": "A_PTEL",
+      "isic_code": "ISIC_I",
+      "isic_name": "Transport, storage and communications (I)",
+      "consumption_category": "Mobility"
+    },
+    {
+      "exio_number": 128,
+      "exio_name": "Financial intermediation, except insurance and pension funding (65)",
+      "exio_code": "i65",
+      "exio_label": "A_FINT",
+      "isic_code": "ISIC_J_K",
+      "isic_name": "Financial intermediation; real estate, renting and business activities (J+K)",
+      "consumption_category": "Services"
+    },
+    {
+      "exio_number": 129,
+      "exio_name": "Insurance and pension funding, except compulsory social security (66)",
+      "exio_code": "i66",
+      "exio_label": "A_FINS",
+      "isic_code": "ISIC_J_K",
+      "isic_name": "Financial intermediation; real estate, renting and business activities (J+K)",
+      "consumption_category": "Services"
+    },
+    {
+      "exio_number": 130,
+      "exio_name": "Activities auxiliary to financial intermediation (67)",
+      "exio_code": "i67",
+      "exio_label": "A_FAUX",
+      "isic_code": "ISIC_J_K",
+      "isic_name": "Financial intermediation; real estate, renting and business activities (J+K)",
+      "consumption_category": "Services"
+    },
+    {
+      "exio_number": 131,
+      "exio_name": "Real estate activities (70)",
+      "exio_code": "i70",
+      "exio_label": "A_REAL",
+      "isic_code": "ISIC_J_K",
+      "isic_name": "Financial intermediation; real estate, renting and business activities (J+K)",
+      "consumption_category": "Services"
+    },
+    {
+      "exio_number": 132,
+      "exio_name": "Renting of machinery and equipment without operator and of personal and household goods (71)",
+      "exio_code": "i71",
+      "exio_label": "A_MARE",
+      "isic_code": "ISIC_J_K",
+      "isic_name": "Financial intermediation; real estate, renting and business activities (J+K)",
+      "consumption_category": "Services"
+    },
+    {
+      "exio_number": 133,
+      "exio_name": "Computer and related activities (72)",
+      "exio_code": "i72",
+      "exio_label": "A_COMP",
+      "isic_code": "ISIC_J_K",
+      "isic_name": "Financial intermediation; real estate, renting and business activities (J+K)",
+      "consumption_category": "Services"
+    },
+    {
+      "exio_number": 134,
+      "exio_name": "Research and development (73)",
+      "exio_code": "i73",
+      "exio_label": "A_RESD",
+      "isic_code": "ISIC_J_K",
+      "isic_name": "Financial intermediation; real estate, renting and business activities (J+K)",
+      "consumption_category": "Services"
+    },
+    {
+      "exio_number": 135,
+      "exio_name": "Other business activities (74)",
+      "exio_code": "i74",
+      "exio_label": "A_OBUS",
+      "isic_code": "ISIC_J_K",
+      "isic_name": "Financial intermediation; real estate, renting and business activities (J+K)",
+      "consumption_category": "Services"
+    },
+    {
+      "exio_number": 136,
+      "exio_name": "Public administration and defence; compulsory social security (75)",
+      "exio_code": "i75",
+      "exio_label": "A_PADF",
+      "isic_code": "ISIC_L",
+      "isic_name": "Public administration and defense; compulsory social security (L)",
+      "consumption_category": "Services"
+    },
+    {
+      "exio_number": 137,
+      "exio_name": "Education (80)",
+      "exio_code": "i80",
+      "exio_label": "A_EDUC",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Services"
+    },
+    {
+      "exio_number": 138,
+      "exio_name": "Health and social work (85)",
+      "exio_code": "i85",
+      "exio_label": "A_HEAL",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Services"
+    },
+    {
+      "exio_number": 139,
+      "exio_name": "Incineration of waste: Food",
+      "exio_code": "i90.1.a",
+      "exio_label": "A_INCF",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 140,
+      "exio_name": "Incineration of waste: Paper",
+      "exio_code": "i90.1.b",
+      "exio_label": "A_INCP",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 141,
+      "exio_name": "Incineration of waste: Plastic",
+      "exio_code": "i90.1.c",
+      "exio_label": "A_INCL",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 142,
+      "exio_name": "Incineration of waste: Metals and Inert materials",
+      "exio_code": "i90.1.d",
+      "exio_label": "A_INCM",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 143,
+      "exio_name": "Incineration of waste: Textiles",
+      "exio_code": "i90.1.e",
+      "exio_label": "A_INCT",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 144,
+      "exio_name": "Incineration of waste: Wood",
+      "exio_code": "i90.1.f",
+      "exio_label": "A_INCW",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 145,
+      "exio_name": "Incineration of waste: Oil/Hazardous waste",
+      "exio_code": "i90.1.g",
+      "exio_label": "A_INCO",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 146,
+      "exio_name": "Biogasification of food waste, incl. land application",
+      "exio_code": "i90.2.a",
+      "exio_label": "A_BIOF",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 147,
+      "exio_name": "Biogasification of paper, incl. land application",
+      "exio_code": "i90.2.b",
+      "exio_label": "A_BIOP",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 148,
+      "exio_name": "Biogasification of sewage slugde, incl. land application",
+      "exio_code": "i90.2.c",
+      "exio_label": "A_BIOS",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 149,
+      "exio_name": "Composting of food waste, incl. land application",
+      "exio_code": "i90.3.a",
+      "exio_label": "A_COMF",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 150,
+      "exio_name": "Composting of paper and wood, incl. land application",
+      "exio_code": "i90.3.b",
+      "exio_label": "A_COMW",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 151,
+      "exio_name": "Waste water treatment, food",
+      "exio_code": "i90.4.a",
+      "exio_label": "A_WASF",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 152,
+      "exio_name": "Waste water treatment, other",
+      "exio_code": "i90.4.b",
+      "exio_label": "A_WASO",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 153,
+      "exio_name": "Landfill of waste: Food",
+      "exio_code": "i90.5.a",
+      "exio_label": "A_LANF",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 154,
+      "exio_name": "Landfill of waste: Paper",
+      "exio_code": "i90.5.b",
+      "exio_label": "A_LANP",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 155,
+      "exio_name": "Landfill of waste: Plastic",
+      "exio_code": "i90.5.c",
+      "exio_label": "A_LANL",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 156,
+      "exio_name": "Landfill of waste: Inert/metal/hazardous",
+      "exio_code": "i90.5.d",
+      "exio_label": "A_LANI",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 157,
+      "exio_name": "Landfill of waste: Textiles",
+      "exio_code": "i90.5.e",
+      "exio_label": "A_LANT",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 158,
+      "exio_name": "Landfill of waste: Wood",
+      "exio_code": "i90.5.f",
+      "exio_label": "A_LANW",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 159,
+      "exio_name": "Activities of membership organisation n.e.c. (91)",
+      "exio_code": "i91",
+      "exio_label": "A_ORGA",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Services"
+    },
+    {
+      "exio_number": 160,
+      "exio_name": "Recreational, cultural and sporting activities (92)",
+      "exio_code": "i92",
+      "exio_label": "A_RECR",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Services"
+    },
+    {
+      "exio_number": 161,
+      "exio_name": "Other service activities (93)",
+      "exio_code": "i93",
+      "exio_label": "A_OSER",
+      "isic_code": "ISIC_M_N_O",
+      "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
+      "consumption_category": "Services"
+    },
+    {
+      "exio_number": 162,
+      "exio_name": "Private households with employed persons (95)",
+      "exio_code": "i95",
+      "exio_label": "A_PRHH",
+      "isic_code": "ISIC_P",
+      "isic_name": "Private households with employed persons (P)",
+      "consumption_category": "Shelter"
+    },
+    {
+      "exio_number": 163,
+      "exio_name": "Extra-territorial organizations and bodies",
+      "exio_code": "i99",
+      "exio_label": "A_EXTO",
+      "isic_code": "ISIC_L",
+      "isic_name": "Public administration and defense; compulsory social security (L)",
+      "consumption_category": "Services"
+    }
+  ],
+  "products": [
+    {
+      "exio_number": 1,
+      "exio_name": "Paddy rice",
+      "exio_code": "p01.a",
+      "exio_label": "C_PARI",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 2,
+      "exio_name": "Wheat",
+      "exio_code": "p01.b",
+      "exio_label": "C_WHEA",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 3,
+      "exio_name": "Cereal grains nec",
+      "exio_code": "p01.c",
+      "exio_label": "C_OCER",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 4,
+      "exio_name": "Vegetables, fruit, nuts",
+      "exio_code": "p01.d",
+      "exio_label": "C_FVEG",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 5,
+      "exio_name": "Oil seeds",
+      "exio_code": "p01.e",
+      "exio_label": "C_OILS",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 6,
+      "exio_name": "Sugar cane, sugar beet",
+      "exio_code": "p01.f",
+      "exio_label": "C_SUGB",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 7,
+      "exio_name": "Plant-based fibers",
+      "exio_code": "p01.g",
+      "exio_label": "C_FIBR",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 8,
+      "exio_name": "Crops nec",
+      "exio_code": "p01.h",
+      "exio_label": "C_OTCR",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 9,
+      "exio_name": "Cattle",
+      "exio_code": "p01.i",
+      "exio_label": "C_CATL",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 10,
+      "exio_name": "Pigs",
+      "exio_code": "p01.j",
+      "exio_label": "C_PIGS",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 11,
+      "exio_name": "Poultry",
+      "exio_code": "p01.k",
+      "exio_label": "C_PLTR",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 12,
+      "exio_name": "Meat animals nec",
+      "exio_code": "p01.l",
+      "exio_label": "C_OMEA",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 13,
+      "exio_name": "Animal products nec",
+      "exio_code": "p01.m",
+      "exio_label": "C_OANP",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 14,
+      "exio_name": "Raw milk",
+      "exio_code": "p01.n",
+      "exio_label": "C_MILK",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 15,
+      "exio_name": "Wool, silk-worm cocoons",
+      "exio_code": "p01.o",
+      "exio_label": "C_WOOL",
+      "consumption_category": "Clothing",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 16,
+      "exio_name": "Manure (conventional treatment)",
+      "exio_code": "p01.w.1",
+      "exio_label": "C_MANC",
+      "consumption_category": "Food",
+      "type": "Waste"
+    },
+    {
+      "exio_number": 17,
+      "exio_name": "Manure (biogas treatment)",
+      "exio_code": "p01.w.2",
+      "exio_label": "C_MANB",
+      "consumption_category": "Food",
+      "type": "Waste"
+    },
+    {
+      "exio_number": 18,
+      "exio_name": "Products of forestry, logging and related services (02)",
+      "exio_code": "p02",
+      "exio_label": "C_FORE",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 19,
+      "exio_name": "Fish and other fishing products; services incidental of fishing (05)",
+      "exio_code": "p05",
+      "exio_label": "C_FISH",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 20,
+      "exio_name": "Anthracite",
+      "exio_code": "p10.a",
+      "exio_label": "C_ANTH",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 21,
+      "exio_name": "Coking Coal",
+      "exio_code": "p10.b",
+      "exio_label": "C_COKC",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 22,
+      "exio_name": "Other Bituminous Coal",
+      "exio_code": "p10.c",
+      "exio_label": "C_OTBC",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 23,
+      "exio_name": "Sub-Bituminous Coal",
+      "exio_code": "p10.d",
+      "exio_label": "C_SUBC",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 24,
+      "exio_name": "Patent Fuel",
+      "exio_code": "p10.e",
+      "exio_label": "C_PATF",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 25,
+      "exio_name": "Lignite/Brown Coal",
+      "exio_code": "p10.f",
+      "exio_label": "C_LIBC",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 26,
+      "exio_name": "BKB/Peat Briquettes",
+      "exio_code": "p10.g",
+      "exio_label": "C_BKBP",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 27,
+      "exio_name": "Peat",
+      "exio_code": "p10.h",
+      "exio_label": "C_PEAT",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 28,
+      "exio_name": "Crude petroleum and services related to crude oil extraction, excluding surveying",
+      "exio_code": "p11.a",
+      "exio_label": "C_COIL",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 29,
+      "exio_name": "Natural gas and services related to natural gas extraction, excluding surveying",
+      "exio_code": "p11.b",
+      "exio_label": "C_GASE",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 30,
+      "exio_name": "Natural Gas Liquids",
+      "exio_code": "p11.b.1",
+      "exio_label": "C_GASL",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 31,
+      "exio_name": "Other Hydrocarbons",
+      "exio_code": "p11.c",
+      "exio_label": "C_OGPL",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 32,
+      "exio_name": "Uranium and thorium ores (12)",
+      "exio_code": "p12",
+      "exio_label": "C_ORAN",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 33,
+      "exio_name": "Iron ores",
+      "exio_code": "p13.1",
+      "exio_label": "C_IRON",
+      "consumption_category": "Construction",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 34,
+      "exio_name": "Copper ores and concentrates",
+      "exio_code": "p13.20.11",
+      "exio_label": "C_COPO",
+      "consumption_category": "Construction",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 35,
+      "exio_name": "Nickel ores and concentrates",
+      "exio_code": "p13.20.12",
+      "exio_label": "C_NIKO",
+      "consumption_category": "Construction",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 36,
+      "exio_name": "Aluminium ores and concentrates",
+      "exio_code": "p13.20.13",
+      "exio_label": "C_ALUO",
+      "consumption_category": "Construction",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 37,
+      "exio_name": "Precious metal ores and concentrates",
+      "exio_code": "p13.20.14",
+      "exio_label": "C_PREO",
+      "consumption_category": "Construction",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 38,
+      "exio_name": "Lead, zinc and tin ores and concentrates",
+      "exio_code": "p13.20.15",
+      "exio_label": "C_LZTO",
+      "consumption_category": "Construction",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 39,
+      "exio_name": "Other non-ferrous metal ores and concentrates",
+      "exio_code": "p13.20.16",
+      "exio_label": "C_ONFO",
+      "consumption_category": "Construction",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 40,
+      "exio_name": "Stone",
+      "exio_code": "p14.1",
+      "exio_label": "C_STON",
+      "consumption_category": "Construction",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 41,
+      "exio_name": "Sand and clay",
+      "exio_code": "p14.2",
+      "exio_label": "C_SDCL",
+      "consumption_category": "Construction",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 42,
+      "exio_name": "Chemical and fertilizer minerals, salt and other mining and quarrying products n.e.c.",
+      "exio_code": "p14.3",
+      "exio_label": "C_CHMF",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 43,
+      "exio_name": "Products of meat cattle",
+      "exio_code": "p15.a",
+      "exio_label": "C_PCAT",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 44,
+      "exio_name": "Products of meat pigs",
+      "exio_code": "p15.b",
+      "exio_label": "C_PPIG",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 45,
+      "exio_name": "Products of meat poultry",
+      "exio_code": "p15.c",
+      "exio_label": "C_PPLT",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 46,
+      "exio_name": "Meat products nec",
+      "exio_code": "p15.d",
+      "exio_label": "C_POME",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 47,
+      "exio_name": "products of Vegetable oils and fats",
+      "exio_code": "p15.e",
+      "exio_label": "C_VOIL",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 48,
+      "exio_name": "Dairy products",
+      "exio_code": "p15.f",
+      "exio_label": "C_DAIR",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 49,
+      "exio_name": "Processed rice",
+      "exio_code": "p15.g",
+      "exio_label": "C_RICE",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 50,
+      "exio_name": "Sugar",
+      "exio_code": "p15.h",
+      "exio_label": "C_SUGR",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 51,
+      "exio_name": "Food products nec",
+      "exio_code": "p15.i",
+      "exio_label": "C_OFOD",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 52,
+      "exio_name": "Beverages",
+      "exio_code": "p15.j",
+      "exio_label": "C_BEVR",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 53,
+      "exio_name": "Fish products",
+      "exio_code": "p15.k",
+      "exio_label": "C_FSHP",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 54,
+      "exio_name": "Tobacco products (16)",
+      "exio_code": "p16",
+      "exio_label": "C_TOBC",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 55,
+      "exio_name": "Textiles (17)",
+      "exio_code": "p17",
+      "exio_label": "C_TEXT",
+      "consumption_category": "Clothing",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 56,
+      "exio_name": "Wearing apparel; furs (18)",
+      "exio_code": "p18",
+      "exio_label": "C_GARM",
+      "consumption_category": "Clothing",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 57,
+      "exio_name": "Leather and leather products (19)",
+      "exio_code": "p19",
+      "exio_label": "C_LETH",
+      "consumption_category": "Clothing",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 58,
+      "exio_name": "Wood and products of wood and cork (except furniture); articles of straw and plaiting materials (20)",
+      "exio_code": "p20",
+      "exio_label": "C_WOOD",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 59,
+      "exio_name": "Wood material for treatment, Re-processing of secondary wood material into new wood material",
+      "exio_code": "p20.w",
+      "exio_label": "C_WOOW",
+      "consumption_category": "Shelter",
+      "type": "Waste"
+    },
+    {
+      "exio_number": 60,
+      "exio_name": "Pulp",
+      "exio_code": "p21.1",
+      "exio_label": "C_PULP",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 61,
+      "exio_name": "Secondary paper for treatment, Re-processing of secondary paper into new pulp",
+      "exio_code": "p21.w.1",
+      "exio_label": "C_PAPR",
+      "consumption_category": "Manufactured_products",
+      "type": "Waste"
+    },
+    {
+      "exio_number": 62,
+      "exio_name": "Paper and paper products",
+      "exio_code": "p21.2",
+      "exio_label": "C_PAPE",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 63,
+      "exio_name": "Printed matter and recorded media (22)",
+      "exio_code": "p22",
+      "exio_label": "C_MDIA",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 64,
+      "exio_name": "Coke Oven Coke",
+      "exio_code": "p23.1.a",
+      "exio_label": "C_COKE",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 65,
+      "exio_name": "Gas Coke",
+      "exio_code": "p23.1.b",
+      "exio_label": "C_GCOK",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 66,
+      "exio_name": "Coal Tar",
+      "exio_code": "p23.1.c",
+      "exio_label": "C_COTA",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 67,
+      "exio_name": "Motor Gasoline",
+      "exio_code": "p23.20.a",
+      "exio_label": "C_MGSL",
+      "consumption_category": "Mobility",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 68,
+      "exio_name": "Aviation Gasoline",
+      "exio_code": "p23.20.b",
+      "exio_label": "C_AGSL",
+      "consumption_category": "Mobility",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 69,
+      "exio_name": "Gasoline Type Jet Fuel",
+      "exio_code": "p23.20.c",
+      "exio_label": "C_GJET",
+      "consumption_category": "Mobility",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 70,
+      "exio_name": "Kerosene Type Jet Fuel",
+      "exio_code": "p23.20.d",
+      "exio_label": "C_KJET",
+      "consumption_category": "Mobility",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 71,
+      "exio_name": "Kerosene",
+      "exio_code": "p23.20.e",
+      "exio_label": "C_KERO",
+      "consumption_category": "Mobility",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 72,
+      "exio_name": "Gas/Diesel Oil",
+      "exio_code": "p23.20.f",
+      "exio_label": "C_DOIL",
+      "consumption_category": "Mobility",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 73,
+      "exio_name": "Heavy Fuel Oil",
+      "exio_code": "p23.20.g",
+      "exio_label": "C_FOIL",
+      "consumption_category": "Mobility",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 74,
+      "exio_name": "Refinery Gas",
+      "exio_code": "p23.20.h",
+      "exio_label": "C_RGAS",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 75,
+      "exio_name": "Liquefied Petroleum Gases (LPG)",
+      "exio_code": "p23.20.i",
+      "exio_label": "C_LPGA",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 76,
+      "exio_name": "Refinery Feedstocks",
+      "exio_code": "p23.20.j",
+      "exio_label": "C_REFF",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 77,
+      "exio_name": "Ethane",
+      "exio_code": "p23.20.k",
+      "exio_label": "C_ETHA",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 78,
+      "exio_name": "Naphtha",
+      "exio_code": "p23.20.l",
+      "exio_label": "C_NAPT",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 79,
+      "exio_name": "White Spirit & SBP",
+      "exio_code": "p23.20.m",
+      "exio_label": "C_WHSP",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 80,
+      "exio_name": "Lubricants",
+      "exio_code": "p23.20.n",
+      "exio_label": "C_LUBR",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 81,
+      "exio_name": "Bitumen",
+      "exio_code": "p23.20.o",
+      "exio_label": "C_BITU",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 82,
+      "exio_name": "Paraffin Waxes",
+      "exio_code": "p23.20.p",
+      "exio_label": "C_PARW",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 83,
+      "exio_name": "Petroleum Coke",
+      "exio_code": "p23.20.q",
+      "exio_label": "C_PETC",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 84,
+      "exio_name": "Non-specified Petroleum Products",
+      "exio_code": "p23.20.r",
+      "exio_label": "C_NSPP",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 85,
+      "exio_name": "Nuclear fuel",
+      "exio_code": "p23.3",
+      "exio_label": "C_NUCF",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 86,
+      "exio_name": "Plastics, basic",
+      "exio_code": "p24.a",
+      "exio_label": "C_PLAS",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 87,
+      "exio_name": "Secondary plastic for treatment, Re-processing of secondary plastic into new plastic",
+      "exio_code": "p24.a.w",
+      "exio_label": "C_PLAW",
+      "consumption_category": "Manufactured_products",
+      "type": "Waste"
+    },
+    {
+      "exio_number": 88,
+      "exio_name": "N-fertiliser",
+      "exio_code": "p24.b",
+      "exio_label": "C_NFER",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 89,
+      "exio_name": "P- and other fertiliser",
+      "exio_code": "p24.c",
+      "exio_label": "C_PFER",
+      "consumption_category": "Food",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 90,
+      "exio_name": "Chemicals nec",
+      "exio_code": "p24.d",
+      "exio_label": "C_CHEM",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 91,
+      "exio_name": "Charcoal",
+      "exio_code": "p24.e",
+      "exio_label": "C_CHAR",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 92,
+      "exio_name": "Additives/Blending Components",
+      "exio_code": "p24.f",
+      "exio_label": "C_ADDC",
+      "consumption_category": "Mobility",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 93,
+      "exio_name": "Biogasoline",
+      "exio_code": "p24.g",
+      "exio_label": "C_BIOG",
+      "consumption_category": "Mobility",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 94,
+      "exio_name": "Biodiesels",
+      "exio_code": "p24.h",
+      "exio_label": "C_BIOD",
+      "consumption_category": "Mobility",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 95,
+      "exio_name": "Other Liquid Biofuels",
+      "exio_code": "p24.i",
+      "exio_label": "C_OBIO",
+      "consumption_category": "Mobility",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 96,
+      "exio_name": "Rubber and plastic products (25)",
+      "exio_code": "p25",
+      "exio_label": "C_RUBP",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 97,
+      "exio_name": "Glass and glass products",
+      "exio_code": "p26.a",
+      "exio_label": "C_GLAS",
+      "consumption_category": "Construction",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 98,
+      "exio_name": "Secondary glass for treatment, Re-processing of secondary glass into new glass",
+      "exio_code": "p26.a.w",
+      "exio_label": "C_GLAW",
+      "consumption_category": "Construction",
+      "type": "Waste"
+    },
+    {
+      "exio_number": 99,
+      "exio_name": "Ceramic goods",
+      "exio_code": "p26.b",
+      "exio_label": "C_CRMC",
+      "consumption_category": "Construction",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 100,
+      "exio_name": "Bricks, tiles and construction products, in baked clay",
+      "exio_code": "p26.c",
+      "exio_label": "C_BRIK",
+      "consumption_category": "Construction",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 101,
+      "exio_name": "Cement, lime and plaster",
+      "exio_code": "p26.d",
+      "exio_label": "C_CMNT",
+      "consumption_category": "Construction",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 102,
+      "exio_name": "Ash for treatment, Re-processing of ash into clinker",
+      "exio_code": "p26.d.w",
+      "exio_label": "C_ASHW",
+      "consumption_category": "Construction",
+      "type": "Waste"
+    },
+    {
+      "exio_number": 103,
+      "exio_name": "Other non-metallic mineral products",
+      "exio_code": "p26.e",
+      "exio_label": "C_ONMM",
+      "consumption_category": "Construction",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 104,
+      "exio_name": "Basic iron and steel and of ferro-alloys and first products thereof",
+      "exio_code": "p27.a",
+      "exio_label": "C_STEL",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 105,
+      "exio_name": "Secondary steel for treatment, Re-processing of secondary steel into new steel",
+      "exio_code": "p27.a.w",
+      "exio_label": "C_STEW",
+      "consumption_category": "Manufactured_products",
+      "type": "Waste"
+    },
+    {
+      "exio_number": 106,
+      "exio_name": "Precious metals",
+      "exio_code": "p27.41",
+      "exio_label": "C_PREM",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 107,
+      "exio_name": "Secondary preciuos metals for treatment, Re-processing of secondary preciuos metals into new preciuos metals",
+      "exio_code": "p27.41.w",
+      "exio_label": "C_PREW",
+      "consumption_category": "Manufactured_products",
+      "type": "Waste"
+    },
+    {
+      "exio_number": 108,
+      "exio_name": "Aluminium and aluminium products",
+      "exio_code": "p27.42",
+      "exio_label": "C_ALUM",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 109,
+      "exio_name": "Secondary aluminium for treatment, Re-processing of secondary aluminium into new aluminium",
+      "exio_code": "p27.42.w",
+      "exio_label": "C_ALUW",
+      "consumption_category": "Manufactured_products",
+      "type": "Waste"
+    },
+    {
+      "exio_number": 110,
+      "exio_name": "Lead, zinc and tin and products thereof",
+      "exio_code": "p27.43",
+      "exio_label": "C_LZTP",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 111,
+      "exio_name": "Secondary lead for treatment, Re-processing of secondary lead into new lead",
+      "exio_code": "p27.43.w",
+      "exio_label": "C_LZTW",
+      "consumption_category": "Manufactured_products",
+      "type": "Waste"
+    },
+    {
+      "exio_number": 112,
+      "exio_name": "Copper products",
+      "exio_code": "p27.44",
+      "exio_label": "C_COPP",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 113,
+      "exio_name": "Secondary copper for treatment, Re-processing of secondary copper into new copper",
+      "exio_code": "p27.44.w",
+      "exio_label": "C_COPW",
+      "consumption_category": "Manufactured_products",
+      "type": "Waste"
+    },
+    {
+      "exio_number": 114,
+      "exio_name": "Other non-ferrous metal products",
+      "exio_code": "p27.45",
+      "exio_label": "C_ONFM",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 115,
+      "exio_name": "Secondary other non-ferrous metals for treatment, Re-processing of secondary other non-ferrous metals into new other non-ferrous metals",
+      "exio_code": "p27.45.w",
+      "exio_label": "C_ONFW",
+      "consumption_category": "Manufactured_products",
+      "type": "Waste"
+    },
+    {
+      "exio_number": 116,
+      "exio_name": "Foundry work services",
+      "exio_code": "p27.5",
+      "exio_label": "C_METC",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 117,
+      "exio_name": "Fabricated metal products, except machinery and equipment (28)",
+      "exio_code": "p28",
+      "exio_label": "C_FABM",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 118,
+      "exio_name": "Machinery and equipment n.e.c. (29)",
+      "exio_code": "p29",
+      "exio_label": "C_MACH",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 119,
+      "exio_name": "Office machinery and computers (30)",
+      "exio_code": "p30",
+      "exio_label": "C_OFMA",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 120,
+      "exio_name": "Electrical machinery and apparatus n.e.c. (31)",
+      "exio_code": "p31",
+      "exio_label": "C_ELMA",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 121,
+      "exio_name": "Radio, television and communication equipment and apparatus (32)",
+      "exio_code": "p32",
+      "exio_label": "C_RATV",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 122,
+      "exio_name": "Medical, precision and optical instruments, watches and clocks (33)",
+      "exio_code": "p33",
+      "exio_label": "C_MEIN",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 123,
+      "exio_name": "Motor vehicles, trailers and semi-trailers (34)",
+      "exio_code": "p34",
+      "exio_label": "C_MOTO",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 124,
+      "exio_name": "Other transport equipment (35)",
+      "exio_code": "p35",
+      "exio_label": "C_OTRE",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 125,
+      "exio_name": "Furniture; other manufactured goods n.e.c. (36)",
+      "exio_code": "p36",
+      "exio_label": "C_FURN",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 126,
+      "exio_name": "Secondary raw materials",
+      "exio_code": "p37",
+      "exio_label": "C_RYMS",
+      "consumption_category": "Manufactured_products",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 127,
+      "exio_name": "Bottles for treatment, Recycling of bottles by direct reuse",
+      "exio_code": "p37.w.1",
+      "exio_label": "C_BOTW",
+      "consumption_category": "Manufactured_products",
+      "type": "Waste"
+    },
+    {
+      "exio_number": 128,
+      "exio_name": "Electricity by coal",
+      "exio_code": "p40.11.a",
+      "exio_label": "C_POWC",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 129,
+      "exio_name": "Electricity by gas",
+      "exio_code": "p40.11.b",
+      "exio_label": "C_POWG",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 130,
+      "exio_name": "Electricity by nuclear",
+      "exio_code": "p40.11.c",
+      "exio_label": "C_POWN",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 131,
+      "exio_name": "Electricity by hydro",
+      "exio_code": "p40.11.d",
+      "exio_label": "C_POWH",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 132,
+      "exio_name": "Electricity by wind",
+      "exio_code": "p40.11.e",
+      "exio_label": "C_POWW",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 133,
+      "exio_name": "Electricity by petroleum and other oil derivatives",
+      "exio_code": "p40.11.f",
+      "exio_label": "C_POWP",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 134,
+      "exio_name": "Electricity by biomass and waste",
+      "exio_code": "p40.11.g",
+      "exio_label": "C_POWB",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 135,
+      "exio_name": "Electricity by solar photovoltaic",
+      "exio_code": "p40.11.h",
+      "exio_label": "C_POWS",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 136,
+      "exio_name": "Electricity by solar thermal",
+      "exio_code": "p40.11.i",
+      "exio_label": "C_POWE",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 137,
+      "exio_name": "Electricity by tide, wave, ocean",
+      "exio_code": "p40.11.j",
+      "exio_label": "C_POWO",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 138,
+      "exio_name": "Electricity by Geothermal",
+      "exio_code": "p40.11.k",
+      "exio_label": "C_POWM",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 139,
+      "exio_name": "Electricity nec",
+      "exio_code": "p40.11.l",
+      "exio_label": "C_POWZ",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 140,
+      "exio_name": "Transmission services of electricity",
+      "exio_code": "p40.12",
+      "exio_label": "C_POWT",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 141,
+      "exio_name": "Distribution and trade services of electricity",
+      "exio_code": "p40.13",
+      "exio_label": "C_POWD",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 142,
+      "exio_name": "Coke oven gas",
+      "exio_code": "p40.2.a",
+      "exio_label": "C_COOG",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 143,
+      "exio_name": "Blast Furnace Gas",
+      "exio_code": "p40.2.b",
+      "exio_label": "C_MBFG",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 144,
+      "exio_name": "Oxygen Steel Furnace Gas",
+      "exio_code": "p40.2.c",
+      "exio_label": "C_MOSG",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 145,
+      "exio_name": "Gas Works Gas",
+      "exio_code": "p40.2.d",
+      "exio_label": "C_MGWG",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 146,
+      "exio_name": "Biogas",
+      "exio_code": "p40.2.e",
+      "exio_label": "C_MBIO",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 147,
+      "exio_name": "Distribution services of gaseous fuels through mains",
+      "exio_code": "p40.2.1",
+      "exio_label": "C_GASD",
+      "consumption_category": "Shelter",
+      "type": "TradeMargin"
+    },
+    {
+      "exio_number": 148,
+      "exio_name": "Steam and hot water supply services",
+      "exio_code": "p40.3",
+      "exio_label": "C_HWAT",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 149,
+      "exio_name": "Collected and purified water, distribution services of water (41)",
+      "exio_code": "p41",
+      "exio_label": "C_WATR",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 150,
+      "exio_name": "Construction work (45)",
+      "exio_code": "p45",
+      "exio_label": "C_CONS",
+      "consumption_category": "Construction",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 151,
+      "exio_name": "Secondary construction material for treatment, Re-processing of secondary construction material into aggregates",
+      "exio_code": "p45.w",
+      "exio_label": "C_CONW",
+      "consumption_category": "Construction",
+      "type": "TransportMargin"
+    },
+    {
+      "exio_number": 152,
+      "exio_name": "Sale, maintenance, repair of motor vehicles, motor vehicles parts, motorcycles, motor cycles parts and accessoiries",
+      "exio_code": "p50.a",
+      "exio_label": "C_TDMO",
+      "consumption_category": "Trade",
+      "type": "TradeMargin"
+    },
+    {
+      "exio_number": 153,
+      "exio_name": "Retail trade services of motor fuel",
+      "exio_code": "p50.b",
+      "exio_label": "C_TDFU",
+      "consumption_category": "Trade",
+      "type": "TradeMargin"
+    },
+    {
+      "exio_number": 154,
+      "exio_name": "Wholesale trade and commission trade services, except of motor vehicles and motorcycles (51)",
+      "exio_code": "p51",
+      "exio_label": "C_TDWH",
+      "consumption_category": "Trade",
+      "type": "TradeMargin"
+    },
+    {
+      "exio_number": 155,
+      "exio_name": "Retail  trade services, except of motor vehicles and motorcycles; repair services of personal and household goods (52)",
+      "exio_code": "p52",
+      "exio_label": "C_TDRT",
+      "consumption_category": "Trade",
+      "type": "TradeMargin"
+    },
+    {
+      "exio_number": 156,
+      "exio_name": "Hotel and restaurant services (55)",
+      "exio_code": "p55",
+      "exio_label": "C_HORE",
+      "consumption_category": "Services",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 157,
+      "exio_name": "Railway transportation services",
+      "exio_code": "p60.1",
+      "exio_label": "C_TRAI",
+      "consumption_category": "Mobility",
+      "type": "TransportMargin"
+    },
+    {
+      "exio_number": 158,
+      "exio_name": "Other land transportation services",
+      "exio_code": "p60.2",
+      "exio_label": "C_TLND",
+      "consumption_category": "Mobility",
+      "type": "TransportMargin"
+    },
+    {
+      "exio_number": 159,
+      "exio_name": "Transportation services via pipelines",
+      "exio_code": "p60.3",
+      "exio_label": "C_TPIP",
+      "consumption_category": "Mobility",
+      "type": "TransportMargin"
+    },
+    {
+      "exio_number": 160,
+      "exio_name": "Sea and coastal water transportation services",
+      "exio_code": "p61.1",
+      "exio_label": "C_TWAS",
+      "consumption_category": "Mobility",
+      "type": "TransportMargin"
+    },
+    {
+      "exio_number": 161,
+      "exio_name": "Inland water transportation services",
+      "exio_code": "p61.2",
+      "exio_label": "C_TWAI",
+      "consumption_category": "Mobility",
+      "type": "TransportMargin"
+    },
+    {
+      "exio_number": 162,
+      "exio_name": "Air transport services (62)",
+      "exio_code": "p62",
+      "exio_label": "C_TAIR",
+      "consumption_category": "Mobility",
+      "type": "TransportMargin"
+    },
+    {
+      "exio_number": 163,
+      "exio_name": "Supporting and auxiliary transport services; travel agency services (63)",
+      "exio_code": "p63",
+      "exio_label": "C_TAUX",
+      "consumption_category": "Services",
+      "type": "TransportMargin"
+    },
+    {
+      "exio_number": 164,
+      "exio_name": "Post and telecommunication services (64)",
+      "exio_code": "p64",
+      "exio_label": "C_PTEL",
+      "consumption_category": "Services",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 165,
+      "exio_name": "Financial intermediation services, except insurance and pension funding services (65)",
+      "exio_code": "p65",
+      "exio_label": "C_FINT",
+      "consumption_category": "Services",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 166,
+      "exio_name": "Insurance and pension funding services, except compulsory social security services (66)",
+      "exio_code": "p66",
+      "exio_label": "C_FINS",
+      "consumption_category": "Services",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 167,
+      "exio_name": "Services auxiliary to financial intermediation (67)",
+      "exio_code": "p67",
+      "exio_label": "C_FAUX",
+      "consumption_category": "Services",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 168,
+      "exio_name": "Real estate services (70)",
+      "exio_code": "p70",
+      "exio_label": "C_REAL",
+      "consumption_category": "Services",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 169,
+      "exio_name": "Renting services of machinery and equipment without operator and of personal and household goods (71)",
+      "exio_code": "p71",
+      "exio_label": "C_MARE",
+      "consumption_category": "Services",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 170,
+      "exio_name": "Computer and related services (72)",
+      "exio_code": "p72",
+      "exio_label": "C_COMP",
+      "consumption_category": "Services",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 171,
+      "exio_name": "Research and development services (73)",
+      "exio_code": "p73",
+      "exio_label": "C_RESD",
+      "consumption_category": "Services",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 172,
+      "exio_name": "Other business services (74)",
+      "exio_code": "p74",
+      "exio_label": "C_OBUS",
+      "consumption_category": "Services",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 173,
+      "exio_name": "Public administration and defence services; compulsory social security services (75)",
+      "exio_code": "p75",
+      "exio_label": "C_PADF",
+      "consumption_category": "Services",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 174,
+      "exio_name": "Education services (80)",
+      "exio_code": "p80",
+      "exio_label": "C_EDUC",
+      "consumption_category": "Services",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 175,
+      "exio_name": "Health and social work services (85)",
+      "exio_code": "p85",
+      "exio_label": "C_HEAL",
+      "consumption_category": "Services",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 176,
+      "exio_name": "Food waste for treatment: incineration",
+      "exio_code": "p90.1.a",
+      "exio_label": "C_INCF",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 177,
+      "exio_name": "Paper waste for treatment: incineration",
+      "exio_code": "p90.1.b",
+      "exio_label": "C_INCP",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 178,
+      "exio_name": "Plastic waste for treatment: incineration",
+      "exio_code": "p90.1.c",
+      "exio_label": "C_INCL",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 179,
+      "exio_name": "Intert/metal waste for treatment: incineration",
+      "exio_code": "p90.1.d",
+      "exio_label": "C_INCM",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 180,
+      "exio_name": "Textiles waste for treatment: incineration",
+      "exio_code": "p90.1.e",
+      "exio_label": "C_INCT",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 181,
+      "exio_name": "Wood waste for treatment: incineration",
+      "exio_code": "p90.1.f",
+      "exio_label": "C_INCW",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 182,
+      "exio_name": "Oil/hazardous waste for treatment: incineration",
+      "exio_code": "p90.1.g",
+      "exio_label": "C_INCO",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 183,
+      "exio_name": "Food waste for treatment: biogasification and land application",
+      "exio_code": "p90.2.a",
+      "exio_label": "C_BIOF",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 184,
+      "exio_name": "Paper waste for treatment: biogasification and land application",
+      "exio_code": "p90.2.b",
+      "exio_label": "C_BIOP",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 185,
+      "exio_name": "Sewage sludge for treatment: biogasification and land application",
+      "exio_code": "p90.2.c",
+      "exio_label": "C_BIOS",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 186,
+      "exio_name": "Food waste for treatment: composting and land application",
+      "exio_code": "p90.3.a",
+      "exio_label": "C_COMF",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 187,
+      "exio_name": "Paper and wood waste for treatment: composting and land application",
+      "exio_code": "p90.3.b",
+      "exio_label": "C_COMW",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 188,
+      "exio_name": "Food waste for treatment: waste water treatment",
+      "exio_code": "p90.4.a",
+      "exio_label": "C_WASF",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 189,
+      "exio_name": "Other waste for treatment: waste water treatment",
+      "exio_code": "p90.4.b",
+      "exio_label": "C_WASO",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 190,
+      "exio_name": "Food waste for treatment: landfill",
+      "exio_code": "p90.5.a",
+      "exio_label": "C_LANF",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 191,
+      "exio_name": "Paper for treatment: landfill",
+      "exio_code": "p90.5.b",
+      "exio_label": "C_LANP",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 192,
+      "exio_name": "Plastic waste for treatment: landfill",
+      "exio_code": "p90.5.c",
+      "exio_label": "C_LANL",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 193,
+      "exio_name": "Inert/metal/hazardous waste for treatment: landfill",
+      "exio_code": "p90.5.d",
+      "exio_label": "C_LANI",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 194,
+      "exio_name": "Textiles waste for treatment: landfill",
+      "exio_code": "p90.5.e",
+      "exio_label": "C_LANT",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 195,
+      "exio_name": "Wood waste for treatment: landfill",
+      "exio_code": "p90.5.f",
+      "exio_label": "C_LANW",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 196,
+      "exio_name": "Membership organisation services n.e.c. (91)",
+      "exio_code": "p91",
+      "exio_label": "C_ORGA",
+      "consumption_category": "Services",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 197,
+      "exio_name": "Recreational, cultural and sporting services (92)",
+      "exio_code": "p92",
+      "exio_label": "C_RECR",
+      "consumption_category": "Services",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 198,
+      "exio_name": "Other services (93)",
+      "exio_code": "p93",
+      "exio_label": "C_OSER",
+      "consumption_category": "Services",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 199,
+      "exio_name": "Private households with employed persons (95)",
+      "exio_code": "p95",
+      "exio_label": "C_PRHH",
+      "consumption_category": "Shelter",
+      "type": "Commodity"
+    },
+    {
+      "exio_number": 200,
+      "exio_name": "Extra-territorial organizations and bodies",
+      "exio_code": "p99",
+      "exio_label": "C_EXTO",
+      "consumption_category": "Services",
+      "type": "Commodity"
+    }
+  ]
+}
