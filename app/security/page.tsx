@@ -2,6 +2,7 @@
 import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
 import { sectionTitle } from '@/app/components/headingStyles'
+import { ACCESS_NO_STANDING } from '@/lib/disclosures'
 
 export default function Page() {
   return (
@@ -149,7 +150,7 @@ export default function Page() {
             <h2 style={sectionTitle}>Who can access your data.</h2>
             {[
               ['Account-level access', 'Your data belongs to the account that created it, and access is per account \u2014 signing in with your own credentials is what reaches your data, and no other account can. ThemisIQ does not offer shared team accounts or per-user permissions within an organisation.'],
-              ['Who operates ThemisIQ', 'ThemisIQ is operated by its founder, with one named deputy for continuity. Production access is held by those two accounts and no others. There is no support organisation with standing access to customer data, and no third party administers the platform on our behalf.'],
+              ['Who operates ThemisIQ', `ThemisIQ is operated by its founder, with one named deputy for continuity. Production access is held by those two accounts and no others. ${ACCESS_NO_STANDING}`],
               ['Multi-factor authentication', 'Every account with production access \u2014 Supabase, Vercel and GitHub \u2014 has multi-factor authentication enrolled via authenticator app. We recommend enabling MFA on your own ThemisIQ account as well.'],
             ].map(([title, body], i) => (
               <div key={i} style={{ borderBottom: '0.5px solid #e8e7e4', padding: '14px 0' }}>

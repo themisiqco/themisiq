@@ -2,6 +2,7 @@
 
 import Nav from '../components/Nav'
 import Footer from '../components/Footer'
+import { ACCESS_NO_STANDING, ACCESS_BY_NAME } from '../../lib/disclosures'
 
 const GRAD = 'var(--color-brand)'
 
@@ -40,7 +41,7 @@ const PRINCIPLES = [
     title: 'Who can access your data',
     color: '#B91C1C',
     bg: '#FCEBEB',
-    content: 'ThemisIQ enforces row-level security, so your data is technically isolated from other customers at the database level rather than only by application logic. Production access is restricted to a small number of named individuals who require it to operate the platform, each with multi-factor authentication enrolled. There is no support organisation with standing access to your data, and no third party administers the platform on our behalf. Access is granted by name, not by role, and removed when it is no longer required.',
+    content: `ThemisIQ enforces row-level security, so your data is technically isolated from other customers at the database level rather than only by application logic. Production access is restricted to a small number of named individuals who require it to operate the platform, each with multi-factor authentication enrolled. ${ACCESS_NO_STANDING} ${ACCESS_BY_NAME}`,
   },
 ]
 
