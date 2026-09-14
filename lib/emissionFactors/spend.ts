@@ -243,6 +243,25 @@ export interface SpendFactorCaveats {
   price_year_mismatch: boolean
   /** factor.price_basis !== query.spend_price_basis. This module performs NO BASIS CONVERSION. */
   price_basis_mismatch: boolean
+  /**
+   * The value sits outside the reliability bounds recorded beside the factor set.
+   *
+   * ⚠️ REPORTED, NEVER CORRECTED HERE - on exactly the same footing as currency_mismatch. THE
+   * VALUE IS AS PUBLISHED; THE BOUND IS OURS. EXIOBASE intensities carry a seven-order-of-magnitude
+   * tail, because an industry with negligible output in a region produces an intensity that
+   * explodes: the median is around 7.9e5 and the top of the range around 3.7e14. Other users clip
+   * that - Ignite Procurement publishes a p3/p97 truncation with zero-filling - and we do not,
+   * because the factor file's own note says the values are stored exactly as published and clipping
+   * would make that false. So the resolver hands back the published number with this flag set, and
+   * the caller decides what to show.
+   *
+   * TWO BOUNDS EXIST AND THEY ARE NOT SUBSTITUTES. A global p3/p97 across all non-zero factors, and
+   * a per-industry p5/p95 across that industry's regions. They disagree on 12.3% of the factors
+   * carrying both: 186 sit outside the global bound but inside their own industry's range, and 648
+   * the reverse. Seven industries have too few non-zero regions for a local bound at all, and for
+   * those "no local bound" means UNBOUNDED, never "in range".
+   */
+  outside_reliability_bounds: boolean
 }
 
 export type SpendFactorResult =
@@ -264,7 +283,9 @@ export type SpendFactorResult =
       used_region: string
       reason: SpendFallbackReason
       /** A sentence naming the substitution, for the workings row and for the customer. The caller
-       *  must render it; it is not optional prose. */
+       *  must render it; it is not optional prose. When caveats.outside_reliability_bounds is true
+       *  on the same result, this sentence MUST name that as well as the region substitution - see
+       *  the resolver contract below. */
       disclosure: string
       caveats: SpendFactorCaveats
     }
@@ -290,6 +311,22 @@ export type SpendFactorResult =
  *     a basis conversion belongs to the publisher's own margin and tax matrices. None of the three
  *     is a coefficient this resolver may apply on its own authority
  *   - no factor at all returns null
+ *
+ * ⚠️ A ZERO-VALUED FACTOR RESOLVES TO null. IT IS AN ABSENT FACTOR, NOT A FACTOR OF ZERO.
+ * EXIOBASE is built from national supply-use tables, and where a country or sector has insufficient
+ * economic data the cell is empty rather than nil - 1,108 of 7,987 cells in the 2019 ixi extract,
+ * and they are structured rather than scattered: three industries are zero in all 49 regions, and
+ * Indonesia, Cyprus, Luxembourg, South Africa and India head the per-region counts. Returning 0.0
+ * would report NO EMISSIONS for a real purchase, which is worse than reporting nothing: a customer
+ * can act on "we cannot price this" and cannot act on a confident zero. This is one of the cases
+ * that reaches the null above; it is not a separate branch and there is still no default.
+ *
+ * ⚠️ A FALLBACK RESULT THAT ALSO SITS OUTSIDE THE BOUNDS MUST SAY BOTH THINGS IN ITS DISCLOSURE.
+ * `disclosure` on the fallback arm is required prose, and when caveats.outside_reliability_bounds
+ * is true on that same result the sentence must name the substituted region AND the fact that the
+ * value is in the tail. Two compounding weaknesses reported as one is a weaker claim than the
+ * reader is entitled to: a factor borrowed from another region is already a substitution, and a
+ * borrowed factor that is also an outlier for its industry is a different order of uncertainty.
  */
 export declare function resolveSpendFactor(query: SpendFactorQuery): SpendFactorResult | null
 
