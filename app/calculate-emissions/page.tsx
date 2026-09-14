@@ -67,6 +67,15 @@ export const revalidate = 86400;
 // --- FAQ structured data (FAQPage) -------------------------------
 // Plain-text answers mirroring the visible FAQ. Keep in sync if the
 // visible copy changes.
+//
+// "Keep in sync" was the whole of the instruction here for months, and
+// nothing enforced it. The "Is my data secure?" answer is one of three
+// places the AI disclosure is published (with /trust and /privacy §5),
+// each deliberately in its own register and NOT a shared string. The
+// facts they must all carry are asserted in lib/aiDisclosure.test.ts;
+// reword this answer freely, but that guard fails if a rewrite drops a
+// fact. It found this answer missing the exactly-two-places claim the
+// day it was written.
 const FAQ_LD = {
   "@context": "https://schema.org",
   "@type": "FAQPage",
@@ -164,7 +173,7 @@ const FAQ_LD = {
       name: "Is my data secure?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Your data belongs to you and is never sold or shared. It is encrypted in transit (TLS 1.2+) and at rest (AES-256) on infrastructure provided by Supabase on AWS, which holds SOC 2 Type II certification, with row-level security isolating it from every other customer at the database level. If you use the Concierge add-on, the bills you upload are sent to our AI provider, Anthropic, to read the figures off them; the GHG guide sends only the questions you type into it and which step you're on. Payments run through Stripe (PCI DSS Level 1). You can export your reports at any time and ask us to delete your data, and we comply with PIPEDA, Quebec Law 25, GDPR and UK GDPR, and CCPA.",
+        text: "Your data belongs to you and is never sold or shared. It is encrypted in transit (TLS 1.2+) and at rest (AES-256) on infrastructure provided by Supabase on AWS, which holds SOC 2 Type II certification, with row-level security isolating it from every other customer at the database level. AI is used in exactly two places, and nothing else in the platform uses it. If you use the Concierge add-on, the bills you upload are sent to our AI provider, Anthropic, to read the figures off them; the GHG guide sends only the questions you type into it and which step you're on. Payments run through Stripe (PCI DSS Level 1). You can export your reports at any time and ask us to delete your data, and we comply with PIPEDA, Quebec Law 25, GDPR and UK GDPR, and CCPA.",
       },
     },
     {
