@@ -19,10 +19,16 @@ const PRINCIPLES = [
     content: 'ThemisIQ does not sell, rent, share, or license your data to any third party — ever. Your compliance data is not used for benchmarking products sold to others, not shared with industry bodies, and not disclosed to regulators on your behalf without your explicit instruction.',
   },
   {
+    title: 'Where we use AI',
+    color: '#7425e3',
+    bg: '#EDE9FE',
+    content: 'ThemisIQ uses AI in exactly two places, both through our AI provider Anthropic: reading the figures off documents you upload to the Concierge add-on, and answering questions in the GHG guide, which sends your question and which step of the wizard you are on. Nothing else in the platform uses it. Framework classification and risk scoring are rules-based, and the rules are published on our methodology page.',
+  },
+  {
     title: 'Your data is never used to train AI models',
     color: '#7425e3',
     bg: '#EDE9FE',
-    content: 'ThemisIQ uses AI in exactly two places, both through our AI provider Anthropic: reading the figures off documents you upload to the Concierge add-on, and answering the questions you type into the GHG guide. Nothing else in the platform uses it — framework classification and risk scoring are rules-based, and the rules are published on our methodology page. Your data is never used to train, fine-tune, or improve any AI model, including the models behind those two features. Each session is processed in isolation.',
+    content: 'Your data is never used to train, fine-tune, or improve any AI model, including the models behind those two features. Each session is processed in isolation.',
   },
   {
     title: 'Encrypted in transit and at rest',
@@ -31,10 +37,10 @@ const PRINCIPLES = [
     content: 'All data transmitted to and from ThemisIQ is encrypted using TLS 1.2+. All data stored in ThemisIQ is encrypted at rest using AES-256. Our infrastructure runs on Supabase (hosted on AWS) with SOC 2 Type II certified data centres.',
   },
   {
-    title: 'Access controls — only you can see your data',
+    title: 'Who can access your data',
     color: '#B91C1C',
     bg: '#FCEBEB',
-    content: 'ThemisIQ enforces row-level security — your data is technically isolated from other customers at the database level, not just by application logic. ThemisIQ staff cannot access your inventory data without your explicit request for support purposes.',
+    content: 'ThemisIQ enforces row-level security, so your data is technically isolated from other customers at the database level rather than only by application logic. Production access is restricted to a small number of named individuals who require it to operate the platform, each with multi-factor authentication enrolled. There is no support organisation with standing access to your data, and no third party administers the platform on our behalf. Access is granted by name, not by role, and removed when it is no longer required.',
   },
 ]
 
