@@ -100,6 +100,17 @@ export const SBTI_NET_ZERO_STANDARD_URL =
 // UNVERIFIED: carried over from app/dashboard/ghg/page.tsx, not opened.
 export const EPA_EGRID_POWER_PROFILER_URL = 'https://www.epa.gov/egrid/power-profiler'
 
+// Intent: the EPA's landing page for the USEEIO environmentally-extended input-output models, cited
+// by SPEND_EF_SOURCES.useeio_us in lib/emissionFactors/spend.ts as the provenance for US
+// spend-based factors.
+// VERIFIED 14 September 2026: opened. It resolves and describes the model ("melds data on economic
+// transactions between 389 industry sectors"), but names NO current version, NO release date and NO
+// sector classification — which is exactly why those three fields are null on that source record.
+// The "Current Versions and Other Technical Resources" page it links, /land-research/
+// useeio-technical-content, returned 404 on the same date.
+export const EPA_USEEIO_URL =
+  'https://www.epa.gov/land-research/us-environmentally-extended-input-output-useeio-models'
+
 // ── EU INSTRUMENTS ───────────────────────────────────────────────────────────────────────────────
 
 // Intent: the Commission's CSDDD (CS3D) policy page — the due-diligence directive's official landing
