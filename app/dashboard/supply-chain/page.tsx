@@ -127,7 +127,7 @@ const scoreSupplier = (supplier: Supplier): { risk: RiskLevel; score: number; fa
   const risk: RiskLevel = score >= 7 ? 'critical' : score >= 5 ? 'high' : score >= 3 ? 'medium' : 'low'
 
   // Scope 3 Cat.1 spend-based estimate (kg CO2e per $ spend × annual spend / 1000 = mt)
-  const scope3 = supplier.annual_spend > 0 ? (supplier.annual_spend * sectorData.ef) / 1000000 : 0
+  const scope3 = supplier.annual_spend > 0 ? (supplier.annual_spend * sectorData.ef) / 1000 : 0
 
   return { risk, score: Math.round(score * 10) / 10, factors, scope3 }
 }
