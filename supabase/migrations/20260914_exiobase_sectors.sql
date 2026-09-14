@@ -1,6 +1,25 @@
 -- 20260914_exiobase_sectors.sql
 --
--- NOT RUN. Propose only.
+-- ⚠️ RUN ON 14 SEPTEMBER 2026, IN FULL. DO NOT RUN IT AGAIN.
+--
+-- All eight blocks were executed and the four verification queries in section 8 passed. This file
+-- is now a RECORD of what was done, not a script to run. It is kept executable-looking because the
+-- schema it creates has to be reproducible into an empty database, and that is the only situation
+-- in which any of it should be executed again.
+--
+-- ⚠️ SECTION 5 TRUNCATES supply_chain_registers, scope3_inventories, supplier_responses AND
+-- campaign_suppliers. When it ran, those tables held one register named TEST, one scope3 row and
+-- twelve campaign suppliers, all pre-launch. A second run against a live database would delete
+-- every customer register, every saved Scope 3 inventory and every supplier response, with no
+-- undo. If you are re-establishing this schema on an empty database, read section 5 before you
+-- start and satisfy yourself the counts are what its own pre-flight query expects.
+--
+-- One thing HAS changed since the run: the row fingerprint below moved from 505866da... to
+-- b393d1ad... when lib/emissionFactors/exiobaseSectors.json gained display_group and a groups
+-- array on 14 September 2026. The live reference_data_fingerprints row was updated by a standalone
+-- statement rather than by re-running any part of this file. The values seeded in sections 1 to 3
+-- did not change: the generator now READS the display groups from this migration, so the file and
+-- the database agree by construction.
 --
 -- The sector vocabulary becomes EXIOBASE's own. Three tables' worth of internal sector strings
 -- become foreign keys into a seeded reference table, and the display groupings the UI needs become
@@ -8,11 +27,11 @@
 --
 -- ── WHY THIS IS A SCHEMA CHANGE AND A TRUNCATE, NOT A MIGRATION ──────────────────────────────
 --
--- There is no customer data. One supply_chain_registers row named TEST, one scope3_inventories
--- row, twelve campaign_suppliers rows, all pre-launch. So the sector strings already stored are
--- discarded rather than mapped, and the constraints below can be added outright instead of
--- backfilled behind a nullable column. Section 4 does the truncate; nothing here is reversible
--- once it runs, and nothing here should be run once a real customer row exists.
+-- There WAS no customer data when this ran. One supply_chain_registers row named TEST, one
+-- scope3_inventories row, twelve campaign_suppliers rows, all pre-launch. So the sector strings
+-- already stored were discarded rather than mapped, and the constraints below were added outright
+-- instead of backfilled behind a nullable column. Section 5 does the truncate; nothing here is
+-- reversible once it runs, and nothing here may be run once a real customer row exists.
 --
 -- ── FIVE DECISIONS WORTH FINDING HERE RATHER THAN INFERRING ──────────────────────────────────
 --
@@ -157,8 +176,8 @@ create index if not exists exiobase_sectors_isic_idx    on public.exiobase_secto
 -- ═══ 3. SEED — 363 ROWS, GENERATED ═══════════════════════════════════════════════════════════
 --
 -- Do not hand-edit these values. They are a transcription of
--- lib/emissionFactors/exiobaseSectors.json, whose row fingerprint at the time this file was
--- written was sha256 505866dada27b84c718e2289ca16f5695b79763071ba83c75e40d64e59fd524c
+-- lib/emissionFactors/exiobaseSectors.json, whose row fingerprint is sha256
+-- b393d1ad7d4966cd0ddd7c29379c98b362ab9bed01be7e98afd53226647e3341
 -- (pinned in lib/emissionFactors/exiobaseSectors.test.ts as ROWS_SHA256). If the JSON changes,
 -- regenerate this block rather than editing it. See section 7 on how the two stay in step.
 --
@@ -731,7 +750,7 @@ comment on table public.reference_data_fingerprints is
 
 insert into public.reference_data_fingerprints (dataset, fingerprint, source_file) values
   ('exiobase_sectors',
-   '505866dada27b84c718e2289ca16f5695b79763071ba83c75e40d64e59fd524c',
+   'b393d1ad7d4966cd0ddd7c29379c98b362ab9bed01be7e98afd53226647e3341',
    'lib/emissionFactors/exiobaseSectors.json')
 on conflict (dataset) do update
   set fingerprint = excluded.fingerprint,

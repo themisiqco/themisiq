@@ -31,11 +31,22 @@ attribution is required wherever a derived figure is shown. See lib/emissionFact
 
 import json
 import pathlib
+import re
 import sys
 from datetime import date
 
 REQUIRED_PYMRIO = "0.6.3"
-OUT = pathlib.Path(__file__).resolve().parent.parent / "lib" / "emissionFactors" / "exiobaseSectors.json"
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+OUT = ROOT / "lib" / "emissionFactors" / "exiobaseSectors.json"
+# ── THE DISPLAY GROUPS ARE READ FROM THE MIGRATION, NOT RE-DERIVED HERE ────────────────────────
+# supabase/migrations/20260914_exiobase_sectors.sql seeds both the 20 headings and the per-industry
+# assignment. Re-deriving the same assignment in Python would put two independent copies of a
+# judgement call in the repo, and the day they diverge a dropdown would group an industry one way
+# while the database grouped it another - with nothing failing, because each side would be
+# internally consistent. Parsing the migration makes the SQL the single source and this file a
+# projection of it. If the parse below stops matching, that is the migration's format changing and
+# it must be looked at, which is why every step of it aborts rather than skipping a row.
+MIGRATION = ROOT / "supabase" / "migrations" / "20260914_exiobase_sectors.sql"
 
 try:
     import pymrio
@@ -76,6 +87,85 @@ PRODUCT_COLUMNS = {
 }
 
 
+def sql_literals(row: str) -> list:
+    """Split one SQL VALUES row into its literals. Handles '' escaping inside quoted strings."""
+    out, i, n = [], 0, len(row)
+    while i < n:
+        while i < n and row[i] in " \t":
+            i += 1
+        if i >= n:
+            break
+        if row[i] == "'":
+            i += 1
+            buf = []
+            while i < n:
+                if row[i] == "'" and i + 1 < n and row[i + 1] == "'":
+                    buf.append("'")
+                    i += 2
+                elif row[i] == "'":
+                    i += 1
+                    break
+                else:
+                    buf.append(row[i])
+                    i += 1
+            out.append("".join(buf))
+        else:
+            j = i
+            while j < n and row[j] != ",":
+                j += 1
+            tok = row[i:j].strip()
+            out.append(None if tok == "null" else tok)
+            i = j
+        while i < n and row[i] in " \t":
+            i += 1
+        if i < n and row[i] == ",":
+            i += 1
+    return out
+
+
+def read_display_groups() -> tuple:
+    """The 20 headings in seed order, and the exio_code -> heading assignment, from the migration."""
+    if not MIGRATION.is_file():
+        sys.exit(f"{MIGRATION} is missing. The display groups are seeded there and read from there; "
+                 f"this script does not re-derive them.")
+    sql = MIGRATION.read_text(encoding="utf-8")
+
+    groups = []
+    for m in re.finditer(r"^  \((\d+), '((?:[^']|'')*)', (\d+)\)", sql, re.M):
+        groups.append({"id": int(m.group(1)),
+                       "heading": m.group(2).replace("''", "'"),
+                       "member_count": int(m.group(3))})
+    if len(groups) != 20:
+        sys.exit(f"expected 20 display groups in {MIGRATION.name}, parsed {len(groups)}")
+    if [g["id"] for g in groups] != list(range(1, 21)):
+        sys.exit(f"display group ids are not 1..20 in seed order: {[g['id'] for g in groups]}")
+
+    assignment = {}
+    for line in sql.splitlines():
+        if not line.startswith("  ('industry',"):
+            continue
+        cols = sql_literals(line.strip().rstrip(",").lstrip("(").rstrip(")"))
+        if len(cols) != 10:
+            sys.exit(f"industry seed row has {len(cols)} columns, expected 10: {line[:90]}")
+        code, group = cols[1], cols[8]
+        if group is None:
+            sys.exit(f"industry {code} has a null display_group in the migration")
+        assignment[code] = group
+    if len(assignment) != 163:
+        sys.exit(f"expected 163 industry seed rows in {MIGRATION.name}, parsed {len(assignment)}")
+
+    headings = {g["heading"] for g in groups}
+    stray = sorted({v for v in assignment.values()} - headings)
+    if stray:
+        sys.exit(f"industries assigned to headings not in sector_display_groups: {stray}")
+    for g in groups:
+        actual = sum(1 for v in assignment.values() if v == g["heading"])
+        if actual != g["member_count"]:
+            sys.exit(f"group {g['heading']!r} seeds member_count {g['member_count']} "
+                     f"but {actual} industries are assigned to it")
+    return groups, assignment
+
+
 def read(model: str, columns: dict) -> list:
     df = pd.read_csv(root / model / "sectors.tsv", sep="\t")
     missing = [c for c in columns if c not in df.columns]
@@ -89,6 +179,16 @@ def read(model: str, columns: dict) -> list:
 
 industries = read("exio3_ixi", INDUSTRY_COLUMNS)
 products = read("exio3_pxp", PRODUCT_COLUMNS)
+
+groups, assignment = read_display_groups()
+missing = [r["exio_code"] for r in industries if r["exio_code"] not in assignment]
+if missing:
+    sys.exit(f"{len(missing)} industries have no display_group in the migration: {missing[:5]}")
+for r in industries:
+    r["display_group"] = assignment[r["exio_code"]]
+# Products get none. They have no grouped UI, and the database column is null on all 200; emitting
+# an empty string or a placeholder here would make "no group" indistinguishable from "a group whose
+# name happens to be blank".
 
 if len(industries) != 163:
     sys.exit(f"expected 163 industries, got {len(industries)}")
@@ -116,12 +216,23 @@ payload = {
             "multi-section buckets (ISIC_G_H, ISIC_J_K, ISIC_M_N_O) - so this is a grouping, not a "
             "crosswalk, and it cannot resolve an ISIC code back to an EXIOBASE industry."
         ),
+        "display_group_note": (
+            "The `groups` array and each industry's `display_group` are OURS, not EXIOBASE's. They "
+            "are presentation only: headings that make a 163-item dropdown navigable, assigned by "
+            "reading what the EXIOBASE name strings say. They are not a classification, they are "
+            "not derived from ISIC or NACE, and no emission figure is computed from them. The "
+            "published classification is isic_code / isic_name. Both the headings and the "
+            "assignment are READ FROM supabase/migrations/20260914_exiobase_sectors.sql so the file "
+            "and the database cannot disagree; they are not re-derived here. Products carry no "
+            "display_group - the database column is null on all 200."
+        ),
         "scope_note": (
             "Classification only. This file carries NO emission factors. Industry and product code "
             "spaces are parallel but not identical (163 against 200); a code is meaningless without "
             "knowing which table it came from. See lib/emissionFactors/spend.ts SpendFactorType."
         ),
     },
+    "groups": groups,
     "industries": industries,
     "products": products,
 }
@@ -132,10 +243,10 @@ OUT.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encodin
 # The fingerprint the test pins. Metadata is excluded because generated_on changes every run; the
 # rows are what must not move.
 import hashlib
-rows = json.dumps({"industries": industries, "products": products}, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+rows = json.dumps({"groups": groups, "industries": industries, "products": products}, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
 digest = hashlib.sha256(rows.encode("utf-8")).hexdigest()
 
 print(f"wrote {OUT.relative_to(pathlib.Path(__file__).resolve().parent.parent)}")
-print(f"  industries: {len(industries)}   products: {len(products)}")
+print(f"  industries: {len(industries)}   products: {len(products)}   groups: {len(groups)}")
 print(f"  rows sha256: {digest}")
 print(f"  -> pin this in lib/emissionFactors/exiobaseSectors.test.ts if it has changed")

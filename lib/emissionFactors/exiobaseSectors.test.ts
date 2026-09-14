@@ -22,23 +22,25 @@ import data from './exiobaseSectors.json'
 // A digest change with no generator run and no pymrio version change means the file was edited by
 // hand. That is the case this test exists to stop.
 
-const ROWS_SHA256 = '505866dada27b84c718e2289ca16f5695b79763071ba83c75e40d64e59fd524c'
+const ROWS_SHA256 = 'b393d1ad7d4966cd0ddd7c29379c98b362ab9bed01be7e98afd53226647e3341'
 
 const INDUSTRY_FIELDS = [
   'exio_number', 'exio_name', 'exio_code', 'exio_label',
-  'isic_code', 'isic_name', 'consumption_category',
+  'isic_code', 'isic_name', 'consumption_category', 'display_group',
 ] as const
+const GROUP_FIELDS = ['id', 'heading', 'member_count'] as const
 const PRODUCT_FIELDS = [
   'exio_number', 'exio_name', 'exio_code', 'exio_label',
   'consumption_category', 'type',
 ] as const
 const METADATA_FIELDS = [
   'source', 'version', 'publisher', 'published', 'doi', 'url', 'licence',
-  'generated_on', 'generated_from', 'generated_by', 'isic_note', 'scope_note',
+  'generated_on', 'generated_from', 'generated_by', 'isic_note', 'display_group_note', 'scope_note',
 ] as const
 
 type Row = Record<string, unknown>
 const industries = data.industries as Row[]
+const groups = data.groups as Row[]
 const products = data.products as Row[]
 const metadata = data.metadata as Row
 
@@ -46,7 +48,7 @@ describe('exiobaseSectors.json is generated, not maintained', () => {
   it('E1 the fingerprint matches the generator output', () => {
     // Must mirror the generator's serialisation exactly: sort_keys, no spaces, metadata excluded
     // because generated_on moves on every run and the rows must not.
-    const canonical = JSON.stringify(sortDeep({ industries, products }))
+    const canonical = JSON.stringify(sortDeep({ groups, industries, products }))
     const digest = createHash('sha256').update(canonical, 'utf8').digest('hex')
     expect(
       digest,
@@ -91,7 +93,44 @@ describe('exiobaseSectors.json is generated, not maintained', () => {
     expect(bad, 'the generator refuses to emit nulls; a null here means the file was edited').toEqual([])
   })
 
-  it('E5 the metadata block is present and complete', () => {
+  it('E5 display groups: 20 headings, every industry in exactly one, no product in any', () => {
+    // ⚠️ THE HEADINGS AND THE ASSIGNMENT ARE ALSO SEEDED BY
+    // supabase/migrations/20260914_exiobase_sectors.sql, AND THE GENERATOR READS THEM FROM THERE
+    // RATHER THAN RE-DERIVING THEM. That is what stops the file and the database grouping an
+    // industry differently while each stays internally consistent - a drift with no failing test on
+    // either side. This test guards the file's half: the counts have to agree with the membership,
+    // so renaming a heading in one place and not the other breaks it here.
+    expect(groups, '20 headings').toHaveLength(20)
+    expect(groups.map(g => g.id), 'ids 1..20 in seed order — this is the optgroup order')
+      .toEqual(Array.from({ length: 20 }, (_, i) => i + 1))
+    for (const g of groups) {
+      expect(Object.keys(g).sort()).toEqual([...GROUP_FIELDS].sort())
+      expect(String(g.heading).trim(), 'a blank heading would render as an unnamed optgroup').not.toBe('')
+    }
+    const headings = new Set(groups.map(g => g.heading))
+    expect(headings.size, 'headings must be distinct').toBe(20)
+
+    // Every industry in exactly one group, and that group must exist.
+    const orphans = industries.filter(r => !headings.has(r.display_group))
+    expect(orphans.map(r => `${r.exio_code} -> ${String(r.display_group)}`),
+      'an industry assigned to a heading no group declares').toEqual([])
+
+    // Counts: each declared member_count equals actual membership, and they sum to 163.
+    const actual = new Map<unknown, number>()
+    for (const r of industries) actual.set(r.display_group, (actual.get(r.display_group) ?? 0) + 1)
+    const mismatched = groups
+      .filter(g => (actual.get(g.heading) ?? 0) !== g.member_count)
+      .map(g => `${String(g.heading)}: declares ${String(g.member_count)}, has ${actual.get(g.heading) ?? 0}`)
+    expect(mismatched, 'a renamed heading shows up here as a group with zero members').toEqual([])
+    expect(groups.reduce((n, g) => n + Number(g.member_count), 0), 'the 20 counts sum to 163').toBe(163)
+
+    // Products carry none. The database column is null on all 200, and an empty string here would
+    // make "no group" indistinguishable from "a group whose name happens to be blank".
+    expect(products.filter(r => 'display_group' in r).map(r => r.exio_code),
+      'no product may carry a display_group').toEqual([])
+  })
+
+  it('E6 the metadata block is present and complete', () => {
     // Provenance is not decoration. The licence in particular is load-bearing: CC BY-SA 4.0 attaches
     // attribution and ShareAlike obligations to anything we publish from this. See spend.ts.
     for (const f of METADATA_FIELDS) {
@@ -104,21 +143,27 @@ describe('exiobaseSectors.json is generated, not maintained', () => {
     expect(String(metadata.generated_by)).toContain('scripts/generate-exiobase-sectors.py')
     expect(String(metadata.generated_from), 'name the pymrio version the rows came from').toMatch(/pymrio \d+\.\d+\.\d+/)
     expect(String(metadata.isic_note), 'the Rev. 3.1 caveat must survive a regeneration').toMatch(/Rev\. 3\.1/)
+    expect(String(metadata.display_group_note), 'the groups are ours, not EXIOBASE\'s')
+      .toMatch(/[Pp]resentation only/)
+    expect(String(metadata.display_group_note), 'and they are read from the migration, not re-derived')
+      .toMatch(/20260914_exiobase_sectors\.sql/)
   })
 
-  it('E6 codes are in the shape each table uses', () => {
+  it('E7 codes are in the shape each table uses', () => {
     // i-prefixed for industries, p-prefixed for products. The two spaces are parallel and must not
     // be confused; see SpendFactorType in spend.ts.
     expect(industries.every(r => String(r.exio_code).startsWith('i')), 'industry codes start with i').toBe(true)
     expect(products.every(r => String(r.exio_code).startsWith('p')), 'product codes start with p').toBe(true)
   })
 
-  it('E7 the generator is in the repo', async () => {
+  it('E8 the generator is in the repo', async () => {
     // A generated file whose generator is absent is a hand-maintained file with a misleading header.
     const { readFileSync } = await import('node:fs')
     const src = readFileSync('scripts/generate-exiobase-sectors.py', 'utf8')
     expect(src.length, 'scripts/generate-exiobase-sectors.py looks empty').toBeGreaterThan(2_000)
     expect(src, 'the generator must pin the pymrio version it was written against').toContain('REQUIRED_PYMRIO')
+    expect(src, 'the display groups must be read from the migration, never re-derived here')
+      .toContain('20260914_exiobase_sectors.sql')
   })
 })
 

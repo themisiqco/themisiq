@@ -11,8 +11,111 @@
     "generated_from": "pymrio 0.6.3 bundled classification (mrio_models/exio3_*/sectors.tsv)",
     "generated_by": "scripts/generate-exiobase-sectors.py",
     "isic_note": "The isic_code and isic_name fields are ISIC Rev. 3.1 style section labels, not Rev. 4: 'Electricity, gas and water supply' is one section E under Rev. 3.1 and is split across D and E under Rev. 4. That is consistent with the v3.8.2 readme, which states 'The database is under the NACE1 classification scheme' (NACE Rev. 1.1). They are SECTION level only - 12 distinct codes across 163 industries, three of them pre-aggregated multi-section buckets (ISIC_G_H, ISIC_J_K, ISIC_M_N_O) - so this is a grouping, not a crosswalk, and it cannot resolve an ISIC code back to an EXIOBASE industry.",
+    "display_group_note": "The `groups` array and each industry's `display_group` are OURS, not EXIOBASE's. They are presentation only: headings that make a 163-item dropdown navigable, assigned by reading what the EXIOBASE name strings say. They are not a classification, they are not derived from ISIC or NACE, and no emission figure is computed from them. The published classification is isic_code / isic_name. Both the headings and the assignment are READ FROM supabase/migrations/20260914_exiobase_sectors.sql so the file and the database cannot disagree; they are not re-derived here. Products carry no display_group - the database column is null on all 200.",
     "scope_note": "Classification only. This file carries NO emission factors. Industry and product code spaces are parallel but not identical (163 against 200); a code is meaningless without knowing which table it came from. See lib/emissionFactors/spend.ts SpendFactorType."
   },
+  "groups": [
+    {
+      "id": 1,
+      "heading": "Food, drink & tobacco",
+      "member_count": 12
+    },
+    {
+      "id": 2,
+      "heading": "Textiles, clothing & leather",
+      "member_count": 3
+    },
+    {
+      "id": 3,
+      "heading": "Wood, paper & print",
+      "member_count": 6
+    },
+    {
+      "id": 4,
+      "heading": "Fuels & chemicals",
+      "member_count": 9
+    },
+    {
+      "id": 5,
+      "heading": "Non-metallic minerals",
+      "member_count": 7
+    },
+    {
+      "id": 6,
+      "heading": "Metals & metal products",
+      "member_count": 14
+    },
+    {
+      "id": 7,
+      "heading": "Machinery, electronics & vehicles",
+      "member_count": 8
+    },
+    {
+      "id": 8,
+      "heading": "Waste, recycling & water treatment",
+      "member_count": 22
+    },
+    {
+      "id": 9,
+      "heading": "Education, health & other services",
+      "member_count": 5
+    },
+    {
+      "id": 10,
+      "heading": "Agriculture & horticulture",
+      "member_count": 17
+    },
+    {
+      "id": 11,
+      "heading": "Forestry & logging",
+      "member_count": 1
+    },
+    {
+      "id": 12,
+      "heading": "Fishing",
+      "member_count": 1
+    },
+    {
+      "id": 13,
+      "heading": "Mining & quarrying",
+      "member_count": 15
+    },
+    {
+      "id": 14,
+      "heading": "Electricity, gas & water supply",
+      "member_count": 17
+    },
+    {
+      "id": 15,
+      "heading": "Construction",
+      "member_count": 2
+    },
+    {
+      "id": 16,
+      "heading": "Wholesale, retail & hospitality",
+      "member_count": 5
+    },
+    {
+      "id": 17,
+      "heading": "Transport, storage & communications",
+      "member_count": 8
+    },
+    {
+      "id": 18,
+      "heading": "Finance, real estate & business services",
+      "member_count": 8
+    },
+    {
+      "id": 19,
+      "heading": "Public administration & defence",
+      "member_count": 2
+    },
+    {
+      "id": 20,
+      "heading": "Households as employers",
+      "member_count": 1
+    }
+  ],
   "industries": [
     {
       "exio_number": 1,
@@ -21,7 +124,8 @@
       "exio_label": "A_PARI",
       "isic_code": "ISIC_A",
       "isic_name": "Agriculture, hunting and related service activities (01)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Agriculture & horticulture"
     },
     {
       "exio_number": 2,
@@ -30,7 +134,8 @@
       "exio_label": "A_WHEA",
       "isic_code": "ISIC_A",
       "isic_name": "Agriculture, hunting and related service activities (01)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Agriculture & horticulture"
     },
     {
       "exio_number": 3,
@@ -39,7 +144,8 @@
       "exio_label": "A_OCER",
       "isic_code": "ISIC_A",
       "isic_name": "Agriculture, hunting and related service activities (01)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Agriculture & horticulture"
     },
     {
       "exio_number": 4,
@@ -48,7 +154,8 @@
       "exio_label": "A_FVEG",
       "isic_code": "ISIC_A",
       "isic_name": "Agriculture, hunting and related service activities (01)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Agriculture & horticulture"
     },
     {
       "exio_number": 5,
@@ -57,7 +164,8 @@
       "exio_label": "A_OILS",
       "isic_code": "ISIC_A",
       "isic_name": "Agriculture, hunting and related service activities (01)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Agriculture & horticulture"
     },
     {
       "exio_number": 6,
@@ -66,7 +174,8 @@
       "exio_label": "A_SUGB",
       "isic_code": "ISIC_A",
       "isic_name": "Agriculture, hunting and related service activities (01)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Agriculture & horticulture"
     },
     {
       "exio_number": 7,
@@ -75,7 +184,8 @@
       "exio_label": "A_FIBR",
       "isic_code": "ISIC_A",
       "isic_name": "Agriculture, hunting and related service activities (01)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Agriculture & horticulture"
     },
     {
       "exio_number": 8,
@@ -84,7 +194,8 @@
       "exio_label": "A_OTCR",
       "isic_code": "ISIC_A",
       "isic_name": "Agriculture, hunting and related service activities (01)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Agriculture & horticulture"
     },
     {
       "exio_number": 9,
@@ -93,7 +204,8 @@
       "exio_label": "A_CATL",
       "isic_code": "ISIC_A",
       "isic_name": "Agriculture, hunting and related service activities (01)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Agriculture & horticulture"
     },
     {
       "exio_number": 10,
@@ -102,7 +214,8 @@
       "exio_label": "A_PIGS",
       "isic_code": "ISIC_A",
       "isic_name": "Agriculture, hunting and related service activities (01)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Agriculture & horticulture"
     },
     {
       "exio_number": 11,
@@ -111,7 +224,8 @@
       "exio_label": "A_PLTR",
       "isic_code": "ISIC_A",
       "isic_name": "Agriculture, hunting and related service activities (01)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Agriculture & horticulture"
     },
     {
       "exio_number": 12,
@@ -120,7 +234,8 @@
       "exio_label": "A_OMEA",
       "isic_code": "ISIC_A",
       "isic_name": "Agriculture, hunting and related service activities (01)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Agriculture & horticulture"
     },
     {
       "exio_number": 13,
@@ -129,7 +244,8 @@
       "exio_label": "A_OANP",
       "isic_code": "ISIC_A",
       "isic_name": "Agriculture, hunting and related service activities (01)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Agriculture & horticulture"
     },
     {
       "exio_number": 14,
@@ -138,7 +254,8 @@
       "exio_label": "A_MILK",
       "isic_code": "ISIC_A",
       "isic_name": "Agriculture, hunting and related service activities (01)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Agriculture & horticulture"
     },
     {
       "exio_number": 15,
@@ -147,7 +264,8 @@
       "exio_label": "A_WOOL",
       "isic_code": "ISIC_A",
       "isic_name": "Agriculture, hunting and related service activities (01)",
-      "consumption_category": "Clothing"
+      "consumption_category": "Clothing",
+      "display_group": "Agriculture & horticulture"
     },
     {
       "exio_number": 16,
@@ -156,7 +274,8 @@
       "exio_label": "A_MANC",
       "isic_code": "ISIC_A",
       "isic_name": "Agriculture, hunting and related service activities (01)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Agriculture & horticulture"
     },
     {
       "exio_number": 17,
@@ -165,7 +284,8 @@
       "exio_label": "A_MANB",
       "isic_code": "ISIC_A",
       "isic_name": "Agriculture, hunting and related service activities (01)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Agriculture & horticulture"
     },
     {
       "exio_number": 18,
@@ -174,7 +294,8 @@
       "exio_label": "A_FORE",
       "isic_code": "ISIC_A",
       "isic_name": "Forestry, logging and related service activities (02)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Forestry & logging"
     },
     {
       "exio_number": 19,
@@ -183,7 +304,8 @@
       "exio_label": "A_FISH",
       "isic_code": "ISIC_B",
       "isic_name": "Fishing (B)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Fishing"
     },
     {
       "exio_number": 20,
@@ -192,7 +314,8 @@
       "exio_label": "A_COAL",
       "isic_code": "ISIC_C",
       "isic_name": "Mining and quarrying (C)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Mining & quarrying"
     },
     {
       "exio_number": 21,
@@ -201,7 +324,8 @@
       "exio_label": "A_COIL",
       "isic_code": "ISIC_C",
       "isic_name": "Mining and quarrying (C)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Mining & quarrying"
     },
     {
       "exio_number": 22,
@@ -210,7 +334,8 @@
       "exio_label": "A_GASE",
       "isic_code": "ISIC_C",
       "isic_name": "Mining and quarrying (C)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Mining & quarrying"
     },
     {
       "exio_number": 23,
@@ -219,7 +344,8 @@
       "exio_label": "A_OGPL",
       "isic_code": "ISIC_C",
       "isic_name": "Mining and quarrying (C)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Mining & quarrying"
     },
     {
       "exio_number": 24,
@@ -228,7 +354,8 @@
       "exio_label": "A_ORAN",
       "isic_code": "ISIC_C",
       "isic_name": "Mining and quarrying (C)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Mining & quarrying"
     },
     {
       "exio_number": 25,
@@ -237,7 +364,8 @@
       "exio_label": "A_IRON",
       "isic_code": "ISIC_C",
       "isic_name": "Mining and quarrying (C)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Mining & quarrying"
     },
     {
       "exio_number": 26,
@@ -246,7 +374,8 @@
       "exio_label": "A_COPO",
       "isic_code": "ISIC_C",
       "isic_name": "Mining and quarrying (C)",
-      "consumption_category": "Construction"
+      "consumption_category": "Construction",
+      "display_group": "Mining & quarrying"
     },
     {
       "exio_number": 27,
@@ -255,7 +384,8 @@
       "exio_label": "A_NIKO",
       "isic_code": "ISIC_C",
       "isic_name": "Mining and quarrying (C)",
-      "consumption_category": "Construction"
+      "consumption_category": "Construction",
+      "display_group": "Mining & quarrying"
     },
     {
       "exio_number": 28,
@@ -264,7 +394,8 @@
       "exio_label": "A_ALUO",
       "isic_code": "ISIC_C",
       "isic_name": "Mining and quarrying (C)",
-      "consumption_category": "Construction"
+      "consumption_category": "Construction",
+      "display_group": "Mining & quarrying"
     },
     {
       "exio_number": 29,
@@ -273,7 +404,8 @@
       "exio_label": "A_PREO",
       "isic_code": "ISIC_C",
       "isic_name": "Mining and quarrying (C)",
-      "consumption_category": "Construction"
+      "consumption_category": "Construction",
+      "display_group": "Mining & quarrying"
     },
     {
       "exio_number": 30,
@@ -282,7 +414,8 @@
       "exio_label": "A_LZTO",
       "isic_code": "ISIC_C",
       "isic_name": "Mining and quarrying (C)",
-      "consumption_category": "Construction"
+      "consumption_category": "Construction",
+      "display_group": "Mining & quarrying"
     },
     {
       "exio_number": 31,
@@ -291,7 +424,8 @@
       "exio_label": "A_ONFO",
       "isic_code": "ISIC_C",
       "isic_name": "Mining and quarrying (C)",
-      "consumption_category": "Construction"
+      "consumption_category": "Construction",
+      "display_group": "Mining & quarrying"
     },
     {
       "exio_number": 32,
@@ -300,7 +434,8 @@
       "exio_label": "A_STON",
       "isic_code": "ISIC_C",
       "isic_name": "Mining and quarrying (C)",
-      "consumption_category": "Construction"
+      "consumption_category": "Construction",
+      "display_group": "Mining & quarrying"
     },
     {
       "exio_number": 33,
@@ -309,7 +444,8 @@
       "exio_label": "A_SDCL",
       "isic_code": "ISIC_C",
       "isic_name": "Mining and quarrying (C)",
-      "consumption_category": "Construction"
+      "consumption_category": "Construction",
+      "display_group": "Mining & quarrying"
     },
     {
       "exio_number": 34,
@@ -318,7 +454,8 @@
       "exio_label": "A_CHMF",
       "isic_code": "ISIC_C",
       "isic_name": "Mining and quarrying (C)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Mining & quarrying"
     },
     {
       "exio_number": 35,
@@ -327,7 +464,8 @@
       "exio_label": "A_PCAT",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Food, drink & tobacco"
     },
     {
       "exio_number": 36,
@@ -336,7 +474,8 @@
       "exio_label": "A_PPIG",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Food, drink & tobacco"
     },
     {
       "exio_number": 37,
@@ -345,7 +484,8 @@
       "exio_label": "A_PPLT",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Food, drink & tobacco"
     },
     {
       "exio_number": 38,
@@ -354,7 +494,8 @@
       "exio_label": "A_POME",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Food, drink & tobacco"
     },
     {
       "exio_number": 39,
@@ -363,7 +504,8 @@
       "exio_label": "A_VOIL",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Food, drink & tobacco"
     },
     {
       "exio_number": 40,
@@ -372,7 +514,8 @@
       "exio_label": "A_DAIR",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Food, drink & tobacco"
     },
     {
       "exio_number": 41,
@@ -381,7 +524,8 @@
       "exio_label": "A_RICE",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Food, drink & tobacco"
     },
     {
       "exio_number": 42,
@@ -390,7 +534,8 @@
       "exio_label": "A_SUGR",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Food, drink & tobacco"
     },
     {
       "exio_number": 43,
@@ -399,7 +544,8 @@
       "exio_label": "A_OFOD",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Food, drink & tobacco"
     },
     {
       "exio_number": 44,
@@ -408,7 +554,8 @@
       "exio_label": "A_BEVR",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Food, drink & tobacco"
     },
     {
       "exio_number": 45,
@@ -417,7 +564,8 @@
       "exio_label": "A_FSHP",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Food, drink & tobacco"
     },
     {
       "exio_number": 46,
@@ -426,7 +574,8 @@
       "exio_label": "A_TOBC",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Food, drink & tobacco"
     },
     {
       "exio_number": 47,
@@ -435,7 +584,8 @@
       "exio_label": "A_TEXT",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Clothing"
+      "consumption_category": "Clothing",
+      "display_group": "Textiles, clothing & leather"
     },
     {
       "exio_number": 48,
@@ -444,7 +594,8 @@
       "exio_label": "A_GARM",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Clothing"
+      "consumption_category": "Clothing",
+      "display_group": "Textiles, clothing & leather"
     },
     {
       "exio_number": 49,
@@ -453,7 +604,8 @@
       "exio_label": "A_LETH",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Clothing"
+      "consumption_category": "Clothing",
+      "display_group": "Textiles, clothing & leather"
     },
     {
       "exio_number": 50,
@@ -462,7 +614,8 @@
       "exio_label": "A_WOOD",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Wood, paper & print"
     },
     {
       "exio_number": 51,
@@ -471,7 +624,8 @@
       "exio_label": "A_WOOW",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Wood, paper & print"
     },
     {
       "exio_number": 52,
@@ -480,7 +634,8 @@
       "exio_label": "A_PULP",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Wood, paper & print"
     },
     {
       "exio_number": 53,
@@ -489,7 +644,8 @@
       "exio_label": "A_PAPR",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Wood, paper & print"
     },
     {
       "exio_number": 54,
@@ -498,7 +654,8 @@
       "exio_label": "A_PAPE",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Wood, paper & print"
     },
     {
       "exio_number": 55,
@@ -507,7 +664,8 @@
       "exio_label": "A_MDIA",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Services"
+      "consumption_category": "Services",
+      "display_group": "Wood, paper & print"
     },
     {
       "exio_number": 56,
@@ -516,7 +674,8 @@
       "exio_label": "A_COKE",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Fuels & chemicals"
     },
     {
       "exio_number": 57,
@@ -525,7 +684,8 @@
       "exio_label": "A_REFN",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Mobility"
+      "consumption_category": "Mobility",
+      "display_group": "Fuels & chemicals"
     },
     {
       "exio_number": 58,
@@ -534,7 +694,8 @@
       "exio_label": "A_NUCF",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Fuels & chemicals"
     },
     {
       "exio_number": 59,
@@ -543,7 +704,8 @@
       "exio_label": "A_PLAS",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Fuels & chemicals"
     },
     {
       "exio_number": 60,
@@ -552,7 +714,8 @@
       "exio_label": "A_PLAW",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Fuels & chemicals"
     },
     {
       "exio_number": 61,
@@ -561,7 +724,8 @@
       "exio_label": "A_NFER",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Fuels & chemicals"
     },
     {
       "exio_number": 62,
@@ -570,7 +734,8 @@
       "exio_label": "A_PFER",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Food"
+      "consumption_category": "Food",
+      "display_group": "Fuels & chemicals"
     },
     {
       "exio_number": 63,
@@ -579,7 +744,8 @@
       "exio_label": "A_CHEM",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Fuels & chemicals"
     },
     {
       "exio_number": 64,
@@ -588,7 +754,8 @@
       "exio_label": "A_RUBP",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Fuels & chemicals"
     },
     {
       "exio_number": 65,
@@ -597,7 +764,8 @@
       "exio_label": "A_GLAS",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Construction"
+      "consumption_category": "Construction",
+      "display_group": "Non-metallic minerals"
     },
     {
       "exio_number": 66,
@@ -606,7 +774,8 @@
       "exio_label": "A_GLAW",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Construction"
+      "consumption_category": "Construction",
+      "display_group": "Non-metallic minerals"
     },
     {
       "exio_number": 67,
@@ -615,7 +784,8 @@
       "exio_label": "A_CRMC",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Construction"
+      "consumption_category": "Construction",
+      "display_group": "Non-metallic minerals"
     },
     {
       "exio_number": 68,
@@ -624,7 +794,8 @@
       "exio_label": "A_BRIK",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Construction"
+      "consumption_category": "Construction",
+      "display_group": "Non-metallic minerals"
     },
     {
       "exio_number": 69,
@@ -633,7 +804,8 @@
       "exio_label": "A_CMNT",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Construction"
+      "consumption_category": "Construction",
+      "display_group": "Non-metallic minerals"
     },
     {
       "exio_number": 70,
@@ -642,7 +814,8 @@
       "exio_label": "A_ASHW",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Construction"
+      "consumption_category": "Construction",
+      "display_group": "Non-metallic minerals"
     },
     {
       "exio_number": 71,
@@ -651,7 +824,8 @@
       "exio_label": "A_ONMM",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Construction"
+      "consumption_category": "Construction",
+      "display_group": "Non-metallic minerals"
     },
     {
       "exio_number": 72,
@@ -660,7 +834,8 @@
       "exio_label": "A_STEL",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Metals & metal products"
     },
     {
       "exio_number": 73,
@@ -669,7 +844,8 @@
       "exio_label": "A_STEW",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Metals & metal products"
     },
     {
       "exio_number": 74,
@@ -678,7 +854,8 @@
       "exio_label": "A_PREM",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Metals & metal products"
     },
     {
       "exio_number": 75,
@@ -687,7 +864,8 @@
       "exio_label": "A_PREW",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Metals & metal products"
     },
     {
       "exio_number": 76,
@@ -696,7 +874,8 @@
       "exio_label": "A_ALUM",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Metals & metal products"
     },
     {
       "exio_number": 77,
@@ -705,7 +884,8 @@
       "exio_label": "A_ALUW",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Metals & metal products"
     },
     {
       "exio_number": 78,
@@ -714,7 +894,8 @@
       "exio_label": "A_LZTP",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Metals & metal products"
     },
     {
       "exio_number": 79,
@@ -723,7 +904,8 @@
       "exio_label": "A_LZTW",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Metals & metal products"
     },
     {
       "exio_number": 80,
@@ -732,7 +914,8 @@
       "exio_label": "A_COPP",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Metals & metal products"
     },
     {
       "exio_number": 81,
@@ -741,7 +924,8 @@
       "exio_label": "A_COPW",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Metals & metal products"
     },
     {
       "exio_number": 82,
@@ -750,7 +934,8 @@
       "exio_label": "A_ONFM",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Metals & metal products"
     },
     {
       "exio_number": 83,
@@ -759,7 +944,8 @@
       "exio_label": "A_ONFW",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Metals & metal products"
     },
     {
       "exio_number": 84,
@@ -768,7 +954,8 @@
       "exio_label": "A_METC",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Metals & metal products"
     },
     {
       "exio_number": 85,
@@ -777,7 +964,8 @@
       "exio_label": "A_FABM",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Metals & metal products"
     },
     {
       "exio_number": 86,
@@ -786,7 +974,8 @@
       "exio_label": "A_MACH",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Machinery, electronics & vehicles"
     },
     {
       "exio_number": 87,
@@ -795,7 +984,8 @@
       "exio_label": "A_OFMA",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Machinery, electronics & vehicles"
     },
     {
       "exio_number": 88,
@@ -804,7 +994,8 @@
       "exio_label": "A_ELMA",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Machinery, electronics & vehicles"
     },
     {
       "exio_number": 89,
@@ -813,7 +1004,8 @@
       "exio_label": "A_RATV",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Machinery, electronics & vehicles"
     },
     {
       "exio_number": 90,
@@ -822,7 +1014,8 @@
       "exio_label": "A_MEIN",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Machinery, electronics & vehicles"
     },
     {
       "exio_number": 91,
@@ -831,7 +1024,8 @@
       "exio_label": "A_MOTO",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Machinery, electronics & vehicles"
     },
     {
       "exio_number": 92,
@@ -840,7 +1034,8 @@
       "exio_label": "A_OTRE",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Machinery, electronics & vehicles"
     },
     {
       "exio_number": 93,
@@ -849,7 +1044,8 @@
       "exio_label": "A_FURN",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Machinery, electronics & vehicles"
     },
     {
       "exio_number": 94,
@@ -858,7 +1054,8 @@
       "exio_label": "A_RYMS",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Waste, recycling & water treatment"
     },
     {
       "exio_number": 95,
@@ -867,7 +1064,8 @@
       "exio_label": "A_BOTW",
       "isic_code": "ISIC_D",
       "isic_name": "Manufacturing (D)",
-      "consumption_category": "Manufactured_products"
+      "consumption_category": "Manufactured_products",
+      "display_group": "Waste, recycling & water treatment"
     },
     {
       "exio_number": 96,
@@ -876,7 +1074,8 @@
       "exio_label": "A_POWC",
       "isic_code": "ISIC_E",
       "isic_name": "Electricity, gas and water supply (E)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Electricity, gas & water supply"
     },
     {
       "exio_number": 97,
@@ -885,7 +1084,8 @@
       "exio_label": "A_POWG",
       "isic_code": "ISIC_E",
       "isic_name": "Electricity, gas and water supply (E)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Electricity, gas & water supply"
     },
     {
       "exio_number": 98,
@@ -894,7 +1094,8 @@
       "exio_label": "A_POWN",
       "isic_code": "ISIC_E",
       "isic_name": "Electricity, gas and water supply (E)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Electricity, gas & water supply"
     },
     {
       "exio_number": 99,
@@ -903,7 +1104,8 @@
       "exio_label": "A_POWH",
       "isic_code": "ISIC_E",
       "isic_name": "Electricity, gas and water supply (E)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Electricity, gas & water supply"
     },
     {
       "exio_number": 100,
@@ -912,7 +1114,8 @@
       "exio_label": "A_POWW",
       "isic_code": "ISIC_E",
       "isic_name": "Electricity, gas and water supply (E)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Electricity, gas & water supply"
     },
     {
       "exio_number": 101,
@@ -921,7 +1124,8 @@
       "exio_label": "A_POWP",
       "isic_code": "ISIC_E",
       "isic_name": "Electricity, gas and water supply (E)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Electricity, gas & water supply"
     },
     {
       "exio_number": 102,
@@ -930,7 +1134,8 @@
       "exio_label": "A_POWB",
       "isic_code": "ISIC_E",
       "isic_name": "Electricity, gas and water supply (E)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Electricity, gas & water supply"
     },
     {
       "exio_number": 103,
@@ -939,7 +1144,8 @@
       "exio_label": "A_POWS",
       "isic_code": "ISIC_E",
       "isic_name": "Electricity, gas and water supply (E)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Electricity, gas & water supply"
     },
     {
       "exio_number": 104,
@@ -948,7 +1154,8 @@
       "exio_label": "A_POWE",
       "isic_code": "ISIC_E",
       "isic_name": "Electricity, gas and water supply (E)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Electricity, gas & water supply"
     },
     {
       "exio_number": 105,
@@ -957,7 +1164,8 @@
       "exio_label": "A_POWO",
       "isic_code": "ISIC_E",
       "isic_name": "Electricity, gas and water supply (E)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Electricity, gas & water supply"
     },
     {
       "exio_number": 106,
@@ -966,7 +1174,8 @@
       "exio_label": "A_POWM",
       "isic_code": "ISIC_E",
       "isic_name": "Electricity, gas and water supply (E)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Electricity, gas & water supply"
     },
     {
       "exio_number": 107,
@@ -975,7 +1184,8 @@
       "exio_label": "A_POWZ",
       "isic_code": "ISIC_E",
       "isic_name": "Electricity, gas and water supply (E)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Electricity, gas & water supply"
     },
     {
       "exio_number": 108,
@@ -984,7 +1194,8 @@
       "exio_label": "A_POWT",
       "isic_code": "ISIC_E",
       "isic_name": "Electricity, gas and water supply (E)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Electricity, gas & water supply"
     },
     {
       "exio_number": 109,
@@ -993,7 +1204,8 @@
       "exio_label": "A_POWD",
       "isic_code": "ISIC_E",
       "isic_name": "Electricity, gas and water supply (E)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Electricity, gas & water supply"
     },
     {
       "exio_number": 110,
@@ -1002,7 +1214,8 @@
       "exio_label": "A_GASD",
       "isic_code": "ISIC_E",
       "isic_name": "Electricity, gas and water supply (E)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Electricity, gas & water supply"
     },
     {
       "exio_number": 111,
@@ -1011,7 +1224,8 @@
       "exio_label": "A_HWAT",
       "isic_code": "ISIC_E",
       "isic_name": "Electricity, gas and water supply (E)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Electricity, gas & water supply"
     },
     {
       "exio_number": 112,
@@ -1020,7 +1234,8 @@
       "exio_label": "A_WATR",
       "isic_code": "ISIC_E",
       "isic_name": "Electricity, gas and water supply (E)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Electricity, gas & water supply"
     },
     {
       "exio_number": 113,
@@ -1029,7 +1244,8 @@
       "exio_label": "A_CONS",
       "isic_code": "ISIC_F",
       "isic_name": "Construction (F)",
-      "consumption_category": "Construction"
+      "consumption_category": "Construction",
+      "display_group": "Construction"
     },
     {
       "exio_number": 114,
@@ -1038,7 +1254,8 @@
       "exio_label": "A_CONW",
       "isic_code": "ISIC_F",
       "isic_name": "Construction (F)",
-      "consumption_category": "Construction"
+      "consumption_category": "Construction",
+      "display_group": "Construction"
     },
     {
       "exio_number": 115,
@@ -1047,7 +1264,8 @@
       "exio_label": "A_TDMO",
       "isic_code": "ISIC_G_H",
       "isic_name": "Wholesale retail trade, repair of motor vehicles, motorcycles, etc.; hotels and restaurants (G+H)",
-      "consumption_category": "Trade"
+      "consumption_category": "Trade",
+      "display_group": "Wholesale, retail & hospitality"
     },
     {
       "exio_number": 116,
@@ -1056,7 +1274,8 @@
       "exio_label": "A_TDFU",
       "isic_code": "ISIC_G_H",
       "isic_name": "Wholesale retail trade, repair of motor vehicles, motorcycles, etc.; hotels and restaurants (G+H)",
-      "consumption_category": "Trade"
+      "consumption_category": "Trade",
+      "display_group": "Wholesale, retail & hospitality"
     },
     {
       "exio_number": 117,
@@ -1065,7 +1284,8 @@
       "exio_label": "A_TDWH",
       "isic_code": "ISIC_G_H",
       "isic_name": "Wholesale retail trade, repair of motor vehicles, motorcycles, etc.; hotels and restaurants (G+H)",
-      "consumption_category": "Trade"
+      "consumption_category": "Trade",
+      "display_group": "Wholesale, retail & hospitality"
     },
     {
       "exio_number": 118,
@@ -1074,7 +1294,8 @@
       "exio_label": "A_TDRT",
       "isic_code": "ISIC_G_H",
       "isic_name": "Wholesale retail trade, repair of motor vehicles, motorcycles, etc.; hotels and restaurants (G+H)",
-      "consumption_category": "Trade"
+      "consumption_category": "Trade",
+      "display_group": "Wholesale, retail & hospitality"
     },
     {
       "exio_number": 119,
@@ -1083,7 +1304,8 @@
       "exio_label": "A_HORE",
       "isic_code": "ISIC_G_H",
       "isic_name": "Wholesale retail trade, repair of motor vehicles, motorcycles, etc.; hotels and restaurants (G+H)",
-      "consumption_category": "Services"
+      "consumption_category": "Services",
+      "display_group": "Wholesale, retail & hospitality"
     },
     {
       "exio_number": 120,
@@ -1092,7 +1314,8 @@
       "exio_label": "A_TRAI",
       "isic_code": "ISIC_I",
       "isic_name": "Transport, storage and communications (I)",
-      "consumption_category": "Mobility"
+      "consumption_category": "Mobility",
+      "display_group": "Transport, storage & communications"
     },
     {
       "exio_number": 121,
@@ -1101,7 +1324,8 @@
       "exio_label": "A_TLND",
       "isic_code": "ISIC_I",
       "isic_name": "Transport, storage and communications (I)",
-      "consumption_category": "Mobility"
+      "consumption_category": "Mobility",
+      "display_group": "Transport, storage & communications"
     },
     {
       "exio_number": 122,
@@ -1110,7 +1334,8 @@
       "exio_label": "A_TPIP",
       "isic_code": "ISIC_I",
       "isic_name": "Transport, storage and communications (I)",
-      "consumption_category": "Mobility"
+      "consumption_category": "Mobility",
+      "display_group": "Transport, storage & communications"
     },
     {
       "exio_number": 123,
@@ -1119,7 +1344,8 @@
       "exio_label": "A_TWAS",
       "isic_code": "ISIC_I",
       "isic_name": "Transport, storage and communications (I)",
-      "consumption_category": "Mobility"
+      "consumption_category": "Mobility",
+      "display_group": "Transport, storage & communications"
     },
     {
       "exio_number": 124,
@@ -1128,7 +1354,8 @@
       "exio_label": "A_TWAI",
       "isic_code": "ISIC_I",
       "isic_name": "Transport, storage and communications (I)",
-      "consumption_category": "Mobility"
+      "consumption_category": "Mobility",
+      "display_group": "Transport, storage & communications"
     },
     {
       "exio_number": 125,
@@ -1137,7 +1364,8 @@
       "exio_label": "A_TAIR",
       "isic_code": "ISIC_I",
       "isic_name": "Transport, storage and communications (I)",
-      "consumption_category": "Mobility"
+      "consumption_category": "Mobility",
+      "display_group": "Transport, storage & communications"
     },
     {
       "exio_number": 126,
@@ -1146,7 +1374,8 @@
       "exio_label": "A_TAUX",
       "isic_code": "ISIC_I",
       "isic_name": "Transport, storage and communications (I)",
-      "consumption_category": "Mobility"
+      "consumption_category": "Mobility",
+      "display_group": "Transport, storage & communications"
     },
     {
       "exio_number": 127,
@@ -1155,7 +1384,8 @@
       "exio_label": "A_PTEL",
       "isic_code": "ISIC_I",
       "isic_name": "Transport, storage and communications (I)",
-      "consumption_category": "Mobility"
+      "consumption_category": "Mobility",
+      "display_group": "Transport, storage & communications"
     },
     {
       "exio_number": 128,
@@ -1164,7 +1394,8 @@
       "exio_label": "A_FINT",
       "isic_code": "ISIC_J_K",
       "isic_name": "Financial intermediation; real estate, renting and business activities (J+K)",
-      "consumption_category": "Services"
+      "consumption_category": "Services",
+      "display_group": "Finance, real estate & business services"
     },
     {
       "exio_number": 129,
@@ -1173,7 +1404,8 @@
       "exio_label": "A_FINS",
       "isic_code": "ISIC_J_K",
       "isic_name": "Financial intermediation; real estate, renting and business activities (J+K)",
-      "consumption_category": "Services"
+      "consumption_category": "Services",
+      "display_group": "Finance, real estate & business services"
     },
     {
       "exio_number": 130,
@@ -1182,7 +1414,8 @@
       "exio_label": "A_FAUX",
       "isic_code": "ISIC_J_K",
       "isic_name": "Financial intermediation; real estate, renting and business activities (J+K)",
-      "consumption_category": "Services"
+      "consumption_category": "Services",
+      "display_group": "Finance, real estate & business services"
     },
     {
       "exio_number": 131,
@@ -1191,7 +1424,8 @@
       "exio_label": "A_REAL",
       "isic_code": "ISIC_J_K",
       "isic_name": "Financial intermediation; real estate, renting and business activities (J+K)",
-      "consumption_category": "Services"
+      "consumption_category": "Services",
+      "display_group": "Finance, real estate & business services"
     },
     {
       "exio_number": 132,
@@ -1200,7 +1434,8 @@
       "exio_label": "A_MARE",
       "isic_code": "ISIC_J_K",
       "isic_name": "Financial intermediation; real estate, renting and business activities (J+K)",
-      "consumption_category": "Services"
+      "consumption_category": "Services",
+      "display_group": "Finance, real estate & business services"
     },
     {
       "exio_number": 133,
@@ -1209,7 +1444,8 @@
       "exio_label": "A_COMP",
       "isic_code": "ISIC_J_K",
       "isic_name": "Financial intermediation; real estate, renting and business activities (J+K)",
-      "consumption_category": "Services"
+      "consumption_category": "Services",
+      "display_group": "Finance, real estate & business services"
     },
     {
       "exio_number": 134,
@@ -1218,7 +1454,8 @@
       "exio_label": "A_RESD",
       "isic_code": "ISIC_J_K",
       "isic_name": "Financial intermediation; real estate, renting and business activities (J+K)",
-      "consumption_category": "Services"
+      "consumption_category": "Services",
+      "display_group": "Finance, real estate & business services"
     },
     {
       "exio_number": 135,
@@ -1227,7 +1464,8 @@
       "exio_label": "A_OBUS",
       "isic_code": "ISIC_J_K",
       "isic_name": "Financial intermediation; real estate, renting and business activities (J+K)",
-      "consumption_category": "Services"
+      "consumption_category": "Services",
+      "display_group": "Finance, real estate & business services"
     },
     {
       "exio_number": 136,
@@ -1236,7 +1474,8 @@
       "exio_label": "A_PADF",
       "isic_code": "ISIC_L",
       "isic_name": "Public administration and defense; compulsory social security (L)",
-      "consumption_category": "Services"
+      "consumption_category": "Services",
+      "display_group": "Public administration & defence"
     },
     {
       "exio_number": 137,
@@ -1245,7 +1484,8 @@
       "exio_label": "A_EDUC",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Services"
+      "consumption_category": "Services",
+      "display_group": "Education, health & other services"
     },
     {
       "exio_number": 138,
@@ -1254,7 +1494,8 @@
       "exio_label": "A_HEAL",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Services"
+      "consumption_category": "Services",
+      "display_group": "Education, health & other services"
     },
     {
       "exio_number": 139,
@@ -1263,7 +1504,8 @@
       "exio_label": "A_INCF",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Waste, recycling & water treatment"
     },
     {
       "exio_number": 140,
@@ -1272,7 +1514,8 @@
       "exio_label": "A_INCP",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Waste, recycling & water treatment"
     },
     {
       "exio_number": 141,
@@ -1281,7 +1524,8 @@
       "exio_label": "A_INCL",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Waste, recycling & water treatment"
     },
     {
       "exio_number": 142,
@@ -1290,7 +1534,8 @@
       "exio_label": "A_INCM",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Waste, recycling & water treatment"
     },
     {
       "exio_number": 143,
@@ -1299,7 +1544,8 @@
       "exio_label": "A_INCT",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Waste, recycling & water treatment"
     },
     {
       "exio_number": 144,
@@ -1308,7 +1554,8 @@
       "exio_label": "A_INCW",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Waste, recycling & water treatment"
     },
     {
       "exio_number": 145,
@@ -1317,7 +1564,8 @@
       "exio_label": "A_INCO",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Waste, recycling & water treatment"
     },
     {
       "exio_number": 146,
@@ -1326,7 +1574,8 @@
       "exio_label": "A_BIOF",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Waste, recycling & water treatment"
     },
     {
       "exio_number": 147,
@@ -1335,7 +1584,8 @@
       "exio_label": "A_BIOP",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Waste, recycling & water treatment"
     },
     {
       "exio_number": 148,
@@ -1344,7 +1594,8 @@
       "exio_label": "A_BIOS",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Waste, recycling & water treatment"
     },
     {
       "exio_number": 149,
@@ -1353,7 +1604,8 @@
       "exio_label": "A_COMF",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Waste, recycling & water treatment"
     },
     {
       "exio_number": 150,
@@ -1362,7 +1614,8 @@
       "exio_label": "A_COMW",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Waste, recycling & water treatment"
     },
     {
       "exio_number": 151,
@@ -1371,7 +1624,8 @@
       "exio_label": "A_WASF",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Waste, recycling & water treatment"
     },
     {
       "exio_number": 152,
@@ -1380,7 +1634,8 @@
       "exio_label": "A_WASO",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Waste, recycling & water treatment"
     },
     {
       "exio_number": 153,
@@ -1389,7 +1644,8 @@
       "exio_label": "A_LANF",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Waste, recycling & water treatment"
     },
     {
       "exio_number": 154,
@@ -1398,7 +1654,8 @@
       "exio_label": "A_LANP",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Waste, recycling & water treatment"
     },
     {
       "exio_number": 155,
@@ -1407,7 +1664,8 @@
       "exio_label": "A_LANL",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Waste, recycling & water treatment"
     },
     {
       "exio_number": 156,
@@ -1416,7 +1674,8 @@
       "exio_label": "A_LANI",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Waste, recycling & water treatment"
     },
     {
       "exio_number": 157,
@@ -1425,7 +1684,8 @@
       "exio_label": "A_LANT",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Waste, recycling & water treatment"
     },
     {
       "exio_number": 158,
@@ -1434,7 +1694,8 @@
       "exio_label": "A_LANW",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Waste, recycling & water treatment"
     },
     {
       "exio_number": 159,
@@ -1443,7 +1704,8 @@
       "exio_label": "A_ORGA",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Services"
+      "consumption_category": "Services",
+      "display_group": "Education, health & other services"
     },
     {
       "exio_number": 160,
@@ -1452,7 +1714,8 @@
       "exio_label": "A_RECR",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Services"
+      "consumption_category": "Services",
+      "display_group": "Education, health & other services"
     },
     {
       "exio_number": 161,
@@ -1461,7 +1724,8 @@
       "exio_label": "A_OSER",
       "isic_code": "ISIC_M_N_O",
       "isic_name": "Education; health and social work; other community, social and personal services (M+N+O)",
-      "consumption_category": "Services"
+      "consumption_category": "Services",
+      "display_group": "Education, health & other services"
     },
     {
       "exio_number": 162,
@@ -1470,7 +1734,8 @@
       "exio_label": "A_PRHH",
       "isic_code": "ISIC_P",
       "isic_name": "Private households with employed persons (P)",
-      "consumption_category": "Shelter"
+      "consumption_category": "Shelter",
+      "display_group": "Households as employers"
     },
     {
       "exio_number": 163,
@@ -1479,7 +1744,8 @@
       "exio_label": "A_EXTO",
       "isic_code": "ISIC_L",
       "isic_name": "Public administration and defense; compulsory social security (L)",
-      "consumption_category": "Services"
+      "consumption_category": "Services",
+      "display_group": "Public administration & defence"
     }
   ],
   "products": [
