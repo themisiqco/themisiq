@@ -146,12 +146,15 @@ export interface SpendFactorSource {
    * Any unit normalisation applied between the published file and a SpendFactor, stated in full.
    * Null means none was needed.
    *
-   * WARNING: THIS IS NOT ONE OF THE THREE CONVERSIONS THIS MODULE REFUSES, and the distinction is
-   * the point of the field. FX, deflation and basis conversion each change WHICH QUANTITY is being
-   * expressed - a different currency, a different year's prices, a different valuation - and each
-   * needs a judgement or an external table, so each is reported as a caveat and never applied. A
-   * unit normalisation changes only THE UNIT THE SAME QUANTITY IS WRITTEN IN. It is arithmetic
-   * with no judgement in it. It is recorded here rather than left implicit because a reader
+   * WARNING: THE TEST FOR BELONGING HERE IS NO EXTERNAL INPUT AND NO CHOICE - not "changes the unit
+   * rather than the quantity", which is the wrong test and lets FX through, since converting USD to
+   * EUR also leaves the purchase it describes unchanged. A unit normalisation needs no data beyond
+   * the number itself and admits one correct answer; FX needs a rate, deflation needs a price index
+   * and basis conversion needs margin matrices, and each of those is a choice that changes the
+   * figure, so none may be applied on this module's own authority. Deflation IS performed, by
+   * lib/emissionFactors/spendAdjustment.ts, on a caller-supplied index and against the SPEND rather
+   * than the factor - the authority is the caller's, which is the same arrangement as
+   * SpendFactorQuery.fallback_regions. Recorded here rather than left implicit because a reader
    * comparing a resolved value against the published file must be able to see why they differ.
    */
   unit_conversion: string | null
