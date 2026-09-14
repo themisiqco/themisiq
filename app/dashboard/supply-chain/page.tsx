@@ -438,12 +438,38 @@ function SupplyChainDashboardInner() {
       header: true, skipEmptyLines: true,
       complete: (results) => {
         const rows = results.data as any[]
-        const suppliers: Supplier[] = rows.map(row => {
+        const suppliers: Supplier[] = []
+        const rejected: string[] = []
+
+        rows.forEach((row, i) => {
+          // header: true, so data index 0 is the SECOND line of the file. Report the number the
+          // customer sees in their spreadsheet, not the array index.
+          const line = i + 2
+          const sector = String(row['Sector'] || row['sector'] || row['Category'] || '').trim()
+
+          // ⚠️ NO DEFAULT SECTOR, AND THAT IS THE WHOLE POINT OF THIS CHECK. A file with no sector
+          // column used to make every row 'Professional Services' — the lowest factor in
+          // SECTOR_RISK, against a range topping out 40x higher — producing a complete,
+          // confident-looking register priced at the bottom of the scale with nothing on screen
+          // saying a substitution had happened. An unrecognised string was quieter still: it reached
+          // scoreSupplier's 'Unknown — assess manually' fallback, which prices at 0.5 and does say
+          // so, but only in a per-supplier risk-factor list the customer has no reason to re-read
+          // after an import they were told nothing about.
+          // Object.hasOwn, not `in`: 'constructor' and 'toString' are `in` every object literal.
+          if (!sector) {
+            rejected.push(`row ${line}: no sector`)
+            return
+          }
+          if (!Object.hasOwn(SECTOR_RISK, sector)) {
+            rejected.push(`row ${line}: "${sector}"`)
+            return
+          }
+
           const base: Supplier = {
             id: Math.random().toString(36).slice(2),
             name: row['Supplier'] || row['supplier'] || row['Name'] || row['name'] || '',
             country: row['Country'] || row['country'] || 'Germany',
-            sector: row['Sector'] || row['sector'] || row['Category'] || 'Professional Services',
+            sector,
             annual_spend: Number(row['Annual Spend'] || row['annual_spend'] || row['Spend'] || 0),
             currency: row['Currency'] || row['currency'] || 'USD',
             tier: (row['Tier'] || row['tier'] || '1') as '1' | '2' | '3',
@@ -451,8 +477,23 @@ function SupplyChainDashboardInner() {
             risk_level: 'low', risk_score: 0, risk_factors: [], scope3_emissions: 0,
           }
           const result = scoreSupplier(base)
-          return { ...base, risk_level: result.risk, risk_score: result.score, risk_factors: result.factors, scope3_emissions: result.scope3 }
+          suppliers.push({ ...base, risk_level: result.risk, risk_score: result.score, risk_factors: result.factors, scope3_emissions: result.scope3 })
         })
+
+        if (rejected.length > 0) {
+          // Reuses the save banner — the one error surface this page has. Capped at five rows named:
+          // a file with no sector column rejects every row, and a 200-line banner is not read.
+          const shown = rejected.slice(0, 5).join('; ')
+          const more = rejected.length > 5 ? ` and ${rejected.length - 5} more` : ''
+          setSaveError(
+            `Imported ${suppliers.length} supplier${suppliers.length === 1 ? '' : 's'}. ` +
+            `Skipped ${rejected.length} with a sector that is not on the list — ${shown}${more}. ` +
+            'Set those rows to one of the sectors in the dropdown and upload again, or add them by hand.'
+          )
+        } else {
+          setSaveError(null)
+        }
+
         if (suppliers.length > 0) {
           setInventory(prev => ({ ...prev, suppliers }))
           setActiveSupplier(0)
