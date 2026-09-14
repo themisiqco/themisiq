@@ -142,6 +142,19 @@ export interface SpendFactorSource {
   licence: string | null
   /** The classification system the publisher tabulates against, in the publisher's own words. */
   classification: string | null
+  /**
+   * Any unit normalisation applied between the published file and a SpendFactor, stated in full.
+   * Null means none was needed.
+   *
+   * WARNING: THIS IS NOT ONE OF THE THREE CONVERSIONS THIS MODULE REFUSES, and the distinction is
+   * the point of the field. FX, deflation and basis conversion each change WHICH QUANTITY is being
+   * expressed - a different currency, a different year's prices, a different valuation - and each
+   * needs a judgement or an external table, so each is reported as a caveat and never applied. A
+   * unit normalisation changes only THE UNIT THE SAME QUANTITY IS WRITTEN IN. It is arithmetic
+   * with no judgement in it. It is recorded here rather than left implicit because a reader
+   * comparing a resolved value against the published file must be able to see why they differ.
+   */
+  unit_conversion: string | null
   /** Anything a reader must know before treating this source as a spend-based factor set. */
   note: string | null
 }
@@ -156,6 +169,7 @@ export const SPEND_EF_SOURCES: Record<SpendSourceId, SpendFactorSource> = {
     doi: null,
     licence: null,
     classification: null,
+    unit_conversion: null,
     note:
       'The EPA landing page states the model "melds data on economic transactions between 389 ' +
       'industry sectors" but names no current version, no release date and no classification. ' +
@@ -173,6 +187,7 @@ export const SPEND_EF_SOURCES: Record<SpendSourceId, SpendFactorSource> = {
     doi: null,
     licence: null,
     classification: null,
+    unit_conversion: null,
     note:
       'The multiplier series to use is the DIRECT PLUS INDIRECT greenhouse gas emissions intensity ' +
       'published in catalogue 16-509-X, in tonnes per thousand current dollars of production. ' +
@@ -195,6 +210,12 @@ export const SPEND_EF_SOURCES: Record<SpendSourceId, SpendFactorSource> = {
     doi: '10.5281/zenodo.5589597',
     licence: 'CC BY-SA 4.0',
     classification: null,
+    unit_conversion:
+      'Divided by 1e6. The published files record kg CO2 eq. per MILLION EUR - impacts/unit.txt ' +
+      'gives the numerator only, and the archive root unit.txt reports M.EUR for every ' +
+      'region-sector pair - while SpendFactorUnit is per ONE currency unit. The stored files are ' +
+      'unchanged; the division happens in the resolver at the point a raw row becomes a ' +
+      'SpendFactor, which is the first point at which the type asserts a unit.',
     note:
       'Multipliers are in M.txt inside the IOT_YYYY_*.zip archives; they are not a separate ' +
       'download. Resolution is 163 industries by 200 products, covering 44 countries (28 EU ' +
@@ -227,6 +248,17 @@ export interface SpendFactorQuery {
   /** The basis the caller's spend figure is on. Required for the same reason price_basis is
    *  required on the factor: without it the mismatch cannot be detected, only assumed away. */
   spend_price_basis: PriceBasis
+  /**
+   * Regions to try, in order, when `region` itself has no factor. OMIT FOR NO FALLBACK.
+   *
+   * WARNING: THE RESOLVER INVENTS NO GEOGRAPHY, AND THE OMISSION IS DELIBERATE. EXIOBASE carries
+   * five rest-of-world regions - WA, WL, WE, WF, WM - and mapping a country to one of them is a
+   * methodological choice with no published basis in this module. Building that table here would
+   * make every fallback the resolver's decision rather than someone's, which is the silent
+   * substitution the discriminated return type exists to prevent. Absent this field a missing
+   * region returns null, and null is a legitimate answer.
+   */
+  fallback_regions?: readonly string[]
 }
 
 /** Why a factor other than the exact requested one was returned. One member per reason, so a new
@@ -262,6 +294,22 @@ export interface SpendFactorCaveats {
    * those "no local bound" means UNBOUNDED, never "in range".
    */
   outside_reliability_bounds: boolean
+  /**
+   * The per-sector bound could not be evaluated, so only the global one was applied.
+   *
+   * WARNING: A BOOLEAN CANNOT CARRY THREE STATES, AND THE THIRD ONE IS THE DANGEROUS ONE. Seven
+   * industries and two products have too few non-zero regions for a p5/p95 to mean anything, so
+   * they carry no local bound at all. For those, `outside_reliability_bounds: false` means "the
+   * global check passed and the local check COULD NOT BE MADE" - it does not mean in range, and a
+   * caller that reads it as in range has been told something nobody established.
+   *
+   * Same shape and same reasoning as FactorEditionState in lib/ghg/factorEditions.ts, which is a
+   * three-member union rather than a boolean because a boolean there was hiding "we never recorded
+   * it" behind "they agree". Kept as a second flag rather than widening
+   * outside_reliability_bounds to a union, because the contract fixes that field as a boolean and
+   * callers written against it must keep compiling.
+   */
+  reliability_bounds_incomplete: boolean
 }
 
 export type SpendFactorResult =
@@ -290,45 +338,21 @@ export type SpendFactorResult =
       caveats: SpendFactorCaveats
     }
 
-/**
- * Resolve one spend-based factor, with its provenance.
- *
- * ⚠️ RETURNS null WHEN THERE IS NO FACTOR, AND THERE IS NO DEFAULT IN THIS MODULE. That is the
- * single most important line in the file. lib/emissionFactors.ts has DEFAULT_SPEND_EF, and
- * app/dashboard/scope3/page.tsx has a literal fallback inside calcGenericSpend; both turn "we do
- * not know" into a number that renders identically to one we do know. A null forces the caller to
- * decide what to show, and "we cannot price this" is a legitimate thing to show.
- *
- * The contract:
- *   - exact region match is preferred and returns kind 'exact'
- *   - a factor from another region returns kind 'fallback', naming used_region and carrying a
- *     disclosure sentence; the discriminated union means TypeScript will not let a caller reach
- *     .factor without narrowing on .kind, so a substitution cannot pass silently
- *   - the full provenance record and its source entry are returned alongside the value; a caller
- *     that wants only the number still receives the rest
- *   - currency, price-year and price-basis mismatches are REPORTED, never corrected here. FX
- *     belongs to a conversion step the customer can see; deflation belongs to a documented index;
- *     a basis conversion belongs to the publisher's own margin and tax matrices. None of the three
- *     is a coefficient this resolver may apply on its own authority
- *   - no factor at all returns null
- *
- * ⚠️ A ZERO-VALUED FACTOR RESOLVES TO null. IT IS AN ABSENT FACTOR, NOT A FACTOR OF ZERO.
- * EXIOBASE is built from national supply-use tables, and where a country or sector has insufficient
- * economic data the cell is empty rather than nil - 1,108 of 7,987 cells in the 2019 ixi extract,
- * and they are structured rather than scattered: three industries are zero in all 49 regions, and
- * Indonesia, Cyprus, Luxembourg, South Africa and India head the per-region counts. Returning 0.0
- * would report NO EMISSIONS for a real purchase, which is worse than reporting nothing: a customer
- * can act on "we cannot price this" and cannot act on a confident zero. This is one of the cases
- * that reaches the null above; it is not a separate branch and there is still no default.
- *
- * ⚠️ A FALLBACK RESULT THAT ALSO SITS OUTSIDE THE BOUNDS MUST SAY BOTH THINGS IN ITS DISCLOSURE.
- * `disclosure` on the fallback arm is required prose, and when caveats.outside_reliability_bounds
- * is true on that same result the sentence must name the substituted region AND the fact that the
- * value is in the tail. Two compounding weaknesses reported as one is a weaker claim than the
- * reader is entitled to: a factor borrowed from another region is already a substitution, and a
- * borrowed factor that is also an outlier for its industry is a different order of uncertainty.
- */
-export declare function resolveSpendFactor(query: SpendFactorQuery): SpendFactorResult | null
+// ── THE RESOLVER LIVES IN spendResolver.server.ts ────────────────────────────────────────────────
+//
+// Its full contract - every rule the implementation must follow - is the doc comment on
+// resolveSpendFactor in lib/emissionFactors/spendResolver.server.ts. It is stated there rather than
+// here so it sits against the code that has to honour it.
+//
+// WARNING: THIS FILE HELD `export declare function resolveSpendFactor(...)` UNTIL THE
+// IMPLEMENTATION EXISTED, AND THAT WAS A LANDMINE. A `declare`d function with no implementation
+// type-checks at every call site and throws at runtime, so the compiler actively hid the fact that
+// nothing backed it. The declaration is gone; the types above are the contract, and the
+// implementation imports them.
+//
+// WARNING: THE SPLIT IS NOT TIDINESS. This file is client-safe - types, a small source catalogue,
+// no data. The resolver imports 2.17 MB of factor JSON and must never reach a browser bundle, so
+// it lives in a file named .server.ts and is imported only from server code.
 
 // ── NOT YET WIRED ────────────────────────────────────────────────────────────────────────────────
 //
