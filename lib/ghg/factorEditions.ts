@@ -345,7 +345,25 @@ export function factorEditionsForSave(
   return Object.keys(fresh).length > 0 ? fresh : (stored ?? {})
 }
 
-/** Do two inventories name the same editions? The comparison behind factorEditionState. */
+/**
+ * Do two inventories name the same editions? The comparison behind factorEditionState.
+ *
+ * ⚠️ BY EDITION LABEL, NOT BY CITATION, SINCE 17 SEP 2026. The label identifies an edition; the
+ * citation is prose ABOUT it, and prose gets reworded without the edition changing. Comparing
+ * citations turned every rewording into a false "Emission factors changed between years" for any
+ * series saved on both sides of it — and that had already happened twice before it was caught:
+ *   combustion_eu  reworded twice on 14 Aug 2026 (cb8928e, ab60e4b), a day after this column began
+ *                  recording (e709a34, 13 Aug) — label 'IPCC 2006' unchanged throughout
+ *   steam_uk       canonicalised 17 Sep 2026 to defraCitation(2026) — label 'DEFRA 2026' unchanged
+ * No label has been reworded since the column began recording: each was introduced once and only
+ * ever moved between files byte-identically (ccbca10, 54e6c3a).
+ *
+ * ⚠️ WHAT THIS GIVES UP, WRITTEN DOWN. A label is only as specific as it is written. Electricity's is
+ * the usedYear alone ('2026'), which identifies an edition only because each jurisdiction's grid
+ * factors come from ONE publisher. If a jurisdiction ever took grid factors from a second publisher
+ * with the same year, two different editions would compare equal here. The fix then is a more
+ * specific label — never a return to comparing prose.
+ */
 export function sameFactorEditions(a: FactorEditions, b: FactorEditions): boolean {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<FactorJurisdiction>
   for (const j of keys) {
@@ -356,7 +374,7 @@ export function sameFactorEditions(a: FactorEditions, b: FactorEditions): boolea
     for (const f of FAMILIES) {
       const x = a[j]?.[f], y = b[j]?.[f]
       if (!x !== !y) return false
-      if (x && y && (x.source !== y.source || x.edition !== y.edition)) return false
+      if (x && y && x.edition !== y.edition) return false
     }
   }
   return true
@@ -461,6 +479,14 @@ export type FactorEditionYear = {
 
 const isEmpty = (m: FactorEditions | null | undefined) => !m || Object.keys(m).length === 0
 
+/** Any family record in the map whose `edition` is missing, not a string, or blank. */
+const hasUnlabelledRecord = (m: FactorEditions): boolean =>
+  Object.values(m).some(families =>
+    Object.values(families ?? {}).some(rec => {
+      const edition = (rec as { edition?: unknown } | undefined)?.edition
+      return typeof edition !== 'string' || edition.trim() === ''
+    }))
+
 export function factorEditionState(
   years: readonly FactorEditionYear[],
 ): FactorEditionState {
@@ -482,6 +508,16 @@ export function factorEditionState(
   const gap = years.some(y => isEmpty(y.editions) && y.anyPublished)
   if (gap) return 'unknown'
   const recorded = years.filter(y => !isEmpty(y.editions)).map(y => y.editions as FactorEditions)
+
+  // ⚠️ A STORED RECORD WITHOUT A LABEL CANNOT BE COMPARED, SO IT IS TREATED AS UNRECORDED. PROVISIONAL.
+  // None should exist: FactorEdition has required `edition` since the column's first commit, and the
+  // only write path (buildFactorEditions via factorEditionsForSave) always fills it. But the column is
+  // jsonb with no shape constraint, so a hand-edited or malformed record is possible, and comparing on
+  // a missing label would make two unlabelled records compare EQUAL whatever they cited — a silent
+  // 'consistent'. 'unknown' says only what is true: the basis could not be confirmed. Whether such a
+  // record should instead be relabelled from its citation, or compared on its citation as a fallback,
+  // is an open decision recorded in the 17 Sep 2026 report — not settled by this guard.
+  if (recorded.some(hasUnlabelledRecord)) return 'unknown'
 
   // EVERY YEAR HAD NOTHING TO RECORD -> 'consistent', which renders NOTHING. Not 'unknown': that
   // message says a consistent factor basis could not be CONFIRMED, which implies there should have

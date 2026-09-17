@@ -8,7 +8,7 @@ import {
 import type { FactorEditions } from './factorEditions'
 import { buildCompanySeries } from './series'
 import type { InventoryRow } from './series'
-import { EF_SOURCES, emptyLocation, getGridFactor, gridSource, combustionSource, findUnpriceableLocations, buildWorkings } from './engine'
+import { EF_SOURCES, EF_SOURCE_LOCATORS, DEFRA_DESNZ_PUBLICATION, defraCitation, emptyLocation, getGridFactor, gridSource, combustionSource, findUnpriceableLocations, buildWorkings } from './engine'
 import type { Location } from './engine'
 
 // THE COLUMN EXISTS BECAUSE A 26% FALL LOOKED LIKE PERFORMANCE.
@@ -279,6 +279,36 @@ describe('the declared edition labels cannot drift from their citations', () => 
     }
   })
 
+  it('F16b the DEFRA/DESNZ publication is cited ONE way, and the steam label matches it too', () => {
+    // Canonicalised 17 Sep 2026: three UK entries had worded one publication three ways.
+    expect(EF_SOURCES.combustion_uk).toBe(defraCitation(2026))
+    expect(EF_SOURCES.steam_uk).toBe(defraCitation(2026))
+    expect(EF_SOURCES.electricity_uk, 'year-neutral by design: GRID_EF.UK holds 2025 and 2026').toBe(defraCitation())
+    // F16 covers combustion labels; the steam label summarises a citation too.
+    for (const token of 'DEFRA 2026'.split(/\s+/)) expect(EF_SOURCES.steam_uk).toContain(token)
+    expect(DEFRA_DESNZ_PUBLICATION.title_as_published).toBe('UK Government GHG Conversion Factors for Company Reporting')
+  })
+
+  it('F16c ⚠️ the STORED citations did not move — a reworded source would read as a changed edition', () => {
+    // factorEditionState compares stored `source` strings year to year. These two literals are what
+    // inventories saved before 17 Sep 2026 hold; if canonicalisation had changed them, a customer's
+    // 2025 and 2026 inventories priced from the same edition would compare as "changed".
+    expect(EF_SOURCES.combustion_uk).toBe('UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting')
+    expect(EF_SOURCES.electricity_uk).toBe('UK DEFRA/DESNZ GHG Conversion Factors for Company Reporting')
+    // steam_uk DID move, from the string below. Pinned so the change is visible, not silent.
+    expect(EF_SOURCES.steam_uk).not.toBe('UK DESNZ/DEFRA (2026) GHG Conversion Factors, flat file v1.2 — Scope 2, District heat and steam')
+  })
+
+  it('F16d locators record what was noted at transcription and invent nothing', () => {
+    expect(EF_SOURCE_LOCATORS.steam_uk).toEqual({ factor_set: 'Flat file', file_version: '1.2', sheet: 'Scope 2', row: 'Heat and steam > District heat and steam' })
+    expect(EF_SOURCE_LOCATORS.combustion_uk).toEqual({ factor_set: 'Full set', file_version: null, sheet: 'Fuels', row: null })
+    expect(EF_SOURCE_LOCATORS.electricity_uk).toEqual({ factor_set: null, file_version: null, sheet: 'UK electricity', row: null })
+    // No citation string carries a file version or a sheet any more: those are locator fields.
+    for (const c of [EF_SOURCES.combustion_uk, EF_SOURCES.steam_uk, EF_SOURCES.electricity_uk]) {
+      expect(c).not.toMatch(/flat file|full set|sheet|v\d/i)
+    }
+  })
+
   it('F17 THE REGEX THAT WOULD HAVE BEEN WRONG — Australia proves prose parsing does not work', () => {
     // Documented in factorEditions.ts as the reason the label is declared. Asserted because a future
     // reader will be tempted by it, and the counter-example is one citation away.
@@ -328,7 +358,7 @@ describe('the declared edition labels cannot drift from their citations', () => 
 })
 
 describe('sameFactorEditions', () => {
-  it('F20 equal maps match; a moved edition, a moved source, or a missing family does not', () => {
+  it('F20 equal maps match; a moved edition or a missing family does not — a reworded citation DOES', () => {
     const base = buildFactorEditions([uk()], 2026)
     expect(sameFactorEditions(base, buildFactorEditions([uk()], 2026))).toBe(true)
     expect(sameFactorEditions(base, buildFactorEditions([uk()], 2025))).toBe(false)
@@ -336,9 +366,17 @@ describe('sameFactorEditions', () => {
     expect(sameFactorEditions({}, {})).toBe(true)
     expect(sameFactorEditions(base, {}), 'an unknown map is not a matching map').toBe(false)
 
-    const tweaked: FactorEditions = JSON.parse(JSON.stringify(base))
-    tweaked.UK!.combustion!.source = 'UK DEFRA/DESNZ (2025) GHG Conversion Factors for Company Reporting'
-    expect(sameFactorEditions(base, tweaked), 'the source moved even though the label did not').toBe(false)
+    // ⚠️ REVERSED 17 SEP 2026. This used to assert that a moved citation with an unchanged label was a
+    // DIFFERENT edition. Comparison is now by label: the citation is prose about an edition, and prose
+    // is reworded without the edition moving.
+    const reworded: FactorEditions = JSON.parse(JSON.stringify(base))
+    reworded.UK!.combustion!.source = 'A completely different sentence about the same publication'
+    expect(sameFactorEditions(base, reworded), 'a reworded citation under the same label is the same edition').toBe(true)
+
+    // The label is what identifies an edition, so a moved label is a change even with an identical citation.
+    const relabelled: FactorEditions = JSON.parse(JSON.stringify(base))
+    relabelled.UK!.combustion!.edition = 'DEFRA 2027'
+    expect(sameFactorEditions(base, relabelled), 'a moved label is a changed edition').toBe(false)
   })
 })
 
@@ -434,6 +472,33 @@ const gap = (editions: FactorEditions | null | undefined = {}) => ({ editions, a
 const nothing = () => ({ editions: {} as FactorEditions, anyPublished: false })
 
 describe('factorEditionState — a union, because "we cannot say" is a third answer', () => {
+  it('G0a ⚠️ citations reworded AFTER a year was saved do not read as a factor change', () => {
+    // The two real rewordings: steam_uk canonicalised 17 Sep 2026, combustion_eu reworded twice on
+    // 14 Aug 2026. A year saved before either holds the old prose; a year saved after holds the new.
+    // Neither edition moved, so the series is consistent.
+    const savedBefore: FactorEditions = {
+      UK: { steam: { source: 'UK DESNZ/DEFRA (2026) GHG Conversion Factors, flat file v1.2 — Scope 2, District heat and steam', edition: 'DEFRA 2026' } },
+      EU: { combustion: { source: 'IPCC (2006) Guidelines Vol.2 — Tier 1 default combustion factors', edition: 'IPCC 2006' } },
+    }
+    const savedAfter: FactorEditions = {
+      UK: { steam: { source: EF_SOURCES.steam_uk, edition: 'DEFRA 2026' } },
+      EU: { combustion: { source: EF_SOURCES.combustion_eu, edition: 'IPCC 2006' } },
+    }
+    expect(savedBefore.UK!.steam!.source).not.toBe(savedAfter.UK!.steam!.source)
+    expect(savedBefore.EU!.combustion!.source).not.toBe(savedAfter.EU!.combustion!.source)
+    expect(factorEditionState([rec(savedBefore), rec(savedAfter)])).toBe('consistent')
+  })
+
+  it('G0b a stored record with no label cannot be confirmed, so the series is unknown — never consistent', () => {
+    // None should exist; the column is jsonb, so a hand-edited or malformed one is possible. Two such
+    // records must not compare equal on a missing label. Provisional handling — see factorEditionState.
+    const unlabelled = { UK: { combustion: { source: EF_SOURCES.combustion_uk } } } as unknown as FactorEditions
+    const blank: FactorEditions = { UK: { combustion: { source: EF_SOURCES.combustion_uk, edition: '  ' } } }
+    expect(factorEditionState([rec(unlabelled), rec(unlabelled)])).toBe('unknown')
+    expect(factorEditionState([rec(UK26), rec(blank)])).toBe('unknown')
+    expect(factorEditionState([rec(UK26)]), 'a labelled series is unaffected').toBe('consistent')
+  })
+
   it('G1 three years on one edition → consistent', () => {
     expect(factorEditionState([rec(UK26), rec(UK26), rec(UK26)])).toBe('consistent')
     // Distinct objects with equal content, not the same reference — otherwise this would only be
