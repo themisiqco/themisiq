@@ -1,0 +1,1305 @@
+{
+  "metadata": {
+    "source": "Bjelle EL, Többen J, Stadler K, Kastner T, Theurl MC, Erb K-H, Olsen K-S, Wiebe KS, Wood R (2020). Adding country resolution to EXIOBASE: impacts on land use embodied in trade. Journal of Economic Structures 9:14.",
+    "publication": "Journal of Economic Structures 9:14 (2020)",
+    "article_doi": "10.1186/s40008-020-0182-y",
+    "additional_file_doi": "10.6084/m9.figshare.11854137",
+    "additional_file": "Additional file 2",
+    "licence": "CC BY 4.0 (Creative Commons Attribution 4.0 International)",
+    "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+    "attribution_note": "CC BY 4.0 requires attribution. Anywhere a figure derived from this mapping is shown, credit the source above by citation and DOI. Verified 15 Sep 2026 against the published article PDF, which licenses the article and its material under CC BY 4.0 except where a credit line indicates otherwise; Additional file 2 carries no such credit line.",
+    "sheet": "Countries",
+    "generated_on": "2026-09-15",
+    "generated_from": "exiobase3rx-concordance-MOESM2.xlsx",
+    "generated_by": "scripts/generate-country-regions.py",
+    "pycountry_version": "24.6.1",
+    "source_rows": 214,
+    "regions": 49,
+    "countries": 212,
+    "dropped": [
+      "Netherlands Antilles"
+    ],
+    "collapsed": [
+      "Zanzibar -> TZ"
+    ],
+    "fingerprint_sha256": "e83c3d0388474c36e160572e8db608094d8529e6c3bffaab3444c5229075c9a8",
+    "scope_note": "Classification only. This file carries NO emission factors: it says which EXIOBASE region a country's spend is priced against, not what the price is. The regions are EXIOBASE 3's; the country-to-region assignment is the cited paper's; neither is ours.",
+    "bridge_only_note": "WHAT IS TAKEN FROM THE PAPER IS THE BRIDGE, NOT THE DATA. The cited work builds EXIOBASE 3rx, a 214-country extension of EXIOBASE 3, and to do so it must state which of the 49 regions each country sits in. That statement - the region classification - is the only thing read here. NO EXIOBASE 3rx ESTIMATED DATA IS USED: no 3rx table, no 3rx multiplier, no 3rx figure of any kind enters this repo, and factors continue to come from the published EXIOBASE 3 archives via scripts/generate-exiobase-factors.py. The distinction matters because the paper describes 3rx as experimental and flags high uncertainty for individual small economies. THAT CAVEAT ATTACHES TO 3rx's ESTIMATED FACTORS, NOT TO THIS BRIDGE: which region a country belongs to is a classification decision, not an estimate, and carries no uncertainty of that kind. Reporting the 3rx uncertainty against a figure priced from this mapping would describe a property the figure does not have. What DOES need saying beside such a figure is that 169 of the 212 countries resolve to a rest-of-world bucket, so the factor is a multi-economy average - see row_bucket_note.",
+    "row_bucket_note": "Five of the 49 regions are rest-of-world buckets (WA, WL, WE, WF, WM) holding 169 of the 212 countries between them. A factor read through one of those is a bucket average across dozens of economies, not a national figure, and must be described that way wherever it is shown.",
+    "code_collision_note": "WF IS BOTH THINGS AND THEY ARE NOT RELATED. As an EXIOBASE region code it means RoW Africa; as an ISO 3166-1 alpha-2 country code it means Wallis and Futuna. The two appear in adjacent fields of the same record, so never compare an iso2 against a region_code, and never let one default to the other. WA, WL, WE and WM are not ISO codes at all, so WF is the only collision."
+  },
+  "mapping": [
+    {
+      "iso2": "AF",
+      "country_name": "Afghanistan",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "AL",
+      "country_name": "Albania",
+      "region_code": "WE",
+      "basis": "published"
+    },
+    {
+      "iso2": "DZ",
+      "country_name": "Algeria",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "AD",
+      "country_name": "Andorra",
+      "region_code": "WE",
+      "basis": "published"
+    },
+    {
+      "iso2": "AO",
+      "country_name": "Angola",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "AI",
+      "country_name": "Anguilla",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "AG",
+      "country_name": "Antigua and Barbuda",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "AR",
+      "country_name": "Argentina",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "AM",
+      "country_name": "Armenia",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "AW",
+      "country_name": "Aruba",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "AU",
+      "country_name": "Australia",
+      "region_code": "AU",
+      "basis": "published"
+    },
+    {
+      "iso2": "AT",
+      "country_name": "Austria",
+      "region_code": "AT",
+      "basis": "published"
+    },
+    {
+      "iso2": "AZ",
+      "country_name": "Azerbaijan",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "BS",
+      "country_name": "Bahamas",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "BH",
+      "country_name": "Bahrain",
+      "region_code": "WM",
+      "basis": "published"
+    },
+    {
+      "iso2": "BD",
+      "country_name": "Bangladesh",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "BB",
+      "country_name": "Barbados",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "BY",
+      "country_name": "Belarus",
+      "region_code": "WE",
+      "basis": "published"
+    },
+    {
+      "iso2": "BE",
+      "country_name": "Belgium",
+      "region_code": "BE",
+      "basis": "published"
+    },
+    {
+      "iso2": "BZ",
+      "country_name": "Belize",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "BJ",
+      "country_name": "Benin",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "BM",
+      "country_name": "Bermuda",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "BT",
+      "country_name": "Bhutan",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "BO",
+      "country_name": "Bolivia",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "BA",
+      "country_name": "Bosnia and Herzegovina",
+      "region_code": "WE",
+      "basis": "published"
+    },
+    {
+      "iso2": "BW",
+      "country_name": "Botswana",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "BR",
+      "country_name": "Brazil",
+      "region_code": "BR",
+      "basis": "published"
+    },
+    {
+      "iso2": "VG",
+      "country_name": "British Virgin Islands",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "BN",
+      "country_name": "Brunei Darussalam",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "BG",
+      "country_name": "Bulgaria",
+      "region_code": "BG",
+      "basis": "published"
+    },
+    {
+      "iso2": "BF",
+      "country_name": "Burkina Faso",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "BI",
+      "country_name": "Burundi",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "CV",
+      "country_name": "Cabo Verde",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "KH",
+      "country_name": "Cambodia",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "CM",
+      "country_name": "Cameroon",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "CA",
+      "country_name": "Canada",
+      "region_code": "CA",
+      "basis": "published"
+    },
+    {
+      "iso2": "KY",
+      "country_name": "Cayman Islands",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "CF",
+      "country_name": "Central African Republic",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "TD",
+      "country_name": "Chad",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "CL",
+      "country_name": "Chile",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "CN",
+      "country_name": "China",
+      "region_code": "CN",
+      "basis": "published"
+    },
+    {
+      "iso2": "HK",
+      "country_name": "Hong Kong",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "MO",
+      "country_name": "Macao",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "CO",
+      "country_name": "Colombia",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "KM",
+      "country_name": "Comoros",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "CG",
+      "country_name": "Congo Republic",
+      "region_code": "WF",
+      "basis": "manual-resolution"
+    },
+    {
+      "iso2": "CK",
+      "country_name": "Cook Islands",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "CR",
+      "country_name": "Costa Rica",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "HR",
+      "country_name": "Croatia",
+      "region_code": "HR",
+      "basis": "published"
+    },
+    {
+      "iso2": "CU",
+      "country_name": "Cuba",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "CW",
+      "country_name": "Curacao",
+      "region_code": "WL",
+      "basis": "manual-resolution"
+    },
+    {
+      "iso2": "CY",
+      "country_name": "Cyprus",
+      "region_code": "CY",
+      "basis": "published"
+    },
+    {
+      "iso2": "CZ",
+      "country_name": "Czech Republic",
+      "region_code": "CZ",
+      "basis": "published"
+    },
+    {
+      "iso2": "CI",
+      "country_name": "Cote d'Ivoire",
+      "region_code": "WF",
+      "basis": "manual-resolution"
+    },
+    {
+      "iso2": "KP",
+      "country_name": "North Korea",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "CD",
+      "country_name": "DR Congo",
+      "region_code": "WF",
+      "basis": "manual-resolution"
+    },
+    {
+      "iso2": "DK",
+      "country_name": "Denmark",
+      "region_code": "DK",
+      "basis": "published"
+    },
+    {
+      "iso2": "DJ",
+      "country_name": "Djibouti",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "DM",
+      "country_name": "Dominica",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "DO",
+      "country_name": "Dominican Republic",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "EC",
+      "country_name": "Ecuador",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "EG",
+      "country_name": "Egypt",
+      "region_code": "WM",
+      "basis": "published"
+    },
+    {
+      "iso2": "SV",
+      "country_name": "El Salvador",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "GQ",
+      "country_name": "Equatorial Guinea",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "ER",
+      "country_name": "Eritrea",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "EE",
+      "country_name": "Estonia",
+      "region_code": "EE",
+      "basis": "published"
+    },
+    {
+      "iso2": "ET",
+      "country_name": "Ethiopia",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "FJ",
+      "country_name": "Fiji",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "FI",
+      "country_name": "Finland",
+      "region_code": "FI",
+      "basis": "published"
+    },
+    {
+      "iso2": "FR",
+      "country_name": "France",
+      "region_code": "FR",
+      "basis": "published"
+    },
+    {
+      "iso2": "PF",
+      "country_name": "French Polynesia",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "GA",
+      "country_name": "Gabon",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "GM",
+      "country_name": "Gambia",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "GE",
+      "country_name": "Georgia",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "DE",
+      "country_name": "Germany",
+      "region_code": "DE",
+      "basis": "published"
+    },
+    {
+      "iso2": "GH",
+      "country_name": "Ghana",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "GR",
+      "country_name": "Greece",
+      "region_code": "GR",
+      "basis": "published"
+    },
+    {
+      "iso2": "GL",
+      "country_name": "Greenland",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "GD",
+      "country_name": "Grenada",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "GT",
+      "country_name": "Guatemala",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "GN",
+      "country_name": "Guinea",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "GW",
+      "country_name": "Guinea-Bissau",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "GY",
+      "country_name": "Guyana",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "HT",
+      "country_name": "Haiti",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "HN",
+      "country_name": "Honduras",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "HU",
+      "country_name": "Hungary",
+      "region_code": "HU",
+      "basis": "published"
+    },
+    {
+      "iso2": "IS",
+      "country_name": "Iceland",
+      "region_code": "WE",
+      "basis": "published"
+    },
+    {
+      "iso2": "IN",
+      "country_name": "India",
+      "region_code": "IN",
+      "basis": "published"
+    },
+    {
+      "iso2": "ID",
+      "country_name": "Indonesia",
+      "region_code": "ID",
+      "basis": "published"
+    },
+    {
+      "iso2": "IR",
+      "country_name": "Iran",
+      "region_code": "WM",
+      "basis": "published"
+    },
+    {
+      "iso2": "IQ",
+      "country_name": "Iraq",
+      "region_code": "WM",
+      "basis": "published"
+    },
+    {
+      "iso2": "IE",
+      "country_name": "Ireland",
+      "region_code": "IE",
+      "basis": "published"
+    },
+    {
+      "iso2": "IL",
+      "country_name": "Israel",
+      "region_code": "WM",
+      "basis": "published"
+    },
+    {
+      "iso2": "IT",
+      "country_name": "Italy",
+      "region_code": "IT",
+      "basis": "published"
+    },
+    {
+      "iso2": "JM",
+      "country_name": "Jamaica",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "JP",
+      "country_name": "Japan",
+      "region_code": "JP",
+      "basis": "published"
+    },
+    {
+      "iso2": "JO",
+      "country_name": "Jordan",
+      "region_code": "WM",
+      "basis": "published"
+    },
+    {
+      "iso2": "KZ",
+      "country_name": "Kazakhstan",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "KE",
+      "country_name": "Kenya",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "KI",
+      "country_name": "Kiribati",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "XK",
+      "country_name": "Kosovo",
+      "region_code": "WE",
+      "basis": "manual-resolution"
+    },
+    {
+      "iso2": "KW",
+      "country_name": "Kuwait",
+      "region_code": "WM",
+      "basis": "published"
+    },
+    {
+      "iso2": "KG",
+      "country_name": "Kyrgyz Republic",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "LA",
+      "country_name": "Laos",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "LV",
+      "country_name": "Latvia",
+      "region_code": "LV",
+      "basis": "published"
+    },
+    {
+      "iso2": "LB",
+      "country_name": "Lebanon",
+      "region_code": "WM",
+      "basis": "published"
+    },
+    {
+      "iso2": "LS",
+      "country_name": "Lesotho",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "LR",
+      "country_name": "Liberia",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "LY",
+      "country_name": "Libya",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "LI",
+      "country_name": "Liechtenstein",
+      "region_code": "WE",
+      "basis": "published"
+    },
+    {
+      "iso2": "LT",
+      "country_name": "Lithuania",
+      "region_code": "LT",
+      "basis": "published"
+    },
+    {
+      "iso2": "LU",
+      "country_name": "Luxembourg",
+      "region_code": "LU",
+      "basis": "published"
+    },
+    {
+      "iso2": "MG",
+      "country_name": "Madagascar",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "MW",
+      "country_name": "Malawi",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "MY",
+      "country_name": "Malaysia",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "MV",
+      "country_name": "Maldives",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "ML",
+      "country_name": "Mali",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "MT",
+      "country_name": "Malta",
+      "region_code": "MT",
+      "basis": "published"
+    },
+    {
+      "iso2": "MH",
+      "country_name": "Marshall Islands",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "MR",
+      "country_name": "Mauritania",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "MU",
+      "country_name": "Mauritius",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "MX",
+      "country_name": "Mexico",
+      "region_code": "MX",
+      "basis": "published"
+    },
+    {
+      "iso2": "FM",
+      "country_name": "Micronesia, Fed. Sts.",
+      "region_code": "WA",
+      "basis": "manual-resolution"
+    },
+    {
+      "iso2": "MC",
+      "country_name": "Monaco",
+      "region_code": "WE",
+      "basis": "published"
+    },
+    {
+      "iso2": "MN",
+      "country_name": "Mongolia",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "ME",
+      "country_name": "Montenegro",
+      "region_code": "WE",
+      "basis": "published"
+    },
+    {
+      "iso2": "MS",
+      "country_name": "Montserrat",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "MA",
+      "country_name": "Morocco",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "MZ",
+      "country_name": "Mozambique",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "MM",
+      "country_name": "Myanmar",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "NA",
+      "country_name": "Namibia",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "NR",
+      "country_name": "Nauru",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "NP",
+      "country_name": "Nepal",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "NL",
+      "country_name": "Netherlands",
+      "region_code": "NL",
+      "basis": "published"
+    },
+    {
+      "iso2": "NC",
+      "country_name": "New Caledonia",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "NZ",
+      "country_name": "New Zealand",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "NI",
+      "country_name": "Nicaragua",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "NE",
+      "country_name": "Niger",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "NG",
+      "country_name": "Nigeria",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "NO",
+      "country_name": "Norway",
+      "region_code": "NO",
+      "basis": "published"
+    },
+    {
+      "iso2": "OM",
+      "country_name": "Oman",
+      "region_code": "WM",
+      "basis": "published"
+    },
+    {
+      "iso2": "PK",
+      "country_name": "Pakistan",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "PW",
+      "country_name": "Palau",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "PA",
+      "country_name": "Panama",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "PG",
+      "country_name": "Papua New Guinea",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "PY",
+      "country_name": "Paraguay",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "PE",
+      "country_name": "Peru",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "PH",
+      "country_name": "Philippines",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "PL",
+      "country_name": "Poland",
+      "region_code": "PL",
+      "basis": "published"
+    },
+    {
+      "iso2": "PT",
+      "country_name": "Portugal",
+      "region_code": "PT",
+      "basis": "published"
+    },
+    {
+      "iso2": "PR",
+      "country_name": "Puerto Rico",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "QA",
+      "country_name": "Qatar",
+      "region_code": "WM",
+      "basis": "published"
+    },
+    {
+      "iso2": "KR",
+      "country_name": "South Korea",
+      "region_code": "KR",
+      "basis": "published"
+    },
+    {
+      "iso2": "MD",
+      "country_name": "Moldova",
+      "region_code": "WE",
+      "basis": "published"
+    },
+    {
+      "iso2": "RO",
+      "country_name": "Romania",
+      "region_code": "RO",
+      "basis": "published"
+    },
+    {
+      "iso2": "RU",
+      "country_name": "Russia",
+      "region_code": "RU",
+      "basis": "manual-resolution"
+    },
+    {
+      "iso2": "RW",
+      "country_name": "Rwanda",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "KN",
+      "country_name": "St. Kitts and Nevis",
+      "region_code": "WL",
+      "basis": "manual-resolution"
+    },
+    {
+      "iso2": "LC",
+      "country_name": "St. Lucia",
+      "region_code": "WL",
+      "basis": "manual-resolution"
+    },
+    {
+      "iso2": "WS",
+      "country_name": "Samoa",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "SM",
+      "country_name": "San Marino",
+      "region_code": "WE",
+      "basis": "published"
+    },
+    {
+      "iso2": "ST",
+      "country_name": "Sao Tome and Principe",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "SA",
+      "country_name": "Saudi Arabia",
+      "region_code": "WM",
+      "basis": "published"
+    },
+    {
+      "iso2": "SN",
+      "country_name": "Senegal",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "RS",
+      "country_name": "Serbia",
+      "region_code": "WE",
+      "basis": "published"
+    },
+    {
+      "iso2": "SC",
+      "country_name": "Seychelles",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "SL",
+      "country_name": "Sierra Leone",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "SG",
+      "country_name": "Singapore",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "SX",
+      "country_name": "Sint Maarten",
+      "region_code": "WL",
+      "basis": "manual-resolution"
+    },
+    {
+      "iso2": "SK",
+      "country_name": "Slovakia",
+      "region_code": "SK",
+      "basis": "published"
+    },
+    {
+      "iso2": "SI",
+      "country_name": "Slovenia",
+      "region_code": "SI",
+      "basis": "published"
+    },
+    {
+      "iso2": "SB",
+      "country_name": "Solomon Islands",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "SO",
+      "country_name": "Somalia",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "ZA",
+      "country_name": "South Africa",
+      "region_code": "ZA",
+      "basis": "published"
+    },
+    {
+      "iso2": "SS",
+      "country_name": "South Sudan",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "ES",
+      "country_name": "Spain",
+      "region_code": "ES",
+      "basis": "published"
+    },
+    {
+      "iso2": "LK",
+      "country_name": "Sri Lanka",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "VC",
+      "country_name": "St. Vincent and the Grenadines",
+      "region_code": "WL",
+      "basis": "manual-resolution"
+    },
+    {
+      "iso2": "PS",
+      "country_name": "Palestine",
+      "region_code": "WM",
+      "basis": "manual-resolution"
+    },
+    {
+      "iso2": "SD",
+      "country_name": "Sudan",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "SR",
+      "country_name": "Suriname",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "SZ",
+      "country_name": "Swaziland",
+      "region_code": "WF",
+      "basis": "manual-resolution"
+    },
+    {
+      "iso2": "SE",
+      "country_name": "Sweden",
+      "region_code": "SE",
+      "basis": "published"
+    },
+    {
+      "iso2": "CH",
+      "country_name": "Switzerland",
+      "region_code": "CH",
+      "basis": "published"
+    },
+    {
+      "iso2": "SY",
+      "country_name": "Syria",
+      "region_code": "WM",
+      "basis": "published"
+    },
+    {
+      "iso2": "MK",
+      "country_name": "Macedonia",
+      "region_code": "WE",
+      "basis": "manual-resolution"
+    },
+    {
+      "iso2": "TJ",
+      "country_name": "Tajikistan",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "TH",
+      "country_name": "Thailand",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "TL",
+      "country_name": "Timor-Leste",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "TG",
+      "country_name": "Togo",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "TO",
+      "country_name": "Tonga",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "TT",
+      "country_name": "Trinidad and Tobago",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "TN",
+      "country_name": "Tunisia",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "TR",
+      "country_name": "Turkey",
+      "region_code": "TR",
+      "basis": "manual-resolution"
+    },
+    {
+      "iso2": "TM",
+      "country_name": "Turkmenistan",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "TC",
+      "country_name": "Turks and Caicos Islands",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "TV",
+      "country_name": "Tuvalu",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "TZ",
+      "country_name": "Tanzania",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "UG",
+      "country_name": "Uganda",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "UA",
+      "country_name": "Ukraine",
+      "region_code": "WE",
+      "basis": "published"
+    },
+    {
+      "iso2": "AE",
+      "country_name": "United Arab Emirates",
+      "region_code": "WM",
+      "basis": "published"
+    },
+    {
+      "iso2": "GB",
+      "country_name": "United Kingdom",
+      "region_code": "GB",
+      "basis": "published"
+    },
+    {
+      "iso2": "US",
+      "country_name": "United States",
+      "region_code": "US",
+      "basis": "published"
+    },
+    {
+      "iso2": "UY",
+      "country_name": "Uruguay",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "UZ",
+      "country_name": "Uzbekistan",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "VU",
+      "country_name": "Vanuatu",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "VE",
+      "country_name": "Venezuela",
+      "region_code": "WL",
+      "basis": "published"
+    },
+    {
+      "iso2": "VN",
+      "country_name": "Vietnam",
+      "region_code": "WA",
+      "basis": "published"
+    },
+    {
+      "iso2": "YE",
+      "country_name": "Yemen",
+      "region_code": "WM",
+      "basis": "published"
+    },
+    {
+      "iso2": "ZM",
+      "country_name": "Zambia",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "ZW",
+      "country_name": "Zimbabwe",
+      "region_code": "WF",
+      "basis": "published"
+    },
+    {
+      "iso2": "TW",
+      "country_name": "Taiwan",
+      "region_code": "TW",
+      "basis": "published"
+    }
+  ]
+}
