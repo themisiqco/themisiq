@@ -1,0 +1,70 @@
+-- 20260917_revoke_audit_log_truncate.sql
+--
+-- RUN. APPLIED 17 SEP 2026, DIRECTLY IN THE SUPABASE SQL EDITOR, BEFORE THIS FILE EXISTED. Verified
+-- immediately afterwards: `service_role` holds REFERENCES and TRIGGER on public.audit_log and nothing
+-- else. This file is the record of that change, not an instruction to make it.
+--
+-- Revokes TRUNCATE on public.audit_log from `service_role`. Nothing else changes: no policy, no other
+-- grant, no other role.
+--
+-- ══════════════════════════════════════════════════════════════════════════════════════════════
+-- WHY: THE ONLY AUDIT-LOG WRITE service_role COULD PERFORM WAS ERASING THE WHOLE TABLE
+-- ══════════════════════════════════════════════════════════════════════════════════════════════
+-- The grant pattern found on 17 Sep 2026 was asymmetric in the worst direction:
+--
+--     postgres       every privilege
+--     service_role   TRUNCATE — but no DELETE and no UPDATE
+--     authenticated  SELECT only, under the audit_select_own policy (20260908_grant_audit_log_select)
+--
+-- So the one write `service_role` could make to the audit trail was to empty it in a single statement,
+-- while the narrower operations — correcting a row, removing a row — were already denied it. That is
+-- the reverse of what a least-privilege set would look like, and it reads as incidental rather than
+-- designed: nothing in the repository requested it, and no migration granted it.
+--
+-- NOTHING IN THE CODEBASE TRUNCATES ANYTHING. Searched across app/, lib/, scripts/ and
+-- supabase/: every occurrence of "truncate" is the word "truncated" in comments about model
+-- responses and spreadsheet rows. There is no TRUNCATE statement anywhere.
+--
+-- THE ERASURE PATH DOES NOT USE IT EITHER, and it is the one place that legitimately removes audit
+-- rows. scripts/erase-account.mjs deletes from public.audit_log in two passes —
+--     delete from public.audit_log al where al.user_id = $1::uuid
+--     delete from public.audit_log al where <jsonb content carries the subject's id>
+-- — over a DIRECT Postgres connection (pg.Client, connection string), so it needs DELETE as whatever
+-- role that connection authenticates as, and never TRUNCATE. Its use of service_role is limited to the
+-- auth admin API for removing the auth user. Deleting rather than truncating is also deliberate there:
+-- the script is scoped to one subject, and TRUNCATE would take every other account's history with it.
+--
+-- ══════════════════════════════════════════════════════════════════════════════════════════════
+-- WHAT THE CLAIM ON THE PRODUCT NOW RESTS ON
+-- ══════════════════════════════════════════════════════════════════════════════════════════════
+-- The verifier page and the assurance PDF describe the log as "append-only: written by a database
+-- trigger, and no signed-in account can modify or delete an entry" (lib/auditTrailNotice.ts). That
+-- sentence is about `authenticated`, which this change does not touch. What this change removes is the
+-- one bulk-delete privilege sitting behind the server key. It does NOT make the log immutable —
+-- postgres still holds everything, which is why the wording says what it says.
+--
+-- ══════════════════════════════════════════════════════════════════════════════════════════════
+-- IF SOMETHING BREAKS
+-- ══════════════════════════════════════════════════════════════════════════════════════════════
+--     grant truncate on public.audit_log to service_role;
+--
+-- Paths to watch, being everything that runs with the service key (lib/supabaseAdmin.ts):
+--   · app/api/webhooks/stripe/route.ts     — entitlement writes, purchase_consents upsert
+--   · app/api/admin/create-invoice/route.ts — user lookup by email, invoice provisioning
+--   · lib/order/provision.ts                — entitlement provisioning shared by both
+--   · lib/rateLimit.ts                      — rate-limit row reads and writes
+-- None reads or writes audit_log, so a failure in any of them traced to this revoke would mean
+-- something writes the audit trail that this file did not find. Nothing here is user-facing: a
+-- regression would appear as a failed webhook or a 503 from a route, not as a wrong figure.
+--
+-- ══════════════════════════════════════════════════════════════════════════════════════════════
+-- RE-RUNNING
+-- ══════════════════════════════════════════════════════════════════════════════════════════════
+-- INERT. The file is one REVOKE statement. PostgreSQL treats revoking a privilege the grantee does not
+-- hold as a no-op: the statement succeeds and changes nothing (at most a notice). So running this file
+-- against a database where it has already been applied leaves the grants exactly as they are, and
+-- running it where TRUNCATE was never granted is equally harmless. It is not wrapped in a transaction
+-- because a single statement is already atomic, and there is no pre-flight guard because there is no
+-- state in which this statement is unsafe.
+
+revoke truncate on public.audit_log from service_role;
