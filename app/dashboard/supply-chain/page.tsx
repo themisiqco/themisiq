@@ -8,6 +8,7 @@ import { supabase } from '../../../lib/supabase'
 import { useEntitlementAccess } from '../../../lib/useEntitlement'
 import { DRAFT_KEYS, readDraft, useDraftAutosave, clearDraft } from '../../../lib/drafts'
 import { CS3D_APPLIES_FROM } from '../../../lib/cs3d'
+import { INDUSTRY_CODES, INDUSTRY_OPTION_GROUPS, industryName } from '../../../lib/emissionFactors/industryOptions'
 import { sectionHead } from '@/app/components/headingStyles'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
 import { reportingYearOptions, defaultReportingYear } from '../../../lib/reportingYears'
@@ -34,7 +35,8 @@ interface Supplier {
   risk_level: RiskLevel
   risk_score: number
   risk_factors: string[]
-  scope3_emissions: number
+  /** null when no spend factor is available for the selected sector. NOT zero: see scoreSupplier. */
+  scope3_emissions: number | null
 }
 
 interface SupplyChainInventory {
@@ -98,9 +100,19 @@ const SECTOR_RISK: Record<string, { risk: number; label: string; ef: number }> =
 const COUNTRIES = Object.keys(COUNTRY_RISK).sort()
 const SECTORS = Object.keys(SECTOR_RISK).sort()
 
-const scoreSupplier = (supplier: Supplier): { risk: RiskLevel; score: number; factors: string[]; scope3: number } => {
+// ⚠️ SECTOR_RISK IS KEYED ON THE RETIRED INTERNAL VOCABULARY AND THE DROPDOWN NOW EMITS EXIOBASE
+// CODES, SO EVERY LOOKUP MISSES. That is deliberate and the miss is surfaced rather than absorbed.
+// The table stays because its RISK ratings are a separate piece of work from its `ef` column and
+// come out separately; what must not happen is `ef` quietly becoming 0.5 for every supplier, which
+// is what the old `|| { ..., ef: 0.5 }` fallback did. A factor of 0.5 against a range running to
+// 4.2 is a wrong number that renders identically to a right one.
+//   The RISK half keeps its 2-out-of-5 default so the score does not silently drop five points for
+// every supplier at once, but the default is now NAMED in risk_factors instead of being invisible
+// below the `>= 3` threshold that used to hide it.
+//   scope3 becomes null. Null is not zero and is not rendered as a figure.
+const scoreSupplier = (supplier: Supplier): { risk: RiskLevel; score: number; factors: string[]; scope3: number | null } => {
   const countryData = COUNTRY_RISK[supplier.country] || { risk: 2, label: 'Unknown — assess manually' }
-  const sectorData = SECTOR_RISK[supplier.sector] || { risk: 2, label: 'Unknown — assess manually', ef: 0.5 }
+  const sectorData = SECTOR_RISK[supplier.sector]
 
   const factors: string[] = []
   let score = 0
@@ -110,8 +122,9 @@ const scoreSupplier = (supplier: Supplier): { risk: RiskLevel; score: number; fa
   if (countryData.risk >= 3) factors.push(`Country risk: ${countryData.label}`)
 
   // Sector risk (40%)
-  score += sectorData.risk * 2.5
-  if (sectorData.risk >= 3) factors.push(`Sector risk: ${sectorData.label}`)
+  score += (sectorData?.risk ?? 2) * 2.5
+  if (!sectorData) factors.push('Sector risk not rated — no risk profile held for this sector yet')
+  else if (sectorData.risk >= 3) factors.push(`Sector risk: ${sectorData.label}`)
 
   // Spend concentration (10%)
   if (supplier.annual_spend > 1000000) { score += 1; factors.push('High spend concentration — strategic dependency') }
@@ -126,8 +139,11 @@ const scoreSupplier = (supplier: Supplier): { risk: RiskLevel; score: number; fa
 
   const risk: RiskLevel = score >= 7 ? 'critical' : score >= 5 ? 'high' : score >= 3 ? 'medium' : 'low'
 
-  // Scope 3 Cat.1 spend-based estimate (kg CO2e per $ spend × annual spend / 1000 = mt)
-  const scope3 = supplier.annual_spend > 0 ? (supplier.annual_spend * sectorData.ef) / 1000 : 0
+  // Scope 3 Cat.1 spend-based estimate (kg CO2e per $ spend × annual spend / 1000 = mt).
+  // null when no factor is held for this sector — see the header. Zero spend is still zero.
+  const scope3 = sectorData === undefined
+    ? null
+    : supplier.annual_spend > 0 ? (supplier.annual_spend * sectorData.ef) / 1000 : 0
 
   return { risk, score: Math.round(score * 10) / 10, factors, scope3 }
 }
@@ -460,7 +476,7 @@ function SupplyChainDashboardInner() {
             rejected.push(`row ${line}: no sector`)
             return
           }
-          if (!Object.hasOwn(SECTOR_RISK, sector)) {
+          if (!INDUSTRY_CODES.has(sector)) {
             rejected.push(`row ${line}: "${sector}"`)
             return
           }
@@ -488,7 +504,8 @@ function SupplyChainDashboardInner() {
           setSaveError(
             `Imported ${suppliers.length} supplier${suppliers.length === 1 ? '' : 's'}. ` +
             `Skipped ${rejected.length} with a sector that is not on the list — ${shown}${more}. ` +
-            'Set those rows to one of the sectors in the dropdown and upload again, or add them by hand.'
+            'Sectors are EXIOBASE industry codes now, such as i01.b for wheat. Pick them from the ' +
+            'dropdown, or put the code in the Sector column and upload again.'
           )
         } else {
           setSaveError(null)
@@ -512,7 +529,14 @@ function SupplyChainDashboardInner() {
   // Summary stats
   const critical = inventory.suppliers.filter(s => s.risk_level === 'critical').length
   const high = inventory.suppliers.filter(s => s.risk_level === 'high').length
-  const totalScope3 = inventory.suppliers.reduce((sum, s) => sum + s.scope3_emissions, 0)
+  // ⚠️ A TOTAL OVER A PARTLY UNPRICED REGISTER IS NOT A TOTAL, AND SUMMING PAST THE NULLS WOULD
+  // MAKE IT LOOK LIKE ONE. Same rule the GHG engine already applies to an unpriceable location: it
+  // is left out and SAID to be left out, never counted as zero. Until the EXIOBASE resolver is
+  // wired in, no supplier has a factor, so unpricedCount is every supplier and totalScope3 is null.
+  const unpricedCount = inventory.suppliers.filter(s => s.scope3_emissions === null).length
+  const totalScope3 = unpricedCount > 0
+    ? null
+    : inventory.suppliers.reduce((sum, s) => sum + (s.scope3_emissions ?? 0), 0)
   const totalSpend = inventory.suppliers.reduce((sum, s) => sum + s.annual_spend, 0)
   const needsAssessment = inventory.suppliers.filter(s => !s.has_assessment && (s.risk_level === 'critical' || s.risk_level === 'high')).length
 
@@ -523,15 +547,17 @@ function SupplyChainDashboardInner() {
       ['Reporting Year', inventory.reporting_year],
       ['Total Suppliers', inventory.suppliers.length],
       ['Total Annual Spend', `${inventory.currency} ${totalSpend.toLocaleString()}`],
-      ['Total Scope 3 Cat.1 (estimated)', `${totalScope3.toFixed(2)} mt CO2e`],
+      ['Total Scope 3 Cat.1 (estimated)', totalScope3 === null
+        ? `Not available — ${unpricedCount} of ${inventory.suppliers.length} suppliers have no spend factor for their sector`
+        : `${totalScope3.toFixed(2)} mt CO2e`],
       [''],
       ['SUPPLIER RISK REGISTER'],
       ['Supplier', 'Country', 'Sector', 'Tier', 'Annual Spend', 'Risk Level', 'Risk Score', 'Scope 3 (mt CO2e)', 'Risk Factors', 'Assessment Required'],
       ...inventory.suppliers.map(s => [
-        s.name, s.country, s.sector, s.tier,
+        s.name, s.country, `${industryName(s.sector)} (${s.sector})`, s.tier,
         `${s.currency} ${s.annual_spend.toLocaleString()}`,
         RISK_CONFIG[s.risk_level].label, s.risk_score,
-        s.scope3_emissions.toFixed(2),
+        s.scope3_emissions === null ? 'not available' : s.scope3_emissions.toFixed(2),
         s.risk_factors.join(' | '),
         !s.has_assessment && (s.risk_level === 'critical' || s.risk_level === 'high') ? 'YES' : 'No',
       ]),
@@ -656,7 +682,14 @@ function SupplyChainDashboardInner() {
             <div>
               <label style={labelStyle}>Sector</label>
               <select style={inputStyle} value={inventory.suppliers[activeSupplier].sector} onChange={e => updateSupplier(activeSupplier, 'sector', e.target.value)}>
-                {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
+                <option value="">Select sector</option>
+                {/* 163 EXIOBASE industries under our 20 display headings. The headings are ours and
+                    carry no methodological claim; the names and codes beneath them are EXIOBASE's. */}
+                {INDUSTRY_OPTION_GROUPS.map(g => (
+                  <optgroup key={g.heading} label={g.heading}>
+                    {g.industries.map(o => <option key={o.code} value={o.code}>{o.name}</option>)}
+                  </optgroup>
+                ))}
               </select>
             </div>
             <div>
@@ -691,9 +724,14 @@ function SupplyChainDashboardInner() {
                 {inventory.suppliers[activeSupplier].risk_factors.map((f, i) => (
                   <div key={i} style={{ fontSize: 11, color: '#555553', marginBottom: 3 }}>• {f}</div>
                 ))}
-                {inventory.suppliers[activeSupplier].scope3_emissions > 0 && (
+                {inventory.suppliers[activeSupplier].scope3_emissions === null ? (
+                  <div style={{ fontSize: 11, color: '#92400e', marginTop: 6, lineHeight: 1.6 }}>
+                    No spend factor is held for this sector yet, so no Scope 3 Cat.1 estimate is shown.
+                    It is not counted as zero, and nothing else you have entered is affected.
+                  </div>
+                ) : inventory.suppliers[activeSupplier].scope3_emissions > 0 ? (
                   <div style={{ fontSize: 11, color: 'var(--color-brand)', marginTop: 6, fontWeight: 500 }}>Estimated Scope 3 Cat.1: {inventory.suppliers[activeSupplier].scope3_emissions.toFixed(2)} mt CO₂e</div>
-                )}
+                ) : null}
               </div>
             )}
           </div>
@@ -755,7 +793,7 @@ function SupplyChainDashboardInner() {
                     {s.risk_factors.length > 0 && <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 2 }}>Tier {s.tier} · {s.risk_factors.length} risk factor{s.risk_factors.length > 1 ? 's' : ''}</div>}
                   </div>
                   <div style={{ fontSize: 12, color: '#555553' }}>{s.country}</div>
-                  <div style={{ fontSize: 11, color: '#555553' }}>{s.sector}</div>
+                  <div style={{ fontSize: 11, color: '#555553' }}>{industryName(s.sector)}</div>
                   <div>
                     <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: cfg.bg, color: cfg.color, border: `0.5px solid ${cfg.border}` }}>{cfg.label}</span>
                     {!s.has_assessment && (s.risk_level === 'critical' || s.risk_level === 'high') && (
@@ -791,7 +829,25 @@ function SupplyChainDashboardInner() {
                 This is an estimate only — primary data collection from suppliers is the gold standard
               </div>
             </div>
-            <div className="tq-summary-figure">{totalScope3.toFixed(1)}<small>mt CO₂e</small></div>
+            {totalScope3 === null ? (
+              // Same treatment the GHG wizard gives an unpriceable location: the figure is withheld
+              // and the withholding is explained, rather than a number appearing that nothing
+              // supports. See app/dashboard/ghg/page.tsx, "We can't work out this location's
+              // emissions yet".
+              <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>⚠ No Scope 3 estimate yet</div>
+                <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
+                  {unpricedCount === inventory.suppliers.length
+                    ? 'No spend factors are held for the sectors in this register yet, so no Scope 3 Cat.1 estimate is shown.'
+                    : `${unpricedCount} of ${inventory.suppliers.length} suppliers have no spend factor for their sector, so no register total is shown.`}
+                </div>
+                <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 4 }}>
+                  Nothing is counted as zero, and every supplier, spend figure and risk rating you have entered is unaffected.
+                </div>
+              </div>
+            ) : (
+              <div className="tq-summary-figure">{totalScope3.toFixed(1)}<small>mt CO₂e</small></div>
+            )}
             </div>
           </div>
 
@@ -802,13 +858,13 @@ function SupplyChainDashboardInner() {
                 <div key={h} style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-ink-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
               ))}
             </div>
-            {[...inventory.suppliers].sort((a, b) => b.scope3_emissions - a.scope3_emissions).map((s, i) => (
+            {[...inventory.suppliers].sort((a, b) => (b.scope3_emissions ?? -1) - (a.scope3_emissions ?? -1)).map((s, i) => (
               <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', padding: '12px 16px', borderBottom: i < inventory.suppliers.length - 1 ? '0.5px solid #e8e7e4' : 'none', alignItems: 'center' }}>
                 <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{s.name || `Supplier ${i + 1}`}</div>
-                <div style={{ fontSize: 12, color: '#555553' }}>{s.sector}</div>
+                <div style={{ fontSize: 12, color: '#555553' }}>{industryName(s.sector)}</div>
                 <div style={{ fontSize: 12, color: '#555553' }}>{s.annual_spend > 0 ? `${s.currency} ${s.annual_spend.toLocaleString()}` : '—'}</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: s.scope3_emissions > 100 ? '#B91C1C' : s.scope3_emissions > 10 ? 'var(--color-module-climate)' : '#0F6E56' }}>
-                  {s.scope3_emissions > 0 ? `${s.scope3_emissions.toFixed(2)} mt` : '—'}
+                <div style={{ fontSize: 13, fontWeight: 600, color: s.scope3_emissions === null ? '#92400e' : s.scope3_emissions > 100 ? '#B91C1C' : s.scope3_emissions > 10 ? 'var(--color-module-climate)' : '#0F6E56' }}>
+                  {s.scope3_emissions === null ? 'not available' : s.scope3_emissions > 0 ? `${s.scope3_emissions.toFixed(2)} mt` : '—'}
                 </div>
               </div>
             ))}
@@ -835,7 +891,7 @@ function SupplyChainDashboardInner() {
           {[
             { label: 'Suppliers', val: inventory.suppliers.length },
             { label: 'Critical/High', val: critical + high, urgent: (critical + high) > 0 },
-            { label: 'Scope 3 Cat.1', val: `${totalScope3.toFixed(1)} mt` },
+            { label: 'Scope 3 Cat.1', val: totalScope3 === null ? 'not available' : `${totalScope3.toFixed(1)} mt` },
             { label: 'Need assessment', val: needsAssessment, urgent: needsAssessment > 0 },
           ].map(({ label, val, urgent }) => (
             <div key={label}>
@@ -985,7 +1041,7 @@ function SupplyChainDashboardInner() {
                     { label: 'Suppliers', val: inventory.suppliers.length },
                     { label: 'Critical/High risk', val: critical + high, urgent: (critical + high) > 0 },
                     { label: 'Need assessment', val: needsAssessment, urgent: needsAssessment > 0 },
-                    { label: 'Scope 3 Cat.1', val: `${totalScope3.toFixed(1)} mt` },
+                    { label: 'Scope 3 Cat.1', val: totalScope3 === null ? 'not available' : `${totalScope3.toFixed(1)} mt` },
                     { label: 'Total spend', val: totalSpend > 0 ? `${inventory.currency} ${(totalSpend / 1000000).toFixed(1)}M` : '—' },
                   ].map(({ label, val, urgent }) => (
                     <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

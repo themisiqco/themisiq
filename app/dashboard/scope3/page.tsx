@@ -6,6 +6,8 @@ import { supabase } from '../../../lib/supabase'
 import { useEntitlementState } from '../../../lib/useEntitlement'
 import { EMISSION_FACTORS, DEFAULT_SPEND_EF } from '../../../lib/emissionFactors'
 import { resolvePcafResult, assessAsset } from '../../../lib/pcaf/engine'
+import { INDUSTRY_OPTION_GROUPS, industryName } from '../../../lib/emissionFactors/industryOptions'
+import { matchCountries, countryByIso2 } from '../../../lib/emissionFactors/countryOptions'
 import type { PcafPortfolioAsset, PcafAssetClass, EmissionInputs } from '../../../lib/pcaf/types'
 import { sectionHead } from '@/app/components/headingStyles'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
@@ -58,6 +60,45 @@ const SECTOR_MATERIAL: Record<string, number[]> = {
 
 // Emission factors (kg CO2e per unit)
 
+// ⚠️ EMISSION_FACTORS.spend AND SECTOR_MATERIAL ARE KEYED ON THE RETIRED INTERNAL VOCABULARY, AND
+// THE DROPDOWNS NOW EMIT EXIOBASE CODES, SO EVERY LOOKUP MISSES. Deliberate. The tables stay —
+// SECTOR_MATERIAL's materiality suggestions are separate work and come out separately — but a miss
+// must not fall through to DEFAULT_SPEND_EF (0.5) or to SECTOR_MATERIAL['Other'], because both
+// produce output that renders identically to output someone established. `sectorPriced` is the one
+// place that question is asked, so every surface answers it the same way.
+const sectorPriced = (sector: string | undefined): boolean =>
+  !!sector && Object.hasOwn(EMISSION_FACTORS.spend, sector)
+
+/** The GHG wizard's treatment of an unpriceable location, reused: withhold the figure, say why, and
+ *  say it is not a zero. See app/dashboard/ghg/page.tsx, "We can't work out this location's
+ *  emissions yet". */
+function NoFactorNotice({ what }: { what: string }) {
+  return (
+    <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem', marginTop: 10 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>⚠ No spend factor for this sector yet</div>
+      <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
+        {what} cannot be estimated from spend until a factor is available for the sector you selected.
+      </div>
+      <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 4 }}>
+        It is not counted as zero. Enter a known figure above if you hold one, and everything else you have entered is unaffected.
+      </div>
+    </div>
+  )
+}
+
+/** 163 EXIOBASE industries under our 20 display headings. One list, four selects. */
+function IndustryOptions() {
+  return (
+    <>
+      {INDUSTRY_OPTION_GROUPS.map(g => (
+        <optgroup key={g.heading} label={g.heading}>
+          {g.industries.map(o => <option key={o.code} value={o.code}>{o.name}</option>)}
+        </optgroup>
+      ))}
+    </>
+  )
+}
+
 const SECTORS = [
   'Energy & Utilities', 'Financial Services', 'Real Estate', 'Technology',
   'Healthcare & Pharma', 'Industrials & Manufacturing', 'Consumer & Retail',
@@ -80,6 +121,31 @@ const PCAF_ASSET_CLASSES: { value: PcafAssetClass; label: string; denominatorLab
 const GRAD = 'var(--color-brand)'
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
+// ─── EXIOBASE rest-of-world bucket names ─────────────────────────────────────
+//
+// The published names for the five RoW regions, held HERE rather than in
+// lib/emissionFactors/countryOptions.ts. That module returns a region_code and stops; how a region
+// is described to a customer is this screen's copy, and a second surface must be free to word it
+// differently without editing a data module.
+//
+// ⚠️ WF IS RoW AFRICA HERE, AND WF IS ALSO THE ISO COUNTRY CODE FOR WALLIS AND FUTUNA. The two are
+// unrelated. This map is keyed by REGION code and must never be handed a country code: both are
+// two uppercase letters, so the mistake passes every check silently. Wallis and Futuna is not one
+// of the 212 countries the concordance covers, so it can never reach this map by accident from a
+// selected country — but a future lookup that falls back from country to region could get here and
+// would produce a confident wrong answer rather than an error.
+const ROW_BUCKET_NAMES: Record<string, string> = {
+  WA: 'RoW Asia and Pacific',
+  WE: 'RoW Europe',
+  WF: 'RoW Africa',
+  WL: 'RoW America',
+  WM: 'RoW Middle East',
+}
+
+// Visually hidden but announced. Used for the results count, which sighted users read off the list
+// itself and a screen reader otherwise never hears.
+const srOnly: React.CSSProperties = { position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }
+
 const sectionSub: React.CSSProperties = { fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
 
 const STEP_NAMES = ['Setup', 'Materiality', 'Calculate', 'Results', 'Export']
@@ -130,6 +196,13 @@ export default function Scope3Dashboard() {
   const [reportingYear, setReportingYear] = useState(defaultReportingYear(new Date(), YEAR_FLOOR))
   const [currency, setCurrency] = useState('USD')
   const [revenue, setRevenue] = useState(0)
+  // Primary country of supply. countryIso2 is the persisted value; the other four are presentation
+  // state for the typeahead and are deliberately NOT saved.
+  const [countryIso2, setCountryIso2] = useState('')
+  const [countryQuery, setCountryQuery] = useState('')
+  const [countryOpen, setCountryOpen] = useState(false)
+  const [countryFocusIdx, setCountryFocusIdx] = useState(-1)
+  const [countryHoverIdx, setCountryHoverIdx] = useState(-1)
   const [materialCats, setMaterialCats] = useState<number[]>([])
   const [catData, setCatData] = useState<Record<string, CategoryData>>({})
   const [openInfo, setOpenInfo] = useState<Record<string, boolean>>({})
@@ -205,6 +278,12 @@ export default function Scope3Dashboard() {
       justRestored.current = true
       if (s3.sector) setSector(s3.sector)
       if (s3.currency) setCurrency(s3.currency)
+      if (s3.country_iso2) {
+        setCountryIso2(s3.country_iso2)
+        // Show the stored CODE if we no longer recognise it, never a blank box. Same principle as
+        // industryName(): a value the customer saved must stay visible even once it stops resolving.
+        setCountryQuery(countryByIso2(s3.country_iso2)?.display_name ?? s3.country_iso2)
+      }
       if (s3.revenue_millions != null) setRevenue(s3.revenue_millions * 1_000_000) // overrides ghg-derived revenue (user may have edited it)
       if (s3.cat_data) setCatData(s3.cat_data as Record<string, CategoryData>)
       setMaterialCats(
@@ -268,7 +347,14 @@ export default function Scope3Dashboard() {
 
   // Auto-detect material categories
   const autoDetect = () => {
-    const suggested = SECTOR_MATERIAL[sector] || SECTOR_MATERIAL['Other']
+    // SECTOR_MATERIAL is keyed on the retired vocabulary too. Falling through to 'Other' would
+    // suggest one generic set of material categories to every company while looking tailored, so
+    // an unmatched sector suggests nothing and says so.
+    const suggested = SECTOR_MATERIAL[sector]
+    if (!suggested) {
+      setMaterialCats([])
+      return
+    }
     setMaterialCats(suggested)
     // Initialise category data
     const init: Record<string, CategoryData> = {}
@@ -404,8 +490,40 @@ export default function Scope3Dashboard() {
     }
   }
 
-  const totalScope3 = CATEGORIES.filter(c => catData[c.id]?.included)
+  // ── CATEGORIES THAT CANNOT BE PRICED ARE EXCLUDED AND NAMED, NEVER COUNTED AS ZERO ───────────
+  //
+  // Same rule the GHG engine applies to an unpriceable location: it is left out of the totals and
+  // the exclusion is stated, because a category summed in at zero is a claim that it emits nothing.
+  // Only the two sector-keyed categories are affected. Cat 1 reads EMISSION_FACTORS.spend by sector;
+  // Cat 15 passes a sector into lib/pcaf, which falls back to 0.12 on a miss. The other thirteen
+  // never used the sector — calcGenericSpend has always been a flat 0.5 and calcCat5/6/7 are
+  // activity-based — so they are unaffected by the vocabulary change.
+  const unpricedCatIds = new Set(
+    CATEGORIES.filter(c => {
+      const d = catData[c.id]
+      if (!d?.included) return false
+      if (c.id === 'cat1') return !(d.has_supplier_data && d.supplier_emissions) && !sectorPriced(d.supplier_sector || sector)
+      if (c.id === 'cat15') return !d.emissions_override && !sectorPriced(d.portfolio_sector || sector)
+      return false
+    }).map(c => c.id),
+  )
+  const totalScope3 = CATEGORIES.filter(c => catData[c.id]?.included && !unpricedCatIds.has(c.id))
     .reduce((sum, c) => sum + getCatEmissions(c.id), 0)
+  const unpricedCats = CATEGORIES.filter(c => unpricedCatIds.has(c.id))
+  // The categories that actually contribute to totalScope3: included, priceable, and non-zero.
+  // ONE definition, read by both the Results rows and the Export tile's count, because those two
+  // disagreed (Results showed 1 row, Export said "Categories: 3") and a count that differs from the
+  // rows beside the same total reads as a claim about what the total is made of. This is a display
+  // set, not a calculation: totalScope3 above is unchanged and still sums its own filter.
+  const categoriesInTotal = CATEGORIES.filter(c => catData[c.id]?.included && !unpricedCatIds.has(c.id) && getCatEmissions(c.id) > 0)
+  // The categories marked material: everything the inventory claims to cover, whether or not it
+  // could be priced or has data yet. Shown beside categoriesInTotal wherever a category count
+  // appears, so "in scope" versus "in total" is always visible rather than one standing in for the
+  // other under a bare "Categories".
+  const categoriesInScope = CATEGORIES.filter(c => catData[c.id]?.included)
+  // The total as displayed. ONE expression for every surface that shows it, so a total missing
+  // unpriced categories never reads as complete on one step and partial on the next.
+  const totalScope3Label = unpricedCats.length > 0 ? `${totalScope3.toFixed(1)} mt (partial)` : `${totalScope3.toFixed(1)} mt`
 
   const getConfidence = (id: string): 'high' | 'medium' | 'low' => {
     const d = catData[id]
@@ -437,6 +555,9 @@ export default function Scope3Dashboard() {
         inventory_id: boundInventoryId,
         sector,
         currency,
+        // NULL, not ''. scope3_inventories_country_iso2_format rejects anything that is not two
+        // uppercase letters or NULL, so an empty string would fail the whole upsert.
+        country_iso2: countryIso2 || null,
         revenue_millions: (revenue || 0) / 1_000_000, // raw -> millions
         cat_data: catData,
         total_scope3_tco2e: totalScope3,
@@ -454,7 +575,7 @@ export default function Scope3Dashboard() {
   useEffect(() => {
     if (justRestored.current) { justRestored.current = false; return }
     setSaved(false)
-  }, [catData, sector, currency, revenue])
+  }, [catData, sector, currency, revenue, countryIso2])
 
   const generateExport = () => {
     const rows = [
@@ -463,6 +584,9 @@ export default function Scope3Dashboard() {
       ['Sector', sector],
       ['Reporting year', reportingYear],
       ['Total Scope 3', `${totalScope3.toFixed(2)} mt CO2e`],
+      ...(unpricedCats.length > 0
+        ? [['Excluded from total', `${unpricedCats.map(c => `Cat ${c.num} ${c.name}`).join('; ')} — no spend factor held for the selected sector; not counted as zero`]]
+        : []),
       ['Generated', new Date().toLocaleDateString()],
       [],
       ['SCOPE 3 BY CATEGORY'],
@@ -470,7 +594,7 @@ export default function Scope3Dashboard() {
       ...CATEGORIES.map(c => [
         `Cat ${c.num}`,
         c.name,
-        catData[c.id]?.included ? getCatEmissions(c.id).toFixed(2) : '—',
+        catData[c.id]?.included ? (unpricedCatIds.has(c.id) ? 'no factor yet' : getCatEmissions(c.id).toFixed(2)) : '—',
         catData[c.id]?.included ? confidenceConfig[getConfidence(c.id)].label : 'Excluded',
         catData[c.id]?.included ? confidenceConfig[getConfidence(c.id)].label : '—',
         catData[c.id]?.included ? 'Yes' : `No — ${catData[c.id]?.excluded_reason || 'not material'}`,
@@ -490,6 +614,67 @@ export default function Scope3Dashboard() {
     a.click()
   }
 
+  // ─── Country typeahead: matching, selection and keyboard ────────────────────
+  //
+  // Results are derived from the QUERY ALONE, not from countryOpen. Deriving them from the open
+  // flag as well would make ArrowDown a two-step action, because the option it wants to focus
+  // would not exist until after the render that opens the list.
+  const countryResults = countryQuery.trim() === '' ? [] : matchCountries(countryQuery, 8)
+  const countryListVisible = countryOpen && countryQuery.trim() !== ''
+
+  const countryInputRef = useRef<HTMLInputElement | null>(null)
+  const countryOptionRefs = useRef<Array<HTMLButtonElement | null>>([])
+
+  const closeCountryList = () => { setCountryOpen(false); setCountryFocusIdx(-1); setCountryHoverIdx(-1) }
+
+  const selectCountry = (iso2: string, displayName: string) => {
+    setCountryIso2(iso2)
+    setCountryQuery(displayName)
+    closeCountryList()
+    countryInputRef.current?.focus()   // focus must come back, or the keyboard user is stranded
+  }
+
+  const clearCountry = () => {
+    setCountryIso2('')
+    setCountryQuery('')
+    closeCountryList()
+    countryInputRef.current?.focus()
+  }
+
+  const onCountryInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') { e.preventDefault(); closeCountryList(); return }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      // Already open: step into the list. Closed: reopen it, and a second ArrowDown enters.
+      if (countryListVisible) countryOptionRefs.current[0]?.focus()
+      else setCountryOpen(true)
+      return
+    }
+    if (e.key === 'Enter' && countryListVisible && countryResults.length > 0) {
+      // Enter from the input takes the top result, the ordinary typeahead shortcut. preventDefault
+      // because Enter in a text input is otherwise a submit gesture.
+      e.preventDefault()
+      selectCountry(countryResults[0].iso2, countryResults[0].display_name)
+    }
+  }
+
+  const onCountryOptionKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, i: number) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      countryOptionRefs.current[Math.min(i + 1, countryResults.length - 1)]?.focus()
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      // Off the top of the list goes back to the input, not nowhere.
+      if (i === 0) countryInputRef.current?.focus()
+      else countryOptionRefs.current[i - 1]?.focus()
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      closeCountryList()
+      countryInputRef.current?.focus()
+    }
+    // Enter and Space need no handler: these are real <button>s and fire click natively.
+  }
+
   // ─── Steps ──────────────────────────────────────────────────────────────────
 
   const renderStep0 = () => (
@@ -506,7 +691,7 @@ export default function Scope3Dashboard() {
           <label style={labelStyle}>Primary sector</label>
           <select style={inputStyle} value={sector} onChange={e => setSector(e.target.value)}>
             <option value="">Select sector</option>
-            {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
+            <IndustryOptions />
           </select>
         </div>
         <div>
@@ -520,6 +705,116 @@ export default function Scope3Dashboard() {
           <select style={inputStyle} value={currency} onChange={e => setCurrency(e.target.value)}>
             {['USD', 'EUR', 'GBP', 'CAD', 'AUD'].map(c => <option key={c} value={c}>{c}</option>)}
           </select>
+        </div>
+        <div
+          style={{ gridColumn: '1 / -1', position: 'relative' }}
+          // ONE focusout handler for the whole control, rather than onBlur on the input.
+          // relatedTarget is the element about to receive focus: if it is still inside this box the
+          // user is moving between the input and a result, so the list must stay open. Closing on
+          // the input's own blur would destroy the option before the user could reach it.
+          onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) closeCountryList() }}
+        >
+          <label style={labelStyle} htmlFor="s3-country-input">Primary country of supply</label>
+          <input
+            id="s3-country-input"
+            ref={countryInputRef}
+            style={inputStyle}
+            value={countryQuery}
+            onChange={e => { setCountryQuery(e.target.value); setCountryOpen(true); if (countryIso2) setCountryIso2('') }}
+            onFocus={() => { if (countryQuery.trim() !== '' && !countryIso2) setCountryOpen(true) }}
+            onKeyDown={onCountryInputKeyDown}
+            placeholder="Start typing a country"
+            autoComplete="off"
+            aria-describedby="s3-country-hint"
+            aria-expanded={countryListVisible}
+            aria-controls="s3-country-results"
+          />
+          <div id="s3-country-hint" style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 6 }}>
+            The country whose production the estimate should represent — usually where your main suppliers are, not where your company is.
+          </div>
+
+          {/* Announced on every change. Sighted users read the count off the list; a screen reader
+              otherwise hears nothing when results appear or disappear. */}
+          <div aria-live="polite" style={srOnly}>
+            {countryListVisible ? (countryResults.length === 0 ? 'No countries match' : `${countryResults.length} ${countryResults.length === 1 ? 'country' : 'countries'} found`) : ''}
+          </div>
+
+          {countryListVisible && (
+            <div
+              id="s3-country-results"
+              aria-label="Country results"
+              style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, marginTop: 4, background: '#fff', border: '1px solid #e8e7e4', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.08)', overflow: 'hidden' }}
+            >
+              {countryResults.length === 0 ? (
+                <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>No countries match “{countryQuery}” — try a different spelling</div>
+              ) : countryResults.map((c, i) => {
+                const lit = countryFocusIdx === i || countryHoverIdx === i
+                return (
+                  <button
+                    key={c.iso2}
+                    type="button"
+                    ref={el => { countryOptionRefs.current[i] = el }}
+                    // Keeps focus in the input while the mouse is used, so the focusout handler
+                    // above never fires mid-click. Safari does not focus a button on mousedown, so
+                    // without this the list would unmount before click and the selection would be
+                    // lost on that browser alone.
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => selectCountry(c.iso2, c.display_name)}
+                    onKeyDown={e => onCountryOptionKeyDown(e, i)}
+                    onFocus={() => setCountryFocusIdx(i)}
+                    onBlur={() => setCountryFocusIdx(idx => (idx === i ? -1 : idx))}
+                    onMouseEnter={() => setCountryHoverIdx(i)}
+                    onMouseLeave={() => setCountryHoverIdx(idx => (idx === i ? -1 : idx))}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer',
+                      padding: '9px 12px', fontSize: 13, color: '#0d0d0d', fontFamily: 'inherit',
+                      background: lit ? 'var(--color-brand-wash)' : '#fff',
+                      // Inline styles cannot express :focus-visible, so the ring is driven by the
+                      // focus handler above. It is an outline rather than a border so the row does
+                      // not shift by a pixel when it gains focus.
+                      outline: countryFocusIdx === i ? '2px solid var(--color-brand)' : 'none',
+                      outlineOffset: -2,
+                    }}
+                  >
+                    {c.display_name}
+                    <span style={{ color: 'var(--color-ink-muted)', marginLeft: 6 }}>{c.iso2}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {(() => {
+            if (!countryIso2) return null
+            const picked = countryByIso2(countryIso2)
+            if (!picked) {
+              // A stored code the concordance no longer carries. Say so; do not guess a region.
+              return (
+                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: 'var(--color-module-climate)' }}>
+                  <span>⚠ {countryIso2} — not in the country list; no region resolved</span>
+                  <button type="button" onClick={clearCountry} style={{ border: 'none', background: 'none', padding: 0, font: 'inherit', color: 'var(--color-brand)', textDecoration: 'underline', cursor: 'pointer' }}>Clear</button>
+                </div>
+              )
+            }
+            // ⚠️ THE TEST IS region_code === iso2, NOT basis. See the note in the report: `basis`
+            // records how the country NAME was resolved from the source, not how good the region
+            // is. Russia and Turkey are both 'manual-resolution' (the source spelled them with
+            // their pre-rename names) and both ARE among the 44 countries EXIOBASE resolves
+            // individually, so keying on basis would tell a customer their Russian supply was a
+            // regional average when it is a country-specific factor.
+            const named = picked.region_code === picked.iso2
+            const bucket = ROW_BUCKET_NAMES[picked.region_code] ?? picked.region_code
+            return (
+              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: '#555553' }}>
+                <span>
+                  ✓ {named
+                    ? `${picked.display_name} — country-specific factor`
+                    : `${picked.display_name} — ${bucket} (regional average)`}
+                </span>
+                <button type="button" onClick={clearCountry} style={{ border: 'none', background: 'none', padding: 0, font: 'inherit', color: 'var(--color-brand)', textDecoration: 'underline', cursor: 'pointer' }}>Clear</button>
+              </div>
+            )
+          })()}
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={labelStyle}>Annual revenue ({currency})</label>
@@ -609,7 +904,9 @@ export default function Scope3Dashboard() {
                     <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-ink-muted)', marginRight: 10 }}>Cat {cat.num}</span>
                     <span style={{ fontSize: 13, fontWeight: 600 }}>{cat.name}</span>
                   </div>
-                  {getCatEmissions(cat.id) > 0 && (
+                  {unpricedCatIds.has(cat.id) ? (
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-module-climate)' }}>no factor yet</span>
+                  ) : getCatEmissions(cat.id) > 0 && (
                     <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-module-ghg)' }}>{getCatEmissions(cat.id).toFixed(2)} mt CO₂e</span>
                   )}
                 </div>
@@ -652,8 +949,10 @@ export default function Scope3Dashboard() {
                       <div>
                         <label style={labelStyle}>Primary supplier sector</label>
                         <select style={inputStyle} value={catData['cat1']?.supplier_sector || sector} onChange={e => updateCat('cat1', 'supplier_sector', e.target.value)}>
-                          {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
+                          <option value="">Select sector</option>
+                          <IndustryOptions />
                         </select>
+                        {unpricedCatIds.has('cat1') && <NoFactorNotice what="Purchased goods & services" />}
                       </div>
                     </>}
                     <div style={{ gridColumn: '1 / -1', background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
@@ -782,8 +1081,10 @@ export default function Scope3Dashboard() {
                     <div>
                       <label style={labelStyle}>Primary portfolio sector</label>
                       <select style={inputStyle} value={catData['cat15']?.portfolio_sector || 'Financial Services'} onChange={e => updateCat('cat15', 'portfolio_sector', e.target.value)}>
-                        {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
+                        <option value="">Select sector</option>
+                        <IndustryOptions />
                       </select>
+                      {unpricedCatIds.has('cat15') && <NoFactorNotice what="Financed emissions" />}
                     </div>
                     <div style={{ gridColumn: '1 / -1' }}>
                       <label style={labelStyle}>Or enter known financed emissions directly (mt CO₂e)</label>
@@ -857,11 +1158,20 @@ export default function Scope3Dashboard() {
                               <input style={inputStyle} type="number" value={row.emissions.revenue ?? ''} onChange={e => updatePcafEmissions(idx, { revenue: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="For estimate" />
                               <select style={{ ...inputStyle, marginTop: 6 }} value={row.emissions.sector ?? ''} onChange={e => updatePcafEmissions(idx, { sector: e.target.value === '' ? undefined : e.target.value })}>
                                 <option value="">Sector for estimate…</option>
-                                {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
+                                <IndustryOptions />
                               </select>
                             </div>
                             <div style={{ gridColumn: '1 / -1' }}>
                               {(() => {
+                                // ⚠️ GATED HERE RATHER THAN IN lib/pcaf. estimateEmissions falls back
+                                // to LEGACY_SPEND_FALLBACK (0.12) on an unknown sector key, so an
+                                // EXIOBASE code would produce a confident financed-emissions figure
+                                // from a constant nobody chose for this asset. The library is left
+                                // alone — it is tested and has other callers — and the page refuses
+                                // to ask it a question it cannot answer honestly.
+                                if (row.emissions.revenue != null && !sectorPriced(row.emissions.sector)) {
+                                  return <div style={{ fontSize: 11, color: '#92400e', lineHeight: 1.5 }}>No spend factor for this sector yet, so a revenue-based estimate is not shown. Enter known emissions for this holding instead. It is not counted as zero.</div>
+                                }
                                 try {
                                   const a = assessAsset(row)
                                   return <div style={{ fontSize: 11, color: '#0F6E56', fontWeight: 600 }}>Financed: {a.financedEmissions.toFixed(1)} tCO₂e · PCAF DQ {a.dqScore}</div>
@@ -943,7 +1253,8 @@ export default function Scope3Dashboard() {
   }
 
   const renderStep3 = () => {
-    const activeCats = CATEGORIES.filter(c => catData[c.id]?.included && getCatEmissions(c.id) > 0)
+    // Copied before sorting: categoriesInTotal is shared with the Export count, and sort() mutates.
+    const activeCats = [...categoriesInTotal]
       .sort((a, b) => getCatEmissions(b.id) - getCatEmissions(a.id))
     const highCount = activeCats.filter(c => getConfidence(c.id) === 'high').length
     const medCount = activeCats.filter(c => getConfidence(c.id) === 'medium').length
@@ -969,6 +1280,11 @@ export default function Scope3Dashboard() {
 
         {/* Total */}
         <div className="tq-summary" data-module="ghg" style={{ marginBottom: 20 }}>
+          {/* .tq-summary is itself a flex ROW, so the amber box cannot simply become its second child
+              — it would sit beside .tq-summary-body instead of inside it. This column wrapper stacks
+              the body and the box vertically while .tq-summary keeps its border and left rule round
+              both. minWidth 0 lets it shrink with the panel rather than holding its content width. */}
+          <div style={{ flex: 1, minWidth: 0 }}>
           <div className="tq-summary-body">
           <div style={{ flex: 1 }}>
             <div className="tq-summary-label">Data quality</div>
@@ -984,22 +1300,50 @@ export default function Scope3Dashboard() {
               measured 14.61:1 on the black panel and 1.33:1 on a white one. */}
           <div className="tq-summary-figure">{totalScope3.toFixed(1)}<small>mt CO₂e total Scope 3</small></div>
           </div>
+          {/* Below the body, not inside it. It was a third flex column beside the figure, which
+              squeezed the Data quality column down to its longest word. The side margins match
+              .tq-summary-body's 24px padding so the box lines up with the content above it; the
+              body's own 20px bottom padding now provides the gap marginTop used to. */}
+          {unpricedCats.length > 0 && (
+            <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem', margin: '0 24px 20px', textAlign: 'left' as const }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>
+                ⚠ This total excludes {unpricedCats.length} categor{unpricedCats.length === 1 ? 'y' : 'ies'} we cannot price yet
+              </div>
+              <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
+                {unpricedCats.map(c => `Cat ${c.num} ${c.name}`).join(', ')} — no spend factor is held for the sector selected.
+              </div>
+              <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 4 }}>
+                They are left out rather than counted as zero. Enter a known figure for a category to include it.
+              </div>
+            </div>
+          )}
+          </div>
         </div>
 
         {/* Category breakdown */}
         <div style={{ border: '0.5px solid #e8e7e4', borderRadius: 12, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 100px 100px 80px', background: '#f8f7f5', padding: '10px 16px', borderBottom: '0.5px solid #e8e7e4' }}>
+          {/* Column widths, measured against SF Pro (the -apple-system face this page sets) at opsz 17:
+                #          32px  "15" at 11px/700 is ~14px
+                Category   1fr   ~98px at the 900px layout; longest unbreakable word "transportation" is 89.5px
+                mt CO₂e    88px  "1250000.00" at 13px/600 is 79.3px
+                % of total 84px  header "% OF TOTAL" at 10px/700 +0.06em is 69.7px
+                Method     96px  widest pill "Spend-based" is 60.7px + 12px padding at 9px, and 93px even if
+                                 a minimum-font-size setting renders it at 12px
+              plus an 8px column gap. A 12px gap would push Category below 89.5px and break
+              "transportation" mid-word, so the gap is 8. Header and rows must stay identical. */}
+          <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 88px 84px 96px', columnGap: 8, background: '#f8f7f5', padding: '10px 16px', borderBottom: '0.5px solid #e8e7e4' }}>
             {['#', 'Category', 'mt CO₂e', '% of total', 'Method'].map(h => (
               <div key={h} style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-ink-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
             ))}
           </div>
           {activeCats.map((cat, i) => {
-            const emissions = getCatEmissions(cat.id)
-            const pct = totalScope3 > 0 ? ((emissions / totalScope3) * 100).toFixed(1) : '0'
+            const unpriced = unpricedCatIds.has(cat.id)
+            const emissions = unpriced ? 0 : getCatEmissions(cat.id)
+            const pct = !unpriced && totalScope3 > 0 ? ((emissions / totalScope3) * 100).toFixed(1) : '0'
             const conf = getConfidence(cat.id)
             const ccfg = confidenceConfig[conf]
             return (
-              <div key={cat.id} style={{ display: 'grid', gridTemplateColumns: '40px 1fr 100px 100px 80px', padding: '12px 16px', borderBottom: i < activeCats.length - 1 ? '0.5px solid #f3f4f6' : 'none', alignItems: 'center', background: i === 0 ? '#fafafa' : '#fff' }}>
+              <div key={cat.id} style={{ display: 'grid', gridTemplateColumns: '32px 1fr 88px 84px 96px', columnGap: 8, padding: '12px 16px', borderBottom: i < activeCats.length - 1 ? '0.5px solid #f3f4f6' : 'none', alignItems: 'center', background: i === 0 ? '#fafafa' : '#fff' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-ink-muted)' }}>{cat.num}</div>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{cat.name}</div>
@@ -1013,7 +1357,9 @@ export default function Scope3Dashboard() {
                   </div>
                 </div>
                 <div>
-                  <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 99, background: ccfg.bg, color: ccfg.color }}>{ccfg.label}</span>
+                  {/* nowrap is what guarantees one line; the 96px column is what stops one line overflowing.
+                      inline-block so the vertical padding takes up space instead of overlapping. */}
+                  <span style={{ display: 'inline-block', whiteSpace: 'nowrap', fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 99, background: ccfg.bg, color: ccfg.color }}>{ccfg.label}</span>
                 </div>
               </div>
             )
@@ -1059,11 +1405,17 @@ export default function Scope3Dashboard() {
         <div style={{ flex: 1, padding: '20px 24px' }}>
         <div className="tq-summary-label" style={{ marginBottom: 12 }}>Inventory summary — {company || 'Your company'}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+          {/* Read left to right as an explanation: how many categories the inventory covers, how many
+              of those made it into the figure, then the figure — so "3 / 1 / 13.9 mt (partial)" says
+              why the total is partial before the reader has to ask.
+              'Standard: GHG Protocol' was dropped to keep four columns. It is the one figure here that
+              says nothing about THIS inventory, and the same screen already states it twice: the
+              subtitle directly above this tile and the banner at the top of every step. */}
           {[
-            { label: 'Total Scope 3', val: `${totalScope3.toFixed(1)} mt` },
-            { label: 'Categories', val: CATEGORIES.filter(c => catData[c.id]?.included).length },
+            { label: 'Categories in scope', val: categoriesInScope.length },
+            { label: 'Categories in total', val: categoriesInTotal.length },
+            { label: 'Total Scope 3', val: totalScope3Label },
             { label: 'Reporting year', val: reportingYear },
-            { label: 'Standard', val: 'GHG Protocol' },
           ].map(({ label, val }) => (
             <div key={label}>
               <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginBottom: 4 }}>{label}</div>
@@ -1148,7 +1500,6 @@ export default function Scope3Dashboard() {
   )
 
   const steps = [renderStep0, renderStep1, renderStep2, renderStep3, renderStep4]
-  const activeCatCount = CATEGORIES.filter(c => catData[c.id]?.included).length
 
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
@@ -1203,8 +1554,13 @@ export default function Scope3Dashboard() {
                   {[
                     { label: 'Company', val: company || '—' },
                     { label: 'Sector', val: sector || '—' },
-                    { label: 'Categories', val: activeCatCount },
-                    { label: 'Total Scope 3', val: totalScope3 > 0 ? `${totalScope3.toFixed(1)} mt` : '—' },
+                    // Same two labels, same two sets and same order as the Export tile, so a reader moving
+                    // between steps is never comparing different counts under one word. Two rows rather
+                    // than one because this sidebar also shows on Materiality and Calculate, where "in
+                    // scope" is the live number and "in total" is still 0 until data is entered.
+                    { label: 'Categories in scope', val: categoriesInScope.length },
+                    { label: 'Categories in total', val: categoriesInTotal.length },
+                    { label: 'Total Scope 3', val: totalScope3 > 0 ? totalScope3Label : '—' },
                   ].map(({ label, val }) => (
                     <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{label}</span>
