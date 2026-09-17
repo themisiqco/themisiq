@@ -28,7 +28,7 @@ const METADATA_FIELDS = [
   'source', 'version', 'publisher', 'doi', 'url', 'licence', 'archive', 'data_year',
   'factor_type', 'price_basis', 'currency', 'price_year', 'gwp_set', 'source_member',
   'source_row_number', 'source_row_label', 'source_row_index_name', 'unit', 'unit_source',
-  'regions', 'industries', 'generated_on', 'generated_by', 'reliability_bounds',
+  'regions', 'industries', 'generated_on', 'generated_by', 'intensity_percentiles',
   'gwp_note', 'price_basis_note', 'denominator_note', 'margin_note', 'version_note',
 ] as const
 
@@ -116,15 +116,18 @@ describe('exiobaseFactors2019ixi.json is generated, not maintained', () => {
     expect(String(meta.margin_note), 'no basic-to-purchaser conversion is possible from this archive').toMatch(/no trade/i)
   })
 
-  it('T8 the reliability bounds are pinned, and no value moved to produce them', () => {
+  it('T8 the intensity percentiles are pinned, and no value moved to produce them', () => {
     // ⚠️ THE POINT OF THIS TEST IS THAT T1 STILL PASSES. The bounds are DESCRIPTIVE: they are
     // computed FROM the factors and stored beside them, and not one value is clipped, winsorised
     // or replaced. Other users of EXIOBASE do clip - Ignite Procurement publishes a p3/p97
     // truncation with zero-filling - and this file's source note says the values are stored exactly
     // as published, so clipping here would make that note false. If a future change starts
     // modifying values, T1's digest moves and this suite fails before anything ships.
-    const b = meta.reliability_bounds as Record<string, any>
-    expect(b, 'reliability_bounds missing').toBeTruthy()
+    // Named reliability_bounds until 17 Sep 2026: renamed because the bounds measure POSITION, and
+    // "reliability" is a defined data-quality term. T1 above is what proves the rename moved no row.
+    expect(meta.reliability_bounds, 'the old key must not linger beside the new one').toBeUndefined()
+    const b = meta.intensity_percentiles as Record<string, any>
+    expect(b, 'intensity_percentiles missing').toBeTruthy()
     expect(b.values_modified, 'bounds must never modify a value').toBe(false)
     expect(b.zeros_excluded, 'a zero is an absent factor, not a factor of zero').toBe(true)
     expect(String(b.zeros_excluded_reason)).toMatch(/absent factor/i)
@@ -136,21 +139,37 @@ describe('exiobaseFactors2019ixi.json is generated, not maintained', () => {
     expect(b.global.n_below).toBe(207)
     expect(b.global.n_above).toBe(207)
 
-    expect(b.per_industry.percentiles).toEqual([5, 95])
-    expect(b.per_industry.min_nonzero_regions, 'the threshold is a judgement and is pinned').toBe(20)
-    expect(b.per_industry.industries_with_bound).toBe(153)
+    expect(b.per_sector.percentiles).toEqual([5, 95])
+    expect(b.per_sector.min_nonzero_regions, 'the threshold is a judgement and is pinned').toBe(20)
+    expect(b.per_sector.industries_with_bound).toBe(153)
     // Named, not counted: an industry silently gaining or losing a bound changes what a resolver
     // can say about it, and 'unbounded' must never be mistaken for 'in range'.
-    expect(b.per_industry.industries_without_local_bound).toEqual(
+    expect(b.per_sector.industries_without_local_bound).toEqual(
       ['i27.41.w', 'i27.45.w', 'i37.w.1', 'i40.11.i', 'i40.11.j', 'i40.11.k', 'i45.w'])
-    expect(b.per_industry.industries_zero_in_every_region).toEqual(['i01.w.1', 'i01.w.2', 'i99'])
-    expect(Object.keys(b.per_industry.bounds)).toHaveLength(153)
-    for (const [code, v] of Object.entries(b.per_industry.bounds as Record<string, any>)) {
+    expect(b.per_sector.industries_zero_in_every_region).toEqual(['i01.w.1', 'i01.w.2', 'i99'])
+    expect(Object.keys(b.per_sector.bounds)).toHaveLength(153)
+    for (const [code, v] of Object.entries(b.per_sector.bounds as Record<string, any>)) {
       expect(String(code).startsWith('i'), `${code} is not an industry code`).toBe(true)
       expect(v.p5, `${code}: p5 must not exceed p95`).toBeLessThanOrEqual(v.p95)
       expect(v.n_nonzero_regions, `${code}: below the stated threshold`).toBeGreaterThanOrEqual(20)
     }
     expect(String(b.disagreement_note), 'the global and local bounds are not substitutes').toMatch(/disagree/i)
+  })
+
+  it('T8b every statistic in the prose is THIS file\'s, and the rank test is stated', () => {
+    // ⚠️ These notes were once typed in, and the product file carried the industry file's counts.
+    // They are now generated; pinning them here is what catches a note describing the other file.
+    const b = meta.intensity_percentiles as Record<string, unknown> & { per_sector: Record<string, unknown> }
+    expect(String(b.what_this_measures)).toMatch(/^POSITION/)
+    expect(String(b.zeros_excluded_reason)).toContain('1,108 of 7,987 cells in this file are zero')
+    expect(String(b.zeros_excluded_reason)).toContain('3 industries are zero in all 49 regions')
+    expect(String(b.per_sector.min_nonzero_regions_reason)).toContain('7 industries fall under the threshold')
+    expect(String(b.disagreement_note)).toContain('(834 of 6,795)')
+    expect(String(b.disagreement_note)).toContain('a 713x span')
+    expect(String(b.disagreement_note)).toContain("median sector's own span is 17x")
+    expect(String(b.rank_test_note)).toMatch(/^THE PER-SECTOR BOUND IS A RANK TEST, NOT AN OUTLIER TEST/)
+    expect(String(b.rank_test_note)).toContain('every one of the 81 industries with a non-zero factor in all 49 regions has exactly 3 regions below its p5 and 3 above its p95')
+    expect(String(b.rank_test_note)).toContain('1,062 of 6,879 non-zero factors (15.4%) sit outside at least one of the two bounds: 525 below and 537 above')
   })
 
   it('T9 the metadata block is complete, licence included', () => {

@@ -28,6 +28,9 @@ import {
   type PriceBasis,
   type SpendFactor,
   type SpendFactorCaveats,
+  type IntensityPosition,
+  type SectorIntensityPosition,
+  intensityPositionSentences,
   type SpendFactorQuery,
   type SpendFactorResult,
   type SpendFactorSource,
@@ -66,7 +69,15 @@ interface SystemIndex {
   byKey: Map<string, RawFactor>
   globalLower: number
   globalUpper: number
+  globalPercentiles: [number, number]
   localBounds: Map<string, LocalBound>
+  sectorPercentiles: [number, number]
+  minSectorRegions: number
+  regionsInDataset: number
+  /** Every sector's NON-ZERO values, ascending. The population a rank is taken over. Built for every
+   *  sector with at least one non-zero value, bounded or not, so an unassessed sector can still say
+   *  how many regions it has. */
+  sectorValues: Map<string, number[]>
   priceYear: number
   currency: string
   priceBasis: PriceBasis
@@ -111,22 +122,37 @@ function buildIndex(): Map<SpendFactorType, SystemIndex> {
   const out = new Map<SpendFactorType, SystemIndex>()
   for (const [type, file] of [['industry', ixiFile], ['product', pxpFile]] as const) {
     const meta = file.metadata as Record<string, any>
-    const bounds = meta.reliability_bounds
+    // Named reliability_bounds until 17 Sep 2026; see IntensityPosition in spend.ts for why.
+    const bounds = meta.intensity_percentiles
     const byKey = new Map<string, RawFactor>()
+    const sectorValues = new Map<string, number[]>()
+    const regions = new Set<string>()
     for (const f of file.factors as RawFactor[]) {
       byKey.set(`${type}|${f.region}|${f.exio_code}`, f)
+      regions.add(f.region)
+      if (f.value !== 0) {
+        const vals = sectorValues.get(f.exio_code)
+        if (vals) vals.push(f.value)
+        else sectorValues.set(f.exio_code, [f.value])
+      }
     }
+    for (const vals of sectorValues.values()) vals.sort((a, b) => a - b)
     // The per-sector bound map is keyed `bounds` in both files; the SIBLING keys differ
     // ('industries_with_bound' vs 'products_with_bound'), so nothing here reads them. A sector
-    // absent from this map is UNBOUNDED, never in range — see resolveBounds.
+    // absent from this map is NOT ASSESSED, never in range — see positionOf.
     const localBounds = new Map<string, LocalBound>(
-      Object.entries(bounds.per_industry.bounds as Record<string, LocalBound>),
+      Object.entries(bounds.per_sector.bounds as Record<string, LocalBound>),
     )
     out.set(type, {
       byKey,
       globalLower: bounds.global.lower,
       globalUpper: bounds.global.upper,
+      globalPercentiles: bounds.global.percentiles as [number, number],
       localBounds,
+      sectorPercentiles: bounds.per_sector.percentiles as [number, number],
+      minSectorRegions: bounds.per_sector.min_nonzero_regions,
+      regionsInDataset: regions.size,
+      sectorValues,
       priceYear: meta.price_year,
       currency: meta.currency,
       priceBasis: meta.price_basis as PriceBasis,
@@ -146,23 +172,63 @@ export function __resetSpendIndexForTests(): void {
   INDEX = null
 }
 
-// ── BOUNDS ───────────────────────────────────────────────────────────────────────────────────────
+// ── POSITION ────────────────────────────────────────────────────────────────────────────────────
+//
+// ⚠️ NOT "RELIABILITY". Until 17 Sep 2026 this was resolveBounds and produced
+// outside_reliability_bounds. The bounds are unchanged; what changed is what the result says. The
+// per-sector bound is a RANK TEST: with 49 regions it puts the lowest three and highest three of every
+// fully populated sector outside, whatever their values. So the result now carries WHICH test fired,
+// in WHICH direction, and the region's rank, and the words are chosen from that in spend.ts.
 
-function resolveBounds(sys: SystemIndex, code: string, value: number): {
-  outside: boolean
-  incomplete: boolean
-} {
-  const outsideGlobal = value < sys.globalLower || value > sys.globalUpper
+/** Count of values strictly less than x, in an ascending array. */
+function countBelow(sorted: readonly number[], x: number): number {
+  let lo = 0, hi = sorted.length
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (sorted[mid] < x) lo = mid + 1; else hi = mid }
+  return lo
+}
+
+/** Count of values strictly greater than x, in an ascending array. */
+function countAbove(sorted: readonly number[], x: number): number {
+  let lo = 0, hi = sorted.length
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (sorted[mid] <= x) lo = mid + 1; else hi = mid }
+  return sorted.length - lo
+}
+
+function positionOf(sys: SystemIndex, code: string, value: number): Pick<SpendFactorCaveats, 'intensity_among_all_factors' | 'intensity_within_sector'> {
+  const among: IntensityPosition = value < sys.globalLower ? 'below' : value > sys.globalUpper ? 'above' : 'within'
+  const values = sys.sectorValues.get(code) ?? []
   const local = sys.localBounds.get(code)
+
+  let within: SectorIntensityPosition
   if (!local) {
-    // ⚠️ NOT `outside: false`. A sector with too few non-zero regions has no local bound, and the
-    // absence of a check is not a passed check. The global result stands on its own and
-    // `incomplete` says the other half could not be evaluated, so a caller reading
-    // `outside === false` here knows it means "global passed, local unknown".
-    return { outside: outsideGlobal, incomplete: true }
+    // ⚠️ NOT 'within'. A sector with too few non-zero regions has no per-sector percentile, and the
+    // absence of a position is not a middle position.
+    within = {
+      assessed: false,
+      regions_with_factor: values.length,
+      minimum_regions: sys.minSectorRegions,
+      regions_in_dataset: sys.regionsInDataset,
+    }
+  } else {
+    within = {
+      assessed: true,
+      position: value < local.p5 ? 'below' : value > local.p95 ? 'above' : 'within',
+      lower_percentile: sys.sectorPercentiles[0],
+      upper_percentile: sys.sectorPercentiles[1],
+      rank_from_lowest: countBelow(values, value) + 1,
+      rank_from_highest: countAbove(values, value) + 1,
+      regions_ranked: values.length,
+      regions_in_dataset: sys.regionsInDataset,
+    }
   }
-  const outsideLocal = value < local.p5 || value > local.p95
-  return { outside: outsideGlobal || outsideLocal, incomplete: false }
+  return {
+    intensity_among_all_factors: {
+      position: among,
+      lower_percentile: sys.globalPercentiles[0],
+      upper_percentile: sys.globalPercentiles[1],
+    },
+    intensity_within_sector: within,
+  }
 }
 
 // ── RESOLUTION ───────────────────────────────────────────────────────────────────────────────────
@@ -185,36 +251,30 @@ function toFactor(sys: SystemIndex, raw: RawFactor, type: SpendFactorType): Spen
 }
 
 function caveatsFor(
-  factor: SpendFactor, query: SpendFactorQuery, bounds: { outside: boolean; incomplete: boolean },
+  factor: SpendFactor, query: SpendFactorQuery,
+  position: Pick<SpendFactorCaveats, 'intensity_among_all_factors' | 'intensity_within_sector'>,
 ): SpendFactorCaveats {
   return {
     currency_mismatch: factor.currency !== query.reporting_currency,
     price_year_mismatch: factor.price_year !== query.reporting_year,
     price_basis_mismatch: factor.price_basis !== query.spend_price_basis,
-    outside_reliability_bounds: bounds.outside,
-    reliability_bounds_incomplete: bounds.incomplete,
+    ...position,
   }
 }
 
-function disclosureFor(requested: string, used: string, caveats: SpendFactorCaveats): string {
+function disclosureFor(requested: string, used: string, caveats: SpendFactorCaveats, factorType: SpendFactorType): string {
   const base =
     `No factor is published for ${requested} in this dataset, so the figure uses the ` +
     `${used} factor instead. It describes a different economy and is a substitution, not a ` +
     `measurement of your supplier.`
-  // ⚠️ BOTH WEAKNESSES, NAMED SEPARATELY. A borrowed factor is one kind of uncertainty; a borrowed
-  // factor that is also an outlier for its own sector is a different and larger one, and reporting
-  // them as a single caveat is a weaker claim than the reader is entitled to.
-  if (caveats.outside_reliability_bounds) {
-    return base +
-      ' That substituted value also sits outside the reliability bounds recorded for this dataset,' +
-      ' so it is an outlier within its own sector as well as being borrowed.'
-  }
-  if (caveats.reliability_bounds_incomplete) {
-    return base +
-      ' This sector has too few regions with published data for a per-sector reliability bound, so' +
-      ' the substituted value could not be checked against one.'
-  }
-  return base
+  // ⚠️ THE SUBSTITUTION AND THE SUBSTITUTED VALUE'S POSITION, NAMED SEPARATELY. A borrowed factor is
+  // one kind of uncertainty; a borrowed factor that is also an extreme across the whole dataset is a
+  // different and larger one, and folding them into one caveat is a weaker claim than the reader is
+  // entitled to. The position sentences come from the same place as the route's, so a fallback and
+  // an exact match describe a position in the same words. "This region" in them is the substituted
+  // one, named in the sentence before.
+  const position = intensityPositionSentences(caveats, factorType)
+  return position.length > 0 ? `${base} ${position.join(' ')}` : base
 }
 
 /**
@@ -256,10 +316,10 @@ function disclosureFor(requested: string, used: string, caveats: SpendFactorCave
  * other zero returns plain null, including p45.w and p99: see SECONDARY_MATERIAL_CODES for why
  * those two are excluded on purpose.
  *
- * ⚠️ A FALLBACK RESULT THAT ALSO SITS OUTSIDE THE BOUNDS MUST SAY BOTH THINGS IN ITS DISCLOSURE.
- * `disclosure` on the fallback arm is required prose, and when caveats.outside_reliability_bounds
- * is true on that same result the sentence must name the substituted region AND the fact that the
- * value is in the tail. See disclosureFor.
+ * ⚠️ A FALLBACK RESULT MUST ALSO SAY WHERE THE SUBSTITUTED VALUE SITS. `disclosure` on the fallback
+ * arm is required prose, and when caveats.intensity_* places that value at an extreme, at an end of
+ * its sector, or not assessed within it, the sentence must name the substituted region AND that
+ * position. See disclosureFor.
  */
 export function resolveSpendFactor(query: SpendFactorQuery): SpendFactorResolution | null {
   const sys = index().get(query.factor_type)
@@ -296,7 +356,7 @@ export function resolveSpendFactor(query: SpendFactorQuery): SpendFactorResoluti
       source,
       requested_region: query.region,
       used_region: query.region,
-      caveats: caveatsFor(factor, query, resolveBounds(sys, exact.exio_code, exact.value)),
+      caveats: caveatsFor(factor, query, positionOf(sys, exact.exio_code, exact.value)),
     }
   }
 
@@ -317,7 +377,7 @@ export function resolveSpendFactor(query: SpendFactorQuery): SpendFactorResoluti
     const raw = lookup(region)
     if (raw === undefined || raw.value === 0) continue
     const factor = toFactor(sys, raw, query.factor_type)
-    const caveats = caveatsFor(factor, query, resolveBounds(sys, raw.exio_code, raw.value))
+    const caveats = caveatsFor(factor, query, positionOf(sys, raw.exio_code, raw.value))
     return {
       kind: 'fallback',
       factor,
@@ -325,7 +385,7 @@ export function resolveSpendFactor(query: SpendFactorQuery): SpendFactorResoluti
       requested_region: query.region,
       used_region: region,
       reason: 'no_factor_for_region',
-      disclosure: disclosureFor(query.region, region, caveats),
+      disclosure: disclosureFor(query.region, region, caveats, query.factor_type),
       caveats,
     }
   }

@@ -1,19 +1,26 @@
 import { describe, it, expect } from 'vitest'
 import { resolveSpendFactor, type SpendFactorAbsent } from './spendResolver.server'
-import type { SpendFactorQuery, SpendFactorResult } from './spend'
+import { intensityPositionSentences, ordinal, type SpendFactorQuery, type SpendFactorResult } from './spend'
+import ixiFile from './exiobaseFactors2019ixi.json'
+import pxpFile from './exiobaseFactors2019pxp.json'
 
 // THE RESOLVER'S JOB IS TO REFUSE WELL, NOT ONLY TO ANSWER.
 //
 // Most of this file is about the cases where there is no number: a zero that must not become 0.0, a
-// region EXIOBASE does not cover, a sector whose reliability could not be checked, a secondary
+// region EXIOBASE does not cover, a sector too thinly populated to rank a region within, a secondary
 // material the model never prices. lib/emissionFactors.ts answers every one of those with
 // DEFAULT_SPEND_EF = 0.5, which is why this module exists.
 //
 // Fixtures are real rows, chosen from the extract and named here so a data change fails visibly
 // rather than silently re-pointing a test at a different row.
-//   AT / i01.b   1,813,850.91108   in bounds, globally and locally  -> 1.81385091108 per EUR
-//   AT / i15.d      42,141.9141288 below the global p3 of 60,429.90
-//   AT / i37.w.1   293,558.201759   sector has NO local bound (3 of 49 regions non-zero elsewhere)
+//   AT / i01.b   1,813,850.91108   within both: 28th lowest of the 48 non-zero regions -> 1.81385091108 per EUR
+//   AT / i15.d      42,141.9141288 below the global p3 of 60,429.90 AND 3rd lowest of 49 in its sector
+//   AT / i37.w.1   293,558.201759   sector NOT ASSESSED: 19 of 49 regions non-zero, under the 20 needed
+//   DE / i28       243,209.898938   3rd lowest of 49 for its sector, 0.12% under p5; globally within
+//   CH / i28       243,956.368618   4th lowest of 49, inside p5 — 0.3% above Germany
+//   IN / i28     2,348,330.26945    the highest of 49 for its sector; globally within
+//   JP / i11.b  43,190,680.0283     above the global p97 of 43,080,559; 5th highest of 41, within its sector
+//   AT / i01.m     103,221.176496   2nd lowest of the 47 regions with a non-zero factor
 //   AT / i01.a               0      Austria grows no rice
 //   p01.w.1                  0      Manure (conventional treatment), product_type 'Waste'
 
@@ -63,9 +70,13 @@ describe('resolveSpendFactor', () => {
       currency_mismatch: false,
       price_year_mismatch: false,
       price_basis_mismatch: false,
-      outside_reliability_bounds: false,
-      reliability_bounds_incomplete: false,
+      intensity_among_all_factors: { position: 'within', lower_percentile: 3, upper_percentile: 97 },
+      intensity_within_sector: {
+        assessed: true, position: 'within', lower_percentile: 5, upper_percentile: 95,
+        rank_from_lowest: 28, rank_from_highest: 21, regions_ranked: 48, regions_in_dataset: 49,
+      },
     })
+    expect(intensityPositionSentences(r.caveats, 'industry'), 'a middle position says nothing').toEqual([])
   })
 
   it('R3 currency mismatch is reported and nothing is converted', () => {
@@ -96,23 +107,26 @@ describe('resolveSpendFactor', () => {
     expect(r.factor.price_basis).toBe('basic')
   })
 
-  it('R6 a value outside the bounds is flagged, not clipped', () => {
+  it('R6 a value at a global extreme is reported with its position, not clipped', () => {
     const r = asResult(resolveSpendFactor(q({ sector_key: 'i15.d' })))
-    expect(r.caveats.outside_reliability_bounds).toBe(true)
-    expect(r.caveats.reliability_bounds_incomplete, 'this sector does have a local bound').toBe(false)
+    expect(r.caveats.intensity_among_all_factors.position).toBe('below')
+    expect(r.caveats.intensity_within_sector).toMatchObject({ assessed: true, position: 'below', rank_from_lowest: 3, regions_ranked: 49 })
     // As published, divided only by 1e6.
     expect(r.factor.value).toBeCloseTo(42141.9141288 / 1e6, 12)
   })
 
-  it('R7 a sector with no local bound is never reported as in range', () => {
-    // i37.w.1 has too few non-zero regions for a p5/p95. outside===false here would mean "in
-    // range", which nobody established; incomplete===true is what stops it being read that way.
+  it('R7 a sector too thin to rank within is NOT ASSESSED, never "within"', () => {
+    // i37.w.1 has 19 non-zero regions, under the 20 a p5/p95 needs. A 'within' here would claim a
+    // middle position nobody established; assessed:false is what stops it being read that way.
     const r = asResult(resolveSpendFactor(q({ sector_key: 'i37.w.1' })))
-    expect(r.caveats.reliability_bounds_incomplete, 'the local check could not be made').toBe(true)
-    expect(
-      r.caveats.outside_reliability_bounds === false && r.caveats.reliability_bounds_incomplete === false,
-      'an unbounded sector must never present as fully checked',
-    ).toBe(false)
+    expect(r.caveats.intensity_within_sector).toEqual({
+      assessed: false, regions_with_factor: 19, minimum_regions: 20, regions_in_dataset: 49,
+    })
+    expect(r.caveats.intensity_among_all_factors.position, 'the global test still applies').toBe('within')
+    expect(intensityPositionSentences(r.caveats, 'industry')).toEqual([
+      'Only 19 of 49 regions have a non-zero emission factor for this sector, fewer than the 20 needed to ' +
+      'place one region within it, so this factor\'s position within the sector was not assessed.',
+    ])
   })
 
   it('R8 a zero resolves to null, not to a factor of zero', () => {
@@ -184,9 +198,13 @@ describe('resolveSpendFactor', () => {
     const r = resolveSpendFactor(q({ region: 'NZ', sector_key: 'i15.d', fallback_regions: ['AT'] }))
     const f = asResult(r)
     if (f.kind !== 'fallback') throw new Error('expected fallback')
-    expect(f.caveats.outside_reliability_bounds).toBe(true)
+    expect(f.caveats.intensity_among_all_factors.position).toBe('below')
     expect(f.disclosure, 'the substitution').toMatch(/NZ/)
-    expect(f.disclosure, 'and the tail, named separately').toMatch(/outside the reliability bounds/)
+    expect(f.disclosure, 'and the global extreme, named separately').toContain(
+      'This emission factor is in the lowest 3% of all industry factors in the source data.')
+    expect(f.disclosure, 'and the rank within the sector').toContain(
+      'This region has the 3rd lowest emission factor of 49 regions for this sector.')
+    expect(f.disclosure).not.toMatch(/reliab/i)
   })
 
   it('R16 product factors resolve on their own code space', () => {
@@ -195,5 +213,107 @@ describe('resolveSpendFactor', () => {
     expect(r.factor.sector_key).toBe('p01.b')
     expect(r.factor.currency).toBe('EUR')
     expect(r.factor.price_basis).toBe('basic')
+  })
+})
+
+// ── POSITION, NOT RELIABILITY ────────────────────────────────────────────────────────────────────
+//
+// The per-sector test is a RANK test: with 49 regions it puts the lowest three and highest three of
+// every fully populated sector outside p5/p95 whatever their values. These tests pin that a
+// within-sector position is stated as a rank, a global extreme as a caution, and that nothing is
+// called reliability, confidence or quality.
+
+describe('intensity position', () => {
+  const industry = (region: string, sector_key: string) =>
+    asResult(resolveSpendFactor(q({ region, sector_key })))
+
+  it('P1 Germany i28 is the 3rd lowest of 49 for its sector — a FACT, not a caution', () => {
+    const r = industry('DE', 'i28')
+    expect(r.caveats.intensity_among_all_factors.position).toBe('within')
+    expect(r.caveats.intensity_within_sector).toEqual({
+      assessed: true, position: 'below', lower_percentile: 5, upper_percentile: 95,
+      rank_from_lowest: 3, rank_from_highest: 47, regions_ranked: 49, regions_in_dataset: 49,
+    })
+    expect(intensityPositionSentences(r.caveats, 'industry')).toEqual([
+      'This region has the 3rd lowest emission factor of 49 regions for this sector.',
+    ])
+  })
+
+  it('P2 Switzerland i28, 0.3% above Germany, is 4th lowest and inside — so says nothing', () => {
+    const r = industry('CH', 'i28')
+    expect(r.caveats.intensity_within_sector).toMatchObject({ position: 'within', rank_from_lowest: 4 })
+    expect(intensityPositionSentences(r.caveats, 'industry')).toEqual([])
+  })
+
+  it('P3 the top of a sector is a fact with the count below it', () => {
+    const r = industry('IN', 'i28')
+    expect(r.caveats.intensity_within_sector).toMatchObject({ position: 'above', rank_from_highest: 1, rank_from_lowest: 49 })
+    expect(intensityPositionSentences(r.caveats, 'industry')).toEqual([
+      'This region has the highest emission factor of 49 regions for this sector: 48 regions have a lower one.',
+    ])
+  })
+
+  it('P4 a global extreme is a caution, and can sit inside its own sector', () => {
+    const r = industry('JP', 'i11.b')
+    expect(r.caveats.intensity_among_all_factors.position).toBe('above')
+    expect(r.caveats.intensity_within_sector).toMatchObject({ assessed: true, position: 'within', rank_from_highest: 5, regions_ranked: 41 })
+    expect(intensityPositionSentences(r.caveats, 'industry')).toEqual([
+      'This emission factor is in the highest 3% of all industry factors in the source data. It was used ' +
+      'as published; a value at either extreme of the source data should be checked against what is ' +
+      'known about the supplier before it is relied on.',
+    ])
+  })
+
+  it('P5 a global low extreme that is also at the bottom of its sector says both', () => {
+    expect(intensityPositionSentences(industry('AT', 'i15.d').caveats, 'industry')).toEqual([
+      'This emission factor is in the lowest 3% of all industry factors in the source data. It was used ' +
+      'as published; a value at either extreme of the source data should be checked against what is ' +
+      'known about the supplier before it is relied on.',
+      'This region has the 3rd lowest emission factor of 49 regions for this sector.',
+    ])
+  })
+
+  it('P6 a rank over fewer than every region names the population it was taken over', () => {
+    expect(intensityPositionSentences(industry('AT', 'i01.m').caveats, 'industry')).toEqual([
+      'This region has the 2nd lowest emission factor of the 47 regions with a non-zero factor for this sector.',
+    ])
+  })
+
+  it('P7 the rank is computed from the data, independently of the percentile', () => {
+    // Recount i28 directly from the file and compare with what the resolver reports for every region.
+    const i28 = (ixiFile.factors as { region: string; exio_code: string; value: number }[])
+      .filter(f => f.exio_code === 'i28' && f.value !== 0)
+    for (const f of i28) {
+      const r = industry(f.region, 'i28')
+      const s = r.caveats.intensity_within_sector
+      if (!s.assessed) throw new Error('i28 is assessed')
+      expect(s.rank_from_lowest, f.region).toBe(i28.filter(g => g.value < f.value).length + 1)
+      expect(s.rank_from_highest, f.region).toBe(i28.filter(g => g.value > f.value).length + 1)
+    }
+    // And the rank test itself: exactly three below p5 and three above p95 in a fully populated sector.
+    const positions = i28.map(f => (industry(f.region, 'i28').caveats.intensity_within_sector as { position: string }).position)
+    expect(positions.filter(p => p === 'below')).toHaveLength(3)
+    expect(positions.filter(p => p === 'above')).toHaveLength(3)
+  })
+
+  it('P8 ordinals', () => {
+    expect([1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 101, 111, 112].map(ordinal))
+      .toEqual(['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '23rd', '101st', '111th', '112th'])
+  })
+
+  it('P9 no caveat or metadata KEY names reliability, confidence or quality', () => {
+    // Keys only. The prose that explains the rename necessarily uses the word.
+    const banned = /reliab|confiden|quality/i
+    const keys = (o: unknown, path = ''): string[] =>
+      o && typeof o === 'object' && !Array.isArray(o)
+        ? Object.entries(o as Record<string, unknown>).flatMap(([k, v]) =>
+            k === 'bounds' ? [`${path}.${k}`] : [`${path}.${k}`, ...keys(v, `${path}.${k}`)])
+        : []
+    const found = [
+      ...keys(asResult(resolveSpendFactor(q())).caveats, 'caveats'),
+      ...keys(ixiFile.metadata, 'ixi.metadata'),
+      ...keys(pxpFile.metadata, 'pxp.metadata'),
+    ].filter(k => banned.test(k))
+    expect(found).toEqual([])
   })
 })
