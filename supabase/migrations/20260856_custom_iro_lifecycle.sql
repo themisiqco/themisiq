@@ -1,4 +1,33 @@
 -- supabase/migrations/20260856_custom_iro_lifecycle.sql
+--
+-- ⚠️ RUN. Verified live on 16 Sep 2026, not from a dump:
+--     to_regprocedure('public.materiality_custom_iro_create(uuid,text,text)') is not null
+--
+-- ⚠️ RE-RUNNING IS NOT INERT — IT RAISES, AND THE HEADER USED TO IMPLY OTHERWISE. The DEPLOY note
+-- below says "Re-runnable; §1 refuses a half-applied state rather than compounding it". §1 refuses
+-- a FULLY-applied state too, so once this file has run it cannot be run again. Its third guard is:
+--
+--     if position('iro_key' in pg_get_functiondef(
+--                 'public.impact_determination_json(uuid,text,text)'::regprocedure)) > 0 then
+--       raise exception 'impact_determination_json already filters iro_key. This file forks
+--                        20260841''s body and would discard whatever else was changed. ...'
+--
+-- §3 is what puts iro_key into that function, so after a successful run the guard fires on the
+-- next one. The whole file is inside begin/commit, so a second run aborts having changed nothing.
+-- That is the guard working: re-running would silently revert any later edit to that function.
+--
+-- ⚠️ THIS FILE HAD NO STATUS LINE AT ALL UNTIL NOW, AND THAT ABSENCE MISLED A SURVEY TWICE IN ONE
+-- DAY. On 16 Sep 2026 a keyword audit of every migration read this file wrong on both counts:
+--   · as NOT RUN — because the string "NOT RUN" appears at line ~1004 inside the sentence
+--     "⚠️ THESE CANNOT RUN AGAINST A FINALISED ASSESSMENT", which is about the RPCs' behaviour and
+--     not about this file's deployment;
+--   · as DESTRUCTIVE AT MIGRATION LEVEL — because it contains two DELETE statements. Both are
+--     INSIDE the body of materiality_custom_iro_delete(), scoped to all three of its parameters,
+--     and reached only by a user calling that RPC. Running this migration deletes nothing; a grep
+--     at column 0 finds no destructive statement in it at all.
+-- Both readings were wrong, and a status line would have prevented both. That is the argument for
+-- one existing here rather than a reader inferring from keywords.
+--
 -- Custom IROs gain a creator, a deleter, and the two gates that make deleting one safe.
 --
 -- WHY NOW. 20260855 made custom IROs exist, enumerable and reportable. Nothing lets a customer

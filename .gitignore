@@ -37,5 +37,6 @@ app/concierge-test/
 # generated CBAM reference data — rebuild with scripts/gen-cbam-defaults.ts
 public/data/
 supabase/.temp/
-.venv-sql/
+*venv*/
+__pycache__/
 logo/CLAUDE-CODE-PROMPT*.md

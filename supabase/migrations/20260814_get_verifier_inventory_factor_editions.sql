@@ -1,5 +1,23 @@
 -- get_verifier_inventory - factor_editions added to the verifier projection
 -- ---------------------------------------------------------------------------
+-- APPLIED. THIS IS THE CURRENT DEFINITION.
+--
+-- VERIFIED LIVE on 16 Sep 2026 by pg_get_functiondef on public.get_verifier_inventory(uuid):
+-- 'changed_fields' present, 'to_jsonb(a)' absent, 'comparability_disclosure' present, and
+-- 'factor_editions' present. The last of those is this file's change. Nothing supersedes it, so
+-- the live body and this file agree today.
+--
+-- CREATE OR REPLACE WITH NO PRE-FLIGHT GUARD IS THE ONE SHAPE WHERE RE-RUNNING IS BOTH PERMITTED
+-- AND DESTRUCTIVE. It succeeds silently, reverts the verifier projection, raises nothing, and the
+-- only symptom would be an assurance provider no longer seeing which factor editions priced an
+-- inventory, from a page that looks normal.
+--
+-- FOR THIS FILE THE HAZARD IS PROSPECTIVE RATHER THAN PRESENT, and only because it happens to sit
+-- at the head of the chain: re-running it today rewrites the same body and changes nothing. That
+-- stops being true the moment a fifth definition of this function lands. At that point this file
+-- becomes what 20260805 and 20260806 are now - a file that succeeds and reverts. The BEFORE
+-- RUNNING block below is the manual version of the guard that would prevent it.
+--
 -- ASCII ONLY, DELIBERATELY, AND FOR A RECORDED REASON. The 13 Aug factor_editions column migration
 -- did not paste cleanly into the Supabase SQL editor: only its `alter table` ran, and the comment
 -- and grants had to be run separately. Non-ASCII characters in the header block are the suspected

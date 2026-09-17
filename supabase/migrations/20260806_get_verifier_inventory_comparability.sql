@@ -1,5 +1,17 @@
 -- get_verifier_inventory — comparability disclosure added to the verifier projection
 -- ---------------------------------------------------------------------------
+-- ⚠️ APPLIED, AND SUPERSEDED ONCE SINCE. NOT the current definition.
+--
+-- VERIFIED LIVE on 16 Sep 2026 by pg_get_functiondef on public.get_verifier_inventory(uuid):
+-- 'changed_fields' present, 'to_jsonb(a)' absent, 'comparability_disclosure' present — this file's
+-- change — and 'factor_editions' ALSO present, which is 20260814's. The current definition is
+-- 20260814's; running this file would revert factor_editions out of the verifier projection.
+--
+-- ⚠️ CREATE OR REPLACE WITH NO PRE-FLIGHT GUARD IS THE ONE SHAPE WHERE RE-RUNNING IS BOTH
+-- PERMITTED AND DESTRUCTIVE. It succeeds silently, reverts the verifier projection, raises nothing,
+-- and the only symptom would be an assurance provider no longer seeing which factor editions priced
+-- an inventory, from a page that looks normal.
+--
 -- Captures a function definition already hand-run in the Supabase SQL editor (2026-08-06).
 -- Transcribed from pg_get_functiondef against the live database, so the body below is what is
 -- ACTUALLY RUNNING, not a reconstruction. It carries no trailing statement terminator, because

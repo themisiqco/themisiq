@@ -1,6 +1,18 @@
 -- supabase/migrations/20260910_concierge_review_schema.sql
 --
--- ⚠️ NOT RUN. Drafted 10 Sep 2026, revised 12 Sep 2026 for HUMAN review. Still unrun.
+-- ⚠️ RUN. Verified live on 16 Sep 2026: to_regclass('public.concierge_jobs') is not null.
+--
+-- ⚠️ RE-RUNNING IS NOT INERT — IT RAISES BEFORE CREATING ANYTHING, and the reason is a pre-flight
+-- guard rather than the IF NOT EXISTS clauses further down. The tables are all CREATE TABLE IF NOT
+-- EXISTS, so on their own they would be harmless; but §0 checks first and refuses:
+--
+--     if to_regclass('public.concierge_jobs') is not null ... then
+--       raise exception 'Pre-flight: one or more concierge_* tables already exist. An earlier
+--                        version of this file has been run ...'
+--
+-- The whole file is inside begin/commit, so a second run aborts having changed nothing. That is
+-- deliberate: the file revises its own earlier version, and silently re-applying it over live
+-- tables would mask whatever had diverged.
 --
 -- Concierge review: the three tables a reviewer works from. A person — Lisa or Dima — opens each
 -- uploaded document and types the figures. The Anthropic extractor is no longer the source of a

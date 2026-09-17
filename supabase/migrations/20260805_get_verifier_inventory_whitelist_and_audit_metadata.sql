@@ -1,7 +1,25 @@
 -- get_verifier_inventory — narrow the inventory whitelist, strip the audit value blobs
 -- ---------------------------------------------------------------------------
--- ⚠️ NOT YET APPLIED. Unlike 20260707_ and 20260708_, this file is the SOURCE, not a record of
--- something already live. Lisa runs it in the Supabase SQL editor; nothing applies it automatically.
+-- ⚠️ APPLIED, AND SUPERSEDED TWICE SINCE. THIS FILE IS HISTORY, NOT A PENDING CHANGE.
+--
+-- VERIFIED LIVE on 16 Sep 2026 by pg_get_functiondef on public.get_verifier_inventory(uuid):
+-- 'changed_fields' present and 'to_jsonb(a)' absent, which is this file's audit change; and
+-- 'comparability_disclosure' and 'factor_editions' BOTH present, which are not this file's — they
+-- were added after it by 20260806 and 20260814. The live body contains everything this file adds
+-- plus two later columns, which is only possible if this landed first and was then built on.
+--
+-- ⚠️ RUNNING IT NOW WOULD REVERT THE LIVE FUNCTION BY TWO MIGRATIONS, dropping
+-- comparability_disclosure (20260806) and factor_editions (20260814) out of the verifier
+-- projection. The current definition is 20260814's. Read this file for what changed on 5 Aug; do
+-- not run it.
+--
+-- ⚠️ CREATE OR REPLACE WITH NO PRE-FLIGHT GUARD IS THE ONE SHAPE WHERE RE-RUNNING IS BOTH
+-- PERMITTED AND DESTRUCTIVE. It succeeds silently, reverts the verifier projection, raises nothing,
+-- and the only symptom would be an assurance provider no longer seeing which factor editions priced
+-- an inventory, from a page that looks normal.
+--
+-- The NOT YET APPLIED line this replaces was written when the file was drafted and never updated.
+-- It survived three later migrations to the same function.
 --
 -- ⚠️ 20260708_get_verifier_inventory_add_accepted_at.sql IS WRONG AND THIS SUPERSEDES IT. That file
 -- states it is "the authoritative current live definition, reproduced verbatim" and then shows the

@@ -1,6 +1,21 @@
 -- 20260913_supply_chain_registers.sql
 --
--- NOT RUN. Propose only.
+-- ⚠️ RUN. Verified live on 16 Sep 2026: public.supply_chain_registers exists AND
+-- trg_enforce_supply_chain_entitlement is present. Both together, which matters — a table present
+-- without its trigger would be the pre-dating case (a hand-created table this file merely
+-- describes, per the CLAUDE.md warning that much of the schema is not in git). The trigger only
+-- exists because this file ran.
+--
+-- ⚠️ RE-RUNNING IS NOT INERT — IT RAISES. The table is a plain `create table
+-- public.supply_chain_registers (...)` with no IF NOT EXISTS, and the pre-flight refuses ahead of
+-- it anyway:
+--
+--     if to_regclass('public.supply_chain_registers') is not null then
+--       raise exception 'Pre-flight: public.supply_chain_registers already exists. Inspect it
+--                        before running this file; nothing was changed.'
+--
+-- Inside begin/commit, so a second run aborts having changed nothing. Note that the policy and
+-- trigger further down ARE idempotent (drop ... if exists then create), but they are never reached.
 --
 -- Server-side persistence for the supply chain risk register, plus the binary entitlement gate
 -- that goes with it. Follows the ghg_inventories shape — identity and summary scalars as columns,

@@ -1,6 +1,20 @@
 -- 20260910_erasure_log.sql
 --
--- NOT RUN. Propose only. Lisa runs this in the Supabase SQL editor.
+-- ⚠️ RUN. Verified live on 16 Sep 2026: to_regclass('public.erasure_log') is not null.
+--
+-- ⚠️ RE-RUNNING IS NOT INERT — IT RAISES, AND NOT ONE STATEMENT HERE IS GUARDED BY IF NOT EXISTS.
+-- The table is a plain `create table public.erasure_log (...)` and both indexes are plain CREATE
+-- INDEX, so a second run would error on the table before reaching them. It never gets there: the
+-- pre-flight raises first —
+--
+--     if to_regclass('public.erasure_log') is not null then
+--       raise exception 'Pre-flight: public.erasure_log already exists. Inspect it before running
+--                        this file; nothing was changed.'
+--
+-- — and the file is inside begin/commit, so nothing is created and nothing is dropped. Refusing
+-- rather than re-creating matters more here than elsewhere: this table is the only proof an
+-- account erasure happened, so a re-run that recreated it empty would destroy the evidence it
+-- exists to hold.
 --
 -- The record that an account was erased, and nothing about who it was.
 --

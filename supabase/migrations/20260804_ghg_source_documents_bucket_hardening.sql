@@ -1,7 +1,25 @@
 -- supabase/migrations/20260804_ghg_source_documents_bucket_hardening.sql
 --
--- ⚠️ NOT YET APPLIED. Lisa runs this by hand in the Supabase SQL editor. It changes LIVE storage
--- configuration for the bucket holding every GHG customer's evidence.
+-- ⚠️ APPLIED. The bucket now carries the settings below.
+--
+-- EVIDENCE: on 16 Sep 2026 storage.buckets for 'source-documents' showed 7 allowed_mime_types,
+-- file_size_limit 26214400 and public false — matching the insert below exactly, on all three
+-- settings. Before this ran, allowed_mime_types and file_size_limit were both null.
+--
+-- ⚠️ A BUCKET AUDIT THE SAME DAY FOUND 73 OBJECTS, ALL INSIDE THE ALLOWLIST. No text/html, no
+-- image/svg+xml, no application/xhtml+xml — the three types named below as the live hazard. So
+-- the gap this file closes was never exploited before it closed.
+--
+-- ⚠️ THAT AUDIT IS A POINT-IN-TIME RESULT, NOT A GUARANTEE, AND THE DISTINCTION IS THE WHOLE
+-- REASON THE "WHAT THIS DOES NOT DO" BLOCK BELOW EXISTS. allowed_mime_types gates NEW uploads
+-- only. It inspects nothing already stored, and it re-types nothing. The 73 were clean on 16 Sep
+-- 2026; anything that arrived before the setting was applied could have been otherwise, and
+-- anything already stored keeps whatever content-type it was stored with. Re-run the audit
+-- queries at the foot of this file rather than citing this line — a clean count on one day is not
+-- a property of the bucket.
+--
+-- Re-running this file is safe: the insert is ON CONFLICT DO UPDATE on the primary key, so a
+-- second run rewrites the same three settings and changes nothing else.
 --
 -- ── WHAT THIS FIXES ───────────────────────────────────────────────────────────────────────────
 -- The 'source-documents' bucket (GHG evidence) has never declared allowed_mime_types or

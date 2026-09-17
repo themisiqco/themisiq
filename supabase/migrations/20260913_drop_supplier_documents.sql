@@ -1,6 +1,17 @@
 -- 20260913_drop_supplier_documents.sql
 --
--- NOT RUN. Propose only.
+-- ⚠️ RUN. public.supplier_documents no longer exists.
+--
+-- EVIDENCE: on 16 Sep 2026 `select to_regclass('public.supplier_documents')` returned null. The
+-- table is gone, which is the post-condition this file's own post-flight block checks for.
+--
+-- ⚠️ RE-RUNNING IS NOW INERT, AND NOT BECAUSE THE DROP IS GUARDED — IT IS NOT.
+-- `drop table public.supplier_documents restrict;` carries no IF EXISTS, so on a second run it
+-- would raise. But it never gets there: the pre-flight do-block at the top raises first, with
+-- "Pre-flight: public.supplier_documents does not exist. Nothing to drop.", and the whole file is
+-- inside begin/commit, so the transaction aborts having changed nothing. A second run fails loudly
+-- and destroys nothing. That is the pre-flight doing the job it was written for, in the direction
+-- nobody expected to need.
 --
 -- Drops public.supplier_documents. The case for removing it is that it was never designed:
 --

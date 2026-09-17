@@ -1,6 +1,23 @@
 -- 20260913_module_entitlement_triggers.sql
 --
--- NOT RUN. Propose only.
+-- ⚠️ RUN. Verified live on 16 Sep 2026: both triggers this file attaches are present —
+-- trg_enforce_materiality_entitlement and trg_enforce_cbam_entitlement.
+--
+-- ⚠️ TWO TRIGGERS, NOT THREE. The supply-chain gate, trg_enforce_supply_chain_entitlement, is
+-- attached by 20260913_supply_chain_registers.sql, not by this file — it is created alongside the
+-- table it guards. All three entitlement gates are live, but they come from two migrations, and
+-- this file's own post-flight asserts exactly 2. Counting three here would make that assertion
+-- look broken.
+--
+-- ⚠️ RE-RUNNING IS INERT — and this file is the only one of the five corrected today that is.
+-- Reading the statements rather than the IF EXISTS clauses: the pre-flight checks only that four
+-- dependency tables exist, which they do; both functions are CREATE OR REPLACE FUNCTION, which
+-- rewrites the same body; both triggers are `drop trigger if exists` immediately followed by
+-- `create trigger`, which lands the same definition; and the post-flight asserts 2 triggers,
+-- INSERT-only, which holds. Nothing is inserted, updated or deleted.
+--   The one thing to know: the drop-and-recreate means each gate is momentarily absent DURING the
+-- transaction. That window is inside begin/commit and invisible to other sessions, so no insert
+-- can slip past unguarded — but it is why the pair is a pair and not an ALTER.
 --
 -- Binary entitlement enforcement on materiality_assessments and cbam_installations: may this
 -- user create one at all. Modelled on enforce_deals_free_tier_cap(), which is the closest
