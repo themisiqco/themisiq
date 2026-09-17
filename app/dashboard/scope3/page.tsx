@@ -4,11 +4,19 @@ import { useState, useEffect, useRef } from 'react'
 import Nav from '../../components/Nav'
 import { supabase } from '../../../lib/supabase'
 import { useEntitlementState } from '../../../lib/useEntitlement'
-import { EMISSION_FACTORS, DEFAULT_SPEND_EF } from '../../../lib/emissionFactors'
+import { EMISSION_FACTORS, GENERIC_SPEND_FACTOR } from '../../../lib/emissionFactors'
+import { SPEND_EF_SOURCES } from '../../../lib/emissionFactors/spend'
+import { scope3MethodFor, scope3MethodDescription, provenanceGap } from '../../../lib/scope3/categoryMethods'
 import { resolvePcafResult, assessAsset } from '../../../lib/pcaf/engine'
 import { INDUSTRY_OPTION_GROUPS, industryName } from '../../../lib/emissionFactors/industryOptions'
 import { matchCountries, countryByIso2 } from '../../../lib/emissionFactors/countryOptions'
+import { regionName, regionLabel, countryLabel } from '../../../lib/emissionFactors/regionNames'
+import {
+  DEFRA_WASTE_META, WASTE_MATERIAL_GROUPS, WASTE_METHOD_LABEL, wasteRoutesFor, wasteMaterialKey, parseWasteMaterialKey,
+  priceWasteRow, wasteMethodFor, withoutListMarker, type WasteRowPricing,
+} from '../../../lib/emissionFactors/defraWaste'
 import type { PcafPortfolioAsset, PcafAssetClass, EmissionInputs } from '../../../lib/pcaf/types'
+import { editRows, type RowEdit } from '../../../lib/rowList'
 import { sectionHead } from '@/app/components/headingStyles'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
 import { reportingYearOptions, defaultReportingYear } from '../../../lib/reportingYears'
@@ -27,7 +35,7 @@ const CATEGORIES = [
   { id: 'cat2', num: 2, name: 'Capital goods', stream: 'Upstream', desc: 'Emissions from producing capital equipment and assets you buy', method: 'spend', unit: 'spend', materialSectors: ['Industrials & Manufacturing', 'Energy & Utilities', 'Mining & Metals'], typicalShare: 0.05 , guidance: 'Emissions from producing long-life assets you purchase — buildings, machinery, vehicles, IT equipment, infrastructure. Count the full cradle-to-gate footprint in the year acquired (not depreciated over time).', dataSource: 'Fixed-asset register / capital expenditure records for the reporting year. Spend-based estimation is permitted for this category.' },
   { id: 'cat3', num: 3, name: 'Fuel & energy related', stream: 'Upstream', desc: 'Upstream emissions from extraction and production of fuels and energy you use', method: 'activity', unit: 'kwh', materialSectors: ['all'], typicalShare: 0.03 , guidance: 'Upstream emissions of the fuel and electricity you use that AREN\'T already in Scope 1 or 2 — i.e. extracting, producing and transporting those fuels, plus grid transmission & distribution (T&D) losses.', dataSource: 'Your Scope 1 & 2 energy consumption data (kWh, fuel volumes) — apply well-to-tank and T&D-loss factors. Source the consumption from utility bills / the GHG module.' },
   { id: 'cat4', num: 4, name: 'Upstream transportation', stream: 'Upstream', desc: 'Emissions from transporting purchased goods to your facilities', method: 'activity', unit: 'tonne_km', materialSectors: ['Consumer & Retail', 'Agriculture & Food', 'Industrials & Manufacturing'], typicalShare: 0.04 , guidance: 'Emissions from transporting and distributing the goods you BUY, between your suppliers and you — plus third-party logistics you pay for (inbound freight and warehousing).', dataSource: 'Logistics/freight invoices, shipment records (tonne-km or mode/distance). Spend-based estimation is permitted for this category.' },
-  { id: 'cat5', num: 5, name: 'Waste generated in operations', stream: 'Upstream', desc: 'Emissions from disposal and treatment of waste generated', method: 'activity', unit: 'tonnes', materialSectors: ['all'], typicalShare: 0.01 , guidance: 'Emissions from third parties treating the waste your operations generate — landfill, incineration, recycling, wastewater.', dataSource: 'Waste contractor invoices / facilities team: tonnes by treatment type. Activity data (tonnes) is needed — spend-based is not appropriate here.' },
+  { id: 'cat5', num: 5, name: 'Waste generated in operations', stream: 'Upstream', desc: 'Emissions from disposal and treatment of waste generated', method: 'activity', unit: 'tonnes', materialSectors: ['all'], typicalShare: 0.01 , guidance: 'Emissions from third parties treating the waste your operations generate — landfill, combustion, recycling, composting and anaerobic digestion. Wastewater is not covered: the waste factors used here publish none.', dataSource: 'Waste contractor invoices / facilities team: tonnes by material and treatment route. Activity data (tonnes) is needed — spend-based is not appropriate here.' },
   { id: 'cat6', num: 6, name: 'Business travel', stream: 'Upstream', desc: 'Emissions from employee travel for business purposes', method: 'activity', unit: 'mixed', materialSectors: ['Professional Services', 'Financial Services', 'Technology'], typicalShare: 0.05 , guidance: 'Emissions from employees travelling for business — flights, rail, hotels, rental cars — in vehicles not owned by your company.', dataSource: 'Travel & expense system or travel agency reports: flights (distance/class), hotel nights, rail. Spend-based estimation is permitted for this category.' },
   { id: 'cat7', num: 7, name: 'Employee commuting', stream: 'Upstream', desc: 'Emissions from employees travelling to and from work', method: 'activity', unit: 'mixed', materialSectors: ['all'], typicalShare: 0.03 , guidance: 'Emissions from employees commuting between home and work, including remote-work energy use.', dataSource: 'HR headcount + a commuting survey or assumptions (distance, mode, WFH days). Activity-based; spend-based is not appropriate here.' },
   { id: 'cat8', num: 8, name: 'Upstream leased assets', stream: 'Upstream', desc: 'Emissions from assets leased by your organisation', method: 'activity', unit: 'kwh', materialSectors: ['Real Estate', 'Transport & Logistics'], typicalShare: 0.02 , guidance: 'Emissions from assets you LEASE FROM others (as lessee) that aren\'t already in your Scope 1 & 2 — e.g. leased offices or equipment you don\'t operationally control.', dataSource: 'Lease agreements + energy use of leased assets (floor area or metered kWh). Activity-based; spend-based is not appropriate here.' },
@@ -66,22 +74,125 @@ const SECTOR_MATERIAL: Record<string, number[]> = {
 // must not fall through to DEFAULT_SPEND_EF (0.5) or to SECTOR_MATERIAL['Other'], because both
 // produce output that renders identically to output someone established. `sectorPriced` is the one
 // place that question is asked, so every surface answers it the same way.
+//   Cat 1 no longer asks it: its spend path is priced by /api/scope3/spend-factor against EXIOBASE
+// codes (see "Cat 1 spend pricing" in the component). Cat 15 still does.
 const sectorPriced = (sector: string | undefined): boolean =>
   !!sector && Object.hasOwn(EMISSION_FACTORS.spend, sector)
 
 /** The GHG wizard's treatment of an unpriceable location, reused: withhold the figure, say why, and
  *  say it is not a zero. See app/dashboard/ghg/page.tsx, "We can't work out this location's
- *  emissions yet". */
-function NoFactorNotice({ what }: { what: string }) {
+ *  emissions yet".
+ *
+ *  `detail`, when given, REPLACES the sector sentence and is rendered VERBATIM. It exists for text a
+ *  server already wrote — the resolver's explanation, the pricing route's notice or error — which
+ *  names what was actually observed. Rewording it here would put a cause in the customer's mind that
+ *  nobody checked. Without `detail` the notice keeps its original sector wording, which is still the
+ *  accurate one for Cat 15. */
+function NoFactorNotice({ what, detail, title }: { what: string; detail?: string; title?: string }) {
   return (
     <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem', marginTop: 10 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>⚠ No spend factor for this sector yet</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>{title ?? '⚠ No spend factor for this sector yet'}</div>
       <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
-        {what} cannot be estimated from spend until a factor is available for the sector you selected.
+        {detail ?? `${what} cannot be estimated from spend until a factor is available for the sector you selected.`}
       </div>
       <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 4 }}>
         It is not counted as zero. Enter a known figure above if you hold one, and everything else you have entered is unaffected.
       </div>
+    </div>
+  )
+}
+
+// ─── /api/scope3/spend-factor response, as this page reads it ──────────────────────────────────
+//
+// Only the fields this page uses. The route owns the full contract (app/api/scope3/spend-factor/
+// route.ts); typing a subset here means a field the page does not read cannot drift out of sync.
+type SpendFactorLine =
+  | {
+      id: string; outcome: 'priced'; emissions_mt: number; used_region: string; disclosures: string[]
+      source: { dataset: string | null; version: string | null }
+    }
+  | { id: string; outcome: 'absent'; explanation: string }
+  | { id: string; outcome: 'no_factor'; notice: string }
+
+interface SpendFactorResponse {
+  edition_id: string
+  /** True of the estimate whatever the line count: source and licence, edition, price-vintage lag. */
+  disclosures: string[]
+  /** Counts across lines. Each restates what the lines already say, so render only for 2+ lines. */
+  batch_summary: string[]
+  lines: SpendFactorLine[]
+}
+
+/** What the Cat 1 spend request produced, keyed by the inputs it was made for. */
+type Cat1SpendResult =
+  | { key: string; kind: 'done'; response: SpendFactorResponse; line: SpendFactorLine }
+  | { key: string; kind: 'error'; message: string }
+
+/** The caller's own key for the single Cat 1 line; the route echoes it back. */
+const CAT1_LINE_ID = 'cat1-spend'
+
+/** Identity of one Cat 1 pricing question. Every input that changes the answer, and nothing else. */
+const cat1SpendKey = (sectorKey: string, countryIso2: string, currency: string, reportingYear: number, spend: number) =>
+  JSON.stringify([sectorKey, countryIso2, currency, reportingYear, spend])
+
+/**
+ * ⚠️ 400 ms. Long enough that typing a figure fires ONE request rather than one per keystroke —
+ * ordinary typing puts 100-300 ms between keys, so a pause of 400 ms means the customer has stopped —
+ * and short enough that the figure appears to follow the field rather than lag it. The discrete
+ * inputs (sector, country, currency, year) are NOT debounced: a selection is one deliberate change,
+ * and delaying it would only lengthen the time a stale figure is withheld.
+ */
+const SPEND_DEBOUNCE_MS = 400
+
+/**
+ * A priced spend figure with its workings, collapsed by default.
+ *
+ * ⚠️ THE SAME SHAPE AS THE GHG WORKINGS CARD, and deliberately not a second pattern:
+ * app/dashboard/ghg/page.tsx renders buildWorkings() as one full-width card per location whose header
+ * carries the figures and a "▼ Show workings" / "▲ Hide" toggle, collapsed until opened, with an
+ * uppercase label over the body. A customer reads the figure in the header; a verifier opens the
+ * workings in one click. What is NOT copied is its toggle: that header is a <div onClick> with no
+ * role, no tabIndex and no key handler, so a keyboard user cannot open the workings at all. This one
+ * is a real <button> carrying aria-expanded and aria-controls.
+ *
+ * The body is a list of sentences rather than the GHG table, because this is what the route returns:
+ * finished sentences, not rows of fields. Each renders verbatim, one per item, at a readable measure.
+ * `summary` is the one place this card composes text from fields, and it names only the figure and
+ * the method; every qualification of the figure stays in the sentences below it.
+ */
+function SpendFactorWorkings({ id, figureMt, summary, sentences }: {
+  id: string
+  figureMt: number
+  summary: string
+  sentences: string[]
+}) {
+  const [open, setOpen] = useState(false)
+  const bodyId = `${id}-workings`
+  return (
+    <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, overflow: 'hidden' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        aria-controls={bodyId}
+        style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '0.9rem 1.25rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', font: 'inherit', color: 'inherit' }}
+      >
+        <span style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.5 }}>
+          <strong style={{ fontWeight: 600 }}>{figureMt.toFixed(2)} mt CO₂e</strong>
+          <span style={{ color: 'var(--color-ink-muted)' }}> · {summary}</span>
+        </span>
+        <span style={{ fontSize: 12, color: 'var(--color-ink-muted)', whiteSpace: 'nowrap' }}>{open ? '▲ Hide' : '▼ Show workings'}</span>
+      </button>
+      {open && (
+        <div id={bodyId} style={{ padding: '0 1.25rem 1.25rem', borderTop: '0.5px solid #e8e7e4' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', margin: '1rem 0 0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase' }}>How this estimate was made</div>
+          <ul style={{ margin: 0, paddingLeft: '1.1rem', maxWidth: '72ch' }}>
+            {sentences.map(s => (
+              <li key={s} style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, marginBottom: 6 }}>{s}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }
@@ -121,26 +232,14 @@ const PCAF_ASSET_CLASSES: { value: PcafAssetClass; label: string; denominatorLab
 const GRAD = 'var(--color-brand)'
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
-// ─── EXIOBASE rest-of-world bucket names ─────────────────────────────────────
-//
-// The published names for the five RoW regions, held HERE rather than in
-// lib/emissionFactors/countryOptions.ts. That module returns a region_code and stops; how a region
-// is described to a customer is this screen's copy, and a second surface must be free to word it
-// differently without editing a data module.
-//
-// ⚠️ WF IS RoW AFRICA HERE, AND WF IS ALSO THE ISO COUNTRY CODE FOR WALLIS AND FUTUNA. The two are
-// unrelated. This map is keyed by REGION code and must never be handed a country code: both are
-// two uppercase letters, so the mistake passes every check silently. Wallis and Futuna is not one
-// of the 212 countries the concordance covers, so it can never reach this map by accident from a
-// selected country — but a future lookup that falls back from country to region could get here and
-// would produce a confident wrong answer rather than an error.
-const ROW_BUCKET_NAMES: Record<string, string> = {
-  WA: 'RoW Asia and Pacific',
-  WE: 'RoW Europe',
-  WF: 'RoW Africa',
-  WL: 'RoW America',
-  WM: 'RoW Middle East',
-}
+// The five RoW bucket names moved to lib/emissionFactors/regionNames.ts on 17 Sep 2026, so the
+// spend-factor route and this page name a region in the same words. The DESCRIBING words ("regional
+// average", "country-specific factor") stay here; see the resolved-region line in renderStep0.
+
+/** A sector for a RECORD: EXIOBASE's name with its code, so a verifier can read it and find the row.
+ *  The bare code when there is no name (not "i99 (EXIOBASE i99)"); '' when nothing is set. */
+const sectorLabel = (code: string | undefined): string =>
+  !code ? '' : industryName(code) === code ? code : `${industryName(code)} (EXIOBASE ${code})`
 
 // Visually hidden but announced. Used for the results count, which sighted users read off the list
 // itself and a screen reader otherwise never hears.
@@ -149,6 +248,19 @@ const srOnly: React.CSSProperties = { position: 'absolute', width: 1, height: 1,
 const sectionSub: React.CSSProperties = { fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
 
 const STEP_NAMES = ['Setup', 'Materiality', 'Calculate', 'Results', 'Export']
+
+/**
+ * One Cat 5 waste stream. `activity` is stored beside `waste_type` because the activity block is part of
+ * the factor's identity in the sheet, and a record that names the material without its block would need
+ * the artefact to say which one it meant. '' means not chosen; tonnes 0 means not entered.
+ */
+interface WasteRow {
+  id: string
+  activity: string
+  waste_type: string
+  route: string
+  tonnes: number
+}
 
 interface CategoryData {
   included: boolean
@@ -169,7 +281,12 @@ interface CategoryData {
   avg_commute_km?: number
   commute_mode?: string
   wfh_days?: number
-  // Cat 5
+  // Cat 5 — one row per material and treatment route, priced from lib/emissionFactors/defraWaste2026.json.
+  wasteRows?: WasteRow[]
+  // ⚠️ THE PREVIOUS CAT 5 FORM. NEVER PRICED, NEVER WRITTEN, AND NEVER REMOVED. No input sets these any
+  // more and no calculation reads them. They are typed only so that an inventory saved under the old form
+  // can say what it holds (cat5LegacyNotice). Saves spread the stored cat5 object, so the values stay in
+  // cat_data exactly as they were.
   waste_landfill_tonnes?: number
   waste_recycled_tonnes?: number
   // Cat 11
@@ -208,11 +325,18 @@ export default function Scope3Dashboard() {
   const [openInfo, setOpenInfo] = useState<Record<string, boolean>>({})
   const [dataConfirmed, setDataConfirmed] = useState(false)
   const [boundInventoryId, setBoundInventoryId] = useState<string | null>(null)
+  // The bound GHG inventory's recorded GWP basis (ghg_inventories.gwp_version: AR4, AR5, AR6 or null).
+  // Read so the Cat 5 disclosure can state whether its AR5 factors match it, rather than assume either way.
+  const [ghgGwpVersion, setGhgGwpVersion] = useState<string | null>(null)
   const [inventoryList, setInventoryList] = useState<Array<{ id: string; company_name: string; reporting_year: number; updated_at: string }>>([])
   const [bindChecked, setBindChecked] = useState(false) // have we resolved bind status yet?
   const [cameFromGhg, setCameFromGhg] = useState(false) // arrived via ?from=ghg (unsaved GHG wizard)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  // The total_scope3_tco2e that is actually in the database for this inventory, as last read or
+  // written. `saved` says the INPUTS were saved; this is what lets the page check that the TOTAL on
+  // screen is the one that was saved, which it may not be once a Cat 1 figure is fetched afresh.
+  const [savedTotal, setSavedTotal] = useState<number | null>(null)
   const justRestored = useRef(false) // suppress the saved-reset effect for one restore pass
 
   // ─── Supplier Portal bridge (pull allocated Cat 1 from campaigns) ────────────
@@ -227,6 +351,10 @@ export default function Scope3Dashboard() {
     method_note: string
   }
   const [campaigns, setCampaigns] = useState<{ id: string; name: string }[]>([])
+  // null = still loading, '' = loaded, otherwise the failure to show. Three states rather than a
+  // boolean because "No supplier campaigns found" is a claim, and it must not be made before the list
+  // has loaded or when the list could not be loaded at all.
+  const [campaignsError, setCampaignsError] = useState<string | null>(null)
   const [selectedCampaign, setSelectedCampaign] = useState<string>('')
   const [pulling, setPulling] = useState(false)
   const [pullError, setPullError] = useState<string | null>(null)
@@ -237,20 +365,145 @@ export default function Scope3Dashboard() {
     let active = true
     ;(async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      const uid = session?.user?.id
-      if (!uid) return
+      const token = session?.access_token
+      if (!token) {
+        if (active) setCampaignsError('Sign in again to load your supplier campaigns.')
+        return
+      }
       try {
-        const res = await fetch(`/api/campaigns?buyer_id=${uid}`)
-        const json = await res.json()
-        if (active && Array.isArray(json?.data)) {
-          const list = json.data.map((c: any) => ({ id: c.id, name: c.name }))
-          setCampaigns(list)
-          if (list.length === 1) setSelectedCampaign(list[0].id)
+        // ⚠️ THE BEARER TOKEN IS REQUIRED. This call used to send none, so /api/campaigns answered 401
+        // every time, the body failed the Array.isArray check below, and the page quietly rendered
+        // "No supplier campaigns found" to buyers who had campaigns. Same header as the portal pull.
+        // The route scopes to the token's user, so buyer_id in the query string is not what it reads.
+        const res = await fetch('/api/campaigns', { headers: { Authorization: `Bearer ${token}` } })
+        const json = await res.json().catch(() => null)
+        if (!active) return
+        if (!res.ok) {
+          setCampaignsError(json?.error ? `Could not load your supplier campaigns: ${json.error}` : `Could not load your supplier campaigns (HTTP ${res.status}).`)
+          return
         }
-      } catch { /* non-fatal: the manual entry path still works */ }
+        if (!Array.isArray(json?.data)) {
+          setCampaignsError('Could not load your supplier campaigns: the response held no campaign list.')
+          return
+        }
+        const list = (json.data as { id: string; name: string }[]).map(c => ({ id: c.id, name: c.name }))
+        setCampaigns(list)
+        if (list.length === 1) setSelectedCampaign(list[0].id)
+        setCampaignsError('')
+      } catch {
+        if (active) setCampaignsError('Could not reach the server to load your supplier campaigns.')
+      }
     })()
     return () => { active = false }
   }, [])
+
+  // ─── Cat 1 spend pricing (/api/scope3/spend-factor) ─────────────────────────
+  //
+  // The factor lives server-side (spendResolver.server.ts imports 2.17 MB of JSON), so the figure is
+  // fetched and held in state, and calcCat1 stays SYNCHRONOUS and reads that state.
+  //
+  // ⚠️ SEQUENCING: AbortController, plus a key on every stored result. Either alone is not enough.
+  //   · The effect's cleanup aborts the in-flight request whenever an input changes, and every await
+  //     is followed by an aborted check before any state is set. React runs the old effect's cleanup
+  //     before the new effect starts, so a superseded response can never write. Abort was chosen over
+  //     a bare request counter because it also cancels the network request, rather than letting a
+  //     response nobody will read finish downloading.
+  //   · Every stored result carries the key of the inputs it was computed for, and it is only USED
+  //     when that key equals the inputs on screen now. This is what stops a figure being read as
+  //     current during the gap before the new request settles — including the debounce window, when
+  //     no request has even been sent yet. The same comparison drives the loading state.
+  const cat1Data = catData['cat1']
+  const cat1NeedsSpendPrice = !!cat1Data?.included && !(cat1Data.has_supplier_data && cat1Data.supplier_emissions)
+  const cat1Sector = cat1Data?.supplier_sector || sector
+  const cat1SpendRaw = cat1Data?.total_spend || 0
+  const [cat1SpendDebounced, setCat1SpendDebounced] = useState(0)
+  const [cat1Spend, setCat1Spend] = useState<Cat1SpendResult | null>(null)
+
+  useEffect(() => {
+    const t = setTimeout(() => setCat1SpendDebounced(cat1SpendRaw), SPEND_DEBOUNCE_MS)
+    return () => clearTimeout(t)
+  }, [cat1SpendRaw])
+
+  useEffect(() => {
+    if (!cat1NeedsSpendPrice || !cat1Sector || !countryIso2 || cat1SpendDebounced === 0) return
+    const key = cat1SpendKey(cat1Sector, countryIso2, currency, reportingYear, cat1SpendDebounced)
+    const controller = new AbortController()
+    ;(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (controller.signal.aborted) return
+        const token = session?.access_token
+        if (!token) { setCat1Spend({ key, kind: 'error', message: 'Please sign in again to price this spend.' }); return }
+        const res = await fetch('/api/scope3/spend-factor', {
+          method: 'POST',
+          signal: controller.signal,
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            reporting_year: reportingYear,
+            reporting_currency: currency,
+            lines: [{
+              id: CAT1_LINE_ID,
+              country_iso2: countryIso2,
+              sector_key: cat1Sector,
+              factor_type: 'industry',
+              spend: cat1SpendDebounced,
+              // PURCHASER prices, because this field holds what the customer PAID: a figure read off
+              // invoices or an AP ledger, which includes trade and transport margins and product
+              // taxes. EXIOBASE factors are in basic prices, so the route will flag the mismatch and
+              // say it was not converted. Claiming 'basic' here would silence that disclosure while
+              // the figure stayed exactly as unconverted as before.
+              spend_price_basis: 'purchaser',
+            }],
+          }),
+        })
+        const json = await res.json().catch(() => null)
+        if (controller.signal.aborted) return
+        if (!res.ok) {
+          // The route's customer `message`, verbatim. NOT operator_detail: that names tables, columns and
+          // fingerprints, and is for whoever reads the server log or the network panel.
+          setCat1Spend({ key, kind: 'error', message: json?.message ?? `The pricing service answered HTTP ${res.status} with no message.` })
+          return
+        }
+        const line = (json as SpendFactorResponse | null)?.lines?.[0]
+        if (!line || line.id !== CAT1_LINE_ID) {
+          setCat1Spend({ key, kind: 'error', message: 'The pricing service returned a response that did not include this spend line.' })
+          return
+        }
+        setCat1Spend({ key, kind: 'done', response: json as SpendFactorResponse, line })
+      } catch {
+        // An abort rejects the fetch too. That is supersession, not failure, so it writes nothing.
+        if (controller.signal.aborted) return
+        setCat1Spend({ key, kind: 'error', message: 'Could not reach the pricing service.' })
+      }
+    })()
+    return () => controller.abort()
+  }, [cat1NeedsSpendPrice, cat1Sector, countryIso2, currency, reportingYear, cat1SpendDebounced])
+
+  // The inputs on screen NOW, including the undebounced spend. A stored result counts only if it was
+  // made for exactly these; otherwise the figure is pending, never the previous one.
+  const cat1SpendInputsComplete = cat1NeedsSpendPrice && !!cat1Sector && !!countryIso2 && cat1SpendRaw !== 0
+  const cat1CurrentKey = cat1SpendInputsComplete ? cat1SpendKey(cat1Sector, countryIso2, currency, reportingYear, cat1SpendRaw) : null
+  const cat1SpendCurrent = cat1CurrentKey !== null && cat1Spend?.key === cat1CurrentKey ? cat1Spend : null
+  const cat1SpendPending = cat1CurrentKey !== null && cat1SpendCurrent === null
+  const cat1SpendPriced = cat1SpendCurrent?.kind === 'done' && cat1SpendCurrent.line.outcome === 'priced'
+    ? cat1SpendCurrent.line
+    : null
+  /** The sentences behind a priced Cat 1 figure. ONE derivation, read by the workings card and the CSV,
+   *  so the export cannot disclose something different from the screen. The line's own sentences, then
+   *  what is true of the whole estimate, then batch counts only for more than one line. */
+  const cat1SpendSentences: string[] = cat1SpendPriced && cat1SpendCurrent?.kind === 'done'
+    ? [...new Set([
+        ...cat1SpendPriced.disclosures,
+        ...cat1SpendCurrent.response.disclosures,
+        ...(cat1SpendCurrent.response.lines.length > 1 ? cat1SpendCurrent.response.batch_summary : []),
+      ])]
+    : []
+  /** The Cat 1 spend inputs not yet entered. One list, read by the panel hint and the unpriced reason. */
+  const cat1MissingInputs = [
+    !cat1SpendRaw && 'total annual spend',
+    !cat1Sector && 'primary supplier sector',
+    !countryIso2 && 'primary country of supply (Step 1)',
+  ].filter((x): x is string => typeof x === 'string')
 
   // Load a GHG inventory and prefill + lock company/year so the two records stay
   // aligned. Single code path used by both the ?inventoryId= URL effect and the
@@ -265,6 +518,7 @@ export default function Scope3Dashboard() {
       .maybeSingle()
     if (!row) return // no row -> stays unbound; the picker gate handles it
     setBoundInventoryId(id)
+    setGhgGwpVersion(row.gwp_version ?? null)
     setCompany(row.company_name)
     setReportingYear(row.reporting_year)
     setRevenue((row.revenue_millions ?? 0) * 1_000_000) // millions -> raw
@@ -290,6 +544,8 @@ export default function Scope3Dashboard() {
         CATEGORIES.filter(c => (s3.cat_data as any)?.[c.id]?.included).map(c => c.num)
       )
       setSaved(true) // it IS saved
+      // null when the row predates total_scope3_tco2e being written; then there is nothing to match.
+      setSavedTotal(s3.total_scope3_tco2e == null ? null : Number(s3.total_scope3_tco2e))
       setStep(3)     // land on Results, not Setup
     }
   }
@@ -380,9 +636,18 @@ export default function Scope3Dashboard() {
     setCatData(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }))
   }
 
-  // ─── Cat 15 detailed (per-asset PCAF) row helpers ────────────────────────────
-  // Mirrors the supply-chain add/update/remove row pattern, one spread deeper into
-  // catData['cat15'].pcafAssets. All immutable via setCatData.
+  // ─── Row editors: Cat 15 holdings and Cat 5 waste rows ───────────────────────
+  //
+  // ⚠️ EVERY WRITE READS THE LIST INSIDE THE setCatData UPDATER, THROUGH lib/rowList.ts. These helpers
+  // used to read catData from the render, build the next list from it and pass that list in, so two
+  // edits in one tick both started from the same rendered list and the second erased the first.
+  // cat15Assets() and wasteRows() below are for RENDERING only; a write must never start from them.
+  // Rows are addressed by id rather than position, for the reason given in lib/rowList.ts.
+  //
+  // What stays here is what is specific to a row: Cat 15's nested emissions merge and Cat 5's route
+  // clearing. Both are function patches, so they too read the row as it is when the edit applies.
+
+  // Cat 15 detailed (per-asset PCAF) holdings, in catData['cat15'].pcafAssets.
   const newPcafAsset = (): PcafPortfolioAsset => ({
     id: Math.random().toString(36).slice(2),
     assetClass: 'listed_equity_corp_bonds',
@@ -390,16 +655,49 @@ export default function Scope3Dashboard() {
     denominator: 0,
     emissions: {}, // EmissionInputs — empty until the user fills a path
   })
+  /** For rendering only. */
   const cat15Assets = () => catData['cat15']?.pcafAssets ?? []
-  const setCat15Assets = (next: PcafPortfolioAsset[]) =>
-    setCatData(prev => ({ ...prev, cat15: { ...prev.cat15, pcafAssets: next } }))
-  const addPcafAsset = () => setCat15Assets([...cat15Assets(), newPcafAsset()])
-  const removePcafAsset = (idx: number) => setCat15Assets(cat15Assets().filter((_, i) => i !== idx))
-  const updatePcafAsset = (idx: number, patch: Partial<PcafPortfolioAsset>) => {
-    const next = [...cat15Assets()]; next[idx] = { ...next[idx], ...patch }; setCat15Assets(next)
+  const editCat15Assets = (edit: RowEdit<PcafPortfolioAsset>) =>
+    setCatData(prev => ({ ...prev, cat15: { ...prev.cat15, pcafAssets: editRows(prev.cat15?.pcafAssets, edit) } }))
+  const addPcafAsset = () => editCat15Assets({ kind: 'add', row: newPcafAsset() })
+  const removePcafAsset = (id: string) => editCat15Assets({ kind: 'remove', id })
+  const updatePcafAsset = (id: string, patch: Partial<PcafPortfolioAsset> | ((row: PcafPortfolioAsset) => Partial<PcafPortfolioAsset>)) =>
+    editCat15Assets({ kind: 'update', id, patch })
+  // Row-specific: merges into the nested emissions object as it is when the edit applies.
+  const updatePcafEmissions = (id: string, patch: Partial<EmissionInputs>) =>
+    updatePcafAsset(id, row => ({ emissions: { ...row.emissions, ...patch } }))
+
+  // Cat 5 waste rows, in catData['cat5'].wasteRows.
+  const newWasteRow = (): WasteRow => ({
+    id: Math.random().toString(36).slice(2),
+    activity: '',
+    waste_type: '',
+    route: '',
+    tonnes: 0,
+  })
+  /** For rendering only. */
+  const wasteRows = () => catData['cat5']?.wasteRows ?? []
+  const editWasteRows = (edit: RowEdit<WasteRow>) =>
+    setCatData(prev => ({ ...prev, cat5: { ...prev.cat5, wasteRows: editRows(prev.cat5?.wasteRows, edit) } }))
+  const addWasteRow = () => editWasteRows({ kind: 'add', row: newWasteRow() })
+  const removeWasteRow = (id: string) => editWasteRows({ kind: 'remove', id })
+  const updateWasteRow = (id: string, patch: Partial<WasteRow> | ((row: WasteRow) => Partial<WasteRow>)) =>
+    editWasteRows({ kind: 'update', id, patch })
+  /**
+   * ⚠️ A MATERIAL CHANGE CLEARS A ROUTE THE NEW MATERIAL DOES NOT PUBLISH. Keeping it would leave a pair
+   * the sheet has no factor for, which the route select could not even display. A route the new material
+   * does publish is kept, because the customer chose it and it is still valid.
+   */
+  const setWasteMaterial = (id: string, key: string) => {
+    const m = parseWasteMaterialKey(key)
+    if (!m) { updateWasteRow(id, { activity: '', waste_type: '', route: '' }); return }
+    // The route is checked against the row as it is when the edit applies, not as it was rendered.
+    updateWasteRow(id, row => ({
+      activity: m.activity,
+      waste_type: m.waste_type,
+      route: wasteRoutesFor(m.activity, m.waste_type).includes(row.route) ? row.route : '',
+    }))
   }
-  const updatePcafEmissions = (idx: number, patch: Partial<EmissionInputs>) =>
-    updatePcafAsset(idx, { emissions: { ...cat15Assets()[idx].emissions, ...patch } })
 
   // ─── Calculations ────────────────────────────────────────────────────────────
 
@@ -407,9 +705,13 @@ export default function Scope3Dashboard() {
     const d = catData['cat1']
     if (!d?.included) return 0
     if (d.has_supplier_data && d.supplier_emissions) return d.supplier_emissions
-    const spend = d.total_spend || 0
-    const ef = EMISSION_FACTORS.spend[d.supplier_sector || sector] || DEFAULT_SPEND_EF
-    return (spend * ef) / 1000 // convert kg to mt
+    // The spend path reads the route's answer for the inputs on screen now, and nothing else. Absent,
+    // no_factor, an error, a request still in flight or an input not yet entered all return 0, and
+    // unpricedCatIds excludes the category rather than summing that 0 in.
+    //   ⚠️ NO DEFAULT FACTOR. This used to fall back to DEFAULT_SPEND_EF (0.5 kg per currency unit)
+    // on a sector miss — the last way a flat 0.5 could reach a Cat 1 figure, rendering exactly like a
+    // figure priced from a real factor. It is gone; a miss is a miss.
+    return cat1SpendPriced ? cat1SpendPriced.emissions_mt : 0
   }
 
   const calcCat6 = (): number => {
@@ -436,20 +738,112 @@ export default function Scope3Dashboard() {
     return (employees * commuteKm * 2 * workingDays * ef) / 1000
   }
 
+  // Every Cat 5 row with its pricing, in entry order. ONE evaluation read by the figure, the panel, the
+  // workings, the CSV and factor_basis, so none of them can price a row differently.
+  const cat5Evaluated: { row: WasteRow; n: number; pricing: WasteRowPricing }[] =
+    wasteRows().map((row, i) => ({ row, n: i + 1, pricing: priceWasteRow(row) }))
+  const cat5Priced = cat5Evaluated.flatMap(e => e.pricing.status === 'priced' ? [{ ...e, pricing: e.pricing }] : [])
+  const cat5NotPriced = cat5Evaluated.filter(e => e.pricing.status !== 'priced')
+
+  // The sum over PRICED rows of tonnes x factor, in kg, over 1000 for mt. An incomplete row, or one whose
+  // saved pair the sheet does not publish, adds nothing and is named wherever this figure is described.
   const calcCat5 = (): number => {
     const d = catData['cat5']
     if (!d?.included) return 0
-    const landfill = (d.waste_landfill_tonnes || 0) * EMISSION_FACTORS.waste_landfill
-    const recycled = (d.waste_recycled_tonnes || 0) * EMISSION_FACTORS.waste_recycled
-    return (landfill + recycled) / 1000
+    return cat5Priced.reduce((kg, e) => kg + e.pricing.kg_co2e, 0) / 1000
   }
+
+  /**
+   * What an inventory saved under the previous Cat 5 form holds, and why it is not priced. null when
+   * cat_data.cat5 carries neither field. Read by the Cat 5 panel and the CSV.
+   *
+   * ⚠️ SHOWN WHENEVER A FIELD IS PRESENT, INCLUDING AT 0. The old inputs wrote 0 when cleared, so a stored
+   * 0 is still something the customer entered, and saying nothing would be deciding it did not matter.
+   */
+  const cat5LegacyNotice: { tonnages: string; sentences: string[] } | null = (() => {
+    const d = catData['cat5']
+    const landfill = d?.waste_landfill_tonnes
+    const recycled = d?.waste_recycled_tonnes
+    const hasLandfill = landfill !== undefined && landfill !== null
+    const hasRecycled = recycled !== undefined && recycled !== null
+    if (!hasLandfill && !hasRecycled) return null
+    const tonnages = [hasLandfill && `${landfill} t to landfill`, hasRecycled && `${recycled} t recycled`]
+      .filter((x): x is string => typeof x === 'string').join(' and ')
+    const both = hasLandfill && hasRecycled
+    const sheet = `the ${DEFRA_WASTE_META.sheet} sheet of ${DEFRA_WASTE_META.source}`
+    const sentences = [
+      `This inventory was saved with the previous Cat 5 form, which recorded ${tonnages}.`,
+      `${both ? 'These tonnages are' : 'This tonnage is'} not priced and not in the Cat 5 figure.`,
+      `${both ? 'Neither names a' : 'It names no'} waste type, and ${sheet} publishes each factor for a waste type and a treatment route together.`,
+      ...(hasRecycled
+        ? ['"Recycled" is also not one route on that sheet. Its recycling routes are Open-loop and Closed-loop, two separate routes, and not every waste type publishes both.']
+        : []),
+      'To price this waste, add it as waste streams in the Cat 5 panel. The saved figures are kept as they were.',
+    ]
+    return { tonnages, sentences }
+  })()
+
+  /** "row 1", "rows 1 and 3", "rows 1, 2 and 4". */
+  const rowList = (ns: number[]): string =>
+    ns.length === 1 ? `row ${ns[0]}` : `rows ${ns.slice(0, -1).join(', ')} and ${ns[ns.length - 1]}`
+
+  /** Why a row adds nothing to the figure, from what was observed about it. null for a priced row. */
+  const wasteRowNotPricedReason = (row: WasteRow, pricing: WasteRowPricing): string | null =>
+    pricing.status === 'incomplete' ? `${pricing.missing.join(', ')} not entered`
+      : pricing.status === 'no_factor' ? `the sheet publishes no ${row.route} factor for ${row.waste_type} (${row.activity}), so it is not counted, and not counted as zero`
+      : null
+
+  /**
+   * The Cat 5 workings, and the CSV's Cat 5 disclosure rows: the same sentences in both, as for Cat 1.
+   *
+   * ⚠️ THE GWP SENTENCE READS THE BOUND INVENTORY, IT DOES NOT ASSERT A MIX. These factors are AR5. The
+   * GHG inventory records its own basis in gwp_version, and the sentence says whether the two match,
+   * differ, or cannot be compared because nothing is recorded.
+   */
+  const cat5Sentences: string[] = (() => {
+    const m = DEFRA_WASTE_META
+    const out: string[] = []
+    out.push(
+      `Priced from ${m.source} — ${m.factor_set.toLowerCase()} v${m.file_version}, ${m.sheet} sheet, factor edition ${m.edition}. ` +
+      `Each row is its tonnes multiplied by the kg CO2e per tonne the sheet publishes for that material and treatment route, and the rows are summed.`,
+    )
+    // ⚠️ VERBATIM FROM THE ARTEFACT: the attribution OGL v3.0 requires, then the licence and its link, which
+    // the licence asks for where possible. Never reworded here.
+    out.push(DEFRA_WASTE_META.attribution_required)
+    out.push(`Licence: ${DEFRA_WASTE_META.licence}, ${DEFRA_WASTE_META.licence_url}`)
+    const specific = cat5Priced.filter(e => e.pricing.method === 'waste_type_specific')
+    const average = cat5Priced.filter(e => e.pricing.method === 'average_data')
+    const methodParts = [
+      specific.length > 0 && `${WASTE_METHOD_LABEL.waste_type_specific} for ${rowList(specific.map(e => e.n))}, where a specific material was chosen`,
+      average.length > 0 && `${WASTE_METHOD_LABEL.average_data} for ${average.map(e => `row ${e.n}, because ${wasteMethodFor(e.row.waste_type).reason}`).join('; ')}`,
+    ].filter((x): x is string => typeof x === 'string')
+    if (methodParts.length > 0) {
+      out.push(`Method, in the GHG Protocol Scope 3 Standard's terms for Category 5: ${methodParts.join('; ')}.`)
+    }
+    const mix = !boundInventoryId ? ''
+      : ghgGwpVersion === m.gwp_basis ? ` The linked GHG inventory records ${ghgGwpVersion} as well, so the two share a GWP basis.`
+      : ghgGwpVersion ? ` The linked GHG inventory records ${ghgGwpVersion}. These factors are not re-based to it, so the inventory combines ${ghgGwpVersion} and ${m.gwp_basis} figures.`
+      : ` The linked GHG inventory records no GWP basis, so whether it shares ${m.gwp_basis} with these factors is not known.`
+    out.push(`GWP basis: ${m.gwp_basis}. ${m.gwp_basis_note}${mix}`)
+    out.push(withoutListMarker(m.scope_guidance))
+    out.push(withoutListMarker(m.lifecycle_guidance))
+    out.push('Each material is offered only the treatment routes the sheet publishes a factor for. A route it does not publish is not offered, and is not treated as zero.')
+    out.push(`Re-use is not offered. The workbook's FAQ, "${m.reuse_faq_question}": ${m.reuse_faq_answer}`)
+    out.push('The sheet publishes no wastewater factors, so wastewater treatment is not in this figure.')
+    for (const e of cat5NotPriced) {
+      out.push(`Row ${e.n} is not in this figure: ${wasteRowNotPricedReason(e.row, e.pricing)}.`)
+    }
+    return out
+  })()
 
   const calcGenericSpend = (id: string): number => {
     const d = catData[id]
     if (!d?.included) return 0
     if (d.emissions_override) return d.emissions_override
     const spend = d.annual_spend || 0
-    return (spend * 0.5) / 1000
+    // GENERIC_SPEND_FACTOR is 0.5, the literal that stood here. Named so that every description of
+    // these figures reads the factor and its (empty) provenance instead of restating them.
+    return (spend * GENERIC_SPEND_FACTOR.kg_co2e_per_currency_unit) / 1000
   }
 
   // Full PCAF result for cat 15. Delegates to the engine orchestrator, which chooses the
@@ -479,14 +873,17 @@ export default function Scope3Dashboard() {
     }
   }
 
+  // Dispatches on scope3MethodFor, the same map every basis description reads, so a category cannot be
+  // described as one method and calculated with another. The mapping is identical to the switch on id
+  // it replaced: cat1, cat5, cat6, cat7 and cat15 to their own functions, everything else generic.
   const getCatEmissions = (id: string): number => {
-    switch (id) {
-      case 'cat1': return calcCat1()
-      case 'cat5': return calcCat5()
-      case 'cat6': return calcCat6()
-      case 'cat7': return calcCat7()
-      case 'cat15': return calcCat15()
-      default: return calcGenericSpend(id)
+    switch (scope3MethodFor(id)) {
+      case 'exiobase_spend': return calcCat1()
+      case 'waste_factors': return calcCat5()
+      case 'travel_factors': return calcCat6()
+      case 'commuting_factors': return calcCat7()
+      case 'pcaf': return calcCat15()
+      case 'flat_spend': return calcGenericSpend(id)
     }
   }
 
@@ -494,15 +891,16 @@ export default function Scope3Dashboard() {
   //
   // Same rule the GHG engine applies to an unpriceable location: it is left out of the totals and
   // the exclusion is stated, because a category summed in at zero is a claim that it emits nothing.
-  // Only the two sector-keyed categories are affected. Cat 1 reads EMISSION_FACTORS.spend by sector;
-  // Cat 15 passes a sector into lib/pcaf, which falls back to 0.12 on a miss. The other thirteen
+  // Only the two sector-keyed categories are affected. Cat 1's spend path is priced by the
+  // spend-factor route, so it is unpriced unless the route priced the inputs on screen; Cat 15 passes
+  // a sector into lib/pcaf, which falls back to 0.12 on a miss. The other thirteen
   // never used the sector — calcGenericSpend has always been a flat 0.5 and calcCat5/6/7 are
   // activity-based — so they are unaffected by the vocabulary change.
   const unpricedCatIds = new Set(
     CATEGORIES.filter(c => {
       const d = catData[c.id]
       if (!d?.included) return false
-      if (c.id === 'cat1') return !(d.has_supplier_data && d.supplier_emissions) && !sectorPriced(d.supplier_sector || sector)
+      if (c.id === 'cat1') return !(d.has_supplier_data && d.supplier_emissions) && !cat1SpendPriced
       if (c.id === 'cat15') return !d.emissions_override && !sectorPriced(d.portfolio_sector || sector)
       return false
     }).map(c => c.id),
@@ -525,13 +923,54 @@ export default function Scope3Dashboard() {
   // unpriced categories never reads as complete on one step and partial on the next.
   const totalScope3Label = unpricedCats.length > 0 ? `${totalScope3.toFixed(1)} mt (partial)` : `${totalScope3.toFixed(1)} mt`
 
+  /**
+   * Why an included category was left out of the total, from what was actually OBSERVED for it.
+   *
+   * ⚠️ THIS REPLACES A FIXED "no spend factor held for the selected sector", which was the only cause
+   * when Cat 1 priced from a local table and is now one of several. A missing input is checked; a
+   * request in flight is checked; a route answer is quoted verbatim. Where none of those applies the
+   * sentence says no reason was recorded — it does not reach for the likeliest one.
+   */
+  const unpricedReason = (id: string): string => {
+    const NO_REASON = 'It was not priced, and no reason was recorded.'
+    if (id === 'cat1') {
+      if (cat1MissingInputs.length > 0) {
+        return `Not estimated, because ${cat1MissingInputs.length === 1 ? 'this has' : 'these have'} not been entered: ${cat1MissingInputs.join(', ')}.`
+      }
+      if (cat1SpendPending) return 'Its estimate had not finished calculating.'
+      if (cat1SpendCurrent?.kind === 'error') return cat1SpendCurrent.message
+      if (cat1SpendCurrent?.line.outcome === 'absent') return cat1SpendCurrent.line.explanation
+      if (cat1SpendCurrent?.line.outcome === 'no_factor') return cat1SpendCurrent.line.notice
+      return NO_REASON
+    }
+    if (id === 'cat15') {
+      // Checked against the same lookup unpricedCatIds used: a sector that is set and not in the table.
+      return (catData['cat15']?.portfolio_sector || sector)
+        ? 'No spend factor is held for the sector selected.'
+        : 'No sector has been selected.'
+    }
+    return NO_REASON
+  }
+
+  // ─── Save state ────────────────────────────────────────────────────────────
+  //
+  // ⚠️ "✓ Saved" IS A CLAIM ABOUT THE TOTAL ON SCREEN, so it is DERIVED rather than stored. It shows
+  // only when (a) the inputs were saved, (b) no Cat 1 estimate is pending, and (c) the total on screen
+  // equals the total in the database. (c) is what re-arms the button on a restored inventory whose
+  // Cat 1 figure comes back different from the one saved — including one saved under the old 0.5
+  // fallback, or saved while no factor edition was active. The comparison is a relative tolerance
+  // because the total round-trips through a Postgres numeric and back to a double.
+  const savedTotalMatches = savedTotal !== null
+    && Math.abs(totalScope3 - savedTotal) <= 1e-9 * Math.max(1, Math.abs(totalScope3), Math.abs(savedTotal))
+  const showSaved = saved && !cat1SpendPending && savedTotalMatches
+
   const getConfidence = (id: string): 'high' | 'medium' | 'low' => {
     const d = catData[id]
     if (!d?.included) return 'low'
     if (d.emissions_override || d.has_supplier_data) return 'high'
     if (id === 'cat6' && (d.short_haul_flights || d.long_haul_flights)) return 'medium'
     if (id === 'cat7' && d.employee_count) return 'medium'
-    if (id === 'cat5' && (d.waste_landfill_tonnes || d.waste_recycled_tonnes)) return 'medium'
+    if (id === 'cat5' && cat5Priced.length > 0) return 'medium'
     if (d.annual_spend || d.total_spend) return 'low'
     return 'low'
   }
@@ -542,9 +981,95 @@ export default function Scope3Dashboard() {
     low: { label: 'Spend-based', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
   }
 
+  /**
+   * What an INCLUDED category's figure in THIS inventory actually rests on: a short basis and a detail
+   * sentence. Read by the CSV's METHODOLOGY NOTE and by factor_basis.
+   *
+   * ⚠️ PER CATEGORY AND FROM WHAT WAS ENTERED, NEVER ONE SENTENCE FOR ALL. It replaced "DEFRA/Exiobase",
+   * which was false for every category. A customer must be able to tell which of THEIR figures rest on
+   * EXIOBASE through a named edition, which on fixed activity factors with no recorded source, which on
+   * one flat unsourced spend factor, which on PCAF, and which on a figure they typed in themselves.
+   */
+  const categoryBasis = (id: string): { basis: string; detail: string } => {
+    const d = catData[id]
+    const method = scope3MethodFor(id)
+    const notPriced = { basis: 'Not priced', detail: unpricedReason(id) }
+
+    if (method === 'exiobase_spend') {
+      if (d?.has_supplier_data && d.supplier_emissions) {
+        return { basis: 'Supplier-specific', detail: `${d.supplier_emissions} mt CO2e entered from supplier data; no emission factor was applied.` }
+      }
+      if (cat1SpendPriced && cat1SpendCurrent?.kind === 'done') {
+        const src = SPEND_EF_SOURCES.exiobase_38
+        return {
+          basis: `${src.dataset} ${src.version}, spend-based`,
+          detail: `Priced from ${src.dataset} version ${src.version} through factor edition ${cat1SpendCurrent.response.edition_id}, ` +
+            `using the factor for ${sectorLabel(cat1Sector)} in ${regionLabel(cat1SpendPriced.used_region)}.`,
+        }
+      }
+      return notPriced
+    }
+
+    if (method === 'pcaf') {
+      if (unpricedCatIds.has(id)) return notPriced
+      if (d?.emissions_override) {
+        return { basis: 'Entered figure', detail: `${d.emissions_override} mt CO2e of financed emissions entered directly; no emission factor was applied.` }
+      }
+      let result: ReturnType<typeof cat15PcafResult> | null = null
+      try { result = d ? cat15PcafResult(d) : null } catch { result = null }
+      if (result?.mode === 'decomposed') {
+        return {
+          basis: 'PCAF-aligned, per asset',
+          detail: `Assessed asset by asset across ${result.assetCount} ${result.assetCount === 1 ? 'asset' : 'assets'}, ` +
+            `with a weighted PCAF data quality score of ${result.weightedDataQualityScore.toFixed(1)}.`,
+        }
+      }
+      return { basis: 'PCAF-aligned portfolio proxy', detail: scope3MethodDescription('pcaf') }
+    }
+
+    if (method === 'flat_spend') {
+      if (d?.emissions_override) {
+        return { basis: 'Entered figure', detail: `${d.emissions_override} mt CO2e entered directly; no emission factor was applied.` }
+      }
+      if (d?.annual_spend) {
+        const gap = provenanceGap(GENERIC_SPEND_FACTOR)
+        return {
+          basis: 'Flat spend factor, unsourced',
+          detail: `${d.annual_spend} ${currency} of spend at a flat ${GENERIC_SPEND_FACTOR.kg_co2e_per_currency_unit} kg CO2e ` +
+            `per ${currency}, the same whatever was bought.${gap ? ` The factor is recorded with ${gap}.` : ''}`,
+        }
+      }
+      return { basis: 'No data', detail: 'No spend or figure was entered, so nothing was calculated.' }
+    }
+
+    if (method === 'waste_factors') {
+      const skipped = cat5NotPriced.length > 0
+        ? ` ${cat5NotPriced.length} ${cat5NotPriced.length === 1 ? 'row was' : 'rows were'} not priced: ${cat5NotPriced.map(e => `row ${e.n}, ${wasteRowNotPricedReason(e.row, e.pricing)}`).join('; ')}.`
+        : ''
+      if (cat5Priced.length === 0) {
+        return { basis: 'No data', detail: `No complete waste row was entered, so nothing was calculated.${skipped}` }
+      }
+      const methods = Array.from(new Set(cat5Priced.map(e => WASTE_METHOD_LABEL[e.pricing.method]))).join(' and ')
+      return {
+        basis: `${DEFRA_WASTE_META.source}, ${DEFRA_WASTE_META.sheet} sheet, ${methods}`,
+        detail: `${scope3MethodDescription('waste_factors')} ${cat5Priced.length} ${cat5Priced.length === 1 ? 'row' : 'rows'} priced.${skipped}`,
+      }
+    }
+
+    // travel, commuting: fixed activity factors
+    if (getCatEmissions(id) === 0) {
+      return { basis: 'No data', detail: 'No activity data was entered, so nothing was calculated.' }
+    }
+    return { basis: 'Fixed activity factors, unsourced', detail: scope3MethodDescription(method) }
+  }
+
   // Persist the bound Scope 3 record. Upsert on inventory_id so re-saves update
   // the existing row rather than erroring on the unique FK.
   const saveScope3 = async () => {
+    // A Cat 1 estimate still being fetched means totalScope3 is about to change. Writing it now would
+    // store a total the page is on the point of contradicting. The button is disabled in this state
+    // too; this guard is for any other caller.
+    if (cat1SpendPending) return
     setSaving(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -561,12 +1086,19 @@ export default function Scope3Dashboard() {
         revenue_millions: (revenue || 0) / 1_000_000, // raw -> millions
         cat_data: catData,
         total_scope3_tco2e: totalScope3,
-        factor_basis: 'DEFRA/Exiobase (spend-based) · GHG Protocol category methodologies (activity-based)',
+        // Derived per included category from categoryBasis — the same statements the CSV carries. It was
+        // the literal 'DEFRA/Exiobase (spend-based) · GHG Protocol category methodologies (activity-based)',
+        // which was false. Still plain text in a column nothing reads; see the report on moving it to a
+        // structured record on the factor_editions pattern.
+        factor_basis: CATEGORIES.filter(c => catData[c.id]?.included)
+          .map(c => { const b = categoryBasis(c.id); return `Cat ${c.num} ${c.name}: ${b.basis}. ${b.detail}` })
+          .join('\n'),
         status: 'confirmed',
         updated_at: new Date().toISOString(),
       }, { onConflict: 'inventory_id' })
       if (error) { console.error('Scope 3 save failed:', error); alert('Save failed: ' + error.message); return }
       setSaved(true)
+      setSavedTotal(totalScope3) // exactly the value written above, from the same render
     } finally { setSaving(false) }
   }
 
@@ -577,15 +1109,91 @@ export default function Scope3Dashboard() {
     setSaved(false)
   }, [catData, sector, currency, revenue, countryIso2])
 
+  /**
+   * The CSV's ESTIMATE BASIS rows: what a verifier needs to reconstruct a sector- or region-dependent
+   * figure, in the file's own four-column shape. Placed straight after SCOPE 3 BY CATEGORY, which it
+   * annotates, and before the METHODOLOGY NOTE — the same prose-row precedent as "Excluded from total".
+   *
+   * ⚠️ EACH ROW REPORTS WHAT THE CALCULATION USED, NOT WHAT A SELECT DISPLAYS. Cat 1 prices from the
+   * supplier sector where one is set and the company sector otherwise, so the row names which, and
+   * names the company sector alongside when the two differ. Cat 15's select shows "Financial Services"
+   * when nothing is stored, but the calculation receives only portfolio_sector, so an unset value is
+   * reported as unset.
+   */
+  const estimateBasisRows = (): string[][] => {
+    const out: string[][] = []
+
+    const c1 = catData['cat1']
+    if (c1?.included) {
+      if (c1.has_supplier_data && c1.supplier_emissions) {
+        out.push(['Cat 1', 'Basis', 'Supplier-specific emissions',
+          'Entered as a figure; no spend-based estimate was made, so no sector, region or factor edition applies.'])
+      } else {
+        const supplier = c1.supplier_sector
+        out.push(['Cat 1', 'Sector used', sectorLabel(cat1Sector),
+          !cat1Sector ? 'No sector selected.'
+            : !supplier ? 'The company sector: no primary supplier sector was set for Cat 1.'
+            : supplier === sector ? 'The primary supplier sector set for Cat 1, which is the same as the company sector.'
+            : `The primary supplier sector set for Cat 1. It differs from the company sector, ${sectorLabel(sector) || 'which is not set'}, which was not used for this category.`])
+        out.push(['Cat 1', 'Country of supply', countryIso2 ? countryLabel(countryIso2) : '', countryIso2 ? '' : 'Not entered.'])
+        // The region that PRICED the figure where there is one; otherwise the region the country resolves
+        // to in the same concordance the route uses, labelled as not having priced anything.
+        const region = cat1SpendPriced?.used_region ?? (countryIso2 ? countryByIso2(countryIso2)?.region_code : undefined)
+        out.push(['Cat 1', 'EXIOBASE region', region ? regionLabel(region) : '',
+          cat1SpendPriced ? 'The region whose factor priced this estimate.'
+            : region ? 'The region this country resolves to. No estimate was priced.'
+            : 'No country of supply, so no region.'])
+        out.push(['Cat 1', 'Factor edition', cat1SpendCurrent?.kind === 'done' ? cat1SpendCurrent.response.edition_id : '',
+          cat1SpendPriced ? '' : `Not priced. ${unpricedReason('cat1')}`])
+        for (const d of cat1SpendSentences) out.push(['Cat 1', 'Disclosure', d, ''])
+      }
+    }
+
+    const c5 = catData['cat5']
+    if (c5?.included) {
+      if (cat5LegacyNotice) {
+        out.push(['Cat 5', 'Previous form, not priced', cat5LegacyNotice.tonnages, cat5LegacyNotice.sentences.join(' ')])
+      }
+      // One row per waste row, with the pair, the published factor and the arithmetic, so a verifier can
+      // find each factor on the sheet and redo the sum. Then the same disclosures the workings show.
+      for (const e of cat5Evaluated) {
+        const r = e.row
+        const what = [r.waste_type && `${r.waste_type} (${r.activity})`, r.route].filter(Boolean).join(', ')
+        out.push(['Cat 5', `Waste row ${e.n}`, what,
+          e.pricing.status === 'priced'
+            ? `${r.tonnes} t × ${e.pricing.factor_kg_per_tonne} kg CO2e per t = ${e.pricing.kg_co2e.toFixed(2)} kg CO2e; ${WASTE_METHOD_LABEL[e.pricing.method]}.`
+            : `Not priced: ${wasteRowNotPricedReason(r, e.pricing)}.`])
+      }
+      if (cat5Evaluated.length === 0) out.push(['Cat 5', 'Waste rows', '', 'None entered.'])
+      for (const d of cat5Sentences) out.push(['Cat 5', 'Disclosure', d, ''])
+    }
+
+    const c15 = catData['cat15']
+    if (c15?.included) {
+      // Which path actually ran, from the engine's own result rather than inferred from the inputs.
+      let mode: string | null = null
+      try { mode = cat15PcafResult(c15).mode } catch { mode = null }
+      out.push(['Cat 15', 'Portfolio sector', sectorLabel(c15.portfolio_sector),
+        mode === 'decomposed' ? 'Not used: the per-asset (detailed) assessment ran, and each asset carries its own inputs.'
+          : c15.emissions_override ? 'Not used: known financed emissions were entered directly.'
+          : c15.portfolio_sector ? 'The primary portfolio sector set for Cat 15.'
+          : 'No portfolio sector set for Cat 15; the calculation received none.'])
+    }
+    return out
+  }
+
   const generateExport = () => {
     const rows = [
       ['ThemisIQ — Scope 3 GHG Inventory'],
       ['Company', company],
-      ['Sector', sector],
+      // ⚠️ NAME AND CODE, NOT EITHER ALONE. A verifier needs the name to read it and the code to find
+      // the published row; the code alone means consulting the EXIOBASE classification. On a miss
+      // industryName returns the code itself, and that is written once rather than as "i99 (i99)".
+      ['Sector', sectorLabel(sector)],
       ['Reporting year', reportingYear],
       ['Total Scope 3', `${totalScope3.toFixed(2)} mt CO2e`],
       ...(unpricedCats.length > 0
-        ? [['Excluded from total', `${unpricedCats.map(c => `Cat ${c.num} ${c.name}`).join('; ')} — no spend factor held for the selected sector; not counted as zero`]]
+        ? [['Excluded from total', `${unpricedCats.map(c => `Cat ${c.num} ${c.name}: ${unpricedReason(c.id)}`).join(' ')} Left out of the total rather than counted as zero.`]]
         : []),
       ['Generated', new Date().toLocaleDateString()],
       [],
@@ -594,18 +1202,36 @@ export default function Scope3Dashboard() {
       ...CATEGORIES.map(c => [
         `Cat ${c.num}`,
         c.name,
-        catData[c.id]?.included ? (unpricedCatIds.has(c.id) ? 'no factor yet' : getCatEmissions(c.id).toFixed(2)) : '—',
+        catData[c.id]?.included ? (unpricedCatIds.has(c.id) ? 'not priced' : getCatEmissions(c.id).toFixed(2)) : '—',
         catData[c.id]?.included ? confidenceConfig[getConfidence(c.id)].label : 'Excluded',
         catData[c.id]?.included ? confidenceConfig[getConfidence(c.id)].label : '—',
         catData[c.id]?.included ? 'Yes' : `No — ${catData[c.id]?.excluded_reason || 'not material'}`,
       ]),
+      ...(() => {
+        const basis = estimateBasisRows()
+        return basis.length > 0 ? [[], ['ESTIMATE BASIS'], ['Category', 'Item', 'Value', 'Note'], ...basis] : []
+      })(),
       [],
       ['METHODOLOGY NOTE'],
-      ['Spend-based estimates use DEFRA/Exiobase emission factors. Activity-based calculations use GHG Protocol Category-specific methodologies. Primary data supersedes all estimates where available.'],
+      // One row per INCLUDED category, from categoryBasis. It was a single sentence claiming
+      // "DEFRA/Exiobase" for everything, which was false for every category and could not tell a reader
+      // which of their figures rested on what.
+      ['Category', 'Name', 'Basis', 'Detail'],
+      ...CATEGORIES.filter(c => catData[c.id]?.included).map(c => {
+        const b = categoryBasis(c.id)
+        return [`Cat ${c.num}`, c.name, b.basis, b.detail]
+      }),
       [],
       ['Generated by ThemisIQ · www.themisiq.co · GHG Protocol Scope 3 Standard'],
     ]
-    const csv = rows.map(r => r.join(',')).join('\n')
+    // ⚠️ CELLS ARE NOW QUOTED. The reasons above are the route's own sentences and contain commas, and
+    // this used to join raw values with ',' — so one reason would have spilled across several columns.
+    // RFC 4180: wrap any cell holding a comma, quote or newline in quotes, and double embedded quotes.
+    const csvCell = (v: unknown): string => {
+      const t = String(v ?? '')
+      return /[",\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t
+    }
+    const csv = rows.map(r => r.map(csvCell).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -803,7 +1429,7 @@ export default function Scope3Dashboard() {
             // individually, so keying on basis would tell a customer their Russian supply was a
             // regional average when it is a country-specific factor.
             const named = picked.region_code === picked.iso2
-            const bucket = ROW_BUCKET_NAMES[picked.region_code] ?? picked.region_code
+            const bucket = regionName(picked.region_code)
             return (
               <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: '#555553' }}>
                 <span>
@@ -831,7 +1457,9 @@ export default function Scope3Dashboard() {
   const renderStep1 = () => (
     <div>
       <h2 style={sectionHead}>Materiality screening</h2>
-      <p style={sectionSub}>ThemisIQ has identified the Scope 3 categories likely to be material for a {sector || 'company'} based on GHG Protocol guidance. Review and confirm.</p>
+      {/* Reworded along with the name: "material for a {sector}" read as an article before the retired
+          vocabulary ("for a Technology"), and reads as nonsense before an EXIOBASE name. */}
+      <p style={sectionSub}>ThemisIQ has identified the Scope 3 categories likely to be material for {sector ? <>your sector, <strong style={{ fontWeight: 600 }}>{industryName(sector)}</strong>,</> : 'your company'} based on GHG Protocol guidance. Review and confirm.</p>
       <div style={{ background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 20%, transparent)', borderRadius: 10, padding: '0.75rem 1rem', marginBottom: 16, fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
         These are suggestions, not limits — <strong>click any category to add or remove it</strong>. Under the GHG Protocol you may include any category you judge material, and you must briefly justify any you exclude. Tap a category in the Calculate step for what it means and where to find the data.
       </div>
@@ -841,7 +1469,7 @@ export default function Scope3Dashboard() {
       ) : (
         <>
           <button onClick={autoDetect} style={{ fontSize: 12, fontWeight: 500, padding: '8px 16px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer', marginBottom: 20 }}>
-            ⚡ Auto-detect material categories for {sector}
+            ⚡ Auto-detect material categories for {industryName(sector)}
           </button>
 
           {['Upstream', 'Downstream'].map(stream => (
@@ -904,8 +1532,13 @@ export default function Scope3Dashboard() {
                     <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-ink-muted)', marginRight: 10 }}>Cat {cat.num}</span>
                     <span style={{ fontSize: 13, fontWeight: 600 }}>{cat.name}</span>
                   </div>
-                  {unpricedCatIds.has(cat.id) ? (
-                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-module-climate)' }}>no factor yet</span>
+                  {cat.id === 'cat1' && cat1SpendPending ? (
+                    // In flight or debouncing: no figure at all, rather than the last one.
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)' }}>pricing…</span>
+                  ) : unpricedCatIds.has(cat.id) ? (
+                    // Cat 1 can now be unpriced for reasons other than the sector (no country, no active
+                    // edition, a failed request), so its badge does not name one. The panel below does.
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-module-climate)' }}>{cat.id === 'cat1' ? 'not priced' : 'no factor yet'}</span>
                   ) : getCatEmissions(cat.id) > 0 && (
                     <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-module-ghg)' }}>{getCatEmissions(cat.id).toFixed(2)} mt CO₂e</span>
                   )}
@@ -952,13 +1585,46 @@ export default function Scope3Dashboard() {
                           <option value="">Select sector</option>
                           <IndustryOptions />
                         </select>
-                        {unpricedCatIds.has('cat1') && <NoFactorNotice what="Purchased goods & services" />}
+                      </div>
+                      {/* FULL PANEL WIDTH, below both controls. This used to sit inside the sector
+                          column, about 130px wide, where every sentence wrapped to three or four words. */}
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        {!cat1SpendInputsComplete ? (
+                          // Say which input is missing; that much is checkable. No notice about factors,
+                          // because nothing has been asked yet.
+                          <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 8 }}>
+                            To estimate from spend, enter: {cat1MissingInputs.join(', ')}.
+                          </div>
+                        ) : cat1SpendPending ? (
+                          <div role="status" style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 8 }}>Pricing this spend…</div>
+                        ) : cat1SpendCurrent?.kind === 'error' ? (
+                          <NoFactorNotice what="Purchased goods & services" title="⚠ This spend could not be priced" detail={cat1SpendCurrent.message} />
+                        ) : cat1SpendCurrent?.line.outcome === 'absent' ? (
+                          <NoFactorNotice what="Purchased goods & services" title="⚠ This spend cannot be estimated" detail={cat1SpendCurrent.line.explanation} />
+                        ) : cat1SpendCurrent?.line.outcome === 'no_factor' ? (
+                          <NoFactorNotice what="Purchased goods & services" title="⚠ This spend cannot be estimated" detail={cat1SpendCurrent.line.notice} />
+                        ) : cat1SpendPriced && cat1SpendCurrent?.kind === 'done' ? (
+                          <SpendFactorWorkings
+                            id="cat1-spend"
+                            figureMt={cat1SpendPriced.emissions_mt}
+                            // Figure and method only. Region by name, from regionNames.ts — the same words
+                            // the route's sentences below use.
+                            // A missing dataset or version is omitted, not replaced with a placeholder.
+                            summary={`spend-based estimate from the ${[cat1SpendPriced.source.dataset, cat1SpendPriced.source.version && `v${cat1SpendPriced.source.version}`].filter(Boolean).join(' ')} factor for ${regionName(cat1SpendPriced.used_region)}`.replace('from the  factor', 'from the factor')}
+                            // See cat1SpendSentences: shared with the CSV, verbatim, de-duplicated.
+                            sentences={cat1SpendSentences}
+                          />
+                        ) : null}
                       </div>
                     </>}
                     <div style={{ gridColumn: '1 / -1', background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
                       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--color-brand)', marginBottom: 6 }}>Pull from Supplier Portal</div>
                       <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginBottom: 10 }}>Bring in primary Cat 1 data you collected from suppliers. Supplier-allocated emissions are used directly; suppliers without an allocated figure are estimated from the spend you recorded (sector default). You review the full breakdown before it is applied.</div>
-                      {campaigns.length === 0 ? (
+                      {campaignsError === null ? (
+                        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Loading your supplier campaigns…</div>
+                      ) : campaignsError ? (
+                        <div role="alert" style={{ fontSize: 11, color: '#B91C1C', lineHeight: 1.5 }}>{campaignsError}</div>
+                      ) : campaigns.length === 0 ? (
                         <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>No supplier campaigns found. <a href="/dashboard/supply-chain/portal" style={{ color: 'var(--color-brand)', textDecoration: 'none', fontWeight: 600 }}>Create one in the Supplier Portal →</a></div>
                       ) : (
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1057,16 +1723,102 @@ export default function Scope3Dashboard() {
                     </div>
                   </>}
 
-                  {/* Cat 5 — Waste */}
+                  {/* Cat 5 — Waste: one row per material and treatment route, priced from the DEFRA/DESNZ 2026
+                      Waste disposal sheet. Selects are built from lib/emissionFactors/defraWaste.ts, so a
+                      material is only ever offered the routes the sheet publishes for it. */}
                   {cat.id === 'cat5' && <>
-                    <div>
-                      <label style={labelStyle}>Waste to landfill (tonnes)</label>
-                      <input style={inputStyle} type="number" value={catData['cat5']?.waste_landfill_tonnes || ''} onChange={e => updateCat('cat5', 'waste_landfill_tonnes', Number(e.target.value))} placeholder="0" />
+                    {/* Old saved data, first: it is the customer's own entry, and it is not in the figure. */}
+                    {cat5LegacyNotice && (
+                      <div style={{ gridColumn: '1 / -1', background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem' }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>⚠ Saved waste figures not priced: {cat5LegacyNotice.tonnages}</div>
+                        <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>{cat5LegacyNotice.sentences.join(' ')}</div>
+                      </div>
+                    )}
+                    {/* ⚠️ ABOVE THE ROWS, NOT ONLY IN THE WORKINGS. A row priced at 520.58 kg per tonne to
+                        landfill beside one at 4.65 to combustion reads as a comparison of the two routes,
+                        and the workbook says these factors cannot make it. Both sentences are the
+                        artefact's own, verbatim but for the list marker. */}
+                    <div style={{ gridColumn: '1 / -1', background: '#E6F1FB', borderRadius: 8, padding: '0.75rem', fontSize: 11, color: '#0C447C', lineHeight: 1.6 }}>
+                      <div style={{ fontWeight: 700, marginBottom: 4 }}>Before comparing treatment routes</div>
+                      <p style={{ margin: '0 0 6px' }}>{withoutListMarker(DEFRA_WASTE_META.lifecycle_guidance)}</p>
+                      <p style={{ margin: 0 }}>{withoutListMarker(DEFRA_WASTE_META.scope_guidance)}</p>
+                      {/* This box quotes the workbook whether or not any row is priced, so it carries the
+                          required attribution itself rather than relying on the workings card below. */}
+                      <p style={{ margin: '6px 0 0', fontSize: 10 }}>
+                        {DEFRA_WASTE_META.attribution_required}{' '}
+                        <a href={DEFRA_WASTE_META.licence_url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>{DEFRA_WASTE_META.licence}</a>
+                      </p>
                     </div>
-                    <div>
-                      <label style={labelStyle}>Waste recycled (tonnes)</label>
-                      <input style={inputStyle} type="number" value={catData['cat5']?.waste_recycled_tonnes || ''} onChange={e => updateCat('cat5', 'waste_recycled_tonnes', Number(e.target.value))} placeholder="0" />
+
+                    <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {wasteRows().length === 0 && (
+                        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', background: '#f8f7f5', borderRadius: 8, padding: '0.75rem', lineHeight: 1.5 }}>
+                          No waste streams yet. Add one for each material and treatment route on your waste contractor&apos;s report.
+                        </div>
+                      )}
+                      {cat5Evaluated.map(({ row, n, pricing }) => {
+                        const hasMaterial = !!row.activity && !!row.waste_type
+                        const routes = hasMaterial ? wasteRoutesFor(row.activity, row.waste_type) : []
+                        const materialKey = hasMaterial && WASTE_MATERIAL_GROUPS.some(g => g.activity === row.activity && g.materials.includes(row.waste_type))
+                          ? wasteMaterialKey(row.activity, row.waste_type) : ''
+                        const fieldId = (f: string) => `cat5-${row.id}-${f}`
+                        return (
+                          <div key={row.id} style={{ border: '1px solid #e8e7e4', borderRadius: 10, padding: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: '#555553' }}>Waste stream {n}</span>
+                              <button type="button" aria-label={`Remove waste stream ${n}`} onClick={() => removeWasteRow(row.id)} style={{ fontSize: 11, color: '#B91C1C', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Remove</button>
+                            </div>
+                            <div style={{ gridColumn: '1 / -1' }}>
+                              <label htmlFor={fieldId('material')} style={labelStyle}>Waste type</label>
+                              <select id={fieldId('material')} style={inputStyle} value={materialKey} onChange={e => setWasteMaterial(row.id, e.target.value)}>
+                                <option value="">Select waste type</option>
+                                {WASTE_MATERIAL_GROUPS.map(g => (
+                                  <optgroup key={g.activity} label={g.activity}>
+                                    {g.materials.map(mat => <option key={mat} value={wasteMaterialKey(g.activity, mat)}>{mat}</option>)}
+                                  </optgroup>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label htmlFor={fieldId('route')} style={labelStyle}>Treatment route</label>
+                              {/* Only the routes this material publishes. Disabled until a material is chosen,
+                                  because until then there is no list that would be true. */}
+                              <select id={fieldId('route')} style={inputStyle} disabled={!hasMaterial} value={routes.includes(row.route) ? row.route : ''} onChange={e => updateWasteRow(row.id, { route: e.target.value })}>
+                                <option value="">{hasMaterial ? 'Select route' : 'Choose a waste type first'}</option>
+                                {routes.map(r => <option key={r} value={r}>{r}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label htmlFor={fieldId('tonnes')} style={labelStyle}>Tonnes</label>
+                              <input id={fieldId('tonnes')} style={inputStyle} type="number" min={0} value={row.tonnes || ''} onChange={e => updateWasteRow(row.id, { tonnes: Number(e.target.value) })} placeholder="0" />
+                            </div>
+                            <div style={{ gridColumn: '1 / -1', fontSize: 11, lineHeight: 1.5 }}>
+                              {pricing.status === 'priced' ? (
+                                <span style={{ color: '#555553' }}>
+                                  {row.tonnes} t × {pricing.factor_kg_per_tonne} kg CO₂e per t = <strong style={{ fontWeight: 600 }}>{pricing.kg_co2e.toLocaleString('en', { maximumFractionDigits: 2 })} kg CO₂e</strong> · {WASTE_METHOD_LABEL[pricing.method]}
+                                </span>
+                              ) : pricing.status === 'no_factor' ? (
+                                <span style={{ color: '#92400e' }}>⚠ Not counted: {wasteRowNotPricedReason(row, pricing)}. Choose the waste type and route again.</span>
+                              ) : (
+                                <span style={{ color: 'var(--color-ink-muted)' }}>Not priced until entered: {pricing.missing.join(', ')}.</span>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                      <button type="button" onClick={addWasteRow} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: 'none', border: '0.5px solid var(--color-brand)', color: 'var(--color-brand)', cursor: 'pointer', alignSelf: 'flex-start' }}>+ Add waste stream</button>
                     </div>
+
+                    {cat5Priced.length > 0 && (
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <SpendFactorWorkings
+                          id="cat5-waste"
+                          figureMt={calcCat5()}
+                          summary={`${cat5Priced.length} waste ${cat5Priced.length === 1 ? 'stream' : 'streams'} priced from the DEFRA/DESNZ ${DEFRA_WASTE_META.year} waste disposal factors`}
+                          sentences={cat5Sentences}
+                        />
+                      </div>
+                    )}
                   </>}
 
                   {/* Cat 15 — Investments */}
@@ -1127,36 +1879,36 @@ export default function Scope3Dashboard() {
                           <div key={row.id} style={{ border: '1px solid #e8e7e4', borderRadius: 10, padding: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                             <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <span style={{ fontSize: 11, fontWeight: 700, color: '#555553' }}>Holding {idx + 1}</span>
-                              <button onClick={() => removePcafAsset(idx)} style={{ fontSize: 11, color: '#B91C1C', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Remove</button>
+                              <button onClick={() => removePcafAsset(row.id)} style={{ fontSize: 11, color: '#B91C1C', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Remove</button>
                             </div>
                             <div style={{ gridColumn: '1 / -1' }}>
                               <label style={labelStyle}>Asset class</label>
-                              <select style={inputStyle} value={row.assetClass} onChange={e => updatePcafAsset(idx, { assetClass: e.target.value as PcafAssetClass })}>
+                              <select style={inputStyle} value={row.assetClass} onChange={e => updatePcafAsset(row.id, { assetClass: e.target.value as PcafAssetClass })}>
                                 {PCAF_ASSET_CLASSES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                               </select>
                             </div>
                             <div>
                               <label style={labelStyle}>Outstanding amount ({currency})</label>
-                              <input style={inputStyle} type="number" value={row.outstandingAmount || ''} onChange={e => updatePcafAsset(idx, { outstandingAmount: Number(e.target.value) })} placeholder="0" />
+                              <input style={inputStyle} type="number" value={row.outstandingAmount || ''} onChange={e => updatePcafAsset(row.id, { outstandingAmount: Number(e.target.value) })} placeholder="0" />
                             </div>
                             <div>
                               {/* Correctness-critical: denominator label tracks the selected asset class */}
                               <label style={labelStyle}>{meta.denominatorLabel} ({currency})</label>
-                              <input style={inputStyle} type="number" value={row.denominator || ''} onChange={e => updatePcafAsset(idx, { denominator: Number(e.target.value) })} placeholder="0" />
+                              <input style={inputStyle} type="number" value={row.denominator || ''} onChange={e => updatePcafAsset(row.id, { denominator: Number(e.target.value) })} placeholder="0" />
                             </div>
                             <div style={{ gridColumn: '1 / -1', fontSize: 10, color: 'var(--color-ink-muted)', lineHeight: 1.5 }}>Enter the investee&apos;s reported emissions where available (best data quality). Otherwise provide revenue + sector for an estimate.</div>
                             <div>
                               <label style={labelStyle}>Investee emissions (tCO₂e)</label>
-                              <input style={inputStyle} type="number" value={row.emissions.reportedEmissions ?? ''} onChange={e => updatePcafEmissions(idx, { reportedEmissions: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="Reported" />
+                              <input style={inputStyle} type="number" value={row.emissions.reportedEmissions ?? ''} onChange={e => updatePcafEmissions(row.id, { reportedEmissions: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="Reported" />
                               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#555553', marginTop: 6, cursor: 'pointer' }}>
-                                <input type="checkbox" checked={row.emissions.verified ?? false} onChange={e => updatePcafEmissions(idx, { verified: e.target.checked })} />
+                                <input type="checkbox" checked={row.emissions.verified ?? false} onChange={e => updatePcafEmissions(row.id, { verified: e.target.checked })} />
                                 Third-party verified
                               </label>
                             </div>
                             <div>
                               <label style={labelStyle}>or Investee revenue ({currency})</label>
-                              <input style={inputStyle} type="number" value={row.emissions.revenue ?? ''} onChange={e => updatePcafEmissions(idx, { revenue: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="For estimate" />
-                              <select style={{ ...inputStyle, marginTop: 6 }} value={row.emissions.sector ?? ''} onChange={e => updatePcafEmissions(idx, { sector: e.target.value === '' ? undefined : e.target.value })}>
+                              <input style={inputStyle} type="number" value={row.emissions.revenue ?? ''} onChange={e => updatePcafEmissions(row.id, { revenue: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="For estimate" />
+                              <select style={{ ...inputStyle, marginTop: 6 }} value={row.emissions.sector ?? ''} onChange={e => updatePcafEmissions(row.id, { sector: e.target.value === '' ? undefined : e.target.value })}>
                                 <option value="">Sector for estimate…</option>
                                 <IndustryOptions />
                               </select>
@@ -1307,11 +2059,14 @@ export default function Scope3Dashboard() {
           {unpricedCats.length > 0 && (
             <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem', margin: '0 24px 20px', textAlign: 'left' as const }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>
-                ⚠ This total excludes {unpricedCats.length} categor{unpricedCats.length === 1 ? 'y' : 'ies'} we cannot price yet
+                ⚠ This total excludes {unpricedCats.length} categor{unpricedCats.length === 1 ? 'y' : 'ies'} that {unpricedCats.length === 1 ? 'was' : 'were'} not priced
               </div>
-              <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
-                {unpricedCats.map(c => `Cat ${c.num} ${c.name}`).join(', ')} — no spend factor is held for the sector selected.
-              </div>
+              {/* One line per category, each with its OWN observed reason. See unpricedReason. */}
+              {unpricedCats.map(c => (
+                <div key={c.id} style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 2 }}>
+                  <strong style={{ fontWeight: 600 }}>Cat {c.num} {c.name}:</strong> {unpricedReason(c.id)}
+                </div>
+              ))}
               <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 4 }}>
                 They are left out rather than counted as zero. Enter a known figure for a category to include it.
               </div>
@@ -1438,8 +2193,8 @@ export default function Scope3Dashboard() {
               <span style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>I confirm that the data entered is accurate to the best of my knowledge. I understand that spend-based estimates carry inherent uncertainty and should be disclosed as such in external reports.</span>
             </label>
           </div>
-          <button onClick={() => dataConfirmed && saveScope3()} disabled={!dataConfirmed || !boundInventoryId || saving} style={{ ...((dataConfirmed && boundInventoryId && !saving) ? btnStepPrimary : btnStepPrimaryDisabled), marginRight: 12 }}>
-            {saving ? 'Saving…' : saved ? '✓ Saved to your inventory' : 'Save Scope 3 to inventory'}
+          <button onClick={() => dataConfirmed && !cat1SpendPending && saveScope3()} disabled={!dataConfirmed || !boundInventoryId || saving || cat1SpendPending} style={{ ...((dataConfirmed && boundInventoryId && !saving && !cat1SpendPending) ? btnStepPrimary : btnStepPrimaryDisabled), marginRight: 12 }}>
+            {saving ? 'Saving…' : cat1SpendPending ? 'Waiting for the Cat 1 estimate…' : showSaved ? '✓ Saved to your inventory' : 'Save Scope 3 to inventory'}
           </button>
           <button onClick={() => dataConfirmed && generateExport()} style={{ ...(dataConfirmed ? btnStepPrimary : btnStepPrimaryDisabled) }}>
             ⬇ Download Scope 3 Inventory (CSV)
@@ -1553,7 +2308,9 @@ export default function Scope3Dashboard() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {[
                     { label: 'Company', val: company || '—' },
-                    { label: 'Sector', val: sector || '—' },
+                    // EXIOBASE's published name, never the stored code: 'i17' is our vocabulary, not the
+                    // customer's. industryName falls through to the code on a miss rather than blanking.
+                    { label: 'Sector', val: sector ? industryName(sector) : '—' },
                     // Same two labels, same two sets and same order as the Export tile, so a reader moving
                     // between steps is never comparing different counts under one word. Two rows rather
                     // than one because this sidebar also shows on Materiality and Calculate, where "in
@@ -1562,9 +2319,12 @@ export default function Scope3Dashboard() {
                     { label: 'Categories in total', val: categoriesInTotal.length },
                     { label: 'Total Scope 3', val: totalScope3 > 0 ? totalScope3Label : '—' },
                   ].map(({ label, val }) => (
-                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{label}</span>
-                      <span style={{ fontSize: 12, color: 'var(--color-ink)', fontWeight: 500 }}>{val}</span>
+                    // Baseline-aligned and right-aligned, with the label unable to shrink: a sector name
+                    // runs to 132 characters and wraps in this 260px column, and a centred label beside
+                    // a four-line value reads as belonging to its middle line.
+                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
+                      <span style={{ fontSize: 11, color: 'var(--color-ink-muted)', flexShrink: 0 }}>{label}</span>
+                      <span style={{ fontSize: 12, color: 'var(--color-ink)', fontWeight: 500, textAlign: 'right', lineHeight: 1.4 }}>{val}</span>
                     </div>
                   ))}
                 </div>

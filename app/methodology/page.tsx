@@ -2,6 +2,19 @@
 
 import Nav from '../components/Nav'
 import Footer from '../components/Footer'
+import { scope3MethodFor, scope3MethodDescription, provenanceGap } from '../../lib/scope3/categoryMethods'
+import { EMISSION_FACTORS, EMISSION_FACTORS_PROVENANCE } from '../../lib/emissionFactors'
+
+// ⚠️ SCOPE 3 BASIS PARAGRAPHS ARE BUILT, NOT WRITTEN. Two entries on this page said Scope 3 spend
+// estimates used "DEFRA and Exiobase" / "DEFRA (2023) and Exiobase v3", which was false: no DEFRA spend
+// factor exists in the codebase. They are now assembled from lib/scope3/categoryMethods.ts — the same
+// map the calculator dispatches on — so this page names the method each category is actually
+// calculated with, and the factor values and missing provenance are read from the factor records.
+const flatSpendCategories = Array.from({ length: 15 }, (_, i) => i + 1)
+  .filter(n => scope3MethodFor(`cat${n}`) === 'flat_spend')
+const listNumbers = (ns: number[]) =>
+  ns.length <= 1 ? ns.join('') : `${ns.slice(0, -1).join(', ')} and ${ns[ns.length - 1]}`
+const bridgeGap = provenanceGap(EMISSION_FACTORS_PROVENANCE)
 
 const GRAD = 'var(--color-brand)'
 
@@ -74,7 +87,15 @@ const METHODOLOGIES = [
       },
       {
         title: 'Calculation hierarchy',
-        content: 'ThemisIQ applies a three-tier data quality hierarchy: (1) Supplier-specific primary data — highest accuracy; (2) Activity-based calculations using industry average factors; (3) Spend-based estimates using DEFRA and Exiobase emission intensity factors. Each category displays its data quality level in all exports.',
+        content: [
+          'Each Scope 3 category is calculated by one of the methods below, and every export names the method used for each category in that inventory. Where a figure is entered directly, it is used instead of any estimate.',
+          `Category 1, purchased goods and services: ${scope3MethodDescription('exiobase_spend')} Supplier-specific figures, where entered, are used instead.`,
+          `Category 5, waste: ${scope3MethodDescription('waste_factors')}`,
+          `Category 6, business travel: ${scope3MethodDescription('travel_factors')}`,
+          `Category 7, employee commuting: ${scope3MethodDescription('commuting_factors')}`,
+          `Category 15, investments: ${scope3MethodDescription('pcaf')}`,
+          `The other ${flatSpendCategories.length} categories (${listNumbers(flatSpendCategories)}): ${scope3MethodDescription('flat_spend')}`,
+        ],
       },
       {
         title: 'Category 15 — Financed emissions',
@@ -247,7 +268,11 @@ const METHODOLOGIES = [
       },
       {
         title: 'Scope 3 Category 1',
-        content: 'Spend-based estimates use sector-specific emission intensity factors from DEFRA (2023) and Exiobase v3. Supplier-specific data submitted via the portal automatically supersedes spend-based estimates, improving inventory accuracy over time.',
+        content: [
+          `The supplier register estimates Category 1 for a supplier only where its own fixed table holds a factor for that supplier's sector. Those factors are recorded with no published source, year or region, and supplier sectors are now recorded as EXIOBASE industries that the table does not cover, so in practice no supplier is priced there. While any supplier is unpriced, no total is shown.`,
+          `In the Scope 3 calculator, Category 1 is ${scope3MethodDescription('exiobase_spend').replace(/^Spend-based/, 'spend-based')}`,
+          `Figures pulled from the Supplier Portal use each supplier's own allocated emissions where the supplier provided them. A supplier without one is estimated from its recorded spend at ${EMISSION_FACTORS.spend.Other} kg CO2e per US dollar, one factor for every sector${bridgeGap ? `, recorded with ${bridgeGap}` : ''}; spend in any other currency is flagged and left out. The buyer reviews the result before applying it to Category 1.`,
+        ],
       },
     ],
   },
