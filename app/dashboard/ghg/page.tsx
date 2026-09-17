@@ -24,7 +24,7 @@ import {
   GRID_REGIONS_CA, GRID_REGIONS_US, FRAMEWORKS,
   isResolvedGridRegion, getGridFactor, getResidualFactor, residualRegionFor,
   detectGridRegion, gridRegionForCountry, pickEF,
-  combustionSourcesFor, gridSourcesFor,
+  combustionSourcesFor, gridSourcesFor, sourceAttributionsFor, sourceAttributionsForLocations,
   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation, pctEstimated,
   applyResolutions, findUnresolvedCoverage, findUndeclaredStreams, findUnpriceableLocations, STREAM_META,
   findSteamFactorGaps, steamFactorFor,
@@ -37,6 +37,7 @@ import { disclaimerParas } from '../../../lib/disclaimer'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
 import { sectionHeadFixed as auditSectionHead, sectionHeadFixed as sectionHead } from '@/app/components/headingStyles'
 import ThemisIQLogo from '../../components/ThemisIQLogo'
+import SourceAttributions from '../../components/SourceAttributions'
 import type {
   GwpVersion, Location, Inventory, SourceDoc, ExtractedProposal,
   ConciergeStatus, CoveragePeriod, CoverageResolution, DeclarableStream, UnpriceableLocation,
@@ -1008,10 +1009,14 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // ⚠️ On 'error' it is a GUESS: the query failed, so whether a prior year exists is unknown, and
   // basis.statement will still say it isn't held on the platform. Nothing renders or persists that
   // sentence today, and a write path must refuse this case rather than record it.
-  const totals_ar4 = calcInventory(inventory.locations, 'AR4', inventory.reporting_year)
-  const totals_ar5 = calcInventory(inventory.locations, 'AR5', inventory.reporting_year)
+  // ⚠️ AR6 ONLY. Until 17 Sep 2026 this computed the inventory three times, on AR4, AR5 and AR6, and
+  // looked each framework's totals up by FRAMEWORKS[].gwp. That was built on 20 May 2026, when SB 253, CDP,
+  // EcoVadis and IFRS S2 were AR4 and ESRS E1 and GRI 305 were AR5. Every framework has been AR6 since
+  // f83326a (20 Jun 2026), so the AR4 and AR5 totals were computed on every render and never shown.
+  // Every surface below reads totals_ar6 directly; lib/ghg/gwpBasis.test.ts fails if a framework's gwp
+  // ever stops being AR6, because then these surfaces would label AR6 figures with another basis.
+  // The engine still computes on AR4 and AR5 (its GWP table and tests use them); only this page stopped.
   const totals_ar6 = calcInventory(inventory.locations, 'AR6', inventory.reporting_year)
-  const totalsByGwp: Record<GwpVersion, typeof totals_ar4> = { AR4: totals_ar4, AR5: totals_ar5, AR6: totals_ar6 }
 
   // Everything the comparability step hands forward. Assembled here rather than read out of
   // scattered state at save time, so the write path takes FACTS and infers nothing.
@@ -2022,7 +2027,6 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
   }
 
     const renderStep4 = () => {
-    const ar5 = totals_ar5
     const rev = inventory.revenue_millions
     const emp = inventory.employee_count
     return (
@@ -2034,7 +2038,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           <div style={{ filter: isPaid ? 'none' : 'blur(4px)', pointerEvents: isPaid ? 'auto' : 'none' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: '2rem' }}>
               {activeFrameworks.map(fw => {
-                const totals = totalsByGwp[fw.gwp as GwpVersion]
+                const totals = totals_ar6
                 return (
                   <div key={fw.id} style={{ background: fw.bg, border: `0.5px solid color-mix(in srgb, ${fw.color} 20%, transparent)`, borderRadius: 10, padding: '1.25rem' }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: fw.color, letterSpacing: '0.06em', textTransform: 'uppercase' as const, marginBottom: 8 }}>{fw.name} — GWP {fw.gwp}</div>
@@ -2094,7 +2098,9 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             // rows and the always-emitted market-based row); the screen just filters by location. The
             // second, hand-rolled table derivation that used to live here is gone (Phase 4).
             const allRows = buildWorkings(inventory.locations, wGwp, inventory.reporting_year, coverageResolutions, inventory.fiscal_year_end_month)
-            return inventory.locations.map((loc, i) => {
+            // The licence attributions the cited sources require, from the SAME rows the tables render.
+            const attributions = sourceAttributionsFor(allRows.map(r => r.ef_source))
+            return <>{inventory.locations.map((loc, i) => {
               // calcLocation is the SAME call that refuses an unpriceable location, so it must not
               // run for one — this line is a second unguarded render-path crash site, not just the
               // totals at the top of the component.
@@ -2251,7 +2257,9 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   )}
                 </div>
               )
-            })
+            })}
+            <SourceAttributions attributions={attributions} style={{ marginTop: 4 }} />
+            </>
             })()}
             <div className="tq-summary" style={{ display: 'block', padding: '1.5rem', marginTop: '1.5rem' }}>
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Assurance readiness — ISO 14064-3 / ISAE 3410</div>
@@ -2341,7 +2349,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             </div>
             {activeFrameworks.map(fw => {
               if (fw.id !== activeExport) return null
-              const totals = totalsByGwp[fw.gwp as GwpVersion]
+              const totals = totals_ar6
               const rev = inventory.revenue_millions
               const emp = inventory.employee_count
               return (
@@ -2482,12 +2490,12 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
     // ⚠️ NOT `as any`. Every other argument here is cast, and that is why changing the audit
     // parameter's TYPE did not break this call site on its own — `as any` defeats the check that
     // would have caught it. This one argument is passed typed so the union actually binds.
-    generateAssurancePDF(inventory as any, totals_ar4 as any, totals_ar5 as any, totals_ar6 as any, activeFrameworks as any, { ok: true, rows: auditRows ?? [] }, EF_SOURCES, residualRows)
+    generateAssurancePDF(inventory as any, totals_ar6 as any, activeFrameworks as any, { ok: true, rows: auditRows ?? [] }, EF_SOURCES, residualRows)
   }
 
   const generateExport = async (frameworkId: string) => {
     const fw = FRAMEWORKS.find(f => f.id === frameworkId)!
-    const totals = totalsByGwp[fw.gwp as GwpVersion]
+    const totals = totals_ar6
     const rev = inventory.revenue_millions
     const emp = inventory.employee_count
     const header = [
@@ -2519,7 +2527,13 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
       ['METHODS'],
       ...combustionSourcesFor(inventory.locations).map(src => ['Combustion factors', src]),
       ...gridSourcesFor(inventory.locations).map(src => ['Electricity factors', src]),
-      ['GWP values', fw.gwp === 'AR4' ? EF_SOURCES.gwp_ar4 : fw.gwp === 'AR5' ? EF_SOURCES.gwp_ar5 : EF_SOURCES.gwp_ar6],
+      // The attribution each cited source's licence requires, verbatim, then the licence and its link.
+      ...sourceAttributionsForLocations(inventory.locations).flatMap(a => [
+        [`Licence attribution — ${a.publisher}`, a.attribution],
+        [`Licence — ${a.publisher}`, `${a.licence}, ${a.licence_url}`],
+      ]),
+      // The same dead branch the PDF had: it chose gwp_ar4 or gwp_ar5 for a framework on AR4 or AR5, and none is.
+      ['GWP values', EF_SOURCES.gwp_ar6],
       ...((fw.id === 'esrs' || fw.id === 'gri')
         ? [
             ['Market-based Scope 2', 'Residual-mix factor applied to uncovered load; covered (contractual) kWh counted at zero'],

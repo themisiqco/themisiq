@@ -6,6 +6,10 @@ import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_STATUS_SENTENCE, SB25
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 import { sectionTitle } from '@/app/components/headingStyles'
 
+// ONE wording for the audit trail, read by the specification row and the feature card below, which carried two
+// copies of it and would otherwise be corrected one at a time. See the ⚠️ notes at both sites.
+const AUDIT_TRAIL_NOTE = 'Every saved change to a GHG inventory, CBAM disclosure or concierge record is written to an audit log by a database trigger, not by the application — with the user, the timestamp and the row as it was before. It covers those modules, and it records each save rather than each keystroke. You can read your own entries; you cannot edit or delete them.'
+
 // --- SEO ---------------------------------------------------------
 // Shape follows app/calculate-emissions/page.tsx. No `revalidate` here: that page
 // sets one because it renders a live SB 253 countdown; this page reads only the
@@ -87,12 +91,24 @@ export default function Page() {
               {[
                 { label: 'Scope coverage', big: 'Scope 1, 2 and 3',
                   note: 'All 15 Scope 3 categories — primary data collection, spend-based, hybrid and supplier-specific methods.' },
-                { label: 'Audit trail', big: 'Every edit logged',
-                  note: 'Every data entry, edit, and deletion is logged with user, timestamp, and previous value. Written by the database — not the application.' },
+                // ⚠️ "Every data entry, edit, and deletion is logged" was corrected on 17 Sep 2026, here and in the
+                // card below. Seven audit triggers exist (verified live that day) and they cover ghg_inventories,
+                // ghg_entries, two cbam_* tables and three concierge_* tables — NOT scope3_inventories, the supply
+                // chain registers, the campaign tables or any materiality table. The granularity is one row per
+                // SAVE, not per edit. "Written by the database" was and is true.
+                { label: 'Audit trail', big: 'Every saved change logged', note: AUDIT_TRAIL_NOTE },
                 { label: 'Frameworks', fw: 'SB 253 · CDP C6 · ESRS E1 · GHG Protocol · IFRS S2 · EcoVadis · CARB template · SBTi',
                   note: 'One inventory exports to CARB SB 253 template, CDP C6 and C7, ESRS E1-6, EcoVadis, GRI 305, and IFRS S2 simultaneously.' },
+                // ⚠️ THIS NOTE AND THE "Real emission factors" CARD BELOW READ, UNTIL 17 SEP 2026: "IPCC AR6 GWP
+                // values throughout. IEA 2024 grid electricity factors. DEFRA 2024 travel and freight factors.
+                // Auto-converts to AR4 on CARB export." All four claims were false: no IEA factor exists; no
+                // DEFRA travel or freight factor exists (travel is unsourced, freight is the flat spend factor);
+                // DEFRA, DCCEEW and MfE factors are applied at their published GWP basis, not AR6; and every
+                // framework, SB 253 included, uses AR6. The replacement names only the publishers EF_SOURCES
+                // cites. lib/publisherClaims.test.ts now fails on a publisher-year or publisher-activity claim
+                // that no factor record supports.
                 { label: 'Emission factors', big: 'IPCC AR6',
-                  note: 'IPCC AR6 GWP values throughout. IEA 2024 grid electricity factors. DEFRA 2024 travel and freight factors. Auto-converts to AR4 on CARB export.' },
+                  note: 'Scope 1 and 2 factors matched to each location\'s country: US EPA and eGRID (US), ECCC (Canada), DEFRA/DESNZ (UK), EU MRR/IPCC defaults and EEA (EU), DCCEEW (Australia) and MfE (New Zealand), with US EPA combustion factors elsewhere. IPCC AR6 GWPs by default; a factor published with its own GWP basis is applied as published. Every factor is cited on its workings row.' },
                 { label: 'Price', big: `From $${ghgFrom}/yr`,
                   note: `${allowanceLabel(GHG_TIERS.starter.locationAllowance)}.` },
               ].map(({ label, big, fw, note }) => (
@@ -154,7 +170,7 @@ export default function Page() {
             <p style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
               SB 253 requires California-nexus companies with global revenue over $1B to disclose Scope 1 and 2 emissions. {SB253_STATUS_SENTENCE} ThemisIQ can have your inventory complete and the CARB template pre-filled in days — not months.
             </p>
-            {['Guided inventory wizard — no spreadsheets', 'IPCC AR6 emission factors (AR4 on CARB export)', 'Pre-filled CARB SB 253 official template', 'Good-faith enforcement confirmed by CARB for year one', `Scope 3 preparation for ${SB253_SCOPE3_FROM}`].map((item, i) => (
+            {['Guided inventory wizard — no spreadsheets', 'Country-matched, cited emission factors; IPCC AR6 GWPs unless the publisher applies its own', 'Pre-filled CARB SB 253 official template', 'Good-faith enforcement confirmed by CARB for year one', `Scope 3 preparation for ${SB253_SCOPE3_FROM}`].map((item, i) => (
               <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8, alignItems: 'flex-start' }}>
                 <span style={{ color: 'var(--color-module-ai)', flexShrink: 0, marginTop: 2 }}>✓</span>
                 <span style={{ fontSize: 13, color: 'var(--color-ink-2)', fontWeight: 400, lineHeight: 1.5 }}>{item}</span>
@@ -192,8 +208,12 @@ export default function Page() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
           {[
             { icon: '', title: 'Guided inventory wizard', desc: 'Step-by-step data collection across all Scope 1, 2, and 3 categories. No blank spreadsheets. No guessing which sources to include.' },
-            { icon: '', title: 'Real emission factors', desc: 'IPCC AR6 GWP values throughout. IEA 2024 grid electricity factors. DEFRA 2024 travel and freight factors. Auto-converts to AR4 on CARB export.' },
-            { icon: '', title: 'Immutable audit trail', desc: 'Every data entry, edit, and deletion is logged with user, timestamp, and previous value. Written by the database — not the application. Cannot be altered.' },
+            { icon: '', title: 'Real emission factors', desc: 'Scope 1 and 2 factors matched to each location\'s country: US EPA and eGRID (US), ECCC (Canada), DEFRA/DESNZ (UK), EU MRR/IPCC defaults and EEA (EU), DCCEEW (Australia) and MfE (New Zealand), with US EPA combustion factors elsewhere. IPCC AR6 GWPs by default; a factor published with its own GWP basis is applied as published. Every factor is cited on its workings row.' },
+            // "Immutable" and "Cannot be altered" went on 17 Sep 2026. What the grants support is that a PLATFORM
+            // USER cannot alter it: `authenticated` holds SELECT on audit_log and nothing else, under one policy
+            // limiting them to their own rows. postgres holds every privilege and service_role holds TRUNCATE, so
+            // "immutable" claimed more than the database enforces.
+            { icon: '', title: 'Audit trail you cannot edit', desc: AUDIT_TRAIL_NOTE },
             { icon: '', title: 'Multi-framework export', desc: 'One inventory exports to: CARB SB 253 template, CDP C6 and C7, ESRS E1-6, EcoVadis, GRI 305, and IFRS S2 simultaneously.' },
             { icon: '', title: 'Scope 3 — all 15 categories', desc: 'Primary data collection, spend-based, hybrid, and supplier-specific methods. CDP supplier engagement. CS3D value chain mapping.' },
             { icon: '', title: 'Assurance-ready package', desc: 'Pre-formatted data room for your verifier: methodology documentation, emission factor citations, uncertainty assessment, and boundary justification.' },
@@ -284,7 +304,7 @@ export default function Page() {
           <p style={sectionSub}>Essentials covers your full GHG inventory — Scope 1, 2 &amp; 3 across all frameworks — everything you need for SB 253. Step up to Professional for more locations and hands-on advisory.</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: '2.5rem', textAlign: 'left' }}>
             {[
-              { plan: 'Essentials', price: '$' + GHG_TIERS.starter.priceUSD?.toLocaleString(), cadence: '/ reporting year', features: ['Scope 1 + 2 · CARB SB 253 ready', 'Scope 3 · all 15 categories', 'IPCC AR6 · IEA 2024 factors', 'Audit trail + assurance package', 'All reporting frameworks included', 'Multi-year trends dashboard', allowanceLabel(GHG_TIERS.starter.locationAllowance)], featured: false },
+              { plan: 'Essentials', price: '$' + GHG_TIERS.starter.priceUSD?.toLocaleString(), cadence: '/ reporting year', features: ['Scope 1 + 2 · CARB SB 253 ready', 'Scope 3 · all 15 categories', 'IPCC AR6 · country-matched factors', 'Audit trail + assurance package', 'All reporting frameworks included', 'Multi-year trends dashboard', allowanceLabel(GHG_TIERS.starter.locationAllowance)], featured: false },
               { plan: 'Professional', price: '$' + GHG_TIERS.professional.priceUSD?.toLocaleString(), cadence: '/ reporting year', features: ['Everything in Essentials', allowanceLabel(GHG_TIERS.professional.locationAllowance), '10 hours of expert advisory / year', 'Quarterly sector roundtables', 'Regulatory Monitor — weekly alerts'], featured: true },
             ].map(({ plan, price, cadence, features, featured }) => (
               <div key={plan} style={{ background: featured ? 'var(--color-brand-wash)' : '#fff', borderRadius: 12, padding: '2rem', border: featured ? '1px solid var(--color-brand)' : '0.5px solid #e8e7e4' }}>

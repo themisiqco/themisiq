@@ -500,7 +500,7 @@ function PricingPageInner() {
         {/* Credibility bar */}
         <div style={s.credBar}>
           {[
-            { label: 'Methodology', val: 'EPA 2024 · IPCC AR4+AR5 · ISO 14064-3 · GHG Protocol' },
+            { label: 'Methodology', val: 'EPA 2024 · IPCC AR6 GWPs by default · ISO 14064-3 · GHG Protocol' },
             { label: 'Frameworks', val: 'SB 253 · CDP · ESRS E1 · GRI 305 · IFRS S2 · EcoVadis' },
             { label: 'Built by', val: 'Practitioners with Big 4 & climate consulting experience' },
             { label: 'Next reporting date', val: SB253_SHORT, red: true },

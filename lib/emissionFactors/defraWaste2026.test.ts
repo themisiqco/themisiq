@@ -49,6 +49,11 @@ describe('defraWaste2026.json', () => {
     // Typed out here ON PURPOSE, once: this test is what pins the required string. Surfaces read the field.
     expect(meta.attribution_required).toBe('Contains public sector information licensed under the Open Government Licence v3.0.')
     expect(String(meta.licence_basis)).toMatch(/verified 17 Sep 2026/)
+    // ONE licence record for the publisher: the generator (Python, which cannot import the engine) must
+    // write exactly what lib/ghg/defraPublication.ts holds for the Scope 1 and 2 factors.
+    expect(meta.licence).toBe(DEFRA_DESNZ_PUBLICATION.licence)
+    expect(meta.licence_url).toBe(DEFRA_DESNZ_PUBLICATION.licence_url)
+    expect(meta.attribution_required).toBe(DEFRA_DESNZ_PUBLICATION.attribution_required)
   })
 
   it('W3 every record is kg CO2e per tonne, and no empty cell became a zero', () => {

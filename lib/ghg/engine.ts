@@ -684,45 +684,16 @@ const EF_NZ = {
   },
 }
 
-// ── THE DEFRA/DESNZ PUBLICATION, CITED ONE WAY ───────────────────────────────────────────────────
-//
-// ⚠️ ONE PUBLICATION, WHICH UNTIL 17 SEP 2026 WAS WORDED THREE WAYS. combustion_uk read "UK DEFRA/DESNZ
-// (2026) GHG Conversion Factors for Company Reporting"; electricity_uk the same without the year;
-// steam_uk "UK DESNZ/DEFRA (2026) GHG Conversion Factors, flat file v1.2 — Scope 2, District heat and
-// steam" — publishers reversed, "for Company Reporting" dropped, and a file version and sheet baked into
-// the prose. Waste and business travel were about to make it five. The citation is now BUILT from the
-// fields below, and where a factor was read from — file, version, sheet, row — is a separate record
-// (EF_SOURCE_LOCATORS), not part of the citation.
-//
-// ⚠️ THE CANONICAL WORDING IS THE ONE ALREADY STORED, CHOSEN SO THAT STORED RECORDS DO NOT MOVE.
-// EF_SOURCES strings are written into ghg_inventories.factor_editions, and factorEditionState compares
-// the stored `source` of each year (sameFactorEditions). Rewording a citation that inventories have
-// already stored would make two years priced from the SAME edition compare as different, and the trends
-// page would tell a customer "Emission factors changed between years" when nothing changed. So the
-// combustion and electricity strings are byte-identical to what they were; only steam_uk moves, and the
-// consequence of that is recorded in the Part A report of 17 Sep 2026.
-//
-// `title_as_published` is the workbook's own heading, row 1 of every sheet of the 2026 full set
-// (data/reference/defra-desnz-ghg-conversion-factors-2026-full-set-v1.xlsx): "UK Government GHG
-// Conversion Factors for Company Reporting". The citation names the publishers instead of "UK
-// Government" because that is the form every stored record already carries.
-export const DEFRA_DESNZ_PUBLICATION = {
-  publishers: 'DEFRA/DESNZ',
-  title: 'GHG Conversion Factors for Company Reporting',
-  title_as_published: 'UK Government GHG Conversion Factors for Company Reporting',
-} as const
+// ── THE DEFRA/DESNZ PUBLICATION ─────────────────────────────────────────────────────────────────────
+// The citation, the licence and the attribution it requires live in lib/ghg/defraPublication.ts, which
+// imports nothing, so the methodology page can read them without the engine. Re-exported here for every
+// existing importer.
+import { DEFRA_DESNZ_PUBLICATION, defraCitation, sourceAttributionsFor, type SourceAttribution } from './defraPublication'
+export { DEFRA_DESNZ_PUBLICATION, defraCitation, sourceAttributionsFor, type SourceAttribution }
 
-/**
- * The citation for the DEFRA/DESNZ conversion factors: with a year where the table it cites holds ONE
- * edition, without one where it holds several (GRID_EF.UK holds 2025 and 2026, and the year then comes
- * from the lookup, not the citation — see electricity_uk).
- *
- * Every word of the edition label 'DEFRA 2026' appears in defraCitation(2026), which is what F16 in
- * factorEditions.test.ts requires of a label and the citation it summarises.
- */
-export function defraCitation(year?: number): string {
-  const p = DEFRA_DESNZ_PUBLICATION
-  return `UK ${p.publishers}${year === undefined ? '' : ` (${year})`} ${p.title}`
+/** The attributions an inventory's locations require: from the same citations its exports print. */
+export function sourceAttributionsForLocations(locations: readonly { country?: string }[]): SourceAttribution[] {
+  return sourceAttributionsFor([...combustionSourcesFor(locations), ...gridSourcesFor(locations)])
 }
 
 /** Where, inside a publication, a factor was read from. Separate from the citation by design. */
@@ -816,9 +787,16 @@ const EF_SOURCES = {
   residual_us: 'Green-e Residual Mix 2025 (2023 data, publ. 2026-01-29, CRS) — residual CO₂; eGRID2023 Rev2 (publ. 2025-06-12) CH₄/N₂O. Green-e factors out Green-e-certified voluntary sales (the only published US residual source per CRS).',
   residual_eu: 'AIB European Residual Mixes 2024 (publ. 2025-05-30, Grexel/AIB; Ecoinvent CO₂ inputs) — combined CO₂e, gCO₂/kWh.',
   residual_au: 'DCCEEW National Greenhouse Accounts Factors 2025, Table 2 — national Residual Mix Factor, 0.81 kg CO₂-e/kWh Scope 2. Calculated on a FINANCIAL-YEAR basis (years ending June) with a lag adjustment using a 3-year average, because Large-scale Generation Certificates are created on a CALENDAR-year basis up to 12 months after the generation they represent. National aggregate only — see RESIDUAL_AU.',
-  gwp_ar4: 'IPCC AR4 (2007) — selectable alternate; aligns with CARB AB 32 / Mandatory Reporting Regulation, but not the default for any current framework',
-  gwp_ar5: 'IPCC AR5 (2014) — GHG Protocol baseline; selectable alternate, not the default for any current framework',
-  gwp_ar6: 'IPCC AR6 (2021) — applied by default across all frameworks (SB 253, CDP, ESRS E1, GRI 305, EcoVadis, IFRS S2)',
+  // ⚠️ NOTHING IS SELECTABLE. gwp_ar4 and gwp_ar5 said "selectable alternate" from f83326a (20 Jun 2026)
+  // until 17 Sep 2026; git history holds no selector, parameter or saved preference by which any inventory
+  // could choose either, then or since. The basis comes from FRAMEWORKS[].gwp, which is AR6 for all six.
+  //   AR5 is still NAMED because published factors arrive on it: DEFRA/DESNZ UK combustion and district
+  // heat, DCCEEW and NZ MfE combustion are combined on AR5 by their publishers (see EF_UK, EF_AU, EF_NZ,
+  // STEAM_EF.UK) and applied as published. AR4 is named for history only: no factor applied is recorded
+  // as AR4. Neither string names a publisher, so sourceAttributionsFor never reads them as a citation.
+  gwp_ar4: 'IPCC AR4 (2007) — not applied. No emission factor ThemisIQ uses is recorded on AR4. SB 253 was calculated on AR4 until June 2026 and has used AR6 since.',
+  gwp_ar5: 'IPCC AR5 (2014) — not applied by ThemisIQ. Some published factors arrive with the gases already combined on AR5 (the UK, Australian and New Zealand fuel factors and UK district heat); those are used as published and their workings rows say so.',
+  gwp_ar6: 'IPCC AR6 (2021) — the GWP set for every framework (SB 253, CDP, ESRS E1, GRI 305, EcoVadis, IFRS S2), applied wherever ThemisIQ combines CO₂, CH₄ and N₂O itself. There is no setting to change it.',
 }
 
 // ── THE EDITION LABEL PER JURISDICTION — ONE DECLARATION, TWO CONSUMERS ──────────────────────────

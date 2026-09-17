@@ -6,6 +6,9 @@ import { VERIFIER_DOC_LINK_NOTICE, VERIFIER_DOC_TAB_DID_NOT_OPEN } from '../../.
 import { docTypeLabel } from '../../../lib/ghg/conciergeDocTypes'
 import type { ComparabilityRecord } from '../../../lib/ghg/comparability'
 import { anyPublishedFactorApplied } from '../../../lib/ghg/factorEditions'
+import { sourceAttributionsFor } from '../../../lib/ghg/defraPublication'
+import { auditTrailLine } from '../../../lib/auditTrailNotice'
+import SourceAttributions from '../../components/SourceAttributions'
 import type { FactorEditions } from '../../../lib/ghg/factorEditions'
 import ThemisIQLogo from '../../components/ThemisIQLogo'
 
@@ -992,6 +995,9 @@ export default function VerifierPage() {
                 on a multi-country inventory, and shortening a published citation would be the same
                 mistake in a new form. Each row already names its own source; this points there. */}
             <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 8 }}>Each row above names the emission factor source it used, in the Factor source column — sources differ by country and by fuel, so read them per row rather than assuming one set applies throughout. Verifier should confirm each sampled line independently.</div>
+            {/* Derived from the STORED rows' citations, the same ones the Factor source column prints, so
+                an inventory saved before the attribution existed carries it too. */}
+            <SourceAttributions attributions={sourceAttributionsFor(inv.workings.map(factorSourceOf))} style={{ marginTop: 6 }} />
           </div>
           </>
         ) : (
@@ -1038,7 +1044,9 @@ export default function VerifierPage() {
             which in this system means an assurance kept — the register of "we do not sell personal
             data" on /privacy — not the brand note the contact panels use. */}
         <div className="tq-callout tq-callout-note" style={{ '--tq-state': '#1D9E75', '--tq-state-wash': '#E1F5EE', marginBottom: '1.25rem', fontSize: 13 } as React.CSSProperties}>
-          {audit.length} change{audit.length !== 1 ? 's' : ''} logged · append-only, tamper-evident record
+          {/* One wording, shared with the assurance PDF; see lib/auditTrailNotice.ts for why
+              "tamper-evident" went and what putting it back would require. */}
+          {auditTrailLine(audit.length)}
         </div>
         {audit.map((row, i) => {
           const isCreate = row.action === 'INSERT', isDelete = row.action === 'DELETE'
