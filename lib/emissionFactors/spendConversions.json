@@ -1,0 +1,1807 @@
+{
+  "metadata": {
+    "edition_id": "exiobase-3.8.2-2019-cpi2024-spendconv",
+    "data_vintage": 2024,
+    "base_year": 2019,
+    "output_currencies": [
+      "USD",
+      "EUR",
+      "GBP",
+      "CAD",
+      "AUD"
+    ],
+    "generated_on": "2026-09-16",
+    "generated_from": [
+      "priceIndices.json"
+    ],
+    "generated_by": "scripts/generate-spend-conversions.py",
+    "supersedes": "edition exiobase-3.8.2-2019-cpi2024-fxnorm, whose generator and artefact were deleted; the surviving record of it is that row in public.factor_editions",
+    "upstream_fingerprints": {
+      "factors_ixi": "8747704c24bb045e87b3c02bc9b952cb69c37ffd2e5e07c5cb2241320f206fdb",
+      "factors_pxp": "300565c2a4448605e4b3ec0aa044977ba09b9077bfcfff5bc01ec17a9a29ddc6",
+      "sectors": "b393d1ad7d4966cd0ddd7c29379c98b362ab9bed01be7e98afd53226647e3341",
+      "country_regions": "e83c3d0388474c36e160572e8db608094d8529e6c3bffaab3444c5229075c9a8",
+      "price_indices": "64df489c58c6298c9fe8561289f2185f9bd7f9f1dddda063f16c52c60d23b158"
+    },
+    "field_meaning": "to_eur2019_per_unit: the number of 2019 EUR that ONE unit of the stated currency, at the vintage year, represents. Multiply a spend by it to bring that spend onto the basis the published EXIOBASE factors are denominated in.",
+    "round_trip": "Each value is the number of 2019 EUR that one unit of the stated currency represents at the price vintage year. It is built in five steps. Steps 1-4 carry an AMOUNT of money forward: (1) a 2019 euro amount is moved to the region's 2019 local currency, dividing by the euro's 2019 USD rate and multiplying by the region's; (2) it is carried from 2019 to the vintage year by the region's CPI ratio; (3) it is moved to vintage-year USD by dividing by the region's vintage USD rate; (4) it is moved to the output currency by multiplying by that currency's vintage USD rate. Step (5) INVERTS the result, because an emission factor carries money in its DENOMINATOR: bringing a spend onto the factor's 2019 basis is the reciprocal of carrying an amount of money forward from it. THE 1e6 IS NOT INCLUDED IN THESE SCALARS. Whether a divisor is still owed depends on where the factor value came from: a value from resolveSpendFactor is ALREADY per one unit of currency, because that resolver applies the denominator conversion itself and records it, so nothing further is owed and applying a divisor there is a millionfold error. A raw value read from exiobaseFactors2019*.json is per MILLION EUR and that reader applies it: kg CO2e per unit of currency = published_factor * to_eur2019_per_unit / 1e6. NO PRICE-BASIS CONVERSION IS PERFORMED: EXIOBASE publishes in basic prices and a customer's spend is a purchaser-price figure, and the 3.8.2 archive carries no margin data from which the difference could be derived. These scalars close the currency and price-year gaps only.",
+    "denominator_note": "THE 1e6 IS NOT INCLUDED IN THESE VALUES. The published factor files record kg CO2 eq. per MILLION EUR and their own denominator_note requires every consumer to apply that divisor itself and say that it did. Folding it in here would hide the step inside a scalar, so the denominator stays a separate named quantity in this artefact. THAT IS A STATEMENT ABOUT THIS ARTEFACT, NOT A GENERAL RULE FOR CONSUMERS, and the two paths differ by a factor of a million. A value from resolveSpendFactor is ALREADY per one unit of currency - that resolver is itself a consumer of the factor files, applies the denominator conversion and records it in SpendFactorSource.unit_conversion - so nothing further is owed and applying a divisor there is a millionfold error: kg CO2e = spend * to_eur2019_per_unit * factor.value. A raw value read straight from exiobaseFactors2019ixi.json or ...pxp.json is per MILLION EUR, and whoever reads it that way applies the divisor and says so: kg CO2e per unit of currency = published_factor * to_eur2019_per_unit / 1e6.",
+    "inversion_note": "SUPERSEDES EDITION exiobase-3.8.2-2019-cpi2024-fxnorm, WHICH HELD THE RECIPROCAL OF THIS DIVIDED BY 1e6. That edition stored the four-step chain itself - the scalar that carries an amount of money forward from 2019 - and described it as a multiplier for an emission factor. Because a factor is denominated per unit of money, applying it that way inflated every figure instead of deflating it: Germany's p28 read 0.3067 kg per 2024 EUR against an honest 0.2147, high by cpi_ratio squared, and every one of the 245 rows was affected in both the CPI and the FX legs. The error never reached a customer figure - nothing in the repo read the artefact or the table - and it was found by checking the direction of travel against inflation rather than by any of the three assertions that had passed on the wrong numbers. The directional check below is that missing test, and it is now the headline one. The superseded generator and artefact have been DELETED rather than retained, so nothing can be regenerated from them by mistake; the surviving record is that edition row in public.factor_editions, kept with is_active false and notes describing the error.",
+    "directional_check": "Every row is asserted to move the right way against inflation: where a region's cpi_ratio exceeds 1, its value must be lower than the same chain computed with the CPI leg neutralised, because a vintage unit of money that buys less represents fewer 2019 euro. This is the check whose absence allowed the superseded artefact to ship inverted.",
+    "euro_rate_basis": "No EMU aggregate row exists in the input. The euro's USD rate is taken from the members already IN the euro in the year checked, after asserting unanimity. 2019: 0.893276257067409 from 19 members (excluded, not yet in the euro: HR); 2024: 0.923889546117607 from 20 members.",
+    "euro_cohorts": {
+      "2019": {
+        "in_euro": [
+          "AT",
+          "BE",
+          "CY",
+          "DE",
+          "EE",
+          "ES",
+          "FI",
+          "FR",
+          "GR",
+          "IE",
+          "IT",
+          "LT",
+          "LU",
+          "LV",
+          "MT",
+          "NL",
+          "PT",
+          "SI",
+          "SK"
+        ],
+        "not_yet_in_euro": [
+          "HR"
+        ]
+      },
+      "2024": {
+        "in_euro": [
+          "AT",
+          "BE",
+          "CY",
+          "DE",
+          "EE",
+          "ES",
+          "FI",
+          "FR",
+          "GR",
+          "HR",
+          "IE",
+          "IT",
+          "LT",
+          "LU",
+          "LV",
+          "MT",
+          "NL",
+          "PT",
+          "SI",
+          "SK"
+        ],
+        "not_yet_in_euro": []
+      }
+    },
+    "composite_note": "WHAT A COMPOSITE VALUE IS. For the five rest-of-world regions there is no single national currency and no single CPI, so steps 1 and 3 have no exchange-rate LEVEL to use. What the formula needs from the region is only the RATIO of its vintage rate to its 2019 rate, and priceIndices.json publishes a GDP-weighted average of exactly that (fx_ratio), alongside a GDP-weighted average of the members' CPI ratios (cpi_ratio). Those are used directly. No proxy rate is substituted and no member stands in for the bucket. WHAT IT IS NOT: it is not any country's currency path. It is the average price-and-currency movement of the members that had usable data, weighted by their GDP, so it understates or overstates any individual member by however far that member diverges from the bucket. gdp_coverage_pct says how much of the bucket's MEASURABLE GDP stood behind the average; it is not a share of the bucket, because members with no GDP figure are absent from both sides of that fraction. A figure priced through a composite must be described as a regional average.",
+    "price_basis_note": "NO BASIC-TO-PURCHASER CONVERSION IS APPLIED. EXIOBASE 3.8.2 publishes in current basic prices; customer spend is a purchaser-price figure off an invoice. The 3.8.2 archive carries no margin data from which the difference could be derived. These scalars close the currency and price-year gaps and leave the basis gap open.",
+    "external_sense_check": "p28 (Fabricated metal products, except machinery and equipment), region DE: the published 256624.197323 kg per million 2019 EUR becomes 0.21473710338586816 kg per one 2024 EUR, below the published 0.256624 per 2019 EUR as positive inflation requires. That published value is corroborated against Climatiq's Procurement API figure to 0.0094%.",
+    "fingerprint_sha256": "041db80fc43f635124004efbf472b0ad824c9d638fcf1e11cb6e5f0f1de24bc1"
+  },
+  "rows": [
+    {
+      "region_code": "AT",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.7361035915880003,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "AT",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.7967441505115781,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "AT",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.9408101657053923,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "AT",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5375531031674867,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "AT",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.4857621584199733,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "AU",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.781159691060441,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "AU",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8455119925786051,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "AU",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.9983961317231086,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "AU",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5704561433982557,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "AU",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.5154951313056264,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "BE",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.7611383279814684,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "BE",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8238412602241728,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "BE",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.9728069318723915,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "BE",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5558351770346402,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "BE",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.502282832581787,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "BG",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.6806750387087207,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "BG",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.7367493674639694,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "BG",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.8699672210232907,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "BG",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.4970753892358631,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "BG",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.44918429928108666,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "BR",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.9152177289195753,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "BR",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.9906137944362802,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "BR",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.1697350115406975,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "BR",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.6683544760232324,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "BR",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.6039613778613797,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CA",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.779407681072891,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CA",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8436156511870261,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CA",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.9961568968850494,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CA",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5691767060794456,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CA",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.5143389623059756,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CH",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.746731407552765,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CH",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8082474909373091,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CH",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.9543935219247615,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CH",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5453142600440991,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CH",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.49277556099174596,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CN",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.8784473090212118,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CN",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.9508142101105551,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CN",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.1227389294226815,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CN",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.6415022047573155,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CN",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.579696208203255,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CY",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.7943876076195294,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CY",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8598296311044172,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CY",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.0153026629669593,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CY",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5801160712617222,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CY",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.5242243663923349,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CZ",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.6470532705859934,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CZ",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.700357822323088,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CZ",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.8269954143369352,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CZ",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.47252247848404927,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "CZ",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.42699695657575026,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "DE",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.773089081432456,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "DE",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8367765223463683,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "DE",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.9880811276011102,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "DE",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5645624331928517,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "DE",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.5101692548971204,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "DK",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.8004928475985371,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "DK",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8664378236147268,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "DK",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.0231057383791171,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "DK",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5845745343555072,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "DK",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.5282532756162075,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "EE",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.6572374564540542,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "EE",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.7113809861967968,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "EE",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.8400117692407809,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "EE",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.4799596663733249,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "EE",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.4337176031879303,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "ES",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.7797526354368393,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "ES",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8439890230531737,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "ES",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.9965977812605853,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "ES",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5694286153092205,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "ES",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.514566601157766,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "FI",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.7797741052691908,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "FI",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8440122615803783,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "FI",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.9966252217414673,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "FI",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5694442940467472,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "FI",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.5145807693159209,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "FR",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.8036942694915571,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "FR",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8699029801439602,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "FR",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.027197459022902,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "FR",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5869124312124273,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "FR",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.5303659260998322,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "GB",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.7239333715686443,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "GB",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.783571342062237,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "GB",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.9252554708989447,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "GB",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5286655775360435,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "GB",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.4777309079103885,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "GR",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.7929850134464508,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "GR",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8583114905658943,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "GR",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.0135100146611076,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "GR",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5790918012284832,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "GR",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.5232987804005153,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "HR",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.7424007590276326,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "HR",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8035600815566847,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "HR",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.9488585426051357,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "HR",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5421517247976801,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "HR",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.48991772250411086,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "HU",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.7433521522043579,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "HU",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.804589850949274,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "HU",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.9500745132680625,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "HU",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5428464970557231,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "HU",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.4905455564235667,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "ID",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.8761280596895287,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "ID",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.9483038999317798,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "ID",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.1197747089338972,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "ID",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.6398085305387509,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "ID",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.5781657122592777,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "IE",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.7738215529490748,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "IE",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8375693352098724,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "IE",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.9890172956307187,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "IE",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5650973339068814,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "IE",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.5106526202127635,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "IN",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.8002894335072351,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "IN",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8662176521752329,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "IN",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.0228457558887019,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "IN",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.58442598749708,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "IN",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.5281190406129104,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "IT",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.7869060609094715,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "IT",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8517317510694096,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "IT",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.0057405370916626,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "IT",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5746525350197537,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "IT",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.5192872185238434,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "JP",
+      "currency": "USD",
+      "to_eur2019_per_unit": 1.1435609258405783,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "JP",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 1.237768010955509,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "JP",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.4615792619803663,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "JP",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.8351062695136946,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "JP",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.7546473485106656,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "KR",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.9103776078089413,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "KR",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.9853749418797453,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "KR",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.1635488779636203,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "KR",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.664819889108482,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "KR",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.6007673332940335,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "LT",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.6629153842738637,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "LT",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.7175266643719307,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "LT",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.8472686992083335,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "LT",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.4841060769519162,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "LT",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.4374645248231764,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "LU",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.7939356999510339,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "LU",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8593404950703593,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "LU",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.0147250821300506,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "LU",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5797860574262768,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "LU",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.5239261479799218,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "LV",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.6897513477608678,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "LV",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.7465733871103521,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "LV",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.8815676043401582,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "LV",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5037035298291772,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "LV",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.45517384684754575,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "MT",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.7975809053809392,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "MT",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8632859942322701,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "MT",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.0193840002004557,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "MT",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5824480353230309,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "MT",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.5263316556798571,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "MX",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.6514229892453967,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "MX",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.7050875204539586,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "MX",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.832580328991638,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "MX",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.47571354541019173,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "MX",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.4298805778376716,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "NL",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.7526713127164301,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "NL",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8146767282726872,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "NL",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.961985283770735,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "NL",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5496519843667864,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "NL",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.4966953641092491,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "NO",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.9040757690198554,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "NO",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.9785539546572278,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "NO",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.1554945306364754,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "NO",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.6602178561399615,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "NO",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.5966086865394414,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "PL",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.6438435104389033,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "PL",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.6968836406305056,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "PL",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.822893036614061,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "PL",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.4701784924646776,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "PL",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.4248788035944597,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "PT",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.7920667707218573,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "PT",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8573176025752225,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "PT",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.0123364134183548,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "PT",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5784212376940746,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "PT",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.5226928227976054,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "RO",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.6768717233257426,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "RO",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.7326327331769374,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "RO",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.865106223445531,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "RO",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.49429794865574866,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "RO",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.4466744532340083,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "RU",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.8867012008884978,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "RU",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.9597480614588799,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "RU",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.1332881856199288,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "RU",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.6475297601682279,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "RU",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.5851430344035841,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "SE",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.8035708819751626,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "SE",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8697694279061272,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "SE",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.027039758080981,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "SE",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5868223252231509,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "SE",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.530284501437637,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "SI",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.7606773246695349,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "SI",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8233422792433068,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "SI",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.9722177259409881,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "SI",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5554985209393131,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "SI",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.501978611862852,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "SK",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.685976942992034,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "SK",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.7424880451074096,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "SK",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.8767435572677278,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "SK",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5009472017535057,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "SK",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.45268307920531214,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "TR",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.91530613207416,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "TR",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.9907094802841784,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "TR",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.1698479991520394,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "TR",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.6684190340428099,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "TR",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.6040197159916008,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "TW",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.845552636652275,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "TW",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.9152096592124878,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "TW",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.0806964200314688,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "TW",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.6174802689704612,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "TW",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.5579886832936413,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "US",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.7280230469946254,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "US",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.7879979268668458,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "US",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.9304824637558848,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "US",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5316521377720033,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "US",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.48042972582795357,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "ZA",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.8854660330039492,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "ZA",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.9584111398650174,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "ZA",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.1317095239812467,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "ZA",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.6466277562426127,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "ZA",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.5843279347023111,
+      "basis": "published",
+      "gdp_coverage_pct": null
+    },
+    {
+      "region_code": "WA",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.795762736752818,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 96.9
+    },
+    {
+      "region_code": "WA",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8613180440202979,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 96.9
+    },
+    {
+      "region_code": "WA",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.0170602083485332,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 96.9
+    },
+    {
+      "region_code": "WA",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5811202844476142,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 96.9
+    },
+    {
+      "region_code": "WA",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.525131827928355,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 96.9
+    },
+    {
+      "region_code": "WE",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.7959036828543964,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 90.4
+    },
+    {
+      "region_code": "WE",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8614706013277927,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 90.4
+    },
+    {
+      "region_code": "WE",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.0172403508267074,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 90.4
+    },
+    {
+      "region_code": "WE",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5812232129146788,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 90.4
+    },
+    {
+      "region_code": "WE",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.5252248396773888,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 90.4
+    },
+    {
+      "region_code": "WF",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.9982178265714696,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 90.6
+    },
+    {
+      "region_code": "WF",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 1.0804514790390332,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 90.6
+    },
+    {
+      "region_code": "WF",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.2758170039637806,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 90.6
+    },
+    {
+      "region_code": "WF",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.7289668145117973,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 90.6
+    },
+    {
+      "region_code": "WF",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.6587339765080916,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 90.6
+    },
+    {
+      "region_code": "WL",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.7851534922454216,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 69.7
+    },
+    {
+      "region_code": "WL",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.8498348049772987,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 69.7
+    },
+    {
+      "region_code": "WL",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 1.0035005882120795,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 69.7
+    },
+    {
+      "region_code": "WL",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.5733726897172172,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 69.7
+    },
+    {
+      "region_code": "WL",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.5181306808479553,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 69.7
+    },
+    {
+      "region_code": "WM",
+      "currency": "USD",
+      "to_eur2019_per_unit": 0.7297522598447521,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 100.0
+    },
+    {
+      "region_code": "WM",
+      "currency": "EUR",
+      "to_eur2019_per_unit": 0.7898695930821343,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 100.0
+    },
+    {
+      "region_code": "WM",
+      "currency": "GBP",
+      "to_eur2019_per_unit": 0.9326925616913644,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 100.0
+    },
+    {
+      "region_code": "WM",
+      "currency": "CAD",
+      "to_eur2019_per_unit": 0.532914927064496,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 100.0
+    },
+    {
+      "region_code": "WM",
+      "currency": "AUD",
+      "to_eur2019_per_unit": 0.48157085076749234,
+      "basis": "row_composite",
+      "gdp_coverage_pct": 100.0
+    }
+  ]
+}
