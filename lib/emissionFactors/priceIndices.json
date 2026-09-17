@@ -1,0 +1,3382 @@
+{
+  "metadata": {
+    "data_vintage": 2024,
+    "base_year": 2019,
+    "generated_on": "2026-09-16",
+    "generated_from": [
+      "API_FP.CPI.TOTL_DS2_en_csv_v2_329222.csv",
+      "API_PA.NUS.FCRF_DS2_en_csv_v2_372594.csv",
+      "API_NY.GDP.MKTP.CD_DS2_en_csv_v2_372592.csv",
+      "dgbas-taiwan-fx-gdp-E018101010.xlsx",
+      "dgbas-taiwan-cpi-E030101015.xlsx"
+    ],
+    "generated_by": "scripts/generate-price-indices.py",
+    "pycountry_version": "24.6.1",
+    "babel_version": "2.18.0",
+    "data_vintage_rule": "The latest year with CPI for at least 80% of the 212 countries in countryRegions.json. Derived, never hardcoded.",
+    "data_vintage_coverage": {
+      "2023": {
+        "countries_with_cpi": 176,
+        "pct": 83.0
+      },
+      "2024": {
+        "countries_with_cpi": 174,
+        "pct": 82.1
+      },
+      "2025": {
+        "countries_with_cpi": 166,
+        "pct": 78.3
+      }
+    },
+    "scope_note": "SERIES ONLY. This file carries CPI and FX series and GDP-weighted composites of their RATIOS. It applies no adjustment to any emission factor, performs no currency conversion, and rebases nothing. A consumer that deflates or converts must do so itself and say that it did.",
+    "ratio_note": "COMPOSITES WEIGHT RATIOS, NOT LEVELS. CPI levels sit on different base years (World Bank 2010=100; Taiwan DGBAS 2021=100) and FX levels are denominated in a different currency per country, so neither is averageable across members. A ratio of two years of one series is dimensionless and base-independent, and is the only form these composites average.",
+    "coverage_note": "Share of MEASURABLE GDP, not of the bucket. The denominator counts only members with a GDP figure for 2025 or 2024; members in unmeasured_no_gdp are absent from both the numerator and the denominator and cannot move this number in either direction, however large their economy. Read it together with members_unmeasured: 100.0% means every member we can measure is covered, not that every member is.",
+    "licence": "This artefact combines sources under two licences. The World Bank series (CPI, exchange rate, GDP) are under the World Bank Open Data default CC BY 4.0 with the World Bank's additional mandatory dispute-resolution terms. The Taiwan series (CPI, exchange rate, GDP) are under the Open Government Data License, Taiwan, version 1.0. Both require attribution. Neither is share-alike and neither restricts commercial use. No licensor endorses or has reviewed the derived values in this file. Note that this artefact is combined downstream with EXIOBASE data under CC BY-SA 4.0, which is share-alike; that obligation attaches to the combination, not to this file.",
+    "sources": {
+      "world_bank_cpi": {
+        "indicator": "FP.CPI.TOTL",
+        "name": "Consumer price index (2010 = 100)",
+        "publisher": "World Bank, World Development Indicators",
+        "source_organization": "International Financial Statistics database, International Monetary Fund (IMF)",
+        "file": "API_FP.CPI.TOTL_DS2_en_csv_v2_329222.csv",
+        "last_updated": "2026-07-13",
+        "url": "https://data.worldbank.org/indicator/FP.CPI.TOTL",
+        "licence": "CC BY 4.0 (World Bank Open Data default), with the World Bank's additional mandatory dispute-resolution terms: non-binding mediation, then UNCITRAL arbitration if unsettled after 45 days, seated at the licensor's headquarters.",
+        "licence_url": "https://datacatalog.worldbank.org/public-licenses",
+        "licence_basis": "Applies as the World Bank Open Data default. The downloaded Metadata_Indicator files carry no per-indicator licence field, so no explicit per-series label was available to verify. Verified 16 Sep 2026."
+      },
+      "world_bank_fx": {
+        "indicator": "PA.NUS.FCRF",
+        "name": "Official exchange rate (LCU per US$, period average)",
+        "publisher": "World Bank, World Development Indicators",
+        "source_organization": "International Financial Statistics database, International Monetary Fund (IMF)",
+        "file": "API_PA.NUS.FCRF_DS2_en_csv_v2_372594.csv",
+        "last_updated": "2026-07-13",
+        "url": "https://data.worldbank.org/indicator/PA.NUS.FCRF",
+        "licence": "CC BY 4.0 (World Bank Open Data default), with the World Bank's additional mandatory dispute-resolution terms: non-binding mediation, then UNCITRAL arbitration if unsettled after 45 days, seated at the licensor's headquarters.",
+        "licence_url": "https://datacatalog.worldbank.org/public-licenses",
+        "licence_basis": "Applies as the World Bank Open Data default. The downloaded Metadata_Indicator files carry no per-indicator licence field, so no explicit per-series label was available to verify. Verified 16 Sep 2026."
+      },
+      "world_bank_gdp": {
+        "indicator": "NY.GDP.MKTP.CD",
+        "name": "GDP (current US$)",
+        "publisher": "World Bank, World Development Indicators",
+        "source_organization": "Country official statistics, National Statistical Organizations and/or Central Banks;\nNational Accounts data files, Organisation for Economic Co-operation and Development (OECD);\nStaff estimates, World Bank (WB)",
+        "file": "API_NY.GDP.MKTP.CD_DS2_en_csv_v2_372592.csv",
+        "last_updated": "2026-07-13",
+        "url": "https://data.worldbank.org/indicator/NY.GDP.MKTP.CD",
+        "role": "composite weights only - never a series in this file",
+        "licence": "CC BY 4.0 (World Bank Open Data default), with the World Bank's additional mandatory dispute-resolution terms: non-binding mediation, then UNCITRAL arbitration if unsettled after 45 days, seated at the licensor's headquarters.",
+        "licence_url": "https://datacatalog.worldbank.org/public-licenses",
+        "licence_basis": "Applies as the World Bank Open Data default. The downloaded Metadata_Indicator files carry no per-indicator licence field, so no explicit per-series label was available to verify. Verified 16 Sep 2026."
+      },
+      "dgbas_taiwan": {
+        "publisher": "Directorate-General of Budget, Accounting and Statistics (DGBAS), Executive Yuan, Republic of China (Taiwan)",
+        "series": [
+          "Principal Figures (2008SNA): Exchange Rate (N.T.$ per U.S.$), GDP (Million U.S.$, at Current Prices)",
+          "Consumer Price Indices, General Index, base period 2021 = 100"
+        ],
+        "files": [
+          "dgbas-taiwan-fx-gdp-E018101010.xlsx",
+          "dgbas-taiwan-cpi-E030101015.xlsx"
+        ],
+        "reason": "The World Bank publishes no Taiwan row in any of the three WDI files used here, so Taiwan's series come from its national statistical office. Its CPI base year is 2021, not 2010 - which is why every composite weights ratios rather than levels.",
+        "licence": "Open Government Data License, Taiwan, version 1.0 (OGDL-Taiwan-1.0). Perpetual, worldwide, irrevocable, sublicensable, free of charge. Permits reproduction, adaptation, compilation, public transmission and derivative products and services. Attribution required.",
+        "licence_exclusions": "Covers copyright only; does not grant patent, trademark or entity logo rights. Works by named authors marked as requiring additional approval are outside its scope. The licence does not permit representing DGBAS as recommending, permitting or approving derivative works."
+      }
+    },
+    "resolutions": {
+      "XK": "Kosovo has no ISO 3166-1 alpha-3. The World Bank publishes it as XKX. Accepted as a deliberate resolution, not a lookup.",
+      "TW": "Taiwan is absent from the World Bank files; series taken from DGBAS national statistics."
+    },
+    "euro_area_members": [
+      "AT",
+      "BE",
+      "CY",
+      "DE",
+      "EE",
+      "ES",
+      "FI",
+      "FR",
+      "GR",
+      "HR",
+      "IE",
+      "IT",
+      "LT",
+      "LU",
+      "LV",
+      "MT",
+      "NL",
+      "PT",
+      "SI",
+      "SK"
+    ],
+    "currency_as_of": "2024-07-01",
+    "fx_normalisation_note": "EVERY FX SERIES IS ON ONE DENOMINATION: the currency in force at the vintage year. The World Bank publishes 'local currency units per US$' where the local currency unit is whatever was legal tender that year, so a series spanning a changeover mixes denominations with nothing marking the break, and a ratio across it measures the redenomination rather than a price movement. Pre-break values are divided by the official conversion rate; see each region's fx_redenomination, null where nothing was converted. Normalisation is applied to all 212 countries, not only the 44 named regions, because a redenominated bucket member would corrupt a composite's fx_ratio.",
+    "fx_redenominations_applied": {
+      "EE": {
+        "from": "EEK",
+        "to": "EUR",
+        "break_year": 2011,
+        "rate": 15.6466,
+        "years_converted": [
+          1993,
+          1994,
+          1995,
+          1996,
+          1997,
+          1998,
+          1999,
+          2000,
+          2001,
+          2002,
+          2003,
+          2004,
+          2005,
+          2006,
+          2007,
+          2008,
+          2009,
+          2010
+        ]
+      },
+      "HR": {
+        "from": "HRK",
+        "to": "EUR",
+        "break_year": 2023,
+        "rate": 7.5345,
+        "years_converted": [
+          1992,
+          1993,
+          1994,
+          1995,
+          1996,
+          1997,
+          1998,
+          1999,
+          2000,
+          2001,
+          2002,
+          2003,
+          2004,
+          2005,
+          2006,
+          2007,
+          2008,
+          2009,
+          2010,
+          2011,
+          2012,
+          2013,
+          2014,
+          2015,
+          2016,
+          2017,
+          2018,
+          2019,
+          2020,
+          2021,
+          2022
+        ]
+      },
+      "LT": {
+        "from": "LTL",
+        "to": "EUR",
+        "break_year": 2015,
+        "rate": 3.4528,
+        "years_converted": [
+          1992,
+          1993,
+          1994,
+          1995,
+          1996,
+          1997,
+          1998,
+          1999,
+          2000,
+          2001,
+          2002,
+          2003,
+          2004,
+          2005,
+          2006,
+          2007,
+          2008,
+          2009,
+          2010,
+          2011,
+          2012,
+          2013,
+          2014
+        ]
+      },
+      "LV": {
+        "from": "LVL",
+        "to": "EUR",
+        "break_year": 2014,
+        "rate": 0.702804,
+        "years_converted": [
+          1992,
+          1993,
+          1994,
+          1995,
+          1996,
+          1997,
+          1998,
+          1999,
+          2000,
+          2001,
+          2002,
+          2003,
+          2004,
+          2005,
+          2006,
+          2007,
+          2008,
+          2009,
+          2010,
+          2011,
+          2012,
+          2013
+        ]
+      },
+      "MT": {
+        "from": "MTL",
+        "to": "EUR",
+        "break_year": 2008,
+        "rate": 0.4293,
+        "years_converted": [
+          1960,
+          1961,
+          1962,
+          1963,
+          1964,
+          1965,
+          1966,
+          1967,
+          1968,
+          1969,
+          1970,
+          1971,
+          1972,
+          1973,
+          1974,
+          1975,
+          1976,
+          1977,
+          1978,
+          1979,
+          1980,
+          1981,
+          1982,
+          1983,
+          1984,
+          1985,
+          1986,
+          1987,
+          1988,
+          1989,
+          1990,
+          1991,
+          1992,
+          1993,
+          1994,
+          1995,
+          1996,
+          1997,
+          1998,
+          1999,
+          2000,
+          2001,
+          2002,
+          2003,
+          2004,
+          2005,
+          2006,
+          2007
+        ]
+      },
+      "SI": {
+        "from": "SIT",
+        "to": "EUR",
+        "break_year": 2007,
+        "rate": 239.64,
+        "years_converted": [
+          1991,
+          1992,
+          1993,
+          1994,
+          1995,
+          1996,
+          1997,
+          1998,
+          1999,
+          2000,
+          2001,
+          2002,
+          2003,
+          2004,
+          2005,
+          2006
+        ]
+      }
+    },
+    "fx_redenominations_known_inert": {
+      "BG": "BGN -> EUR in 2026 at 1.95583; outside the 2019..2024 window, nothing converted"
+    },
+    "fx_redenominations_omitted": {
+      "SK": "SKK -> EUR 2009. Implied SKK/EUR 2006-2008: 37.28783, 33.84304, 31.41742 - a 23.8% spread against the rate that would have been recorded. The koruna appreciated sharply into adoption and the rate was fixed mid-2008, so annual averages cannot corroborate it.",
+      "CY": "CYP -> EUR 2008. Implied CYP/EUR 2005-2007: 0.57735, 0.57621, 0.58399 - 1.548% deviation.",
+      "GR": "GRD -> EUR 2001. Implied GRD/EUR 1999-2000: 325.75095, 337.48670 - 4.402% deviation."
+    },
+    "fx_continuity_check": "Every year-on-year FX move beyond 3.0x must be accounted for, either by a redenomination entry or by an explicit review classifying it as a genuine currency movement; anything unaccounted aborts the run. IT CANNOT CATCH A REDENOMINATION AT A FACTOR NEAR 1 - Bulgaria's 2026 entry at 1.95583 would raise no flag - so the redenomination table, not this check, is the primary defence. Nor can it distinguish a redenomination from a devaluation; that classification is made by hand and recorded.",
+    "fx_discontinuities_reviewed": {
+      "AR 2023->2024": "Argentine peso devaluation following the December 2023 policy change. Unit unchanged.",
+      "LB 2022->2023": "Lebanese pound: the official peg was abandoned/reset. Unit unchanged.",
+      "LB 2023->2024": "Lebanese pound, continued repricing of the official rate. Unit unchanged.",
+      "LY 2020->2021": "Libyan dinar devaluation, January 2021. Unit unchanged.",
+      "SD 2020->2021": "Sudanese pound devaluation/managed-float reform, February 2021. Unit unchanged.",
+      "ZW 2021->2022": "Zimbabwe dollar depreciation. Unit unchanged in this series.",
+      "ZW 2022->2023": "Zimbabwe dollar depreciation. Unit unchanged in this series."
+    },
+    "fingerprint_sha256": "64df489c58c6298c9fe8561289f2185f9bd7f9f1dddda063f16c52c60d23b158"
+  },
+  "regions": {
+    "AT": {
+      "kind": "country",
+      "iso2": "AT",
+      "country_name": "Austria",
+      "currency": "EUR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 118.057980056249,
+        "2020": 119.689435836364,
+        "2021": 123.00084356117,
+        "2022": 133.513565675464,
+        "2023": 143.946494832533,
+        "2024": 148.175521565418
+      },
+      "fx_lcu_per_usd": {
+        "2019": 0.893276257067409,
+        "2020": 0.875506396987998,
+        "2021": 0.84549413889045,
+        "2022": 0.949623753156941,
+        "2023": 0.924839558470698,
+        "2024": 0.923889546117607
+      },
+      "source": "World Bank WDI",
+      "source_code": "AUT",
+      "code_resolution": "lookup",
+      "fx_original_currency": "EUR",
+      "fx_normalised_currency": "EUR",
+      "fx_redenomination": null
+    },
+    "AU": {
+      "kind": "country",
+      "iso2": "AU",
+      "country_name": "Australia",
+      "currency": "AUD",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 119.797089761608,
+        "2020": 120.811652194838,
+        "2021": 124.271592622831,
+        "2022": 132.466181470806,
+        "2023": 139.880337389597,
+        "2024": 144.309741509281
+      },
+      "fx_lcu_per_usd": {
+        "2019": 1.43850654421382,
+        "2020": 1.45308511847016,
+        "2021": 1.33122425957081,
+        "2022": 1.44166445896522,
+        "2023": 1.50519106560509,
+        "2024": 1.51535803855596
+      },
+      "source": "World Bank WDI",
+      "source_code": "AUS",
+      "code_resolution": "lookup",
+      "fx_original_currency": "AUD",
+      "fx_normalised_currency": "AUD",
+      "fx_redenomination": null
+    },
+    "BE": {
+      "kind": "country",
+      "iso2": "BE",
+      "country_name": "Belgium",
+      "currency": "EUR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 117.110457187971,
+        "2020": 117.978001866073,
+        "2021": 120.856958300438,
+        "2022": 132.456219048303,
+        "2023": 137.819385631235,
+        "2024": 142.15172611785
+      },
+      "fx_lcu_per_usd": {
+        "2019": 0.893276257067409,
+        "2020": 0.875506396987998,
+        "2021": 0.84549413889045,
+        "2022": 0.949623753156941,
+        "2023": 0.924839558470698,
+        "2024": 0.923889546117607
+      },
+      "source": "World Bank WDI",
+      "source_code": "BEL",
+      "code_resolution": "lookup",
+      "fx_original_currency": "EUR",
+      "fx_normalised_currency": "EUR",
+      "fx_redenomination": null
+    },
+    "BG": {
+      "kind": "country",
+      "iso2": "BG",
+      "country_name": "Bulgaria",
+      "currency": "BGN",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 114.418393160353,
+        "2020": 116.331973243132,
+        "2021": 120.168304321485,
+        "2022": 138.584408106261,
+        "2023": 151.670713970091,
+        "2024": 155.381367457081
+      },
+      "fx_lcu_per_usd": {
+        "2019": 1.74704166666667,
+        "2020": 1.71633333333333,
+        "2021": 1.653775,
+        "2022": 1.86014166666667,
+        "2023": 1.80896666666667,
+        "2024": 1.80784166666667
+      },
+      "source": "World Bank WDI",
+      "source_code": "BGR",
+      "code_resolution": "lookup",
+      "fx_original_currency": "BGN",
+      "fx_normalised_currency": "BGN",
+      "fx_redenomination": null
+    },
+    "BR": {
+      "kind": "country",
+      "iso2": "BR",
+      "country_name": "Brazil",
+      "currency": "BRL",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 167.397860280061,
+        "2020": 172.774291252888,
+        "2021": 187.117425058296,
+        "2022": 204.482120615775,
+        "2023": 213.87513528772,
+        "2024": 223.216054990026
+      },
+      "fx_lcu_per_usd": {
+        "2019": 3.9444710972507,
+        "2020": 5.15517878751281,
+        "2021": 5.39440078962503,
+        "2022": 5.16397029102111,
+        "2023": 4.99437976287199,
+        "2024": 5.3889349057096
+      },
+      "source": "World Bank WDI",
+      "source_code": "BRA",
+      "code_resolution": "lookup",
+      "fx_original_currency": "BRL",
+      "fx_normalised_currency": "BRL",
+      "fx_redenomination": null
+    },
+    "CA": {
+      "kind": "country",
+      "iso2": "CA",
+      "country_name": "Canada",
+      "currency": "CAD",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 116.757298225529,
+        "2020": 117.594447624499,
+        "2021": 121.587006296508,
+        "2022": 129.858328563251,
+        "2023": 134.895535203205,
+        "2024": 138.10818546079
+      },
+      "fx_lcu_per_usd": {
+        "2019": 1.32679336266012,
+        "2020": 1.34115267222386,
+        "2021": 1.2538769021268,
+        "2022": 1.30155477474355,
+        "2023": 1.3499086407939,
+        "2024": 1.36935976604092
+      },
+      "source": "World Bank WDI",
+      "source_code": "CAN",
+      "code_resolution": "lookup",
+      "fx_original_currency": "CAD",
+      "fx_normalised_currency": "CAD",
+      "fx_redenomination": null
+    },
+    "CH": {
+      "kind": "country",
+      "iso2": "CH",
+      "country_name": "Switzerland",
+      "currency": "CHF",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 99.5468963730061,
+        "2020": 98.824310405343,
+        "2021": 99.3992842451936,
+        "2022": 102.21728177187,
+        "2023": 104.400030506506,
+        "2024": 105.509114228825
+      },
+      "fx_lcu_per_usd": {
+        "2019": 0.993709166666667,
+        "2020": 0.938965,
+        "2021": 0.913845833333333,
+        "2022": 0.9548325,
+        "2023": 0.89849,
+        "2024": 0.880440833333333
+      },
+      "source": "World Bank WDI",
+      "source_code": "CHE",
+      "code_resolution": "lookup",
+      "fx_original_currency": "CHF",
+      "fx_normalised_currency": "CHF",
+      "fx_redenomination": null
+    },
+    "CN": {
+      "kind": "country",
+      "iso2": "CN",
+      "country_name": "China",
+      "currency": "CNY",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 125.083154382075,
+        "2020": 128.109443605623,
+        "2021": 129.366216637457,
+        "2022": 131.919356668535,
+        "2023": 132.229151902431,
+        "2024": 132.517581947783
+      },
+      "fx_lcu_per_usd": {
+        "2019": 6.90838500992901,
+        "2020": 6.90076726944925,
+        "2021": 6.44897518024316,
+        "2022": 6.73715811237119,
+        "2023": 7.08399842343631,
+        "2024": 7.19749110789917
+      },
+      "source": "World Bank WDI",
+      "source_code": "CHN",
+      "code_resolution": "lookup",
+      "fx_original_currency": "CNY",
+      "fx_normalised_currency": "CNY",
+      "fx_redenomination": null
+    },
+    "CY": {
+      "kind": "country",
+      "iso2": "CY",
+      "country_name": "Cyprus",
+      "currency": "EUR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 102.510991917283,
+        "2020": 101.856538374448,
+        "2021": 104.348039621067,
+        "2022": 113.108561527348,
+        "2023": 117.114122395083,
+        "2024": 119.222446178799
+      },
+      "fx_lcu_per_usd": {
+        "2019": 0.893276257067409,
+        "2020": 0.875506396987998,
+        "2021": 0.84549413889045,
+        "2022": 0.949623753156941,
+        "2023": 0.924839558470698,
+        "2024": 0.923889546117607
+      },
+      "source": "World Bank WDI",
+      "source_code": "CYP",
+      "code_resolution": "lookup",
+      "fx_original_currency": "EUR",
+      "fx_normalised_currency": "EUR",
+      "fx_redenomination": null
+    },
+    "CZ": {
+      "kind": "country",
+      "iso2": "CZ",
+      "country_name": "Czech Republic",
+      "currency": "CZK",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 116.47554201756,
+        "2020": 120.157677835513,
+        "2021": 124.771546317864,
+        "2022": 143.612255868124,
+        "2023": 158.923132055187,
+        "2024": 162.793406199606
+      },
+      "fx_lcu_per_usd": {
+        "2019": 22.93225,
+        "2020": 23.21025,
+        "2021": 21.6781666666667,
+        "2022": 23.357,
+        "2023": 22.1980833333333,
+        "2024": 23.2168333333333
+      },
+      "source": "World Bank WDI",
+      "source_code": "CZE",
+      "code_resolution": "lookup",
+      "fx_original_currency": "CZK",
+      "fx_normalised_currency": "CZK",
+      "fx_redenomination": null
+    },
+    "DE": {
+      "kind": "country",
+      "iso2": "DE",
+      "country_name": "Germany",
+      "currency": "EUR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 112.854877121191,
+        "2020": 113.018378926344,
+        "2021": 116.484275880086,
+        "2022": 124.489744387368,
+        "2023": 131.892448207044,
+        "2024": 134.868598852104
+      },
+      "fx_lcu_per_usd": {
+        "2019": 0.893276257067409,
+        "2020": 0.875506396987998,
+        "2021": 0.84549413889045,
+        "2022": 0.949623753156941,
+        "2023": 0.924839558470698,
+        "2024": 0.923889546117607
+      },
+      "source": "World Bank WDI",
+      "source_code": "DEU",
+      "code_resolution": "lookup",
+      "fx_original_currency": "EUR",
+      "fx_normalised_currency": "EUR",
+      "fx_redenomination": null
+    },
+    "DK": {
+      "kind": "country",
+      "iso2": "DK",
+      "country_name": "Denmark",
+      "currency": "DKK",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 110.347290420498,
+        "2020": 110.811534684403,
+        "2021": 112.864922774752,
+        "2022": 121.55164717436,
+        "2023": 125.569145611999,
+        "2024": 127.292206053031
+      },
+      "fx_lcu_per_usd": {
+        "2019": 6.669446615,
+        "2020": 6.54215220416667,
+        "2021": 6.2871130825,
+        "2022": 7.0761518625,
+        "2023": 6.88970258583334,
+        "2024": 6.89448141666666
+      },
+      "source": "World Bank WDI",
+      "source_code": "DNK",
+      "code_resolution": "lookup",
+      "fx_original_currency": "DKK",
+      "fx_normalised_currency": "DKK",
+      "fx_redenomination": null
+    },
+    "EE": {
+      "kind": "country",
+      "iso2": "EE",
+      "country_name": "Estonia",
+      "currency": "EUR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 122.14231282149,
+        "2020": 121.599352257573,
+        "2021": 127.257572871023,
+        "2022": 151.94333206325,
+        "2023": 165.860163840732,
+        "2024": 171.697466184035
+      },
+      "fx_lcu_per_usd": {
+        "2019": 0.893276257067409,
+        "2020": 0.875506396987998,
+        "2021": 0.84549413889045,
+        "2022": 0.949623753156941,
+        "2023": 0.924839558470698,
+        "2024": 0.923889546117607
+      },
+      "source": "World Bank WDI",
+      "source_code": "EST",
+      "code_resolution": "lookup",
+      "fx_original_currency": "EEK",
+      "fx_normalised_currency": "EUR",
+      "fx_redenomination": {
+        "original_currency": "EEK",
+        "normalised_currency": "EUR",
+        "break_year": 2011,
+        "rate_applied": 15.6466,
+        "rate_direction": "15.6466 EEK per 1 EUR; pre-break values divided by it",
+        "years_converted": [
+          1993,
+          1994,
+          1995,
+          1996,
+          1997,
+          1998,
+          1999,
+          2000,
+          2001,
+          2002,
+          2003,
+          2004,
+          2005,
+          2006,
+          2007,
+          2008,
+          2009,
+          2010
+        ],
+        "corroboration": "implied EEK/EUR from WB data 2008-2010: 15.72891, 15.70167, 15.65254; max deviation 0.526%",
+        "rate_source": "Official irrevocable euro conversion rate fixed by the Council of the European Union. The regulation itself was not read from this machine and is deliberately not cited; the corroboration field records the check that WAS performed."
+      }
+    },
+    "ES": {
+      "kind": "country",
+      "iso2": "ES",
+      "country_name": "Spain",
+      "currency": "EUR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 110.961443623997,
+        "2020": 110.603312216661,
+        "2021": 114.024422110457,
+        "2022": 123.591728295232,
+        "2023": 127.957434718697,
+        "2024": 131.472614682343
+      },
+      "fx_lcu_per_usd": {
+        "2019": 0.893276257067409,
+        "2020": 0.875506396987998,
+        "2021": 0.84549413889045,
+        "2022": 0.949623753156941,
+        "2023": 0.924839558470698,
+        "2024": 0.923889546117607
+      },
+      "source": "World Bank WDI",
+      "source_code": "ESP",
+      "code_resolution": "lookup",
+      "fx_original_currency": "EUR",
+      "fx_normalised_currency": "EUR",
+      "fx_redenomination": null
+    },
+    "FI": {
+      "kind": "country",
+      "iso2": "FI",
+      "country_name": "Finland",
+      "currency": "EUR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 112.331712088838,
+        "2020": 112.658096995756,
+        "2021": 115.130462665656,
+        "2022": 123.331790076698,
+        "2023": 131.040820253141,
+        "2024": 133.092512043014
+      },
+      "fx_lcu_per_usd": {
+        "2019": 0.893276257067409,
+        "2020": 0.875506396987998,
+        "2021": 0.84549413889045,
+        "2022": 0.949623753156941,
+        "2023": 0.924839558470698,
+        "2024": 0.923889546117607
+      },
+      "source": "World Bank WDI",
+      "source_code": "FIN",
+      "code_resolution": "lookup",
+      "fx_original_currency": "EUR",
+      "fx_normalised_currency": "EUR",
+      "fx_redenomination": null
+    },
+    "FR": {
+      "kind": "country",
+      "iso2": "FR",
+      "country_name": "France",
+      "currency": "EUR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 110.04856675289,
+        "2020": 110.572946910908,
+        "2021": 112.388921149413,
+        "2022": 118.258283622798,
+        "2023": 124.027345193475,
+        "2024": 126.506713121822
+      },
+      "fx_lcu_per_usd": {
+        "2019": 0.893276257067409,
+        "2020": 0.875506396987998,
+        "2021": 0.84549413889045,
+        "2022": 0.949623753156941,
+        "2023": 0.924839558470698,
+        "2024": 0.923889546117607
+      },
+      "source": "World Bank WDI",
+      "source_code": "FRA",
+      "code_resolution": "lookup",
+      "fx_original_currency": "EUR",
+      "fx_normalised_currency": "EUR",
+      "fx_redenomination": null
+    },
+    "GB": {
+      "kind": "country",
+      "iso2": "GB",
+      "country_name": "United Kingdom",
+      "currency": "GBP",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 119.622711300166,
+        "2020": 120.806362123174,
+        "2021": 123.848714629184,
+        "2022": 133.660070279268,
+        "2023": 142.740891437026,
+        "2024": 147.410763824672
+      },
+      "fx_lcu_per_usd": {
+        "2019": 0.783445110011929,
+        "2020": 0.779999576697153,
+        "2021": 0.727064944688323,
+        "2022": 0.811301715827773,
+        "2023": 0.804538906734353,
+        "2024": 0.782414580986262
+      },
+      "source": "World Bank WDI",
+      "source_code": "GBR",
+      "code_resolution": "lookup",
+      "fx_original_currency": "GBP",
+      "fx_normalised_currency": "GBP",
+      "fx_redenomination": null
+    },
+    "GR": {
+      "kind": "country",
+      "iso2": "GR",
+      "country_name": "Greece",
+      "currency": "EUR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 101.949414101629,
+        "2020": 100.677102178392,
+        "2021": 101.909213734394,
+        "2022": 111.738622172264,
+        "2023": 115.61014338928,
+        "2024": 118.779039104338
+      },
+      "fx_lcu_per_usd": {
+        "2019": 0.893276257067409,
+        "2020": 0.875506396987998,
+        "2021": 0.84549413889045,
+        "2022": 0.949623753156941,
+        "2023": 0.924839558470698,
+        "2024": 0.923889546117607
+      },
+      "source": "World Bank WDI",
+      "source_code": "GRC",
+      "code_resolution": "lookup",
+      "fx_original_currency": "EUR",
+      "fx_normalised_currency": "EUR",
+      "fx_redenomination": null
+    },
+    "HR": {
+      "kind": "country",
+      "iso2": "HR",
+      "country_name": "Croatia",
+      "currency": "EUR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 109.815676449535,
+        "2020": 109.985683607731,
+        "2021": 112.795275590551,
+        "2022": 124.955261274159,
+        "2023": 134.878310665712,
+        "2024": 138.886900501074
+      },
+      "fx_lcu_per_usd": {
+        "2019": 0.8789627933727082,
+        "2020": 0.8778360209702037,
+        "2021": 0.8441280996305885,
+        "2022": 0.9502609994027473,
+        "2023": 0.924839558470698,
+        "2024": 0.923889546117607
+      },
+      "source": "World Bank WDI",
+      "source_code": "HRV",
+      "code_resolution": "lookup",
+      "fx_original_currency": "HRK",
+      "fx_normalised_currency": "EUR",
+      "fx_redenomination": {
+        "original_currency": "HRK",
+        "normalised_currency": "EUR",
+        "break_year": 2023,
+        "rate_applied": 7.5345,
+        "rate_direction": "7.5345 HRK per 1 EUR; pre-break values divided by it",
+        "years_converted": [
+          1992,
+          1993,
+          1994,
+          1995,
+          1996,
+          1997,
+          1998,
+          1999,
+          2000,
+          2001,
+          2002,
+          2003,
+          2004,
+          2005,
+          2006,
+          2007,
+          2008,
+          2009,
+          2010,
+          2011,
+          2012,
+          2013,
+          2014,
+          2015,
+          2016,
+          2017,
+          2018,
+          2019,
+          2020,
+          2021,
+          2022
+        ],
+        "corroboration": "implied HRK/EUR from WB data 2020-2022: 7.55455, 7.52233, 7.53956; max deviation 0.266%",
+        "rate_source": "Official irrevocable euro conversion rate fixed by the Council of the European Union. The regulation itself was not read from this machine and is deliberately not cited; the corroboration field records the check that WAS performed."
+      }
+    },
+    "HU": {
+      "kind": "country",
+      "iso2": "HU",
+      "country_name": "Hungary",
+      "currency": "HUF",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 121.642047406389,
+        "2020": 125.688766746822,
+        "2021": 132.112676056338,
+        "2022": 151.411885949845,
+        "2023": 177.341119890072,
+        "2024": 183.90930951563
+      },
+      "fx_lcu_per_usd": {
+        "2019": 290.66,
+        "2020": 307.996666666667,
+        "2021": 303.140833333333,
+        "2022": 372.595833333333,
+        "2023": 353.088333333333,
+        "2024": 365.690833333333
+      },
+      "source": "World Bank WDI",
+      "source_code": "HUN",
+      "code_resolution": "lookup",
+      "fx_original_currency": "HUF",
+      "fx_normalised_currency": "HUF",
+      "fx_redenomination": null
+    },
+    "ID": {
+      "kind": "country",
+      "iso2": "ID",
+      "country_name": "Indonesia",
+      "currency": "IDR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 151.176672788694,
+        "2020": 154.079015876998,
+        "2021": 156.48276998491,
+        "2022": 163.069856850655,
+        "2023": 169.05352024275,
+        "2024": 172.741444317759
+      },
+      "fx_lcu_per_usd": {
+        "2019": 14147.6713605454,
+        "2020": 14582.2034678177,
+        "2021": 14308.1439011897,
+        "2022": 14849.8539362105,
+        "2023": 15236.8846620506,
+        "2024": 15855.4482866711
+      },
+      "source": "World Bank WDI",
+      "source_code": "IDN",
+      "code_resolution": "lookup",
+      "fx_original_currency": "IDR",
+      "fx_normalised_currency": "IDR",
+      "fx_redenomination": null
+    },
+    "IE": {
+      "kind": "country",
+      "iso2": "IE",
+      "country_name": "Ireland",
+      "currency": "EUR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 106.562039182642,
+        "2020": 106.214451232357,
+        "2021": 108.7002317253,
+        "2022": 117.210870023173,
+        "2023": 124.594480724668,
+        "2024": 127.227722772277
+      },
+      "fx_lcu_per_usd": {
+        "2019": 0.893276257067409,
+        "2020": 0.875506396987998,
+        "2021": 0.84549413889045,
+        "2022": 0.949623753156941,
+        "2023": 0.924839558470698,
+        "2024": 0.923889546117607
+      },
+      "source": "World Bank WDI",
+      "source_code": "IRL",
+      "code_resolution": "lookup",
+      "fx_original_currency": "EUR",
+      "fx_normalised_currency": "EUR",
+      "fx_redenomination": null
+    },
+    "IN": {
+      "kind": "country",
+      "iso2": "IN",
+      "country_name": "India",
+      "currency": "INR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 171.621576003377,
+        "2020": 182.988822584425,
+        "2021": 192.378724699015,
+        "2022": 205.266241146235,
+        "2023": 216.862025027426,
+        "2024": 227.603278134168
+      },
+      "fx_lcu_per_usd": {
+        "2019": 70.4203405359551,
+        "2020": 74.0995668836052,
+        "2021": 73.9180128154351,
+        "2022": 78.6044905829916,
+        "2023": 82.5992764460784,
+        "2024": 83.669281580941
+      },
+      "source": "World Bank WDI",
+      "source_code": "IND",
+      "code_resolution": "lookup",
+      "fx_original_currency": "INR",
+      "fx_normalised_currency": "INR",
+      "fx_redenomination": null
+    },
+    "IT": {
+      "kind": "country",
+      "iso2": "IT",
+      "country_name": "Italy",
+      "currency": "EUR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 110.623595648239,
+        "2020": 110.471258578492,
+        "2021": 112.541250526224,
+        "2022": 121.771084752039,
+        "2023": 128.617291886527,
+        "2024": 129.880793465012
+      },
+      "fx_lcu_per_usd": {
+        "2019": 0.893276257067409,
+        "2020": 0.875506396987998,
+        "2021": 0.84549413889045,
+        "2022": 0.949623753156941,
+        "2023": 0.924839558470698,
+        "2024": 0.923889546117607
+      },
+      "source": "World Bank WDI",
+      "source_code": "ITA",
+      "code_resolution": "lookup",
+      "fx_original_currency": "EUR",
+      "fx_normalised_currency": "EUR",
+      "fx_redenomination": null
+    },
+    "JP": {
+      "kind": "country",
+      "iso2": "JP",
+      "country_name": "Japan",
+      "currency": "JPY",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 105.484267885393,
+        "2020": 105.457901212867,
+        "2021": 105.211812269292,
+        "2022": 107.839690631042,
+        "2023": 111.364035858675,
+        "2024": 114.41378098084
+      },
+      "fx_lcu_per_usd": {
+        "2019": 109.009665900863,
+        "2020": 106.774582262437,
+        "2021": 109.754323839417,
+        "2022": 131.498140443764,
+        "2023": 140.49110006234,
+        "2024": 151.366291302752
+      },
+      "source": "World Bank WDI",
+      "source_code": "JPN",
+      "code_resolution": "lookup",
+      "fx_original_currency": "JPY",
+      "fx_normalised_currency": "JPY",
+      "fx_redenomination": null
+    },
+    "KR": {
+      "kind": "country",
+      "iso2": "KR",
+      "country_name": "South Korea",
+      "currency": "KRW",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 115.158634290169,
+        "2020": 115.777367840135,
+        "2021": 118.669872413341,
+        "2022": 124.709591769001,
+        "2023": 129.195964772806,
+        "2024": 132.195563411264
+      },
+      "fx_lcu_per_usd": {
+        "2019": 1165.3575,
+        "2020": 1180.26583333333,
+        "2021": 1143.95166666667,
+        "2022": 1291.44666666667,
+        "2023": 1305.6625,
+        "2024": 1363.375
+      },
+      "source": "World Bank WDI",
+      "source_code": "KOR",
+      "code_resolution": "lookup",
+      "fx_original_currency": "KRW",
+      "fx_normalised_currency": "KRW",
+      "fx_redenomination": null
+    },
+    "LT": {
+      "kind": "country",
+      "iso2": "LT",
+      "country_name": "Lithuania",
+      "currency": "EUR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 118.382098321258,
+        "2020": 119.802558548614,
+        "2021": 125.413564341792,
+        "2022": 150.12636507601,
+        "2023": 163.813865619739,
+        "2024": 164.986340159053
+      },
+      "fx_lcu_per_usd": {
+        "2019": 0.893276257067409,
+        "2020": 0.875506396987998,
+        "2021": 0.84549413889045,
+        "2022": 0.949623753156941,
+        "2023": 0.924839558470698,
+        "2024": 0.923889546117607
+      },
+      "source": "World Bank WDI",
+      "source_code": "LTU",
+      "code_resolution": "lookup",
+      "fx_original_currency": "LTL",
+      "fx_normalised_currency": "EUR",
+      "fx_redenomination": {
+        "original_currency": "LTL",
+        "normalised_currency": "EUR",
+        "break_year": 2015,
+        "rate_applied": 3.4528,
+        "rate_direction": "3.4528 LTL per 1 EUR; pre-break values divided by it",
+        "years_converted": [
+          1992,
+          1993,
+          1994,
+          1995,
+          1996,
+          1997,
+          1998,
+          1999,
+          2000,
+          2001,
+          2002,
+          2003,
+          2004,
+          2005,
+          2006,
+          2007,
+          2008,
+          2009,
+          2010,
+          2011,
+          2012,
+          2013,
+          2014
+        ],
+        "corroboration": "implied LTL/EUR from WB data 2012-2014: 3.45132, 3.45445, 3.45449; max deviation 0.049%",
+        "rate_source": "Official irrevocable euro conversion rate fixed by the Council of the European Union. The regulation itself was not read from this machine and is deliberately not cited; the corroboration field records the check that WAS performed."
+      }
+    },
+    "LU": {
+      "kind": "country",
+      "iso2": "LU",
+      "country_name": "Luxembourg",
+      "currency": "EUR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 115.087815087815,
+        "2020": 116.031486031486,
+        "2021": 118.963508963509,
+        "2022": 126.501046501047,
+        "2023": 131.233961233961,
+        "2024": 133.925743925744
+      },
+      "fx_lcu_per_usd": {
+        "2019": 0.893276257067409,
+        "2020": 0.875506396987998,
+        "2021": 0.84549413889045,
+        "2022": 0.949623753156941,
+        "2023": 0.924839558470698,
+        "2024": 0.923889546117607
+      },
+      "source": "World Bank WDI",
+      "source_code": "LUX",
+      "code_resolution": "lookup",
+      "fx_original_currency": "EUR",
+      "fx_normalised_currency": "EUR",
+      "fx_redenomination": null
+    },
+    "LV": {
+      "kind": "country",
+      "iso2": "LV",
+      "country_name": "Latvia",
+      "currency": "EUR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 116.856984643274,
+        "2020": 117.112977285483,
+        "2021": 120.949398596532,
+        "2022": 141.886081804437,
+        "2023": 154.567925394545,
+        "2024": 156.524444429468
+      },
+      "fx_lcu_per_usd": {
+        "2019": 0.893276257067409,
+        "2020": 0.875506396987998,
+        "2021": 0.84549413889045,
+        "2022": 0.949623753156941,
+        "2023": 0.924839558470698,
+        "2024": 0.923889546117607
+      },
+      "source": "World Bank WDI",
+      "source_code": "LVA",
+      "code_resolution": "lookup",
+      "fx_original_currency": "LVL",
+      "fx_normalised_currency": "EUR",
+      "fx_redenomination": {
+        "original_currency": "LVL",
+        "normalised_currency": "EUR",
+        "break_year": 2014,
+        "rate_applied": 0.702804,
+        "rate_direction": "0.702804 LVL per 1 EUR; pre-break values divided by it",
+        "years_converted": [
+          1992,
+          1993,
+          1994,
+          1995,
+          1996,
+          1997,
+          1998,
+          1999,
+          2000,
+          2001,
+          2002,
+          2003,
+          2004,
+          2005,
+          2006,
+          2007,
+          2008,
+          2009,
+          2010,
+          2011,
+          2012,
+          2013
+        ],
+        "corroboration": "implied LVL/EUR from WB data 2011-2013: 0.69769, 0.70262, 0.70309; max deviation 0.727%",
+        "rate_source": "Official irrevocable euro conversion rate fixed by the Council of the European Union. The regulation itself was not read from this machine and is deliberately not cited; the corroboration field records the check that WAS performed."
+      }
+    },
+    "MT": {
+      "kind": "country",
+      "iso2": "MT",
+      "country_name": "Malta",
+      "currency": "EUR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 113.452474124359,
+        "2020": 114.176919176219,
+        "2021": 115.887166319179,
+        "2022": 123.018580023951,
+        "2023": 129.28510661979,
+        "2024": 131.41933829849
+      },
+      "fx_lcu_per_usd": {
+        "2019": 0.893276257067409,
+        "2020": 0.875506396987998,
+        "2021": 0.84549413889045,
+        "2022": 0.949623753156941,
+        "2023": 0.924839558470698,
+        "2024": 0.923889546117607
+      },
+      "source": "World Bank WDI",
+      "source_code": "MLT",
+      "code_resolution": "lookup",
+      "fx_original_currency": "MTL",
+      "fx_normalised_currency": "EUR",
+      "fx_redenomination": {
+        "original_currency": "MTL",
+        "normalised_currency": "EUR",
+        "break_year": 2008,
+        "rate_applied": 0.4293,
+        "rate_direction": "0.4293 MTL per 1 EUR; pre-break values divided by it",
+        "years_converted": [
+          1960,
+          1961,
+          1962,
+          1963,
+          1964,
+          1965,
+          1966,
+          1967,
+          1968,
+          1969,
+          1970,
+          1971,
+          1972,
+          1973,
+          1974,
+          1975,
+          1976,
+          1977,
+          1978,
+          1979,
+          1980,
+          1981,
+          1982,
+          1983,
+          1984,
+          1985,
+          1986,
+          1987,
+          1988,
+          1989,
+          1990,
+          1991,
+          1992,
+          1993,
+          1994,
+          1995,
+          1996,
+          1997,
+          1998,
+          1999,
+          2000,
+          2001,
+          2002,
+          2003,
+          2004,
+          2005,
+          2006,
+          2007
+        ],
+        "corroboration": "implied MTL/EUR from WB data 2005-2007: 0.43018, 0.42803, 0.42714; max deviation 0.502%",
+        "rate_source": "Official irrevocable euro conversion rate fixed by the Council of the European Union. The regulation itself was not read from this machine and is deliberately not cited; the corroboration field records the check that WAS performed."
+      }
+    },
+    "MX": {
+      "kind": "country",
+      "iso2": "MX",
+      "country_name": "Mexico",
+      "currency": "MXN",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 141.542522969974,
+        "2020": 146.350487735058,
+        "2021": 154.676672089174,
+        "2022": 166.890369321443,
+        "2023": 176.116003638578,
+        "2024": 184.432651983998
+      },
+      "fx_lcu_per_usd": {
+        "2019": 19.2636333333333,
+        "2020": 21.4856083333333,
+        "2021": 20.2724083333333,
+        "2022": 20.12735,
+        "2023": 17.7587166666667,
+        "2024": 18.3048583333333
+      },
+      "source": "World Bank WDI",
+      "source_code": "MEX",
+      "code_resolution": "lookup",
+      "fx_original_currency": "MXN",
+      "fx_normalised_currency": "MXN",
+      "fx_redenomination": null
+    },
+    "NL": {
+      "kind": "country",
+      "iso2": "NL",
+      "country_name": "Netherlands",
+      "currency": "EUR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 115.907994941178,
+        "2020": 117.382878251613,
+        "2021": 120.523715504927,
+        "2022": 132.577542831667,
+        "2023": 137.666390675753,
+        "2024": 142.274832358267
+      },
+      "fx_lcu_per_usd": {
+        "2019": 0.893276257067409,
+        "2020": 0.875506396987998,
+        "2021": 0.84549413889045,
+        "2022": 0.949623753156941,
+        "2023": 0.924839558470698,
+        "2024": 0.923889546117607
+      },
+      "source": "World Bank WDI",
+      "source_code": "NLD",
+      "code_resolution": "lookup",
+      "fx_original_currency": "EUR",
+      "fx_normalised_currency": "EUR",
+      "fx_redenomination": null
+    },
+    "NO": {
+      "kind": "country",
+      "iso2": "NO",
+      "country_name": "Norway",
+      "currency": "NOK",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 120.269658854402,
+        "2020": 121.81703013302,
+        "2021": 126.06098995566,
+        "2022": 133.327300696769,
+        "2023": 140.684100986336,
+        "2024": 145.109039905891
+      },
+      "fx_lcu_per_usd": {
+        "2019": 8.8,
+        "2020": 9.41583333333334,
+        "2021": 8.59,
+        "2022": 9.61416666666667,
+        "2023": 10.5633333333333,
+        "2024": 10.7458333333333
+      },
+      "source": "World Bank WDI",
+      "source_code": "NOR",
+      "code_resolution": "lookup",
+      "fx_original_currency": "NOK",
+      "fx_normalised_currency": "NOK",
+      "fx_redenomination": null
+    },
+    "PL": {
+      "kind": "country",
+      "iso2": "PL",
+      "country_name": "Poland",
+      "currency": "PLN",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 114.111779375092,
+        "2020": 117.962446824116,
+        "2021": 123.925480416605,
+        "2022": 141.807246589409,
+        "2023": 158.156080387267,
+        "2024": 164.151158966994
+      },
+      "fx_lcu_per_usd": {
+        "2019": 3.839375,
+        "2020": 3.89974166666667,
+        "2021": 3.86191666666667,
+        "2022": 4.45775833333333,
+        "2023": 4.20366666666667,
+        "2024": 3.98078333333333
+      },
+      "source": "World Bank WDI",
+      "source_code": "POL",
+      "code_resolution": "lookup",
+      "fx_original_currency": "PLN",
+      "fx_normalised_currency": "PLN",
+      "fx_redenomination": null
+    },
+    "PT": {
+      "kind": "country",
+      "iso2": "PT",
+      "country_name": "Portugal",
+      "currency": "EUR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 110.624358614714,
+        "2020": 110.610598791976,
+        "2021": 112.010549789253,
+        "2022": 120.783990313085,
+        "2023": 125.991328648484,
+        "2024": 129.035445303373
+      },
+      "fx_lcu_per_usd": {
+        "2019": 0.893276257067409,
+        "2020": 0.875506396987998,
+        "2021": 0.84549413889045,
+        "2022": 0.949623753156941,
+        "2023": 0.924839558470698,
+        "2024": 0.923889546117607
+      },
+      "source": "World Bank WDI",
+      "source_code": "PRT",
+      "code_resolution": "lookup",
+      "fx_original_currency": "EUR",
+      "fx_normalised_currency": "EUR",
+      "fx_redenomination": null
+    },
+    "RO": {
+      "kind": "country",
+      "iso2": "RO",
+      "country_name": "Romania",
+      "currency": "RON",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 123.780383348878,
+        "2020": 127.037135732912,
+        "2021": 133.455469478653,
+        "2022": 151.866303747835,
+        "2023": 167.656128062128,
+        "2024": 177.248415402478
+      },
+      "fx_lcu_per_usd": {
+        "2019": 4.237925,
+        "2020": 4.24399166666667,
+        "2021": 4.16041666666666,
+        "2022": 4.688475,
+        "2023": 4.57429166666667,
+        "2024": 4.598375
+      },
+      "source": "World Bank WDI",
+      "source_code": "ROU",
+      "code_resolution": "lookup",
+      "fx_original_currency": "RON",
+      "fx_normalised_currency": "RON",
+      "fx_redenomination": null
+    },
+    "RU": {
+      "kind": "country",
+      "iso2": "RU",
+      "country_name": "Russia",
+      "currency": "RUB",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 180.749321987511,
+        "2020": 186.862621885623,
+        "2021": 199.372063343799,
+        "2022": 226.773121220448,
+        "2023": 240.07499599875,
+        "2024": 260.32499566125
+      },
+      "fx_lcu_per_usd": {
+        "2019": 64.7376583333333,
+        "2020": 72.1049083333333,
+        "2021": 73.65435,
+        "2022": 68.4849416666667,
+        "2023": 85.1620083333333,
+        "2024": 92.5524
+      },
+      "source": "World Bank WDI",
+      "source_code": "RUS",
+      "code_resolution": "lookup",
+      "fx_original_currency": "RUB",
+      "fx_normalised_currency": "RUB",
+      "fx_redenomination": null
+    },
+    "SE": {
+      "kind": "country",
+      "iso2": "SE",
+      "country_name": "Sweden",
+      "currency": "SEK",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 110.509219846432,
+        "2020": 111.058856590269,
+        "2021": 113.461278849041,
+        "2022": 122.957183435409,
+        "2023": 133.46833183182,
+        "2024": 137.253248917946
+      },
+      "fx_lcu_per_usd": {
+        "2019": 9.45834916666667,
+        "2020": 9.21030902842085,
+        "2021": 8.57656671607378,
+        "2022": 10.114251277564,
+        "2023": 10.6101612965536,
+        "2024": 10.5676364344775
+      },
+      "source": "World Bank WDI",
+      "source_code": "SWE",
+      "code_resolution": "lookup",
+      "fx_original_currency": "SEK",
+      "fx_normalised_currency": "SEK",
+      "fx_redenomination": null
+    },
+    "SI": {
+      "kind": "country",
+      "iso2": "SI",
+      "country_name": "Slovenia",
+      "currency": "EUR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 111.051074912815,
+        "2020": 110.99015582925,
+        "2021": 113.117909327683,
+        "2022": 123.110404802896,
+        "2023": 132.278285436807,
+        "2024": 134.878382554187
+      },
+      "fx_lcu_per_usd": {
+        "2019": 0.893276257067409,
+        "2020": 0.875506396987998,
+        "2021": 0.84549413889045,
+        "2022": 0.949623753156941,
+        "2023": 0.924839558470698,
+        "2024": 0.923889546117607
+      },
+      "source": "World Bank WDI",
+      "source_code": "SVN",
+      "code_resolution": "lookup",
+      "fx_original_currency": "SIT",
+      "fx_normalised_currency": "EUR",
+      "fx_redenomination": {
+        "original_currency": "SIT",
+        "normalised_currency": "EUR",
+        "break_year": 2007,
+        "rate_applied": 239.64,
+        "rate_direction": "239.64 SIT per 1 EUR; pre-break values divided by it",
+        "years_converted": [
+          1991,
+          1992,
+          1993,
+          1994,
+          1995,
+          1996,
+          1997,
+          1998,
+          1999,
+          2000,
+          2001,
+          2002,
+          2003,
+          2004,
+          2005,
+          2006
+        ],
+        "corroboration": "implied SIT/EUR from WB data 2004-2006: 239.30333, 239.74300, 239.85486; max deviation 0.140%",
+        "rate_source": "Official irrevocable euro conversion rate fixed by the Council of the European Union. The regulation itself was not read from this machine and is deliberately not cited; the corroboration field records the check that WAS performed."
+      }
+    },
+    "SK": {
+      "kind": "country",
+      "iso2": "SK",
+      "country_name": "Slovakia",
+      "currency": "EUR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 115.338987748766,
+        "2020": 117.573036199346,
+        "2021": 121.276123953656,
+        "2022": 136.768113531792,
+        "2023": 151.172459670713,
+        "2024": 155.341205166584
+      },
+      "fx_lcu_per_usd": {
+        "2019": 0.893276257067409,
+        "2020": 0.875506396987998,
+        "2021": 0.84549413889045,
+        "2022": 0.949623753156941,
+        "2023": 0.924839558470698,
+        "2024": 0.923889546117607
+      },
+      "source": "World Bank WDI",
+      "source_code": "SVK",
+      "code_resolution": "lookup",
+      "fx_original_currency": "EUR",
+      "fx_normalised_currency": "EUR",
+      "fx_redenomination": null
+    },
+    "TR": {
+      "kind": "country",
+      "iso2": "TR",
+      "country_name": "Turkey",
+      "currency": "TRY",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 234.437126307922,
+        "2020": 263.223561285501,
+        "2021": 314.806147234679,
+        "2022": 542.438807922272,
+        "2023": 834.593142750374,
+        "2024": 1322.88396860986
+      },
+      "fx_lcu_per_usd": {
+        "2019": 5.67381930843574,
+        "2020": 7.00860541558522,
+        "2021": 8.85040754928315,
+        "2022": 16.5488604173067,
+        "2023": 23.7385661219918,
+        "2024": 32.8058614432703
+      },
+      "source": "World Bank WDI",
+      "source_code": "TUR",
+      "code_resolution": "lookup",
+      "fx_original_currency": "TRY",
+      "fx_normalised_currency": "TRY",
+      "fx_redenomination": null
+    },
+    "TW": {
+      "kind": "country",
+      "iso2": "TW",
+      "country_name": "Taiwan",
+      "currency": "TWD",
+      "cpi_base_year": 2021,
+      "cpi": {
+        "2019": 98.3,
+        "2020": 98.07,
+        "2021": 100.0,
+        "2022": 102.95,
+        "2023": 105.51,
+        "2024": 107.81
+      },
+      "fx_lcu_per_usd": {
+        "2019": 30.93,
+        "2020": 29.58,
+        "2021": 28.02,
+        "2022": 29.81,
+        "2023": 31.16,
+        "2024": 32.11
+      },
+      "source": "DGBAS",
+      "source_code": "TW (DGBAS national series)",
+      "code_resolution": "national-source",
+      "fx_original_currency": "TWD",
+      "fx_normalised_currency": "TWD",
+      "fx_redenomination": null
+    },
+    "US": {
+      "kind": "country",
+      "iso2": "US",
+      "country_name": "United States",
+      "currency": "USD",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 117.244195476228,
+        "2020": 118.690501577198,
+        "2021": 124.266413825838,
+        "2022": 134.21120616846,
+        "2023": 139.73579356326,
+        "2024": 143.857336014608
+      },
+      "fx_lcu_per_usd": {
+        "2019": 1.0,
+        "2020": 1.0,
+        "2021": 1.0,
+        "2022": 1.0,
+        "2023": 1.0,
+        "2024": 1.0
+      },
+      "source": "World Bank WDI",
+      "source_code": "USA",
+      "code_resolution": "lookup",
+      "fx_original_currency": "USD",
+      "fx_normalised_currency": "USD",
+      "fx_redenomination": null
+    },
+    "ZA": {
+      "kind": "country",
+      "iso2": "ZA",
+      "country_name": "South Africa",
+      "currency": "ZAR",
+      "cpi_base_year": 2010,
+      "cpi": {
+        "2019": 158.934971838198,
+        "2020": 164.072367298174,
+        "2021": 171.650452295614,
+        "2022": 183.73442566991,
+        "2023": 194.89674005803,
+        "2024": 203.396484041645
+      },
+      "fx_lcu_per_usd": {
+        "2019": 14.4484270548333,
+        "2020": 16.4591053903333,
+        "2021": 14.7786782139167,
+        "2022": 16.3558534845,
+        "2023": 18.4502441785,
+        "2024": 18.3286575505
+      },
+      "source": "World Bank WDI",
+      "source_code": "ZAF",
+      "code_resolution": "lookup",
+      "fx_original_currency": "ZAR",
+      "fx_normalised_currency": "ZAR",
+      "fx_redenomination": null
+    },
+    "WA": {
+      "kind": "row_composite",
+      "members_total": 45,
+      "members_weighted": 34,
+      "members_excluded_no_cpi": 9,
+      "members_unmeasured": 2,
+      "gdp_coverage_pct": 96.9,
+      "gdp_coverage_pct_note": "Share of MEASURABLE GDP, not of the bucket. The denominator counts only members with a GDP figure for 2025 or 2024; members in unmeasured_no_gdp are absent from both the numerator and the denominator and cannot move this number in either direction, however large their economy. Read it together with members_unmeasured: 100.0% means every member we can measure is covered, not that every member is.",
+      "gdp_used_usd": 5220885429944.605,
+      "gdp_measurable_usd": 5385956270493.096,
+      "weight_basis": "GDP in current USD, 2025 where published, else 2024; per-member year recorded below",
+      "cpi_ratio": 1.3225932084965826,
+      "fx_ratio": 1.178213775276139,
+      "fx_ratio_weight_share": 0.975751,
+      "ratio_definition": "CPI(2024)/CPI(2019) and FX(2024)/FX(2019), GDP-weighted across members. RATIOS are weighted, never levels.",
+      "members": [
+        {
+          "iso2": "AF",
+          "country_name": "Afghanistan",
+          "gdp_usd": 17778508875.7396,
+          "gdp_year": 2024,
+          "weight": 0.0034052670019859514,
+          "cpi_ratio": 1.1243575213136752,
+          "fx_ratio": null
+        },
+        {
+          "iso2": "AM",
+          "country_name": "Armenia",
+          "gdp_usd": 29243452882.3545,
+          "gdp_year": 2025,
+          "weight": 0.005601243941234079,
+          "cpi_ratio": 1.2051525555676748,
+          "fx_ratio": 0.8174285217687091
+        },
+        {
+          "iso2": "AZ",
+          "country_name": "Azerbaijan",
+          "gdp_usd": 75937647058.8235,
+          "gdp_year": 2025,
+          "weight": 0.014544974808924166,
+          "cpi_ratio": 1.3873957881425567,
+          "fx_ratio": 1.0
+        },
+        {
+          "iso2": "BD",
+          "country_name": "Bangladesh",
+          "gdp_usd": 456319229255.578,
+          "gdp_year": 2025,
+          "weight": 0.08740265140436526,
+          "cpi_ratio": 1.4582843912034982,
+          "fx_ratio": 1.3688434818884907
+        },
+        {
+          "iso2": "BT",
+          "country_name": "Bhutan",
+          "gdp_usd": 3579320145.13077,
+          "gdp_year": 2025,
+          "weight": 0.0006855772250050597,
+          "cpi_ratio": 1.2829757834850877,
+          "fx_ratio": 1.1881408261327744
+        },
+        {
+          "iso2": "BN",
+          "country_name": "Brunei Darussalam",
+          "gdp_usd": 15031980994.1121,
+          "gdp_year": 2025,
+          "weight": 0.0028792014679915306,
+          "cpi_ratio": 1.0749065136946936,
+          "fx_ratio": 0.9793396459165934
+        },
+        {
+          "iso2": "KH",
+          "country_name": "Cambodia",
+          "gdp_usd": 51267065842.9641,
+          "gdp_year": 2025,
+          "weight": 0.009819611353453519,
+          "cpi_ratio": 1.1490385789567616,
+          "fx_ratio": 1.002769727529054
+        },
+        {
+          "iso2": "HK",
+          "country_name": "Hong Kong",
+          "gdp_usd": 427310315921.993,
+          "gdp_year": 2025,
+          "weight": 0.08184633079115984,
+          "cpi_ratio": 1.0774636105069468,
+          "fx_ratio": 0.9959056055981541
+        },
+        {
+          "iso2": "MO",
+          "country_name": "Macao",
+          "gdp_usd": 52061007670.169,
+          "gdp_year": 2025,
+          "weight": 0.009971681694367573,
+          "cpi_ratio": 1.030657484277695,
+          "fx_ratio": 0.9958317691604183
+        },
+        {
+          "iso2": "FJ",
+          "country_name": "Fiji",
+          "gdp_usd": 6198013062.06553,
+          "gdp_year": 2025,
+          "weight": 0.0011871574554225166,
+          "cpi_ratio": 1.132677723143594,
+          "fx_ratio": 1.0499478006666598
+        },
+        {
+          "iso2": "GE",
+          "country_name": "Georgia",
+          "gdp_usd": 38143612855.1367,
+          "gdp_year": 2025,
+          "weight": 0.007305966270847934,
+          "cpi_ratio": 1.3365746310099749,
+          "fx_ratio": 0.9653927199156431
+        },
+        {
+          "iso2": "KZ",
+          "country_name": "Kazakhstan",
+          "gdp_usd": 306239209650.024,
+          "gdp_year": 2025,
+          "weight": 0.05865656577973848,
+          "cpi_ratio": 1.6509530852544507,
+          "fx_ratio": 1.2252535471965083
+        },
+        {
+          "iso2": "KI",
+          "country_name": "Kiribati",
+          "gdp_usd": 349227254.158833,
+          "gdp_year": 2025,
+          "weight": 6.68904266996218e-05,
+          "cpi_ratio": 1.2344788163941343,
+          "fx_ratio": 1.0534245010224415
+        },
+        {
+          "iso2": "KG",
+          "country_name": "Kyrgyz Republic",
+          "gdp_usd": 22623752095.4613,
+          "gdp_year": 2025,
+          "weight": 0.004333317097077409,
+          "cpi_ratio": 1.5762816466368925,
+          "fx_ratio": 1.2487623636506122
+        },
+        {
+          "iso2": "LA",
+          "country_name": "Laos",
+          "gdp_usd": 18302970218.5902,
+          "gdp_year": 2025,
+          "weight": 0.003505721484254903,
+          "cpi_ratio": 2.1666120271316176,
+          "fx_ratio": 2.323583456430792
+        },
+        {
+          "iso2": "MY",
+          "country_name": "Malaysia",
+          "gdp_usd": 472193128644.597,
+          "gdp_year": 2025,
+          "weight": 0.09044311256790154,
+          "cpi_ratio": 1.0930854712580589,
+          "fx_ratio": 1.1047583211650045
+        },
+        {
+          "iso2": "MV",
+          "country_name": "Maldives",
+          "gdp_usd": 7741066860.6337,
+          "gdp_year": 2025,
+          "weight": 0.001482711498749712,
+          "cpi_ratio": 1.0589700127809905,
+          "fx_ratio": 1.0004651142291485
+        },
+        {
+          "iso2": "MN",
+          "country_name": "Mongolia",
+          "gdp_usd": 25369107325.4549,
+          "gdp_year": 2025,
+          "weight": 0.0048591580232635115,
+          "cpi_ratio": 1.5026654162266115,
+          "fx_ratio": 1.27273468417268
+        },
+        {
+          "iso2": "NP",
+          "country_name": "Nepal",
+          "gdp_usd": 45489810283.1132,
+          "gdp_year": 2025,
+          "weight": 0.008713045113421662,
+          "cpi_ratio": 1.320744951837249,
+          "fx_ratio": 1.1875256065431607
+        },
+        {
+          "iso2": "NZ",
+          "country_name": "New Zealand",
+          "gdp_usd": 264057413739.965,
+          "gdp_year": 2025,
+          "weight": 0.050577132420001544,
+          "cpi_ratio": 1.2330354986718146,
+          "fx_ratio": 1.088566801174886
+        },
+        {
+          "iso2": "PK",
+          "country_name": "Pakistan",
+          "gdp_usd": 407307214476.222,
+          "gdp_year": 2025,
+          "weight": 0.07801496890548383,
+          "cpi_ratio": 2.121561191612338,
+          "fx_ratio": 1.8567560108831862
+        },
+        {
+          "iso2": "PW",
+          "country_name": "Palau",
+          "gdp_usd": 345000000.0,
+          "gdp_year": 2025,
+          "weight": 6.608074523551851e-05,
+          "cpi_ratio": 1.3326060606060581,
+          "fx_ratio": 1.0
+        },
+        {
+          "iso2": "PG",
+          "country_name": "Papua New Guinea",
+          "gdp_usd": 32498658653.8415,
+          "gdp_year": 2025,
+          "weight": 0.006224740820291534,
+          "cpi_ratio": 1.1869166727067495,
+          "fx_ratio": 1.1373306013131226
+        },
+        {
+          "iso2": "PH",
+          "country_name": "Philippines",
+          "gdp_usd": 487086123720.417,
+          "gdp_year": 2025,
+          "weight": 0.09329569289659456,
+          "cpi_ratio": 1.2317460317460283,
+          "fx_ratio": 1.1060872553116317
+        },
+        {
+          "iso2": "WS",
+          "country_name": "Samoa",
+          "gdp_usd": 1287936621.64619,
+          "gdp_year": 2025,
+          "weight": 0.00024668930949129356,
+          "cpi_ratio": 1.2420726689343238,
+          "fx_ratio": 1.0396882885036494
+        },
+        {
+          "iso2": "SG",
+          "country_name": "Singapore",
+          "gdp_usd": 603869516998.738,
+          "gdp_year": 2025,
+          "weight": 0.11566419625591079,
+          "cpi_ratio": 1.1635751173754456,
+          "fx_ratio": 0.9795295023182793
+        },
+        {
+          "iso2": "SB",
+          "country_name": "Solomon Islands",
+          "gdp_usd": 1749572442.95016,
+          "gdp_year": 2025,
+          "weight": 0.00033511029238745876,
+          "cpi_ratio": 1.1987321711568928,
+          "fx_ratio": 1.0344332013749344
+        },
+        {
+          "iso2": "LK",
+          "country_name": "Sri Lanka",
+          "gdp_usd": 108825231671.196,
+          "gdp_year": 2025,
+          "weight": 0.020844209881914735,
+          "cpi_ratio": 1.9736657653676073,
+          "fx_ratio": null
+        },
+        {
+          "iso2": "TH",
+          "country_name": "Thailand",
+          "gdp_usd": 577009981112.015,
+          "gdp_year": 2025,
+          "weight": 0.11051956394265047,
+          "cpi_ratio": 1.0821118057052594,
+          "fx_ratio": 1.136755546636002
+        },
+        {
+          "iso2": "TL",
+          "country_name": "Timor-Leste",
+          "gdp_usd": 1902180257.82737,
+          "gdp_year": 2025,
+          "weight": 0.00036434054785369085,
+          "cpi_ratio": 1.2339582128995004,
+          "fx_ratio": 1.0
+        },
+        {
+          "iso2": "TO",
+          "country_name": "Tonga",
+          "gdp_usd": 679218218.578017,
+          "gdp_year": 2025,
+          "weight": 0.00013009636539471498,
+          "cpi_ratio": 1.2819333728838644,
+          "fx_ratio": 1.0364955091443229
+        },
+        {
+          "iso2": "UZ",
+          "country_name": "Uzbekistan",
+          "gdp_usd": 147038081129.405,
+          "gdp_year": 2025,
+          "weight": 0.02816343762038178,
+          "cpi_ratio": 1.6807892745328203,
+          "fx_ratio": 1.431774479240776
+        },
+        {
+          "iso2": "VU",
+          "country_name": "Vanuatu",
+          "gdp_usd": 1353658840.63993,
+          "gdp_year": 2025,
+          "weight": 0.00025927763763517267,
+          "cpi_ratio": 1.293192894199026,
+          "fx_ratio": 1.0386333427755867
+        },
+        {
+          "iso2": "VN",
+          "country_name": "Vietnam",
+          "gdp_usd": 514697215165.065,
+          "gdp_year": 2025,
+          "weight": 0.09858427695290874,
+          "cpi_ratio": 1.1601407099552115,
+          "fx_ratio": 1.0483571574990689
+        }
+      ],
+      "excluded_no_cpi": [
+        {
+          "iso2": "PF",
+          "country_name": "French Polynesia",
+          "gdp_usd": 6323716355.05009,
+          "gdp_year": 2024,
+          "reason": "no CPI for 2019+2024"
+        },
+        {
+          "iso2": "MH",
+          "country_name": "Marshall Islands",
+          "gdp_usd": 308000000.0,
+          "gdp_year": 2025,
+          "reason": "no CPI for 2019+2024"
+        },
+        {
+          "iso2": "FM",
+          "country_name": "Micronesia, Fed. Sts.",
+          "gdp_usd": 501797600.0,
+          "gdp_year": 2025,
+          "reason": "no CPI for 2024"
+        },
+        {
+          "iso2": "MM",
+          "country_name": "Myanmar",
+          "gdp_usd": 81665773809.5238,
+          "gdp_year": 2025,
+          "reason": "no CPI for 2024"
+        },
+        {
+          "iso2": "NR",
+          "country_name": "Nauru",
+          "gdp_usd": 176040043.932346,
+          "gdp_year": 2025,
+          "reason": "no CPI for 2019+2024"
+        },
+        {
+          "iso2": "NC",
+          "country_name": "New Caledonia",
+          "gdp_usd": 8548919387.12607,
+          "gdp_year": 2024,
+          "reason": "no CPI for 2019+2024"
+        },
+        {
+          "iso2": "TJ",
+          "country_name": "Tajikistan",
+          "gdp_usd": 17660626562.4832,
+          "gdp_year": 2025,
+          "reason": "no CPI for 2019+2024"
+        },
+        {
+          "iso2": "TM",
+          "country_name": "Turkmenistan",
+          "gdp_usd": 49828621355.6516,
+          "gdp_year": 2025,
+          "reason": "no CPI for 2019+2024"
+        },
+        {
+          "iso2": "TV",
+          "country_name": "Tuvalu",
+          "gdp_usd": 57345434.7234984,
+          "gdp_year": 2025,
+          "reason": "no CPI for 2019+2024"
+        }
+      ],
+      "unmeasured_no_gdp": [
+        {
+          "iso2": "CK",
+          "country_name": "Cook Islands",
+          "gdp_usd": null,
+          "gdp_year": null,
+          "reason": "no GDP for 2025 or 2024 (also no CPI for 2019+2024)"
+        },
+        {
+          "iso2": "KP",
+          "country_name": "North Korea",
+          "gdp_usd": null,
+          "gdp_year": null,
+          "reason": "no GDP for 2025 or 2024 (also no CPI for 2019+2024)"
+        }
+      ]
+    },
+    "WE": {
+      "kind": "row_composite",
+      "members_total": 14,
+      "members_weighted": 9,
+      "members_excluded_no_cpi": 4,
+      "members_unmeasured": 1,
+      "gdp_coverage_pct": 90.4,
+      "gdp_coverage_pct_note": "Share of MEASURABLE GDP, not of the bucket. The denominator counts only members with a GDP figure for 2025 or 2024; members in unmeasured_no_gdp are absent from both the numerator and the denominator and cannot move this number in either direction, however large their economy. Read it together with members_unmeasured: 100.0% means every member we can measure is covered, not that every member is.",
+      "gdp_used_usd": 537848771045.76794,
+      "gdp_measurable_usd": 594981289822.6555,
+      "weight_basis": "GDP in current USD, 2025 where published, else 2024; per-member year recorded below",
+      "cpi_ratio": 1.4870980487398988,
+      "fx_ratio": 1.3249952681417296,
+      "fx_ratio_weight_share": 1.0,
+      "ratio_definition": "CPI(2024)/CPI(2019) and FX(2024)/FX(2019), GDP-weighted across members. RATIOS are weighted, never levels.",
+      "members": [
+        {
+          "iso2": "AL",
+          "country_name": "Albania",
+          "gdp_usd": 30540188271.3421,
+          "gdp_year": 2025,
+          "weight": 0.05678211035410788,
+          "cpi_ratio": 1.185041768068208,
+          "fx_ratio": 0.8477253244930649
+        },
+        {
+          "iso2": "BY",
+          "country_name": "Belarus",
+          "gdp_usd": 93397215864.198,
+          "gdp_year": 2025,
+          "weight": 0.17364958496158842,
+          "cpi_ratio": 1.4784726638936718,
+          "fx_ratio": 1.5518775845172021
+        },
+        {
+          "iso2": "IS",
+          "country_name": "Iceland",
+          "gdp_usd": 38582528789.0033,
+          "gdp_year": 2025,
+          "weight": 0.07173490182748812,
+          "cpi_ratio": 1.339174185796295,
+          "fx_ratio": 1.125207212662582
+        },
+        {
+          "iso2": "XK",
+          "country_name": "Kosovo",
+          "gdp_usd": 12456403306.8191,
+          "gdp_year": 2025,
+          "weight": 0.023159676060241715,
+          "cpi_ratio": 1.2322821935897117,
+          "fx_ratio": 1.0348760886363528
+        },
+        {
+          "iso2": "ME",
+          "country_name": "Montenegro",
+          "gdp_usd": 9232801464.79257,
+          "gdp_year": 2025,
+          "weight": 0.017166166331180312,
+          "cpi_ratio": 1.295660066017964,
+          "fx_ratio": 1.0348760886363528
+        },
+        {
+          "iso2": "MD",
+          "country_name": "Moldova",
+          "gdp_usd": 20351796275.2943,
+          "gdp_year": 2025,
+          "weight": 0.03783925402622604,
+          "cpi_ratio": 1.666944210154935,
+          "fx_ratio": 1.0124300343514456
+        },
+        {
+          "iso2": "RS",
+          "country_name": "Serbia",
+          "gdp_usd": 99953324472.9042,
+          "gdp_year": 2025,
+          "weight": 0.1858390868469582,
+          "cpi_ratio": 1.3925351756677027,
+          "fx_ratio": 1.028106372892941
+        },
+        {
+          "iso2": "MK",
+          "country_name": "Macedonia",
+          "gdp_usd": 19101199817.0174,
+          "gdp_year": 2025,
+          "weight": 0.0355140716969157,
+          "cpi_ratio": 1.350321513871028,
+          "fx_ratio": 1.035041518645778
+        },
+        {
+          "iso2": "UA",
+          "country_name": "Ukraine",
+          "gdp_usd": 214233312784.397,
+          "gdp_year": 2025,
+          "weight": 0.39831514789529365,
+          "cpi_ratio": 1.6228546866844762,
+          "fx_ratio": 1.5535371315064377
+        }
+      ],
+      "excluded_no_cpi": [
+        {
+          "iso2": "AD",
+          "country_name": "Andorra",
+          "gdp_usd": 4500982731.80784,
+          "gdp_year": 2025,
+          "reason": "no CPI for 2019+2024"
+        },
+        {
+          "iso2": "BA",
+          "country_name": "Bosnia and Herzegovina",
+          "gdp_usd": 32599982936.3931,
+          "gdp_year": 2025,
+          "reason": "no CPI for 2024"
+        },
+        {
+          "iso2": "LI",
+          "country_name": "Liechtenstein",
+          "gdp_usd": 8905764270.4054,
+          "gdp_year": 2024,
+          "reason": "no CPI for 2019+2024"
+        },
+        {
+          "iso2": "MC",
+          "country_name": "Monaco",
+          "gdp_usd": 11125788838.2812,
+          "gdp_year": 2024,
+          "reason": "no CPI for 2019+2024"
+        }
+      ],
+      "unmeasured_no_gdp": [
+        {
+          "iso2": "SM",
+          "country_name": "San Marino",
+          "gdp_usd": null,
+          "gdp_year": null,
+          "reason": "no GDP for 2025 or 2024"
+        }
+      ]
+    },
+    "WF": {
+      "kind": "row_composite",
+      "members_total": 52,
+      "members_weighted": 45,
+      "members_excluded_no_cpi": 5,
+      "members_unmeasured": 2,
+      "gdp_coverage_pct": 90.6,
+      "gdp_coverage_pct_note": "Share of MEASURABLE GDP, not of the bucket. The denominator counts only members with a GDP figure for 2025 or 2024; members in unmeasured_no_gdp are absent from both the numerator and the denominator and cannot move this number in either direction, however large their economy. Read it together with members_unmeasured: 100.0% means every member we can measure is covered, not that every member is.",
+      "gdp_used_usd": 2133179717269.8782,
+      "gdp_measurable_usd": 2353744406680.012,
+      "weight_basis": "GDP in current USD, 2025 where published, else 2024; per-member year recorded below",
+      "cpi_ratio": 1.760409895976646,
+      "fx_ratio": 1.9672218155733499,
+      "fx_ratio_weight_share": 0.970744,
+      "ratio_definition": "CPI(2024)/CPI(2019) and FX(2024)/FX(2019), GDP-weighted across members. RATIOS are weighted, never levels.",
+      "members": [
+        {
+          "iso2": "DZ",
+          "country_name": "Algeria",
+          "gdp_usd": 287031225987.736,
+          "gdp_year": 2025,
+          "weight": 0.1345555761964065,
+          "cpi_ratio": 1.3648399612027102,
+          "fx_ratio": 1.1231608302140472
+        },
+        {
+          "iso2": "AO",
+          "country_name": "Angola",
+          "gdp_usd": 122174889423.635,
+          "gdp_year": 2025,
+          "weight": 0.05727360354803997,
+          "cpi_ratio": 2.7194370148160494,
+          "fx_ratio": 2.3842781341511152
+        },
+        {
+          "iso2": "BJ",
+          "country_name": "Benin",
+          "gdp_usd": 24566420903.5337,
+          "gdp_year": 2025,
+          "weight": 0.011516339061658953,
+          "cpi_ratio": 1.1040052744354631,
+          "fx_ratio": 1.0348057949115659
+        },
+        {
+          "iso2": "BW",
+          "country_name": "Botswana",
+          "gdp_usd": 19928479839.4476,
+          "gdp_year": 2025,
+          "weight": 0.009342147629714389,
+          "cpi_ratio": 1.318113010602453,
+          "fx_ratio": 1.2609986487994078
+        },
+        {
+          "iso2": "BF",
+          "country_name": "Burkina Faso",
+          "gdp_usd": 27627297461.3181,
+          "gdp_year": 2025,
+          "weight": 0.012951228270947808,
+          "cpi_ratio": 1.266907877266215,
+          "fx_ratio": 1.034876088636353
+        },
+        {
+          "iso2": "BI",
+          "country_name": "Burundi",
+          "gdp_usd": 3364713864.08488,
+          "gdp_year": 2025,
+          "weight": 0.0015773232029372398,
+          "cpi_ratio": 2.10914010823812,
+          "fx_ratio": 1.5632909152454775
+        },
+        {
+          "iso2": "CV",
+          "country_name": "Cabo Verde",
+          "gdp_usd": 3056630435.32463,
+          "gdp_year": 2025,
+          "weight": 0.0014328986960538974,
+          "cpi_ratio": 1.1592872205415408,
+          "fx_ratio": 1.0347918777287486
+        },
+        {
+          "iso2": "CM",
+          "country_name": "Cameroon",
+          "gdp_usd": 58933453923.761,
+          "gdp_year": 2025,
+          "weight": 0.02762704588209108,
+          "cpi_ratio": 1.24946621485316,
+          "fx_ratio": 1.034876088636353
+        },
+        {
+          "iso2": "CF",
+          "country_name": "Central African Republic",
+          "gdp_usd": 3066109226.40165,
+          "gdp_year": 2025,
+          "weight": 0.0014373421993369453,
+          "cpi_ratio": 1.1700175957439995,
+          "fx_ratio": 1.034876088636353
+        },
+        {
+          "iso2": "TD",
+          "country_name": "Chad",
+          "gdp_usd": 21472835225.4338,
+          "gdp_year": 2025,
+          "weight": 0.010066116348094442,
+          "cpi_ratio": 1.3235564472610515,
+          "fx_ratio": 1.034876088636353
+        },
+        {
+          "iso2": "KM",
+          "country_name": "Comoros",
+          "gdp_usd": 1814920856.27026,
+          "gdp_year": 2025,
+          "weight": 0.0008508054157729675,
+          "cpi_ratio": 1.291183673469387,
+          "fx_ratio": 1.0342707967529543
+        },
+        {
+          "iso2": "CG",
+          "country_name": "Congo Republic",
+          "gdp_usd": 16306633778.765,
+          "gdp_year": 2025,
+          "weight": 0.007644285029877759,
+          "cpi_ratio": 1.147229509638726,
+          "fx_ratio": 1.034876088636353
+        },
+        {
+          "iso2": "CI",
+          "country_name": "Cote d'Ivoire",
+          "gdp_usd": 99773555666.1988,
+          "gdp_year": 2025,
+          "weight": 0.04677222217070987,
+          "cpi_ratio": 1.212026410062849,
+          "fx_ratio": 1.034876088636353
+        },
+        {
+          "iso2": "DJ",
+          "country_name": "Djibouti",
+          "gdp_usd": 4624533092.31886,
+          "gdp_year": 2025,
+          "weight": 0.0021679059925797097,
+          "cpi_ratio": 1.1219731598518183,
+          "fx_ratio": 1.0
+        },
+        {
+          "iso2": "GQ",
+          "country_name": "Equatorial Guinea",
+          "gdp_usd": 12823210425.9217,
+          "gdp_year": 2025,
+          "weight": 0.006011312746932226,
+          "cpi_ratio": 1.1610679941659,
+          "fx_ratio": 1.034876088636353
+        },
+        {
+          "iso2": "ET",
+          "country_name": "Ethiopia",
+          "gdp_usd": 126358758448.356,
+          "gdp_year": 2025,
+          "weight": 0.059234933383894434,
+          "cpi_ratio": 3.2215580043546064,
+          "fx_ratio": 2.8414876753489935
+        },
+        {
+          "iso2": "GA",
+          "country_name": "Gabon",
+          "gdp_usd": 21427119323.2764,
+          "gdp_year": 2025,
+          "weight": 0.010044685475773986,
+          "cpi_ratio": 1.1196310842113002,
+          "fx_ratio": 1.034876088636353
+        },
+        {
+          "iso2": "GM",
+          "country_name": "Gambia",
+          "gdp_usd": 2593673987.53306,
+          "gdp_year": 2025,
+          "weight": 0.0012158722336121494,
+          "cpi_ratio": 1.6551496568243733,
+          "fx_ratio": 1.351536388932338
+        },
+        {
+          "iso2": "GH",
+          "country_name": "Ghana",
+          "gdp_usd": 114209905278.717,
+          "gdp_year": 2025,
+          "weight": 0.05353974836442146,
+          "cpi_ratio": 2.691098769388705,
+          "fx_ratio": 2.7182183221420817
+        },
+        {
+          "iso2": "GN",
+          "country_name": "Guinea",
+          "gdp_usd": 28346024753.2924,
+          "gdp_year": 2025,
+          "weight": 0.013288155950390661,
+          "cpi_ratio": 1.6039166666666664,
+          "fx_ratio": null
+        },
+        {
+          "iso2": "GW",
+          "country_name": "Guinea-Bissau",
+          "gdp_usd": 2527930272.92988,
+          "gdp_year": 2025,
+          "weight": 0.001185052648149692,
+          "cpi_ratio": 1.257148830268183,
+          "fx_ratio": 1.034876088636353
+        },
+        {
+          "iso2": "KE",
+          "country_name": "Kenya",
+          "gdp_usd": 135941278878.815,
+          "gdp_year": 2025,
+          "weight": 0.06372706330285084,
+          "cpi_ratio": 1.3546832606397883,
+          "fx_ratio": 1.3219018230815096
+        },
+        {
+          "iso2": "LS",
+          "country_name": "Lesotho",
+          "gdp_usd": 2573572920.05159,
+          "gdp_year": 2025,
+          "weight": 0.0012064491796993755,
+          "cpi_ratio": 1.3600625972228326,
+          "fx_ratio": 1.26855729561016
+        },
+        {
+          "iso2": "LR",
+          "country_name": "Liberia",
+          "gdp_usd": 5245938900.0,
+          "gdp_year": 2025,
+          "weight": 0.002459210941079988,
+          "cpi_ratio": 1.6163664181108424,
+          "fx_ratio": 1.026159570873944
+        },
+        {
+          "iso2": "LY",
+          "country_name": "Libya",
+          "gdp_usd": 48098909613.6316,
+          "gdp_year": 2025,
+          "weight": 0.02254798750627085,
+          "cpi_ratio": 1.140258511979826,
+          "fx_ratio": 3.455865375835077
+        },
+        {
+          "iso2": "MG",
+          "country_name": "Madagascar",
+          "gdp_usd": 19620352035.7899,
+          "gdp_year": 2025,
+          "weight": 0.00919770232059995,
+          "cpi_ratio": 1.4100762745885171,
+          "fx_ratio": 1.2506971182745756
+        },
+        {
+          "iso2": "MW",
+          "country_name": "Malawi",
+          "gdp_usd": 14918276698.303,
+          "gdp_year": 2025,
+          "weight": 0.006993445783084774,
+          "cpi_ratio": 2.4453316517444152,
+          "fx_ratio": null
+        },
+        {
+          "iso2": "ML",
+          "country_name": "Mali",
+          "gdp_usd": 30069148580.7688,
+          "gdp_year": 2025,
+          "weight": 0.01409592841021965,
+          "cpi_ratio": 1.205240535625716,
+          "fx_ratio": 1.034876088636353
+        },
+        {
+          "iso2": "MR",
+          "country_name": "Mauritania",
+          "gdp_usd": 11679910946.4371,
+          "gdp_year": 2025,
+          "weight": 0.0054753525227520345,
+          "cpi_ratio": 1.2492542145358785,
+          "fx_ratio": null
+        },
+        {
+          "iso2": "MU",
+          "country_name": "Mauritius",
+          "gdp_usd": 16157804491.7614,
+          "gdp_year": 2025,
+          "weight": 0.007574516277719325,
+          "cpi_ratio": 1.311091153630538,
+          "fx_ratio": 1.308431736163738
+        },
+        {
+          "iso2": "MA",
+          "country_name": "Morocco",
+          "gdp_usd": 182374250612.28,
+          "gdp_year": 2025,
+          "weight": 0.08549408619246074,
+          "cpi_ratio": 1.1668853474673007,
+          "fx_ratio": 1.0338234941596447
+        },
+        {
+          "iso2": "MZ",
+          "country_name": "Mozambique",
+          "gdp_usd": 22337997046.1913,
+          "gdp_year": 2025,
+          "weight": 0.010471690155942553,
+          "cpi_ratio": 1.3539533932383685,
+          "fx_ratio": 1.0216898931492986
+        },
+        {
+          "iso2": "NA",
+          "country_name": "Namibia",
+          "gdp_usd": 15080340653.5276,
+          "gdp_year": 2025,
+          "weight": 0.007069418732720736,
+          "cpi_ratio": 1.2399500816219708,
+          "fx_ratio": 1.268534227309004
+        },
+        {
+          "iso2": "NE",
+          "country_name": "Niger",
+          "gdp_usd": 21646191388.2507,
+          "gdp_year": 2025,
+          "weight": 0.010147382901218607,
+          "cpi_ratio": 1.25960591133005,
+          "fx_ratio": 1.034876088636353
+        },
+        {
+          "iso2": "NG",
+          "country_name": "Nigeria",
+          "gdp_usd": 290794361542.112,
+          "gdp_year": 2025,
+          "weight": 0.13631967301577447,
+          "cpi_ratio": 2.6144976238974307,
+          "fx_ratio": 4.818716969940234
+        },
+        {
+          "iso2": "RW",
+          "country_name": "Rwanda",
+          "gdp_usd": 16372132990.2271,
+          "gdp_year": 2025,
+          "weight": 0.007674989996239397,
+          "cpi_ratio": 1.5699119564679553,
+          "fx_ratio": 1.4656447560128418
+        },
+        {
+          "iso2": "ST",
+          "country_name": "Sao Tome and Principe",
+          "gdp_usd": 981293586.906408,
+          "gdp_year": 2025,
+          "weight": 0.000460014493369693,
+          "cpi_ratio": 1.9431937357193059,
+          "fx_ratio": 1.0346482533205708
+        },
+        {
+          "iso2": "SN",
+          "country_name": "Senegal",
+          "gdp_usd": 37006536238.3731,
+          "gdp_year": 2025,
+          "weight": 0.017348063052903685,
+          "cpi_ratio": 1.2274553634743466,
+          "fx_ratio": 1.034876088636353
+        },
+        {
+          "iso2": "SC",
+          "country_name": "Seychelles",
+          "gdp_usd": 2387022853.48583,
+          "gdp_year": 2025,
+          "weight": 0.0011189975388200435,
+          "cpi_ratio": 1.1317789600751123,
+          "fx_ratio": 1.0353762094134857
+        },
+        {
+          "iso2": "SL",
+          "country_name": "Sierra Leone",
+          "gdp_usd": 7464157904.43509,
+          "gdp_year": 2025,
+          "weight": 0.0034990759775214786,
+          "cpi_ratio": 3.0662273806311324,
+          "fx_ratio": null
+        },
+        {
+          "iso2": "TG",
+          "country_name": "Togo",
+          "gdp_usd": 11889949067.4697,
+          "gdp_year": 2025,
+          "weight": 0.005573814982024531,
+          "cpi_ratio": 1.2413305310309872,
+          "fx_ratio": 1.034876088636353
+        },
+        {
+          "iso2": "TN",
+          "country_name": "Tunisia",
+          "gdp_usd": 57502836548.0878,
+          "gdp_year": 2025,
+          "weight": 0.026956395695380997,
+          "cpi_ratio": 1.417479349411383,
+          "fx_ratio": 1.0589608442288698
+        },
+        {
+          "iso2": "TZ",
+          "country_name": "Tanzania",
+          "gdp_usd": 90143496090.4411,
+          "gdp_year": 2025,
+          "weight": 0.04225780667266519,
+          "cpi_ratio": 1.1955430709033656,
+          "fx_ratio": 1.1353434348878741
+        },
+        {
+          "iso2": "UG",
+          "country_name": "Uganda",
+          "gdp_usd": 61985829288.1496,
+          "gdp_year": 2025,
+          "weight": 0.029057949870009706,
+          "cpi_ratio": 1.2320871640514381,
+          "fx_ratio": 1.0143662955578268
+        },
+        {
+          "iso2": "ZM",
+          "country_name": "Zambia",
+          "gdp_usd": 28879806220.1264,
+          "gdp_year": 2025,
+          "weight": 0.013538384031275075,
+          "cpi_ratio": 1.9984905550838563,
+          "fx_ratio": 2.0299781370044685
+        }
+      ],
+      "excluded_no_cpi": [
+        {
+          "iso2": "CD",
+          "country_name": "DR Congo",
+          "gdp_usd": 91030531316.9936,
+          "gdp_year": 2025,
+          "reason": "no CPI for 2019+2024"
+        },
+        {
+          "iso2": "SO",
+          "country_name": "Somalia",
+          "gdp_usd": 12995200000.2658,
+          "gdp_year": 2025,
+          "reason": "no CPI for 2019+2024"
+        },
+        {
+          "iso2": "SD",
+          "country_name": "Sudan",
+          "gdp_usd": 60162634574.4689,
+          "gdp_year": 2025,
+          "reason": "no CPI for 2024"
+        },
+        {
+          "iso2": "SZ",
+          "country_name": "Swaziland",
+          "gdp_usd": 5160679612.81734,
+          "gdp_year": 2025,
+          "reason": "no CPI for 2024"
+        },
+        {
+          "iso2": "ZW",
+          "country_name": "Zimbabwe",
+          "gdp_usd": 51215643905.5886,
+          "gdp_year": 2025,
+          "reason": "no CPI for 2024"
+        }
+      ],
+      "unmeasured_no_gdp": [
+        {
+          "iso2": "ER",
+          "country_name": "Eritrea",
+          "gdp_usd": null,
+          "gdp_year": null,
+          "reason": "no GDP for 2025 or 2024 (also no CPI for 2019+2024)"
+        },
+        {
+          "iso2": "SS",
+          "country_name": "South Sudan",
+          "gdp_usd": null,
+          "gdp_year": null,
+          "reason": "no GDP for 2025 or 2024"
+        }
+      ]
+    },
+    "WL": {
+      "kind": "row_composite",
+      "members_total": 42,
+      "members_weighted": 27,
+      "members_excluded_no_cpi": 10,
+      "members_unmeasured": 5,
+      "gdp_coverage_pct": 69.7,
+      "gdp_coverage_pct_note": "Share of MEASURABLE GDP, not of the bucket. The denominator counts only members with a GDP figure for 2025 or 2024; members in unmeasured_no_gdp are absent from both the numerator and the denominator and cannot move this number in either direction, however large their economy. Read it together with members_unmeasured: 100.0% means every member we can measure is covered, not that every member is.",
+      "gdp_used_usd": 2169894776482.154,
+      "gdp_measurable_usd": 3111527619339.5693,
+      "weight_basis": "GDP in current USD, 2025 where published, else 2024; per-member year recorded below",
+      "cpi_ratio": 1.3179242887461842,
+      "fx_ratio": 1.1584018377710483,
+      "fx_ratio_weight_share": 1.0,
+      "ratio_definition": "CPI(2024)/CPI(2019) and FX(2024)/FX(2019), GDP-weighted across members. RATIOS are weighted, never levels.",
+      "members": [
+        {
+          "iso2": "AG",
+          "country_name": "Antigua and Barbuda",
+          "gdp_usd": 2338196296.2963,
+          "gdp_year": 2025,
+          "weight": 0.0010775620650541394,
+          "cpi_ratio": 1.2322512536289212,
+          "fx_ratio": 1.0
+        },
+        {
+          "iso2": "BS",
+          "country_name": "Bahamas",
+          "gdp_usd": 15832800000.0,
+          "gdp_year": 2024,
+          "weight": 0.00729657500981141,
+          "cpi_ratio": 1.1249239208314363,
+          "fx_ratio": 1.0
+        },
+        {
+          "iso2": "BB",
+          "country_name": "Barbados",
+          "gdp_usd": 8016550000.0,
+          "gdp_year": 2025,
+          "weight": 0.0036944418166656346,
+          "cpi_ratio": 1.1155662331207055,
+          "fx_ratio": 1.0
+        },
+        {
+          "iso2": "BZ",
+          "country_name": "Belize",
+          "gdp_usd": 3326500000.0,
+          "gdp_year": 2025,
+          "weight": 0.0015330236452262174,
+          "cpi_ratio": 1.1844322222274082,
+          "fx_ratio": 1.0
+        },
+        {
+          "iso2": "BO",
+          "country_name": "Bolivia",
+          "gdp_usd": 64768947525.3256,
+          "gdp_year": 2025,
+          "weight": 0.029848888631516683,
+          "cpi_ratio": 1.1153911022936474,
+          "fx_ratio": 1.0
+        },
+        {
+          "iso2": "CL",
+          "country_name": "Chile",
+          "gdp_usd": 357371159574.862,
+          "gdp_year": 2025,
+          "weight": 0.16469515639566365,
+          "cpi_ratio": 1.3492581619058783,
+          "fx_ratio": 1.3424037948281013
+        },
+        {
+          "iso2": "CO",
+          "country_name": "Colombia",
+          "gdp_usd": 457410034202.523,
+          "gdp_year": 2025,
+          "weight": 0.21079825582329795,
+          "cpi_ratio": 1.3926280476929291,
+          "fx_ratio": 1.241591483121469
+        },
+        {
+          "iso2": "CR",
+          "country_name": "Costa Rica",
+          "gdp_usd": 102904921157.478,
+          "gdp_year": 2025,
+          "weight": 0.04742392224396615,
+          "cpi_ratio": 1.110647898086369,
+          "fx_ratio": 0.8770892422730554
+        },
+        {
+          "iso2": "DM",
+          "country_name": "Dominica",
+          "gdp_usd": 723859259.259259,
+          "gdp_year": 2025,
+          "weight": 0.00033359187141451335,
+          "cpi_ratio": 1.149382166546714,
+          "fx_ratio": 1.0
+        },
+        {
+          "iso2": "DO",
+          "country_name": "Dominican Republic",
+          "gdp_usd": 127407463759.043,
+          "gdp_year": 2025,
+          "weight": 0.058715964082644005,
+          "cpi_ratio": 1.3231295119581388,
+          "fx_ratio": 1.1612300972985758
+        },
+        {
+          "iso2": "EC",
+          "country_name": "Ecuador",
+          "gdp_usd": 130320560400.0,
+          "gdp_year": 2025,
+          "weight": 0.06005847002925941,
+          "cpi_ratio": 1.0717377535713164,
+          "fx_ratio": 1.0
+        },
+        {
+          "iso2": "SV",
+          "country_name": "El Salvador",
+          "gdp_usd": 36708110000.0,
+          "gdp_year": 2025,
+          "weight": 0.01691700003053208,
+          "cpi_ratio": 1.1595503486619945,
+          "fx_ratio": 1.0
+        },
+        {
+          "iso2": "GD",
+          "country_name": "Grenada",
+          "gdp_usd": 1420173228.56948,
+          "gdp_year": 2025,
+          "weight": 0.0006544894452770991,
+          "cpi_ratio": 1.0699069314573022,
+          "fx_ratio": 1.0
+        },
+        {
+          "iso2": "GT",
+          "country_name": "Guatemala",
+          "gdp_usd": 123306008821.471,
+          "gdp_year": 2025,
+          "weight": 0.056825801028645,
+          "cpi_ratio": 1.2566654842753857,
+          "fx_ratio": 1.0080345057047193
+        },
+        {
+          "iso2": "GY",
+          "country_name": "Guyana",
+          "gdp_usd": 27097477218.2254,
+          "gdp_year": 2025,
+          "weight": 0.012487922231029094,
+          "cpi_ratio": 1.1909611875836075,
+          "fx_ratio": 1.0
+        },
+        {
+          "iso2": "HT",
+          "country_name": "Haiti",
+          "gdp_usd": 32077278409.2339,
+          "gdp_year": 2025,
+          "weight": 0.014782872771940476,
+          "cpi_ratio": 3.3388256034716597,
+          "fx_ratio": 1.484107885647332
+        },
+        {
+          "iso2": "HN",
+          "country_name": "Honduras",
+          "gdp_usd": 39601409103.3005,
+          "gdp_year": 2025,
+          "weight": 0.018250382245494193,
+          "cpi_ratio": 1.3158318650893555,
+          "fx_ratio": 1.0118629481614194
+        },
+        {
+          "iso2": "JM",
+          "country_name": "Jamaica",
+          "gdp_usd": 22704903217.5631,
+          "gdp_year": 2025,
+          "weight": 0.01046359642119256,
+          "cpi_ratio": 1.3796666666666633,
+          "fx_ratio": 1.173483266680285
+        },
+        {
+          "iso2": "NI",
+          "country_name": "Nicaragua",
+          "gdp_usd": 22237167113.0916,
+          "gdp_year": 2025,
+          "weight": 0.010248039376887492,
+          "cpi_ratio": 1.3628377068777298,
+          "fx_ratio": 1.1057478918053012
+        },
+        {
+          "iso2": "PA",
+          "country_name": "Panama",
+          "gdp_usd": 90462600000.0,
+          "gdp_year": 2025,
+          "weight": 0.041689855646668036,
+          "cpi_ratio": 1.0517018616895129,
+          "fx_ratio": 1.0
+        },
+        {
+          "iso2": "PY",
+          "country_name": "Paraguay",
+          "gdp_usd": 49278227554.3339,
+          "gdp_year": 2025,
+          "weight": 0.02270996183244611,
+          "cpi_ratio": 1.2717356687898147,
+          "fx_ratio": 1.2114379543503353
+        },
+        {
+          "iso2": "PE",
+          "country_name": "Peru",
+          "gdp_usd": 334854659181.893,
+          "gdp_year": 2025,
+          "weight": 0.15431838576281626,
+          "cpi_ratio": 1.2512436906348319,
+          "fx_ratio": 1.124423558051622
+        },
+        {
+          "iso2": "LC",
+          "country_name": "St. Lucia",
+          "gdp_usd": 2656444444.44444,
+          "gdp_year": 2025,
+          "weight": 0.001224227309653735,
+          "cpi_ratio": 1.1376557010539703,
+          "fx_ratio": 1.0
+        },
+        {
+          "iso2": "VC",
+          "country_name": "St. Vincent and the Grenadines",
+          "gdp_usd": 1255222222.22222,
+          "gdp_year": 2025,
+          "weight": 0.0005784714705185813,
+          "cpi_ratio": 1.1556120541389276,
+          "fx_ratio": 1.0
+        },
+        {
+          "iso2": "SR",
+          "country_name": "Suriname",
+          "gdp_usd": 4523657796.86421,
+          "gdp_year": 2025,
+          "weight": 0.0020847360184893344,
+          "cpi_ratio": 5.764991704195304,
+          "fx_ratio": 4.4489878877268305
+        },
+        {
+          "iso2": "TT",
+          "country_name": "Trinidad and Tobago",
+          "gdp_usd": 25942749718.4685,
+          "gdp_year": 2025,
+          "weight": 0.011955763938252819,
+          "cpi_ratio": 1.142835201965902,
+          "fx_ratio": 0.9993776679224068
+        },
+        {
+          "iso2": "UY",
+          "country_name": "Uruguay",
+          "gdp_usd": 85347696277.6859,
+          "gdp_year": 2025,
+          "weight": 0.039332642855637485,
+          "cpi_ratio": 1.4322375598737818,
+          "fx_ratio": 1.1406143744039028
+        }
+      ],
+      "excluded_no_cpi": [
+        {
+          "iso2": "AR",
+          "country_name": "Argentina",
+          "gdp_usd": 683097891618.597,
+          "gdp_year": 2025,
+          "reason": "no CPI for 2019+2024"
+        },
+        {
+          "iso2": "AW",
+          "country_name": "Aruba",
+          "gdp_usd": 4167588070.29217,
+          "gdp_year": 2024,
+          "reason": "no CPI for 2024"
+        },
+        {
+          "iso2": "BM",
+          "country_name": "Bermuda",
+          "gdp_usd": 9194499000.0,
+          "gdp_year": 2024,
+          "reason": "no CPI for 2019+2024"
+        },
+        {
+          "iso2": "KY",
+          "country_name": "Cayman Islands",
+          "gdp_usd": 7765336505.34319,
+          "gdp_year": 2024,
+          "reason": "no CPI for 2019+2024"
+        },
+        {
+          "iso2": "CW",
+          "country_name": "Curacao",
+          "gdp_usd": 3561178212.2905,
+          "gdp_year": 2024,
+          "reason": "no CPI for 2024"
+        },
+        {
+          "iso2": "PR",
+          "country_name": "Puerto Rico",
+          "gdp_usd": 129368484000.0,
+          "gdp_year": 2025,
+          "reason": "no CPI for 2019+2024"
+        },
+        {
+          "iso2": "KN",
+          "country_name": "St. Kitts and Nevis",
+          "gdp_usd": 1183514814.81481,
+          "gdp_year": 2025,
+          "reason": "no CPI for 2024"
+        },
+        {
+          "iso2": "SX",
+          "country_name": "Sint Maarten",
+          "gdp_usd": 1887728480.44693,
+          "gdp_year": 2025,
+          "reason": "no CPI for 2019+2024"
+        },
+        {
+          "iso2": "TC",
+          "country_name": "Turks and Caicos Islands",
+          "gdp_usd": 1745378000.0,
+          "gdp_year": 2024,
+          "reason": "no CPI for 2019+2024"
+        },
+        {
+          "iso2": "VE",
+          "country_name": "Venezuela",
+          "gdp_usd": 99661244155.6306,
+          "gdp_year": 2025,
+          "reason": "no CPI for 2019+2024"
+        }
+      ],
+      "unmeasured_no_gdp": [
+        {
+          "iso2": "AI",
+          "country_name": "Anguilla",
+          "gdp_usd": null,
+          "gdp_year": null,
+          "reason": "no GDP for 2025 or 2024 (also no CPI for 2019+2024)"
+        },
+        {
+          "iso2": "VG",
+          "country_name": "British Virgin Islands",
+          "gdp_usd": null,
+          "gdp_year": null,
+          "reason": "no GDP for 2025 or 2024 (also no CPI for 2019+2024)"
+        },
+        {
+          "iso2": "CU",
+          "country_name": "Cuba",
+          "gdp_usd": null,
+          "gdp_year": null,
+          "reason": "no GDP for 2025 or 2024 (also no CPI for 2019+2024)"
+        },
+        {
+          "iso2": "GL",
+          "country_name": "Greenland",
+          "gdp_usd": null,
+          "gdp_year": null,
+          "reason": "no GDP for 2025 or 2024 (also no CPI for 2019+2024)"
+        },
+        {
+          "iso2": "MS",
+          "country_name": "Montserrat",
+          "gdp_usd": null,
+          "gdp_year": null,
+          "reason": "no GDP for 2025 or 2024 (also no CPI for 2019+2024)"
+        }
+      ],
+      "bias_note": "DIRECTIONAL BIAS, NOT JUST A GAP. Argentina is 22.0% of this bucket's GDP and the World Bank publishes no CPI for it in ANY year from 2015 to 2025 - the series is empty, not sparse. Venezuela and Puerto Rico are likewise absent across the window. All three are among the region's highest-inflation economies, so their exclusion does not merely shrink the sample: it removes the upper tail and biases this composite's cpi_ratio DOWNWARD. The composite therefore understates Latin American price change by an amount that cannot be quantified from these files. Do not present it as a regional average without saying so."
+    },
+    "WM": {
+      "kind": "row_composite",
+      "members_total": 15,
+      "members_weighted": 13,
+      "members_excluded_no_cpi": 0,
+      "members_unmeasured": 2,
+      "gdp_coverage_pct": 100.0,
+      "gdp_coverage_pct_note": "Share of MEASURABLE GDP, not of the bucket. The denominator counts only members with a GDP figure for 2025 or 2024; members in unmeasured_no_gdp are absent from both the numerator and the denominator and cannot move this number in either direction, however large their economy. Read it together with members_unmeasured: 100.0% means every member we can measure is covered, not that every member is.",
+      "gdp_used_usd": 4058437678970.09,
+      "gdp_measurable_usd": 4058437678970.09,
+      "weight_basis": "GDP in current USD, 2025 where published, else 2024; per-member year recorded below",
+      "cpi_ratio": 1.9519751637060287,
+      "fx_ratio": 1.5946447424358343,
+      "fx_ratio_weight_share": 0.906405,
+      "ratio_definition": "CPI(2024)/CPI(2019) and FX(2024)/FX(2019), GDP-weighted across members. RATIOS are weighted, never levels.",
+      "members": [
+        {
+          "iso2": "BH",
+          "country_name": "Bahrain",
+          "gdp_usd": 48965725531.9149,
+          "gdp_year": 2025,
+          "weight": 0.012065166304177656,
+          "cpi_ratio": 1.016112740940347,
+          "fx_ratio": 1.0
+        },
+        {
+          "iso2": "EG",
+          "country_name": "Egypt",
+          "gdp_usd": 365254630179.737,
+          "gdp_year": 2025,
+          "weight": 0.08999882690632512,
+          "cpi_ratio": 2.1617940264268376,
+          "fx_ratio": 2.7011143933114
+        },
+        {
+          "iso2": "IR",
+          "country_name": "Iran",
+          "gdp_usd": 362682115433.364,
+          "gdp_year": 2025,
+          "weight": 0.08936495866690304,
+          "cpi_ratio": 5.145570675124421,
+          "fx_ratio": null
+        },
+        {
+          "iso2": "IQ",
+          "country_name": "Iraq",
+          "gdp_usd": 254367293538.462,
+          "gdp_year": 2025,
+          "weight": 0.06267616104013031,
+          "cpi_ratio": 1.1991003148897934,
+          "fx_ratio": 1.0998307952622672
+        },
+        {
+          "iso2": "IL",
+          "country_name": "Israel",
+          "gdp_usd": 610777842873.595,
+          "gdp_year": 2025,
+          "weight": 0.15049580434325954,
+          "cpi_ratio": 1.1317427385892123,
+          "fx_ratio": 1.037927133095648
+        },
+        {
+          "iso2": "JO",
+          "country_name": "Jordan",
+          "gdp_usd": 61610052535.2113,
+          "gdp_year": 2025,
+          "weight": 0.015180731455964132,
+          "cpi_ratio": 1.0987801919741123,
+          "fx_ratio": 1.0
+        },
+        {
+          "iso2": "KW",
+          "country_name": "Kuwait",
+          "gdp_usd": 157209026926.418,
+          "gdp_year": 2025,
+          "weight": 0.03873634126280657,
+          "cpi_ratio": 1.170984455958539,
+          "fx_ratio": 1.0101428601323472
+        },
+        {
+          "iso2": "LB",
+          "country_name": "Lebanon",
+          "gdp_usd": 25971643441.3408,
+          "gdp_year": 2024,
+          "weight": 0.00639941906116238,
+          "cpi_ratio": 59.61266540151305,
+          "fx_ratio": 59.3698175787728
+        },
+        {
+          "iso2": "OM",
+          "country_name": "Oman",
+          "gdp_usd": 109604780696.23,
+          "gdp_year": 2025,
+          "weight": 0.027006643779249658,
+          "cpi_ratio": 1.054159409471681,
+          "fx_ratio": 1.0
+        },
+        {
+          "iso2": "QA",
+          "country_name": "Qatar",
+          "gdp_usd": 215559615384.615,
+          "gdp_year": 2025,
+          "weight": 0.053113940002478384,
+          "cpi_ratio": 1.0922261185383,
+          "fx_ratio": 1.0
+        },
+        {
+          "iso2": "SA",
+          "country_name": "Saudi Arabia",
+          "gdp_usd": 1276942933333.33,
+          "gdp_year": 2025,
+          "weight": 0.3146390395373473,
+          "cpi_ratio": 1.1360105449107454,
+          "fx_ratio": 1.0
+        },
+        {
+          "iso2": "PS",
+          "country_name": "Palestine",
+          "gdp_usd": 17167100000.0,
+          "gdp_year": 2025,
+          "weight": 0.004229977483442963,
+          "cpi_ratio": 1.6961001881933688,
+          "fx_ratio": null
+        },
+        {
+          "iso2": "AE",
+          "country_name": "United Arab Emirates",
+          "gdp_usd": 552324919095.872,
+          "gdp_year": 2024,
+          "weight": 0.136092990156753,
+          "cpi_ratio": 1.067134895947224,
+          "fx_ratio": 1.0
+        }
+      ],
+      "excluded_no_cpi": [],
+      "unmeasured_no_gdp": [
+        {
+          "iso2": "SY",
+          "country_name": "Syria",
+          "gdp_usd": null,
+          "gdp_year": null,
+          "reason": "no GDP for 2025 or 2024 (also no CPI for 2024)"
+        },
+        {
+          "iso2": "YE",
+          "country_name": "Yemen",
+          "gdp_usd": null,
+          "gdp_year": null,
+          "reason": "no GDP for 2025 or 2024 (also no CPI for 2019+2024)"
+        }
+      ]
+    }
+  }
+}
