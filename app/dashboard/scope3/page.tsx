@@ -7,6 +7,7 @@ import { useEntitlementState } from '../../../lib/useEntitlement'
 import { EMISSION_FACTORS, GENERIC_SPEND_FACTOR } from '../../../lib/emissionFactors'
 import { SPEND_EF_SOURCES } from '../../../lib/emissionFactors/spend'
 import { scope3MethodFor, scope3MethodDescription, provenanceGap } from '../../../lib/scope3/categoryMethods'
+import { scope3Status, relevanceFromStored, coverageEntry, type Relevance, type Scope3Status, type Scope3CoverageEntry } from '../../../lib/scope3/categoryStatus'
 import { resolvePcafResult, assessAsset } from '../../../lib/pcaf/engine'
 import { INDUSTRY_OPTION_GROUPS, industryName } from '../../../lib/emissionFactors/industryOptions'
 import { matchCountries, countryByIso2 } from '../../../lib/emissionFactors/countryOptions'
@@ -263,8 +264,20 @@ interface WasteRow {
 }
 
 interface CategoryData {
-  included: boolean
+  /**
+   * Is this category relevant to the company? true / false / null = not yet answered.
+   *
+   * ⚠️ REPLACED `included: boolean` ON 17 SEP 2026. That one flag had to mean four things — relevant and
+   * calculated, relevant and not yet calculated, excluded, and never looked at — so the export said "not
+   * material" about a category nobody had reached. Whether a category is CALCULATED is derived from its
+   * data (isCalculated below), never stored.
+   */
+  relevant?: Relevance
+  /** Required when relevant === false: the exclusion's justification. */
   excluded_reason: string
+  /** ⚠️ RETIRED. Read once on restore to derive `relevant` (relevanceFromStored), then never again. A
+   *  saved record keeps it, because saves spread the stored object; nothing else reads it. */
+  included?: boolean
   // Cat 1
   total_spend?: number
   supplier_sector?: string
@@ -320,7 +333,6 @@ export default function Scope3Dashboard() {
   const [countryOpen, setCountryOpen] = useState(false)
   const [countryFocusIdx, setCountryFocusIdx] = useState(-1)
   const [countryHoverIdx, setCountryHoverIdx] = useState(-1)
-  const [materialCats, setMaterialCats] = useState<number[]>([])
   const [catData, setCatData] = useState<Record<string, CategoryData>>({})
   const [openInfo, setOpenInfo] = useState<Record<string, boolean>>({})
   const [dataConfirmed, setDataConfirmed] = useState(false)
@@ -413,7 +425,10 @@ export default function Scope3Dashboard() {
   //     current during the gap before the new request settles — including the debounce window, when
   //     no request has even been sent yet. The same comparison drives the loading state.
   const cat1Data = catData['cat1']
-  const cat1NeedsSpendPrice = !!cat1Data?.included && !(cat1Data.has_supplier_data && cat1Data.supplier_emissions)
+  // Priced whenever the inputs are there, whatever the relevance answer: an excluded Cat 1 still needs its
+  // figure, because that figure is what justifies excluding it. An unanswered category with no spend
+  // entered asks for nothing, so this costs no request.
+  const cat1NeedsSpendPrice = !(cat1Data?.has_supplier_data && cat1Data.supplier_emissions)
   const cat1Sector = cat1Data?.supplier_sector || sector
   const cat1SpendRaw = cat1Data?.total_spend || 0
   const [cat1SpendDebounced, setCat1SpendDebounced] = useState(0)
@@ -539,10 +554,14 @@ export default function Scope3Dashboard() {
         setCountryQuery(countryByIso2(s3.country_iso2)?.display_name ?? s3.country_iso2)
       }
       if (s3.revenue_millions != null) setRevenue(s3.revenue_millions * 1_000_000) // overrides ghg-derived revenue (user may have edited it)
-      if (s3.cat_data) setCatData(s3.cat_data as Record<string, CategoryData>)
-      setMaterialCats(
-        CATEGORIES.filter(c => (s3.cat_data as any)?.[c.id]?.included).map(c => c.num)
-      )
+      if (s3.cat_data) {
+        // ⚠️ MAPPED ON READ, NOT MIGRATED IN PLACE. A record saved before 17 Sep 2026 carries `included`
+        // and no `relevant`; relevanceFromStored maps true -> true, false -> false (the exclusion the
+        // page always displayed it as) and a record with neither to null, not evaluated. The stored
+        // `included` is left exactly as it was, so nothing is rewritten by opening an inventory.
+        const stored = s3.cat_data as Record<string, CategoryData>
+        setCatData(Object.fromEntries(Object.entries(stored).map(([id, d]) => [id, { ...d, relevant: relevanceFromStored(d) }])))
+      }
       setSaved(true) // it IS saved
       // null when the row predates total_scope3_tco2e being written; then there is nothing to match.
       setSavedTotal(s3.total_scope3_tco2e == null ? null : Number(s3.total_scope3_tco2e))
@@ -607,30 +626,65 @@ export default function Scope3Dashboard() {
     // suggest one generic set of material categories to every company while looking tailored, so
     // an unmatched sector suggests nothing and says so.
     const suggested = SECTOR_MATERIAL[sector]
-    if (!suggested) {
-      setMaterialCats([])
-      return
-    }
-    setMaterialCats(suggested)
-    // Initialise category data
+    if (!suggested) return
+    // ⚠️ THE SUGGESTION ANSWERS "RELEVANT?", AND ONLY THAT. A category the sector table does not suggest
+    // is left UNANSWERED (null) rather than marked not relevant: the table is a prompt, and an exclusion
+    // is the customer's judgement, which they have not made yet and which needs a reason.
     const init: Record<string, CategoryData> = {}
     CATEGORIES.forEach(c => {
-      init[c.id] = { included: suggested.includes(c.num), excluded_reason: '' }
+      init[c.id] = { ...catData[c.id], relevant: suggested.includes(c.num) ? true : (catData[c.id]?.relevant ?? null), excluded_reason: catData[c.id]?.excluded_reason ?? '' }
     })
     setCatData(init)
   }
 
-  const toggleCat = (num: number) => {
-    setMaterialCats(prev =>
-      prev.includes(num) ? prev.filter(n => n !== num) : [...prev, num]
-    )
-    const cat = CATEGORIES.find(c => c.num === num)
-    if (!cat) return
+  /**
+   * Answer — or un-answer — the relevance question for one category.
+   *
+   * ⚠️ THREE STATES, AND THE THIRD IS NOT A SHRUG. A checkbox had two, so "not yet answered" and "judged
+   * not relevant" were the same box left alone, and the export reported both as "not material". Pressing
+   * the option a category already holds clears it back to unanswered — the only way to take an answer
+   * back without asserting its opposite.
+   *
+   * The exclusion's reason is NOT cleared when relevance changes: a customer who flips to relevant and
+   * back has not withdrawn what they wrote, and losing it silently would cost them the justification the
+   * report needs.
+   */
+  const setRelevance = (id: string, next: Relevance) => {
     setCatData(prev => ({
       ...prev,
-      [cat.id]: { ...prev[cat.id], included: !prev[cat.id]?.included }
+      [id]: {
+        ...prev[id],
+        excluded_reason: prev[id]?.excluded_reason ?? '',
+        relevant: (prev[id]?.relevant ?? null) === next ? null : next,
+      },
     }))
   }
+
+  /**
+   * What the saved total is a total OF, written with it.
+   *
+   * ⚠️ ONE ENTRY PER CATEGORY, INCLUDING THE ONES NOBODY ANSWERED. A map of only the answered categories
+   * would make "not evaluated" indistinguishable from "this record predates the column", which is the
+   * distinction the whole record exists to preserve (see 20260917_scope3_coverage.sql). Fifteen entries
+   * say the question was asked of all fifteen.
+   *
+   * `mt` is null wherever nothing was calculated — not 0, which would claim the category emits nothing.
+   * `in_total` is the status's own inTotal, further narrowed by the unpriced set, so it matches the figure
+   * that was actually summed rather than the one that would have been.
+   */
+  const scope3Coverage = (): Record<string, Scope3CoverageEntry> =>
+    Object.fromEntries(CATEGORIES.map(c => {
+      const unpriced = couldNotPriceCatIds.has(c.id)
+      return [c.id, coverageEntry(statusOf(c.id), {
+        mt: unpricedCatIds.has(c.id) ? null : Number(getCatEmissions(c.id).toFixed(4)),
+        unpriced,
+        // The wizard's own sentence for this category, verbatim — the same one the amber notice shows.
+        reason: unpriced ? unpricedReason(c.id) : null,
+      })]
+    }))
+
+  /** Answered exclusions with no justification written. The report needs one for each. */
+  const unjustifiedExclusions = CATEGORIES.filter(c => catData[c.id]?.relevant === false && !(catData[c.id]?.excluded_reason || '').trim())
 
   const updateCat = (id: string, field: string, value: any) => {
     setCatData(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }))
@@ -700,10 +754,16 @@ export default function Scope3Dashboard() {
   }
 
   // ─── Calculations ────────────────────────────────────────────────────────────
+  //
+  // ⚠️ THE CALCULATORS NO LONGER ASK WHETHER A CATEGORY IS RELEVANT. Each used to open with
+  // `if (!d?.included) return 0`, so an excluded category could not have a figure at all. Under the status
+  // model "not relevant, calculated" is a real state — a customer who calculated a category, found it
+  // small, and excludes it on that basis — and the figure is the evidence for the exclusion. So a figure
+  // is computed wherever the data supports one, and RELEVANCE IS APPLIED AT THE TOTAL (see scope3Status's
+  // inTotal), not at the arithmetic. Nothing that sums reads a calculator without going through that.
 
   const calcCat1 = (): number => {
-    const d = catData['cat1']
-    if (!d?.included) return 0
+    const d = catData['cat1'] ?? ({} as CategoryData)
     if (d.has_supplier_data && d.supplier_emissions) return d.supplier_emissions
     // The spend path reads the route's answer for the inputs on screen now, and nothing else. Absent,
     // no_factor, an error, a request still in flight or an input not yet entered all return 0, and
@@ -715,8 +775,9 @@ export default function Scope3Dashboard() {
   }
 
   const calcCat6 = (): number => {
-    const d = catData['cat6']
-    if (!d?.included) return 0
+    // `?? {}`: the relevance gate that guaranteed a record is gone, and a category with no entry has no
+    // inputs, so every field below falls back to its own default and the figure is 0.
+    const d = catData['cat6'] ?? ({} as CategoryData)
     const shortHaul = (d.short_haul_flights || 0) * (d.avg_flight_km || 800) * EMISSION_FACTORS.flight_short
     const longHaul = (d.long_haul_flights || 0) * (d.avg_flight_km || 5000) * EMISSION_FACTORS.flight_long
     const hotels = (d.hotel_nights || 0) * EMISSION_FACTORS.hotel
@@ -725,8 +786,7 @@ export default function Scope3Dashboard() {
   }
 
   const calcCat7 = (): number => {
-    const d = catData['cat7']
-    if (!d?.included) return 0
+    const d = catData['cat7'] ?? ({} as CategoryData)
     const employees = d.employee_count || 0
     const commuteKm = d.avg_commute_km || 15
     const wfhDays = d.wfh_days || 0
@@ -748,8 +808,6 @@ export default function Scope3Dashboard() {
   // The sum over PRICED rows of tonnes x factor, in kg, over 1000 for mt. An incomplete row, or one whose
   // saved pair the sheet does not publish, adds nothing and is named wherever this figure is described.
   const calcCat5 = (): number => {
-    const d = catData['cat5']
-    if (!d?.included) return 0
     return cat5Priced.reduce((kg, e) => kg + e.pricing.kg_co2e, 0) / 1000
   }
 
@@ -837,8 +895,7 @@ export default function Scope3Dashboard() {
   })()
 
   const calcGenericSpend = (id: string): number => {
-    const d = catData[id]
-    if (!d?.included) return 0
+    const d = catData[id] ?? ({} as CategoryData)
     if (d.emissions_override) return d.emissions_override
     const spend = d.annual_spend || 0
     // GENERIC_SPEND_FACTOR is 0.5, the literal that stood here. Named so that every description of
@@ -859,8 +916,7 @@ export default function Scope3Dashboard() {
     })
 
   const calcCat15 = (): number => {
-    const d = catData['cat15']
-    if (!d?.included) return 0                // preserve the included gate exactly
+    const d = catData['cat15'] ?? ({} as CategoryData)
     // portfolioFromProxy wraps the same portfolioProxyEstimate that is regression-tested
     // to equal the legacy portfolio×spend/1000 formula (and the emissions_override path).
     // The try/catch only guards invalid inputs (e.g. a negative value) the engine throws
@@ -896,16 +952,72 @@ export default function Scope3Dashboard() {
   // a sector into lib/pcaf, which falls back to 0.12 on a miss. The other thirteen
   // never used the sector — calcGenericSpend has always been a flat 0.5 and calcCat5/6/7 are
   // activity-based — so they are unaffected by the vocabulary change.
+  /**
+   * Has this category been CALCULATED — does its data actually produce a figure?
+   *
+   * ⚠️ DERIVED, NEVER STORED, and derived per method because the methods fail differently: Cat 1 can hold a
+   * complete spend and still have no figure (no active factor edition, a sector with no factor), Cat 5
+   * depends on whether any waste row is complete, and the flat-spend ten need only a spend. Each test is
+   * the same one the category's own basis description and confidence already use, so "calculated" and the
+   * figure beside it cannot disagree.
+   *
+   * ⚠️ A GENUINE ZERO READS AS NOT CALCULATED for the PCAF path, which tests the result rather than the
+   * inputs. Everywhere else the test is on the inputs, so a zero entered deliberately still counts as
+   * calculated. Worth revisiting if a customer ever needs to report a calculated zero.
+   */
+  const isCalculated = (id: string): boolean => {
+    const d = catData[id]
+    if (!d) return false
+    if (d.emissions_override) return true
+    switch (scope3MethodFor(id)) {
+      case 'exiobase_spend': return !!(d.has_supplier_data && d.supplier_emissions) || !!cat1SpendPriced
+      case 'waste_factors': return cat5Priced.length > 0
+      case 'travel_factors': return !!(d.short_haul_flights || d.long_haul_flights || d.hotel_nights || d.rail_km)
+      case 'commuting_factors': return !!d.employee_count
+      case 'pcaf': try { return cat15PcafResult(d).totalFinancedEmissions > 0 } catch { return false }
+      case 'flat_spend': return !!d.annual_spend
+    }
+  }
+
+  /** The category's status: the stored relevance answer, and whether its data produced a figure. */
+  const statusOf = (id: string): Scope3Status => scope3Status(catData[id]?.relevant ?? null, isCalculated(id))
+
   const unpricedCatIds = new Set(
     CATEGORIES.filter(c => {
       const d = catData[c.id]
-      if (!d?.included) return false
+      // Only a category the customer CLAIMS can be missing from the total. An excluded or unanswered one
+      // is not part of the claim, so its inability to be priced is not an omission from it.
+      if (d?.relevant !== true) return false
       if (c.id === 'cat1') return !(d.has_supplier_data && d.supplier_emissions) && !cat1SpendPriced
       if (c.id === 'cat15') return !d.emissions_override && !sectorPriced(d.portfolio_sector || sector)
       return false
     }).map(c => c.id),
   )
-  const totalScope3 = CATEGORIES.filter(c => catData[c.id]?.included && !unpricedCatIds.has(c.id))
+  // ⚠️ ONLY 'Relevant, calculated' SUMS. A calculated category the customer judged not relevant has a
+  // figure, and that figure is reported as the evidence for the exclusion — but the total is the claim.
+  /**
+   * The claimed categories the PLATFORM could not price: the inputs their method needs are all there, and
+   * still no figure came back.
+   *
+   * ⚠️ NARROWER THAN unpricedCatIds, AND THE DIFFERENCE IS WHOSE TURN IT IS. That set answers "is this
+   * category missing from the total", which is true of a category nobody has filled in yet — and the amber
+   * notice it drives says so, category by category, which is the right thing on screen. This one answers
+   * "did we fail to price something the customer completed", which is what the stored record calls
+   * unpriced, and what a consumer of a baseline needs to tell a platform gap from an unfinished one.
+   */
+  const couldNotPriceCatIds = new Set(
+    CATEGORIES.filter(c => {
+      const d = catData[c.id]
+      if (d?.relevant !== true) return false
+      // Cat 1: a complete spend question (sector, country, a non-zero figure) that the route did not price.
+      if (c.id === 'cat1') return !(d.has_supplier_data && d.supplier_emissions) && cat1SpendInputsComplete && !cat1SpendPriced
+      // Cat 15: a portfolio value entered against a sector the factor table does not hold.
+      if (c.id === 'cat15') return !d.emissions_override && !!d.portfolio_value && !sectorPriced(d.portfolio_sector || sector)
+      return false
+    }).map(c => c.id),
+  )
+
+  const totalScope3 = CATEGORIES.filter(c => statusOf(c.id).inTotal && !unpricedCatIds.has(c.id))
     .reduce((sum, c) => sum + getCatEmissions(c.id), 0)
   const unpricedCats = CATEGORIES.filter(c => unpricedCatIds.has(c.id))
   // The categories that actually contribute to totalScope3: included, priceable, and non-zero.
@@ -913,12 +1025,12 @@ export default function Scope3Dashboard() {
   // disagreed (Results showed 1 row, Export said "Categories: 3") and a count that differs from the
   // rows beside the same total reads as a claim about what the total is made of. This is a display
   // set, not a calculation: totalScope3 above is unchanged and still sums its own filter.
-  const categoriesInTotal = CATEGORIES.filter(c => catData[c.id]?.included && !unpricedCatIds.has(c.id) && getCatEmissions(c.id) > 0)
+  const categoriesInTotal = CATEGORIES.filter(c => statusOf(c.id).inTotal && !unpricedCatIds.has(c.id) && getCatEmissions(c.id) > 0)
   // The categories marked material: everything the inventory claims to cover, whether or not it
   // could be priced or has data yet. Shown beside categoriesInTotal wherever a category count
   // appears, so "in scope" versus "in total" is always visible rather than one standing in for the
   // other under a bare "Categories".
-  const categoriesInScope = CATEGORIES.filter(c => catData[c.id]?.included)
+  const categoriesInScope = CATEGORIES.filter(c => catData[c.id]?.relevant === true)
   // The total as displayed. ONE expression for every surface that shows it, so a total missing
   // unpriced categories never reads as complete on one step and partial on the next.
   const totalScope3Label = unpricedCats.length > 0 ? `${totalScope3.toFixed(1)} mt (partial)` : `${totalScope3.toFixed(1)} mt`
@@ -966,7 +1078,8 @@ export default function Scope3Dashboard() {
 
   const getConfidence = (id: string): 'high' | 'medium' | 'low' => {
     const d = catData[id]
-    if (!d?.included) return 'low'
+    // No relevance gate: confidence describes the DATA, and an excluded category that was calculated
+    // still reports its figure with the quality that figure has.
     if (d.emissions_override || d.has_supplier_data) return 'high'
     if (id === 'cat6' && (d.short_haul_flights || d.long_haul_flights)) return 'medium'
     if (id === 'cat7' && d.employee_count) return 'medium'
@@ -979,6 +1092,16 @@ export default function Scope3Dashboard() {
     high: { label: 'Primary data', color: '#0F6E56', bg: '#E1F5EE' },
     medium: { label: 'Activity data', color: '#0C447C', bg: '#E6F1FB' },
     low: { label: 'Spend-based', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
+  }
+
+  /**
+   * Whether a category appears in the record at all: the customer claims it, or it has a figure that has
+   * to be reported (an exclusion justified by its own magnitude). Anything else is a category with no
+   * answer and no data, and a row for it would say nothing.
+   */
+  const isReportable = (id: string): boolean => {
+    const st = statusOf(id)
+    return st.relevant === true || st.calculated
   }
 
   /**
@@ -1086,11 +1209,24 @@ export default function Scope3Dashboard() {
         revenue_millions: (revenue || 0) / 1_000_000, // raw -> millions
         cat_data: catData,
         total_scope3_tco2e: totalScope3,
+        // ⚠️ WHAT THAT TOTAL COVERS, SAVED WITH IT. The number alone cannot say whether it is two
+        // categories or fifteen, and it is read as a Scope 3 BASELINE by the SBTi dashboard, where a
+        // baseline is fixed for the life of a target. These five columns are nullable and unbackfilled:
+        // an older row is UNRECORDED, not complete. Counts and map are written together on purpose —
+        // see the migration for why the counts are not left to be derived by each consumer.
+        scope3_categories_relevant: categoriesInScope.length,
+        scope3_categories_in_total: categoriesInTotal.length,
+        // ⚠️ THE NARROW SET. The column means "the platform could not price these", and unpricedCats is the
+        // wider UI set that also holds categories nobody has filled in yet. Writing that one would have
+        // reported an unfinished inventory as a platform failure.
+        scope3_categories_unpriced: couldNotPriceCatIds.size,
+        scope3_exclusions_unjustified: unjustifiedExclusions.length,
+        scope3_coverage: scope3Coverage(),
         // Derived per included category from categoryBasis — the same statements the CSV carries. It was
         // the literal 'DEFRA/Exiobase (spend-based) · GHG Protocol category methodologies (activity-based)',
         // which was false. Still plain text in a column nothing reads; see the report on moving it to a
         // structured record on the factor_editions pattern.
-        factor_basis: CATEGORIES.filter(c => catData[c.id]?.included)
+        factor_basis: CATEGORIES.filter(c => isReportable(c.id))
           .map(c => { const b = categoryBasis(c.id); return `Cat ${c.num} ${c.name}: ${b.basis}. ${b.detail}` })
           .join('\n'),
         status: 'confirmed',
@@ -1124,7 +1260,7 @@ export default function Scope3Dashboard() {
     const out: string[][] = []
 
     const c1 = catData['cat1']
-    if (c1?.included) {
+    if (c1 && isReportable('cat1')) {
       if (c1.has_supplier_data && c1.supplier_emissions) {
         out.push(['Cat 1', 'Basis', 'Supplier-specific emissions',
           'Entered as a figure; no spend-based estimate was made, so no sector, region or factor edition applies.'])
@@ -1150,7 +1286,7 @@ export default function Scope3Dashboard() {
     }
 
     const c5 = catData['cat5']
-    if (c5?.included) {
+    if (c5 && isReportable('cat5')) {
       if (cat5LegacyNotice) {
         out.push(['Cat 5', 'Previous form, not priced', cat5LegacyNotice.tonnages, cat5LegacyNotice.sentences.join(' ')])
       }
@@ -1169,7 +1305,7 @@ export default function Scope3Dashboard() {
     }
 
     const c15 = catData['cat15']
-    if (c15?.included) {
+    if (c15 && isReportable('cat15')) {
       // Which path actually ran, from the engine's own result rather than inferred from the inputs.
       let mode: string | null = null
       try { mode = cat15PcafResult(c15).mode } catch { mode = null }
@@ -1195,18 +1331,37 @@ export default function Scope3Dashboard() {
       ...(unpricedCats.length > 0
         ? [['Excluded from total', `${unpricedCats.map(c => `Cat ${c.num} ${c.name}: ${unpricedReason(c.id)}`).join(' ')} Left out of the total rather than counted as zero.`]]
         : []),
+      // ⚠️ IN THE HEADER, BECAUSE THE PER-CATEGORY COLUMN ONLY READS AS A GAP IF SOMEONE GETS THERE. The
+      // Exclusion justification column says "No justification recorded" against the row it belongs to; this
+      // line carries the same fact where a reader meets it first, and survives the file being quoted in
+      // part. OMITTED ENTIRELY when every exclusion is justified: "0 of 3" would make a reader look for a
+      // problem that is not there.
+      ...(unjustifiedExclusions.length > 0
+        ? [['Exclusions without justification', `${unjustifiedExclusions.length} of ${CATEGORIES.filter(c => catData[c.id]?.relevant === false).length} excluded categories carry no justification: ${unjustifiedExclusions.map(c => `Cat ${c.num} ${c.name}`).join(', ')}. The GHG Protocol requires one for each.`]]
+        : []),
       ['Generated', new Date().toLocaleDateString()],
       [],
       ['SCOPE 3 BY CATEGORY'],
-      ['Category', 'Name', 'mt CO2e', 'Method', 'Confidence', 'Included'],
-      ...CATEGORIES.map(c => [
-        `Cat ${c.num}`,
-        c.name,
-        catData[c.id]?.included ? (unpricedCatIds.has(c.id) ? 'not priced' : getCatEmissions(c.id).toFixed(2)) : '—',
-        catData[c.id]?.included ? confidenceConfig[getConfidence(c.id)].label : 'Excluded',
-        catData[c.id]?.included ? confidenceConfig[getConfidence(c.id)].label : '—',
-        catData[c.id]?.included ? 'Yes' : `No — ${catData[c.id]?.excluded_reason || 'not material'}`,
-      ]),
+      // ⚠️ STATUS, NOT A YES/NO. The last column was 'Included' — 'Yes', or 'No — not material' for
+      // everything else, which reported a category nobody had reached as a judgement the customer never
+      // made. It now carries the CDP-shaped status, and the figure column shows a figure wherever one was
+      // calculated, including for an excluded category, where the figure is what justifies the exclusion.
+      // 'In total' says separately whether that figure is part of the claim.
+      ['Category', 'Name', 'mt CO2e', 'Method', 'Confidence', 'Status', 'In total', 'Exclusion justification'],
+      ...CATEGORIES.map(c => {
+        const st = statusOf(c.id)
+        const priced = st.calculated && !unpricedCatIds.has(c.id)
+        return [
+          `Cat ${c.num}`,
+          c.name,
+          priced ? getCatEmissions(c.id).toFixed(2) : (unpricedCatIds.has(c.id) ? 'not priced' : '—'),
+          st.calculated ? scope3MethodDescription(scope3MethodFor(c.id)) : '—',
+          st.calculated ? confidenceConfig[getConfidence(c.id)].label : '—',
+          st.label,
+          st.inTotal && priced ? 'Yes' : 'No',
+          st.requiresExplanation ? (catData[c.id]?.excluded_reason || 'No justification recorded') : '',
+        ]
+      }),
       ...(() => {
         const basis = estimateBasisRows()
         return basis.length > 0 ? [[], ['ESTIMATE BASIS'], ['Category', 'Item', 'Value', 'Note'], ...basis] : []
@@ -1217,7 +1372,7 @@ export default function Scope3Dashboard() {
       // "DEFRA/Exiobase" for everything, which was false for every category and could not tell a reader
       // which of their figures rested on what.
       ['Category', 'Name', 'Basis', 'Detail'],
-      ...CATEGORIES.filter(c => catData[c.id]?.included).map(c => {
+      ...CATEGORIES.filter(c => isReportable(c.id)).map(c => {
         const b = categoryBasis(c.id)
         return [`Cat ${c.num}`, c.name, b.basis, b.detail]
       }),
@@ -1461,7 +1616,7 @@ export default function Scope3Dashboard() {
           vocabulary ("for a Technology"), and reads as nonsense before an EXIOBASE name. */}
       <p style={sectionSub}>ThemisIQ has identified the Scope 3 categories likely to be material for {sector ? <>your sector, <strong style={{ fontWeight: 600 }}>{industryName(sector)}</strong>,</> : 'your company'} based on GHG Protocol guidance. Review and confirm.</p>
       <div style={{ background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 20%, transparent)', borderRadius: 10, padding: '0.75rem 1rem', marginBottom: 16, fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
-        These are suggestions, not limits — <strong>click any category to add or remove it</strong>. Under the GHG Protocol you may include any category you judge material, and you must briefly justify any you exclude. Tap a category in the Calculate step for what it means and where to find the data.
+        These are suggestions, not limits — <strong>answer each category yourself</strong>: relevant, not relevant, or leave it unanswered for now. Pressing the answer a category already holds clears it. Under the GHG Protocol you may include any category you judge material, and you must briefly justify any you exclude — a box appears for that when you mark one not relevant. Tap a category in the Calculate step for what it means and where to find the data.
       </div>
 
       {!sector ? (
@@ -1477,13 +1632,13 @@ export default function Scope3Dashboard() {
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 10 }}>{stream}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {CATEGORIES.filter(c => c.stream === stream).map(cat => {
-                  const included = catData[cat.id]?.included ?? materialCats.includes(cat.num)
+                  const relevant = catData[cat.id]?.relevant ?? null
+                  const included = relevant === true
+                  const excluded = relevant === false
                   const isMaterial = (SECTOR_MATERIAL[sector] || []).includes(cat.num)
+                  const reason = catData[cat.id]?.excluded_reason || ''
                   return (
-                    <div key={cat.id} onClick={() => toggleCat(cat.num)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', border: `1.5px solid ${included ? 'var(--color-brand)' : '#e8e7e4'}`, borderRadius: 10, cursor: 'pointer', background: included ? 'var(--color-brand-wash)' : '#f8f7f5', transition: 'all 0.15s' }}>
-                      <div style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${included ? 'var(--color-brand)' : '#e8e7e4'}`, background: included ? 'var(--color-brand)' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        {included && <span style={{ color: '#fff', fontSize: 9, fontWeight: 700 }}>✓</span>}
-                      </div>
+                    <div key={cat.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 14px', border: `1.5px solid ${included ? 'var(--color-brand)' : '#e8e7e4'}`, borderRadius: 10, background: included ? 'var(--color-brand-wash)' : '#fff' }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-ink-muted)', minWidth: 40 }}>Cat {cat.num}</span>
@@ -1502,6 +1657,47 @@ export default function Scope3Dashboard() {
                           })()}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>{cat.desc}</div>
+                        {/* ⚠️ THE FIELD THE BOX ABOVE HAS ALWAYS PROMISED. "you must briefly justify any you
+                            exclude" was true of the GHG Protocol and false of this form, which had nowhere to
+                            write it. It does NOT gate this step: the justification belongs in the report, so
+                            the export is where its absence is named. */}
+                        {excluded && (
+                          <div style={{ marginTop: 8, maxWidth: 520 }}>
+                            <label htmlFor={`excl-${cat.id}`} style={{ ...labelStyle, marginBottom: 4 }}>Why is this category not relevant?</label>
+                            <input
+                              id={`excl-${cat.id}`}
+                              style={{ ...inputStyle, fontSize: 12 }}
+                              value={reason}
+                              onChange={e => updateCat(cat.id, 'excluded_reason', e.target.value)}
+                              placeholder="e.g. no leased assets in the reporting year"
+                            />
+                            {!reason.trim() && (
+                              <div style={{ fontSize: 10, color: 'var(--color-module-climate)', marginTop: 4, lineHeight: 1.5 }}>
+                                The GHG Protocol requires a justification for every excluded category. Until you write one, your export names this exclusion as unjustified.
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {/* ⚠️ TWO BUTTONS, NOT A CHECKBOX. A checkbox has two states and the model has three, so
+                          "not yet answered" and "judged not relevant" were the same empty box. aria-pressed
+                          carries the answer to a screen reader, and pressing the active one clears it. The row
+                          is no longer clickable as a whole: one click used to mean both answers, depending on
+                          what the category already held. */}
+                      <div role="group" aria-label={`Is Cat ${cat.num} ${cat.name} relevant?`} style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                        {([[true, 'Relevant'], [false, 'Not relevant']] as [boolean, string][]).map(([value, text]) => {
+                          const on = relevant === value
+                          return (
+                            <button
+                              key={text}
+                              type="button"
+                              aria-pressed={on}
+                              title={on ? 'Clear this answer' : undefined}
+                              onClick={() => setRelevance(cat.id, value)}
+                              style={{ fontSize: 11, fontWeight: 600, padding: '6px 10px', borderRadius: 8, cursor: 'pointer', whiteSpace: 'nowrap', border: `1px solid ${on ? (value ? 'var(--color-brand)' : 'var(--color-ink-muted)') : '#e8e7e4'}`, background: on ? (value ? 'var(--color-brand)' : '#f8f7f5') : '#fff', color: on ? (value ? 'var(--color-on-dark)' : '#0d0d0d') : '#555553' }}
+                            >{text}</button>
+                          )
+                        })}
                       </div>
                     </div>
                   )
@@ -1515,7 +1711,9 @@ export default function Scope3Dashboard() {
   )
 
   const renderStep2 = () => {
-    const activeCats = CATEGORIES.filter(c => catData[c.id]?.included)
+    // Claimed, or calculated and therefore reported: a category excluded on the strength of its own
+    // figure keeps its panel and its row, because that figure is part of the record.
+    const activeCats = CATEGORIES.filter(c => isReportable(c.id))
     return (
       <div>
         <h2 style={sectionHead}>Data entry</h2>
@@ -1540,7 +1738,13 @@ export default function Scope3Dashboard() {
                     // edition, a failed request), so its badge does not name one. The panel below does.
                     <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-module-climate)' }}>{cat.id === 'cat1' ? 'not priced' : 'no factor yet'}</span>
                   ) : getCatEmissions(cat.id) > 0 && (
-                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-module-ghg)' }}>{getCatEmissions(cat.id).toFixed(2)} mt CO₂e</span>
+                    // The figure, and — where the customer has judged the category not relevant — why it is
+                    // still here. Without the second half a number on a panel the total does not contain
+                    // reads as a bug in the total.
+                    <span style={{ fontSize: 11, fontWeight: 600, color: statusOf(cat.id).inTotal ? 'var(--color-module-ghg)' : 'var(--color-ink-muted)' }}>
+                      {getCatEmissions(cat.id).toFixed(2)} mt CO₂e
+                      {!statusOf(cat.id).inTotal && <span style={{ fontWeight: 500 }}> · {statusOf(cat.id).label.toLowerCase()}, not in the total</span>}
+                    </span>
                   )}
                 </div>
                 {(cat as any).guidance && (
@@ -2094,7 +2298,12 @@ export default function Scope3Dashboard() {
           {activeCats.map((cat, i) => {
             const unpriced = unpricedCatIds.has(cat.id)
             const emissions = unpriced ? 0 : getCatEmissions(cat.id)
-            const pct = !unpriced && totalScope3 > 0 ? ((emissions / totalScope3) * 100).toFixed(1) : '0'
+            // ⚠️ A ROW CAN CARRY A FIGURE AND NO SHARE. A category the customer judged not relevant after
+            // calculating it keeps its figure — that figure is the evidence for the exclusion — but it is not
+            // part of the total, so it has no percentage OF that total. '—' rather than a 0% that would read
+            // as "this category emits nothing".
+            const st = statusOf(cat.id)
+            const pct = st.inTotal && !unpriced && totalScope3 > 0 ? ((emissions / totalScope3) * 100).toFixed(1) : '0'
             const conf = getConfidence(cat.id)
             const ccfg = confidenceConfig[conf]
             return (
@@ -2103,13 +2312,20 @@ export default function Scope3Dashboard() {
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{cat.name}</div>
                   <div style={{ fontSize: 10, color: 'var(--color-ink-muted)' }}>{cat.stream}</div>
+                  {!st.inTotal && st.calculated && (
+                    <div style={{ fontSize: 10, color: 'var(--color-module-climate)', lineHeight: 1.4, marginTop: 2 }}>
+                      {st.label} — reported, not in the total
+                    </div>
+                  )}
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{emissions.toFixed(2)}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: st.inTotal ? '#0d0d0d' : 'var(--color-ink-muted)' }}>{emissions.toFixed(2)}</div>
                 <div>
-                  <div style={{ fontSize: 12, color: '#555553' }}>{pct}%</div>
-                  <div style={{ height: 4, background: '#f3f4f6', borderRadius: 99, marginTop: 4, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${pct}%`, background: GRAD, borderRadius: 99 }} />
-                  </div>
+                  <div style={{ fontSize: 12, color: '#555553' }}>{st.inTotal ? `${pct}%` : '—'}</div>
+                  {st.inTotal && (
+                    <div style={{ height: 4, background: '#f3f4f6', borderRadius: 99, marginTop: 4, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: GRAD, borderRadius: 99 }} />
+                    </div>
+                  )}
                 </div>
                 <div>
                   {/* nowrap is what guarantees one line; the 96px column is what stops one line overflowing.
@@ -2124,12 +2340,37 @@ export default function Scope3Dashboard() {
           )}
         </div>
 
-        {/* Excluded categories */}
-        {CATEGORIES.filter(c => !catData[c.id]?.included).length > 0 && (
+        {/* A figure outside the total needs saying out loud, or it reads as a bug. */}
+        {activeCats.some(c => { const st = statusOf(c.id); return !st.inTotal && st.calculated }) && (
+          <div style={{ marginTop: 12, fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, maxWidth: '72ch' }}>
+            A category you judged not relevant keeps the figure you calculated for it. The figure is shown because it
+            is what justifies the exclusion — a category is easier to exclude when you can say how small it is — and it
+            is left out of the total, because the total is what you are claiming as your inventory. Both appear in the
+            export, under the category&apos;s status.
+          </div>
+        )}
+
+        {/* ⚠️ "NOT MATERIAL" WAS WRONG TWICE OVER. Until 17 Sep 2026 this box listed every category that was
+            not selected, including ones nobody had looked at, and called all of them "not material". It now
+            lists ANSWERED exclusions only, and says "not relevant" — CDP's term, and the question the
+            materiality step actually asks. Each exclusion carries the reason the customer gave, or says
+            plainly that none is recorded yet. */}
+        {CATEGORIES.filter(c => catData[c.id]?.relevant === false).length > 0 && (
           <div style={{ marginTop: 16, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', marginBottom: 6 }}>EXCLUDED CATEGORIES (not material)</div>
-            <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>
-              {CATEGORIES.filter(c => !catData[c.id]?.included).map(c => `Cat ${c.num} (${c.name})`).join(' · ')}
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', marginBottom: 8 }}>EXCLUDED — JUDGED NOT RELEVANT</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {CATEGORIES.filter(c => catData[c.id]?.relevant === false).map(c => {
+                const reason = (catData[c.id]?.excluded_reason || '').trim()
+                return (
+                  <div key={c.id} style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
+                    <strong style={{ fontWeight: 600, color: '#0d0d0d' }}>Cat {c.num} {c.name}:</strong>{' '}
+                    {reason
+                      ? reason
+                      : <span style={{ color: 'var(--color-module-climate)' }}>No justification recorded. The GHG Protocol requires one for every excluded category — add it in the Materiality step.</span>}
+                    {statusOf(c.id).calculated && <span style={{ color: 'var(--color-ink-muted)' }}> · calculated at {getCatEmissions(c.id).toFixed(2)} mt CO₂e, reported but not in the total.</span>}
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
@@ -2155,6 +2396,23 @@ export default function Scope3Dashboard() {
     <div>
       <h2 style={sectionHead}>Export Scope 3 inventory</h2>
       <p style={sectionSub}>Download your GHG Protocol-aligned Scope 3 inventory for CSRD, CDP, SBTi and SB 253 reporting.</p>
+
+      {/* ⚠️ NAMED HERE, NOT BLOCKED HERE. The GHG Protocol wants the justification in the REPORT, so the
+          moment it matters is the download, not the click that excluded the category. The export is not
+          gated on it: a customer who has not written one yet still gets their inventory, and the file says
+          "No justification recorded" against that category rather than leaving the cell blank. */}
+      {unjustifiedExclusions.length > 0 && (
+        <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem', marginBottom: 20 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>
+            {unjustifiedExclusions.length} excluded {unjustifiedExclusions.length === 1 ? 'category has' : 'categories have'} no justification
+          </div>
+          <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
+            {unjustifiedExclusions.map(c => `Cat ${c.num} ${c.name}`).join(' · ')}. The GHG Protocol requires a
+            justification for every category you exclude. You can export without one — the file records the exclusion
+            as unjustified — but a reader of the report will be missing the reason.
+          </div>
+        </div>
+      )}
 
       <div className="tq-summary" data-module="ghg" style={{ marginBottom: 20 }}>
         <div style={{ flex: 1, padding: '20px 24px' }}>
