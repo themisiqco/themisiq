@@ -6,7 +6,7 @@ import { supabase } from '../../../lib/supabase'
 import { useEntitlementState } from '../../../lib/useEntitlement'
 import { EMISSION_FACTORS, GENERIC_SPEND_FACTOR } from '../../../lib/emissionFactors'
 import { SPEND_EF_SOURCES } from '../../../lib/emissionFactors/spend'
-import { scope3MethodFor, scope3MethodDescription, provenanceGap } from '../../../lib/scope3/categoryMethods'
+import { scope3MethodFor, scope3MethodDescription, provenanceGap, takesEnteredFigure } from '../../../lib/scope3/categoryMethods'
 import { scope3Status, relevanceFromStored, coverageEntry, type Relevance, type Scope3Status, type Scope3CoverageEntry } from '../../../lib/scope3/categoryStatus'
 // ⚠️ assessAsset ONLY. resolvePcafResult is no longer imported: it existed to choose between the
 // decomposed assessment and the lumped spend proxy, and it answered with the proxy whenever any holding
@@ -25,8 +25,9 @@ import { matchCountries, countryByIso2 } from '../../../lib/emissionFactors/coun
 import { regionName, regionLabel, countryLabel } from '../../../lib/emissionFactors/regionNames'
 import {
   DEFRA_WASTE_META, WASTE_MATERIAL_GROUPS, WASTE_METHOD_LABEL, wasteRoutesFor, wasteMaterialKey, parseWasteMaterialKey,
-  priceWasteRow, wasteMethodFor, withoutListMarker, type WasteRowPricing,
+  wasteMethodFor, withoutListMarker,
 } from '../../../lib/emissionFactors/defraWaste'
+import { evaluateWasteRows, wasteRowNotPricedReason, type WasteRow, type EvaluatedWasteRow } from '../../../lib/scope3/wasteRows'
 import type { PcafPortfolioAsset, PcafAssetClass, EmissionInputs } from '../../../lib/pcaf/types'
 import { editRows, type RowEdit } from '../../../lib/rowList'
 import { sectionHead } from '@/app/components/headingStyles'
@@ -383,20 +384,94 @@ const srOnly: React.CSSProperties = { position: 'absolute', width: 1, height: 1,
 
 const sectionSub: React.CSSProperties = { fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
 
-const STEP_NAMES = ['Setup', 'Relevance', 'Calculate', 'Results', 'Export']
+/** The categories whose figure is a sum of priced waste rows, and the words each one's editor uses. */
+type WasteRowsCategoryId = 'cat5'
+const WASTE_EDITOR_COPY: Readonly<Record<WasteRowsCategoryId, { empty: string; stream: string; add: string }>> = {
+  cat5: {
+    empty: 'No waste streams yet. Add one for each material and treatment route on your waste contractor\'s report.',
+    stream: 'Waste stream',
+    add: '+ Add waste stream',
+  },
+}
 
 /**
- * One Cat 5 waste stream. `activity` is stored beside `waste_type` because the activity block is part of
- * the factor's identity in the sheet, and a record that names the material without its block would need
- * the artefact to say which one it meant. '' means not chosen; tonnes 0 means not entered.
+ * One category's waste rows: material, route and tonnes per row, each row's own priced line, and the add
+ * button. Extracted from the Category 5 panel on 18 Sep 2026 so Category 12 can render the same editor over
+ * its own rows. The markup is Category 5's, moved verbatim; what differs by category is the words
+ * (WASTE_EDITOR_COPY) and the id prefix, and the rows and handlers come in as props.
  */
-interface WasteRow {
-  id: string
-  activity: string
-  waste_type: string
-  route: string
-  tonnes: number
+function WasteRowsEditor({ catId, evaluated, onAdd, onRemove, onUpdate, onSetMaterial }: {
+  catId: WasteRowsCategoryId
+  evaluated: readonly EvaluatedWasteRow[]
+  onAdd: () => void
+  onRemove: (id: string) => void
+  onUpdate: (id: string, patch: Partial<WasteRow>) => void
+  onSetMaterial: (id: string, key: string) => void
+}) {
+  const copy = WASTE_EDITOR_COPY[catId]
+  return (
+  <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 10 }}>
+    {evaluated.length === 0 && (
+      <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', background: '#f8f7f5', borderRadius: 8, padding: '0.75rem', lineHeight: 1.5 }}>
+        {copy.empty}
+      </div>
+    )}
+    {evaluated.map(({ row, n, pricing }) => {
+      const hasMaterial = !!row.activity && !!row.waste_type
+      const routes = hasMaterial ? wasteRoutesFor(row.activity, row.waste_type) : []
+      const materialKey = hasMaterial && WASTE_MATERIAL_GROUPS.some(g => g.activity === row.activity && g.materials.includes(row.waste_type))
+        ? wasteMaterialKey(row.activity, row.waste_type) : ''
+      const fieldId = (f: string) => `${catId}-${row.id}-${f}`
+      return (
+        <div key={row.id} style={{ border: '1px solid #e8e7e4', borderRadius: 10, padding: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#555553' }}>{copy.stream} {n}</span>
+            <button type="button" aria-label={`Remove ${copy.stream.toLowerCase()} ${n}`} onClick={() => onRemove(row.id)} style={{ fontSize: 11, color: '#B91C1C', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Remove</button>
+          </div>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label htmlFor={fieldId('material')} style={labelStyle}>Waste type</label>
+            <select id={fieldId('material')} style={inputStyle} value={materialKey} onChange={e => onSetMaterial(row.id, e.target.value)}>
+              <option value="">Select waste type</option>
+              {WASTE_MATERIAL_GROUPS.map(g => (
+                <optgroup key={g.activity} label={g.activity}>
+                  {g.materials.map(mat => <option key={mat} value={wasteMaterialKey(g.activity, mat)}>{mat}</option>)}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor={fieldId('route')} style={labelStyle}>Treatment route</label>
+            {/* Only the routes this material publishes. Disabled until a material is chosen,
+                because until then there is no list that would be true. */}
+            <select id={fieldId('route')} style={inputStyle} disabled={!hasMaterial} value={routes.includes(row.route) ? row.route : ''} onChange={e => onUpdate(row.id, { route: e.target.value })}>
+              <option value="">{hasMaterial ? 'Select route' : 'Choose a waste type first'}</option>
+              {routes.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+          <div>
+            <label htmlFor={fieldId('tonnes')} style={labelStyle}>Tonnes</label>
+            <input id={fieldId('tonnes')} style={inputStyle} type="number" min={0} value={row.tonnes || ''} onChange={e => onUpdate(row.id, { tonnes: Number(e.target.value) })} placeholder="0" />
+          </div>
+          <div style={{ gridColumn: '1 / -1', fontSize: 11, lineHeight: 1.5 }}>
+            {pricing.status === 'priced' ? (
+              <span style={{ color: '#555553' }}>
+                {row.tonnes} t × {pricing.factor_kg_per_tonne} kg CO₂e per t = <strong style={{ fontWeight: 600 }}>{pricing.kg_co2e.toLocaleString('en', { maximumFractionDigits: 2 })} kg CO₂e</strong> · {WASTE_METHOD_LABEL[pricing.method]}
+              </span>
+            ) : pricing.status === 'no_factor' ? (
+              <span style={{ color: '#92400e' }}>⚠ Not counted: {wasteRowNotPricedReason(row, pricing)}. Choose the waste type and route again.</span>
+            ) : (
+              <span style={{ color: 'var(--color-ink-muted)' }}>Not priced until entered: {pricing.missing.join(', ')}.</span>
+            )}
+          </div>
+        </div>
+      )
+    })}
+    <button type="button" onClick={onAdd} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: 'none', border: '0.5px solid var(--color-brand)', color: 'var(--color-brand)', cursor: 'pointer', alignSelf: 'flex-start' }}>{copy.add}</button>
+  </div>
+  )
 }
+
+const STEP_NAMES = ['Setup', 'Relevance', 'Calculate', 'Results', 'Export']
 
 interface CategoryData {
   /**
@@ -995,7 +1070,7 @@ export default function Scope3Dashboard() {
   const updatePcafEmissions = (id: string, patch: Partial<EmissionInputs>) =>
     updatePcafAsset(id, row => ({ emissions: { ...row.emissions, ...patch } }))
 
-  // Cat 5 waste rows, in catData['cat5'].wasteRows.
+  // Waste rows, in catData[catId].wasteRows, for every row-priced category (Cat 5 today).
   const newWasteRow = (): WasteRow => ({
     id: Math.random().toString(36).slice(2),
     activity: '',
@@ -1004,23 +1079,23 @@ export default function Scope3Dashboard() {
     tonnes: 0,
   })
   /** For rendering only. */
-  const wasteRows = () => catData['cat5']?.wasteRows ?? []
-  const editWasteRows = (edit: RowEdit<WasteRow>) =>
-    setCatData(prev => ({ ...prev, cat5: { ...prev.cat5, wasteRows: editRows(prev.cat5?.wasteRows, edit) } }))
-  const addWasteRow = () => editWasteRows({ kind: 'add', row: newWasteRow() })
-  const removeWasteRow = (id: string) => editWasteRows({ kind: 'remove', id })
-  const updateWasteRow = (id: string, patch: Partial<WasteRow> | ((row: WasteRow) => Partial<WasteRow>)) =>
-    editWasteRows({ kind: 'update', id, patch })
+  const wasteRows = (catId: WasteRowsCategoryId) => catData[catId]?.wasteRows ?? []
+  const editWasteRows = (catId: WasteRowsCategoryId, edit: RowEdit<WasteRow>) =>
+    setCatData(prev => ({ ...prev, [catId]: { ...prev[catId], wasteRows: editRows(prev[catId]?.wasteRows, edit) } }))
+  const addWasteRow = (catId: WasteRowsCategoryId) => editWasteRows(catId, { kind: 'add', row: newWasteRow() })
+  const removeWasteRow = (catId: WasteRowsCategoryId, id: string) => editWasteRows(catId, { kind: 'remove', id })
+  const updateWasteRow = (catId: WasteRowsCategoryId, id: string, patch: Partial<WasteRow> | ((row: WasteRow) => Partial<WasteRow>)) =>
+    editWasteRows(catId, { kind: 'update', id, patch })
   /**
    * ⚠️ A MATERIAL CHANGE CLEARS A ROUTE THE NEW MATERIAL DOES NOT PUBLISH. Keeping it would leave a pair
    * the sheet has no factor for, which the route select could not even display. A route the new material
    * does publish is kept, because the customer chose it and it is still valid.
    */
-  const setWasteMaterial = (id: string, key: string) => {
+  const setWasteMaterial = (catId: WasteRowsCategoryId, id: string, key: string) => {
     const m = parseWasteMaterialKey(key)
-    if (!m) { updateWasteRow(id, { activity: '', waste_type: '', route: '' }); return }
+    if (!m) { updateWasteRow(catId, id, { activity: '', waste_type: '', route: '' }); return }
     // The route is checked against the row as it is when the edit applies, not as it was rendered.
-    updateWasteRow(id, row => ({
+    updateWasteRow(catId, id, row => ({
       activity: m.activity,
       waste_type: m.waste_type,
       route: wasteRoutesFor(m.activity, m.waste_type).includes(row.route) ? row.route : '',
@@ -1077,17 +1152,17 @@ export default function Scope3Dashboard() {
   }
 
   // Every Cat 5 row with its pricing, in entry order. ONE evaluation read by the figure, the panel, the
-  // workings, the CSV and factor_basis, so none of them can price a row differently.
-  const cat5Evaluated: { row: WasteRow; n: number; pricing: WasteRowPricing }[] =
-    wasteRows().map((row, i) => ({ row, n: i + 1, pricing: priceWasteRow(row) }))
-  const cat5Priced = cat5Evaluated.flatMap(e => e.pricing.status === 'priced' ? [{ ...e, pricing: e.pricing }] : [])
-  const cat5NotPriced = cat5Evaluated.filter(e => e.pricing.status !== 'priced')
+  // workings, the CSV and factor_basis, so none of them can price a row differently. It is
+  // lib/scope3/wasteRows.ts over Cat 5's OWN rows: the page no longer prices rows itself, which is what
+  // lets a second row-priced category run the same evaluation without reading Category 5's.
+  const cat5Waste = evaluateWasteRows(wasteRows('cat5'))
+  const cat5Evaluated = cat5Waste.evaluated
+  const cat5Priced = cat5Waste.priced
+  const cat5NotPriced = cat5Waste.notPriced
 
   // The sum over PRICED rows of tonnes x factor, in kg, over 1000 for mt. An incomplete row, or one whose
   // saved pair the sheet does not publish, adds nothing and is named wherever this figure is described.
-  const calcCat5 = (): number => {
-    return cat5Priced.reduce((kg, e) => kg + e.pricing.kg_co2e, 0) / 1000
-  }
+  const calcCat5 = (): number => cat5Waste.mt
 
   /**
    * What an inventory saved under the previous Cat 5 form holds, and why it is not priced. null when
@@ -1122,12 +1197,6 @@ export default function Scope3Dashboard() {
   /** "row 1", "rows 1 and 3", "rows 1, 2 and 4". */
   const rowList = (ns: number[]): string =>
     ns.length === 1 ? `row ${ns[0]}` : `rows ${ns.slice(0, -1).join(', ')} and ${ns[ns.length - 1]}`
-
-  /** Why a row adds nothing to the figure, from what was observed about it. null for a priced row. */
-  const wasteRowNotPricedReason = (row: WasteRow, pricing: WasteRowPricing): string | null =>
-    pricing.status === 'incomplete' ? `${pricing.missing.join(', ')} not entered`
-      : pricing.status === 'no_factor' ? `the sheet publishes no ${row.route} factor for ${row.waste_type} (${row.activity}), so it is not counted, and not counted as zero`
-      : null
 
   /**
    * The Cat 5 workings, and the CSV's Cat 5 disclosure rows: the same sentences in both, as for Cat 1.
@@ -1239,7 +1308,10 @@ export default function Scope3Dashboard() {
   const isCalculated = (id: string): boolean => {
     const d = catData[id]
     if (!d) return false
-    if (d.emissions_override) return true
+    // ⚠️ ONLY WHERE THE CALCULATOR USES ONE. Honouring a stored override for every category reported Cat 5,
+    // 6 and 7 as "calculated" on the override alone, while their calculators ignored it. See
+    // METHOD_TAKES_ENTERED_FIGURE, which the methodology page's published sentence also reads.
+    if (d.emissions_override && takesEnteredFigure(id)) return true
     switch (scope3MethodFor(id)) {
       case 'exiobase_spend': return !!(d.has_supplier_data && d.supplier_emissions) || !!spendPricedLine(id)
       case 'waste_factors': return cat5Priced.length > 0
@@ -1412,7 +1484,8 @@ export default function Scope3Dashboard() {
     const d = catData[id]
     // No relevance gate: confidence describes the DATA, and an excluded category that was calculated
     // still reports its figure with the quality that figure has.
-    if (d.emissions_override || d.has_supplier_data) return 'high'
+    // An entered figure is primary data — but only on a category whose calculator uses one.
+    if ((d.emissions_override && takesEnteredFigure(id)) || d.has_supplier_data) return 'high'
     if (id === 'cat6' && (d.short_haul_flights || d.long_haul_flights)) return 'medium'
     if (id === 'cat7' && d.employee_count) return 'medium'
     if (id === 'cat5' && cat5Priced.length > 0) return 'medium'
@@ -2362,64 +2435,14 @@ export default function Scope3Dashboard() {
                       </p>
                     </div>
 
-                    <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {wasteRows().length === 0 && (
-                        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', background: '#f8f7f5', borderRadius: 8, padding: '0.75rem', lineHeight: 1.5 }}>
-                          No waste streams yet. Add one for each material and treatment route on your waste contractor&apos;s report.
-                        </div>
-                      )}
-                      {cat5Evaluated.map(({ row, n, pricing }) => {
-                        const hasMaterial = !!row.activity && !!row.waste_type
-                        const routes = hasMaterial ? wasteRoutesFor(row.activity, row.waste_type) : []
-                        const materialKey = hasMaterial && WASTE_MATERIAL_GROUPS.some(g => g.activity === row.activity && g.materials.includes(row.waste_type))
-                          ? wasteMaterialKey(row.activity, row.waste_type) : ''
-                        const fieldId = (f: string) => `cat5-${row.id}-${f}`
-                        return (
-                          <div key={row.id} style={{ border: '1px solid #e8e7e4', borderRadius: 10, padding: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontSize: 11, fontWeight: 700, color: '#555553' }}>Waste stream {n}</span>
-                              <button type="button" aria-label={`Remove waste stream ${n}`} onClick={() => removeWasteRow(row.id)} style={{ fontSize: 11, color: '#B91C1C', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Remove</button>
-                            </div>
-                            <div style={{ gridColumn: '1 / -1' }}>
-                              <label htmlFor={fieldId('material')} style={labelStyle}>Waste type</label>
-                              <select id={fieldId('material')} style={inputStyle} value={materialKey} onChange={e => setWasteMaterial(row.id, e.target.value)}>
-                                <option value="">Select waste type</option>
-                                {WASTE_MATERIAL_GROUPS.map(g => (
-                                  <optgroup key={g.activity} label={g.activity}>
-                                    {g.materials.map(mat => <option key={mat} value={wasteMaterialKey(g.activity, mat)}>{mat}</option>)}
-                                  </optgroup>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <label htmlFor={fieldId('route')} style={labelStyle}>Treatment route</label>
-                              {/* Only the routes this material publishes. Disabled until a material is chosen,
-                                  because until then there is no list that would be true. */}
-                              <select id={fieldId('route')} style={inputStyle} disabled={!hasMaterial} value={routes.includes(row.route) ? row.route : ''} onChange={e => updateWasteRow(row.id, { route: e.target.value })}>
-                                <option value="">{hasMaterial ? 'Select route' : 'Choose a waste type first'}</option>
-                                {routes.map(r => <option key={r} value={r}>{r}</option>)}
-                              </select>
-                            </div>
-                            <div>
-                              <label htmlFor={fieldId('tonnes')} style={labelStyle}>Tonnes</label>
-                              <input id={fieldId('tonnes')} style={inputStyle} type="number" min={0} value={row.tonnes || ''} onChange={e => updateWasteRow(row.id, { tonnes: Number(e.target.value) })} placeholder="0" />
-                            </div>
-                            <div style={{ gridColumn: '1 / -1', fontSize: 11, lineHeight: 1.5 }}>
-                              {pricing.status === 'priced' ? (
-                                <span style={{ color: '#555553' }}>
-                                  {row.tonnes} t × {pricing.factor_kg_per_tonne} kg CO₂e per t = <strong style={{ fontWeight: 600 }}>{pricing.kg_co2e.toLocaleString('en', { maximumFractionDigits: 2 })} kg CO₂e</strong> · {WASTE_METHOD_LABEL[pricing.method]}
-                                </span>
-                              ) : pricing.status === 'no_factor' ? (
-                                <span style={{ color: '#92400e' }}>⚠ Not counted: {wasteRowNotPricedReason(row, pricing)}. Choose the waste type and route again.</span>
-                              ) : (
-                                <span style={{ color: 'var(--color-ink-muted)' }}>Not priced until entered: {pricing.missing.join(', ')}.</span>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })}
-                      <button type="button" onClick={addWasteRow} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: 'none', border: '0.5px solid var(--color-brand)', color: 'var(--color-brand)', cursor: 'pointer', alignSelf: 'flex-start' }}>+ Add waste stream</button>
-                    </div>
+                    <WasteRowsEditor
+                      catId="cat5"
+                      evaluated={cat5Evaluated}
+                      onAdd={() => addWasteRow('cat5')}
+                      onRemove={id => removeWasteRow('cat5', id)}
+                      onUpdate={(id, patch) => updateWasteRow('cat5', id, patch)}
+                      onSetMaterial={(id, key) => setWasteMaterial('cat5', id, key)}
+                    />
 
                     {cat5Priced.length > 0 && (
                       <div style={{ gridColumn: '1 / -1' }}>
