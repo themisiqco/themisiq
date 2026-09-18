@@ -64,13 +64,113 @@ export interface Cat15Figure {
   reason: string
 }
 
-/** The sentence a customer reads where the withdrawn proxy used to put a number. */
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+// THE CATEGORY 15 SENTENCES, ONCE
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+// Every customer surface that says who supplied the investee figure, why a portfolio value times a spend
+// factor does not measure emissions, what withholds the figure, or what a known total does, builds that
+// sentence from here. Until 18 Sep 2026 the same four claims were written out on seven surfaces in three
+// phrasings each ("own reported" / "as entered by the customer"; "does not measure emissions" / "prices a
+// year of purchasing nobody made" / "not a quantity"), and correcting one left the rest stale.
+//
+// ⚠️ NO NEW WORDING. Each sentence below is already approved and live: the methodology page's Category 15
+// passage (the LONG forms) or scope3MethodDescription('pcaf') (the SHORT forms). They were written for
+// different places — a paragraph on a public page, and a hierarchy line that is also a CSV cell — and both
+// are kept verbatim, so they render byte-identical to what was live when this module took them over.
+//
+// ⚠️ APOSTROPHES DIFFER BETWEEN THE TWO, AND THAT IS INHERITED, NOT CHOSEN. The long passage uses the
+// typographic ’ (the methodology page writes \u2019); the short description uses a straight '. Sharing a
+// sentence across the two would have changed one of them visibly, so the only text they share literally is
+// the apostrophe-free CAT15_FIGURE_SOURCE. Unifying the apostrophes is a deliberate visible change for
+// another day.
+//
+// cat15Copy.test.ts bans the superseded phrasings everywhere and checks each surface reads from here.
+
+/** Who supplied the investee's emissions: the customer typed them in. The code cannot tell an investee's
+ *  published figure from the customer's own estimate, so no surface may call it "reported". */
+export const CAT15_FIGURE_SOURCE = 'emissions as entered by the customer'
+
+/** One holding's figure, as the short description states it. Starts lower-case: it follows "Otherwise". */
+export const CAT15_HOLDING_FIGURE =
+  `each holding's figure is the investee's ${CAT15_FIGURE_SOURCE}, multiplied by the outstanding amount ` +
+  `over the value its PCAF asset class attributes on, capped at 100%`
+
+export const CAT15_SENTENCES = {
+  /** What withholds the figure. SHORT: the hierarchy line and CSV cell. */
+  withholdsShort:
+    'A holding missing its emissions or its attribution value withholds the category figure; an outstanding ' +
+    'amount left blank is read as zero.',
+  /** LONG: the methodology passage, where the status the category is then reported with is named. */
+  withholdsLong:
+    'If any holding is missing its emissions or its attribution value, the category produces no figure and ' +
+    'is reported as not yet calculated; an outstanding amount left blank is read as zero.',
+  /** What a known total does. SHORT. */
+  knownTotalShort: 'A known total, where entered, replaces the holding-level figures.',
+  /** LONG: adds the PCAF score it carries, which the passage's data-quality sentence sets up. */
+  knownTotalLong: 'A known total may be entered instead; it is scored 2 and replaces the holding-level figures entirely.',
+  /** Why a portfolio value times a spend factor is not used. SHORT: the claim and the consequence. */
+  noPortfolioProxyShort:
+    'A portfolio value multiplied by a spend factor does not measure emissions, so ThemisIQ does not ' +
+    'estimate this category that way.',
+  /** LONG: the reason as well — a stock at a date against a flow per year. Used where the sentence has to
+   *  stand alone as the explanation (the passage, and the reason shown when there is no figure). */
+  noPortfolioProxyLong:
+    'ThemisIQ does not estimate this category from a portfolio\u2019s total value multiplied by a sector spend ' +
+    'factor: a balance is a position at a date and a spend factor is an intensity per year of activity, so ' +
+    'their product does not measure emissions.',
+} as const
+
+/** scope3MethodDescription('pcaf'): the Category 15 line of the methodology hierarchy, and the Method cell
+ *  of the CSV's per-category table. */
+export function cat15MethodDescription(): string {
+  const s = CAT15_SENTENCES
+  return `PCAF-aligned financed emissions. ${s.knownTotalShort} Otherwise ${CAT15_HOLDING_FIGURE}. ` +
+    `${s.withholdsShort} ${s.noPortfolioProxyShort}`
+}
+
+/** The methodology page's Category 15 passage. The page renders this; it is not typed there any more. */
+export function cat15MethodologyPassage(): string {
+  const s = CAT15_SENTENCES
+  return 'Category 15 financed emissions are calculated with a PCAF-aligned method (Partnership for Carbon ' +
+    'Accounting Financials) for six asset classes: listed equity and corporate bonds, business loans and ' +
+    'unlisted equity, project finance, commercial real estate, mortgages, and motor vehicle loans. Sovereign ' +
+    `debt is not supported. For each holding, the investee\u2019s ${CAT15_FIGURE_SOURCE} are multiplied by the ` +
+    'outstanding amount over the value PCAF attributes on for that asset class: enterprise value including ' +
+    'cash, total equity plus debt, or property or vehicle value at origination. Attribution is capped at 100%. ' +
+    'Each holding is scored on PCAF\u2019s data-quality scale, 1 where the customer marks the investee\u2019s ' +
+    'figure as verified and 2 otherwise, and the portfolio score is weighted by emissions. ' +
+    `${s.withholdsLong} ${s.knownTotalLong} ${s.noPortfolioProxyLong} ` +
+    'ThemisIQ is not a PCAF signatory and is not accredited by PCAF.'
+}
+
+/** The Calculate step's info box for Category 15 (CATEGORIES.cat15.guidance). */
+export const CAT15_GUIDANCE =
+  'Emissions associated with your investments and lending (financed emissions), for investors, banks and ' +
+  `asset owners. ThemisIQ assesses this holding by holding on PCAF\u2019s method: each investee\u2019s ` +
+  `${CAT15_FIGURE_SOURCE}, multiplied by your share of that investee. ` +
+  `${CAT15_SENTENCES.noPortfolioProxyShort} ThemisIQ is not PCAF-certified or a PCAF signatory.`
+
+/** The Category 15 panel's opening box: the method in one line, then why a portfolio value is not used. */
+export const CAT15_PANEL_METHOD =
+  `Financed emissions are worked out holding by holding: ${CAT15_HOLDING_FIGURE}. That is PCAF's method, ` +
+  'and it is the only way this figure can be checked.'
+export const CAT15_PANEL_NO_PROXY = CAT15_SENTENCES.noPortfolioProxyShort
+
+/** The CSV note on a record that still carries a portfolio value or sector from before 17 Sep 2026. */
+export const CAT15_RECORDED_NOT_USED = `Recorded, and NOT used to produce any figure. ${CAT15_SENTENCES.noPortfolioProxyShort}`
+
+/** The CSV methodology note and factor_basis for a decomposed assessment. */
+export function cat15DecomposedBasisDetail(holdings: number, weightedDq: number): string {
+  const first = CAT15_HOLDING_FIGURE.charAt(0).toUpperCase() + CAT15_HOLDING_FIGURE.slice(1)
+  return `Assessed asset by asset across ${holdings} ${holdings === 1 ? 'holding' : 'holdings'}, with an ` +
+    `emissions-weighted PCAF data quality score of ${weightedDq.toFixed(1)} of 5. ${first}.`
+}
+
+/** The sentence a customer reads where the withdrawn proxy used to put a number: the amber box, the CSV's
+ *  "Excluded from total" line and its Category 15 "Not calculated" row. The long form, because here the
+ *  sentence stands alone as the reason there is no figure. */
 export const CAT15_NO_BASIS =
-  'A portfolio value cannot be turned into financed emissions on its own: it is a balance at a date, and a ' +
-  'spend factor is an intensity per year of activity, so multiplying them prices a year of purchasing that ' +
-  'nobody made. No emission factor fixes that, so nothing is estimated rather than a figure that looks ' +
-  'sourced. Itemise the holdings — PCAF attributes each investee\'s own emissions by your share of it — or ' +
-  'enter a figure you already hold.'
+  `${CAT15_SENTENCES.noPortfolioProxyLong} Itemise the holdings, or enter a figure you already hold.`
 
 /** A decomposed assessment that threw after every row computed on its own: a platform failure, not a gap
  *  in what the customer supplied, and the only Cat 15 state that belongs in scope3_categories_unpriced. */
@@ -142,9 +242,12 @@ export function cat15Figure(d: Cat15Data | undefined): Cat15Figure {
   const incomplete = assets.map((a, i) => (holdingComputes(a) ? 0 : i + 1)).filter(n => n > 0)
   if (incomplete.length > 0) {
     return none(
-      `${listHoldings(incomplete)} ${incomplete.length === 1 ? 'cannot' : 'cannot'} be computed yet, so no figure ` +
-      `is shown rather than a total of the rest. Each holding needs an outstanding amount, the value the ` +
-      `attribution divides by, and the investee's reported emissions.`,
+      // ⚠️ THE SHARED WITHHOLDING SENTENCE, NOT A LOCAL ONE. This ended "Each holding needs an outstanding
+      // amount, the value the attribution divides by, and the investee's reported emissions", which was wrong
+      // twice: a blank outstanding amount is read as zero and does not withhold anything, and the investee
+      // figure is whatever the customer entered, not a report.
+      `${listHoldings(incomplete)} cannot be computed yet, so no figure is shown rather than a total of the ` +
+      `rest. ${CAT15_SENTENCES.withholdsShort}`,
       incomplete,
     )
   }

@@ -19,7 +19,9 @@ describe('Category 15: what produces a figure', () => {
     expect(f.mt).toBeNull()
     expect(f.basis).toBeNull()
     expect(f.reason).toBe(CAT15_NO_BASIS)
-    expect(f.reason).toContain('balance at a date')
+    // The shared long sentence (CAT15_SENTENCES.noPortfolioProxyLong): the reason, not only the refusal.
+    expect(f.reason).toContain('does not measure emissions')
+    expect(f.reason).toContain('a position at a date')
     expect(cat15Figure(undefined).mt).toBeNull()
   })
 

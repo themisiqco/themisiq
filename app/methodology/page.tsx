@@ -4,6 +4,7 @@ import Nav from '../components/Nav'
 import Footer from '../components/Footer'
 import { scope3MethodDescription, provenanceGap } from '../../lib/scope3/categoryMethods'
 import { methodologyHierarchyLines } from '../../lib/scope3/methodSummary'
+import { cat15MethodologyPassage } from '../../lib/scope3/cat15'
 import { EMISSION_FACTORS, EMISSION_FACTORS_PROVENANCE } from '../../lib/emissionFactors'
 import { DEFRA_DESNZ_PUBLICATION } from '../../lib/ghg/defraPublication'
 
@@ -107,7 +108,10 @@ const METHODOLOGIES = [
         // platform no longer runs: a portfolio balance multiplied by an intensity per year of activity is
         // not a quantity, and no factor repairs the equation. Claiming a tier-5 estimate we do not produce
         // would be the same defect in the other direction — a published method with nothing behind it.
-        content: 'Category 15 financed emissions are calculated with a PCAF-aligned method (Partnership for Carbon Accounting Financials) for six asset classes: listed equity and corporate bonds, business loans and unlisted equity, project finance, commercial real estate, mortgages, and motor vehicle loans. Sovereign debt is not supported. For each holding, the investee\u2019s emissions as entered by the customer are multiplied by the outstanding amount over the value PCAF attributes on for that asset class: enterprise value including cash, total equity plus debt, or property or vehicle value at origination. Attribution is capped at 100%. Each holding is scored on PCAF\u2019s data-quality scale, 1 where the customer marks the investee\u2019s figure as verified and 2 otherwise, and the portfolio score is weighted by emissions. If any holding is missing its emissions or its attribution value, the category produces no figure and is reported as not yet calculated; an outstanding amount left blank is read as zero. A known total may be entered instead; it is scored 2 and replaces the holding-level figures entirely. ThemisIQ does not estimate this category from a portfolio\u2019s total value multiplied by a sector spend factor: a balance is a position at a date and a spend factor is an intensity per year of activity, so their product does not measure emissions. ThemisIQ is not a PCAF signatory and is not accredited by PCAF.',
+        // The passage is built in lib/scope3/cat15.ts from the same sentences as the hierarchy's Category 15 line,
+        // the CSV and the Scope 3 panel, so no surface can drift from it. Byte-identical to the literal it
+        // replaced on 18 Sep 2026.
+        content: cat15MethodologyPassage(),
       },
       {
         // ⚠️ REWRITTEN 18 SEP 2026. This said ThemisIQ "applies sector-based materiality screening" and
