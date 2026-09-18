@@ -107,7 +107,12 @@ const METHODOLOGIES = [
       },
       {
         title: 'Category 15 — Financed emissions',
-        content: 'Category 15 financed emissions use a PCAF-aligned methodology (Partnership for Carbon Accounting Financials). Current estimates are spend-based (PCAF data-quality tier 5); ThemisIQ is not a PCAF signatory or PCAF-accredited.',
+        // ⚠️ REWRITTEN 17 SEP 2026, AND THE OLD TEXT WAS TRUE WHEN IT WAS WRITTEN. It said "current
+        // estimates are spend-based (PCAF data-quality tier 5)", which described the lumped proxy this
+        // platform no longer runs: a portfolio balance multiplied by an intensity per year of activity is
+        // not a quantity, and no factor repairs the equation. Claiming a tier-5 estimate we do not produce
+        // would be the same defect in the other direction — a published method with nothing behind it.
+        content: 'Category 15 financed emissions use a PCAF-aligned methodology (Partnership for Carbon Accounting Financials): each holding\u2019s financed emissions are the investee\u2019s own reported emissions multiplied by the outstanding amount over the value the holding\u2019s PCAF asset class attributes on \u2014 EVIC, total equity plus debt, property value or vehicle value, per asset class. Each holding carries PCAF\u2019s own data-quality score and the portfolio score is weighted by emissions. Known financed emissions may be entered directly instead. ThemisIQ does NOT estimate this category from a total portfolio value multiplied by a sector spend factor: a portfolio balance is a position at a date and a spend factor is an intensity per year of activity, so the product is not a quantity. Where a holding lacks the investee\u2019s emissions, no figure is produced for the category and the category is reported as not calculated rather than estimated. ThemisIQ is not a PCAF signatory or PCAF-accredited.',
       },
       {
         title: 'Materiality',

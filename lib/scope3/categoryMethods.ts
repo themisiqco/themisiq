@@ -32,6 +32,15 @@ export type Scope3Method =
 
 const METHOD_BY_CATEGORY: Readonly<Record<string, Scope3Method>> = {
   cat1: 'exiobase_spend',
+  // ⚠️ CAT 2 AND CAT 4 JOINED CAT 1 ON 17 SEP 2026, AND THE OTHER SEVEN DID NOT. These three are the
+  // categories a customer BUYS — purchased goods and services, capital goods, inbound freight — so a
+  // spend figure has something to multiply. Cats 9, 11, 13 and 14 price what the company SOLD or LEASED
+  // OUT, where there is no purchase; Cat 3 is derived from energy already in Scopes 1 and 2; Cat 12 is
+  // tonnes by material; Cat 8's own guidance says spend is not appropriate. Those EIGHT — 3, 8, 9, 10, 11,
+  // 12, 13, 14 — keep flat_spend deliberately; see SPEND_PRICED_CATEGORIES in app/dashboard/scope3/page.tsx.
+  // flat_spend therefore still has eight members, and whether it survives is a later question.
+  cat2: 'exiobase_spend',
+  cat4: 'exiobase_spend',
   cat5: 'waste_factors',
   cat6: 'travel_factors',
   cat7: 'commuting_factors',
@@ -73,10 +82,15 @@ export function scope3MethodDescription(method: Scope3Method): string {
   switch (method) {
     case 'exiobase_spend': {
       const src = SPEND_EF_SOURCES.exiobase_38
+      // ⚠️ WORDED FOR THREE CATEGORIES, NOT ONE. It read "the factor for the supplier's sector", which was
+      // Cat 1's question. Cat 2 prices a PRODUCT (what was bought) and Cat 4 an INDUSTRY (who carried the
+      // freight), each with its own recorded code — so the sentence names the category's own selection
+      // rather than one category's vocabulary.
       return (
         `Spend-based, priced from ${src.dataset} version ${src.version} (${src.publisher}, licensed ` +
-        `${src.licence}) through the active factor edition, using the factor for the supplier's sector ` +
-        `in the EXIOBASE region its country of supply belongs to.`
+        `${src.licence}) through the active factor edition, using the factor recorded for that category — ` +
+        `an EXIOBASE industry or product, whichever the category is priced against — in the EXIOBASE ` +
+        `region the inventory's country of supply belongs to.`
       )
     }
     case 'flat_spend':
@@ -109,11 +123,18 @@ export function scope3MethodDescription(method: Scope3Method): string {
         gapSentence(EMISSION_FACTORS_PROVENANCE, 'These factors are')
       )
     case 'pcaf':
+      // ⚠️ THE THIRD ARM IS GONE, AND WITH IT THE PROVENANCE SENTENCE. This ended "otherwise portfolio
+      // value multiplied by a sector factor from ThemisIQ's own factor table", and that path was withdrawn
+      // on 17 Sep 2026: the equation multiplies a balance at a date by an intensity per year of activity,
+      // which no factor repairs. No sentence about that table's provenance is needed here now, because this
+      // method no longer reads it — the remaining two arms use no emission factor at all.
       return (
         `PCAF-aligned financed emissions: known financed emissions where entered, otherwise an assessment ` +
-        `asset by asset, otherwise portfolio value multiplied by a sector factor from ThemisIQ's own factor ` +
-        `table.` +
-        gapSentence(EMISSION_FACTORS_PROVENANCE, 'That table is')
+        `holding by holding — each investee's own reported emissions multiplied by the outstanding amount ` +
+        `over the value that holding's PCAF asset class attributes on — carrying PCAF's own data-quality ` +
+        `score per holding and weighted by emissions across the portfolio. No emission factor is applied ` +
+        `on either path. A portfolio value alone produces no figure: it is a balance at a date, and a spend ` +
+        `factor is an intensity per year of activity, so the two do not multiply into a quantity.`
       )
   }
 }
