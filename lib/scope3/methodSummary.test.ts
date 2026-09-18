@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { scope3MethodFor } from './categoryMethods'
+import { DEFRA_WASTE_META } from '../emissionFactors/defraWaste'
+import { CAT15_GWP_TAIL } from './cat15'
 import {
-  scope3MethodGroups, methodologyHierarchyLines, assistantScope3Basis, categoryHeading,
+  scope3MethodGroups, methodologyHierarchyLines, assistantScope3Basis, assistantScope3GwpClause, categoryHeading,
   SCOPE3_CATEGORY_NAMES, SCOPE3_CATEGORY_NUMBERS,
 } from './methodSummary'
 
@@ -87,5 +89,19 @@ describe('Scope 3 method summary: every category, under the method that prices i
     expect(route).toContain('${assistantScope3Basis()}')
     expect(route).not.toMatch(/the remaining (ten|eight|seven) categories/)
     expect(route).not.toMatch(/Those (ten|eight|seven) are a rough/)
+  })
+
+  it('SM8 ⚠️ the assistant\'s Scope 3 GWP clause is derived: categories from the method map, bases from the records', () => {
+    const clause = assistantScope3GwpClause()
+    const waste = scope3MethodGroups().filter(g => g.method === 'waste_factors' || g.method === 'end_of_life_factors').flatMap(g => g.categories).sort((a, b) => a - b)
+    expect(waste).toEqual([5, 12])
+    expect(clause).toContain(`Categories 5 and 12 use the UK DEFRA/DESNZ ${DEFRA_WASTE_META.year} waste factors, which their publisher combined on ${DEFRA_WASTE_META.gwp_basis}`)
+    const pcaf = scope3MethodGroups().find(g => g.method === 'pcaf')!.categories
+    expect(clause).toContain(`Category ${pcaf.join(', ')} uses investee emissions ${CAT15_GWP_TAIL}`)
+    // Never a basis for the investee figures, and nothing said of the methods whose records carry none.
+    expect(clause).not.toMatch(/Category 15[^;]*\bAR[456]\b/)
+    expect(clause).not.toMatch(/EXIOBASE|Categor(y|ies) (1|2|4|6|7)\b/)
+    const route = readFileSync(join(ROOT, 'app/api/ghg-bot/route.ts'), 'utf8')
+    expect(route).toContain('${assistantScope3GwpClause()}')
   })
 })

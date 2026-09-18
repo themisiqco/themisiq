@@ -51,7 +51,8 @@ export interface FinancedEmissionsResult {
   attributionFactor: number;
   capped: boolean;
   financedEmissions: number; // tCO2e
-  gwpBasis: GwpVersion; // cite 'AR6'
+  /** The GWP basis the investee's figure is on. ALWAYS null today: not recorded. See PCAF_GWP_BASIS. */
+  gwpBasis: GwpVersion | null;
 }
 
 // PCAF data-quality score. 1 = highest fidelity (reported, verified),
@@ -95,7 +96,8 @@ export interface AssetAssessment {
   financedEmissions: number; // tCO2e
   dqScore: DataQualityScore;
   basis: string;
-  gwpBasis: GwpVersion;
+  /** Not recorded (null); carried from the holding's FinancedEmissionsResult. */
+  gwpBasis: GwpVersion | null;
 }
 
 // Portfolio-level result — one honest shape for both the decomposed and the
@@ -108,5 +110,6 @@ export interface PortfolioResult {
   perAsset: AssetAssessment[]; // decomposed: one per asset; proxy: []
   byAssetClass: Partial<Record<PcafAssetClass, number>>; // decomposed only
   coverageByScore: Record<DataQualityScore, number>; // count at each tier
-  gwpBasis: GwpVersion;
+  /** Not recorded (null): the holdings' investee figures keep whatever basis each investee used. */
+  gwpBasis: GwpVersion | null;
 }

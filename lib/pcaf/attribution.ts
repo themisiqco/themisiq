@@ -17,7 +17,8 @@
 //   motor_vehicle_loans            → vehicle value at origination
 //
 // Financed emissions = attribution factor × investee emissions (tCO2e-native; no
-// GWP math here — AR6 is cited as the basis the investee figure is reported on).
+// GWP math here). The investee's figure is used on whatever GWP basis the investee
+// reported it on, and that basis is not recorded: see PCAF_GWP_BASIS.
 //
 // Data-quality scoring and the score-5 spend-based emissions ESTIMATOR are separate
 // later steps and deliberately not implemented here.
@@ -25,8 +26,13 @@
 
 import type { PcafAsset, AttributionResult, FinancedEmissionsResult } from './types';
 
-// PCAF cites investee emissions on the AR6 100-year GWP basis.
-const PCAF_GWP_BASIS = 'AR6' as const;
+// ⚠️ NOT RECORDED, AND NOT 'AR6'. Until 18 Sep 2026 this was the literal 'AR6', stamped on every
+// holding, and the Scope 3 CSV printed it as "the AR6 basis the investee figures are reported on". Nothing
+// ever asked the customer which basis an investee reported on, so the stamp asserted a fact nobody had
+// collected. An investee's CO2e total also cannot be re-based without its split by gas, which the holding
+// form does not collect, so knowing the basis would change what can be DISCLOSED, not the figure. null
+// says "not recorded"; lib/scope3/cat15.ts words that for customers (CAT15_SENTENCES.gwpAsReported).
+const PCAF_GWP_BASIS = null;
 
 // Compute the attribution factor for one asset.
 //

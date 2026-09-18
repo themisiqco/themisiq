@@ -19,6 +19,7 @@ import { scope3MethodFor, scope3MethodDescription, METHOD_TAKES_ENTERED_FIGURE, 
 import { SPEND_EF_SOURCES } from '../emissionFactors/spend'
 import { DEFRA_WASTE_META } from '../emissionFactors/defraWaste'
 import { GENERIC_SPEND_FACTOR } from '../emissionFactors'
+import { CAT15_GWP_TAIL } from './cat15'
 
 /**
  * The fifteen categories by their GHG Protocol Scope 3 Standard titles, in prose case.
@@ -187,4 +188,69 @@ export function assistantScope3Basis(): string {
     : flat.categories.length === 1 ? ' That one is a rough order-of-magnitude estimate, not a sourced figure,'
     : ` Those ${NUMBER_WORDS[flat.categories.length]} are a rough order-of-magnitude estimate, not a sourced figure,`
   return `${joined}.${warning}${warning ? ' and every' : ' Every'} export names the method used for each category`
+}
+
+// ── THE GWP BASIS OF SCOPE 3 FIGURES, FOR THE ASSISTANT ───────────────────────────────────────────
+
+/**
+ * What each Scope 3 method's figures are on, as far as a RECORD states it.
+ *
+ * ⚠️ READ FROM THE RECORDS, NOT TYPED, WHERE A RECORD CARRIES A BASIS. Only the DEFRA/DESNZ waste record
+ * does (DEFRA_WASTE_META.gwp_basis, 'AR5'). The EXIOBASE source record carries no GWP field, and the fixed
+ * travel, commuting and flat-spend factors have no recorded source at all, so those methods are
+ * 'not_recorded' and the assistant is told nothing about them rather than something invented. Category 15
+ * is 'investee': each investee's own basis, which ThemisIQ neither re-bases nor records.
+ *
+ * A Record, so a new method fails tsc here until someone decides what its figures are on.
+ */
+type Scope3GwpSource =
+  | { kind: 'publisher'; basis: string; publisher: string }
+  | { kind: 'investee' }
+  | { kind: 'not_recorded' }
+
+const DEFRA_WASTE_GWP: Scope3GwpSource = {
+  kind: 'publisher',
+  basis: DEFRA_WASTE_META.gwp_basis,
+  publisher: `UK DEFRA/DESNZ ${DEFRA_WASTE_META.year} waste factors`,
+}
+
+const METHOD_GWP: Readonly<Record<Scope3Method, Scope3GwpSource>> = {
+  exiobase_spend: { kind: 'not_recorded' },
+  waste_factors: DEFRA_WASTE_GWP,
+  end_of_life_factors: DEFRA_WASTE_GWP,
+  travel_factors: { kind: 'not_recorded' },
+  commuting_factors: { kind: 'not_recorded' },
+  flat_spend: { kind: 'not_recorded' },
+  pcaf: { kind: 'investee' },
+}
+
+/**
+ * The Scope 3 part of the assistant's GWP-uniformity rule: which categories rest on a publisher's combined
+ * basis, and which on each investee's own. Categories come from the method map, bases from the records.
+ */
+export function assistantScope3GwpClause(): string {
+  const publisherGroups = new Map<string, { basis: string; publisher: string; categories: number[] }>()
+  const investee: number[] = []
+  for (const g of scope3MethodGroups()) {
+    const src = METHOD_GWP[g.method]
+    if (src.kind === 'publisher') {
+      const key = `${src.publisher}|${src.basis}`
+      const e = publisherGroups.get(key) ?? { basis: src.basis, publisher: src.publisher, categories: [] }
+      e.categories.push(...g.categories)
+      publisherGroups.set(key, e)
+    } else if (src.kind === 'investee') {
+      investee.push(...g.categories)
+    }
+  }
+  const word = (ns: readonly number[]) => (ns.length === 1 ? 'Category' : 'Categories')
+  const parts = [
+    ...[...publisherGroups.values()].map(e => {
+      const ns = [...e.categories].sort((x, y) => x - y)
+      return `${word(ns)} ${listNumbers(ns)} ${ns.length === 1 ? 'uses' : 'use'} the ${e.publisher}, which their publisher combined on ${e.basis}`
+    }),
+    investee.length > 0 &&
+      // The shared sentence's own words after the subject: CAT15_GWP_TAIL, verbatim.
+      `${word(investee)} ${listNumbers(investee)} ${investee.length === 1 ? 'uses' : 'use'} investee emissions ${CAT15_GWP_TAIL}`,
+  ].filter((x): x is string => typeof x === 'string' && x.length > 0)
+  return parts.length > 0 ? `In the Scope 3 module, ${parts.join('; ')}.` : ''
 }

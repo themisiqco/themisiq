@@ -95,6 +95,23 @@ export const CAT15_HOLDING_FIGURE =
   `each holding's figure is the investee's ${CAT15_FIGURE_SOURCE}, multiplied by the outstanding amount ` +
   `over the value its PCAF asset class attributes on, capped at 100%`
 
+/**
+ * What GWP basis the investee figures are on: each investee's own, and ThemisIQ neither re-bases nor records
+ * it. ONE SENTENCE, said once wherever it appears: its own sentence after the formula in the methodology
+ * passage and the method description, the whole of the CSV GWP row and the panel line (gwpAsReported), and,
+ * from CAT15_GWP_TAIL, the assistant prompt's Cat 15 clause in the same words.
+ *
+ * ⚠️ WHY "NOT RECORDED" AND NOT A BASIS. Until 18 Sep 2026 lib/pcaf stamped 'AR6' on every holding and the
+ * CSV said the figures were "on the AR6 basis the investee figures are reported on". Nothing ever asked the
+ * customer which basis an investee used. And an investee's CO2e total cannot be converted between AR5 and
+ * AR6 without its split by gas, which the holding form does not collect, so recording the basis would change
+ * what can be disclosed, never the figure. Apostrophe-free, so the passage (’) and the description (') can
+ * carry it byte for byte.
+ */
+export const CAT15_GWP_TAIL =
+  'on whatever GWP basis each investee reported, not re-based, and ThemisIQ does not record which basis that was'
+export const CAT15_GWP_SENTENCE = `Investee emissions are used ${CAT15_GWP_TAIL}.`
+
 export const CAT15_SENTENCES = {
   /** What withholds the figure. SHORT: the hierarchy line and CSV cell. */
   withholdsShort:
@@ -118,14 +135,33 @@ export const CAT15_SENTENCES = {
     'ThemisIQ does not estimate this category from a portfolio\u2019s total value multiplied by a sector spend ' +
     'factor: a balance is a position at a date and a spend factor is an intensity per year of activity, so ' +
     'their product does not measure emissions.',
+  /** The GWP disclosure: CAT15_GWP_SENTENCE itself, so the CSV row and the panel line say it once. */
+  gwpAsReported: CAT15_GWP_SENTENCE,
 } as const
+
+/**
+ * The Cat 15 GWP sentence, checked against the bound GHG inventory's basis the way wasteGwpSentence is for
+ * Cat 5 and Cat 12.
+ *
+ * ⚠️ NO "MATCH" BRANCH, AND THAT IS THE POINT. The waste sentence can say the inventory and the factors share
+ * a basis because the factor record states one (AR5). The investee basis is never recorded, so whatever the
+ * inventory records, whether the two agree is not known, and this never says otherwise.
+ */
+export function cat15GwpSentence(bound: boolean, ghgGwpVersion: string | null): string {
+  const base = CAT15_SENTENCES.gwpAsReported
+  if (!bound) return base
+  return ghgGwpVersion
+    ? `${base} The linked GHG inventory records ${ghgGwpVersion}. Whether the investee figures share that basis is not known.`
+    : `${base} The linked GHG inventory records no GWP basis either.`
+}
 
 /** scope3MethodDescription('pcaf'): the Category 15 line of the methodology hierarchy, and the Method cell
  *  of the CSV's per-category table. */
 export function cat15MethodDescription(): string {
   const s = CAT15_SENTENCES
+  // The GWP sentence follows the formula sentence it qualifies, as its own sentence; the formula is unchanged.
   return `PCAF-aligned financed emissions. ${s.knownTotalShort} Otherwise ${CAT15_HOLDING_FIGURE}. ` +
-    `${s.withholdsShort} ${s.noPortfolioProxyShort}`
+    `${CAT15_GWP_SENTENCE} ${s.withholdsShort} ${s.noPortfolioProxyShort}`
 }
 
 /** The methodology page's Category 15 passage. The page renders this; it is not typed there any more. */
@@ -136,7 +172,9 @@ export function cat15MethodologyPassage(): string {
     'unlisted equity, project finance, commercial real estate, mortgages, and motor vehicle loans. Sovereign ' +
     `debt is not supported. For each holding, the investee\u2019s ${CAT15_FIGURE_SOURCE} are multiplied by the ` +
     'outstanding amount over the value PCAF attributes on for that asset class: enterprise value including ' +
-    'cash, total equity plus debt, or property or vehicle value at origination. Attribution is capped at 100%. ' +
+    // The GWP sentence after the formula and its cap, before the data-quality sentence: the formula and the
+    // 100% cap describe one calculation and stay together.
+    `cash, total equity plus debt, or property or vehicle value at origination. Attribution is capped at 100%. ${CAT15_GWP_SENTENCE} ` +
     'Each holding is scored on PCAF\u2019s data-quality scale, 1 where the customer marks the investee\u2019s ' +
     'figure as verified and 2 otherwise, and the portfolio score is weighted by emissions. ' +
     `${s.withholdsLong} ${s.knownTotalLong} ${s.noPortfolioProxyLong} ` +
