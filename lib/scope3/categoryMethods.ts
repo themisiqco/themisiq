@@ -128,13 +128,23 @@ export function scope3MethodDescription(method: Scope3Method): string {
       // on 17 Sep 2026: the equation multiplies a balance at a date by an intensity per year of activity,
       // which no factor repairs. No sentence about that table's provenance is needed here now, because this
       // method no longer reads it — the remaining two arms use no emission factor at all.
+      //
+      // ⚠️ THE SHORT FORM OF THE METHODOLOGY PAGE'S CATEGORY 15 PASSAGE, AND IT MUST NOT DISAGREE WITH IT.
+      // Rewritten 18 Sep 2026 when that passage was corrected: the investee's emissions are "as entered by
+      // the customer" (the code cannot tell a reported figure from an estimate), a known total comes first
+      // because it replaces the holdings outright, a holding missing its emissions or its attribution value
+      // withholds the figure while a blank outstanding amount is read as zero (see the memory note on that
+      // defect), and a portfolio value times a spend factor "does not measure emissions".
+      // lib/scope3/cat15Copy.test.ts holds both texts to those four points. No em-dashes: this line is
+      // rendered in the hierarchy after a colon and in a CSV cell. Kept to hierarchy-line length: the
+      // data-quality scale, the six asset classes and their denominators are the long passage's job.
       return (
-        `PCAF-aligned financed emissions: known financed emissions where entered, otherwise an assessment ` +
-        `holding by holding — each investee's own reported emissions multiplied by the outstanding amount ` +
-        `over the value that holding's PCAF asset class attributes on — carrying PCAF's own data-quality ` +
-        `score per holding and weighted by emissions across the portfolio. No emission factor is applied ` +
-        `on either path. A portfolio value alone produces no figure: it is a balance at a date, and a spend ` +
-        `factor is an intensity per year of activity, so the two do not multiply into a quantity.`
+        `PCAF-aligned financed emissions. A known total, where entered, replaces the holding-level ` +
+        `figures. Otherwise each holding's figure is the investee's emissions as entered by the customer, ` +
+        `multiplied by the outstanding amount over the value its PCAF asset class attributes on, capped at ` +
+        `100%. A holding missing its emissions or its attribution value withholds the category figure; an ` +
+        `outstanding amount left blank is read as zero. A portfolio value multiplied by a spend factor does ` +
+        `not measure emissions, so ThemisIQ does not estimate this category that way.`
       )
   }
 }
