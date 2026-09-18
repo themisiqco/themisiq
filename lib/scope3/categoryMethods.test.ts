@@ -5,6 +5,7 @@ import { scope3MethodFor, scope3MethodDescription, provenanceGap, type Scope3Met
 import { GENERIC_SPEND_FACTOR } from '../emissionFactors'
 import { defraCitation } from '../ghg/engine'
 import { DEFRA_WASTE_META } from '../emissionFactors/defraWaste'
+import { methodologyHierarchyLines } from './methodSummary'
 
 const IDS = Array.from({ length: 15 }, (_, i) => `cat${i + 1}`)
 const METHODS: Scope3Method[] = ['exiobase_spend', 'flat_spend', 'waste_factors', 'travel_factors', 'commuting_factors', 'pcaf']
@@ -77,8 +78,15 @@ describe('Scope 3 category methods', () => {
     // anywhere under app/ could drift from the wording the licence prescribes, so none is allowed.
     const page = readFileSync(join(__dirname, '../../app/dashboard/scope3/page.tsx'), 'utf8')
     expect(page.match(/DEFRA_WASTE_META\.attribution_required/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
+    // ⚠️ BEHAVIOURAL, NOT A SOURCE STRING, SINCE THE HIERARCHY WAS DERIVED. This asserted that the
+    // methodology page's source CONTAINED scope3MethodDescription('waste_factors'). The page now renders
+    // methodologyHierarchyLines(), which calls it once per method group, so the literal is gone while the
+    // attribution still arrives. Checking the rendered line is stronger: it fails if the waste line stops
+    // carrying the licence wording, whichever function builds it.
     const methodology = readFileSync(join(__dirname, '../../app/methodology/page.tsx'), 'utf8')
-    expect(methodology).toContain("scope3MethodDescription('waste_factors')")
+    expect(methodology).toContain('content: methodologyHierarchyLines()')
+    const wasteLine = methodologyHierarchyLines().find(l => l.includes(DEFRA_WASTE_META.sheet))
+    expect(wasteLine).toContain(DEFRA_WASTE_META.attribution_required)
     const typed: string[] = []
     const walk = (dir: string) => {
       for (const name of readdirSync(dir)) {

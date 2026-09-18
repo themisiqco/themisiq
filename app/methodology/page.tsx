@@ -2,7 +2,8 @@
 
 import Nav from '../components/Nav'
 import Footer from '../components/Footer'
-import { scope3MethodFor, scope3MethodDescription, provenanceGap } from '../../lib/scope3/categoryMethods'
+import { scope3MethodDescription, provenanceGap } from '../../lib/scope3/categoryMethods'
+import { methodologyHierarchyLines } from '../../lib/scope3/methodSummary'
 import { EMISSION_FACTORS, EMISSION_FACTORS_PROVENANCE } from '../../lib/emissionFactors'
 import { DEFRA_DESNZ_PUBLICATION } from '../../lib/ghg/defraPublication'
 
@@ -11,10 +12,12 @@ import { DEFRA_DESNZ_PUBLICATION } from '../../lib/ghg/defraPublication'
 // factor exists in the codebase. They are now assembled from lib/scope3/categoryMethods.ts — the same
 // map the calculator dispatches on — so this page names the method each category is actually
 // calculated with, and the factor values and missing provenance are read from the factor records.
-const flatSpendCategories = Array.from({ length: 15 }, (_, i) => i + 1)
-  .filter(n => scope3MethodFor(`cat${n}`) === 'flat_spend')
-const listNumbers = (ns: number[]) =>
-  ns.length <= 1 ? ns.join('') : `${ns.slice(0, -1).join(', ')} and ${ns[ns.length - 1]}`
+//
+// ⚠️ AND NOW EVERY LINE IS BUILT, NOT ONLY THE FLAT ONE. The hierarchy named Category 1 on its EXIOBASE
+// line by hand and derived only the flat line from the map, so when Categories 2 and 4 moved to EXIOBASE on
+// 17 Sep 2026 they appeared on NO line of this page. methodologyHierarchyLines groups all fifteen by
+// scope3MethodFor, and lib/scope3/methodSummary.test.ts fails if any category is described zero times or
+// twice.
 const bridgeGap = provenanceGap(EMISSION_FACTORS_PROVENANCE)
 
 const GRAD = 'var(--color-brand)'
@@ -95,15 +98,7 @@ const METHODOLOGIES = [
       },
       {
         title: 'Calculation hierarchy',
-        content: [
-          'Each Scope 3 category is calculated by one of the methods below, and every export names the method used for each category in that inventory. Where a figure is entered directly, it is used instead of any estimate.',
-          `Category 1, purchased goods and services: ${scope3MethodDescription('exiobase_spend')} Supplier-specific figures, where entered, are used instead.`,
-          `Category 5, waste: ${scope3MethodDescription('waste_factors')}`,
-          `Category 6, business travel: ${scope3MethodDescription('travel_factors')}`,
-          `Category 7, employee commuting: ${scope3MethodDescription('commuting_factors')}`,
-          `Category 15, investments: ${scope3MethodDescription('pcaf')}`,
-          `The other ${flatSpendCategories.length} categories (${listNumbers(flatSpendCategories)}): ${scope3MethodDescription('flat_spend')}`,
-        ],
+        content: methodologyHierarchyLines(),
       },
       {
         title: 'Category 15 — Financed emissions',

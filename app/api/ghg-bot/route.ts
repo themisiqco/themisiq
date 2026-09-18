@@ -28,10 +28,15 @@
 // ⚠️ THE SCOPE 3 DEFECT IS FIXED — 17 Sep 2026, in its own pass. The prompt twice said Scope 3 was "not
 // covered in this tool", which stopped being true when the 15-category module shipped. It now says Scope 3
 // is a separate module and names what each category rests on, because those differ by an order of
-// magnitude in quality: EXIOBASE through a named edition (Cat 1), the DEFRA/DESNZ 2026 waste factors
-// (Cat 5), unsourced fixed factors (Cats 6 and 7), PCAF (Cat 15), and one flat unsourced 0.5 kg CO2e per
-// currency unit for the other ten. Read lib/scope3/categoryMethods.ts before changing that wording: the
-// map there is what the Scope 3 calculator dispatches on, so the prompt and the calculation agree.
+// magnitude in quality.
+//
+// ⚠️ WHICH CATEGORY RESTS ON WHICH METHOD IS NO LONGER TYPED HERE. It was, and it went stale within a day:
+// the prompt gave the flat-factor group a hand-typed count of ten and named Category 1 alone as EXIOBASE,
+// after Categories 2 and 4 had moved and the true count was eight. (The old wording is not quoted here:
+// methodSummary.test.ts SM7 forbids it anywhere in this file, comments included.) The clause is now
+// assistantScope3Basis() from lib/scope3/methodSummary.ts, grouped by scope3MethodFor — the map the
+// Scope 3 calculator dispatches on — with the flat group's size counted rather than written. Change a
+// method's WORDING there; change which categories it covers in lib/scope3/categoryMethods.ts.
 //
 // Two claims in the prompt are still loose, and were left alone deliberately on the same date: "enter data
 // once, get all reports automatically" (the export gates mean "automatically" holds only once an inventory
@@ -41,6 +46,7 @@ export const runtime = 'nodejs'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { SB253_FIRST_REPORT_DATE } from '../../../lib/sb253'
+import { assistantScope3Basis } from '../../../lib/scope3/methodSummary'
 import { getAuthedClient, bearerFrom, AuthError } from '../../../lib/supabaseAuthed'
 import { checkAndRecordRateLimit, ipFromHeaders } from '../../../lib/rateLimit'
 import { WIZARD_STEP_NAMES, isWizardStep } from '../../../lib/ghg/wizardSteps'
@@ -132,7 +138,7 @@ FRAMEWORK GUIDANCE:
 KEY TECHNICAL FACTS:
 - Scope 1 = direct emissions from owned/controlled sources (natural gas, propane, diesel, gasoline, refrigerants)
 - Scope 2 = indirect emissions from purchased electricity and steam
-- Scope 3 = all other indirect emissions (supply chain, business travel, employee commuting). Not part of this wizard, which covers Scope 1 and 2: ThemisIQ has a separate Scope 3 module that binds to this inventory and has all 15 categories. WHAT IT RESTS ON DIFFERS SHARPLY BY CATEGORY, and you must say so rather than describing it as one inventory: Category 1 (purchased goods and services) is priced from EXIOBASE 3.8.2 through a named factor edition, by sector and country, or from supplier-specific figures where the customer enters them; Category 5 (waste) from the UK DEFRA/DESNZ 2026 waste factors, per material and treatment route; Categories 6 and 7 (business travel, employee commuting) from fixed factors that carry no recorded source, year or region; Category 15 (investments) through a PCAF-aligned path; and the remaining ten categories from ONE flat factor of 0.5 kg CO2e per unit of the inventory's currency, the same whatever was bought, with no source, year or region recorded. Those ten are a rough order-of-magnitude estimate, not a sourced figure, and every export names the method used for each category
+- Scope 3 = all other indirect emissions (supply chain, business travel, employee commuting). Not part of this wizard, which covers Scope 1 and 2: ThemisIQ has a separate Scope 3 module that binds to this inventory and has all 15 categories. WHAT IT RESTS ON DIFFERS SHARPLY BY CATEGORY, and you must say so rather than describing it as one inventory: ${assistantScope3Basis()}
 - Mcf = thousand cubic feet of natural gas (common US utility billing unit)
 - Therms = unit of natural gas energy (1 therm = 100,000 BTU)
 - MMBtu = million British thermal units of natural gas
