@@ -1,0 +1,3403 @@
+{
+  "metadata": {
+    "source": "UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting",
+    "title_as_published": "UK Government GHG Conversion Factors for Company Reporting",
+    "edition": "DEFRA 2026",
+    "factor_set": "Full set",
+    "file_version": "1",
+    "year": "2026",
+    "sheets": [
+      "Business travel- air",
+      "WTT- business travel- air",
+      "Haul definition",
+      "Hotel stay",
+      "Business travel- land",
+      "WTT- pass vehs & travel- land"
+    ],
+    "scope": "Scope 3",
+    "gwp_basis": "AR5",
+    "gwp_basis_note": "Stated by the workbook's Introduction sheet: the CO2e figures use IPCC Fifth Assessment Report (AR5) 100-year GWPs. The CO2, CH4 and N2O components are published already in kg CO2e (the sheet's headers read 'kg CO2e of CH4 per unit' and so on) and are stored as published, not re-based.",
+    "unit_note": "Asserted, not assumed: every air, WTT air and rail row's Unit cell reads 'passenger.km', and every Hotel stay row's reads 'Room per night'. The generator aborts on anything else.",
+    "rf_note": "Air rows carry both the 'With RF' and 'Without RF' column sets as published. The sheet puts the whole indirect effect on the CO2 component (guidance.rf_two_sets); CH4 and N2O are the same in both. The WTT air sheet publishes both columns with identical values (guidance.wtt_air_rf_identical).",
+    "absent_hotel_note": "A COUNTRY LISTED WITH AN EMPTY VALUE CELL HAS NO FACTOR, NOT A FACTOR OF ZERO. Its record carries kg_co2e_per_room_night: null. Reading it as 0 would report a hotel stay as emissions-free rather than as unpriceable. The sheet's own FAQ on missing countries is guidance.hotel_missing_country.",
+    "rail_scope_note": "Only the four Rail rows of 'Business travel- land' and the four WTT- rail rows are read. The rail factors are UK figures; applied outside the UK they are a stand-in, which the calculation must say.",
+    "licence": "Open Government Licence v3.0 (OGL v3.0)",
+    "licence_url": "http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/",
+    "licence_basis": "Stated on the 2026 publication page on gov.uk, as verified on 17 Sep 2026 for this same workbook (lib/ghg/defraPublication.ts); the page was not re-read for this artefact. The workbook itself states no licence. The statement carries an 'except where otherwise stated' exception. The Hotel stay sheet says its factors are taken from the Hotel Footprinting Tool (International Tourism Partnership and Greenview; guidance.hotel_source): third-party data, which the workbook marks with no different licence, but which OGL v3.0 does not cover to the extent the provider was not authorised to license it.",
+    "attribution_required": "Contains public sector information licensed under the Open Government Licence v3.0.",
+    "guidance": {
+      "rf_two_sets": {
+        "sheet": "Business travel- air",
+        "cell": "A11",
+        "text": "●  Emissions from aviation have both direct (CO2, CH4 and N2O) and indirect (non-CO2 emissions e.g. water vapour, contrails, NOx) climate change effects. Two sets of emission factors are presented here; one that includes the indirect effects of non-CO2 emissions and one that represents direct effects only. The entirety of the indirect effects have been applied to the CO2 factor, causing an increase of 70%."
+      },
+      "rf_should_include": {
+        "sheet": "Business travel- air",
+        "cell": "A12",
+        "text": "●  Organisations should include the indirect effects of non-CO2 emissions when reporting air travel emissions to capture the full climate impact of their travel. However, it should be noted that there is significant scientific uncertainty around the magnitude of the indirect effect of non-CO2 aviation emissions and it is an active area of research. Further information can be found in the air transport section of the Methodology Paper."
+      },
+      "rf_comparable_reporting": {
+        "sheet": "Business travel- air",
+        "cell": "A13",
+        "text": "●  Organisations should produce comparable reporting. Therefore, they should avoid reporting emissions including indirect effects of non-CO2 emissions in one year and direct effects only in another year as this may skew the interpretation of their reporting."
+      },
+      "rf_faq_which_set": {
+        "sheet": "Business travel- air",
+        "cell": "A47",
+        "text": "Users should generally use the ‘including indirect effects of non-CO2 emissions’ factors, which incorporate a 70% increase in CO2 emissions to approximate the indirect impact of non-CO2 emissions from aviation (such as water vapour, contrails and NOx). If the user’s historical data do not include these indirect effects, then they should rebaseline their historical dataset to include the effect going forward. However, users should be aware of the significant scientific uncertainty surrounding the quantification of these impacts. If organisations do not wish to include the indirect effects, then they should continue to select the ‘Direct effects from CO2, CH4 and N2O emissions only’ factors."
+      },
+      "rf_faq_indirect_effects": {
+        "sheet": "Business travel- air",
+        "cell": "A51",
+        "text": "Indirect effects refer to the contribution that non-CO2 emissions (e.g. water vapour, contrails, NOx) have towards climate change. Scientific evidence is still emerging, however the effect of releasing these emissions at high altitude is likely to be greater than releases at ground level. The studies used in calculation of these factors provide a multiplier to account for indirect effects but do not distinguish the effects at different altitudes or during different phases of the flight. The multiplier is therefore recommended to be applied equally to all flights irrespective of distance, altitude or phase of the flight, albeit accepting the approximations involved in this approach. Similarly, due to lower flight altitudes, the non-CO2 effects are likely to be less pronounced for turboprops than for commercial jet aircraft, but again the scientific evidence does not provide a mechanism to treat them differently, so the recommendation remains to apply the multiplier equally to all flights."
+      },
+      "distance_uplift": {
+        "sheet": "Business travel- air",
+        "cell": "A49",
+        "text": "All the factors include the distance uplift of 8% to compensate for planes not flying using the most direct route (such as flying around international airspace and stacking).  Historical factors have also included a distance uplift, though it was 9% for 2012 and before. If users did not previously include the distance uplift, then they should rebaseline their historical dataset. However, if users wish to continue to not include the distance uplift, then it should be manually removed from the current factors."
+      },
+      "international_and_non_stop": {
+        "sheet": "Business travel- air",
+        "cell": "A53",
+        "text": "In the 2015 update, a brand new set of aviation factors were introduced where aviation factors are now being presented for international flights between non-UK destinations. This is a relatively high-level analysis and allows users to choose a different factor for air travel if flying between countries outside of the UK. All factors presented are for direct (non-stop) flights only. This analysis was only possible for passenger air travel. However, in the interests of consistency with the air freight travel, international freight factors have been included. International freight factors have been set equal to the current UK, long-haul freight factors.  \nFor these factors, see sheets:"
+      },
+      "international_is_average": {
+        "sheet": "Business travel- air",
+        "cell": "A56",
+        "text": "Please note - the international business travel factors are an average of short and long-haul flights to/from UK."
+      },
+      "class_unknown_use_average": {
+        "sheet": "Business travel- air",
+        "cell": "A18",
+        "text": "The company then multiplies the distance (km) travelled in each class for each category of journey by the appropriate conversion factor. Company L uses the factor set that includes indirect effects of non-CO2 emissions.  Where the ‘haul’ of the journey is known, but the class is unknown, the company uses the ‘average passenger’ factor."
+      },
+      "wtt_air_rf_identical": {
+        "sheet": "WTT- business travel- air",
+        "cell": "A12",
+        "text": "●  Factors are provided including/excluding the indirect effects of non-CO2 emissions for consistency with the ‘Business travel- air’ factors. However, for WTT- business travel- air the indirect effects do not change the emissions and the two sets of factors are therefore the same."
+      },
+      "hotel_average_class": {
+        "sheet": "Hotel stay",
+        "cell": "A11",
+        "text": "●  The conversion factors provided are for an average class of hotel and can be applied to a stay at any type of hotel."
+      },
+      "hotel_country_average": {
+        "sheet": "Hotel stay",
+        "cell": "A12",
+        "text": "●  Unless otherwise stated, conversion factors provided are an average for the specified country."
+      },
+      "hotel_per_room": {
+        "sheet": "Hotel stay",
+        "cell": "A13",
+        "text": "●  The conversion factors are provided on a 'room per night' basis and should be applied to each room that is occupied during the stay.  The conversion factor does not differentiate for number of travellers staying in the room."
+      },
+      "hotel_source": {
+        "sheet": "Hotel stay",
+        "cell": "A86",
+        "text": "The hotel stay conversion factors are taken from the Hotel Footprinting Tool, produced by the International Tourism Partnership and Greenview, which have been derived from the Cornell Hotel Sustainability Benchmarking Index that uses annual data from international hotel companies and a standardized industry methodology."
+      },
+      "hotel_missing_country": {
+        "sheet": "Hotel stay",
+        "cell": "A90",
+        "text": "The provision of conversion factors is limited by the availability of data in different parts of the world. If the hotel stay conversion factor for a certain country is not available in the current set, users may continue to use factors from the last available set, or visit https://www.hotelfootprints.org where more granular data is available by city and segment."
+      },
+      "land_vehicle_vs_passenger_km": {
+        "sheet": "Business travel- land",
+        "cell": "A12",
+        "text": "●  Users should be mindful of the difference between vehicle km conversion factors and passenger km conversion factors. Vehicle km conversion factors should be applied to a whole vehicle (such as a car or taxi) being used for business purposes. Passenger km factors should be used when single passengers are travelling by means of mass transport (such as by train) and the aim is to report emissions on a single-person basis, not account for the whole vehicle."
+      }
+    },
+    "generated_on": "2026-09-18",
+    "generated_from": "defra-desnz-ghg-conversion-factors-2026-full-set-v1.xlsx",
+    "generated_from_sha256": "b5c4f2f86cdc74707337b2fb013b44ded189a1b528f5e29ea99856ba65ae0205",
+    "generated_by": "scripts/generate-defra-travel.py",
+    "air_categories": [
+      "domestic",
+      "short_haul",
+      "long_haul",
+      "international_non_uk"
+    ],
+    "cabin_classes": [
+      "average_passenger",
+      "economy",
+      "premium_economy",
+      "business",
+      "first"
+    ],
+    "counts": {
+      "air": 14,
+      "wtt_air": 14,
+      "haul_territories": 215,
+      "haul_by_haul": {
+        "domestic": 4,
+        "short_haul": 47,
+        "long_haul": 164
+      },
+      "hotel_countries": 55,
+      "hotel_priced": 39,
+      "hotel_absent": 16,
+      "rail": 4,
+      "wtt_rail": 4
+    },
+    "hotel_countries_without_factor": [
+      "Argentina",
+      "Austria",
+      "Czech Republic",
+      "Fiji",
+      "Finland",
+      "Greece",
+      "Ireland",
+      "Israel",
+      "Kazakhstan",
+      "Macau, China",
+      "New Zealand",
+      "Panama",
+      "Peru",
+      "Poland",
+      "Romania",
+      "Taiwan, China"
+    ],
+    "fingerprint_sha256": "164b481fe08447aeed2e812ff87eecb31ddcc2885fec3713c3ca671de71fc5ab"
+  },
+  "air": [
+    {
+      "category": "domestic",
+      "cabin_class": "average_passenger",
+      "haul_as_published": "Domestic, to/from UK",
+      "class_as_published": "Average passenger",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": {
+        "kg_co2e": 0.22928,
+        "co2": 0.22771,
+        "ch4": 0.00022,
+        "n2o": 0.00134
+      },
+      "without_rf": {
+        "kg_co2e": 0.13552,
+        "co2": 0.13395,
+        "ch4": 0.00022,
+        "n2o": 0.00134
+      },
+      "sheet": "Business travel- air",
+      "row": 23,
+      "cells": {
+        "haul": "B23",
+        "class": "C23",
+        "unit": "D23",
+        "with_rf": "E23:H23",
+        "without_rf": "I23:L23"
+      }
+    },
+    {
+      "category": "short_haul",
+      "cabin_class": "average_passenger",
+      "haul_as_published": "Short-haul, to/from UK",
+      "class_as_published": "Average passenger",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": {
+        "kg_co2e": 0.12786,
+        "co2": 0.12693,
+        "ch4": 1e-05,
+        "n2o": 0.00092
+      },
+      "without_rf": {
+        "kg_co2e": 0.07559,
+        "co2": 0.07466,
+        "ch4": 1e-05,
+        "n2o": 0.00092
+      },
+      "sheet": "Business travel- air",
+      "row": 24,
+      "cells": {
+        "haul": "B24",
+        "class": "C24",
+        "unit": "D24",
+        "with_rf": "E24:H24",
+        "without_rf": "I24:L24"
+      }
+    },
+    {
+      "category": "short_haul",
+      "cabin_class": "economy",
+      "haul_as_published": "Short-haul, to/from UK",
+      "class_as_published": "Economy class",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": {
+        "kg_co2e": 0.12576,
+        "co2": 0.12485,
+        "ch4": 1e-05,
+        "n2o": 0.0009
+      },
+      "without_rf": {
+        "kg_co2e": 0.07435,
+        "co2": 0.07344,
+        "ch4": 1e-05,
+        "n2o": 0.0009
+      },
+      "sheet": "Business travel- air",
+      "row": 25,
+      "cells": {
+        "haul": "B24",
+        "class": "C25",
+        "unit": "D25",
+        "with_rf": "E25:H25",
+        "without_rf": "I25:L25"
+      }
+    },
+    {
+      "category": "short_haul",
+      "cabin_class": "business",
+      "haul_as_published": "Short-haul, to/from UK",
+      "class_as_published": "Business class",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": {
+        "kg_co2e": 0.18863,
+        "co2": 0.18727,
+        "ch4": 1e-05,
+        "n2o": 0.00135
+      },
+      "without_rf": {
+        "kg_co2e": 0.11152,
+        "co2": 0.11016,
+        "ch4": 1e-05,
+        "n2o": 0.00135
+      },
+      "sheet": "Business travel- air",
+      "row": 26,
+      "cells": {
+        "haul": "B24",
+        "class": "C26",
+        "unit": "D26",
+        "with_rf": "E26:H26",
+        "without_rf": "I26:L26"
+      }
+    },
+    {
+      "category": "long_haul",
+      "cabin_class": "average_passenger",
+      "haul_as_published": "Long-haul, to/from UK",
+      "class_as_published": "Average passenger",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": {
+        "kg_co2e": 0.15282,
+        "co2": 0.15152,
+        "ch4": 1e-05,
+        "n2o": 0.00129
+      },
+      "without_rf": {
+        "kg_co2e": 0.09043,
+        "co2": 0.08913,
+        "ch4": 1e-05,
+        "n2o": 0.00129
+      },
+      "sheet": "Business travel- air",
+      "row": 27,
+      "cells": {
+        "haul": "B27",
+        "class": "C27",
+        "unit": "D27",
+        "with_rf": "E27:H27",
+        "without_rf": "I27:L27"
+      }
+    },
+    {
+      "category": "long_haul",
+      "cabin_class": "economy",
+      "haul_as_published": "Long-haul, to/from UK",
+      "class_as_published": "Economy class",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": {
+        "kg_co2e": 0.11704,
+        "co2": 0.11604,
+        "ch4": 1e-05,
+        "n2o": 0.00099
+      },
+      "without_rf": {
+        "kg_co2e": 0.06926,
+        "co2": 0.06826,
+        "ch4": 1e-05,
+        "n2o": 0.00099
+      },
+      "sheet": "Business travel- air",
+      "row": 28,
+      "cells": {
+        "haul": "B27",
+        "class": "C28",
+        "unit": "D28",
+        "with_rf": "E28:H28",
+        "without_rf": "I28:L28"
+      }
+    },
+    {
+      "category": "long_haul",
+      "cabin_class": "premium_economy",
+      "haul_as_published": "Long-haul, to/from UK",
+      "class_as_published": "Premium economy class",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": {
+        "kg_co2e": 0.18726,
+        "co2": 0.18567,
+        "ch4": 1e-05,
+        "n2o": 0.00157
+      },
+      "without_rf": {
+        "kg_co2e": 0.11081,
+        "co2": 0.10922,
+        "ch4": 1e-05,
+        "n2o": 0.00157
+      },
+      "sheet": "Business travel- air",
+      "row": 29,
+      "cells": {
+        "haul": "B27",
+        "class": "C29",
+        "unit": "D29",
+        "with_rf": "E29:H29",
+        "without_rf": "I29:L29"
+      }
+    },
+    {
+      "category": "long_haul",
+      "cabin_class": "business",
+      "haul_as_published": "Long-haul, to/from UK",
+      "class_as_published": "Business class",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": {
+        "kg_co2e": 0.3394,
+        "co2": 0.33652,
+        "ch4": 2e-05,
+        "n2o": 0.00285
+      },
+      "without_rf": {
+        "kg_co2e": 0.20083,
+        "co2": 0.19795,
+        "ch4": 2e-05,
+        "n2o": 0.00285
+      },
+      "sheet": "Business travel- air",
+      "row": 30,
+      "cells": {
+        "haul": "B27",
+        "class": "C30",
+        "unit": "D30",
+        "with_rf": "E30:H30",
+        "without_rf": "I30:L30"
+      }
+    },
+    {
+      "category": "long_haul",
+      "cabin_class": "first",
+      "haul_as_published": "Long-haul, to/from UK",
+      "class_as_published": "First class",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": {
+        "kg_co2e": 0.46814,
+        "co2": 0.46417,
+        "ch4": 3e-05,
+        "n2o": 0.00394
+      },
+      "without_rf": {
+        "kg_co2e": 0.27701,
+        "co2": 0.27304,
+        "ch4": 3e-05,
+        "n2o": 0.00394
+      },
+      "sheet": "Business travel- air",
+      "row": 31,
+      "cells": {
+        "haul": "B27",
+        "class": "C31",
+        "unit": "D31",
+        "with_rf": "E31:H31",
+        "without_rf": "I31:L31"
+      }
+    },
+    {
+      "category": "international_non_uk",
+      "cabin_class": "average_passenger",
+      "haul_as_published": "International, to/from non-UK",
+      "class_as_published": "Average passenger",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": {
+        "kg_co2e": 0.14253,
+        "co2": 0.14166,
+        "ch4": 1e-05,
+        "n2o": 0.00086
+      },
+      "without_rf": {
+        "kg_co2e": 0.0842,
+        "co2": 0.08333,
+        "ch4": 1e-05,
+        "n2o": 0.00086
+      },
+      "sheet": "Business travel- air",
+      "row": 32,
+      "cells": {
+        "haul": "B32",
+        "class": "C32",
+        "unit": "D32",
+        "with_rf": "E32:H32",
+        "without_rf": "I32:L32"
+      }
+    },
+    {
+      "category": "international_non_uk",
+      "cabin_class": "economy",
+      "haul_as_published": "International, to/from non-UK",
+      "class_as_published": "Economy class",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": {
+        "kg_co2e": 0.10916,
+        "co2": 0.10849,
+        "ch4": 1e-05,
+        "n2o": 0.00067
+      },
+      "without_rf": {
+        "kg_co2e": 0.06449,
+        "co2": 0.06382,
+        "ch4": 1e-05,
+        "n2o": 0.00067
+      },
+      "sheet": "Business travel- air",
+      "row": 33,
+      "cells": {
+        "haul": "B32",
+        "class": "C33",
+        "unit": "D33",
+        "with_rf": "E33:H33",
+        "without_rf": "I33:L33"
+      }
+    },
+    {
+      "category": "international_non_uk",
+      "cabin_class": "premium_economy",
+      "haul_as_published": "International, to/from non-UK",
+      "class_as_published": "Premium economy class",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": {
+        "kg_co2e": 0.17465,
+        "co2": 0.17358,
+        "ch4": 1e-05,
+        "n2o": 0.00106
+      },
+      "without_rf": {
+        "kg_co2e": 0.10318,
+        "co2": 0.10211,
+        "ch4": 1e-05,
+        "n2o": 0.00106
+      },
+      "sheet": "Business travel- air",
+      "row": 34,
+      "cells": {
+        "haul": "B32",
+        "class": "C34",
+        "unit": "D34",
+        "with_rf": "E34:H34",
+        "without_rf": "I34:L34"
+      }
+    },
+    {
+      "category": "international_non_uk",
+      "cabin_class": "business",
+      "haul_as_published": "International, to/from non-UK",
+      "class_as_published": "Business class",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": {
+        "kg_co2e": 0.31656,
+        "co2": 0.31462,
+        "ch4": 2e-05,
+        "n2o": 0.00192
+      },
+      "without_rf": {
+        "kg_co2e": 0.18701,
+        "co2": 0.18507,
+        "ch4": 2e-05,
+        "n2o": 0.00192
+      },
+      "sheet": "Business travel- air",
+      "row": 35,
+      "cells": {
+        "haul": "B32",
+        "class": "C35",
+        "unit": "D35",
+        "with_rf": "E35:H35",
+        "without_rf": "I35:L35"
+      }
+    },
+    {
+      "category": "international_non_uk",
+      "cabin_class": "first",
+      "haul_as_published": "International, to/from non-UK",
+      "class_as_published": "First class",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": {
+        "kg_co2e": 0.43663,
+        "co2": 0.43396,
+        "ch4": 2e-05,
+        "n2o": 0.00265
+      },
+      "without_rf": {
+        "kg_co2e": 0.25794,
+        "co2": 0.25527,
+        "ch4": 2e-05,
+        "n2o": 0.00265
+      },
+      "sheet": "Business travel- air",
+      "row": 36,
+      "cells": {
+        "haul": "B32",
+        "class": "C36",
+        "unit": "D36",
+        "with_rf": "E36:H36",
+        "without_rf": "I36:L36"
+      }
+    }
+  ],
+  "wtt_air": [
+    {
+      "category": "domestic",
+      "cabin_class": "average_passenger",
+      "haul_as_published": "Domestic, to/from UK",
+      "class_as_published": "Average passenger",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": 0.0335,
+      "without_rf": 0.0335,
+      "sheet": "WTT- business travel- air",
+      "row": 20,
+      "cells": {
+        "haul": "B20",
+        "class": "C20",
+        "unit": "D20",
+        "with_rf": "E20",
+        "without_rf": "F20"
+      }
+    },
+    {
+      "category": "short_haul",
+      "cabin_class": "average_passenger",
+      "haul_as_published": "Short-haul, to/from UK",
+      "class_as_published": "Average passenger",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": 0.02286,
+      "without_rf": 0.02286,
+      "sheet": "WTT- business travel- air",
+      "row": 21,
+      "cells": {
+        "haul": "B21",
+        "class": "C21",
+        "unit": "D21",
+        "with_rf": "E21",
+        "without_rf": "F21"
+      }
+    },
+    {
+      "category": "short_haul",
+      "cabin_class": "economy",
+      "haul_as_published": "Short-haul, to/from UK",
+      "class_as_published": "Economy class",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": 0.02249,
+      "without_rf": 0.02249,
+      "sheet": "WTT- business travel- air",
+      "row": 22,
+      "cells": {
+        "haul": "B21",
+        "class": "C22",
+        "unit": "D22",
+        "with_rf": "E22",
+        "without_rf": "F22"
+      }
+    },
+    {
+      "category": "short_haul",
+      "cabin_class": "business",
+      "haul_as_published": "Short-haul, to/from UK",
+      "class_as_published": "Business class",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": 0.03373,
+      "without_rf": 0.03373,
+      "sheet": "WTT- business travel- air",
+      "row": 23,
+      "cells": {
+        "haul": "B21",
+        "class": "C23",
+        "unit": "D23",
+        "with_rf": "E23",
+        "without_rf": "F23"
+      }
+    },
+    {
+      "category": "long_haul",
+      "cabin_class": "average_passenger",
+      "haul_as_published": "Long-haul, to/from UK",
+      "class_as_published": "Average passenger",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": 0.03213,
+      "without_rf": 0.03213,
+      "sheet": "WTT- business travel- air",
+      "row": 24,
+      "cells": {
+        "haul": "B24",
+        "class": "C24",
+        "unit": "D24",
+        "with_rf": "E24",
+        "without_rf": "F24"
+      }
+    },
+    {
+      "category": "long_haul",
+      "cabin_class": "economy",
+      "haul_as_published": "Long-haul, to/from UK",
+      "class_as_published": "Economy class",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": 0.02461,
+      "without_rf": 0.02461,
+      "sheet": "WTT- business travel- air",
+      "row": 25,
+      "cells": {
+        "haul": "B24",
+        "class": "C25",
+        "unit": "D25",
+        "with_rf": "E25",
+        "without_rf": "F25"
+      }
+    },
+    {
+      "category": "long_haul",
+      "cabin_class": "premium_economy",
+      "haul_as_published": "Long-haul, to/from UK",
+      "class_as_published": "Premium economy class",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": 0.03937,
+      "without_rf": 0.03937,
+      "sheet": "WTT- business travel- air",
+      "row": 26,
+      "cells": {
+        "haul": "B24",
+        "class": "C26",
+        "unit": "D26",
+        "with_rf": "E26",
+        "without_rf": "F26"
+      }
+    },
+    {
+      "category": "long_haul",
+      "cabin_class": "business",
+      "haul_as_published": "Long-haul, to/from UK",
+      "class_as_published": "Business class",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": 0.07137,
+      "without_rf": 0.07137,
+      "sheet": "WTT- business travel- air",
+      "row": 27,
+      "cells": {
+        "haul": "B24",
+        "class": "C27",
+        "unit": "D27",
+        "with_rf": "E27",
+        "without_rf": "F27"
+      }
+    },
+    {
+      "category": "long_haul",
+      "cabin_class": "first",
+      "haul_as_published": "Long-haul, to/from UK",
+      "class_as_published": "First class",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": 0.09844,
+      "without_rf": 0.09844,
+      "sheet": "WTT- business travel- air",
+      "row": 28,
+      "cells": {
+        "haul": "B24",
+        "class": "C28",
+        "unit": "D28",
+        "with_rf": "E28",
+        "without_rf": "F28"
+      }
+    },
+    {
+      "category": "international_non_uk",
+      "cabin_class": "average_passenger",
+      "haul_as_published": "International, to/from non-UK",
+      "class_as_published": "Average passenger",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": 0.02162,
+      "without_rf": 0.02162,
+      "sheet": "WTT- business travel- air",
+      "row": 29,
+      "cells": {
+        "haul": "B29",
+        "class": "C29",
+        "unit": "D29",
+        "with_rf": "E29",
+        "without_rf": "F29"
+      }
+    },
+    {
+      "category": "international_non_uk",
+      "cabin_class": "economy",
+      "haul_as_published": "International, to/from non-UK",
+      "class_as_published": "Economy class",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": 0.01656,
+      "without_rf": 0.01656,
+      "sheet": "WTT- business travel- air",
+      "row": 30,
+      "cells": {
+        "haul": "B29",
+        "class": "C30",
+        "unit": "D30",
+        "with_rf": "E30",
+        "without_rf": "F30"
+      }
+    },
+    {
+      "category": "international_non_uk",
+      "cabin_class": "premium_economy",
+      "haul_as_published": "International, to/from non-UK",
+      "class_as_published": "Premium economy class",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": 0.02649,
+      "without_rf": 0.02649,
+      "sheet": "WTT- business travel- air",
+      "row": 31,
+      "cells": {
+        "haul": "B29",
+        "class": "C31",
+        "unit": "D31",
+        "with_rf": "E31",
+        "without_rf": "F31"
+      }
+    },
+    {
+      "category": "international_non_uk",
+      "cabin_class": "business",
+      "haul_as_published": "International, to/from non-UK",
+      "class_as_published": "Business class",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": 0.04802,
+      "without_rf": 0.04802,
+      "sheet": "WTT- business travel- air",
+      "row": 32,
+      "cells": {
+        "haul": "B29",
+        "class": "C32",
+        "unit": "D32",
+        "with_rf": "E32",
+        "without_rf": "F32"
+      }
+    },
+    {
+      "category": "international_non_uk",
+      "cabin_class": "first",
+      "haul_as_published": "International, to/from non-UK",
+      "class_as_published": "First class",
+      "unit": "kg CO2e per passenger.km",
+      "with_rf": 0.06623,
+      "without_rf": 0.06623,
+      "sheet": "WTT- business travel- air",
+      "row": 33,
+      "cells": {
+        "haul": "B29",
+        "class": "C33",
+        "unit": "D33",
+        "with_rf": "E33",
+        "without_rf": "F33"
+      }
+    }
+  ],
+  "haul_definition": [
+    {
+      "territory": "Guernsey",
+      "iso3": "GGY",
+      "haul": "domestic",
+      "haul_as_published": "Domestic",
+      "sheet": "Haul definition",
+      "row": 6,
+      "cells": "A6:C6"
+    },
+    {
+      "territory": "Isle Of Man",
+      "iso3": "IMN",
+      "haul": "domestic",
+      "haul_as_published": "Domestic",
+      "sheet": "Haul definition",
+      "row": 7,
+      "cells": "A7:C7"
+    },
+    {
+      "territory": "Jersey",
+      "iso3": "JEY",
+      "haul": "domestic",
+      "haul_as_published": "Domestic",
+      "sheet": "Haul definition",
+      "row": 8,
+      "cells": "A8:C8"
+    },
+    {
+      "territory": "United Kingdom",
+      "iso3": "GBR",
+      "haul": "domestic",
+      "haul_as_published": "Domestic",
+      "sheet": "Haul definition",
+      "row": 9,
+      "cells": "A9:C9"
+    },
+    {
+      "territory": "Afghanistan",
+      "iso3": "AFG",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 10,
+      "cells": "A10:C10"
+    },
+    {
+      "territory": "American Samoa",
+      "iso3": "ASM",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 11,
+      "cells": "A11:C11"
+    },
+    {
+      "territory": "Angola",
+      "iso3": "AGO",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 12,
+      "cells": "A12:C12"
+    },
+    {
+      "territory": "Anguilla",
+      "iso3": "AIA",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 13,
+      "cells": "A13:C13"
+    },
+    {
+      "territory": "Antigua and Barbuda",
+      "iso3": "ATG",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 14,
+      "cells": "A14:C14"
+    },
+    {
+      "territory": "Argentina",
+      "iso3": "ARG",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 15,
+      "cells": "A15:C15"
+    },
+    {
+      "territory": "Armenia",
+      "iso3": "ARM",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 16,
+      "cells": "A16:C16"
+    },
+    {
+      "territory": "Aruba",
+      "iso3": "ABW",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 17,
+      "cells": "A17:C17"
+    },
+    {
+      "territory": "Ascension Island",
+      "iso3": "SHN",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 18,
+      "cells": "A18:C18"
+    },
+    {
+      "territory": "Australia",
+      "iso3": "AUS",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 19,
+      "cells": "A19:C19"
+    },
+    {
+      "territory": "Azerbaijan",
+      "iso3": "AZE",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 20,
+      "cells": "A20:C20"
+    },
+    {
+      "territory": "Bahamas",
+      "iso3": "BHS",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 21,
+      "cells": "A21:C21"
+    },
+    {
+      "territory": "Bahrain",
+      "iso3": "BHR",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 22,
+      "cells": "A22:C22"
+    },
+    {
+      "territory": "Bangladesh",
+      "iso3": "BGD",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 23,
+      "cells": "A23:C23"
+    },
+    {
+      "territory": "Barbados",
+      "iso3": "BRB",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 24,
+      "cells": "A24:C24"
+    },
+    {
+      "territory": "Belize",
+      "iso3": "BLZ",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 25,
+      "cells": "A25:C25"
+    },
+    {
+      "territory": "Benin",
+      "iso3": "BEN",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 26,
+      "cells": "A26:C26"
+    },
+    {
+      "territory": "Bermuda",
+      "iso3": "BMU",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 27,
+      "cells": "A27:C27"
+    },
+    {
+      "territory": "Bolivia",
+      "iso3": "BOL",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 28,
+      "cells": "A28:C28"
+    },
+    {
+      "territory": "Botswana",
+      "iso3": "BWA",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 29,
+      "cells": "A29:C29"
+    },
+    {
+      "territory": "Brazil",
+      "iso3": "BRA",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 30,
+      "cells": "A30:C30"
+    },
+    {
+      "territory": "British Virgin Islands",
+      "iso3": "VGB",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 31,
+      "cells": "A31:C31"
+    },
+    {
+      "territory": "Brunei",
+      "iso3": "BRN",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 32,
+      "cells": "A32:C32"
+    },
+    {
+      "territory": "Burkina Faso",
+      "iso3": "BFA",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 33,
+      "cells": "A33:C33"
+    },
+    {
+      "territory": "Burundi",
+      "iso3": "BDI",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 34,
+      "cells": "A34:C34"
+    },
+    {
+      "territory": "Cambodia",
+      "iso3": "KHM",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 35,
+      "cells": "A35:C35"
+    },
+    {
+      "territory": "Cameroon",
+      "iso3": "CMR",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 36,
+      "cells": "A36:C36"
+    },
+    {
+      "territory": "Canada",
+      "iso3": "CAN",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 37,
+      "cells": "A37:C37"
+    },
+    {
+      "territory": "Cape Verde",
+      "iso3": "CPV",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 38,
+      "cells": "A38:C38"
+    },
+    {
+      "territory": "Cayman Islands",
+      "iso3": "CYM",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 39,
+      "cells": "A39:C39"
+    },
+    {
+      "territory": "Central African Republic",
+      "iso3": "CAF",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 40,
+      "cells": "A40:C40"
+    },
+    {
+      "territory": "Chad",
+      "iso3": "TCD",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 41,
+      "cells": "A41:C41"
+    },
+    {
+      "territory": "Chile",
+      "iso3": "CHL",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 42,
+      "cells": "A42:C42"
+    },
+    {
+      "territory": "China",
+      "iso3": "CHN",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 43,
+      "cells": "A43:C43"
+    },
+    {
+      "territory": "Colombia",
+      "iso3": "COL",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 44,
+      "cells": "A44:C44"
+    },
+    {
+      "territory": "Comoros",
+      "iso3": "COM",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 45,
+      "cells": "A45:C45"
+    },
+    {
+      "territory": "Congo-Brazzaville",
+      "iso3": "COG",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 46,
+      "cells": "A46:C46"
+    },
+    {
+      "territory": "Cook Islands",
+      "iso3": "COK",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 47,
+      "cells": "A47:C47"
+    },
+    {
+      "territory": "Costa Rica",
+      "iso3": "CRI",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 48,
+      "cells": "A48:C48"
+    },
+    {
+      "territory": "Cuba",
+      "iso3": "CUB",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 49,
+      "cells": "A49:C49"
+    },
+    {
+      "territory": "Curacao",
+      "iso3": "CUW",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 50,
+      "cells": "A50:C50"
+    },
+    {
+      "territory": "Djibouti",
+      "iso3": "DJI",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 51,
+      "cells": "A51:C51"
+    },
+    {
+      "territory": "Dominica",
+      "iso3": "DMA",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 52,
+      "cells": "A52:C52"
+    },
+    {
+      "territory": "Dominican Republic",
+      "iso3": "DOM",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 53,
+      "cells": "A53:C53"
+    },
+    {
+      "territory": "DR Congo",
+      "iso3": "COD",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 54,
+      "cells": "A54:C54"
+    },
+    {
+      "territory": "Ecuador",
+      "iso3": "ECU",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 55,
+      "cells": "A55:C55"
+    },
+    {
+      "territory": "El Salvador",
+      "iso3": "SLV",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 56,
+      "cells": "A56:C56"
+    },
+    {
+      "territory": "Equatorial Guinea",
+      "iso3": "GNQ",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 57,
+      "cells": "A57:C57"
+    },
+    {
+      "territory": "Eritrea",
+      "iso3": "ERI",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 58,
+      "cells": "A58:C58"
+    },
+    {
+      "territory": "Ethiopia",
+      "iso3": "ETH",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 59,
+      "cells": "A59:C59"
+    },
+    {
+      "territory": "Falkland Islands",
+      "iso3": "FLK",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 60,
+      "cells": "A60:C60"
+    },
+    {
+      "territory": "Fiji",
+      "iso3": "FJI",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 61,
+      "cells": "A61:C61"
+    },
+    {
+      "territory": "French Guiana",
+      "iso3": "GUF",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 62,
+      "cells": "A62:C62"
+    },
+    {
+      "territory": "Gabon",
+      "iso3": "GAB",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 63,
+      "cells": "A63:C63"
+    },
+    {
+      "territory": "Gambia",
+      "iso3": "GMB",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 64,
+      "cells": "A64:C64"
+    },
+    {
+      "territory": "Georgia",
+      "iso3": "GEO",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 65,
+      "cells": "A65:C65"
+    },
+    {
+      "territory": "Ghana",
+      "iso3": "GHA",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 66,
+      "cells": "A66:C66"
+    },
+    {
+      "territory": "Grenada",
+      "iso3": "GRD",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 67,
+      "cells": "A67:C67"
+    },
+    {
+      "territory": "Guadeloupe",
+      "iso3": "GLP",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 68,
+      "cells": "A68:C68"
+    },
+    {
+      "territory": "Guam",
+      "iso3": "GUM",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 69,
+      "cells": "A69:C69"
+    },
+    {
+      "territory": "Guatemala",
+      "iso3": "GTM",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 70,
+      "cells": "A70:C70"
+    },
+    {
+      "territory": "Guinea",
+      "iso3": "GIN",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 71,
+      "cells": "A71:C71"
+    },
+    {
+      "territory": "Guinea-Bissau",
+      "iso3": "GNB",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 72,
+      "cells": "A72:C72"
+    },
+    {
+      "territory": "Guyana",
+      "iso3": "GUY",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 73,
+      "cells": "A73:C73"
+    },
+    {
+      "territory": "Haiti",
+      "iso3": "HTI",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 74,
+      "cells": "A74:C74"
+    },
+    {
+      "territory": "Honduras",
+      "iso3": "HND",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 75,
+      "cells": "A75:C75"
+    },
+    {
+      "territory": "Hong Kong",
+      "iso3": "HKG",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 76,
+      "cells": "A76:C76"
+    },
+    {
+      "territory": "India",
+      "iso3": "IND",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 77,
+      "cells": "A77:C77"
+    },
+    {
+      "territory": "Indonesia",
+      "iso3": "IDN",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 78,
+      "cells": "A78:C78"
+    },
+    {
+      "territory": "Iran",
+      "iso3": "IRN",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 79,
+      "cells": "A79:C79"
+    },
+    {
+      "territory": "Iraq",
+      "iso3": "IRQ",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 80,
+      "cells": "A80:C80"
+    },
+    {
+      "territory": "Israel",
+      "iso3": "ISR",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 81,
+      "cells": "A81:C81"
+    },
+    {
+      "territory": "Ivory Coast",
+      "iso3": "CIV",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 82,
+      "cells": "A82:C82"
+    },
+    {
+      "territory": "Jamaica",
+      "iso3": "JAM",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 83,
+      "cells": "A83:C83"
+    },
+    {
+      "territory": "Japan",
+      "iso3": "JPN",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 84,
+      "cells": "A84:C84"
+    },
+    {
+      "territory": "Jordan",
+      "iso3": "JOR",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 85,
+      "cells": "A85:C85"
+    },
+    {
+      "territory": "Kazakhstan",
+      "iso3": "KAZ",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 86,
+      "cells": "A86:C86"
+    },
+    {
+      "territory": "Kenya",
+      "iso3": "KEN",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 87,
+      "cells": "A87:C87"
+    },
+    {
+      "territory": "Kuwait",
+      "iso3": "KWT",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 88,
+      "cells": "A88:C88"
+    },
+    {
+      "territory": "Kyrgyzstan",
+      "iso3": "KGZ",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 89,
+      "cells": "A89:C89"
+    },
+    {
+      "territory": "Laos",
+      "iso3": "LAO",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 90,
+      "cells": "A90:C90"
+    },
+    {
+      "territory": "Lebanon",
+      "iso3": "LBN",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 91,
+      "cells": "A91:C91"
+    },
+    {
+      "territory": "Lesotho",
+      "iso3": "LSO",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 92,
+      "cells": "A92:C92"
+    },
+    {
+      "territory": "Liberia",
+      "iso3": "LBR",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 93,
+      "cells": "A93:C93"
+    },
+    {
+      "territory": "Macao",
+      "iso3": "MAC",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 94,
+      "cells": "A94:C94"
+    },
+    {
+      "territory": "Madagascar",
+      "iso3": "MDG",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 95,
+      "cells": "A95:C95"
+    },
+    {
+      "territory": "Malawi",
+      "iso3": "MWI",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 96,
+      "cells": "A96:C96"
+    },
+    {
+      "territory": "Malaysia",
+      "iso3": "MYS",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 97,
+      "cells": "A97:C97"
+    },
+    {
+      "territory": "Maldives",
+      "iso3": "MDV",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 98,
+      "cells": "A98:C98"
+    },
+    {
+      "territory": "Mali",
+      "iso3": "MLI",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 99,
+      "cells": "A99:C99"
+    },
+    {
+      "territory": "Marshall Islands",
+      "iso3": "MHL",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 100,
+      "cells": "A100:C100"
+    },
+    {
+      "territory": "Martinique",
+      "iso3": "MTQ",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 101,
+      "cells": "A101:C101"
+    },
+    {
+      "territory": "Mauritania",
+      "iso3": "MRT",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 102,
+      "cells": "A102:C102"
+    },
+    {
+      "territory": "Mauritius",
+      "iso3": "MUS",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 103,
+      "cells": "A103:C103"
+    },
+    {
+      "territory": "Mexico",
+      "iso3": "MEX",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 104,
+      "cells": "A104:C104"
+    },
+    {
+      "territory": "Moldova",
+      "iso3": "MDA",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 105,
+      "cells": "A105:C105"
+    },
+    {
+      "territory": "Mongolia",
+      "iso3": "MNG",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 106,
+      "cells": "A106:C106"
+    },
+    {
+      "territory": "Mozambique",
+      "iso3": "MOZ",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 107,
+      "cells": "A107:C107"
+    },
+    {
+      "territory": "Myanmar",
+      "iso3": "MMR",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 108,
+      "cells": "A108:C108"
+    },
+    {
+      "territory": "Namibia",
+      "iso3": "NAM",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 109,
+      "cells": "A109:C109"
+    },
+    {
+      "territory": "Nepal",
+      "iso3": "NPL",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 110,
+      "cells": "A110:C110"
+    },
+    {
+      "territory": "New Caledonia",
+      "iso3": "NCL",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 111,
+      "cells": "A111:C111"
+    },
+    {
+      "territory": "New Zealand",
+      "iso3": "NZL",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 112,
+      "cells": "A112:C112"
+    },
+    {
+      "territory": "Nicaragua",
+      "iso3": "NIC",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 113,
+      "cells": "A113:C113"
+    },
+    {
+      "territory": "Niger",
+      "iso3": "NER",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 114,
+      "cells": "A114:C114"
+    },
+    {
+      "territory": "Nigeria",
+      "iso3": "NGA",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 115,
+      "cells": "A115:C115"
+    },
+    {
+      "territory": "North Korea",
+      "iso3": "PRK",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 116,
+      "cells": "A116:C116"
+    },
+    {
+      "territory": "Oman",
+      "iso3": "OMN",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 117,
+      "cells": "A117:C117"
+    },
+    {
+      "territory": "Pakistan",
+      "iso3": "PAK",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 118,
+      "cells": "A118:C118"
+    },
+    {
+      "territory": "Palau",
+      "iso3": "PLW",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 119,
+      "cells": "A119:C119"
+    },
+    {
+      "territory": "Panama",
+      "iso3": "PAN",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 120,
+      "cells": "A120:C120"
+    },
+    {
+      "territory": "Papua New Guinea",
+      "iso3": "PNG",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 121,
+      "cells": "A121:C121"
+    },
+    {
+      "territory": "Paraguay",
+      "iso3": "PRY",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 122,
+      "cells": "A122:C122"
+    },
+    {
+      "territory": "Peru",
+      "iso3": "PER",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 123,
+      "cells": "A123:C123"
+    },
+    {
+      "territory": "Philippines",
+      "iso3": "PHL",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 124,
+      "cells": "A124:C124"
+    },
+    {
+      "territory": "Puerto Rico",
+      "iso3": "PRI",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 125,
+      "cells": "A125:C125"
+    },
+    {
+      "territory": "Qatar",
+      "iso3": "QAT",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 126,
+      "cells": "A126:C126"
+    },
+    {
+      "territory": "Reunion",
+      "iso3": "REU",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 127,
+      "cells": "A127:C127"
+    },
+    {
+      "territory": "Russia",
+      "iso3": "RUS",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 128,
+      "cells": "A128:C128"
+    },
+    {
+      "territory": "Rwanda",
+      "iso3": "RWA",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 129,
+      "cells": "A129:C129"
+    },
+    {
+      "territory": "Sao Tome Islands",
+      "iso3": "STP",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 130,
+      "cells": "A130:C130"
+    },
+    {
+      "territory": "Saudi Arabia",
+      "iso3": "SAU",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 131,
+      "cells": "A131:C131"
+    },
+    {
+      "territory": "Senegal",
+      "iso3": "SEN",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 132,
+      "cells": "A132:C132"
+    },
+    {
+      "territory": "Seychelles",
+      "iso3": "SYC",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 133,
+      "cells": "A133:C133"
+    },
+    {
+      "territory": "Sierra Leone",
+      "iso3": "SLE",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 134,
+      "cells": "A134:C134"
+    },
+    {
+      "territory": "Singapore",
+      "iso3": "SGP",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 135,
+      "cells": "A135:C135"
+    },
+    {
+      "territory": "Solomon Islands",
+      "iso3": "SLB",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 136,
+      "cells": "A136:C136"
+    },
+    {
+      "territory": "Somali Republic",
+      "iso3": "SOM",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 137,
+      "cells": "A137:C137"
+    },
+    {
+      "territory": "South Africa",
+      "iso3": "ZAF",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 138,
+      "cells": "A138:C138"
+    },
+    {
+      "territory": "South Korea",
+      "iso3": "KOR",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 139,
+      "cells": "A139:C139"
+    },
+    {
+      "territory": "South Sudan",
+      "iso3": "SSD",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 140,
+      "cells": "A140:C140"
+    },
+    {
+      "territory": "Sri Lanka",
+      "iso3": "LKA",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 141,
+      "cells": "A141:C141"
+    },
+    {
+      "territory": "St Kitts and Nevis",
+      "iso3": "KNA",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 142,
+      "cells": "A142:C142"
+    },
+    {
+      "territory": "St Lucia",
+      "iso3": "LCA",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 143,
+      "cells": "A143:C143"
+    },
+    {
+      "territory": "St Vincent and the Grenadines",
+      "iso3": "VCT",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 144,
+      "cells": "A144:C144"
+    },
+    {
+      "territory": "Sudan",
+      "iso3": "SDN",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 145,
+      "cells": "A145:C145"
+    },
+    {
+      "territory": "Surinam",
+      "iso3": "SUR",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 146,
+      "cells": "A146:C146"
+    },
+    {
+      "territory": "Swaziland",
+      "iso3": "SWZ",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 147,
+      "cells": "A147:C147"
+    },
+    {
+      "territory": "Syria",
+      "iso3": "SYR",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 148,
+      "cells": "A148:C148"
+    },
+    {
+      "territory": "Tahiti",
+      "iso3": "PYF",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 149,
+      "cells": "A149:C149"
+    },
+    {
+      "territory": "Taiwan",
+      "iso3": "TWN",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 150,
+      "cells": "A150:C150"
+    },
+    {
+      "territory": "Tajikistan",
+      "iso3": "TJK",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 151,
+      "cells": "A151:C151"
+    },
+    {
+      "territory": "Tanzania",
+      "iso3": "TZA",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 152,
+      "cells": "A152:C152"
+    },
+    {
+      "territory": "Thailand",
+      "iso3": "THA",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 153,
+      "cells": "A153:C153"
+    },
+    {
+      "territory": "Timor",
+      "iso3": "TLS",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 154,
+      "cells": "A154:C154"
+    },
+    {
+      "territory": "Togo",
+      "iso3": "TGO",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 155,
+      "cells": "A155:C155"
+    },
+    {
+      "territory": "Tonga",
+      "iso3": "TON",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 156,
+      "cells": "A156:C156"
+    },
+    {
+      "territory": "Trinidad and Tobago",
+      "iso3": "TTO",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 157,
+      "cells": "A157:C157"
+    },
+    {
+      "territory": "Turkmenistan",
+      "iso3": "TKM",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 158,
+      "cells": "A158:C158"
+    },
+    {
+      "territory": "Turks and Caicos Islands",
+      "iso3": "TCA",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 159,
+      "cells": "A159:C159"
+    },
+    {
+      "territory": "Uganda",
+      "iso3": "UGA",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 160,
+      "cells": "A160:C160"
+    },
+    {
+      "territory": "Ukraine",
+      "iso3": "UKR",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 161,
+      "cells": "A161:C161"
+    },
+    {
+      "territory": "United Arab Emirates",
+      "iso3": "ARE",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 162,
+      "cells": "A162:C162"
+    },
+    {
+      "territory": "United States",
+      "iso3": "USA",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 163,
+      "cells": "A163:C163"
+    },
+    {
+      "territory": "Uruguay",
+      "iso3": "URY",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 164,
+      "cells": "A164:C164"
+    },
+    {
+      "territory": "Uzbekistan",
+      "iso3": "UZB",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 165,
+      "cells": "A165:C165"
+    },
+    {
+      "territory": "Vanuatu",
+      "iso3": "VUT",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 166,
+      "cells": "A166:C166"
+    },
+    {
+      "territory": "Venezuela",
+      "iso3": "VEN",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 167,
+      "cells": "A167:C167"
+    },
+    {
+      "territory": "Vietnam",
+      "iso3": "VNM",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 168,
+      "cells": "A168:C168"
+    },
+    {
+      "territory": "Virgin Islands (U.S.A)",
+      "iso3": "VIR",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 169,
+      "cells": "A169:C169"
+    },
+    {
+      "territory": "Wake Islands",
+      "iso3": "UMI",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 170,
+      "cells": "A170:C170"
+    },
+    {
+      "territory": "Yemen",
+      "iso3": "YEM",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 171,
+      "cells": "A171:C171"
+    },
+    {
+      "territory": "Zambia",
+      "iso3": "ZMB",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 172,
+      "cells": "A172:C172"
+    },
+    {
+      "territory": "Zimbabwe",
+      "iso3": "ZWE",
+      "haul": "long_haul",
+      "haul_as_published": "Long Haul",
+      "sheet": "Haul definition",
+      "row": 173,
+      "cells": "A173:C173"
+    },
+    {
+      "territory": "Albania",
+      "iso3": "ALB",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 174,
+      "cells": "A174:C174"
+    },
+    {
+      "territory": "Algeria",
+      "iso3": "DZA",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 175,
+      "cells": "A175:C175"
+    },
+    {
+      "territory": "Austria",
+      "iso3": "AUT",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 176,
+      "cells": "A176:C176"
+    },
+    {
+      "territory": "Belarus",
+      "iso3": "BLR",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 177,
+      "cells": "A177:C177"
+    },
+    {
+      "territory": "Belgium",
+      "iso3": "BEL",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 178,
+      "cells": "A178:C178"
+    },
+    {
+      "territory": "Bosnia-Herzegovina",
+      "iso3": "BIH",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 179,
+      "cells": "A179:C179"
+    },
+    {
+      "territory": "Bulgaria",
+      "iso3": "BGR",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 180,
+      "cells": "A180:C180"
+    },
+    {
+      "territory": "Croatia",
+      "iso3": "HRV",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 181,
+      "cells": "A181:C181"
+    },
+    {
+      "territory": "Cyprus",
+      "iso3": "CYP",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 182,
+      "cells": "A182:C182"
+    },
+    {
+      "territory": "Czech Republic",
+      "iso3": "CZE",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 183,
+      "cells": "A183:C183"
+    },
+    {
+      "territory": "Denmark",
+      "iso3": "DNK",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 184,
+      "cells": "A184:C184"
+    },
+    {
+      "territory": "Egypt",
+      "iso3": "EGY",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 185,
+      "cells": "A185:C185"
+    },
+    {
+      "territory": "Estonia",
+      "iso3": "EST",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 186,
+      "cells": "A186:C186"
+    },
+    {
+      "territory": "Faroe Islands",
+      "iso3": "FRO",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 187,
+      "cells": "A187:C187"
+    },
+    {
+      "territory": "Finland",
+      "iso3": "FIN",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 188,
+      "cells": "A188:C188"
+    },
+    {
+      "territory": "France",
+      "iso3": "FRA",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 189,
+      "cells": "A189:C189"
+    },
+    {
+      "territory": "Germany",
+      "iso3": "DEU",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 190,
+      "cells": "A190:C190"
+    },
+    {
+      "territory": "Gibraltar",
+      "iso3": "GIB",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 191,
+      "cells": "A191:C191"
+    },
+    {
+      "territory": "Greece",
+      "iso3": "GRC",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 192,
+      "cells": "A192:C192"
+    },
+    {
+      "territory": "Greenland",
+      "iso3": "GRL",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 193,
+      "cells": "A193:C193"
+    },
+    {
+      "territory": "Hungary",
+      "iso3": "HUN",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 194,
+      "cells": "A194:C194"
+    },
+    {
+      "territory": "Iceland",
+      "iso3": "ISL",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 195,
+      "cells": "A195:C195"
+    },
+    {
+      "territory": "Ireland",
+      "iso3": "IRL",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 196,
+      "cells": "A196:C196"
+    },
+    {
+      "territory": "Italy",
+      "iso3": "ITA",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 197,
+      "cells": "A197:C197"
+    },
+    {
+      "territory": "Kosovo",
+      "iso3": "XKX",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 198,
+      "cells": "A198:C198"
+    },
+    {
+      "territory": "Latvia",
+      "iso3": "LVA",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 199,
+      "cells": "A199:C199"
+    },
+    {
+      "territory": "Libya",
+      "iso3": "LBY",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 200,
+      "cells": "A200:C200"
+    },
+    {
+      "territory": "Lithuania",
+      "iso3": "LTU",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 201,
+      "cells": "A201:C201"
+    },
+    {
+      "territory": "Luxembourg",
+      "iso3": "LUX",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 202,
+      "cells": "A202:C202"
+    },
+    {
+      "territory": "Macedonia",
+      "iso3": "MKD",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 203,
+      "cells": "A203:C203"
+    },
+    {
+      "territory": "Malta",
+      "iso3": "MLT",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 204,
+      "cells": "A204:C204"
+    },
+    {
+      "territory": "Montenegro",
+      "iso3": "MNE",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 205,
+      "cells": "A205:C205"
+    },
+    {
+      "territory": "Morocco",
+      "iso3": "MAR",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 206,
+      "cells": "A206:C206"
+    },
+    {
+      "territory": "Netherlands",
+      "iso3": "NLD",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 207,
+      "cells": "A207:C207"
+    },
+    {
+      "territory": "Norway",
+      "iso3": "NOR",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 208,
+      "cells": "A208:C208"
+    },
+    {
+      "territory": "Poland",
+      "iso3": "POL",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 209,
+      "cells": "A209:C209"
+    },
+    {
+      "territory": "Portugal",
+      "iso3": "PRT",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 210,
+      "cells": "A210:C210"
+    },
+    {
+      "territory": "Romania",
+      "iso3": "ROU",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 211,
+      "cells": "A211:C211"
+    },
+    {
+      "territory": "Serbia",
+      "iso3": "SRB",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 212,
+      "cells": "A212:C212"
+    },
+    {
+      "territory": "Slovak Republic",
+      "iso3": "SVK",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 213,
+      "cells": "A213:C213"
+    },
+    {
+      "territory": "Slovenia",
+      "iso3": "SVN",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 214,
+      "cells": "A214:C214"
+    },
+    {
+      "territory": "Spain",
+      "iso3": "ESP",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 215,
+      "cells": "A215:C215"
+    },
+    {
+      "territory": "Sweden",
+      "iso3": "SWE",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 216,
+      "cells": "A216:C216"
+    },
+    {
+      "territory": "Switzerland",
+      "iso3": "CHE",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 217,
+      "cells": "A217:C217"
+    },
+    {
+      "territory": "Tunisia",
+      "iso3": "TUN",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 218,
+      "cells": "A218:C218"
+    },
+    {
+      "territory": "Turkey",
+      "iso3": "TUR",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 219,
+      "cells": "A219:C219"
+    },
+    {
+      "territory": "Western Sahara",
+      "iso3": "ESH",
+      "haul": "short_haul",
+      "haul_as_published": "Short Haul",
+      "sheet": "Haul definition",
+      "row": 220,
+      "cells": "A220:C220"
+    }
+  ],
+  "hotel_stay": [
+    {
+      "country": "UK",
+      "kg_co2e_per_room_night": 10.4,
+      "sheet": "Hotel stay",
+      "row": 22,
+      "cells": {
+        "country": "B22",
+        "value": "D22"
+      }
+    },
+    {
+      "country": "UK (London)",
+      "kg_co2e_per_room_night": 11.5,
+      "sheet": "Hotel stay",
+      "row": 23,
+      "cells": {
+        "country": "B23",
+        "value": "D23"
+      }
+    },
+    {
+      "country": "Argentina",
+      "kg_co2e_per_room_night": null,
+      "sheet": "Hotel stay",
+      "row": 28,
+      "cells": {
+        "country": "B28",
+        "value": "D28"
+      }
+    },
+    {
+      "country": "Australia",
+      "kg_co2e_per_room_night": 35.0,
+      "sheet": "Hotel stay",
+      "row": 29,
+      "cells": {
+        "country": "B29",
+        "value": "D29"
+      }
+    },
+    {
+      "country": "Austria",
+      "kg_co2e_per_room_night": null,
+      "sheet": "Hotel stay",
+      "row": 30,
+      "cells": {
+        "country": "B30",
+        "value": "D30"
+      }
+    },
+    {
+      "country": "Belgium",
+      "kg_co2e_per_room_night": 12.2,
+      "sheet": "Hotel stay",
+      "row": 31,
+      "cells": {
+        "country": "B31",
+        "value": "D31"
+      }
+    },
+    {
+      "country": "Brazil",
+      "kg_co2e_per_room_night": 8.7,
+      "sheet": "Hotel stay",
+      "row": 32,
+      "cells": {
+        "country": "B32",
+        "value": "D32"
+      }
+    },
+    {
+      "country": "Canada",
+      "kg_co2e_per_room_night": 7.4,
+      "sheet": "Hotel stay",
+      "row": 33,
+      "cells": {
+        "country": "B33",
+        "value": "D33"
+      }
+    },
+    {
+      "country": "Chile",
+      "kg_co2e_per_room_night": 27.6,
+      "sheet": "Hotel stay",
+      "row": 34,
+      "cells": {
+        "country": "B34",
+        "value": "D34"
+      }
+    },
+    {
+      "country": "China",
+      "kg_co2e_per_room_night": 53.5,
+      "sheet": "Hotel stay",
+      "row": 35,
+      "cells": {
+        "country": "B35",
+        "value": "D35"
+      }
+    },
+    {
+      "country": "Colombia",
+      "kg_co2e_per_room_night": 14.7,
+      "sheet": "Hotel stay",
+      "row": 36,
+      "cells": {
+        "country": "B36",
+        "value": "D36"
+      }
+    },
+    {
+      "country": "Costa Rica",
+      "kg_co2e_per_room_night": 4.7,
+      "sheet": "Hotel stay",
+      "row": 37,
+      "cells": {
+        "country": "B37",
+        "value": "D37"
+      }
+    },
+    {
+      "country": "Czech Republic",
+      "kg_co2e_per_room_night": null,
+      "sheet": "Hotel stay",
+      "row": 38,
+      "cells": {
+        "country": "B38",
+        "value": "D38"
+      }
+    },
+    {
+      "country": "Egypt",
+      "kg_co2e_per_room_night": 44.2,
+      "sheet": "Hotel stay",
+      "row": 39,
+      "cells": {
+        "country": "B39",
+        "value": "D39"
+      }
+    },
+    {
+      "country": "Fiji",
+      "kg_co2e_per_room_night": null,
+      "sheet": "Hotel stay",
+      "row": 40,
+      "cells": {
+        "country": "B40",
+        "value": "D40"
+      }
+    },
+    {
+      "country": "Finland",
+      "kg_co2e_per_room_night": null,
+      "sheet": "Hotel stay",
+      "row": 41,
+      "cells": {
+        "country": "B41",
+        "value": "D41"
+      }
+    },
+    {
+      "country": "France",
+      "kg_co2e_per_room_night": 6.7,
+      "sheet": "Hotel stay",
+      "row": 42,
+      "cells": {
+        "country": "B42",
+        "value": "D42"
+      }
+    },
+    {
+      "country": "Germany",
+      "kg_co2e_per_room_night": 13.2,
+      "sheet": "Hotel stay",
+      "row": 43,
+      "cells": {
+        "country": "B43",
+        "value": "D43"
+      }
+    },
+    {
+      "country": "Greece",
+      "kg_co2e_per_room_night": null,
+      "sheet": "Hotel stay",
+      "row": 44,
+      "cells": {
+        "country": "B44",
+        "value": "D44"
+      }
+    },
+    {
+      "country": "Hong Kong, China",
+      "kg_co2e_per_room_night": 51.5,
+      "sheet": "Hotel stay",
+      "row": 45,
+      "cells": {
+        "country": "B45",
+        "value": "D45"
+      }
+    },
+    {
+      "country": "India",
+      "kg_co2e_per_room_night": 58.9,
+      "sheet": "Hotel stay",
+      "row": 46,
+      "cells": {
+        "country": "B46",
+        "value": "D46"
+      }
+    },
+    {
+      "country": "Indonesia",
+      "kg_co2e_per_room_night": 62.7,
+      "sheet": "Hotel stay",
+      "row": 47,
+      "cells": {
+        "country": "B47",
+        "value": "D47"
+      }
+    },
+    {
+      "country": "Ireland",
+      "kg_co2e_per_room_night": null,
+      "sheet": "Hotel stay",
+      "row": 48,
+      "cells": {
+        "country": "B48",
+        "value": "D48"
+      }
+    },
+    {
+      "country": "Israel",
+      "kg_co2e_per_room_night": null,
+      "sheet": "Hotel stay",
+      "row": 49,
+      "cells": {
+        "country": "B49",
+        "value": "D49"
+      }
+    },
+    {
+      "country": "Italy",
+      "kg_co2e_per_room_night": 14.3,
+      "sheet": "Hotel stay",
+      "row": 50,
+      "cells": {
+        "country": "B50",
+        "value": "D50"
+      }
+    },
+    {
+      "country": "Japan",
+      "kg_co2e_per_room_night": 39.0,
+      "sheet": "Hotel stay",
+      "row": 51,
+      "cells": {
+        "country": "B51",
+        "value": "D51"
+      }
+    },
+    {
+      "country": "Jordan",
+      "kg_co2e_per_room_night": 68.9,
+      "sheet": "Hotel stay",
+      "row": 52,
+      "cells": {
+        "country": "B52",
+        "value": "D52"
+      }
+    },
+    {
+      "country": "Kazakhstan",
+      "kg_co2e_per_room_night": null,
+      "sheet": "Hotel stay",
+      "row": 53,
+      "cells": {
+        "country": "B53",
+        "value": "D53"
+      }
+    },
+    {
+      "country": "Korea",
+      "kg_co2e_per_room_night": 55.8,
+      "sheet": "Hotel stay",
+      "row": 54,
+      "cells": {
+        "country": "B54",
+        "value": "D54"
+      }
+    },
+    {
+      "country": "Macau, China",
+      "kg_co2e_per_room_night": null,
+      "sheet": "Hotel stay",
+      "row": 55,
+      "cells": {
+        "country": "B55",
+        "value": "D55"
+      }
+    },
+    {
+      "country": "Malaysia",
+      "kg_co2e_per_room_night": 61.5,
+      "sheet": "Hotel stay",
+      "row": 56,
+      "cells": {
+        "country": "B56",
+        "value": "D56"
+      }
+    },
+    {
+      "country": "Maldives",
+      "kg_co2e_per_room_night": 152.2,
+      "sheet": "Hotel stay",
+      "row": 57,
+      "cells": {
+        "country": "B57",
+        "value": "D57"
+      }
+    },
+    {
+      "country": "Mexico",
+      "kg_co2e_per_room_night": 19.3,
+      "sheet": "Hotel stay",
+      "row": 58,
+      "cells": {
+        "country": "B58",
+        "value": "D58"
+      }
+    },
+    {
+      "country": "Netherlands",
+      "kg_co2e_per_room_night": 14.8,
+      "sheet": "Hotel stay",
+      "row": 59,
+      "cells": {
+        "country": "B59",
+        "value": "D59"
+      }
+    },
+    {
+      "country": "New Zealand",
+      "kg_co2e_per_room_night": null,
+      "sheet": "Hotel stay",
+      "row": 60,
+      "cells": {
+        "country": "B60",
+        "value": "D60"
+      }
+    },
+    {
+      "country": "Oman",
+      "kg_co2e_per_room_night": 90.3,
+      "sheet": "Hotel stay",
+      "row": 61,
+      "cells": {
+        "country": "B61",
+        "value": "D61"
+      }
+    },
+    {
+      "country": "Panama",
+      "kg_co2e_per_room_night": null,
+      "sheet": "Hotel stay",
+      "row": 62,
+      "cells": {
+        "country": "B62",
+        "value": "D62"
+      }
+    },
+    {
+      "country": "Peru",
+      "kg_co2e_per_room_night": null,
+      "sheet": "Hotel stay",
+      "row": 63,
+      "cells": {
+        "country": "B63",
+        "value": "D63"
+      }
+    },
+    {
+      "country": "Philippines",
+      "kg_co2e_per_room_night": 54.3,
+      "sheet": "Hotel stay",
+      "row": 64,
+      "cells": {
+        "country": "B64",
+        "value": "D64"
+      }
+    },
+    {
+      "country": "Poland",
+      "kg_co2e_per_room_night": null,
+      "sheet": "Hotel stay",
+      "row": 65,
+      "cells": {
+        "country": "B65",
+        "value": "D65"
+      }
+    },
+    {
+      "country": "Portugal",
+      "kg_co2e_per_room_night": 19.0,
+      "sheet": "Hotel stay",
+      "row": 66,
+      "cells": {
+        "country": "B66",
+        "value": "D66"
+      }
+    },
+    {
+      "country": "Qatar",
+      "kg_co2e_per_room_night": 86.2,
+      "sheet": "Hotel stay",
+      "row": 67,
+      "cells": {
+        "country": "B67",
+        "value": "D67"
+      }
+    },
+    {
+      "country": "Romania",
+      "kg_co2e_per_room_night": null,
+      "sheet": "Hotel stay",
+      "row": 68,
+      "cells": {
+        "country": "B68",
+        "value": "D68"
+      }
+    },
+    {
+      "country": "Russian Federation",
+      "kg_co2e_per_room_night": 24.2,
+      "sheet": "Hotel stay",
+      "row": 69,
+      "cells": {
+        "country": "B69",
+        "value": "D69"
+      }
+    },
+    {
+      "country": "Saudi Arabia",
+      "kg_co2e_per_room_night": 106.4,
+      "sheet": "Hotel stay",
+      "row": 70,
+      "cells": {
+        "country": "B70",
+        "value": "D70"
+      }
+    },
+    {
+      "country": "Singapore",
+      "kg_co2e_per_room_night": 24.5,
+      "sheet": "Hotel stay",
+      "row": 71,
+      "cells": {
+        "country": "B71",
+        "value": "D71"
+      }
+    },
+    {
+      "country": "South Africa",
+      "kg_co2e_per_room_night": 51.4,
+      "sheet": "Hotel stay",
+      "row": 72,
+      "cells": {
+        "country": "B72",
+        "value": "D72"
+      }
+    },
+    {
+      "country": "Spain",
+      "kg_co2e_per_room_night": 7.0,
+      "sheet": "Hotel stay",
+      "row": 73,
+      "cells": {
+        "country": "B73",
+        "value": "D73"
+      }
+    },
+    {
+      "country": "Switzerland",
+      "kg_co2e_per_room_night": 6.6,
+      "sheet": "Hotel stay",
+      "row": 74,
+      "cells": {
+        "country": "B74",
+        "value": "D74"
+      }
+    },
+    {
+      "country": "Taiwan, China",
+      "kg_co2e_per_room_night": null,
+      "sheet": "Hotel stay",
+      "row": 75,
+      "cells": {
+        "country": "B75",
+        "value": "D75"
+      }
+    },
+    {
+      "country": "Thailand",
+      "kg_co2e_per_room_night": 43.4,
+      "sheet": "Hotel stay",
+      "row": 76,
+      "cells": {
+        "country": "B76",
+        "value": "D76"
+      }
+    },
+    {
+      "country": "Turkey",
+      "kg_co2e_per_room_night": 32.1,
+      "sheet": "Hotel stay",
+      "row": 77,
+      "cells": {
+        "country": "B77",
+        "value": "D77"
+      }
+    },
+    {
+      "country": "United Arab Emirates",
+      "kg_co2e_per_room_night": 63.8,
+      "sheet": "Hotel stay",
+      "row": 78,
+      "cells": {
+        "country": "B78",
+        "value": "D78"
+      }
+    },
+    {
+      "country": "United States",
+      "kg_co2e_per_room_night": 16.1,
+      "sheet": "Hotel stay",
+      "row": 79,
+      "cells": {
+        "country": "B79",
+        "value": "D79"
+      }
+    },
+    {
+      "country": "Vietnam",
+      "kg_co2e_per_room_night": 38.5,
+      "sheet": "Hotel stay",
+      "row": 80,
+      "cells": {
+        "country": "B80",
+        "value": "D80"
+      }
+    }
+  ],
+  "rail": [
+    {
+      "type": "National rail",
+      "unit": "kg CO2e per passenger.km",
+      "kg_co2e": 0.03092,
+      "co2": 0.03056,
+      "ch4": 8e-05,
+      "n2o": 0.00028,
+      "sheet": "Business travel- land",
+      "row": 87,
+      "cells": {
+        "type": "B87",
+        "values": "D87:G87"
+      }
+    },
+    {
+      "type": "International rail",
+      "unit": "kg CO2e per passenger.km",
+      "kg_co2e": 0.01135,
+      "co2": 0.0113,
+      "ch4": 2e-05,
+      "n2o": 3e-05,
+      "sheet": "Business travel- land",
+      "row": 88,
+      "cells": {
+        "type": "B88",
+        "values": "D88:G88"
+      }
+    },
+    {
+      "type": "Light rail and tram",
+      "unit": "kg CO2e per passenger.km",
+      "kg_co2e": 0.02121,
+      "co2": 0.02093,
+      "ch4": 0.00012,
+      "n2o": 0.00016,
+      "sheet": "Business travel- land",
+      "row": 89,
+      "cells": {
+        "type": "B89",
+        "values": "D89:G89"
+      }
+    },
+    {
+      "type": "London Underground",
+      "unit": "kg CO2e per passenger.km",
+      "kg_co2e": 0.01549,
+      "co2": 0.01522,
+      "ch4": 0.00011,
+      "n2o": 0.00016,
+      "sheet": "Business travel- land",
+      "row": 90,
+      "cells": {
+        "type": "B90",
+        "values": "D90:G90"
+      }
+    }
+  ],
+  "wtt_rail": [
+    {
+      "type": "National rail",
+      "unit": "kg CO2e per passenger.km",
+      "kg_co2e": 0.00897,
+      "sheet": "WTT- pass vehs & travel- land",
+      "row": 84,
+      "cells": {
+        "type": "B84",
+        "value": "D84"
+      }
+    },
+    {
+      "type": "International rail",
+      "unit": "kg CO2e per passenger.km",
+      "kg_co2e": 0.00117,
+      "sheet": "WTT- pass vehs & travel- land",
+      "row": 85,
+      "cells": {
+        "type": "B85",
+        "value": "D85"
+      }
+    },
+    {
+      "type": "Light rail and tram",
+      "unit": "kg CO2e per passenger.km",
+      "kg_co2e": 0.00749,
+      "sheet": "WTT- pass vehs & travel- land",
+      "row": 86,
+      "cells": {
+        "type": "B86",
+        "value": "D86"
+      }
+    },
+    {
+      "type": "London Underground",
+      "unit": "kg CO2e per passenger.km",
+      "kg_co2e": 0.00728,
+      "sheet": "WTT- pass vehs & travel- land",
+      "row": 87,
+      "cells": {
+        "type": "B87",
+        "value": "D87"
+      }
+    }
+  ]
+}
