@@ -39,40 +39,32 @@ const YEAR_FLOOR = 2023
 
 const CATEGORIES = [
   // Upstream
-  { id: 'cat1', num: 1, name: 'Purchased goods & services', stream: 'Upstream', desc: 'Emissions from producing goods and services you purchase', method: 'spend', unit: 'spend', materialSectors: ['all'], typicalShare: 0.60 , guidance: 'Emissions from producing everything you buy — raw materials, components, products and services — up to the point they reach you (cradle-to-gate). Usually the single largest Scope 3 category.', dataSource: 'Procurement / AP ledger: annual spend by supplier or category. Best: supplier-specific emissions via the Supplier Portal. Spend-based estimation is permitted for this category.' },
-  { id: 'cat2', num: 2, name: 'Capital goods', stream: 'Upstream', desc: 'Emissions from producing capital equipment and assets you buy', method: 'spend', unit: 'spend', materialSectors: ['Industrials & Manufacturing', 'Energy & Utilities', 'Mining & Metals'], typicalShare: 0.05 , guidance: 'Emissions from producing long-life assets you purchase — buildings, machinery, vehicles, IT equipment, infrastructure. Count the full cradle-to-gate footprint in the year acquired (not depreciated over time).', dataSource: 'Fixed-asset register / capital expenditure records for the reporting year. Spend-based estimation is permitted for this category.' },
-  { id: 'cat3', num: 3, name: 'Fuel & energy related', stream: 'Upstream', desc: 'Upstream emissions from extraction and production of fuels and energy you use', method: 'activity', unit: 'kwh', materialSectors: ['all'], typicalShare: 0.03 , guidance: 'Upstream emissions of the fuel and electricity you use that AREN\'T already in Scope 1 or 2 — i.e. extracting, producing and transporting those fuels, plus grid transmission & distribution (T&D) losses.', dataSource: 'Your Scope 1 & 2 energy consumption data (kWh, fuel volumes) — apply well-to-tank and T&D-loss factors. Source the consumption from utility bills / the GHG module.' },
-  { id: 'cat4', num: 4, name: 'Upstream transportation', stream: 'Upstream', desc: 'Emissions from transporting purchased goods to your facilities', method: 'activity', unit: 'tonne_km', materialSectors: ['Consumer & Retail', 'Agriculture & Food', 'Industrials & Manufacturing'], typicalShare: 0.04 , guidance: 'Emissions from transporting and distributing the goods you BUY, between your suppliers and you — plus third-party logistics you pay for (inbound freight and warehousing).', dataSource: 'Logistics/freight invoices, shipment records (tonne-km or mode/distance). Spend-based estimation is permitted for this category.' },
-  { id: 'cat5', num: 5, name: 'Waste generated in operations', stream: 'Upstream', desc: 'Emissions from disposal and treatment of waste generated', method: 'activity', unit: 'tonnes', materialSectors: ['all'], typicalShare: 0.01 , guidance: 'Emissions from third parties treating the waste your operations generate — landfill, combustion, recycling, composting and anaerobic digestion. Wastewater is not covered: the waste factors used here publish none.', dataSource: 'Waste contractor invoices / facilities team: tonnes by material and treatment route. Activity data (tonnes) is needed — spend-based is not appropriate here.' },
-  { id: 'cat6', num: 6, name: 'Business travel', stream: 'Upstream', desc: 'Emissions from employee travel for business purposes', method: 'activity', unit: 'mixed', materialSectors: ['Professional Services', 'Financial Services', 'Technology'], typicalShare: 0.05 , guidance: 'Emissions from employees travelling for business — flights, rail, hotels, rental cars — in vehicles not owned by your company.', dataSource: 'Travel & expense system or travel agency reports: flights (distance/class), hotel nights, rail. Spend-based estimation is permitted for this category.' },
-  { id: 'cat7', num: 7, name: 'Employee commuting', stream: 'Upstream', desc: 'Emissions from employees travelling to and from work', method: 'activity', unit: 'mixed', materialSectors: ['all'], typicalShare: 0.03 , guidance: 'Emissions from employees commuting between home and work, including remote-work energy use.', dataSource: 'HR headcount + a commuting survey or assumptions (distance, mode, WFH days). Activity-based; spend-based is not appropriate here.' },
-  { id: 'cat8', num: 8, name: 'Upstream leased assets', stream: 'Upstream', desc: 'Emissions from assets leased by your organisation', method: 'activity', unit: 'kwh', materialSectors: ['Real Estate', 'Transport & Logistics'], typicalShare: 0.02 , guidance: 'Emissions from assets you LEASE FROM others (as lessee) that aren\'t already in your Scope 1 & 2 — e.g. leased offices or equipment you don\'t operationally control.', dataSource: 'Lease agreements + energy use of leased assets (floor area or metered kWh). Activity-based; spend-based is not appropriate here.' },
+  { id: 'cat1', num: 1, name: 'Purchased goods & services', stream: 'Upstream', desc: 'Emissions from producing goods and services you purchase', method: 'spend', unit: 'spend', typicalShare: 0.60 , guidance: 'Emissions from producing everything you buy — raw materials, components, products and services — up to the point they reach you (cradle-to-gate). Usually the single largest Scope 3 category.', dataSource: 'Procurement / AP ledger: annual spend by supplier or category. Best: supplier-specific emissions via the Supplier Portal. Spend-based estimation is permitted for this category.' },
+  { id: 'cat2', num: 2, name: 'Capital goods', stream: 'Upstream', desc: 'Emissions from producing capital equipment and assets you buy', method: 'spend', unit: 'spend', typicalShare: 0.05 , guidance: 'Emissions from producing long-life assets you purchase — buildings, machinery, vehicles, IT equipment, infrastructure. Count the full cradle-to-gate footprint in the year acquired (not depreciated over time).', dataSource: 'Fixed-asset register / capital expenditure records for the reporting year. Spend-based estimation is permitted for this category.' },
+  { id: 'cat3', num: 3, name: 'Fuel & energy related', stream: 'Upstream', desc: 'Upstream emissions from extraction and production of fuels and energy you use', method: 'activity', unit: 'kwh', typicalShare: 0.03 , guidance: 'Upstream emissions of the fuel and electricity you use that AREN\'T already in Scope 1 or 2 — i.e. extracting, producing and transporting those fuels, plus grid transmission & distribution (T&D) losses.', dataSource: 'Your Scope 1 & 2 energy consumption data (kWh, fuel volumes) — apply well-to-tank and T&D-loss factors. Source the consumption from utility bills / the GHG module.' },
+  { id: 'cat4', num: 4, name: 'Upstream transportation', stream: 'Upstream', desc: 'Emissions from transporting purchased goods to your facilities', method: 'activity', unit: 'tonne_km', typicalShare: 0.04 , guidance: 'Emissions from transporting and distributing the goods you BUY, between your suppliers and you — plus third-party logistics you pay for (inbound freight and warehousing).', dataSource: 'Logistics/freight invoices, shipment records (tonne-km or mode/distance). Spend-based estimation is permitted for this category.' },
+  { id: 'cat5', num: 5, name: 'Waste generated in operations', stream: 'Upstream', desc: 'Emissions from disposal and treatment of waste generated', method: 'activity', unit: 'tonnes', typicalShare: 0.01 , guidance: 'Emissions from third parties treating the waste your operations generate — landfill, combustion, recycling, composting and anaerobic digestion. Wastewater is not covered: the waste factors used here publish none.', dataSource: 'Waste contractor invoices / facilities team: tonnes by material and treatment route. Activity data (tonnes) is needed — spend-based is not appropriate here.' },
+  { id: 'cat6', num: 6, name: 'Business travel', stream: 'Upstream', desc: 'Emissions from employee travel for business purposes', method: 'activity', unit: 'mixed', typicalShare: 0.05 , guidance: 'Emissions from employees travelling for business — flights, rail, hotels, rental cars — in vehicles not owned by your company.', dataSource: 'Travel & expense system or travel agency reports: flights (distance/class), hotel nights, rail. Spend-based estimation is permitted for this category.' },
+  { id: 'cat7', num: 7, name: 'Employee commuting', stream: 'Upstream', desc: 'Emissions from employees travelling to and from work', method: 'activity', unit: 'mixed', typicalShare: 0.03 , guidance: 'Emissions from employees commuting between home and work, including remote-work energy use.', dataSource: 'HR headcount + a commuting survey or assumptions (distance, mode, WFH days). Activity-based; spend-based is not appropriate here.' },
+  { id: 'cat8', num: 8, name: 'Upstream leased assets', stream: 'Upstream', desc: 'Emissions from assets leased by your organisation', method: 'activity', unit: 'kwh', typicalShare: 0.02 , guidance: 'Emissions from assets you LEASE FROM others (as lessee) that aren\'t already in your Scope 1 & 2 — e.g. leased offices or equipment you don\'t operationally control.', dataSource: 'Lease agreements + energy use of leased assets (floor area or metered kWh). Activity-based; spend-based is not appropriate here.' },
   // Downstream
-  { id: 'cat9', num: 9, name: 'Downstream transportation', stream: 'Downstream', desc: 'Emissions from transporting and distributing sold products', method: 'activity', unit: 'tonne_km', materialSectors: ['Consumer & Retail', 'Agriculture & Food', 'Industrials & Manufacturing'], typicalShare: 0.03 , guidance: 'Emissions from transporting and distributing the products you SELL, after they leave you — outbound logistics, distribution centres, retail, paid for by others.', dataSource: 'Distribution/logistics records or modelled tonne-km of sold-product movement. Spend-based estimation is permitted for this category.' },
-  { id: 'cat10', num: 10, name: 'Processing of sold products', stream: 'Downstream', desc: 'Emissions from processing your intermediate products by third parties', method: 'activity', unit: 'tonnes', materialSectors: ['Industrials & Manufacturing', 'Agriculture & Food'], typicalShare: 0.02 , guidance: 'Emissions from third parties further PROCESSING your sold intermediate products before final use (e.g. you sell a component that\'s then assembled or refined).', dataSource: 'Production volumes of intermediate goods + processing energy assumptions. Activity-based; spend-based is not appropriate here.' },
-  { id: 'cat11', num: 11, name: 'Use of sold products', stream: 'Downstream', desc: 'Emissions from end-users using your sold products', method: 'activity', unit: 'units', materialSectors: ['Technology', 'Energy & Utilities', 'Consumer & Retail', 'Industrials & Manufacturing'], typicalShare: 0.15 , guidance: 'Emissions from customers USING the products you sell over their lifetime — often the largest category for energy-using or fuel products.', dataSource: 'Units sold + expected lifetime energy/fuel use per unit. Activity-based; spend-based is not appropriate here.' },
-  { id: 'cat12', num: 12, name: 'End-of-life treatment', stream: 'Downstream', desc: 'Emissions from disposal of your sold products at end of life', method: 'activity', unit: 'tonnes', materialSectors: ['Consumer & Retail', 'Industrials & Manufacturing', 'Technology'], typicalShare: 0.02 , guidance: 'Emissions from the end-of-life treatment of your sold products once customers dispose of them — landfill, incineration, recycling.', dataSource: 'Units / mass sold + end-of-life treatment assumptions by material. Activity-based; spend-based is not appropriate here.' },
-  { id: 'cat13', num: 13, name: 'Downstream leased assets', stream: 'Downstream', desc: 'Emissions from assets owned and leased to others', method: 'activity', unit: 'kwh', materialSectors: ['Real Estate', 'Financial Services'], typicalShare: 0.01 , guidance: 'Emissions from assets you OWN and LEASE OUT to others (as lessor) that aren\'t in your Scope 1 & 2 — e.g. property you rent to tenants.', dataSource: 'Your leased-out asset portfolio + tenants\' energy use (floor area or metered). Activity-based; spend-based is not appropriate here.' },
-  { id: 'cat14', num: 14, name: 'Franchises', stream: 'Downstream', desc: 'Emissions from franchise operations', method: 'activity', unit: 'spend', materialSectors: ['Consumer & Retail'], typicalShare: 0.01 , guidance: 'Emissions from the operations of your FRANCHISEES — relevant if you\'re a franchisor.', dataSource: 'Franchisee energy/activity data, or estimates from number and type of franchise outlets. Activity-based; spend-based is not appropriate here.' },
-  { id: 'cat15', num: 15, name: 'Investments', stream: 'Downstream', desc: 'Emissions associated with investments and lending (financed emissions)', method: 'pcaf', unit: 'spend', materialSectors: ['Financial Services'], typicalShare: 0.90 , guidance: 'Emissions associated with your investments and lending (financed emissions) — for investors, banks and asset owners. ThemisIQ assesses this holding by holding on PCAF\u2019s method: each investee\u2019s own reported emissions, multiplied by your share of that investee. A total portfolio value on its own produces no figure — it is a balance at a date, and a spend factor is an intensity per year of activity, so multiplying them prices a year of purchasing nobody made. ThemisIQ is not PCAF-certified or a PCAF signatory.', dataSource: 'Per holding: the asset class, the outstanding amount, the value that asset class attributes on (EVIC, equity plus debt, property value or vehicle value) and the investee\u2019s reported emissions. If you already hold a computed figure for the portfolio, enter known financed emissions directly instead.' },
+  { id: 'cat9', num: 9, name: 'Downstream transportation', stream: 'Downstream', desc: 'Emissions from transporting and distributing sold products', method: 'activity', unit: 'tonne_km', typicalShare: 0.03 , guidance: 'Emissions from transporting and distributing the products you SELL, after they leave you — outbound logistics, distribution centres, retail, paid for by others.', dataSource: 'Distribution/logistics records or modelled tonne-km of sold-product movement. Spend-based estimation is permitted for this category.' },
+  { id: 'cat10', num: 10, name: 'Processing of sold products', stream: 'Downstream', desc: 'Emissions from processing your intermediate products by third parties', method: 'activity', unit: 'tonnes', typicalShare: 0.02 , guidance: 'Emissions from third parties further PROCESSING your sold intermediate products before final use (e.g. you sell a component that\'s then assembled or refined).', dataSource: 'Production volumes of intermediate goods + processing energy assumptions. Activity-based; spend-based is not appropriate here.' },
+  { id: 'cat11', num: 11, name: 'Use of sold products', stream: 'Downstream', desc: 'Emissions from end-users using your sold products', method: 'activity', unit: 'units', typicalShare: 0.15 , guidance: 'Emissions from customers USING the products you sell over their lifetime — often the largest category for energy-using or fuel products.', dataSource: 'Units sold + expected lifetime energy/fuel use per unit. Activity-based; spend-based is not appropriate here.' },
+  { id: 'cat12', num: 12, name: 'End-of-life treatment', stream: 'Downstream', desc: 'Emissions from disposal of your sold products at end of life', method: 'activity', unit: 'tonnes', typicalShare: 0.02 , guidance: 'Emissions from the end-of-life treatment of your sold products once customers dispose of them — landfill, incineration, recycling.', dataSource: 'Units / mass sold + end-of-life treatment assumptions by material. Activity-based; spend-based is not appropriate here.' },
+  { id: 'cat13', num: 13, name: 'Downstream leased assets', stream: 'Downstream', desc: 'Emissions from assets owned and leased to others', method: 'activity', unit: 'kwh', typicalShare: 0.01 , guidance: 'Emissions from assets you OWN and LEASE OUT to others (as lessor) that aren\'t in your Scope 1 & 2 — e.g. property you rent to tenants.', dataSource: 'Your leased-out asset portfolio + tenants\' energy use (floor area or metered). Activity-based; spend-based is not appropriate here.' },
+  { id: 'cat14', num: 14, name: 'Franchises', stream: 'Downstream', desc: 'Emissions from franchise operations', method: 'activity', unit: 'spend', typicalShare: 0.01 , guidance: 'Emissions from the operations of your FRANCHISEES — relevant if you\'re a franchisor.', dataSource: 'Franchisee energy/activity data, or estimates from number and type of franchise outlets. Activity-based; spend-based is not appropriate here.' },
+  { id: 'cat15', num: 15, name: 'Investments', stream: 'Downstream', desc: 'Emissions associated with investments and lending (financed emissions)', method: 'pcaf', unit: 'spend', typicalShare: 0.90 , guidance: 'Emissions associated with your investments and lending (financed emissions) — for investors, banks and asset owners. ThemisIQ assesses this holding by holding on PCAF\u2019s method: each investee\u2019s own reported emissions, multiplied by your share of that investee. A total portfolio value on its own produces no figure — it is a balance at a date, and a spend factor is an intensity per year of activity, so multiplying them prices a year of purchasing nobody made. ThemisIQ is not PCAF-certified or a PCAF signatory.', dataSource: 'Per holding: the asset class, the outstanding amount, the value that asset class attributes on (EVIC, equity plus debt, property value or vehicle value) and the investee\u2019s reported emissions. If you already hold a computed figure for the portfolio, enter known financed emissions directly instead.' },
 ]
 
-// Sector-based materiality
-const SECTOR_MATERIAL: Record<string, number[]> = {
-  'Energy & Utilities': [1, 2, 3, 4, 6, 7, 11],
-  'Financial Services': [1, 3, 6, 7, 13, 15],
-  'Real Estate': [1, 2, 3, 7, 8, 13],
-  'Technology': [1, 3, 6, 7, 11, 12],
-  'Healthcare & Pharma': [1, 3, 4, 5, 6, 7],
-  'Industrials & Manufacturing': [1, 2, 3, 4, 5, 7, 9, 10, 12],
-  'Consumer & Retail': [1, 3, 4, 6, 7, 9, 11, 12, 14],
-  'Agriculture & Food': [1, 3, 4, 5, 7, 9, 10],
-  'Transport & Logistics': [1, 3, 4, 6, 7, 8, 9],
-  'Mining & Metals': [1, 2, 3, 4, 5, 7],
-  'Construction & Materials': [1, 2, 3, 4, 5, 7, 9],
-  'Professional Services': [1, 3, 6, 7],
-  'Other': [1, 3, 6, 7],
-}
+// ⚠️ NO SECTOR MATERIALITY TABLE, AND NO SUGGESTION FEATURE. SECTOR_MATERIAL mapped thirteen retired
+// sector names to "likely material" categories, and it drove an auto-detect button and a per-category
+// badge on the relevance step. The company sector select emits EXIOBASE industry codes, and none of the
+// 163 matched any of the thirteen keys, so the feature suggested nothing for any sector a customer could
+// choose — while the methodology page said ThemisIQ "automatically identifies" the likely material
+// categories. Removed 18 Sep 2026 rather than re-keyed: relevance is the customer's judgement against
+// the GHG Protocol's criteria (size, influence, risk, stakeholders, outsourcing, sector guidance), and a
+// thirteen-row table with no source was never the GHG Protocol's sector guidance in the first place.
 
 // Emission factors (kg CO2e per unit)
 
@@ -82,9 +74,8 @@ const SECTOR_MATERIAL: Record<string, number[]> = {
 // EXIOBASE codes, and Cat 15 is assessed per holding or entered. The table's keys and the codes this page
 // offers never overlapped, so the helper had come to answer "no" everywhere — which is exactly how a
 // complete PCAF assessment ended up excluded from the total.
-//   SECTOR_MATERIAL below is keyed on the same retired vocabulary and misses the same way. It is NOT
-// deleted, because the materiality suggestion is separate work; autoDetect now explains the miss instead
-// of doing nothing, which is all this page can honestly do about it today.
+//   SECTOR_MATERIAL, keyed on the same retired vocabulary, was removed on 18 Sep 2026 along with the
+// suggestion feature it drove; the note where it stood, just above, says why.
 
 /** The GHG wizard's treatment of an unpriceable location, reused: withhold the figure, say why, and
  *  say it is not a zero. See app/dashboard/ghg/page.tsx, "We can't work out this location's
@@ -388,7 +379,7 @@ const srOnly: React.CSSProperties = { position: 'absolute', width: 1, height: 1,
 
 const sectionSub: React.CSSProperties = { fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.6, marginBottom: '1.5rem' }
 
-const STEP_NAMES = ['Setup', 'Materiality', 'Calculate', 'Results', 'Export']
+const STEP_NAMES = ['Setup', 'Relevance', 'Calculate', 'Results', 'Export']
 
 /**
  * One Cat 5 waste stream. `activity` is stored beside `waste_type` because the activity block is part of
@@ -911,41 +902,6 @@ export default function Scope3Dashboard() {
     updateCat('cat1', 'supplier_emissions', Number(mt.toFixed(3)))
   }
 
-  /**
-   * The sentence autoDetect leaves behind when it cannot suggest anything. '' = nothing to say.
-   *
-   * ⚠️ IT EXISTS BECAUSE THE BUTTON DID NOTHING. SECTOR_MATERIAL is keyed on the retired thirteen-name
-   * vocabulary and this page's selects emit EXIOBASE codes, so the lookup misses for every sector a
-   * customer can choose and `if (!suggested) return` made the click a no-op. The comment beside it claimed
-   * an unmatched sector "says so"; it said nothing at all, which is the failure mode this repo keeps
-   * finding — an empty result presented as no result.
-   */
-  const [autoDetectNote, setAutoDetectNote] = useState('')
-
-  // Auto-detect material categories
-  const autoDetect = () => {
-    // SECTOR_MATERIAL is keyed on the retired vocabulary too. Falling through to 'Other' would
-    // suggest one generic set of material categories to every company while looking tailored, so
-    // an unmatched sector suggests nothing and says so — in the note below, not by doing nothing.
-    const suggested = SECTOR_MATERIAL[sector]
-    if (!suggested) {
-      setAutoDetectNote(
-        sector
-          ? `No suggestion is held for ${industryName(sector)}. ThemisIQ's sector-materiality table is keyed on an older internal sector list, and this page asks for an EXIOBASE industry, so the two do not meet. Nothing has been changed. Mark the categories relevant yourself below — the suggestion is only ever a prompt, and an exclusion needs your reason in any case.`
-          : 'No primary sector is set in Step 1, so there is nothing to suggest from. Nothing has been changed.',
-      )
-      return
-    }
-    setAutoDetectNote('')
-    // ⚠️ THE SUGGESTION ANSWERS "RELEVANT?", AND ONLY THAT. A category the sector table does not suggest
-    // is left UNANSWERED (null) rather than marked not relevant: the table is a prompt, and an exclusion
-    // is the customer's judgement, which they have not made yet and which needs a reason.
-    const init: Record<string, CategoryData> = {}
-    CATEGORIES.forEach(c => {
-      init[c.id] = { ...catData[c.id], relevant: suggested.includes(c.num) ? true : (catData[c.id]?.relevant ?? null), excluded_reason: catData[c.id]?.excluded_reason ?? '' }
-    })
-    setCatData(init)
-  }
 
   /**
    * Answer — or un-answer — the relevance question for one category.
@@ -1917,7 +1873,7 @@ export default function Scope3Dashboard() {
   const renderStep0 = () => (
     <div>
       <h2 style={sectionHead}>Company setup</h2>
-      <p style={sectionSub}>Tell us about your organisation so we can identify which Scope 3 categories are material to you.</p>
+      <p style={sectionSub}>Tell us about your organisation.</p>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={labelStyle}>Company name</label>
@@ -1927,10 +1883,10 @@ export default function Scope3Dashboard() {
         <div style={{ gridColumn: '1 / -1' }}>
           {/* ⚠️ THIS SECTOR PRICES NOTHING AND SUGGESTS NOTHING, AND THE LABEL SAYS ONLY WHAT IS TRUE.
               It was Cat 1's fallback sector until that fallback was removed. I then labelled it as driving
-              the materiality suggestions — which was ALSO false: SECTOR_MATERIAL is keyed on the retired
-              thirteen-name vocabulary and this select emits EXIOBASE codes, so every lookup misses and
-              autoDetect suggests nothing (see the note it now shows). Recorded and printed is all that is
-              left, so recorded and printed is what it claims. */}
+              the materiality suggestions — which was ALSO false: the suggestion table was keyed on the
+              retired thirteen-name vocabulary and this select emits EXIOBASE codes, so every lookup missed.
+              That feature was removed on 18 Sep 2026. Recorded and printed is all that is left, so recorded
+              and printed is what it claims. */}
           <label style={labelStyle}>Primary sector — what your company does</label>
           <select style={inputStyle} value={sector} onChange={e => setSector(e.target.value)}>
             <option value="">Select sector</option>
@@ -2069,35 +2025,29 @@ export default function Scope3Dashboard() {
       </div>
       <div style={{ marginTop: 20, background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 20%, transparent)', borderRadius: 10, padding: '1rem' }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', marginBottom: 4 }}>GHG Protocol Scope 3 Standard</div>
-        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>ThemisIQ follows the GHG Protocol Corporate Value Chain (Scope 3) Accounting and Reporting Standard. You must report all material categories and explain exclusions.</div>
+        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>ThemisIQ follows the GHG Protocol Corporate Value Chain (Scope 3) Accounting and Reporting Standard. You must report every relevant category and explain each exclusion.</div>
       </div>
     </div>
   )
 
   const renderStep1 = () => (
     <div>
-      <h2 style={sectionHead}>Materiality screening</h2>
-      {/* Reworded along with the name: "material for a {sector}" read as an article before the retired
-          vocabulary ("for a Technology"), and reads as nonsense before an EXIOBASE name. */}
-      <p style={sectionSub}>ThemisIQ has identified the Scope 3 categories likely to be material for {sector ? <>your sector, <strong style={{ fontWeight: 600 }}>{industryName(sector)}</strong>,</> : 'your company'} based on GHG Protocol guidance. Review and confirm.</p>
-      <div style={{ background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 20%, transparent)', borderRadius: 10, padding: '0.75rem 1rem', marginBottom: 16, fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
-        These are suggestions, not limits — <strong>answer each category yourself</strong>: relevant, not relevant, or leave it unanswered for now. Pressing the answer a category already holds clears it. Under the GHG Protocol you may include any category you judge material, and you must briefly justify any you exclude — a box appears for that when you mark one not relevant. Tap a category in the Calculate step for what it means and where to find the data.
+      <h2 style={sectionHead}>Relevance screening</h2>
+      {/* ⚠️ THE CUSTOMER DECIDES, AND THE COPY SAYS SO. This claimed ThemisIQ had already identified the
+          categories likely to matter for the customer's sector, above a suggestion feature that identified
+          nothing for any selectable sector. The name is the COMPANY's: a category is relevant to a
+          company, and the sector select holds an EXIOBASE industry, which reads as nonsense here. */}
+      <p style={sectionSub}>Mark each category relevant or not relevant to {company ? <strong style={{ fontWeight: 600 }}>{company}</strong> : 'your company'}. The GHG Protocol judges relevance on size, influence, risk, stakeholder interest, outsourcing and sector guidance. Give a reason for any category you mark not relevant: CDP asks for one, and your export shows any exclusion made without one.</p>
+      {/* ⚠️ NO SECTOR GATE. The list sat behind a "select your sector in Step 1 first" panel because the
+          badges and the suggestion button read the sector. Nothing here does now, so the gate only stopped
+          a customer answering relevance at all until they filled a field that affects no figure. The
+          box calling the answers "suggestions, not limits" and the suggestion button went with it. */}
+      {/* The two working instructions that box carried, kept: an answer is optional, and pressing the
+          answer a category already holds clears it (setRelevance toggles back to null). */}
+      <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginBottom: 16 }}>
+        If you haven&apos;t decided, leave a category unanswered. To clear an answer, press it again.
       </div>
-
-      {!sector ? (
-        <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>Select your sector in Step 1 first.</div>
-      ) : (
-        <>
-          <button onClick={autoDetect} style={{ fontSize: 12, fontWeight: 500, padding: '8px 16px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer', marginBottom: 20 }}>
-            ⚡ Auto-detect material categories for {industryName(sector)}
-          </button>
-          {/* role=status: the click's whole effect is this sentence, so a screen reader has to hear it. */}
-          {autoDetectNote && (
-            <div role="status" style={{ fontSize: 11, lineHeight: 1.5, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.6rem 0.7rem', marginTop: -12, marginBottom: 20 }}>
-              {autoDetectNote}
-            </div>
-          )}
-
+      <>
           {['Upstream', 'Downstream'].map(stream => (
             <div key={stream} style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 10 }}>{stream}</div>
@@ -2106,7 +2056,6 @@ export default function Scope3Dashboard() {
                   const relevant = catData[cat.id]?.relevant ?? null
                   const included = relevant === true
                   const excluded = relevant === false
-                  const isMaterial = (SECTOR_MATERIAL[sector] || []).includes(cat.num)
                   const reason = catData[cat.id]?.excluded_reason || ''
                   return (
                     <div key={cat.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 14px', border: `1.5px solid ${included ? 'var(--color-brand)' : '#e8e7e4'}`, borderRadius: 10, background: included ? 'var(--color-brand-wash)' : '#fff' }}>
@@ -2114,7 +2063,6 @@ export default function Scope3Dashboard() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-ink-muted)', minWidth: 40 }}>Cat {cat.num}</span>
                           <span style={{ fontSize: 13, fontWeight: included ? 600 : 400, color: included ? 'var(--color-brand)' : '#0d0d0d' }}>{cat.name}</span>
-                          {isMaterial && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: '#E1F5EE', color: '#0F6E56' }}>LIKELY MATERIAL</span>}
                           {cat.num === 15 && (() => {
                             // ⚠️ "Spend-based estimate" WAS THE OTHER ARM OF THIS, and there is no longer a
                             // spend-based path to describe. The badge now names what the figure rests on, or
@@ -2180,8 +2128,7 @@ export default function Scope3Dashboard() {
               </div>
             </div>
           ))}
-        </>
-      )}
+      </>
     </div>
   )
 
@@ -2192,10 +2139,10 @@ export default function Scope3Dashboard() {
     return (
       <div>
         <h2 style={sectionHead}>Data entry</h2>
-        <p style={sectionSub}>Enter data for each material category. ThemisIQ will calculate emissions using the best available method.</p>
+        <p style={sectionSub}>Enter data for each category you marked relevant. ThemisIQ will calculate emissions using the best available method.</p>
 
         {activeCats.length === 0 ? (
-          <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>No categories selected — go back to Step 2 to select material categories.</div>
+          <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>No categories selected — go back to Step 2 to mark the relevant categories.</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {activeCats.map(cat => (
@@ -2716,7 +2663,7 @@ export default function Scope3Dashboard() {
     if (entLoading) return (
       <div>
         <h2 style={sectionHead}>Scope 3 results</h2>
-        <p style={sectionSub}>Your total Scope 3 inventory across all material categories — GHG Protocol aligned.</p>
+        <p style={sectionSub}>Your Scope 3 total across the categories marked relevant and calculated — GHG Protocol aligned.</p>
         <div className="tq-band" style={{ borderRadius: 16, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-2)', fontSize: 13 }}>
           Scope 3 results...
         </div>
@@ -2726,7 +2673,7 @@ export default function Scope3Dashboard() {
     return (
       <div>
         <h2 style={sectionHead}>Scope 3 results</h2>
-        <p style={sectionSub}>Your total Scope 3 inventory across all material categories — GHG Protocol aligned.</p>
+        <p style={sectionSub}>Your Scope 3 total across the categories marked relevant and calculated — GHG Protocol aligned.</p>
 
         <div style={{ position: 'relative' }}>
           <div style={!isPaid ? { filter: 'blur(7px)', pointerEvents: 'none', userSelect: 'none' } : undefined}>
@@ -2863,7 +2810,7 @@ export default function Scope3Dashboard() {
                     <strong style={{ fontWeight: 600, color: '#0d0d0d' }}>Cat {c.num} {c.name}:</strong>{' '}
                     {reason
                       ? reason
-                      : <span style={{ color: 'var(--color-module-climate)' }}>No justification recorded. The GHG Protocol requires one for every excluded category — add it in the Materiality step.</span>}
+                      : <span style={{ color: 'var(--color-module-climate)' }}>No justification recorded. The GHG Protocol requires one for every excluded category — add it in the Relevance step.</span>}
                     {statusOf(c.id).calculated && <span style={{ color: 'var(--color-ink-muted)' }}> · calculated at {getCatEmissions(c.id).toFixed(2)} mt CO₂e, reported but not in the total.</span>}
                   </div>
                 )
