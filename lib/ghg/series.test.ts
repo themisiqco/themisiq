@@ -10,6 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildCompanySeries, describeYearStatus,
+  scope3CoverageLabel, describeScope3Basis, describeScope3CoverageDrift,
   type InventoryRow, type YearExclusion,
 } from './series';
 
@@ -266,3 +267,173 @@ describe('GROUP C — no internal vocabulary reaches the customer', () => {
     expect(copy).not.toContain('(unset)');
   });
 });
+
+// ── GROUP D — Scope 3 coverage ────────────────────────────────────────────────
+//
+// The Scope 3 total is consumed well beyond the calculator: trends stacks it, and the SBTi dashboard
+// takes it as a baseline that is then fixed for the life of a target. These tests pin the three things
+// that stop a bare number being read as more than it is: a zero covering nothing is not a figure, an
+// unrecorded coverage is not a complete one, and two years are comparable only when they cover the same
+// categories — not merely the same number of them.
+
+const cov = (ids: string[], extra: Record<string, { in_total: boolean }> = {}) => ({
+  ...Object.fromEntries(ids.map(id => [id, { status: 'relevant_calculated', mt: 1, in_total: true, unpriced: false, reason: null }])),
+  ...Object.fromEntries(Object.entries(extra).map(([id, e]) => [id, { status: 'relevant_not_calculated', mt: null, in_total: e.in_total, unpriced: false, reason: null }])),
+})
+
+/** A year with a Scope 3 total whose coverage IS recorded. */
+const s3 = (year: number, total: number, ids: string[], o: Partial<InventoryRow> = {}) =>
+  row(year, {
+    scope3_total: total,
+    scope3Relevant: ids.length + 1,
+    scope3InTotal: ids.length,
+    scope3Unpriced: 0,
+    scope3ExclusionsUnjustified: 0,
+    scope3Coverage: cov(ids) as InventoryRow['scope3Coverage'],
+    ...o,
+  })
+
+describe('GROUP D — Scope 3 coverage', () => {
+  it('D1 a recorded coverage travels with the year, figure included', () => {
+    const y = buildCompanySeries([s3(2024, 400, ['cat1', 'cat5'])])[0].years[0]
+    expect(y.scope3).toBe(400)
+    expect(y.scope3Basis).toBe('measured')
+    expect(y.scope3InTotal).toBe(2)
+    expect(y.scope3Relevant).toBe(3)
+    expect(Object.keys(y.scope3Coverage ?? {})).toEqual(['cat1', 'cat5'])
+  })
+
+  it('D2 ⚠️ a zero total covering nothing is NOT a measurement: the figure is nulled and named', () => {
+    // A saved inventory with no category answered writes total 0 with in_total 0. Read through the
+    // total alone it is a Scope 3 of zero — it would stack, sum, and anchor a baseline.
+    const y = buildCompanySeries([row(2024, {
+      scope3_total: 0, scope3Relevant: 0, scope3InTotal: 0, scope3Unpriced: 0,
+      scope3ExclusionsUnjustified: 0, scope3Coverage: {},
+    })])[0].years[0]
+    expect(y.scope3).toBeNull()
+    expect(y.scope3Basis).toBe('covers_nothing')
+    expect(y.allScopesTotal, 'a zero covering nothing must not sum into all scopes').toBeNull()
+    // Nothing is hidden: the counts say what the null means.
+    expect(y.scope3InTotal).toBe(0)
+  })
+
+  it('D3 a pre-migration year keeps its figure and says the coverage is not recorded', () => {
+    const y = buildCompanySeries([row(2022, { scope3_total: 900 })])[0].years[0]
+    expect(y.scope3).toBe(900)
+    expect(y.scope3Basis).toBe('not_recorded')
+    expect(y.scope3Relevant).toBeNull()
+    expect(y.scope3InTotal).toBeNull()
+    expect(y.scope3Coverage).toBeNull()
+  })
+
+  it('D4 no Scope 3 record at all is absent, and stays null', () => {
+    const y = buildCompanySeries([row(2022)])[0].years[0]
+    expect(y.scope3).toBeNull()
+    expect(y.scope3Basis).toBe('absent')
+    expect(y.scope3Relevant).toBeNull()
+  })
+
+  it('D5 ⚠️ the same COUNT is not the same coverage', () => {
+    const differentSixes = buildCompanySeries([
+      s3(2024, 400, ['cat1', 'cat5']),
+      s3(2025, 380, ['cat1', 'cat6']),
+    ])[0]
+    expect(differentSixes.scope3CoverageConsistent).toBe(false)
+    const sameTwo = buildCompanySeries([
+      s3(2024, 400, ['cat1', 'cat5']),
+      s3(2025, 380, ['cat5', 'cat1']),   // order is not coverage
+    ])[0]
+    expect(sameTwo.scope3CoverageConsistent).toBe(true)
+  })
+
+  it('D6 ⚠️ an unrecorded year makes the comparison false, never true', () => {
+    const mixed = buildCompanySeries([
+      row(2022, { scope3_total: 900 }),          // not_recorded
+      s3(2024, 400, ['cat1', 'cat5']),
+    ])[0]
+    expect(mixed.scope3CoverageConsistent).toBe(false)
+    // Two unrecorded years are no better: nobody knows what either covered.
+    expect(buildCompanySeries([
+      row(2022, { scope3_total: 900 }), row(2023, { scope3_total: 950 }),
+    ])[0].scope3CoverageConsistent).toBe(false)
+  })
+
+  it('D7 fewer than two Scope 3 figures is consistent — nothing to compare, as with one GWP basis', () => {
+    expect(buildCompanySeries([s3(2024, 400, ['cat1'])])[0].scope3CoverageConsistent).toBe(true)
+    expect(buildCompanySeries([row(2022), row(2023)])[0].scope3CoverageConsistent).toBe(true)
+    // A year that covers nothing carries no figure, so it is not part of the comparison either.
+    expect(buildCompanySeries([
+      s3(2024, 400, ['cat1']),
+      row(2025, { scope3_total: 0, scope3InTotal: 0, scope3Coverage: {} }),
+    ])[0].scope3CoverageConsistent).toBe(true)
+  })
+
+  it('D8 the baseline carries its own coverage, and null where there is none to state', () => {
+    const s = buildCompanySeries([s3(2024, 400, ['cat1', 'cat5']), s3(2025, 380, ['cat1', 'cat5'])])[0]
+    expect(s.baselineYear).toBe(2024)
+    expect(s.baselineScope3Coverage).toEqual({
+      relevant: 3, inTotal: 2, unpriced: 0, exclusionsUnjustified: 0, categories: ['cat1', 'cat5'],
+    })
+    // A baseline whose coverage was never recorded states nothing rather than guessing.
+    expect(buildCompanySeries([row(2022, { scope3_total: 900 })])[0].baselineScope3Coverage).toBeNull()
+    // No Scope 3 at all: also null.
+    expect(buildCompanySeries([row(2022)])[0].baselineScope3Coverage).toBeNull()
+  })
+
+  it('D9 coverage is surfaced, never gated: an inconsistent series still carries every figure', () => {
+    const s = buildCompanySeries([
+      s3(2024, 400, ['cat1', 'cat5']),
+      s3(2025, 380, ['cat1']),
+    ])[0]
+    expect(s.scope3CoverageConsistent).toBe(false)
+    expect(s.years.map(y => y.scope3)).toEqual([400, 380])
+    expect(s.years.map(y => y.allScopesTotal)).toEqual([550, 530])
+  })
+})
+
+describe('GROUP E — the Scope 3 coverage copy', () => {
+  it('E1 the label counts categories, and says nothing when nothing was recorded', () => {
+    expect(scope3CoverageLabel({ scope3InTotal: 6, scope3Relevant: 12 })).toBe('6 of 12 relevant categories')
+    expect(scope3CoverageLabel({ scope3InTotal: 1, scope3Relevant: 1 })).toBe('1 of 1 relevant category')
+    expect(scope3CoverageLabel({ scope3InTotal: null, scope3Relevant: null })).toBeNull()
+  })
+
+  it('E2 ⚠️ "covers nothing" never reads as a missing record', () => {
+    const y = buildCompanySeries([row(2024, {
+      scope3_total: 0, scope3Relevant: 0, scope3InTotal: 0, scope3Coverage: {},
+    })])[0].years[0]
+    const copy = describeScope3Basis(y)!
+    expect(copy).toContain('saved Scope 3 inventory')
+    expect(copy).toContain('counts no categories yet')
+    expect(copy).toContain('not a missing record')
+    expect(copy).not.toMatch(/no Scope 3 recorded|not reported/i)
+  })
+
+  it('E3 an unrecorded coverage says so without withholding the figure', () => {
+    const y = buildCompanySeries([row(2022, { scope3_total: 900 })])[0].years[0]
+    expect(describeScope3Basis(y)).toContain('was not recorded')
+    expect(y.scope3).toBe(900)
+  })
+
+  it('E4 a measured year needs no sentence of its own', () => {
+    expect(describeScope3Basis(buildCompanySeries([s3(2024, 400, ['cat1'])])[0].years[0])).toBeNull()
+    expect(describeScope3Basis(buildCompanySeries([row(2024)])[0].years[0])).toBeNull()
+  })
+
+  it('E5 the drift line names the years and what each covers', () => {
+    const series = buildCompanySeries([s3(2024, 400, ['cat1', 'cat5']), s3(2025, 380, ['cat1'])])[0]
+    const copy = describeScope3CoverageDrift(series)!
+    expect(copy).toContain('2024 covers 2 of 3 relevant categories')
+    expect(copy).toContain('2025 covers 1 of 2 relevant categories')
+    expect(copy).toContain('may be a change in what is counted rather than in emissions')
+    // Silent when the years agree — the same silence gwpConsistent keeps on one basis.
+    expect(describeScope3CoverageDrift(buildCompanySeries([s3(2024, 400, ['cat1']), s3(2025, 380, ['cat1'])])[0])).toBeNull()
+  })
+
+  it('E6 an unrecorded year is named as unrecorded in the drift line, not counted', () => {
+    const series = buildCompanySeries([row(2022, { scope3_total: 900 }), s3(2024, 400, ['cat1'])])[0]
+    const copy = describeScope3CoverageDrift(series)!
+    expect(copy).toContain("2022's coverage was not recorded")
+    expect(copy).toContain('2024 covers 1 of 2 relevant categories')
+  })
+})

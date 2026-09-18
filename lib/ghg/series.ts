@@ -1,5 +1,6 @@
 import { factorEditionState } from "./factorEditions";
 import type { FactorEditions, FactorEditionState } from "./factorEditions";
+import type { Scope3CoverageEntry } from "../scope3/categoryStatus";
 
 /**
  * GHG multi-year series assembly
@@ -63,6 +64,13 @@ import type { FactorEditions, FactorEditionState } from "./factorEditions";
  */
 export type YearDataStatus = 'ok' | 'excluded' | 'unverifiable'
 
+/**
+ * What a year's Scope 3 figure is. Deliberately NOT folded into YearDataStatus: that describes whether
+ * Scope 1 and 2 can be plotted, and overloading it with a Scope 3 meaning would make one field answer two
+ * questions — the mistake the `included` boolean made on the Scope 3 page.
+ */
+export type Scope3Basis = 'measured' | 'covers_nothing' | 'not_recorded' | 'absent'
+
 /** One location the saved inventory recorded as left out, in the engine's own tokens. */
 export interface YearExclusion {
   locationName: string
@@ -80,6 +88,19 @@ export interface InventoryRow {
   scope2_location_total: number;
   scope2_market_total?: number | null;
   scope3_total?: number | null;      // mapped from scope3_inventories embed; null if none
+  /**
+   * WHAT THAT SCOPE 3 TOTAL COVERS — scope3_inventories' five coverage columns, mapped by the loader.
+   *
+   * ⚠️ NULL IS NOT RECORDED, NOT COMPLETE AND NOT ZERO. Every Scope 3 row saved before
+   * 20260917_scope3_coverage.sql carries a total and none of this, and the customer's judgement about
+   * which categories were relevant cannot be reconstructed from the row afterwards. Nothing here is
+   * defaulted; a consumer is expected to say "coverage not recorded for this year".
+   */
+  scope3Relevant?: number | null;              // categories answered relevant — the claim
+  scope3InTotal?: number | null;               // categories that actually contributed to the total
+  scope3Unpriced?: number | null;              // claimed categories the PLATFORM could not price
+  scope3ExclusionsUnjustified?: number | null; // exclusions with no justification written
+  scope3Coverage?: Record<string, Scope3CoverageEntry> | null;
   revenue_millions?: number | null;
   employee_count?: number | null;
   gwp_version?: string | null;
@@ -135,12 +156,49 @@ export interface SeriesYear {
   gwpVersion: string | null;
   /** Share of this year's S1+2 tCO2e that is estimated (0-100); null = wholly manual / unknown. */
   pctEstimated: number | null;
+  /**
+   * What this year's Scope 3 figure covers. Null throughout for a year saved before the coverage
+   * columns existed — NOT RECORDED, which is neither complete nor zero.
+   */
+  scope3Relevant: number | null;
+  scope3InTotal: number | null;
+  scope3Unpriced: number | null;
+  scope3ExclusionsUnjustified: number | null;
+  scope3Coverage: Record<string, Scope3CoverageEntry> | null;
+  /**
+   * What the Scope 3 number above IS, in one word, because "0" and "null" each mean two things:
+   *
+   *   'measured'       coverage recorded, at least one category in the total — scope3 is a figure
+   *   'covers_nothing' coverage recorded and NO category is in the total — ⚠️ scope3 is NULLED
+   *   'not_recorded'   a Scope 3 total exists, coverage does not (pre-migration row) — scope3 is the
+   *                    figure as saved, because unrecorded coverage is a comparability gap, not a
+   *                    reason to withhold a customer's own number
+   *   'absent'         no Scope 3 record for this year at all
+   *
+   * ⚠️ 'covers_nothing' IS WHY THIS FIELD EXISTS. A saved inventory with nothing answered writes
+   * total_scope3_tco2e = 0 with scope3_categories_in_total = 0. Read through the total alone, that zero
+   * is indistinguishable from a measured Scope 3 of zero — it would stack as an empty segment, sum into
+   * allScopesTotal as a real figure, and anchor an SBTi baseline at zero. Same defect as a dated slice
+   * asserting consumption no bill supports, handled the same way: the figure is nulled and the reason
+   * travels with the year. Nothing is hidden — the counts sit right beside it.
+   */
+  scope3Basis: Scope3Basis;
   /** Why this year is (or is not) plottable. 'ok' for every year that carries figures. */
   dataStatus: YearDataStatus;
   /** Populated only for 'excluded' — what the saved inventory recorded as left out. */
   exclusions: YearExclusion[] | null;
   /** Populated only for 'unverifiable' — why completeness could not be established. */
   unverifiableReason: string | null;
+}
+
+/** The baseline year's Scope 3 coverage: the counts, and WHICH categories the total counted. */
+export interface BaselineScope3Coverage {
+  relevant: number | null;
+  inTotal: number | null;
+  unpriced: number | null;
+  exclusionsUnjustified: number | null;
+  /** Category ids counted in the baseline total, sorted. Empty when the total counted none. */
+  categories: string[];
 }
 
 export interface CompanySeries {
@@ -169,6 +227,27 @@ export interface CompanySeries {
   /** True if ANY year is 'excluded' or 'unverifiable'. Mirrors gwpConsistent: a flag the consumer
    *  must surface, not a reason to hide the series. */
   exclusionsPresent: boolean;
+  /**
+   * Whether the years being compared cover the SAME SCOPE 3 CATEGORIES. Mirrors gwpConsistent and
+   * estimationConsistent: a fact that invalidates no figure but decides whether two may be compared.
+   *
+   * ⚠️ THE SAME SET, NOT THE SAME COUNT. Two years both at 6 of 15 are not comparable if they are
+   * different sixes: the trend would read as a reduction when a category merely moved out of the
+   * inventory. The set compared is the categories each year actually counted (in_total).
+   *
+   * ⚠️ FALSE WHEN ANY COMPARED YEAR'S COVERAGE IS UNRECORDED. A pre-migration year cannot be shown to
+   * cover the same categories as a recorded one, and "consistent" across that gap would assert something
+   * nobody knows. Fewer than two years carrying a Scope 3 figure → true: nothing to compare, which is how
+   * gwpConsistent treats a single year.
+   */
+  scope3CoverageConsistent: boolean;
+  /**
+   * What the BASELINE year's Scope 3 covers — the counts and the category set — so a consumer can state
+   * it without walking the years. Null when the baseline has no Scope 3 figure, or has one whose coverage
+   * was never recorded. A baseline is fixed for the life of a target, which is why this one year gets its
+   * own field.
+   */
+  baselineScope3Coverage: BaselineScope3Coverage | null;
   /**
    * Whether the years being compared were priced by the same emission-factor editions.
    *
@@ -257,6 +336,50 @@ export function describeYearStatus(y: SeriesYear): string | null {
   return `${y.year} isn't shown: we can't confirm its figures are complete${y.unverifiableReason ? ` — ${y.unverifiableReason}` : ""}. We'd rather leave a gap than plot a number we can't stand behind.`;
 }
 
+// ── SCOPE 3 COVERAGE, IN WORDS ──────────────────────────────────────────────────────────────────
+//
+// ONE place the Scope 3 coverage copy lives, on the FACTOR_EDITION_DISCLOSURE pattern: the trends chart
+// and the SBTi baseline both read these, so the two surfaces cannot describe the same year differently.
+//
+// ⚠️ 'covers_nothing' IS NOT "NO SCOPE 3 RECORDED". There IS a saved Scope 3 inventory for that year; it
+// counts no categories yet. Telling a customer their Scope 3 is missing would send them to create what
+// they already have, instead of to answer the relevance question they have not answered.
+
+/** "6 of 12 relevant categories". Null when the year records no coverage to count. */
+export function scope3CoverageLabel(y: Pick<SeriesYear, "scope3InTotal" | "scope3Relevant">): string | null {
+  if (y.scope3InTotal == null || y.scope3Relevant == null) return null;
+  return `${y.scope3InTotal} of ${y.scope3Relevant} relevant categor${y.scope3Relevant === 1 ? "y" : "ies"}`;
+}
+
+/** What a year's Scope 3 basis means, for a reader. Null for 'measured' and 'absent': a measured figure
+ *  with its coverage beside it needs no sentence, and an absent one is already handled as a gap. */
+export function describeScope3Basis(y: SeriesYear): string | null {
+  switch (y.scope3Basis) {
+    case "covers_nothing":
+      return `${y.year} has a saved Scope 3 inventory that counts no categories yet — none has been answered relevant and calculated, so there is no Scope 3 figure to show for that year. It is not a missing record.`;
+    case "not_recorded":
+      return `${y.year}'s Scope 3 figure is shown as it was saved. What it covers was not recorded, so it cannot be compared category by category with a later year.`;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Why the years' Scope 3 figures may not be comparable, naming them. Null when they are comparable, or
+ * when there is nothing to compare — the same silence gwpConsistent keeps on a single GWP basis.
+ */
+export function describeScope3CoverageDrift(series: CompanySeries): string | null {
+  if (series.scope3CoverageConsistent) return null;
+  const parts = series.years
+    .filter((y) => y.scope3 !== null)
+    .map((y) => {
+      const label = scope3CoverageLabel(y);
+      return label ? `${y.year} covers ${label}` : `${y.year}'s coverage was not recorded`;
+    });
+  if (parts.length === 0) return null;
+  return `Scope 3 coverage differs between years: ${parts.join("; ")}. A change in the Scope 3 total may be a change in what is counted rather than in emissions.`;
+}
+
 /**
  * Assemble per-company multi-year series from a flat list of inventory rows.
  * Rows for different companies and years may be intermixed; they are grouped by
@@ -291,6 +414,31 @@ export function buildCompanySeries(
     // callers constructing InventoryRow directly) working unchanged.
     const statusOf = (r: InventoryRow): YearDataStatus => r.dataStatus ?? "ok";
 
+    /**
+     * What a row's Scope 3 figure is, and which categories it counted.
+     *
+     * ⚠️ A ZERO THAT COVERS NOTHING IS NOT A MEASUREMENT. An inventory saved with no category answered
+     * stores total 0 with in_total 0; returning that 0 as a figure would stack an empty Scope 3 segment,
+     * add a real zero into allScopesTotal and anchor a baseline. The figure is nulled and the basis says
+     * why. A year whose coverage was never recorded keeps its figure: unknown coverage is a comparability
+     * gap, not grounds for withholding a customer's own number.
+     */
+    const scope3Of = (r: InventoryRow): { figure: number | null; basis: Scope3Basis; counted: string[] } => {
+      const total = num(r.scope3_total);
+      if (total === null) return { figure: null, basis: 'absent', counted: [] };
+      const inTotal = num(r.scope3InTotal);
+      const coverage = r.scope3Coverage ?? null;
+      if (inTotal === null && coverage === null) return { figure: total, basis: 'not_recorded', counted: [] };
+      const counted = coverage
+        ? Object.entries(coverage).filter(([, e]) => e?.in_total).map(([id]) => id).sort()
+        : [];
+      // Either signal of "nothing counted" is enough: the count is what the column records, the map is
+      // what it is derived from, and a row carrying only one of the two is still saying the same thing.
+      const nothingCounted = inTotal === 0 || (coverage !== null && counted.length === 0);
+      if (nothingCounted) return { figure: null, basis: 'covers_nothing', counted: [] };
+      return { figure: total, basis: 'measured', counted };
+    };
+
     const baselineYear =
       opts?.baselineYearByCompanyId?.[companyId] ?? ordered[0].reporting_year;
     const baselineRow =
@@ -310,6 +458,34 @@ export function buildCompanySeries(
       (r) => r.pctEstimated == null || r.pctEstimated === 0
     );
     const baselinePctEstimated = num(baselineRow.pctEstimated);
+
+    // ── Scope 3 coverage, across the years ────────────────────────────────────────────────────────
+    // Only years that CARRY a Scope 3 figure are compared: a year with no Scope 3 record at all is not an
+    // inconsistency, it is simply not in this comparison (the same way gwpConsistent ignores nothing and
+    // estimationConsistent treats an absent pctEstimated as fully evidenced).
+    const scope3Years = ordered
+      .map((r) => ({ row: r, s3: scope3Of(r) }))
+      .filter(({ s3 }) => s3.figure !== null);
+    const scope3CoverageConsistent =
+      scope3Years.length < 2
+        ? true
+        // ⚠️ AN UNRECORDED YEAR MAKES THIS FALSE RATHER THAN TRUE. 'not_recorded' cannot be shown to
+        // cover the same categories as a recorded year, and a flag that said "consistent" across that
+        // gap would be a claim nobody can support.
+        : scope3Years.every(({ s3 }) => s3.basis === 'measured') &&
+          new Set(scope3Years.map(({ s3 }) => s3.counted.join('|'))).size <= 1;
+
+    const baselineS3 = scope3Of(baselineRow);
+    const baselineScope3Coverage: BaselineScope3Coverage | null =
+      baselineS3.basis === 'measured' || baselineS3.basis === 'covers_nothing'
+        ? {
+            relevant: num(baselineRow.scope3Relevant),
+            inTotal: num(baselineRow.scope3InTotal),
+            unpriced: num(baselineRow.scope3Unpriced),
+            exclusionsUnjustified: num(baselineRow.scope3ExclusionsUnjustified),
+            categories: baselineS3.counted,
+          }
+        : null;
 
     const years: SeriesYear[] = ordered.map((r, i) => {
       const status = statusOf(r);
@@ -332,6 +508,15 @@ export function buildCompanySeries(
           yoyPct: null,
           gwpVersion: r.gwp_version ?? null,
           pctEstimated: num(r.pctEstimated),
+          // The COUNTS still travel with an unplottable year — they describe the saved record, not the
+          // figure, and a consumer naming the gap may still want to say what that year covered. The
+          // figure itself is null above, like every other, so the basis is 'absent' here by construction.
+          scope3Relevant: num(r.scope3Relevant),
+          scope3InTotal: num(r.scope3InTotal),
+          scope3Unpriced: num(r.scope3Unpriced),
+          scope3ExclusionsUnjustified: num(r.scope3ExclusionsUnjustified),
+          scope3Coverage: r.scope3Coverage ?? null,
+          scope3Basis: 'absent' as const,
           dataStatus: status,
           exclusions: status === "excluded" ? r.exclusions ?? [] : null,
           unverifiableReason: status === "unverifiable" ? r.unverifiableReason ?? null : null,
@@ -339,7 +524,8 @@ export function buildCompanySeries(
       }
 
       const scope12Total = r.scope1_total + r.scope2_location_total;
-      const scope3 = num(r.scope3_total);
+      const s3 = scope3Of(r);
+      const scope3 = s3.figure;
       const allScopesTotal = scope3 === null ? null : scope12Total + scope3;
 
       const rev = num(r.revenue_millions);
@@ -374,6 +560,12 @@ export function buildCompanySeries(
             : null,
         gwpVersion: r.gwp_version ?? null,
         pctEstimated: num(r.pctEstimated),
+        scope3Relevant: num(r.scope3Relevant),
+        scope3InTotal: num(r.scope3InTotal),
+        scope3Unpriced: num(r.scope3Unpriced),
+        scope3ExclusionsUnjustified: num(r.scope3ExclusionsUnjustified),
+        scope3Coverage: r.scope3Coverage ?? null,
+        scope3Basis: s3.basis,
         dataStatus: "ok" as const,
         exclusions: null,
         unverifiableReason: null,
@@ -390,6 +582,8 @@ export function buildCompanySeries(
       baselinePctEstimated,
       estimationConsistent,
       exclusionsPresent: years.some((y) => y.dataStatus !== "ok"),
+      scope3CoverageConsistent,
+      baselineScope3Coverage,
       // EVERY year, including unplottable ones. An excluded year was still priced by some edition,
       // and if that edition is unrecorded the series genuinely cannot be confirmed on one basis —
       // filtering to plottable years would let a gap in the record hide behind a gap in the data.
