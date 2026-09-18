@@ -217,7 +217,11 @@ export default function Home() {
               ['01', 'Tell us about your business', "Answer a few guided questions about your operations, locations, and obligations. ThemisIQ's Wizard does the heavy lifting — no compliance expertise required to get started."],
               ['02', 'We apply the right methodology', 'ThemisIQ automatically applies the correct frameworks, factors, and calculations for your selected modules — versioned, auditable, and traceable to source.'],
               ['03', 'Generate the reports you need', 'One data set. Numerous reports. Whether it\'s a regulator, an investor, a customer, or a board asking — ThemisIQ generates the right output automatically.'],
-              ['04', 'Stand behind your numbers', 'Every calculation and data point is logged with a full audit trail. Your verifiers, auditors, and regulators get everything they need — without the scramble.'],
+              // ⚠️ "Every calculation and data point is logged with a full audit trail" was platform-wide and false:
+              // audit_log triggers cover the GHG, CBAM and concierge tables only (verified live 17 Sep 2026), and
+              // they record a saved change to a row rather than every edit. The wording below is the homepage-length
+              // form of AUDIT_TRAIL_NOTE in app/climate-ghg/page.tsx; correct them together.
+              ['04', 'Stand behind your numbers', 'Every figure carries its factor citation and its workings. In the GHG, CBAM and concierge modules, each saved change is written to an audit log by a database trigger — who, when, and the row as it was before — and you can read your own entries but not alter them.'],
             ].map(([num, title, desc]) => (
               <div key={num}>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', fontWeight: 400, color: 'var(--color-brand)', opacity: 0.5, marginBottom: '0.75rem' }}>{num}</div>

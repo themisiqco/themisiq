@@ -92,6 +92,175 @@ def percentile(sorted_vals, p):
     return sorted_vals[lo] + (sorted_vals[hi] - sorted_vals[lo]) * (k - lo)
 
 
+def ordinal(n):
+    return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
+
+
+def intensity_percentiles(factors, cfg):
+    """The percentile-position metadata for one factor file. DESCRIPTIVE ONLY: not one value is
+    changed by anything here, and the fingerprint is computed over the rows, not this block.
+
+    ⚠️ RENAMED FROM reliability_bounds ON 17 SEP 2026, AND THE CALCULATION DID NOT CHANGE. What
+    these bounds measure is POSITION: where a factor's value sits among other factors. "Reliability"
+    is a defined term in the GHG Protocol's data quality indicators, where it describes how data was
+    acquired and verified, and customers report under that meaning; a percentile position says
+    nothing about it. `per_industry` also became `per_sector`, because the product file carried the
+    industry word for product sectors.
+
+    ⚠️ EVERY NUMBER IN THE PROSE BELOW IS COMPUTED. It used to be typed in, and the product file
+    shipped the INDUSTRY file's counts - "1,108 of 7,987", "seven industries", "834 of 6,795" - all
+    false for products. A statistic in a note is data and is generated like data.
+
+    EXIOBASE intensities have a seven-order-of-magnitude tail: an industry with negligible output
+    in a region produces an intensity that explodes. Other users clip it - Ignite Procurement
+    publishes a p3/p97 truncation with zero-filling. That is documented and defensible, and we do
+    NOT do it: the source note says the values are stored exactly as published, and clipping would
+    make that false. We compute the percentiles and DISCLOSE positions against them instead.
+
+    ZEROS ARE EXCLUDED, because a zero is an ABSENT factor rather than a factor of zero."""
+    nouns = cfg['nouns']
+    noun = cfg['factor_type']
+    regions = len({f['region'] for f in factors})
+
+    nonzero = sorted(f['value'] for f in factors if f['value'] != 0)
+    global_lo = percentile(nonzero, 3)
+    global_hi = percentile(nonzero, 97)
+
+    # Per sector, across its regions. Catches a value unremarkable across the file but at an end of
+    # its own sector, which the global bound cannot see.
+    per_sector = {}
+    for f in factors:
+        if f['value'] != 0:
+            per_sector.setdefault(f['exio_code'], []).append(f['value'])
+    LOCAL_MIN_N = 20      # see min_nonzero_regions_reason
+    local_bounds = {}
+    for code, vals in per_sector.items():
+        if len(vals) >= LOCAL_MIN_N:
+            v = sorted(vals)
+            local_bounds[code] = {
+                'p5': percentile(v, 5),
+                'p95': percentile(v, 95),
+                'n_nonzero_regions': len(v),
+            }
+    no_local = sorted(c for c in per_sector if c not in local_bounds)
+    all_zero = sorted({f['exio_code'] for f in factors} - set(per_sector))
+
+    # ── statistics for the notes, from the same values ──────────────────────────────────────────
+    n_all, n_nonzero = len(factors), len(nonzero)
+    outside = below = above = 0
+    glob_only = local_only = 0
+    carrying_both = 0
+    for f in factors:
+        v = f['value']
+        if v == 0:
+            continue
+        b = local_bounds.get(f['exio_code'])
+        g_out = v < global_lo or v > global_hi
+        l_out = b is not None and (v < b['p5'] or v > b['p95'])
+        if g_out or l_out:
+            outside += 1
+            if v < global_lo or (b is not None and v < b['p5']):
+                below += 1
+            else:
+                above += 1
+        if b is not None:
+            carrying_both += 1
+            glob_only += g_out and not l_out
+            local_only += l_out and not g_out
+    disagree = glob_only + local_only
+    spans = sorted(b['p95'] / b['p5'] for b in local_bounds.values())
+    median_span = spans[len(spans) // 2] if len(spans) % 2 else (spans[len(spans) // 2 - 1] + spans[len(spans) // 2]) / 2
+
+    # The rank-test arithmetic: with `regions` values, p5 sits at index (regions-1)*0.05.
+    k = (regions - 1) * 0.05
+    edge = int(k) + 1                       # values strictly below p5 in a sector with distinct values
+    full = [code for code, b in local_bounds.items() if b['n_nonzero_regions'] == regions]
+    full_counts = set()
+    for code in full:
+        vals = per_sector[code]
+        b = local_bounds[code]
+        full_counts.add((sum(v < b['p5'] for v in vals), sum(v > b['p95'] for v in vals)))
+    if full_counts == {(edge, edge)}:
+        full_sentence = (f"every one of the {len(full)} {nouns} with a non-zero factor in all {regions} "
+                         f"regions has exactly {edge} regions below its p5 and {edge} above its p95")
+    else:
+        full_sentence = (f"the {len(full)} {nouns} with a non-zero factor in all {regions} regions have "
+                         f"these (below, above) counts: {sorted(full_counts)}")
+
+    return {
+        'what_this_measures': (
+            'POSITION: where a factor\'s value sits among other non-zero factors - across the whole file '
+            '(3rd and 97th percentiles) and among its own sector\'s regions (5th and 95th). It is not a '
+            'measure of reliability, confidence or data quality. Those are defined terms: in the GHG '
+            'Protocol\'s data quality indicators, reliability describes how data was acquired and '
+            'verified, and a percentile position says nothing about that. These keys were named '
+            'reliability_bounds until 17 Sep 2026; the calculation is unchanged.'
+        ),
+        'method': (
+            'Descriptive bounds computed from the extracted values. NO VALUE IS MODIFIED BY '
+            'THEM: they are reported alongside a factor so a consumer can disclose where it '
+            'sits, never used to clip, winsorise or replace one. The bound is OURS; the value is '
+            'the publisher\'s.'
+        ),
+        'rank_test_note': (
+            f'THE PER-SECTOR BOUND IS A RANK TEST, NOT AN OUTLIER TEST. With {regions} regions the 5th '
+            f'percentile falls between the {ordinal(edge)} and {ordinal(edge + 1)} lowest values and the '
+            f'95th between the {ordinal(edge)} and {ordinal(edge + 1)} highest, so a fully populated '
+            f'sector places its lowest {edge} and highest {edge} regions outside the bound whatever '
+            f'their values are: in this file {full_sentence}. Being outside it means the region ranks '
+            f'at one end of its sector, not that its value is unusual. Across this file {outside:,} of '
+            f'{n_nonzero:,} non-zero factors ({100 * outside / n_nonzero:.1f}%) sit outside at least one '
+            f'of the two bounds: {below:,} below and {above:,} above.'
+        ),
+        'zeros_excluded': True,
+        'zeros_excluded_reason': (
+            'A zero is an ABSENT factor, not a factor of zero. The plainest case in either '
+            'archive is the very first cell of x.txt: Austria, paddy rice, output 0. '
+            'Austria grows no rice, so there is no Austrian paddy-rice intensity to '
+            'publish - and a consumer reading that cell as "0 kg CO2e per euro" would '
+            'report a purchase of Austrian rice as emissions-free rather than as unpriceable. '
+            'EXIOBASE is built from national supply-use tables and a cell is empty where a '
+            f'country or sector has insufficient economic data. {n_all - n_nonzero:,} of {n_all:,} '
+            f'cells in this file are zero and they are structured, not scattered: {len(all_zero)} '
+            f'{nouns if len(all_zero) != 1 else noun} {"are" if len(all_zero) != 1 else "is"} zero in all '
+            f'{regions} regions. Including them would drag both percentiles toward a number that '
+            'describes missing data rather than emissions intensity.'
+        ),
+        'values_modified': False,
+        'global': {
+            'percentiles': [3, 97],
+            'lower': global_lo,
+            'upper': global_hi,
+            'n_nonzero': n_nonzero,
+            'n_below': sum(1 for v in nonzero if v < global_lo),
+            'n_above': sum(1 for v in nonzero if v > global_hi),
+        },
+        'per_sector': {
+            'percentiles': [5, 95],
+            'min_nonzero_regions': LOCAL_MIN_N,
+            'min_nonzero_regions_reason': (
+                f'Below {LOCAL_MIN_N} of {regions} regions a 5th/95th percentile is interpolated '
+                'across so few points that the bound describes the sample rather than the sector. '
+                f'{len(no_local)} {nouns if len(no_local) != 1 else noun} fall under the threshold and '
+                f'carry no per-sector bound; they are listed in {nouns}_without_local_bound and must be '
+                'treated as NOT ASSESSED, never as in range.'
+            ),
+            f"{nouns}_with_bound": len(local_bounds),
+            f"{nouns}_without_local_bound": no_local,
+            f"{nouns}_zero_in_every_region": all_zero,
+            'bounds': local_bounds,
+        },
+        'disagreement_note': (
+            f'The two bounds disagree on {100 * disagree / carrying_both:.1f}% of the factors that carry '
+            f'both ({disagree:,} of {carrying_both:,}): {glob_only:,} are outside the global bound but '
+            f'inside their own sector\'s range, and {local_only:,} the reverse. They are not '
+            f'substitutes. The global bound is wide - a {global_hi / global_lo:.0f}x span - because it '
+            f'pools sectors whose medians differ by orders of magnitude; the median sector\'s own span '
+            f'is {median_span:.0f}x.'
+        ),
+    }
+
+
 def die(msg):
     sys.exit(f"ABORT: {msg}")
 
@@ -268,43 +437,6 @@ def main(archive: pathlib.Path):
     if len(factors) != EXPECTED_COLS:
         die(f"built {len(factors)} factors, expected {EXPECTED_COLS}")
 
-    # ── RELIABILITY BOUNDS — DESCRIPTIVE ONLY. NOT ONE VALUE IS CHANGED BY THIS BLOCK. ─────────
-    #
-    # EXIOBASE intensities have a seven-order-of-magnitude tail: the median is ~7.9e5 and the top
-    # of the range is ~3.7e14, because an industry with negligible output in a region produces an
-    # intensity that explodes. Other users clip it - Ignite Procurement publishes a method that
-    # truncates to the 3rd and 97th percentiles and fills zeros with estimates. That is documented
-    # and defensible, and we are NOT doing it: this file's source note says the values are stored
-    # exactly as published, and clipping would make that false. We compute the same bounds and
-    # DISCLOSE against them instead.
-    #
-    # ZEROS ARE EXCLUDED FROM THE COMPUTATION, because a zero is an ABSENT factor rather than a
-    # factor of zero: EXIOBASE is built from national supply-use tables, and where a country or
-    # sector has insufficient economic data the cell is empty rather than nil. Including 1,108
-    # zeros would drag both percentiles down toward a value that describes missing data.
-    nonzero = sorted(f['value'] for f in factors if f['value'] != 0)
-    global_lo = percentile(nonzero, 3)
-    global_hi = percentile(nonzero, 97)
-
-    # Per industry, across its 49 regions. A local bound catches a value that is unremarkable
-    # globally but extreme for its own industry, which the global bound cannot see.
-    per_industry = {}
-    for f in factors:
-        if f['value'] != 0:
-            per_industry.setdefault(f['exio_code'], []).append(f['value'])
-    LOCAL_MIN_N = 20      # see the note recorded in the metadata below
-    local_bounds = {}
-    for code, vals in per_industry.items():
-        if len(vals) >= LOCAL_MIN_N:
-            v = sorted(vals)
-            local_bounds[code] = {
-                'p5': percentile(v, 5),
-                'p95': percentile(v, 95),
-                'n_nonzero_regions': len(v),
-            }
-    no_local = sorted(c for c in per_industry if c not in local_bounds)
-    all_zero = sorted({f['exio_code'] for f in factors} - set(per_industry))
-
     payload = {
         'metadata': {
             'source': 'EXIOBASE 3',
@@ -362,59 +494,7 @@ def main(archive: pathlib.Path):
                 'on products purchased: Total" and "Other net taxes on production", both M.EUR. That '
                 'is the tax component of the wedge and neither of the two larger ones.'
             ),
-            'reliability_bounds': {
-                'method': (
-                    'Descriptive bounds computed from the extracted values. NO VALUE IS MODIFIED BY '
-                    'THEM: they are reported alongside a factor so a consumer can disclose that it '
-                    'sits in the tail, never used to clip, winsorise or replace one. The bound is '
-                    'OURS; the value is the publisher\'s.'
-                ),
-                'zeros_excluded': True,
-                'zeros_excluded_reason': (
-                    'A zero is an ABSENT factor, not a factor of zero. The plainest case in either '
-                    'archive is the very first cell of x.txt: Austria, paddy rice, output 0. '
-                    'Austria grows no rice, so there is no Austrian paddy-rice intensity to '
-                    'publish - and a consumer reading that cell as "0 kg CO2e per euro" would '
-                    'report a purchase of Austrian rice as emissions-free rather than as unpriceable. '
-                    'EXIOBASE is built from national supply-use tables and a cell is empty where a '
-                    'country or sector has insufficient economic data. 1,108 of 7,987 cells are zero and they are '
-                    'structured, not scattered: three industries are zero in all 49 regions. '
-                    'Including them would drag both percentiles toward a number that describes '
-                    'missing data rather than emissions intensity.'
-                ),
-                'values_modified': False,
-                'global': {
-                    'percentiles': [3, 97],
-                    'lower': global_lo,
-                    'upper': global_hi,
-                    'n_nonzero': len(nonzero),
-                    'n_below': sum(1 for v in nonzero if v < global_lo),
-                    'n_above': sum(1 for v in nonzero if v > global_hi),
-                },
-                'per_industry': {
-                    'percentiles': [5, 95],
-                    'min_nonzero_regions': LOCAL_MIN_N,
-                    'min_nonzero_regions_reason': (
-                        'Below 20 of 49 regions a 5th/95th percentile is interpolated across so few '
-                        'points that the bound describes the sample rather than the industry. Seven '
-                        'industries fall under the threshold and carry no local bound; they are '
-                        'listed in industries_without_local_bound and must be treated as unbounded, '
-                        'not as in-range.'
-                    ),
-                    f"{cfg['nouns']}_with_bound": len(local_bounds),
-                    f"{cfg['nouns']}_without_local_bound": no_local,
-                    f"{cfg['nouns']}_zero_in_every_region": all_zero,
-                    'bounds': local_bounds,
-                },
-                'disagreement_note': (
-                    'The two bounds disagree on 12.3% of the factors that carry both (834 of 6,795): '
-                    '186 are outside the global bound but inside their own industry\'s range, and '
-                    '648 the reverse. They are not substitutes. The global bound is wide - a 713x '
-                    'span - because it pools industries whose medians differ by orders of magnitude; '
-                    'the median industry\'s own span is 17x. A consumer checking only the global '
-                    'bound misses the larger group.'
-                ),
-            },
+            'intensity_percentiles': intensity_percentiles(factors, cfg),
             'join_file_note': (
                 'Joined on {jf} column 3 (CodeNr), by POSITION. Both archives ship BOTH '
                 'products.txt and industries.txt at identical byte sizes, so reading the wrong one '

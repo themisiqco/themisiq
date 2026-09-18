@@ -19,6 +19,7 @@ import { BarChart, ComposedChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianG
 import { loadCompanySeries, type LoadSeriesResult } from '../../../../lib/ghg/loadSeries'
 import { describeYearStatus } from '../../../../lib/ghg/series'
 import { FACTOR_EDITION_DISCLOSURE } from '../../../../lib/ghg/factorEditions'
+import { scope3CoverageLabel, describeScope3Basis, describeScope3CoverageDrift } from '../../../../lib/ghg/series'
 import { supabase } from '../../../../lib/supabase'
 import { computeTrajectory } from '../../../../lib/sbti'
 import { loadMonthly, type LoadMonthlyResult } from '../../../../lib/ghg/loadMonthly'
@@ -162,6 +163,9 @@ export default function TrendsPage() {
         scope1: y.scope1,
         scope2: y.scope2Location,
         scope3: y.scope3,
+        // Rides along so the tooltip can say what that year's Scope 3 counts without a second lookup.
+        // Null for a year whose coverage was never recorded; the note below the chart names those.
+        s3Label: scope3CoverageLabel(y),
       }))
     : []
 
@@ -171,11 +175,11 @@ export default function TrendsPage() {
 
   // Merge actuals (bars) with the target pathway. Actual years keep their bar values + (if present)
   // the target value; future years (beyond the latest actual) carry the target only, bars null.
-  type ChartRow = { year: number; scope1: number | null; scope2: number | null; scope3: number | null; target: number | null }
+  type ChartRow = { year: number; scope1: number | null; scope2: number | null; scope3: number | null; target: number | null; s3Label?: string | null }
   const targetByYear = new Map(targetSeries.map((p) => [p.year, p.target]))
   const lastActualYear = chartData.length ? chartData[chartData.length - 1].year : null
   const mergedData: ChartRow[] = [
-    ...chartData.map((d) => ({ year: d.year, scope1: d.scope1, scope2: d.scope2, scope3: d.scope3, target: targetByYear.get(d.year) ?? null })),
+    ...chartData.map((d) => ({ year: d.year, scope1: d.scope1, scope2: d.scope2, scope3: d.scope3, s3Label: d.s3Label, target: targetByYear.get(d.year) ?? null })),
     ...targetSeries
       .filter((p) => lastActualYear == null || p.year > lastActualYear)
       .map((p) => ({ year: p.year, scope1: null, scope2: null, scope3: null, target: p.target })),
@@ -198,9 +202,21 @@ export default function TrendsPage() {
   // Scope 3 "not reported" is a different absence from an unplottable year, and listing an
   // unplottable year here too would tell the customer to go and complete a Scope 3 that isn't the
   // problem. Only 'ok' years can be missing *just* their Scope 3.
+  // ⚠️ THREE DIFFERENT ABSENCES, AND ONLY ONE OF THEM MEANS "GO AND DO YOUR SCOPE 3". This list used to
+  // be every 'ok' year with a null scope3, which now also catches a year whose Scope 3 inventory EXISTS
+  // and counts no categories yet — telling that customer to complete a Scope 3 would send them to create
+  // what they already have. Each basis gets its own line, from the series' own copy.
   const missingS3Years = selected
-    ? selected.years.filter((y) => y.dataStatus === 'ok' && y.scope3 === null).map((y) => y.year)
+    ? selected.years.filter((y) => y.dataStatus === 'ok' && y.scope3Basis === 'absent').map((y) => y.year)
     : []
+  const scope3BasisNotes = selected
+    ? selected.years
+        .filter((y) => y.dataStatus === 'ok')
+        .map((y) => describeScope3Basis(y))
+        .filter((t): t is string => t !== null)
+    : []
+  // Surfaced, never gated: the bars stay, and this says why two of them may not be comparable.
+  const scope3Drift = selected ? describeScope3CoverageDrift(selected) : null
 
   const gwpVersion = selected?.years[0]?.gwpVersion ?? 'AR6'
 
@@ -346,7 +362,14 @@ export default function TrendsPage() {
                   tick={{ fontSize: 12, fill: '#555553' }}
                   label={{ value: 'tCO₂e', angle: -90, position: 'insideLeft', style: { fontSize: 12, fill: 'var(--color-ink-muted)' } }}
                 />
-                <Tooltip />
+                {/* The Scope 3 segment carries its coverage in the tooltip: a figure covering 6 of 12
+                    categories and one covering 12 of 12 look identical on a stacked bar. */}
+                <Tooltip
+                  formatter={(value, name, item) => {
+                    const label = (item as { payload?: ChartRow } | undefined)?.payload?.s3Label
+                    return name === 'Scope 3' && label ? [`${value} · ${label}`, name] : [value as never, name]
+                  }}
+                />
                 <Legend />
                 {/* No baseline line when the baseline year itself can't be plotted — a dashed rule
                     at a partial figure would anchor every visual comparison on the chart to it. */}
@@ -436,11 +459,32 @@ export default function TrendsPage() {
             </div>
           )}
 
-          {/* Scope 3 not reported marker */}
+          {/* Scope 3 not reported marker — years with NO Scope 3 record at all. */}
           {missingS3Years.length > 0 && (
             <div style={{ marginTop: 12, fontSize: 12, color: 'var(--color-module-climate)', lineHeight: 1.6 }}>
               Scope 3 not reported for: {missingS3Years.join(', ')}.{' '}
               <a href="/dashboard/scope3" style={{ color: 'var(--color-module-climate)', fontWeight: 600 }}>Complete Scope 3</a> to include it.
+            </div>
+          )}
+
+          {/* A saved Scope 3 that counts nothing, and a saved Scope 3 whose coverage was never recorded.
+              Neither is a missing record, and neither is the other. */}
+          {scope3BasisNotes.map((note) => (
+            <div key={note} style={{ marginTop: 12, fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.6 }}>
+              {note}
+              {note.includes('counts no categories') && (
+                <>
+                  {' '}
+                  <a href="/dashboard/scope3" style={{ color: 'var(--color-module-climate)', fontWeight: 600 }}>Answer the categories</a> to bring it into the chart.
+                </>
+              )}
+            </div>
+          ))}
+
+          {/* SURFACED, NOT GATED — the same treatment gwpConsistent and estimationConsistent get. */}
+          {scope3Drift && (
+            <div style={{ marginTop: 12, background: '#FDF6EC', border: '0.5px solid #EAD9BE', borderRadius: 8, padding: '10px 14px', fontSize: 12.5, color: 'var(--color-module-climate)', lineHeight: 1.6 }}>
+              {scope3Drift}
             </div>
           )}
 

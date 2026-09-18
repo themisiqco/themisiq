@@ -2,6 +2,20 @@
 
 import Nav from '../components/Nav'
 import Footer from '../components/Footer'
+import { scope3MethodFor, scope3MethodDescription, provenanceGap } from '../../lib/scope3/categoryMethods'
+import { EMISSION_FACTORS, EMISSION_FACTORS_PROVENANCE } from '../../lib/emissionFactors'
+import { DEFRA_DESNZ_PUBLICATION } from '../../lib/ghg/defraPublication'
+
+// ⚠️ SCOPE 3 BASIS PARAGRAPHS ARE BUILT, NOT WRITTEN. Two entries on this page said Scope 3 spend
+// estimates used "DEFRA and Exiobase" / "DEFRA (2023) and Exiobase v3", which was false: no DEFRA spend
+// factor exists in the codebase. They are now assembled from lib/scope3/categoryMethods.ts — the same
+// map the calculator dispatches on — so this page names the method each category is actually
+// calculated with, and the factor values and missing provenance are read from the factor records.
+const flatSpendCategories = Array.from({ length: 15 }, (_, i) => i + 1)
+  .filter(n => scope3MethodFor(`cat${n}`) === 'flat_spend')
+const listNumbers = (ns: number[]) =>
+  ns.length <= 1 ? ns.join('') : `${ns.slice(0, -1).join(', ')} and ${ns[ns.length - 1]}`
+const bridgeGap = provenanceGap(EMISSION_FACTORS_PROVENANCE)
 
 const GRAD = 'var(--color-brand)'
 
@@ -34,11 +48,18 @@ const METHODOLOGIES = [
       },
       {
         title: 'Global Warming Potentials (GWP)',
-        content: 'ThemisIQ applies IPCC Sixth Assessment Report (AR6) 100-year GWP values by default — the latest published IPCC set — across CDP, ESRS E1, GRI 305, EcoVadis, and IFRS S2. The one exception is California SB 253, which is reported on IPCC AR4 values for consistency with CARB\'s existing AB 32 / Mandatory Reporting Regulation program. AR6 distinguishes fossil from non-fossil (biogenic) methane (fossil CH₄ GWP 29.8, non-fossil 27.0, N₂O 273); the correct GWP set is applied automatically based on each selected framework and stamped on every export.',
+        // ⚠️ SB 253 IS AR6, AND THIS PARAGRAPH SAID AR4 FOR THREE MONTHS AFTER IT STOPPED BEING TRUE. It read
+        // "The one exception is California SB 253, which is reported on IPCC AR4 values for consistency with
+        // CARB's existing AB 32 / Mandatory Reporting Regulation program." Commit f83326a (20 Jun 2026) moved
+        // FRAMEWORKS.sb253.gwp in lib/ghg/engine.ts from 'AR4' to 'AR6'; this page and /calculate-emissions
+        // were not updated. The change is stated rather than the exception deleted, so a reader who knew
+        // SB 253 was different learns that it no longer is. lib/publisherClaims.test.ts P4 now checks every
+        // framework named beside a GWP set against FRAMEWORKS.
+        content: 'ThemisIQ applies IPCC Sixth Assessment Report (AR6) 100-year GWP values — the latest published IPCC set — for every framework it exports: SB 253, CDP, ESRS E1, GRI 305, EcoVadis and IFRS S2. SB 253 was reported on IPCC AR4 values until June 2026, for consistency with CARB\'s AB 32 / Mandatory Reporting Regulation program; since then it uses AR6 like the other frameworks. AR6 distinguishes fossil from non-fossil (biogenic) methane (fossil CH₄ GWP 29.8, non-fossil 27.0, N₂O 273). Where a publisher issues factors with the gases already combined on its own GWP basis — DEFRA/DESNZ, DCCEEW and NZ MfE — those factors are applied as published and the workings row says so. The GWP basis is stamped on every export.',
       },
       {
         title: 'Emission factors',
-        content: 'Combustion factors are country-matched: US locations use US EPA (2024) factors, Canadian locations use Environment and Climate Change Canada (ECCC) "Emission factors and reference values" v3.0, UK locations use UK DEFRA/DESNZ (2026) Greenhouse Gas Conversion Factors for Company Reporting, and EU member-state locations use the EU Monitoring and Reporting Regulation (Commission Implementing Regulation (EU) 2018/2066), Annex VI Table 1, which carries the IPCC (2006 Guidelines, Vol. 2) Tier 1 defaults as directly applicable EU law. For Canadian locations, natural gas CO₂ is applied per province (ECCC marketable values) and reported in m³ or Mcf. For UK locations, factors follow the DEFRA published basis — natural gas reported in kWh on a gross calorific value basis — so reported combustion figures reconcile directly to DEFRA for SECR assurance; because DEFRA factors embed a fixed GWP basis, UK combustion figures are reported on that basis rather than the user-selected AR4/AR5 set. For EU locations, note that both cited sources publish on a MASS basis — emission factors per terajoule and net calorific values per gigagram of fuel — whereas EU customers record consumption by volume. ThemisIQ therefore converts these factors to a per-litre and per-m³ basis using fuel densities, and those densities are published by neither source. Where a European specification bounds the value we state it as a bound rather than a citation: the diesel density falls within the EN 590 range for automotive diesel sold in the EU (0.820–0.845 kg/L at 15 °C), at its conservative upper end, and the petrol density within the EN 228 range (0.720–0.775 kg/L at 15 °C), near its midpoint. The density used for LPG is not bounded by any European standard we have identified. Every affected calculation row in your workings states the arithmetic applied and says which input is not published by the cited source, so a verifier can see the step rather than infer it. These are also 100% fossil factors and exclude any biofuel-blend adjustment: national blended factors embed the fuel-supply mandate of a single country, which is not an appropriate assumption to apply across 27 member states. Locations outside the US, Canada, UK, and EU fall back to US EPA combustion factors. Electricity factors are location-based and country-matched: eGRID 2023 (US states), ECCC NIR (Canadian provinces), DEFRA 2025 and 2026 (UK, by reporting year), and European Environment Agency 2023 per-country generation intensities (all 27 EU member states). All factors are versioned, country-matched, and cited in exports.',
+        content: `Combustion factors are country-matched: US locations use US EPA (2024) factors, Canadian locations use Environment and Climate Change Canada (ECCC) "Emission factors and reference values" v3.0, UK locations use UK DEFRA/DESNZ (2026) Greenhouse Gas Conversion Factors for Company Reporting, and EU member-state locations use the EU Monitoring and Reporting Regulation (Commission Implementing Regulation (EU) 2018/2066), Annex VI Table 1, which carries the IPCC (2006 Guidelines, Vol. 2) Tier 1 defaults as directly applicable EU law. For Canadian locations, natural gas CO₂ is applied per province (ECCC marketable values) and reported in m³ or Mcf. For UK locations, factors follow the DEFRA published basis — natural gas reported in kWh on a gross calorific value basis — so reported combustion figures reconcile directly to DEFRA for SECR assurance; because DEFRA factors embed a fixed GWP basis, UK combustion figures are reported on that basis rather than the user-selected AR4/AR5 set. For EU locations, note that both cited sources publish on a MASS basis — emission factors per terajoule and net calorific values per gigagram of fuel — whereas EU customers record consumption by volume. ThemisIQ therefore converts these factors to a per-litre and per-m³ basis using fuel densities, and those densities are published by neither source. Where a European specification bounds the value we state it as a bound rather than a citation: the diesel density falls within the EN 590 range for automotive diesel sold in the EU (0.820–0.845 kg/L at 15 °C), at its conservative upper end, and the petrol density within the EN 228 range (0.720–0.775 kg/L at 15 °C), near its midpoint. The density used for LPG is not bounded by any European standard we have identified. Every affected calculation row in your workings states the arithmetic applied and says which input is not published by the cited source, so a verifier can see the step rather than infer it. These are also 100% fossil factors and exclude any biofuel-blend adjustment: national blended factors embed the fuel-supply mandate of a single country, which is not an appropriate assumption to apply across 27 member states. Locations outside the US, Canada, UK, and EU fall back to US EPA combustion factors. Electricity factors are location-based and country-matched: eGRID 2023 (US states), ECCC NIR (Canadian provinces), DEFRA 2025 and 2026 (UK, by reporting year), and European Environment Agency 2023 per-country generation intensities (all 27 EU member states). All factors are versioned, country-matched, and cited in exports. ${DEFRA_DESNZ_PUBLICATION.attribution_required}`,
       },
       {
         title: 'Scope 2 accounting',
@@ -74,7 +95,15 @@ const METHODOLOGIES = [
       },
       {
         title: 'Calculation hierarchy',
-        content: 'ThemisIQ applies a three-tier data quality hierarchy: (1) Supplier-specific primary data — highest accuracy; (2) Activity-based calculations using industry average factors; (3) Spend-based estimates using DEFRA and Exiobase emission intensity factors. Each category displays its data quality level in all exports.',
+        content: [
+          'Each Scope 3 category is calculated by one of the methods below, and every export names the method used for each category in that inventory. Where a figure is entered directly, it is used instead of any estimate.',
+          `Category 1, purchased goods and services: ${scope3MethodDescription('exiobase_spend')} Supplier-specific figures, where entered, are used instead.`,
+          `Category 5, waste: ${scope3MethodDescription('waste_factors')}`,
+          `Category 6, business travel: ${scope3MethodDescription('travel_factors')}`,
+          `Category 7, employee commuting: ${scope3MethodDescription('commuting_factors')}`,
+          `Category 15, investments: ${scope3MethodDescription('pcaf')}`,
+          `The other ${flatSpendCategories.length} categories (${listNumbers(flatSpendCategories)}): ${scope3MethodDescription('flat_spend')}`,
+        ],
       },
       {
         title: 'Category 15 — Financed emissions',
@@ -247,7 +276,11 @@ const METHODOLOGIES = [
       },
       {
         title: 'Scope 3 Category 1',
-        content: 'Spend-based estimates use sector-specific emission intensity factors from DEFRA (2023) and Exiobase v3. Supplier-specific data submitted via the portal automatically supersedes spend-based estimates, improving inventory accuracy over time.',
+        content: [
+          `The supplier register estimates Category 1 for a supplier only where its own fixed table holds a factor for that supplier's sector. Those factors are recorded with no published source, year or region, and supplier sectors are now recorded as EXIOBASE industries that the table does not cover, so in practice no supplier is priced there. While any supplier is unpriced, no total is shown.`,
+          `In the Scope 3 calculator, Category 1 is ${scope3MethodDescription('exiobase_spend').replace(/^Spend-based/, 'spend-based')}`,
+          `Figures pulled from the Supplier Portal use each supplier's own allocated emissions where the supplier provided them. A supplier without one is estimated from its recorded spend at ${EMISSION_FACTORS.spend.Other} kg CO2e per US dollar, one factor for every sector${bridgeGap ? `, recorded with ${bridgeGap}` : ''}; spend in any other currency is flagged and left out. The buyer reviews the result before applying it to Category 1.`,
+        ],
       },
     ],
   },

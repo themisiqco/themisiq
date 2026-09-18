@@ -825,7 +825,17 @@ function SupplyChainDashboardInner() {
             <div>
               <div className="tq-summary-label" style={{ marginBottom: 8 }}>Total Scope 3 Category 1 (spend-based estimate)</div>
               <div style={{ fontSize: 11, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>
-                GHG Protocol spend-based method · DEFRA/Exiobase sector emission factors<br />
+                {/* ⚠️ THIS LINE SAID "DEFRA/Exiobase sector emission factors", WHICH WAS FALSE: no DEFRA
+                    factor exists in the codebase, and this register prices a supplier only from the ef
+                    column of SECTOR_RISK above — a hand-typed table keyed on the retired sector names,
+                    with no source recorded. The dropdown now stores EXIOBASE codes, so in practice no
+                    supplier matches it. The line now states what happened to THESE suppliers. */}
+                GHG Protocol spend-based method ·{' '}
+                {unpricedCount === inventory.suppliers.length
+                  ? 'no emission factor is applied to any supplier yet, so no estimate is calculated'
+                  : unpricedCount === 0
+                    ? 'every supplier is priced from a fixed per-sector factor held in this module, with no published source, year or region recorded'
+                    : `${inventory.suppliers.length - unpricedCount} of ${inventory.suppliers.length} suppliers are priced from a fixed per-sector factor held in this module, with no published source, year or region recorded; ${unpricedCount} have no factor for their sector`}<br />
                 This is an estimate only — primary data collection from suppliers is the gold standard
               </div>
             </div>

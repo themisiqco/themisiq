@@ -160,6 +160,15 @@ export interface SpendFactorSource {
   unit_conversion: string | null
   /** Anything a reader must know before treating this source as a spend-based factor set. */
   note: string | null
+  /**
+   * Whether the source publishes uncertainty values (ranges, standard deviations, pedigree scores)
+   * for these factors. false = established that it does not; null = not established either way.
+   *
+   * ⚠️ false IS A DISCLOSURE, NOT A DEFECT. Publishing no uncertainty is the norm for spend-based
+   * factor sets, but a figure shown without one must say so, or the absence reads as a precision
+   * nobody claimed. The spend-factor route states it once per response whenever this is false.
+   */
+  publishes_uncertainty: boolean | null
 }
 
 export const SPEND_EF_SOURCES: Record<SpendSourceId, SpendFactorSource> = {
@@ -173,6 +182,7 @@ export const SPEND_EF_SOURCES: Record<SpendSourceId, SpendFactorSource> = {
     licence: null,
     classification: null,
     unit_conversion: null,
+    publishes_uncertainty: null,
     note:
       'The EPA landing page states the model "melds data on economic transactions between 389 ' +
       'industry sectors" but names no current version, no release date and no classification. ' +
@@ -191,6 +201,7 @@ export const SPEND_EF_SOURCES: Record<SpendSourceId, SpendFactorSource> = {
     licence: null,
     classification: null,
     unit_conversion: null,
+    publishes_uncertainty: null,
     note:
       'The multiplier series to use is the DIRECT PLUS INDIRECT greenhouse gas emissions intensity ' +
       'published in catalogue 16-509-X, in tonnes per thousand current dollars of production. ' +
@@ -219,6 +230,12 @@ export const SPEND_EF_SOURCES: Record<SpendSourceId, SpendFactorSource> = {
       'region-sector pair - while SpendFactorUnit is per ONE currency unit. The stored files are ' +
       'unchanged; the division happens in the resolver at the point a raw row becomes a ' +
       'SpendFactor, which is the first point at which the type asserts a unit.',
+    // false, on this basis: the factors are point values from one row of impacts/M.txt with no
+    // uncertainty column beside them in the extract, and the 17 Sep 2026 brief for this field states
+    // that EXIOBASE 3.8.2 publishes none for these multipliers (Climatiq report that, of their
+    // sources, only ADEME provides uncertainty across its database). The full archive was not
+    // re-opened to confirm it when the field was added; re-check it if the source is re-extracted.
+    publishes_uncertainty: false,
     note:
       'Multipliers are in M.txt inside the IOT_YYYY_*.zip archives; they are not a separate ' +
       'download. Resolution is 163 industries by 200 products, covering 44 countries (28 EU ' +
@@ -279,40 +296,138 @@ export interface SpendFactorCaveats {
   /** factor.price_basis !== query.spend_price_basis. This module performs NO BASIS CONVERSION. */
   price_basis_mismatch: boolean
   /**
-   * The value sits outside the reliability bounds recorded beside the factor set.
+   * Where the factor's value sits among ALL non-zero factors of its type in the file.
    *
-   * ⚠️ REPORTED, NEVER CORRECTED HERE - on exactly the same footing as currency_mismatch. THE
-   * VALUE IS AS PUBLISHED; THE BOUND IS OURS. EXIOBASE intensities carry a seven-order-of-magnitude
-   * tail, because an industry with negligible output in a region produces an intensity that
-   * explodes: the median is around 7.9e5 and the top of the range around 3.7e14. Other users clip
-   * that - Ignite Procurement publishes a p3/p97 truncation with zero-filling - and we do not,
-   * because the factor file's own note says the values are stored exactly as published and clipping
-   * would make that false. So the resolver hands back the published number with this flag set, and
-   * the caller decides what to show.
-   *
-   * TWO BOUNDS EXIST AND THEY ARE NOT SUBSTITUTES. A global p3/p97 across all non-zero factors, and
-   * a per-industry p5/p95 across that industry's regions. They disagree on 12.3% of the factors
-   * carrying both: 186 sit outside the global bound but inside their own industry's range, and 648
-   * the reverse. Seven industries have too few non-zero regions for a local bound at all, and for
-   * those "no local bound" means UNBOUNDED, never "in range".
+   * 'below' / 'above' = in the bottom `lower_percentile`% or top (100 - `upper_percentile`)%. With
+   * the published 3/97 that is a genuine extreme across hundreds of sectors and 49 regions, and a
+   * caller should say so as a caution.
    */
-  outside_reliability_bounds: boolean
+  intensity_among_all_factors: {
+    position: IntensityPosition
+    lower_percentile: number
+    upper_percentile: number
+  }
   /**
-   * The per-sector bound could not be evaluated, so only the global one was applied.
+   * Where the factor's value sits among its OWN SECTOR's regions, with its rank.
    *
-   * WARNING: A BOOLEAN CANNOT CARRY THREE STATES, AND THE THIRD ONE IS THE DANGEROUS ONE. Seven
-   * industries and two products have too few non-zero regions for a p5/p95 to mean anything, so
-   * they carry no local bound at all. For those, `outside_reliability_bounds: false` means "the
-   * global check passed and the local check COULD NOT BE MADE" - it does not mean in range, and a
-   * caller that reads it as in range has been told something nobody established.
+   * ⚠️ THE PER-SECTOR TEST IS A RANK TEST, NOT AN OUTLIER TEST, AND position MUST BE PRESENTED AS A
+   * FACT, NEVER AS A CAUTION. With 49 regions the 5th percentile falls between the 3rd and 4th
+   * lowest values and the 95th between the 3rd and 4th highest, so every fully populated sector
+   * places its lowest three and highest three regions outside, whatever their values. Measured 17 Sep
+   * 2026: that fires on 15.4% of priceable industry factors and 11.9% of the G7-plus-Australia ones,
+   * and about 70% of those are for being BELOW - lower emissions per unit of spend than most regions,
+   * which is what a low-carbon economy produces. Germany i28 sits 0.12% under p5 as the 3rd lowest of
+   * 49, with Switzerland 0.3% higher and inside. So the rank is carried with the position, and a
+   * caller states the rank ("3rd lowest of 49 regions for this sector") rather than a warning.
    *
-   * Same shape and same reasoning as FactorEditionState in lib/ghg/factorEditions.ts, which is a
-   * three-member union rather than a boolean because a boolean there was hiding "we never recorded
-   * it" behind "they agree". Kept as a second flag rather than widening
-   * outside_reliability_bounds to a union, because the contract fixes that field as a boolean and
-   * callers written against it must keep compiling.
+   * `assessed: false` is the case formerly called reliability_bounds_incomplete: the sector has
+   * fewer than `minimum_regions` regions with a non-zero factor, so no per-sector percentile exists
+   * and no position within the sector was established. It is NOT in range; it is not assessed.
    */
-  reliability_bounds_incomplete: boolean
+  intensity_within_sector: SectorIntensityPosition
+}
+
+/**
+ * 'below' / 'within' / 'above' a pair of percentiles. NOT a verdict on the value.
+ *
+ * ⚠️ WHY NONE OF THESE NAMES SAYS RELIABILITY, CONFIDENCE OR QUALITY. Until 17 Sep 2026 this was
+ * `outside_reliability_bounds`. All three words are defined terms elsewhere — in the GHG Protocol's
+ * data quality indicators "reliability" describes how data was acquired and verified, and customers
+ * report under that meaning — and a percentile position measures none of them. It measures where a
+ * number sits among other numbers.
+ */
+export type IntensityPosition = 'below' | 'within' | 'above'
+
+export type SectorIntensityPosition =
+  | {
+      assessed: true
+      position: IntensityPosition
+      lower_percentile: number
+      upper_percentile: number
+      /** 1 = the lowest non-zero factor for this sector. Ties share the better rank. */
+      rank_from_lowest: number
+      /** 1 = the highest non-zero factor for this sector. */
+      rank_from_highest: number
+      /** Regions with a non-zero factor for this sector: the population the rank is taken over. */
+      regions_ranked: number
+      /** Regions in the dataset, so a caller can say "of 49" only when every region was ranked. */
+      regions_in_dataset: number
+    }
+  | {
+      assessed: false
+      /** Regions with a non-zero factor for this sector — fewer than minimum_regions. */
+      regions_with_factor: number
+      minimum_regions: number
+      regions_in_dataset: number
+    }
+
+/** 1st, 2nd, 3rd, 4th … 11th, 12th, 13th … 21st. */
+export function ordinal(n: number): string {
+  const tens = n % 100
+  if (tens >= 11 && tens <= 13) return `${n}th`
+  return `${n}${({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th'}`
+}
+
+/**
+ * The sentences describing where a factor sits, from its caveats. ONE place for these words, read by
+ * the resolver's fallback disclosure and by the spend-factor route, so no two surfaces describe the
+ * same position differently.
+ *
+ * Four cases, and they are NOT written alike, on purpose:
+ *   among all factors, below or above  -> a CAUTION. A bottom- or top-3% value across every sector
+ *                                         and region is a genuine extreme.
+ *   within the sector, below           -> a FACT, stated as a rank. Among the lowest-intensity
+ *                                         regions for the sector; no warning, because being low is
+ *                                         what a low-carbon economy does, and the test is a rank
+ *                                         test that flags three regions at each end of every sector.
+ *   within the sector, above           -> a FACT, stated as a rank, with the count of regions below
+ *                                         it, because a high position moves an estimate up and is
+ *                                         worth the reader's attention even though it is not an error.
+ * Plus the not-assessed case, which says why no within-sector position exists.
+ *
+ * Every number is taken from the caveats, which the resolver computed from the data; nothing here is
+ * asserted.
+ */
+export function intensityPositionSentences(caveats: SpendFactorCaveats, factorType: SpendFactorType): string[] {
+  const out: string[] = []
+  const all = caveats.intensity_among_all_factors
+  if (all.position === 'below') {
+    out.push(
+      `This emission factor is in the lowest ${all.lower_percentile}% of all ${factorType} factors in the ` +
+      `source data. It was used as published; a value at either extreme of the source data should be ` +
+      `checked against what is known about the supplier before it is relied on.`,
+    )
+  } else if (all.position === 'above') {
+    out.push(
+      `This emission factor is in the highest ${100 - all.upper_percentile}% of all ${factorType} factors ` +
+      `in the source data. It was used as published; a value at either extreme of the source data should ` +
+      `be checked against what is known about the supplier before it is relied on.`,
+    )
+  }
+
+  const sector = caveats.intensity_within_sector
+  if (sector.assessed) {
+    const population = sector.regions_ranked === sector.regions_in_dataset
+      ? `${sector.regions_ranked} regions`
+      : `the ${sector.regions_ranked} regions with a non-zero factor`
+    const place = (rank: number, end: 'lowest' | 'highest') => rank === 1 ? `the ${end}` : `the ${ordinal(rank)} ${end}`
+    if (sector.position === 'below') {
+      out.push(`This region has ${place(sector.rank_from_lowest, 'lowest')} emission factor of ${population} for this sector.`)
+    } else if (sector.position === 'above') {
+      const lower = sector.rank_from_lowest - 1
+      out.push(
+        `This region has ${place(sector.rank_from_highest, 'highest')} emission factor of ${population} for ` +
+        `this sector: ${lower} ${lower === 1 ? 'region has' : 'regions have'} a lower one.`,
+      )
+    }
+  } else {
+    out.push(
+      `Only ${sector.regions_with_factor} of ${sector.regions_in_dataset} regions have a non-zero emission ` +
+      `factor for this sector, fewer than the ${sector.minimum_regions} needed to place one region within ` +
+      `it, so this factor's position within the sector was not assessed.`,
+    )
+  }
+  return out
 }
 
 export type SpendFactorResult =
@@ -334,9 +449,9 @@ export type SpendFactorResult =
       used_region: string
       reason: SpendFallbackReason
       /** A sentence naming the substitution, for the workings row and for the customer. The caller
-       *  must render it; it is not optional prose. When caveats.outside_reliability_bounds is true
-       *  on the same result, this sentence MUST name that as well as the region substitution - see
-       *  the resolver contract below. */
+       *  must render it; it is not optional prose. When the substituted value is also at an
+       *  extreme or an end of its sector (caveats.intensity_*), this sentence MUST name that as well
+       *  as the region substitution - see the resolver contract below. */
       disclosure: string
       caveats: SpendFactorCaveats
     }

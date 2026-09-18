@@ -27,6 +27,7 @@ import {
 import { findUnpriceableLocations, type Location } from "./engine";
 import type { FactorEditions } from "./factorEditions";
 import { anyPublishedFactorApplied } from "./factorEditions";
+import type { Scope3CoverageEntry } from "../scope3/categoryStatus";
 import type { PricedRowProbe } from "./factorEditions";
 
 export interface LoadSeriesResult {
@@ -138,6 +139,16 @@ export function assessCompleteness(workings: unknown, locationsData: unknown): C
   return { dataStatus: "ok", exclusions: null, unverifiableReason: null };
 }
 
+/** The Scope 3 embed: the total, and what that total covers. */
+interface Scope3Embed {
+  total_scope3_tco2e: number | null;
+  scope3_categories_relevant: number | null;
+  scope3_categories_in_total: number | null;
+  scope3_categories_unpriced: number | null;
+  scope3_exclusions_unjustified: number | null;
+  scope3_coverage: Record<string, Scope3CoverageEntry> | null;
+}
+
 /** Shape of a raw row back from the embedded select (loosely typed). */
 interface RawRow {
   company_id: string | null;
@@ -155,9 +166,13 @@ interface RawRow {
   // hand us an absent key.
   factor_editions: FactorEditions | null;
   // reverse embed: object when to-one detected, array otherwise, null when none
+  //
+  // ⚠️ THE COVERAGE COLUMNS ARE NULLABLE AND UNBACKFILLED. Every scope3_inventories row saved before
+  // 20260917_scope3_coverage.sql has a total and null coverage, and that is NOT RECORDED rather than
+  // complete. They are carried through untouched — no `?? 0`, no `?? 15` — so the series can say which.
   scope3_inventories:
-    | { total_scope3_tco2e: number | null }
-    | { total_scope3_tco2e: number | null }[]
+    | Scope3Embed
+    | Scope3Embed[]
     | null;
   // Both jsonb. Needed to qualify the totals above — see assessCompleteness.
   workings: unknown;
@@ -176,7 +191,10 @@ const SELECT =
   // for inventories saved since the provenance pass.
   "factor_editions, " +
   "workings, locations_data, " +
-  "scope3_inventories(total_scope3_tco2e)";
+  // The total ALONE cannot say whether it covers two categories or fifteen, and it is read as a Scope 3
+  // baseline by the SBTi dashboard. The five coverage columns come with it, per inventory.
+  "scope3_inventories(total_scope3_tco2e, scope3_categories_relevant, scope3_categories_in_total, " +
+  "scope3_categories_unpriced, scope3_exclusions_unjustified, scope3_coverage)";
 
 export async function loadCompanySeries(): Promise<LoadSeriesResult> {
   const empty = (error: string | null): LoadSeriesResult => ({
@@ -228,6 +246,13 @@ export async function loadCompanySeries(): Promise<LoadSeriesResult> {
         scope2_location_total: r.scope2_location_total,
         scope2_market_total: r.scope2_market_total,
         scope3_total: s3?.total_scope3_tco2e ?? null,
+        // Straight through, nulls included: null is "this row predates the coverage columns", which is a
+        // different claim from 0 ("recorded, and it covers nothing") and from 15.
+        scope3Relevant: s3?.scope3_categories_relevant ?? null,
+        scope3InTotal: s3?.scope3_categories_in_total ?? null,
+        scope3Unpriced: s3?.scope3_categories_unpriced ?? null,
+        scope3ExclusionsUnjustified: s3?.scope3_exclusions_unjustified ?? null,
+        scope3Coverage: s3?.scope3_coverage ?? null,
         revenue_millions: r.revenue_millions,
         employee_count: r.employee_count,
         gwp_version: r.gwp_version,

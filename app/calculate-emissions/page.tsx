@@ -125,7 +125,7 @@ const FAQ_LD = {
       name: "How accurate is it? Will it hold up to a verifier?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Every calculation runs on the GHG Protocol Corporate Accounting and Reporting Standard with IPCC AR6 global warming potentials (AR4 for SB 253), country-matched emission factors, and both location-based and market-based Scope 2 accounting. Workings are documented per source and aligned with ISO 14064-3 and ISAE 3410, so figures hold up under limited or reasonable assurance.",
+        text: "Every calculation runs on the GHG Protocol Corporate Accounting and Reporting Standard with IPCC AR6 global warming potentials for every framework, SB 253 included (it used AR4 until June 2026), country-matched emission factors, and both location-based and market-based Scope 2 accounting. Workings are documented per source and aligned with ISO 14064-3 and ISAE 3410, so figures hold up under limited or reasonable assurance.",
       },
     },
     {
@@ -647,7 +647,7 @@ export default function CalculateEmissionsPage() {
               <details className="qa">
                 <summary>How accurate is it? Will it hold up to a verifier?</summary>
                 <div className="qa-body">
-                  Every calculation runs on the <strong>GHG Protocol Corporate Accounting and Reporting Standard</strong> &mdash; the basis required by SB&nbsp;253, CDP, ESRS&nbsp;E1, GRI&nbsp;305, and IFRS&nbsp;S2. We apply IPCC&nbsp;AR6 global warming potentials by default (AR4 for SB&nbsp;253, to match CARB&rsquo;s program) and country-matched emission factors &mdash; US&nbsp;EPA, Canada&rsquo;s ECCC, UK&nbsp;DEFRA, and IPCC and EEA factors for the EU &mdash; all versioned, vintage-stamped, and cited in every export. Scope&nbsp;2 supports both location-based and market-based (residual-mix) accounting per the GHG Protocol Scope&nbsp;2 Guidance, and workings are documented per source and aligned with ISO&nbsp;14064-3 and ISAE&nbsp;3410, so your numbers hold up under limited or reasonable assurance. For requests that require independent sign-off, the GHG module lets you invite a third-party verifier to a read-only view of your inventory and its full audit trail, by secure link. Full detail is on our <Link href={CONFIG.METHODOLOGY_URL}>methodology page</Link>.
+                  Every calculation runs on the <strong>GHG Protocol Corporate Accounting and Reporting Standard</strong> &mdash; the basis required by SB&nbsp;253, CDP, ESRS&nbsp;E1, GRI&nbsp;305, and IFRS&nbsp;S2. We apply IPCC&nbsp;AR6 global warming potentials for every framework, SB&nbsp;253 included (SB&nbsp;253 used AR4, to match CARB&rsquo;s program, until June 2026), and country-matched emission factors &mdash; US&nbsp;EPA, Canada&rsquo;s ECCC, UK&nbsp;DEFRA, and IPCC and EEA factors for the EU &mdash; all versioned, vintage-stamped, and cited in every export. Scope&nbsp;2 supports both location-based and market-based (residual-mix) accounting per the GHG Protocol Scope&nbsp;2 Guidance, and workings are documented per source and aligned with ISO&nbsp;14064-3 and ISAE&nbsp;3410, so your numbers hold up under limited or reasonable assurance. For requests that require independent sign-off, the GHG module lets you invite a third-party verifier to a read-only view of your inventory and its full audit trail, by secure link. Full detail is on our <Link href={CONFIG.METHODOLOGY_URL}>methodology page</Link>.
                 </div>
               </details>
 

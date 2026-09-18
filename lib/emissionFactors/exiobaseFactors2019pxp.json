@@ -27,10 +27,12 @@
     "price_basis_note": "Basic prices. Customer spend is a PURCHASER-price figure off an invoice or an AP ledger, and the two are not interchangeable: the difference is trade margins, transport margins and taxes less subsidies on products. See PriceBasis in lib/emissionFactors/spend.ts.",
     "denominator_note": "THE UNIT FIELD IS THE NUMERATOR ONLY, AND THE DENOMINATOR IS M.EUR, NOT EUR. impacts/unit.txt records \"kg CO2 eq.\" and says nothing about what it is per. The archive root unit.txt reports M.EUR for all 7,987 region-sector pairs and x.txt gives industry output in the same unit, so an M-matrix multiplier is kg CO2 eq. per MILLION EUR of output. The median value here is about 790,000, which is 0.79 kg per EUR - squarely in the range of the spend factors already in lib/emissionFactors.ts - and reads as nonsense if the denominator is taken as one euro. Nothing is divided here: the values are stored exactly as published, and any consumer must apply the 1e6 itself and say that it did.",
     "margin_note": "NO BASIC-TO-PURCHASER CONVERSION IS POSSIBLE FROM THIS ARCHIVE. It contains no trade margin and no transport margin data of any kind - no member is named for them, and the root unit.txt reports a single valuation (M.EUR) across all 7,987 region-sector pairs. The only related rows are in the satellite extension: \"Taxes less subsidies on products purchased: Total\" and \"Other net taxes on production\", both M.EUR. That is the tax component of the wedge and neither of the two larger ones.",
-    "reliability_bounds": {
-      "method": "Descriptive bounds computed from the extracted values. NO VALUE IS MODIFIED BY THEM: they are reported alongside a factor so a consumer can disclose that it sits in the tail, never used to clip, winsorise or replace one. The bound is OURS; the value is the publisher's.",
+    "intensity_percentiles": {
+      "what_this_measures": "POSITION: where a factor's value sits among other non-zero factors - across the whole file (3rd and 97th percentiles) and among its own sector's regions (5th and 95th). It is not a measure of reliability, confidence or data quality. Those are defined terms: in the GHG Protocol's data quality indicators, reliability describes how data was acquired and verified, and a percentile position says nothing about that. These keys were named reliability_bounds until 17 Sep 2026; the calculation is unchanged.",
+      "method": "Descriptive bounds computed from the extracted values. NO VALUE IS MODIFIED BY THEM: they are reported alongside a factor so a consumer can disclose where it sits, never used to clip, winsorise or replace one. The bound is OURS; the value is the publisher's.",
+      "rank_test_note": "THE PER-SECTOR BOUND IS A RANK TEST, NOT AN OUTLIER TEST. With 49 regions the 5th percentile falls between the 3rd and 4th lowest values and the 95th between the 3rd and 4th highest, so a fully populated sector places its lowest 3 and highest 3 regions outside the bound whatever their values are: in this file every one of the 83 products with a non-zero factor in all 49 regions has exactly 3 regions below its p5 and 3 above its p95. Being outside it means the region ranks at one end of its sector, not that its value is unusual. Across this file 1,262 of 8,138 non-zero factors (15.5%) sit outside at least one of the two bounds: 651 below and 611 above.",
       "zeros_excluded": true,
-      "zeros_excluded_reason": "A zero is an ABSENT factor, not a factor of zero. The plainest case in either archive is the very first cell of x.txt: Austria, paddy rice, output 0. Austria grows no rice, so there is no Austrian paddy-rice intensity to publish - and a consumer reading that cell as \"0 kg CO2e per euro\" would report a purchase of Austrian rice as emissions-free rather than as unpriceable. EXIOBASE is built from national supply-use tables and a cell is empty where a country or sector has insufficient economic data. 1,108 of 7,987 cells are zero and they are structured, not scattered: three industries are zero in all 49 regions. Including them would drag both percentiles toward a number that describes missing data rather than emissions intensity.",
+      "zeros_excluded_reason": "A zero is an ABSENT factor, not a factor of zero. The plainest case in either archive is the very first cell of x.txt: Austria, paddy rice, output 0. Austria grows no rice, so there is no Austrian paddy-rice intensity to publish - and a consumer reading that cell as \"0 kg CO2e per euro\" would report a purchase of Austrian rice as emissions-free rather than as unpriceable. EXIOBASE is built from national supply-use tables and a cell is empty where a country or sector has insufficient economic data. 1,662 of 9,800 cells in this file are zero and they are structured, not scattered: 16 products are zero in all 49 regions. Including them would drag both percentiles toward a number that describes missing data rather than emissions intensity.",
       "values_modified": false,
       "global": {
         "percentiles": [
@@ -43,13 +45,13 @@
         "n_below": 245,
         "n_above": 245
       },
-      "per_industry": {
+      "per_sector": {
         "percentiles": [
           5,
           95
         ],
         "min_nonzero_regions": 20,
-        "min_nonzero_regions_reason": "Below 20 of 49 regions a 5th/95th percentile is interpolated across so few points that the bound describes the sample rather than the industry. Seven industries fall under the threshold and carry no local bound; they are listed in industries_without_local_bound and must be treated as unbounded, not as in-range.",
+        "min_nonzero_regions_reason": "Below 20 of 49 regions a 5th/95th percentile is interpolated across so few points that the bound describes the sample rather than the sector. 2 products fall under the threshold and carry no per-sector bound; they are listed in products_without_local_bound and must be treated as NOT ASSESSED, never as in range.",
         "products_with_bound": 182,
         "products_without_local_bound": [
           "p23.1.b",
@@ -986,7 +988,7 @@
           }
         }
       },
-      "disagreement_note": "The two bounds disagree on 12.3% of the factors that carry both (834 of 6,795): 186 are outside the global bound but inside their own industry's range, and 648 the reverse. They are not substitutes. The global bound is wide - a 713x span - because it pools industries whose medians differ by orders of magnitude; the median industry's own span is 17x. A consumer checking only the global bound misses the larger group."
+      "disagreement_note": "The two bounds disagree on 12.5% of the factors that carry both (1,013 of 8,120): 241 are outside the global bound but inside their own sector's range, and 772 the reverse. They are not substitutes. The global bound is wide - a 262x span - because it pools sectors whose medians differ by orders of magnitude; the median sector's own span is 16x."
     },
     "join_file_note": "Joined on products.txt column 3 (CodeNr), by POSITION. Both archives ship BOTH products.txt and industries.txt at identical byte sizes, so reading the wrong one yields well-formed codes of the wrong kind and the wrong count; the generator asserts both the count and the code prefix and aborts rather than warning.",
     "version_note": "metadata.json inside the archive reads \"version\": \"v3.81\" while its folder name is exio382_ntnu and the Zenodo record is labelled 3.8.2. The version recorded above is the Zenodo one. The discrepancy is the publisher's and is reported, not resolved."

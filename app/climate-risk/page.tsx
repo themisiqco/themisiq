@@ -103,7 +103,14 @@ export default function Page() {
             { title: 'Physical risk screening', desc: 'Acute and chronic physical hazards — flood, heat, wildfire, water stress — screened against your facility locations across IPCC scenarios.' },
             { title: 'Transition risk analysis', desc: 'Policy, legal, technology, market and reputation risks modelled across three IPCC pathways, each scored and compared against the other two.' },
             { title: 'Scenario modelling', desc: 'Three IPCC scenarios so your disclosure shows resilience under multiple climate futures — the scenario analysis investors and IFRS S2 expect.' },
-            { title: 'Immutable audit trail', desc: 'Every entry, edit, and deletion is logged with user, timestamp, and previous value — written by the database, not the application.' },
+            // ⚠️ THIS CARD CLAIMED AN IMMUTABLE AUDIT TRAIL UNTIL 17 SEP 2026, AND NOTHING AUDITED THIS MODULE.
+            // The copy was the GHG card's, reused. Verified live that day: the seven audit_log triggers cover
+            // ghg_inventories, ghg_entries, two cbam_* and three concierge_* tables. A climate-risk assessment is
+            // stored in materiality_assessments (this module posts to /api/materiality), which has no audit
+            // trigger — so no before-and-after record of a change to it exists. What the module DOES hold is
+            // below, and it is a different mechanism: a row per run, the model config version, and per-value
+            // provenance. Re-adding an audit-trail claim here needs a trigger first, not new wording.
+            { title: 'Traceable assessment records', desc: 'Each run is saved as its own record with the inputs it used, the model configuration version, and the provenance of every weighting and hazard value behind the score — so a reader can see what produced a number. Changes to a saved assessment are not written to an audit log; that covers the GHG and CBAM modules.' },
             { title: 'Multi-framework export', desc: 'One assessment maps to TCFD, IFRS S2, CSRD ESRS E1, and SB 261 — a publishable, board-ready climate-related financial risk report in your branding.' },
           ].map(({ title, desc }) => (
             <div key={title} style={{ background: '#fff', padding: '2rem' }}>

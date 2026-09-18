@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { CONCIERGE_UNREAD_DOC_TYPES, SUPPORTED_FUELS } from '../../../lib/ghg/conciergeDocTypes'
 import { WIZARD_STEP_NAMES } from '../../../lib/ghg/wizardSteps'
+import { editRows } from '../../../lib/rowList'
 import { reportingYearOptions, defaultReportingYear } from '../../../lib/reportingYears'
 import { supabase } from '../../../lib/supabase'
 import { buildMonthlyEmissions } from '../../../lib/ghg/monthlyEmissions'
@@ -24,7 +25,7 @@ import {
   GRID_REGIONS_CA, GRID_REGIONS_US, FRAMEWORKS,
   isResolvedGridRegion, getGridFactor, getResidualFactor, residualRegionFor,
   detectGridRegion, gridRegionForCountry, pickEF,
-  combustionSourcesFor, gridSourcesFor,
+  combustionSourcesFor, gridSourcesFor, sourceAttributionsFor, sourceAttributionsForLocations,
   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation, pctEstimated,
   applyResolutions, findUnresolvedCoverage, findUndeclaredStreams, findUnpriceableLocations, STREAM_META,
   findSteamFactorGaps, steamFactorFor,
@@ -37,6 +38,7 @@ import { disclaimerParas } from '../../../lib/disclaimer'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
 import { sectionHeadFixed as auditSectionHead, sectionHeadFixed as sectionHead } from '@/app/components/headingStyles'
 import ThemisIQLogo from '../../components/ThemisIQLogo'
+import SourceAttributions from '../../components/SourceAttributions'
 import type {
   GwpVersion, Location, Inventory, SourceDoc, ExtractedProposal,
   ConciergeStatus, CoveragePeriod, CoverageResolution, DeclarableStream, UnpriceableLocation,
@@ -449,7 +451,13 @@ const searchParams = useSearchParams()
     selected_frameworks: defaultFrameworks,
     locations: [emptyLocation('1', 'Location 1')],
   })
-  const [activeLocation, setActiveLocation] = useState(0)
+  // ⚠️ RAW, THEN CLAMPED. activeLocation is an INDEX into inventory.locations, and addLocation cannot know
+  // the new location's index without reading the rendered length — the third stale read in that handler.
+  // Instead it asks for "one past the end", and the clamp below turns that into the last location that
+  // actually exists. That also makes the index safe against a list that SHRANK under it: the load path
+  // replaces locations wholesale, and an index past the end would read undefined on every consumer.
+  const [activeLocationRaw, setActiveLocation] = useState(0)
+  const activeLocation = Math.min(activeLocationRaw, Math.max(0, inventory.locations.length - 1))
   const [saved, setSaved] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -459,9 +467,11 @@ const searchParams = useSearchParams()
   const [showWorkings, setShowWorkings] = useState<Record<string, boolean>>({})
   const [activeExport, setActiveExport] = useState('sb253')
   const [dataConfirmed, setDataConfirmed] = useState(false)
-  // Keyed `${locIdx}:${docType}`. Only for failures with NO document to hang a note on — i.e. the
-  // storage upload itself. Everything after a successful upload is recorded on the doc instead, so
-  // it survives a reload.
+  // Keyed `${locIdx}:${docType}`. For the two failures that leave nothing on a document to read: the
+  // storage upload, which produced no document at all, and a failed storage DELETE, where the document
+  // is still attached and still listed. Everything that happens to a document that DOES exist and stays
+  // — how its figures were read, whether the reader abstained — is recorded on the doc instead, so it
+  // survives a reload. Both entries here are transient by design: a retry is the remedy.
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({})
   const [mode, setMode] = useState<'loading' | 'list' | 'wizard'>('loading')
   const [inventoryList, setInventoryList] = useState<Array<{ id: string; company_name: string; reporting_year: number; updated_at: string }>>([])
@@ -730,10 +740,48 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     })
   }
 
+  /**
+   * A LOCATION ID THAT CANNOT COLLIDE, AND CANNOT COLLIDE WITH THE OLD SCHEME EITHER.
+   *
+   * ⚠️ IDS USED TO BE String(inventory.locations.length + 1), READ FROM THE RENDER. Two adds in one tick
+   * both saw the same length and produced the same id. A location id is not decoration: coverage
+   * resolutions match on it (`r.locId === loc.id`), unpriceableById is keyed on it, and removeDoc now
+   * addresses a location by it — so two locations sharing an id means one location's coverage resolution
+   * can apply to the other, and a document removal can land on the wrong one.
+   *
+   * The `loc_` prefix is what keeps this clear of saved data: every existing inventory carries ids '1',
+   * '2', '3' … from the old scheme, and no generated id can now take that form, so a new location can
+   * never be mistaken for an old one. 8 base36 characters ~ 2.8e12 values, and the guard inside the
+   * updater below rejects a collision with a location already present rather than trusting the odds.
+   */
+  const newLocationId = () => `loc_${Math.random().toString(36).slice(2, 10)}`
+
+  /**
+   * ⚠️ THE ALLOWANCE IS ENFORCED INSIDE THE UPDATER, WHERE THE COUNT IS CURRENT. The check outside it
+   * is what the customer SEES — the upgrade wall — and it reads the render, which is right for a single
+   * click and stale for two in one tick. The inner check is the one that cannot be raced: the second
+   * add of a double click is REFUSED SILENTLY there (the list is returned unchanged), so the customer
+   * sees one location appear rather than two, and no wall. That is deliberate: the alternative is a
+   * wall raised from inside a state updater, which means a side effect in a function React may call
+   * twice. The allowance itself cannot be exceeded this way, and the database trigger
+   * enforce_ghg_location_allowance refuses the save if it ever were.
+   *
+   * The id is generated OUTSIDE the updater, because generating it inside would make the updater impure;
+   * generation is collision-proof on its own, and the updater still refuses an id it somehow already
+   * holds. Focus is asked for as "one past the end" and clamped where activeLocation is derived, so no
+   * step here reads the rendered length.
+   */
   const addLocation = () => {
     if (locationAllowance != null && !allowanceLoading && inventory.locations.length >= locationAllowance) { setShowLocationWall(true); return }
-    const id = String(inventory.locations.length + 1)
-    setInventory(inv => ({ ...inv, locations: [...inv.locations, emptyLocation(id, `Location ${id}`)] }))
+    const id = newLocationId()
+    setInventory(inv => {
+      if (locationAllowance != null && !allowanceLoading && inv.locations.length >= locationAllowance) return inv
+      if (inv.locations.some(l => l.id === id)) return inv
+      // The NAME counts from the current list, so two adds in one tick are numbered 4 and 5, not 4 and 4.
+      return { ...inv, locations: [...inv.locations, emptyLocation(id, `Location ${inv.locations.length + 1}`)] }
+    })
+    // "The last location", resolved by the clamp on activeLocation. A refused add leaves the list as it
+    // was, so this lands on the last existing location rather than on one that was never created.
     setActiveLocation(inventory.locations.length)
   }
 
@@ -860,9 +908,47 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     setUploading(false)
   }
 
-  const removeDoc = async (locIdx: number, docId: string, filePath: string) => {
-    await supabase.storage.from('source-documents').remove([filePath])
-    updateLocation(locIdx, 'source_docs', inventory.locations[locIdx].source_docs.filter(d => d.id !== docId))
+  /**
+   * Detach a source document: delete the object, then drop the row.
+   *
+   * ⚠️ THIS USED TO ERASE A DOCUMENT UPLOADED WHILE IT WAS WORKING. It read
+   * `inventory.locations[locIdx].source_docs` AFTER awaiting the storage delete — from the render that
+   * produced the click, not from current state — filtered that stale array and wrote the whole thing
+   * back through updateLocation. An upload finishing inside that await (its own await chain runs for
+   * seconds in concierge mode) appended to current state, and this write replaced it with a list that
+   * had never contained it. The file stayed in the bucket with no row pointing at it, the next save
+   * persisted the shortened list, and nothing anywhere noticed: no error, no reconciliation against
+   * storage, and a reload confirmed the loss rather than revealing it.
+   *
+   * Both lists are now edited INSIDE the updater, from `inv`, and both are addressed BY id — the
+   * location as well as the document, because locIdx is a render-time position with exactly the same
+   * staleness if locations are added or removed while this runs.
+   *
+   * ⚠️ STORAGE FIRST, THEN THE ROW, AND THE RESULT IS CHECKED. The delete's result used to be
+   * discarded. Dropping the row first would make a failed delete invisible — the document disappears as
+   * the customer asked and the file is orphaned in the bucket with nobody to notice. This way a failure
+   * leaves the document exactly where it was, listed and attached, with a message saying it is still
+   * there and to try again. Nothing reads source_docs expecting the object to exist (the path is only
+   * signed on demand or downloaded for extraction), so no ordering is forced by the data; what decides
+   * it is which failure a customer can see. Storage deletes are idempotent, so the retry is safe.
+   */
+  const removeDoc = async (locId: string, docId: string, filePath: string, errorKey: string) => {
+    setUploadErrors(prev => { const next = { ...prev }; delete next[errorKey]; return next })
+    const { error } = await supabase.storage.from('source-documents').remove([filePath])
+    if (error) {
+      console.error('[removeDoc] storage delete failed', error)
+      setUploadErrors(prev => ({ ...prev, [errorKey]: `That document couldn’t be deleted — ${error.message}. It is still attached to this location; try Remove again.` }))
+      return
+    }
+    setInventory(inv => ({
+      ...inv,
+      locations: editRows(inv.locations, {
+        kind: 'update',
+        id: locId,
+        // A function patch, so the document list is the one this location holds NOW.
+        patch: loc => ({ source_docs: editRows(loc.source_docs, { kind: 'remove', id: docId }) }),
+      }),
+    }))
   }
 
   // Concierge: update one proposal, then recompute mapped inventory fields from ALL confirmed proposals at this location.
@@ -1008,10 +1094,14 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // ⚠️ On 'error' it is a GUESS: the query failed, so whether a prior year exists is unknown, and
   // basis.statement will still say it isn't held on the platform. Nothing renders or persists that
   // sentence today, and a write path must refuse this case rather than record it.
-  const totals_ar4 = calcInventory(inventory.locations, 'AR4', inventory.reporting_year)
-  const totals_ar5 = calcInventory(inventory.locations, 'AR5', inventory.reporting_year)
+  // ⚠️ AR6 ONLY. Until 17 Sep 2026 this computed the inventory three times, on AR4, AR5 and AR6, and
+  // looked each framework's totals up by FRAMEWORKS[].gwp. That was built on 20 May 2026, when SB 253, CDP,
+  // EcoVadis and IFRS S2 were AR4 and ESRS E1 and GRI 305 were AR5. Every framework has been AR6 since
+  // f83326a (20 Jun 2026), so the AR4 and AR5 totals were computed on every render and never shown.
+  // Every surface below reads totals_ar6 directly; lib/ghg/gwpBasis.test.ts fails if a framework's gwp
+  // ever stops being AR6, because then these surfaces would label AR6 figures with another basis.
+  // The engine still computes on AR4 and AR5 (its GWP table and tests use them); only this page stopped.
   const totals_ar6 = calcInventory(inventory.locations, 'AR6', inventory.reporting_year)
-  const totalsByGwp: Record<GwpVersion, typeof totals_ar4> = { AR4: totals_ar4, AR5: totals_ar5, AR6: totals_ar6 }
 
   // Everything the comparability step hands forward. Assembled here rather than read out of
   // scattered state at save time, so the write path takes FACTS and infers nothing.
@@ -2022,7 +2112,6 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
   }
 
     const renderStep4 = () => {
-    const ar5 = totals_ar5
     const rev = inventory.revenue_millions
     const emp = inventory.employee_count
     return (
@@ -2034,7 +2123,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           <div style={{ filter: isPaid ? 'none' : 'blur(4px)', pointerEvents: isPaid ? 'auto' : 'none' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: '2rem' }}>
               {activeFrameworks.map(fw => {
-                const totals = totalsByGwp[fw.gwp as GwpVersion]
+                const totals = totals_ar6
                 return (
                   <div key={fw.id} style={{ background: fw.bg, border: `0.5px solid color-mix(in srgb, ${fw.color} 20%, transparent)`, borderRadius: 10, padding: '1.25rem' }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: fw.color, letterSpacing: '0.06em', textTransform: 'uppercase' as const, marginBottom: 8 }}>{fw.name} — GWP {fw.gwp}</div>
@@ -2094,7 +2183,9 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             // rows and the always-emitted market-based row); the screen just filters by location. The
             // second, hand-rolled table derivation that used to live here is gone (Phase 4).
             const allRows = buildWorkings(inventory.locations, wGwp, inventory.reporting_year, coverageResolutions, inventory.fiscal_year_end_month)
-            return inventory.locations.map((loc, i) => {
+            // The licence attributions the cited sources require, from the SAME rows the tables render.
+            const attributions = sourceAttributionsFor(allRows.map(r => r.ef_source))
+            return <>{inventory.locations.map((loc, i) => {
               // calcLocation is the SAME call that refuses an unpriceable location, so it must not
               // run for one — this line is a second unguarded render-path crash site, not just the
               // totals at the top of the component.
@@ -2251,7 +2342,9 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   )}
                 </div>
               )
-            })
+            })}
+            <SourceAttributions attributions={attributions} style={{ marginTop: 4 }} />
+            </>
             })()}
             <div className="tq-summary" style={{ display: 'block', padding: '1.5rem', marginTop: '1.5rem' }}>
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Assurance readiness — ISO 14064-3 / ISAE 3410</div>
@@ -2341,7 +2434,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             </div>
             {activeFrameworks.map(fw => {
               if (fw.id !== activeExport) return null
-              const totals = totalsByGwp[fw.gwp as GwpVersion]
+              const totals = totals_ar6
               const rev = inventory.revenue_millions
               const emp = inventory.employee_count
               return (
@@ -2482,12 +2575,12 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
     // ⚠️ NOT `as any`. Every other argument here is cast, and that is why changing the audit
     // parameter's TYPE did not break this call site on its own — `as any` defeats the check that
     // would have caught it. This one argument is passed typed so the union actually binds.
-    generateAssurancePDF(inventory as any, totals_ar4 as any, totals_ar5 as any, totals_ar6 as any, activeFrameworks as any, { ok: true, rows: auditRows ?? [] }, EF_SOURCES, residualRows)
+    generateAssurancePDF(inventory as any, totals_ar6 as any, activeFrameworks as any, { ok: true, rows: auditRows ?? [] }, EF_SOURCES, residualRows)
   }
 
   const generateExport = async (frameworkId: string) => {
     const fw = FRAMEWORKS.find(f => f.id === frameworkId)!
-    const totals = totalsByGwp[fw.gwp as GwpVersion]
+    const totals = totals_ar6
     const rev = inventory.revenue_millions
     const emp = inventory.employee_count
     const header = [
@@ -2519,7 +2612,13 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
       ['METHODS'],
       ...combustionSourcesFor(inventory.locations).map(src => ['Combustion factors', src]),
       ...gridSourcesFor(inventory.locations).map(src => ['Electricity factors', src]),
-      ['GWP values', fw.gwp === 'AR4' ? EF_SOURCES.gwp_ar4 : fw.gwp === 'AR5' ? EF_SOURCES.gwp_ar5 : EF_SOURCES.gwp_ar6],
+      // The attribution each cited source's licence requires, verbatim, then the licence and its link.
+      ...sourceAttributionsForLocations(inventory.locations).flatMap(a => [
+        [`Licence attribution — ${a.publisher}`, a.attribution],
+        [`Licence — ${a.publisher}`, `${a.licence}, ${a.licence_url}`],
+      ]),
+      // The same dead branch the PDF had: it chose gwp_ar4 or gwp_ar5 for a framework on AR4 or AR5, and none is.
+      ['GWP values', EF_SOURCES.gwp_ar6],
       ...((fw.id === 'esrs' || fw.id === 'gri')
         ? [
             ['Market-based Scope 2', 'Residual-mix factor applied to uncovered load; covered (contractual) kWh counted at zero'],
@@ -2751,7 +2850,7 @@ const PROPOSAL_BADGE_COLOUR: Record<ConciergeStatus, { bg: string; color: string
   rejected:            { bg: 'var(--color-sunken)',  color: 'var(--color-ink-muted)' },
 }
 
-function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateProposal, onAddCoverageResolution, uploading, reportingYear, fiscalYearEndMonth, locId, coverageResolutions, uploadError }: { label: string; locIdx: number; docType: string; uploadError?: string; docs: SourceDoc[]; onUpload: (f: FileList, i: number, t: string) => void; onRemove: (i: number, id: string, path: string) => void; onUpdateProposal: (locIdx: number, docId: string, propIdx: number, patch: Partial<ExtractedProposal>) => void; onAddCoverageResolution: (res: CoverageResolution) => void; uploading: boolean; reportingYear: number; fiscalYearEndMonth: number; locId: string; coverageResolutions: CoverageResolution[] }) {
+function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateProposal, onAddCoverageResolution, uploading, reportingYear, fiscalYearEndMonth, locId, coverageResolutions, uploadError }: { label: string; locIdx: number; docType: string; uploadError?: string; docs: SourceDoc[]; onUpload: (f: FileList, i: number, t: string) => void; onRemove: (locId: string, docId: string, path: string, errorKey: string) => void; onUpdateProposal: (locIdx: number, docId: string, propIdx: number, patch: Partial<ExtractedProposal>) => void; onAddCoverageResolution: (res: CoverageResolution) => void; uploading: boolean; reportingYear: number; fiscalYearEndMonth: number; locId: string; coverageResolutions: CoverageResolution[] }) {
   const ref = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState<string | null>(null)   // `${docId}:${propIdx}` being edited
   const [editVal, setEditVal] = useState<string>('')
@@ -2897,7 +2996,7 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
         <div key={doc.id} style={{ padding: '3px 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
             <span style={{ color: '#0d0d0d' }}>✓ {doc.file_name}</span>
-            <button onClick={() => onRemove(locIdx, doc.id, doc.file_path)} style={{ fontSize: 11, color: '#B91C1C', background: 'none', border: 'none' }}>Remove</button>
+            <button onClick={() => onRemove(locId, doc.id, doc.file_path, `${locIdx}:${docType}`)} style={{ fontSize: 11, color: '#B91C1C', background: 'none', border: 'none' }}>Remove</button>
           </div>
           {/* Why this document carries no figures. Abstention is NEUTRAL, not amber: the reader
               declining to guess is the system working, and colouring it as a fault would push a

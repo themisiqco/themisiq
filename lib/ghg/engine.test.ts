@@ -1824,8 +1824,8 @@ describe('Z. fuel oil grades are seeded per table', () => {
     expect(offences, offences.length === 0 ? '' :
       `A DEFRA 2025 CITATION SURVIVED THE REFRESH:\n\n${offences.join('\n')}\n\n` +
       `EF_UK is DEFRA 2026 now. Every citation must move with it or a customer reads one year on the\n` +
-      `methodology page and is priced on another. The Scope 3 DEFRA/Exiobase strings are a DIFFERENT\n` +
-      `dataset and are deliberately not in scope here.\n`).toEqual([]);
+      `methodology page and is priced on another. Scope 3 spend factors are a DIFFERENT dataset and\n` +
+      `are deliberately not in scope here.\n`).toEqual([]);
   });
 
   it('Z15 the legacy fuel_oil_gallon and the new residual key are the SAME number, by construction', () => {
@@ -2180,7 +2180,12 @@ describe('T. purchased steam — per jurisdiction, with no US fallback', () => {
     // displayed factor is rescaled to match. T11 pins the note text.
     expect(row.activity_unit, 'the unit the customer entered').toBe('gj');
     expect(row.activity_data, 'the figure the customer entered').toBe(1000);
-    expect(row.ef_source).toBe(EF_SOURCES.steam_uk);
+    // The ROW carries the table as well as the publication; factor_editions stores the bare citation.
+    // Canonicalised 17 Sep 2026: the locator is a separate field, composed onto the row here.
+    expect(row.ef_source).toBe(
+      'UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting — flat file v1.2, Scope 2 sheet, ' +
+      'Heat and steam > District heat and steam');
+    expect(row.ef_source.startsWith(EF_SOURCES.steam_uk), 'the row citation begins with the canonical one').toBe(true);
     // The US figure must be nowhere near it — this is the 23% the defect was worth.
     expect(row.result_tco2e).not.toBeCloseTo(62.9364, 2);
   });

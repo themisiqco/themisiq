@@ -684,10 +684,61 @@ const EF_NZ = {
   },
 }
 
+// ── THE DEFRA/DESNZ PUBLICATION ─────────────────────────────────────────────────────────────────────
+// The citation, the licence and the attribution it requires live in lib/ghg/defraPublication.ts, which
+// imports nothing, so the methodology page can read them without the engine. Re-exported here for every
+// existing importer.
+import { DEFRA_DESNZ_PUBLICATION, defraCitation, sourceAttributionsFor, type SourceAttribution } from './defraPublication'
+export { DEFRA_DESNZ_PUBLICATION, defraCitation, sourceAttributionsFor, type SourceAttribution }
+
+/** The attributions an inventory's locations require: from the same citations its exports print. */
+export function sourceAttributionsForLocations(locations: readonly { country?: string }[]): SourceAttribution[] {
+  return sourceAttributionsFor([...combustionSourcesFor(locations), ...gridSourcesFor(locations)])
+}
+
+/** Where, inside a publication, a factor was read from. Separate from the citation by design. */
+export type FactorLocator = {
+  /** The publisher's name for the download: 'Full set', 'Condensed set', 'Flat file'. null = not recorded. */
+  factor_set: string | null
+  /** The workbook's own Version cell, as printed. null = not recorded when the factor was transcribed. */
+  file_version: string | null
+  /** The sheet or tab. */
+  sheet: string | null
+  /** The row path within the sheet, as the publisher labels it. null = not recorded. */
+  row: string | null
+}
+
+/**
+ * Locators for the citations that have one. RECORDED, NOT INFERRED: each field says what was noted when
+ * the factor was transcribed, and null where nothing was — a version this repo never wrote down is not
+ * supplied after the fact, even where a later check found the same value (see the Part A report).
+ */
+const EF_SOURCE_LOCATORS: Partial<Record<keyof typeof EF_SOURCES, FactorLocator>> = {
+  // EF_UK header: "(full set, Fuels tab)". No version recorded.
+  combustion_uk: { factor_set: 'Full set', file_version: null, sheet: 'Fuels', row: null },
+  // EF_UK.steam_kwh: "flat file v1.2 (updated 2026-07-10), Scope 2 sheet, 'Heat and steam' > 'District heat and steam'".
+  steam_uk: { factor_set: 'Flat file', file_version: '1.2', sheet: 'Scope 2', row: 'Heat and steam > District heat and steam' },
+  // GRID_EF.UK: DEFRA/DESNZ "UK electricity" generation factor. File, version and row not recorded.
+  electricity_uk: { factor_set: null, file_version: null, sheet: 'UK electricity', row: null },
+}
+
+/**
+ * A citation with its locator appended, for a WORKINGS ROW, where a verifier needs the table and not only
+ * the publication. Never stored as a factor_editions `source`: that stays the bare citation, so a change
+ * of sheet or file version cannot read as a change of edition.
+ */
+function citeWithLocator(key: keyof typeof EF_SOURCES): string {
+  const loc = EF_SOURCE_LOCATORS[key]
+  if (!loc) return EF_SOURCES[key]
+  const file = [loc.factor_set?.toLowerCase(), loc.file_version && `v${loc.file_version}`].filter(Boolean).join(' ')
+  const where = [file, loc.sheet && `${loc.sheet} sheet`, loc.row].filter(Boolean).join(', ')
+  return where ? `${EF_SOURCES[key]} — ${where}` : EF_SOURCES[key]
+}
+
 const EF_SOURCES = {
   combustion: 'US EPA (2024) Emission Factors for Greenhouse Gas Inventories',
   combustion_ca: 'ECCC (2025) Emission factors and reference values v3.0',
-  combustion_uk: 'UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting',
+  combustion_uk: defraCitation(2026),
   // ⚠️ NAMES THE DENSITY CONVERSION, AND THAT CLAUSE IS THE POINT OF THE STRING.
   // This read 'IPCC (2006) Guidelines Vol.2 — Tier 1 default combustion factors' until 14 Aug 2026,
   // printed on a PER-LITRE figure. Both cited sources publish on a MASS basis (t CO2/TJ and TJ/Gg);
@@ -710,7 +761,9 @@ const EF_SOURCES = {
   // factor now carries its own source in STEAM_EF; the general citation-granularity question for the
   // combustion_* family is untouched and still open.
   steam_us: 'US EPA (2025) GHG Emission Factors Hub, Table 7 — Steam and Heat (natural gas at 80% thermal efficiency; combustion only, tank-to-wheel)',
-  steam_uk: 'UK DESNZ/DEFRA (2026) GHG Conversion Factors, flat file v1.2 — Scope 2, District heat and steam',
+  // Canonical since 17 Sep 2026. The table it cites — flat file v1.2, Scope 2, District heat and steam —
+  // is in EF_SOURCE_LOCATORS.steam_uk and reaches the workings row through STEAM_EF.UK.source.
+  steam_uk: defraCitation(2026),
   // Not a published table: the customer's own supplier figure. Named so a verifier can see instantly
   // that this row was NOT priced from a national default, which is the whole point of allowing it.
   steam_supplier: 'Supplier-specific factor supplied by the district energy provider (see row note)',
@@ -727,16 +780,23 @@ const EF_SOURCES = {
   // "DEFRA (2026)" beside "factor_vintage 2025". The vintage column already carries the year, so the
   // citation names the document family and the two together are unambiguous. Re-add a year here only
   // if GRID_EF.UK ever collapses back to a single edition.
-  electricity_uk: 'UK DEFRA/DESNZ GHG Conversion Factors for Company Reporting',
+  electricity_uk: defraCitation(),
   electricity_eu: 'EEA (2023) Greenhouse gas emission intensity of electricity generation',
   electricity_au: 'DCCEEW NGA Factors 2025',
   electricity_nz: 'NZ MfE Measuring Emissions 2026 v2',
   residual_us: 'Green-e Residual Mix 2025 (2023 data, publ. 2026-01-29, CRS) — residual CO₂; eGRID2023 Rev2 (publ. 2025-06-12) CH₄/N₂O. Green-e factors out Green-e-certified voluntary sales (the only published US residual source per CRS).',
   residual_eu: 'AIB European Residual Mixes 2024 (publ. 2025-05-30, Grexel/AIB; Ecoinvent CO₂ inputs) — combined CO₂e, gCO₂/kWh.',
   residual_au: 'DCCEEW National Greenhouse Accounts Factors 2025, Table 2 — national Residual Mix Factor, 0.81 kg CO₂-e/kWh Scope 2. Calculated on a FINANCIAL-YEAR basis (years ending June) with a lag adjustment using a 3-year average, because Large-scale Generation Certificates are created on a CALENDAR-year basis up to 12 months after the generation they represent. National aggregate only — see RESIDUAL_AU.',
-  gwp_ar4: 'IPCC AR4 (2007) — selectable alternate; aligns with CARB AB 32 / Mandatory Reporting Regulation, but not the default for any current framework',
-  gwp_ar5: 'IPCC AR5 (2014) — GHG Protocol baseline; selectable alternate, not the default for any current framework',
-  gwp_ar6: 'IPCC AR6 (2021) — applied by default across all frameworks (SB 253, CDP, ESRS E1, GRI 305, EcoVadis, IFRS S2)',
+  // ⚠️ NOTHING IS SELECTABLE. gwp_ar4 and gwp_ar5 said "selectable alternate" from f83326a (20 Jun 2026)
+  // until 17 Sep 2026; git history holds no selector, parameter or saved preference by which any inventory
+  // could choose either, then or since. The basis comes from FRAMEWORKS[].gwp, which is AR6 for all six.
+  //   AR5 is still NAMED because published factors arrive on it: DEFRA/DESNZ UK combustion and district
+  // heat, DCCEEW and NZ MfE combustion are combined on AR5 by their publishers (see EF_UK, EF_AU, EF_NZ,
+  // STEAM_EF.UK) and applied as published. AR4 is named for history only: no factor applied is recorded
+  // as AR4. Neither string names a publisher, so sourceAttributionsFor never reads them as a citation.
+  gwp_ar4: 'IPCC AR4 (2007) — not applied. No emission factor ThemisIQ uses is recorded on AR4. SB 253 was calculated on AR4 until June 2026 and has used AR6 since.',
+  gwp_ar5: 'IPCC AR5 (2014) — not applied by ThemisIQ. Some published factors arrive with the gases already combined on AR5 (the UK, Australian and New Zealand fuel factors and UK district heat); those are used as published and their workings rows say so.',
+  gwp_ar6: 'IPCC AR6 (2021) — the GWP set for every framework (SB 253, CDP, ESRS E1, GRI 305, EcoVadis, IFRS S2), applied wherever ThemisIQ combines CO₂, CH₄ and N₂O itself. There is no setting to change it.',
 }
 
 // ── THE EDITION LABEL PER JURISDICTION — ONE DECLARATION, TWO CONSUMERS ──────────────────────────
@@ -1969,7 +2029,10 @@ const STEAM_EF: Record<EfJurisdiction, SteamEntry> = {
   US: { kind: 'published', ef: EF.steam_mmbtu, basis: 'mmbtu', source: EF_SOURCES.steam_us },
   // DEFRA 2026 Scope 2 district heat — combined CO2e per kWh with AR5 already applied, hence the
   // zeros and the as-published stamp. See the key's own note in EF_UK.
-  UK: { kind: 'published', ef: EF_UK.steam_kwh, basis: 'kwh', source: EF_SOURCES.steam_uk },
+  // `source` is what the WORKINGS ROW prints, so it carries the table as well as the publication — the
+  // reason steam was given its own citation in the first place (see steam_us/steam_uk in EF_SOURCES).
+  // factor_editions records EF_SOURCES.steam_uk, the bare citation, via factorEditions.ts.
+  UK: { kind: 'published', ef: EF_UK.steam_kwh, basis: 'kwh', source: citeWithLocator('steam_uk') },
   CA: {
     kind: 'unpublished',
     searched: 'ECCC "Emission factors and reference values" v3.0 (Oct 2025), full document. Sections cover fossil fuel combustion, grid electricity and biogas. The only occurrence of "steam" is "Steam-flaked corn" — a beef-cattle diet parameter in Table 9.',
@@ -3160,7 +3223,7 @@ export function findSteamFactorGaps(
 export {
   // Constants / tables
   GWP, REFRIGERANT_GWP, EF, EF_CA, EF_CA_NG_CO2_M3, M3_PER_MCF,
-  EF_UK, EF_EU, EF_AU, EF_NZ, EF_SOURCES, GRID_EF, NZ_TD_LOSS,
+  EF_UK, EF_EU, EF_AU, EF_NZ, EF_SOURCES, EF_SOURCE_LOCATORS, GRID_EF, NZ_TD_LOSS,
   RESIDUAL_EU, RESIDUAL_US,
   CA_PROVINCES, US_STATES, US_SUBREGIONS, AU_STATES,
   EU_COUNTRIES, EU_COUNTRY_OPTIONS,
