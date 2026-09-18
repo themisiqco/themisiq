@@ -10,14 +10,18 @@ const IDS = Array.from({ length: 15 }, (_, i) => `cat${i + 1}`)
 const METHODS: Scope3Method[] = ['exiobase_spend', 'flat_spend', 'waste_factors', 'travel_factors', 'commuting_factors', 'pcaf']
 
 describe('Scope 3 category methods', () => {
-  it('M1 the split is exactly: Cat 1 EXIOBASE, Cat 5/6/7 activity factors, Cat 15 PCAF, the other ten flat', () => {
+  it('M1 the split is exactly: Cats 1/2/4 EXIOBASE, Cat 5/6/7 activity factors, Cat 15 PCAF, the other eight flat', () => {
+    // Cats 2 and 4 moved onto EXIOBASE on 17 Sep 2026: they are purchases, so a spend figure has something
+    // to multiply. The seven left on flat_spend are a decision, not a backlog — see METHOD_BY_CATEGORY.
     expect(IDS.map(id => [id, scope3MethodFor(id)])).toEqual([
-      ['cat1', 'exiobase_spend'], ['cat2', 'flat_spend'], ['cat3', 'flat_spend'], ['cat4', 'flat_spend'],
+      ['cat1', 'exiobase_spend'], ['cat2', 'exiobase_spend'], ['cat3', 'flat_spend'], ['cat4', 'exiobase_spend'],
       ['cat5', 'waste_factors'], ['cat6', 'travel_factors'], ['cat7', 'commuting_factors'],
       ['cat8', 'flat_spend'], ['cat9', 'flat_spend'], ['cat10', 'flat_spend'], ['cat11', 'flat_spend'],
       ['cat12', 'flat_spend'], ['cat13', 'flat_spend'], ['cat14', 'flat_spend'], ['cat15', 'pcaf'],
     ])
-    expect(IDS.filter(id => scope3MethodFor(id) === 'flat_spend')).toHaveLength(10)
+    // EIGHT, not seven: the generic ten were 2, 3, 4, 8, 9, 10, 11, 12, 13, 14, and two left.
+    expect(IDS.filter(id => scope3MethodFor(id) === 'flat_spend')).toHaveLength(8)
+    expect(IDS.filter(id => scope3MethodFor(id) === 'exiobase_spend')).toEqual(['cat1', 'cat2', 'cat4'])
   })
 
   it('M2 descriptions are derived: the flat factor and the gap come from the factor record', () => {

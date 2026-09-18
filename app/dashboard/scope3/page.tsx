@@ -8,8 +8,15 @@ import { EMISSION_FACTORS, GENERIC_SPEND_FACTOR } from '../../../lib/emissionFac
 import { SPEND_EF_SOURCES } from '../../../lib/emissionFactors/spend'
 import { scope3MethodFor, scope3MethodDescription, provenanceGap } from '../../../lib/scope3/categoryMethods'
 import { scope3Status, relevanceFromStored, coverageEntry, type Relevance, type Scope3Status, type Scope3CoverageEntry } from '../../../lib/scope3/categoryStatus'
-import { resolvePcafResult, assessAsset } from '../../../lib/pcaf/engine'
+// ⚠️ assessAsset ONLY. resolvePcafResult is no longer imported: it existed to choose between the
+// decomposed assessment and the lumped spend proxy, and it answered with the proxy whenever any holding
+// was incomplete. lib/scope3/cat15.ts makes that choice explicitly, and there is no proxy to choose.
+import { assessAsset } from '../../../lib/pcaf/engine'
 import { INDUSTRY_OPTION_GROUPS, industryName } from '../../../lib/emissionFactors/industryOptions'
+import { PRODUCT_OPTION_GROUPS, productName } from '../../../lib/emissionFactors/productOptions'
+import { inScopeFor, scopeNote, outOfScopeDisclosure, CATEGORY_SCOPE_LABEL, type SpendCategoryId } from '../../../lib/scope3/categoryScope'
+import { spendSector } from '../../../lib/scope3/spendSector'
+import { cat15Figure, holdingComputes, assessableEmissions, CAT15_ASSESSMENT_FAILED, type Cat15Figure } from '../../../lib/scope3/cat15'
 import { matchCountries, countryByIso2 } from '../../../lib/emissionFactors/countryOptions'
 import { regionName, regionLabel, countryLabel } from '../../../lib/emissionFactors/regionNames'
 import {
@@ -47,7 +54,7 @@ const CATEGORIES = [
   { id: 'cat12', num: 12, name: 'End-of-life treatment', stream: 'Downstream', desc: 'Emissions from disposal of your sold products at end of life', method: 'activity', unit: 'tonnes', materialSectors: ['Consumer & Retail', 'Industrials & Manufacturing', 'Technology'], typicalShare: 0.02 , guidance: 'Emissions from the end-of-life treatment of your sold products once customers dispose of them — landfill, incineration, recycling.', dataSource: 'Units / mass sold + end-of-life treatment assumptions by material. Activity-based; spend-based is not appropriate here.' },
   { id: 'cat13', num: 13, name: 'Downstream leased assets', stream: 'Downstream', desc: 'Emissions from assets owned and leased to others', method: 'activity', unit: 'kwh', materialSectors: ['Real Estate', 'Financial Services'], typicalShare: 0.01 , guidance: 'Emissions from assets you OWN and LEASE OUT to others (as lessor) that aren\'t in your Scope 1 & 2 — e.g. property you rent to tenants.', dataSource: 'Your leased-out asset portfolio + tenants\' energy use (floor area or metered). Activity-based; spend-based is not appropriate here.' },
   { id: 'cat14', num: 14, name: 'Franchises', stream: 'Downstream', desc: 'Emissions from franchise operations', method: 'activity', unit: 'spend', materialSectors: ['Consumer & Retail'], typicalShare: 0.01 , guidance: 'Emissions from the operations of your FRANCHISEES — relevant if you\'re a franchisor.', dataSource: 'Franchisee energy/activity data, or estimates from number and type of franchise outlets. Activity-based; spend-based is not appropriate here.' },
-  { id: 'cat15', num: 15, name: 'Investments', stream: 'Downstream', desc: 'Emissions associated with investments and lending (financed emissions)', method: 'pcaf', unit: 'spend', materialSectors: ['Financial Services'], typicalShare: 0.90 , guidance: 'Emissions associated with your investments and lending (financed emissions) — for investors, banks and asset owners. ThemisIQ estimates this with a PCAF-aligned spend-based portfolio proxy — PCAF data-quality tier 5, the weakest tier — not a full asset-class-decomposed PCAF assessment. ThemisIQ is not PCAF-certified or a PCAF signatory.', dataSource: 'Total portfolio / loan-book value × an openly-sourced sector factor (non-PCAF). A per-asset assessment (asset class + attribution factors) is the higher-fidelity path — if you already hold a computed figure, enter known financed emissions directly.' },
+  { id: 'cat15', num: 15, name: 'Investments', stream: 'Downstream', desc: 'Emissions associated with investments and lending (financed emissions)', method: 'pcaf', unit: 'spend', materialSectors: ['Financial Services'], typicalShare: 0.90 , guidance: 'Emissions associated with your investments and lending (financed emissions) — for investors, banks and asset owners. ThemisIQ assesses this holding by holding on PCAF\u2019s method: each investee\u2019s own reported emissions, multiplied by your share of that investee. A total portfolio value on its own produces no figure — it is a balance at a date, and a spend factor is an intensity per year of activity, so multiplying them prices a year of purchasing nobody made. ThemisIQ is not PCAF-certified or a PCAF signatory.', dataSource: 'Per holding: the asset class, the outstanding amount, the value that asset class attributes on (EVIC, equity plus debt, property value or vehicle value) and the investee\u2019s reported emissions. If you already hold a computed figure for the portfolio, enter known financed emissions directly instead.' },
 ]
 
 // Sector-based materiality
@@ -69,16 +76,15 @@ const SECTOR_MATERIAL: Record<string, number[]> = {
 
 // Emission factors (kg CO2e per unit)
 
-// ⚠️ EMISSION_FACTORS.spend AND SECTOR_MATERIAL ARE KEYED ON THE RETIRED INTERNAL VOCABULARY, AND
-// THE DROPDOWNS NOW EMIT EXIOBASE CODES, SO EVERY LOOKUP MISSES. Deliberate. The tables stay —
-// SECTOR_MATERIAL's materiality suggestions are separate work and come out separately — but a miss
-// must not fall through to DEFAULT_SPEND_EF (0.5) or to SECTOR_MATERIAL['Other'], because both
-// produce output that renders identically to output someone established. `sectorPriced` is the one
-// place that question is asked, so every surface answers it the same way.
-//   Cat 1 no longer asks it: its spend path is priced by /api/scope3/spend-factor against EXIOBASE
-// codes (see "Cat 1 spend pricing" in the component). Cat 15 still does.
-const sectorPriced = (sector: string | undefined): boolean =>
-  !!sector && Object.hasOwn(EMISSION_FACTORS.spend, sector)
+// ⚠️ `sectorPriced` IS GONE, AND SO IS EVERY READER OF EMISSION_FACTORS.spend ON THIS PAGE. It asked
+// whether a sector was a key in that thirteen-entry table, which was the right question while Cat 1 and
+// Cat 15 priced from it. Neither does now: Cat 1, 2 and 4 are priced by /api/scope3/spend-factor against
+// EXIOBASE codes, and Cat 15 is assessed per holding or entered. The table's keys and the codes this page
+// offers never overlapped, so the helper had come to answer "no" everywhere — which is exactly how a
+// complete PCAF assessment ended up excluded from the total.
+//   SECTOR_MATERIAL below is keyed on the same retired vocabulary and misses the same way. It is NOT
+// deleted, because the materiality suggestion is separate work; autoDetect now explains the miss instead
+// of doing nothing, which is all this page can honestly do about it today.
 
 /** The GHG wizard's treatment of an unpriceable location, reused: withhold the figure, say why, and
  *  say it is not a zero. See app/dashboard/ghg/page.tsx, "We can't work out this location's
@@ -124,17 +130,56 @@ interface SpendFactorResponse {
   lines: SpendFactorLine[]
 }
 
-/** What the Cat 1 spend request produced, keyed by the inputs it was made for. */
-type Cat1SpendResult =
+/** What one category's spend request produced, keyed by the inputs it was made for. */
+type SpendLineResult =
   | { key: string; kind: 'done'; response: SpendFactorResponse; line: SpendFactorLine }
   | { key: string; kind: 'error'; message: string }
 
-/** The caller's own key for the single Cat 1 line; the route echoes it back. */
-const CAT1_LINE_ID = 'cat1-spend'
+/**
+ * THE CATEGORIES PRICED FROM EXIOBASE THROUGH /api/scope3/spend-factor.
+ *
+ * ⚠️ THREE OF THE ELEVEN SPEND CATEGORIES, AND THE OTHER SEVEN ARE A DECISION, NOT AN OVERSIGHT. Cats 1,
+ * 2 and 4 are the ones a customer actually BUYS: purchased goods and services, capital goods, and inbound
+ * freight. Cats 9, 11, 13 and 14 price something the company SOLD or LEASED OUT, where there is no
+ * purchase to multiply; Cat 3 is derived from the energy already reported in Scopes 1 and 2; Cat 12 is
+ * tonnes by material, the shape Cat 5 now uses DEFRA for; Cat 8's own data-source note says spend is not
+ * appropriate. Those EIGHT — Cats 3, 8, 9, 10, 11, 12, 13 and 14 — keep the flat 0.5 factor deliberately: a
+ * better-sourced factor behind a figure the method does not support would be the same error with a citation
+ * attached. So flat_spend keeps EIGHT members (the generic ten were 2, 3, 4, 8, 9, 10, 11, 12, 13, 14, and
+ * two left), and whether that method survives is a later question, not one this change answers.
+ *
+ * ⚠️ factor_type IS PER CATEGORY, BECAUSE EXIOBASE PUBLISHES TWO TABLES. Cat 4 buys a transport SERVICE,
+ * so the industry (ixi) table fits. Cat 2 buys identifiable capital GOODS — a machine, a vehicle — so the
+ * product (pxp) table fits, and the sector select offers products there. Both tables are in
+ * exiobaseSectors.json; both factor files exist; the route takes the type per line.
+ */
+const SPEND_PRICED_CATEGORIES: readonly {
+  /** ⚠️ Typed against lib/scope3/categoryScope, so a category priced from EXIOBASE must also have its
+   *  picker scoped there: adding one here without a rule fails tsc rather than shipping an unscoped list. */
+  id: SpendCategoryId
+  factorType: 'industry' | 'product'
+  /** Where this category's EXIOBASE code is stored in cat_data: SPEND_SECTOR_FIELD in
+   *  lib/scope3/spendSector.ts, which is what spendSector() reads. It was duplicated here as a
+   *  `sectorField` nothing consulted, which is how a documented mapping and the code that ignores it
+   *  come to disagree. */
+  /** Where this category's spend figure is stored in cat_data. */
+  spendField: 'total_spend' | 'annual_spend'
+}[] = [
+  { id: 'cat1', factorType: 'industry', spendField: 'total_spend' },
+  { id: 'cat2', factorType: 'product', spendField: 'annual_spend' },
+  { id: 'cat4', factorType: 'industry', spendField: 'annual_spend' },
+]
+const SPEND_PRICED_IDS: readonly string[] = SPEND_PRICED_CATEGORIES.map(c => c.id)
 
-/** Identity of one Cat 1 pricing question. Every input that changes the answer, and nothing else. */
-const cat1SpendKey = (sectorKey: string, countryIso2: string, currency: string, reportingYear: number, spend: number) =>
-  JSON.stringify([sectorKey, countryIso2, currency, reportingYear, spend])
+/**
+ * Identity of ONE category's pricing question: every input that changes the answer, and nothing else.
+ *
+ * ⚠️ PER LINE, NOT PER BATCH. A batch key would invalidate every category's result whenever any one spend
+ * box changed, so editing Cat 2 would blank a priced Cat 4 and re-request it. The category id is part of
+ * the key because two categories can hold the same sector and spend and still be different questions.
+ */
+const spendLineKey = (catId: string, sectorKey: string, countryIso2: string, currency: string, reportingYear: number, spend: number) =>
+  JSON.stringify([catId, sectorKey, countryIso2, currency, reportingYear, spend])
 
 /**
  * ⚠️ 400 ms. Long enough that typing a figure fires ONE request rather than one per keystroke —
@@ -211,6 +256,101 @@ function IndustryOptions() {
   )
 }
 
+/**
+ * The option list ONE spend-priced category's picker offers, scoped by lib/scope3/categoryScope.
+ *
+ * ⚠️ A STEER, NOT A FILTER. Out-of-scope rows are withheld from the default list and returned in full by
+ * `showAll`, each carrying the reason it is unusual here; choosing one is allowed and disclosed. Two rows
+ * are never withheld whatever the rules say: the one already selected — a stored value must render as its
+ * name, not as a blank select — and none at all when `showAll` is on.
+ *
+ * The note rides on the option text as well as under the select because a customer reads the list before
+ * they read the panel, and the row they need to think about is the one they are about to click.
+ */
+function ScopedOptions({ catId, factorType, selected, showAll }: {
+  catId: SpendCategoryId
+  factorType: 'industry' | 'product'
+  selected: string
+  showAll: boolean
+}) {
+  const groups: { heading: string; options: readonly { code: string; name: string; note?: string }[] }[] =
+    factorType === 'product'
+      ? PRODUCT_OPTION_GROUPS.map(g => ({ heading: g.heading, options: g.products }))
+      : INDUSTRY_OPTION_GROUPS.map(g => ({ heading: g.heading, options: g.industries }))
+  return (
+    <>
+      {groups.map(g => {
+        const options = g.options.filter(o => showAll || o.code === selected || inScopeFor(catId, o.code))
+        if (!options.length) return null
+        return (
+          <optgroup key={g.heading} label={g.heading}>
+            {options.map(o => {
+              const inScope = inScopeFor(catId, o.code)
+              const text = [o.name, o.note, scopeNote(catId, o.code)].filter(Boolean).join(' — ')
+              return <option key={o.code} value={o.code}>{inScope ? text : `⚠ ${text}`}</option>
+            })}
+          </optgroup>
+        )
+      })}
+    </>
+  )
+}
+
+/**
+ * The control that opens a scoped picker out to the full EXIOBASE table.
+ *
+ * ⚠️ BOTH HALVES OF THE LABEL, IN BOTH STATES: what is on screen now, then what pressing it will do. An
+ * action-only label ("Show every EXIOBASE product") is unreadable here, because the scoped list and the
+ * full list look the same until you count 200 rows — and once pressed, a lone "show only the ones usual
+ * for this category" reads as though the scoped default had never been applied. That is precisely how the
+ * Cat 2 picker was reported as opening unscoped on 17 Sep 2026 when it was not.
+ *
+ * `aria-pressed` is deliberately absent. It would be announced ON TOP OF a label that already states the
+ * state, so a screen reader would read "showing every product, pressed" — two state claims to reconcile,
+ * and one of them a double negative. The label is the state.
+ */
+function ShowAllToggle({ catId, on, onToggle, noun, usualFor }: {
+  catId: string
+  on: boolean
+  onToggle: (catId: string) => void
+  noun: string
+  usualFor: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(catId)}
+      style={{
+        marginTop: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+        font: 'inherit', fontSize: 11, color: 'var(--color-brand)', textDecoration: 'underline',
+        textAlign: 'left', lineHeight: 1.5,
+      }}
+    >
+      {on
+        ? `Showing every EXIOBASE ${noun} — show only the ${noun}s usual for ${usualFor}`
+        : `Showing the ${noun}s usual for ${usualFor} — show every EXIOBASE ${noun}`}
+    </button>
+  )
+}
+
+/** The sentence under a spend-priced picker: why the chosen row is unusual here, or what the row covers
+ *  that this category does not. Nothing at all for an ordinary in-scope row, which is most of them. */
+function ScopeNoteUnderPicker({ catId, code }: { catId: SpendCategoryId; code: string }) {
+  if (!code) return null
+  const disclosure = outOfScopeDisclosure(catId, code)
+  const note = disclosure ?? scopeNote(catId, code)
+  if (!note) return null
+  return (
+    <div style={{
+      fontSize: 11, lineHeight: 1.5, marginTop: 6, padding: '0.5rem 0.6rem', borderRadius: 6,
+      background: disclosure ? '#FEF3C7' : '#f8f7f5',
+      color: disclosure ? '#92400E' : 'var(--color-ink-muted)',
+    }}>
+      {disclosure ? '⚠ ' : ''}{note}
+    </div>
+  )
+}
+
 const SECTORS = [
   'Energy & Utilities', 'Financial Services', 'Real Estate', 'Technology',
   'Healthcare & Pharma', 'Industrials & Manufacturing', 'Consumer & Retail',
@@ -281,6 +421,20 @@ interface CategoryData {
   // Cat 1
   total_spend?: number
   supplier_sector?: string
+  /**
+   * The EXIOBASE code a SPEND-PRICED category other than Cat 1 is priced with (Cats 2 and 4 today).
+   *
+   * ⚠️ ITS OWN FIELD, AND NO FALLBACK TO THE COMPANY SECTOR — which is now true of Cat 1 too, whose
+   * `supplier_sector` fallback was removed on 17 Sep 2026. Capital goods and inbound freight are different
+   * purchases: a law firm's capital goods are not legal services, and its freight is not legal services
+   * either. Defaulting them to the company sector would produce three figures that all priced the same row
+   * while appearing to price three, which is the misallocation these categories exist to separate. Unset
+   * means unpriced, and the panel says so.
+   *
+   * Holds an ixi code for an industry-priced category and a pxp code for a product-priced one; which is
+   * which comes from SPEND_PRICED_CATEGORIES, not from the value.
+   */
+  spend_sector?: string
   has_supplier_data?: boolean
   supplier_emissions?: number
   // Cat 6
@@ -424,31 +578,143 @@ export default function Scope3Dashboard() {
   //     when that key equals the inputs on screen now. This is what stops a figure being read as
   //     current during the gap before the new request settles — including the debounce window, when
   //     no request has even been sent yet. The same comparison drives the loading state.
-  const cat1Data = catData['cat1']
-  // Priced whenever the inputs are there, whatever the relevance answer: an excluded Cat 1 still needs its
-  // figure, because that figure is what justifies excluding it. An unanswered category with no spend
-  // entered asks for nothing, so this costs no request.
-  const cat1NeedsSpendPrice = !(cat1Data?.has_supplier_data && cat1Data.supplier_emissions)
-  const cat1Sector = cat1Data?.supplier_sector || sector
-  const cat1SpendRaw = cat1Data?.total_spend || 0
-  const [cat1SpendDebounced, setCat1SpendDebounced] = useState(0)
-  const [cat1Spend, setCat1Spend] = useState<Cat1SpendResult | null>(null)
+
+  // ── SPEND PRICING, FOR HOWEVER MANY CATEGORIES USE IT ──────────────────────────────────────────
+  //
+  // ⚠️ THIS WAS SCALAR UNTIL 17 SEP 2026: one key, one result slot, one debounce, one AbortController,
+  // one pending boolean, and a handler that checked lines[0].id. It served Cat 1 and could not serve two
+  // categories at once — the last response would win. It is now keyed PER LINE throughout, so a response
+  // replaces only the lines it answers and editing Cat 2 cannot blank a priced Cat 4. Nothing here is
+  // written for three categories in particular; SPEND_PRICED_CATEGORIES is the only list, and eleven
+  // lines would need no further change (the route caps at 500).
+
+  /**
+   * This category's EXIOBASE code. '' means not chosen, and nothing is priced.
+   *
+   * ⚠️ THE RULE IS IN lib/scope3/spendSector.ts, NOT HERE, AND THAT IS THE FIX. Until 17 Sep 2026 this was
+   * a closure reading `supplier_sector || sector` — the company sector — so an untouched Cat 1 priced a
+   * real figure from a row the customer never chose. The extracted function is not given the company
+   * sector, so no edit here can reintroduce it, and spendSector.test.ts says so out loud.
+   */
+  const spendSectorOf = (catId: string): string => spendSector(catData, catId)
+  const spendAmountOf = (catId: string): number => {
+    const cfg = SPEND_PRICED_CATEGORIES.find(c => c.id === catId)
+    const d = catData[catId]
+    return Number((cfg?.spendField === 'total_spend' ? d?.total_spend : d?.annual_spend) || 0)
+  }
+  /** False when the customer has given a figure directly — a supplier-specific Cat 1 total, or an
+   *  override — because then nothing needs pricing. Relevance is NOT tested: an excluded category still
+   *  needs its figure, which is what justifies excluding it. */
+  const spendNeedsPricing = (catId: string): boolean => {
+    const d = catData[catId]
+    if (catId === 'cat1' && d?.has_supplier_data && d.supplier_emissions) return false
+    return !d?.emissions_override
+  }
+  const spendInputsComplete = (catId: string): boolean =>
+    spendNeedsPricing(catId) && !!spendSectorOf(catId) && !!countryIso2 && spendAmountOf(catId) !== 0
+
+  /** The inputs a category still needs before anything can be priced. Read by its panel and by the
+   *  unpriced reason, so the hint and the explanation cannot differ. */
+  const spendMissingInputs = (catId: string): string[] => [
+    !spendAmountOf(catId) && (catId === 'cat1' ? 'total annual spend' : 'annual spend'),
+    // ⚠️ NAMES THE CONTROL THE CUSTOMER IS LOOKING AT. "the EXIOBASE sector for this category" would send a
+    // Cat 2 customer hunting for a sector select that is labelled "What was bought": Cat 2 chooses a
+    // PRODUCT and Cat 4 an INDUSTRY, so the sentence says which.
+    // ⚠️ CAT 1 NAMES ITS SECTOR THE SAME WAY THE OTHER TWO DO, now that it has no fallback either. "primary
+    // supplier sector" alone read as a field someone else might have filled in — which, until the company
+    // sector fallback was removed, it effectively was.
+    !spendSectorOf(catId) && (catId === 'cat1'
+      ? 'the primary supplier sector (the EXIOBASE industry for this category)'
+      : SPEND_PRICED_CATEGORIES.find(c => c.id === catId)?.factorType === 'product'
+        ? 'what was bought (the EXIOBASE product for this category)'
+        : 'the service provider sector (the EXIOBASE industry for this category)'),
+    !countryIso2 && 'primary country of supply (Step 1)',
+  ].filter((x): x is string => typeof x === 'string')
+
+  // ⚠️ ONE DEBOUNCE TIMER PER CATEGORY, NOT ONE OVER ALL OF THEM. A single timer across every spend box
+  // would mean typing in Cat 2 delayed a request Cat 4 was already waiting on. 400 ms each, for the reason
+  // SPEND_DEBOUNCE_MS gives. Only the spend FIGURE is debounced; a sector or country change is one
+  // deliberate act and fires immediately.
+  const spendRaw: Record<string, number> = Object.fromEntries(SPEND_PRICED_IDS.map(id => [id, spendAmountOf(id)]))
+  // The signature IS the input: the effect parses it rather than reading a ref written during render, so
+  // its dependency is honest and nothing is read mid-render.
+  const spendRawSig = JSON.stringify(spendRaw)
+  const [spendDebounced, setSpendDebounced] = useState<Record<string, number>>(spendRaw)
+  const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const debounceSeen = useRef<Record<string, number>>({})
+  useEffect(() => {
+    const values = JSON.parse(spendRawSig) as Record<string, number>
+    for (const [id, value] of Object.entries(values)) {
+      if (debounceSeen.current[id] === value) continue
+      debounceSeen.current[id] = value
+      clearTimeout(debounceTimers.current[id])
+      debounceTimers.current[id] = setTimeout(() => setSpendDebounced(prev => ({ ...prev, [id]: value })), SPEND_DEBOUNCE_MS)
+    }
+  }, [spendRawSig])
+
+  /** The key of the question ON SCREEN NOW, from the UNDEBOUNCED spend. A stored result counts only if it
+   *  was made for exactly this; otherwise the figure is pending, never the previous one. */
+  const spendLiveKey = (catId: string): string | null =>
+    spendInputsComplete(catId)
+      ? spendLineKey(catId, spendSectorOf(catId), countryIso2, currency, reportingYear, spendAmountOf(catId))
+      : null
+  /** The key of the question that may be SENT — the same, with the debounced spend. */
+  const spendRequestKey = (catId: string): string | null => {
+    const settled = spendDebounced[catId] ?? 0
+    if (!spendNeedsPricing(catId) || !spendSectorOf(catId) || !countryIso2 || settled === 0) return null
+    return spendLineKey(catId, spendSectorOf(catId), countryIso2, currency, reportingYear, settled)
+  }
+
+  /**
+   * Which spend-priced pickers have been opened out to the full EXIOBASE table.
+   *
+   * ⚠️ PER CATEGORY, AND NOT PERSISTED. It is a view of a list, not an answer: nothing about the figure
+   * changes when it is switched on, and the row chosen while it was on keeps its disclosure either way.
+   * Cat 4's default list is eight rows, so this control is a normal path for that category rather than an
+   * escape hatch — which is the reason it is a labelled button and not a link in small print.
+   */
+  const [showAllSectors, setShowAllSectors] = useState<Record<string, boolean>>({})
+  const toggleShowAll = (catId: string) => setShowAllSectors(prev => ({ ...prev, [catId]: !prev[catId] }))
+
+  const [spendResults, setSpendResults] = useState<Record<string, SpendLineResult>>({})
+  /** The stored result for this category, ONLY when it answers the inputs on screen now. */
+  const spendCurrent = (catId: string): SpendLineResult | null => {
+    const key = spendLiveKey(catId)
+    const held = spendResults[catId]
+    return key !== null && held?.key === key ? held : null
+  }
+  const spendPending = (catId: string): boolean => spendLiveKey(catId) !== null && spendCurrent(catId) === null
+  const spendPricedLine = (catId: string) => {
+    const cur = spendCurrent(catId)
+    return cur?.kind === 'done' && cur.line.outcome === 'priced' ? cur.line : null
+  }
+
+  // The lines that need asking: complete, settled, and not already answered for exactly these inputs.
+  type SpendRequestLine = { id: SpendCategoryId; key: string; sector_key: string; factor_type: 'industry' | 'product'; spend: number }
+  const spendToRequest: SpendRequestLine[] = SPEND_PRICED_CATEGORIES
+    .map(c => ({ id: c.id, key: spendRequestKey(c.id), sector_key: spendSectorOf(c.id), factor_type: c.factorType, spend: spendDebounced[c.id] ?? 0 }))
+    .filter((x): x is SpendRequestLine => x.key !== null && spendResults[x.id]?.key !== x.key)
+  // Everything the request needs is IN the signature, so the effect reconstructs the batch from its own
+  // dependency instead of reading a ref written during render.
+  const spendRequestSig = JSON.stringify(spendToRequest)
 
   useEffect(() => {
-    const t = setTimeout(() => setCat1SpendDebounced(cat1SpendRaw), SPEND_DEBOUNCE_MS)
-    return () => clearTimeout(t)
-  }, [cat1SpendRaw])
-
-  useEffect(() => {
-    if (!cat1NeedsSpendPrice || !cat1Sector || !countryIso2 || cat1SpendDebounced === 0) return
-    const key = cat1SpendKey(cat1Sector, countryIso2, currency, reportingYear, cat1SpendDebounced)
+    const batch = JSON.parse(spendRequestSig) as SpendRequestLine[]
+    if (batch.length === 0) return
     const controller = new AbortController()
     ;(async () => {
+      // Every line's key is captured HERE, with the request. The merge below writes each result under the
+      // key it was asked for, so a response answering inputs that have since changed lands under a key
+      // that no longer matches — spendCurrent ignores it, and that line re-requests — while the lines in
+      // the same response whose inputs did not change are kept.
+      const sent = batch.map(x => ({ id: x.id, key: x.key }))
+      const fail = (message: string) =>
+        setSpendResults(prev => ({ ...prev, ...Object.fromEntries(sent.map(l => [l.id, { key: l.key, kind: 'error' as const, message }])) }))
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (controller.signal.aborted) return
         const token = session?.access_token
-        if (!token) { setCat1Spend({ key, kind: 'error', message: 'Please sign in again to price this spend.' }); return }
+        if (!token) { fail('Please sign in again to price this spend.'); return }
         const res = await fetch('/api/scope3/spend-factor', {
           method: 'POST',
           signal: controller.signal,
@@ -456,19 +722,21 @@ export default function Scope3Dashboard() {
           body: JSON.stringify({
             reporting_year: reportingYear,
             reporting_currency: currency,
-            lines: [{
-              id: CAT1_LINE_ID,
+            // The line id IS the category id: the route echoes ids back and requires them unique, and a
+            // category can hold only one spend line.
+            lines: batch.map(line => ({
+              id: line.id,
               country_iso2: countryIso2,
-              sector_key: cat1Sector,
-              factor_type: 'industry',
-              spend: cat1SpendDebounced,
-              // PURCHASER prices, because this field holds what the customer PAID: a figure read off
-              // invoices or an AP ledger, which includes trade and transport margins and product
-              // taxes. EXIOBASE factors are in basic prices, so the route will flag the mismatch and
-              // say it was not converted. Claiming 'basic' here would silence that disclosure while
-              // the figure stayed exactly as unconverted as before.
+              sector_key: line.sector_key,
+              factor_type: line.factor_type,
+              spend: line.spend,
+              // PURCHASER prices, because these fields hold what the customer PAID: figures read off
+              // invoices or an AP ledger, which include trade and transport margins and product taxes.
+              // EXIOBASE factors are in basic prices, so the route will flag the mismatch and say it was
+              // not converted. Claiming 'basic' here would silence that disclosure while the figure
+              // stayed exactly as unconverted as before.
               spend_price_basis: 'purchaser',
-            }],
+            })),
           }),
         })
         const json = await res.json().catch(() => null)
@@ -476,49 +744,72 @@ export default function Scope3Dashboard() {
         if (!res.ok) {
           // The route's customer `message`, verbatim. NOT operator_detail: that names tables, columns and
           // fingerprints, and is for whoever reads the server log or the network panel.
-          setCat1Spend({ key, kind: 'error', message: json?.message ?? `The pricing service answered HTTP ${res.status} with no message.` })
+          fail(json?.message ?? `The pricing service answered HTTP ${res.status} with no message.`)
           return
         }
-        const line = (json as SpendFactorResponse | null)?.lines?.[0]
-        if (!line || line.id !== CAT1_LINE_ID) {
-          setCat1Spend({ key, kind: 'error', message: 'The pricing service returned a response that did not include this spend line.' })
-          return
-        }
-        setCat1Spend({ key, kind: 'done', response: json as SpendFactorResponse, line })
+        const response = json as SpendFactorResponse | null
+        const byId = new Map((response?.lines ?? []).map(l => [l.id, l]))
+        setSpendResults(prev => {
+          const next = { ...prev }
+          for (const l of sent) {
+            const line = byId.get(l.id)
+            next[l.id] = line && response
+              ? { key: l.key, kind: 'done', response, line }
+              : { key: l.key, kind: 'error', message: 'The pricing service returned a response that did not include this spend line.' }
+          }
+          return next
+        })
       } catch {
         // An abort rejects the fetch too. That is supersession, not failure, so it writes nothing.
         if (controller.signal.aborted) return
-        setCat1Spend({ key, kind: 'error', message: 'Could not reach the pricing service.' })
+        fail('Could not reach the pricing service.')
       }
     })()
     return () => controller.abort()
-  }, [cat1NeedsSpendPrice, cat1Sector, countryIso2, currency, reportingYear, cat1SpendDebounced])
+  }, [spendRequestSig, countryIso2, currency, reportingYear])
 
-  // The inputs on screen NOW, including the undebounced spend. A stored result counts only if it was
-  // made for exactly these; otherwise the figure is pending, never the previous one.
-  const cat1SpendInputsComplete = cat1NeedsSpendPrice && !!cat1Sector && !!countryIso2 && cat1SpendRaw !== 0
-  const cat1CurrentKey = cat1SpendInputsComplete ? cat1SpendKey(cat1Sector, countryIso2, currency, reportingYear, cat1SpendRaw) : null
-  const cat1SpendCurrent = cat1CurrentKey !== null && cat1Spend?.key === cat1CurrentKey ? cat1Spend : null
-  const cat1SpendPending = cat1CurrentKey !== null && cat1SpendCurrent === null
-  const cat1SpendPriced = cat1SpendCurrent?.kind === 'done' && cat1SpendCurrent.line.outcome === 'priced'
-    ? cat1SpendCurrent.line
-    : null
-  /** The sentences behind a priced Cat 1 figure. ONE derivation, read by the workings card and the CSV,
-   *  so the export cannot disclose something different from the screen. The line's own sentences, then
-   *  what is true of the whole estimate, then batch counts only for more than one line. */
-  const cat1SpendSentences: string[] = cat1SpendPriced && cat1SpendCurrent?.kind === 'done'
-    ? [...new Set([
-        ...cat1SpendPriced.disclosures,
-        ...cat1SpendCurrent.response.disclosures,
-        ...(cat1SpendCurrent.response.lines.length > 1 ? cat1SpendCurrent.response.batch_summary : []),
-      ])]
-    : []
-  /** The Cat 1 spend inputs not yet entered. One list, read by the panel hint and the unpriced reason. */
-  const cat1MissingInputs = [
-    !cat1SpendRaw && 'total annual spend',
-    !cat1Sector && 'primary supplier sector',
-    !countryIso2 && 'primary country of supply (Step 1)',
-  ].filter((x): x is string => typeof x === 'string')
+  /** Every category whose figure is still being priced. Read by the save gate, which must not write a
+   *  total that is about to change. */
+  const spendPendingIds = SPEND_PRICED_IDS.filter(id => spendPending(id))
+  const anySpendPending = spendPendingIds.length > 0
+
+  /**
+   * The sentences behind one priced figure. ONE derivation, read by that category's workings card and by
+   * the CSV, so the export cannot disclose something different from the screen.
+   *
+   * ⚠️ batch_summary IS NOT HERE ANY MORE. It counts lines across the WHOLE request — "2 of 3 priced" —
+   * which, now that a request carries several categories, is a statement about the inventory rather than
+   * about this category. It would read as a claim about Cat 2 on Cat 2's card. It is carried once, at
+   * inventory level, in the CSV's ESTIMATE BASIS block.
+   */
+  const spendSentences = (catId: string): string[] => {
+    const cur = spendCurrent(catId)
+    const line = spendPricedLine(catId)
+    return line && cur?.kind === 'done'
+      ? [...new Set([...line.disclosures, ...cur.response.disclosures])]
+      : []
+  }
+
+  /** The batch-level counts, once, from whichever response is current. Only meaningful for 2+ lines. */
+  const spendBatchSummary = (): string[] => {
+    for (const id of SPEND_PRICED_IDS) {
+      const cur = spendCurrent(id)
+      if (cur?.kind === 'done' && cur.response.lines.length > 1) return cur.response.batch_summary
+    }
+    return []
+  }
+
+  /** A spend-priced category's sector for a RECORD: the name with its code, from the table that category
+   *  is priced against. sectorLabel reads the industry list; a pxp code is not in it, so a product-priced
+   *  category would otherwise print its bare code in the CSV and the workings. */
+  const spendSectorLabel = (catId: string): string => {
+    const code = spendSectorOf(catId)
+    if (!code) return ''
+    const cfg = SPEND_PRICED_CATEGORIES.find(c => c.id === catId)
+    if (cfg?.factorType !== 'product') return sectorLabel(code)
+    const name = productName(code)
+    return name === code ? code : `${name} (EXIOBASE ${code})`
+  }
 
   // Load a GHG inventory and prefill + lock company/year so the two records stay
   // aligned. Single code path used by both the ?inventoryId= URL effect and the
@@ -620,13 +911,32 @@ export default function Scope3Dashboard() {
     updateCat('cat1', 'supplier_emissions', Number(mt.toFixed(3)))
   }
 
+  /**
+   * The sentence autoDetect leaves behind when it cannot suggest anything. '' = nothing to say.
+   *
+   * ⚠️ IT EXISTS BECAUSE THE BUTTON DID NOTHING. SECTOR_MATERIAL is keyed on the retired thirteen-name
+   * vocabulary and this page's selects emit EXIOBASE codes, so the lookup misses for every sector a
+   * customer can choose and `if (!suggested) return` made the click a no-op. The comment beside it claimed
+   * an unmatched sector "says so"; it said nothing at all, which is the failure mode this repo keeps
+   * finding — an empty result presented as no result.
+   */
+  const [autoDetectNote, setAutoDetectNote] = useState('')
+
   // Auto-detect material categories
   const autoDetect = () => {
     // SECTOR_MATERIAL is keyed on the retired vocabulary too. Falling through to 'Other' would
     // suggest one generic set of material categories to every company while looking tailored, so
-    // an unmatched sector suggests nothing and says so.
+    // an unmatched sector suggests nothing and says so — in the note below, not by doing nothing.
     const suggested = SECTOR_MATERIAL[sector]
-    if (!suggested) return
+    if (!suggested) {
+      setAutoDetectNote(
+        sector
+          ? `No suggestion is held for ${industryName(sector)}. ThemisIQ's sector-materiality table is keyed on an older internal sector list, and this page asks for an EXIOBASE industry, so the two do not meet. Nothing has been changed. Mark the categories relevant yourself below — the suggestion is only ever a prompt, and an exclusion needs your reason in any case.`
+          : 'No primary sector is set in Step 1, so there is nothing to suggest from. Nothing has been changed.',
+      )
+      return
+    }
+    setAutoDetectNote('')
     // ⚠️ THE SUGGESTION ANSWERS "RELEVANT?", AND ONLY THAT. A category the sector table does not suggest
     // is left UNANSWERED (null) rather than marked not relevant: the table is a prompt, and an exclusion
     // is the customer's judgement, which they have not made yet and which needs a reason.
@@ -680,6 +990,10 @@ export default function Scope3Dashboard() {
         unpriced,
         // The wizard's own sentence for this category, verbatim — the same one the amber notice shows.
         reason: unpriced ? unpricedReason(c.id) : null,
+        // ⚠️ THE METHOD'S OWN SCORE, NOT OURS, and only for a method that defines one. PCAF's 1-to-5 for
+        // Cat 15: a submission quotes PCAF's number rather than ThemisIQ's confidence pill. coverageEntry
+        // drops it wherever there is no figure to describe.
+        dq: c.id === 'cat15' ? cat15Result().dqScore : null,
       })]
     }))
 
@@ -762,16 +1076,20 @@ export default function Scope3Dashboard() {
   // is computed wherever the data supports one, and RELEVANCE IS APPLIED AT THE TOTAL (see scope3Status's
   // inTotal), not at the arithmetic. Nothing that sums reads a calculator without going through that.
 
-  const calcCat1 = (): number => {
-    const d = catData['cat1'] ?? ({} as CategoryData)
-    if (d.has_supplier_data && d.supplier_emissions) return d.supplier_emissions
+  /** Every EXIOBASE-priced category's figure: an entered figure if there is one, else the route's answer
+   *  for the inputs on screen now. Was calcCat1; the body never depended on the category. */
+  const calcSpendPriced = (id: string): number => {
+    const d = catData[id] ?? ({} as CategoryData)
+    if (d.emissions_override) return d.emissions_override
+    if (id === 'cat1' && d.has_supplier_data && d.supplier_emissions) return d.supplier_emissions
     // The spend path reads the route's answer for the inputs on screen now, and nothing else. Absent,
     // no_factor, an error, a request still in flight or an input not yet entered all return 0, and
     // unpricedCatIds excludes the category rather than summing that 0 in.
     //   ⚠️ NO DEFAULT FACTOR. This used to fall back to DEFAULT_SPEND_EF (0.5 kg per currency unit)
     // on a sector miss — the last way a flat 0.5 could reach a Cat 1 figure, rendering exactly like a
     // figure priced from a real factor. It is gone; a miss is a miss.
-    return cat1SpendPriced ? cat1SpendPriced.emissions_mt : 0
+    const line = spendPricedLine(id)
+    return line ? line.emissions_mt : 0
   }
 
   const calcCat6 = (): number => {
@@ -906,35 +1224,28 @@ export default function Scope3Dashboard() {
   // Full PCAF result for cat 15. Delegates to the engine orchestrator, which chooses the
   // decomposed per-asset assessment (detailed mode) or the lumped score-5 proxy. Returns
   // the whole PortfolioResult so render can read mode/dqScore without re-plumbing.
-  const cat15PcafResult = (d: CategoryData) =>
-    resolvePcafResult({
-      mode: d.pcafMode,
-      assets: d.pcafAssets,
-      portfolioValue: d.portfolio_value,
-      sector: d.portfolio_sector,
-      emissionsOverride: d.emissions_override,
-    })
+  /**
+   * Cat 15's figure, or the reason there is none. ONE call site for the rule, in lib/scope3/cat15.ts.
+   *
+   * ⚠️ THE LUMPED SPEND PROXY IS GONE. It multiplied a portfolio balance by an intensity per year of
+   * activity, which is not a quantity; no factor repairs the equation, so pricing it through the EXIOBASE
+   * route was designed and then dropped — a better-sourced factor on a wrong equation stops looking wrong.
+   * ⚠️ AND NO SAVED TOTAL CHANGES: `sectorPriced` already excluded every proxy figure from every total,
+   * because the spend table's thirteen keys and the EXIOBASE codes this page offers do not overlap at all.
+   * This makes the code say what the product already does.
+   *
+   * It is a plain function, not memoised: cat15Figure is pure and the portfolio is a handful of rows.
+   */
+  const cat15Result = (): Cat15Figure => cat15Figure(catData['cat15'])
 
-  const calcCat15 = (): number => {
-    const d = catData['cat15'] ?? ({} as CategoryData)
-    // portfolioFromProxy wraps the same portfolioProxyEstimate that is regression-tested
-    // to equal the legacy portfolio×spend/1000 formula (and the emissions_override path).
-    // The try/catch only guards invalid inputs (e.g. a negative value) the engine throws
-    // on — it must never crash the dashboard render.
-    try {
-      return cat15PcafResult(d).totalFinancedEmissions
-    } catch (err) {
-      console.error('PCAF cat15 proxy estimate failed (invalid input); showing 0', err)
-      return 0
-    }
-  }
+  const calcCat15 = (): number => cat15Result().mt ?? 0
 
   // Dispatches on scope3MethodFor, the same map every basis description reads, so a category cannot be
   // described as one method and calculated with another. The mapping is identical to the switch on id
   // it replaced: cat1, cat5, cat6, cat7 and cat15 to their own functions, everything else generic.
   const getCatEmissions = (id: string): number => {
     switch (scope3MethodFor(id)) {
-      case 'exiobase_spend': return calcCat1()
+      case 'exiobase_spend': return calcSpendPriced(id)
       case 'waste_factors': return calcCat5()
       case 'travel_factors': return calcCat6()
       case 'commuting_factors': return calcCat7()
@@ -961,20 +1272,23 @@ export default function Scope3Dashboard() {
    * the same one the category's own basis description and confidence already use, so "calculated" and the
    * figure beside it cannot disagree.
    *
-   * ⚠️ A GENUINE ZERO READS AS NOT CALCULATED for the PCAF path, which tests the result rather than the
-   * inputs. Everywhere else the test is on the inputs, so a zero entered deliberately still counts as
-   * calculated. Worth revisiting if a customer ever needs to report a calculated zero.
+   * ⚠️ THE PCAF PATH TESTS WHETHER A FIGURE EXISTS AT ALL, INCLUDING ZERO. cat15Figure returns null for
+   * no figure and never 0 in its place, so a customer who enters 0 financed emissions is calculated with a
+   * figure of zero. Everywhere else the test is on the inputs, where a deliberate zero also counts.
    */
   const isCalculated = (id: string): boolean => {
     const d = catData[id]
     if (!d) return false
     if (d.emissions_override) return true
     switch (scope3MethodFor(id)) {
-      case 'exiobase_spend': return !!(d.has_supplier_data && d.supplier_emissions) || !!cat1SpendPriced
+      case 'exiobase_spend': return !!(d.has_supplier_data && d.supplier_emissions) || !!spendPricedLine(id)
       case 'waste_factors': return cat5Priced.length > 0
       case 'travel_factors': return !!(d.short_haul_flights || d.long_haul_flights || d.hotel_nights || d.rail_km)
       case 'commuting_factors': return !!d.employee_count
-      case 'pcaf': try { return cat15PcafResult(d).totalFinancedEmissions > 0 } catch { return false }
+      // ⚠️ mt !== null, NOT > 0. An entered zero — a portfolio that finances no emissions — is a
+      // calculated answer, and the note above about a genuine zero reading as not-calculated no longer
+      // applies to this path.
+      case 'pcaf': return cat15Result().mt !== null
       case 'flat_spend': return !!d.annual_spend
     }
   }
@@ -988,8 +1302,16 @@ export default function Scope3Dashboard() {
       // Only a category the customer CLAIMS can be missing from the total. An excluded or unanswered one
       // is not part of the claim, so its inability to be priced is not an omission from it.
       if (d?.relevant !== true) return false
-      if (c.id === 'cat1') return !(d.has_supplier_data && d.supplier_emissions) && !cat1SpendPriced
-      if (c.id === 'cat15') return !d.emissions_override && !sectorPriced(d.portfolio_sector || sector)
+      if (SPEND_PRICED_IDS.includes(c.id)) return spendNeedsPricing(c.id) && !spendPricedLine(c.id)
+      // ⚠️ portfolio_sector ALONE, BECAUSE THAT IS ALL cat15PcafResult IS GIVEN. This read
+      // `portfolio_sector || sector`, so with no portfolio sector chosen the check consulted the COMPANY
+      // sector and could report Cat 15 as priceable while the calculation was pricing it from its own
+      // internal 'Financial Services' default — 0.12 where the company sector said Mining & Metals would
+      // be 4.20. A check that tests an input the calculation never sees is not a check.
+      // ⚠️ THE ASSESSMENT, NOT A SECTOR. This tested sectorPriced(portfolio_sector), which is false for
+      // every sector this page can offer, so Cat 15 was ALWAYS excluded — a complete per-asset PCAF
+      // assessment was computed, displayed with its data-quality score, and then dropped from the total.
+      if (c.id === 'cat15') return cat15Result().mt === null
       return false
     }).map(c => c.id),
   )
@@ -1010,9 +1332,12 @@ export default function Scope3Dashboard() {
       const d = catData[c.id]
       if (d?.relevant !== true) return false
       // Cat 1: a complete spend question (sector, country, a non-zero figure) that the route did not price.
-      if (c.id === 'cat1') return !(d.has_supplier_data && d.supplier_emissions) && cat1SpendInputsComplete && !cat1SpendPriced
-      // Cat 15: a portfolio value entered against a sector the factor table does not hold.
-      if (c.id === 'cat15') return !d.emissions_override && !!d.portfolio_value && !sectorPriced(d.portfolio_sector || sector)
+      if (SPEND_PRICED_IDS.includes(c.id)) return spendInputsComplete(c.id) && !spendPricedLine(c.id)
+      // ⚠️ CAT 15 IS ALMOST NEVER "UNPRICED" IN THIS COLUMN'S SENSE. The column means the platform failed
+      // on inputs the customer completed. A withdrawn proxy is a method boundary and an incomplete holding
+      // is the customer's turn — neither is our failure. The one case that is: every holding computes on
+      // its own and the portfolio assessment still throws.
+      if (c.id === 'cat15') return cat15Result().reason === CAT15_ASSESSMENT_FAILED
       return false
     }).map(c => c.id),
   )
@@ -1045,23 +1370,63 @@ export default function Scope3Dashboard() {
    */
   const unpricedReason = (id: string): string => {
     const NO_REASON = 'It was not priced, and no reason was recorded.'
-    if (id === 'cat1') {
-      if (cat1MissingInputs.length > 0) {
-        return `Not estimated, because ${cat1MissingInputs.length === 1 ? 'this has' : 'these have'} not been entered: ${cat1MissingInputs.join(', ')}.`
+    if (SPEND_PRICED_IDS.includes(id)) {
+      const missing = spendMissingInputs(id)
+      if (missing.length > 0) {
+        return `Not estimated, because ${missing.length === 1 ? 'this has' : 'these have'} not been entered: ${missing.join(', ')}.`
       }
-      if (cat1SpendPending) return 'Its estimate had not finished calculating.'
-      if (cat1SpendCurrent?.kind === 'error') return cat1SpendCurrent.message
-      if (cat1SpendCurrent?.line.outcome === 'absent') return cat1SpendCurrent.line.explanation
-      if (cat1SpendCurrent?.line.outcome === 'no_factor') return cat1SpendCurrent.line.notice
+      if (spendPending(id)) return 'Its estimate had not finished calculating.'
+      const cur = spendCurrent(id)
+      if (cur?.kind === 'error') return cur.message
+      if (cur?.line.outcome === 'absent') return cur.line.explanation
+      if (cur?.line.outcome === 'no_factor') return cur.line.notice
       return NO_REASON
     }
-    if (id === 'cat15') {
-      // Checked against the same lookup unpricedCatIds used: a sector that is set and not in the table.
-      return (catData['cat15']?.portfolio_sector || sector)
-        ? 'No spend factor is held for the sector selected.'
-        : 'No sector has been selected.'
-    }
+    // ⚠️ THE REASON COMES FROM THE SAME FUNCTION THAT WITHHELD THE FIGURE, verbatim, so the panel, the
+    // amber box and the export cannot describe the gap differently. It never says "no factor for this
+    // sector": no factor was ever the problem here.
+    if (id === 'cat15') return cat15Result().reason || NO_REASON
     return NO_REASON
+  }
+
+  /**
+   * The state of one category's spend estimate: what is still missing, that it is being priced, why it
+   * could not be, or the workings behind the figure.
+   *
+   * ⚠️ ONE RENDERER FOR EVERY SPEND-PRICED CATEGORY. This was written inline in the Cat 1 panel. Copying
+   * it into Cat 2 and Cat 4 would have produced three places where a pricing failure is explained, and the
+   * explanations would drift — which is the defect this file has spent the week removing elsewhere.
+   */
+  const renderSpendEstimate = (catId: string, catName: string) => {
+    if (!spendInputsComplete(catId)) {
+      // Say which input is missing; that much is checkable. No notice about factors, because nothing has
+      // been asked yet.
+      return (
+        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 8 }}>
+          To estimate from spend, enter: {spendMissingInputs(catId).join(', ')}.
+        </div>
+      )
+    }
+    if (spendPending(catId)) {
+      return <div role="status" style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 8 }}>Pricing this spend…</div>
+    }
+    const cur = spendCurrent(catId)
+    if (cur?.kind === 'error') return <NoFactorNotice what={catName} title="⚠ This spend could not be priced" detail={cur.message} />
+    if (cur?.line.outcome === 'absent') return <NoFactorNotice what={catName} title="⚠ This spend cannot be estimated" detail={cur.line.explanation} />
+    if (cur?.line.outcome === 'no_factor') return <NoFactorNotice what={catName} title="⚠ This spend cannot be estimated" detail={cur.line.notice} />
+    const priced = spendPricedLine(catId)
+    if (!priced || cur?.kind !== 'done') return null
+    return (
+      <SpendFactorWorkings
+        id={`${catId}-spend`}
+        figureMt={priced.emissions_mt}
+        // Figure and method only. Region by name, from regionNames.ts — the same words the route's
+        // sentences below use. A missing dataset or version is omitted, not replaced with a placeholder.
+        summary={`spend-based estimate from the ${[priced.source.dataset, priced.source.version && `v${priced.source.version}`].filter(Boolean).join(' ')} factor for ${regionName(priced.used_region)}`.replace('from the  factor', 'from the factor')}
+        // Shared with the CSV, verbatim, de-duplicated.
+        sentences={spendSentences(catId)}
+      />
+    )
   }
 
   // ─── Save state ────────────────────────────────────────────────────────────
@@ -1074,9 +1439,16 @@ export default function Scope3Dashboard() {
   // because the total round-trips through a Postgres numeric and back to a double.
   const savedTotalMatches = savedTotal !== null
     && Math.abs(totalScope3 - savedTotal) <= 1e-9 * Math.max(1, Math.abs(totalScope3), Math.abs(savedTotal))
-  const showSaved = saved && !cat1SpendPending && savedTotalMatches
+  const showSaved = saved && !anySpendPending && savedTotalMatches
 
-  const getConfidence = (id: string): 'high' | 'medium' | 'low' => {
+  /**
+   * ⚠️ TWO SPEND METHODS, AND THEY WERE LABELLED THE SAME. Everything with a spend figure read
+   * "Spend-based", whether it was priced from an EXIOBASE factor through a named edition or multiplied by
+   * the flat 0.5 that carries no source, year or region. A verifier reading the results table or the CSV
+   * could not tell one from the other, and they are two different claims about a number. 'exiobase_spend'
+   * is the priced one; 'low' is now labelled for what it actually is.
+   */
+  const getConfidence = (id: string): 'high' | 'medium' | 'exiobase_spend' | 'low' => {
     const d = catData[id]
     // No relevance gate: confidence describes the DATA, and an excluded category that was calculated
     // still reports its figure with the quality that figure has.
@@ -1084,14 +1456,26 @@ export default function Scope3Dashboard() {
     if (id === 'cat6' && (d.short_haul_flights || d.long_haul_flights)) return 'medium'
     if (id === 'cat7' && d.employee_count) return 'medium'
     if (id === 'cat5' && cat5Priced.length > 0) return 'medium'
+    // ⚠️ A PER-ASSET PCAF ASSESSMENT IS NOT A SPEND ESTIMATE, and it used to fall through to 'Flat spend'
+    // — the weakest label in the product — for want of a branch. It rests on each investee's own reported
+    // emissions, attributed by a balance-sheet ratio. 'Primary data' only while the score says so: the
+    // reachable scores are 1 and 2 today, and a weaker tier must not inherit the strongest label.
+    if (id === 'cat15') {
+      const f = cat15Result()
+      if (f.basis === 'decomposed') return f.dqScore !== null && f.dqScore <= 2 ? 'high' : 'medium'
+    }
+    if (spendPricedLine(id)) return 'exiobase_spend'
     if (d.annual_spend || d.total_spend) return 'low'
     return 'low'
   }
 
+  // The pill labels. 'EXIOBASE spend' and 'Flat spend' both fit the 96px Method column at 9px — see the
+  // column-width note above the results grid, which was measured against the longest pill.
   const confidenceConfig = {
     high: { label: 'Primary data', color: '#0F6E56', bg: '#E1F5EE' },
     medium: { label: 'Activity data', color: '#0C447C', bg: '#E6F1FB' },
-    low: { label: 'Spend-based', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
+    exiobase_spend: { label: 'EXIOBASE spend', color: '#0C447C', bg: '#E6F1FB' },
+    low: { label: 'Flat spend', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
   }
 
   /**
@@ -1122,32 +1506,40 @@ export default function Scope3Dashboard() {
       if (d?.has_supplier_data && d.supplier_emissions) {
         return { basis: 'Supplier-specific', detail: `${d.supplier_emissions} mt CO2e entered from supplier data; no emission factor was applied.` }
       }
-      if (cat1SpendPriced && cat1SpendCurrent?.kind === 'done') {
+      const priced = spendPricedLine(id)
+      const cur = spendCurrent(id)
+      if (priced && cur?.kind === 'done') {
         const src = SPEND_EF_SOURCES.exiobase_38
+        const cfg = SPEND_PRICED_CATEGORIES.find(c => c.id === id)
         return {
           basis: `${src.dataset} ${src.version}, spend-based`,
-          detail: `Priced from ${src.dataset} version ${src.version} through factor edition ${cat1SpendCurrent.response.edition_id}, ` +
-            `using the factor for ${sectorLabel(cat1Sector)} in ${regionLabel(cat1SpendPriced.used_region)}.`,
+          detail: `Priced from ${src.dataset} version ${src.version} through factor edition ${cur.response.edition_id}, ` +
+            `using the ${cfg?.factorType === 'product' ? 'product' : 'industry'} factor for ` +
+            `${spendSectorLabel(id)} in ${regionLabel(priced.used_region)}, the EXIOBASE region for the inventory's ` +
+            `country of supply, ${countryIso2 ? countryLabel(countryIso2) : 'which is not set'}.`,
         }
       }
       return notPriced
     }
 
     if (method === 'pcaf') {
-      if (unpricedCatIds.has(id)) return notPriced
-      if (d?.emissions_override) {
-        return { basis: 'Entered figure', detail: `${d.emissions_override} mt CO2e of financed emissions entered directly; no emission factor was applied.` }
+      const f = cat15Result()
+      // ⚠️ TWO BASES ONLY, AND "PCAF-aligned portfolio proxy" IS NO LONGER ONE OF THEM. There is nothing
+      // left that could produce a figure from a portfolio value, so nothing here can claim one did.
+      if (f.basis === 'override') {
+        return { basis: 'Entered figure', detail: `${f.mt} mt CO2e of financed emissions entered directly; no emission factor was applied. PCAF scores a figure reported to you but not independently assured at data quality 2.` }
       }
-      let result: ReturnType<typeof cat15PcafResult> | null = null
-      try { result = d ? cat15PcafResult(d) : null } catch { result = null }
-      if (result?.mode === 'decomposed') {
+      if (f.basis === 'decomposed' && f.assessment) {
+        const a = f.assessment
         return {
           basis: 'PCAF-aligned, per asset',
-          detail: `Assessed asset by asset across ${result.assetCount} ${result.assetCount === 1 ? 'asset' : 'assets'}, ` +
-            `with a weighted PCAF data quality score of ${result.weightedDataQualityScore.toFixed(1)}.`,
+          detail: `Assessed asset by asset across ${a.assetCount} ${a.assetCount === 1 ? 'holding' : 'holdings'}, ` +
+            `each as the investee's own emissions multiplied by the outstanding amount over the value the ` +
+            `asset class attributes on, with an emissions-weighted PCAF data quality score of ` +
+            `${a.weightedDataQualityScore.toFixed(1)} of 5.`,
         }
       }
-      return { basis: 'PCAF-aligned portfolio proxy', detail: scope3MethodDescription('pcaf') }
+      return notPriced
     }
 
     if (method === 'flat_spend') {
@@ -1192,7 +1584,7 @@ export default function Scope3Dashboard() {
     // A Cat 1 estimate still being fetched means totalScope3 is about to change. Writing it now would
     // store a total the page is on the point of contradicting. The button is disabled in this state
     // too; this guard is for any other caller.
-    if (cat1SpendPending) return
+    if (anySpendPending) return
     setSaving(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -1250,40 +1642,74 @@ export default function Scope3Dashboard() {
    * figure, in the file's own four-column shape. Placed straight after SCOPE 3 BY CATEGORY, which it
    * annotates, and before the METHODOLOGY NOTE — the same prose-row precedent as "Excluded from total".
    *
-   * ⚠️ EACH ROW REPORTS WHAT THE CALCULATION USED, NOT WHAT A SELECT DISPLAYS. Cat 1 prices from the
-   * supplier sector where one is set and the company sector otherwise, so the row names which, and
-   * names the company sector alongside when the two differ. Cat 15's select shows "Financial Services"
-   * when nothing is stored, but the calculation receives only portfolio_sector, so an unset value is
-   * reported as unset.
+   * ⚠️ EACH ROW REPORTS WHAT THE CALCULATION USED, NOT WHAT A SELECT DISPLAYS. Cat 15 used to show
+   * unset value is reported as unset. Cat 1 no longer differs from Cat 2 and Cat 4 here: since the
+   * company-sector fallback was removed, an unset supplier sector prices nothing and the row says so. And
+   * Cat 15's portfolio value and sector are reported as RECORDED AND NOT USED, because since the lumped
+   * proxy was withdrawn they are inputs to nothing — see lib/scope3/cat15.ts.
    */
   const estimateBasisRows = (): string[][] => {
     const out: string[][] = []
 
-    const c1 = catData['cat1']
-    if (c1 && isReportable('cat1')) {
-      if (c1.has_supplier_data && c1.supplier_emissions) {
-        out.push(['Cat 1', 'Basis', 'Supplier-specific emissions',
+    // ⚠️ ONE BLOCK PER SPEND-PRICED CATEGORY, FROM THE SAME LIST THE PRICING USES. This was Cat 1 only,
+    // written out by hand. A verifier needs the sector, the country, the region and the edition for EVERY
+    // category priced that way, and a category added to SPEND_PRICED_CATEGORIES now appears here without
+    // a second edit.
+    for (const cfg of SPEND_PRICED_CATEGORIES) {
+      const d = catData[cfg.id]
+      const cat = CATEGORIES.find(c => c.id === cfg.id)
+      if (!d || !cat || !isReportable(cfg.id)) continue
+      const label = `Cat ${cat.num}`
+      if (cfg.id === 'cat1' && d.has_supplier_data && d.supplier_emissions) {
+        out.push([label, 'Basis', 'Supplier-specific emissions',
           'Entered as a figure; no spend-based estimate was made, so no sector, region or factor edition applies.'])
-      } else {
-        const supplier = c1.supplier_sector
-        out.push(['Cat 1', 'Sector used', sectorLabel(cat1Sector),
-          !cat1Sector ? 'No sector selected.'
-            : !supplier ? 'The company sector: no primary supplier sector was set for Cat 1.'
-            : supplier === sector ? 'The primary supplier sector set for Cat 1, which is the same as the company sector.'
-            : `The primary supplier sector set for Cat 1. It differs from the company sector, ${sectorLabel(sector) || 'which is not set'}, which was not used for this category.`])
-        out.push(['Cat 1', 'Country of supply', countryIso2 ? countryLabel(countryIso2) : '', countryIso2 ? '' : 'Not entered.'])
-        // The region that PRICED the figure where there is one; otherwise the region the country resolves
-        // to in the same concordance the route uses, labelled as not having priced anything.
-        const region = cat1SpendPriced?.used_region ?? (countryIso2 ? countryByIso2(countryIso2)?.region_code : undefined)
-        out.push(['Cat 1', 'EXIOBASE region', region ? regionLabel(region) : '',
-          cat1SpendPriced ? 'The region whose factor priced this estimate.'
-            : region ? 'The region this country resolves to. No estimate was priced.'
-            : 'No country of supply, so no region.'])
-        out.push(['Cat 1', 'Factor edition', cat1SpendCurrent?.kind === 'done' ? cat1SpendCurrent.response.edition_id : '',
-          cat1SpendPriced ? '' : `Not priced. ${unpricedReason('cat1')}`])
-        for (const d of cat1SpendSentences) out.push(['Cat 1', 'Disclosure', d, ''])
+        continue
       }
+      if (d.emissions_override) {
+        out.push([label, 'Basis', 'Entered figure',
+          'A known figure was entered for this category, so no spend-based estimate was made.'])
+        continue
+      }
+      const priced = spendPricedLine(cfg.id)
+      const cur = spendCurrent(cfg.id)
+      // ⚠️ "CHOSEN", NOT "SET", AND IT MEANS IT. No spend-priced category defaults from the company
+      // sector any more, so every code named in this file was selected by the customer for this category.
+      // The Cat 1 branch survives only to say whether the choice matches the company sector, which is a
+      // question a verifier asks of Cat 1 and of nothing else.
+      const sectorNote = !spendSectorOf(cfg.id)
+        ? 'No sector was selected for this category, so nothing was estimated. It is not defaulted from the company sector.'
+        : cfg.id === 'cat1'
+          ? (d.supplier_sector === sector
+            ? 'The primary supplier sector chosen for Cat 1, which is the same as the company sector.'
+            : `The primary supplier sector chosen for Cat 1. The company sector is ${sectorLabel(sector) || 'not set'}, and is not used to price any category.`)
+          : `The ${cfg.factorType} chosen for this category. It is not defaulted from the company sector — capital goods and freight are different purchases.`
+      out.push([label, cfg.factorType === 'product' ? 'Product used' : 'Sector used', spendSectorLabel(cfg.id), sectorNote])
+      // ⚠️ THE CHOICE IS ALLOWED, SO THE EXPORT CARRIES IT. A row outside this category's boundary — waste
+      // treatment priced as a capital good, freight priced as Category 1 — is a judgement the customer is
+      // permitted to make and a verifier must be able to see; and a row EXIOBASE gives to two categories at
+      // once (freight and passenger transport, hotels and restaurants) qualifies the figure even when it is
+      // the ordinary choice. Neither is visible from the sector name alone. See lib/scope3/categoryScope.ts.
+      const chosenCode = spendSectorOf(cfg.id)
+      const scopeDisclosure = outOfScopeDisclosure(cfg.id, chosenCode)
+      if (scopeDisclosure) out.push([label, 'Row outside this category', scopeDisclosure, 'The figure is included as entered; this records what was used.'])
+      else {
+        const joint = scopeNote(cfg.id, chosenCode)
+        if (joint) out.push([label, 'Row scope', joint, 'EXIOBASE reports these together, so the row cannot be split.'])
+      }
+      out.push([label, 'Country of supply', countryIso2 ? countryLabel(countryIso2) : '',
+        countryIso2 ? "The inventory's country of supply, used for every spend-priced category." : 'Not entered.'])
+      const region = priced?.used_region ?? (countryIso2 ? countryByIso2(countryIso2)?.region_code : undefined)
+      out.push([label, 'EXIOBASE region', region ? regionLabel(region) : '',
+        priced ? 'The region whose factor priced this estimate.'
+          : region ? 'The region this country resolves to. No estimate was priced.'
+          : 'No country of supply, so no region.'])
+      out.push([label, 'Factor edition', cur?.kind === 'done' ? cur.response.edition_id : '',
+        priced ? '' : `Not priced. ${unpricedReason(cfg.id)}`])
+      for (const sentence of spendSentences(cfg.id)) out.push([label, 'Disclosure', sentence, ''])
     }
+    // ⚠️ THE BATCH COUNTS BELONG TO THE INVENTORY, NOT TO A CATEGORY. They count lines across one request,
+    // which now carries several categories, so they are written once here rather than on any card.
+    for (const sentence of spendBatchSummary()) out.push(['Spend estimates', 'Batch', sentence, ''])
 
     const c5 = catData['cat5']
     if (c5 && isReportable('cat5')) {
@@ -1306,14 +1732,41 @@ export default function Scope3Dashboard() {
 
     const c15 = catData['cat15']
     if (c15 && isReportable('cat15')) {
-      // Which path actually ran, from the engine's own result rather than inferred from the inputs.
-      let mode: string | null = null
-      try { mode = cat15PcafResult(c15).mode } catch { mode = null }
-      out.push(['Cat 15', 'Portfolio sector', sectorLabel(c15.portfolio_sector),
-        mode === 'decomposed' ? 'Not used: the per-asset (detailed) assessment ran, and each asset carries its own inputs.'
-          : c15.emissions_override ? 'Not used: known financed emissions were entered directly.'
-          : c15.portfolio_sector ? 'The primary portfolio sector set for Cat 15.'
-          : 'No portfolio sector set for Cat 15; the calculation received none.'])
+      // ⚠️ THE ATTRIBUTION INPUTS, PER HOLDING. This block used to write ONE row naming a portfolio
+      // sector, which is not something a verifier can check a financed-emissions figure against — and by
+      // then was not even an input to it. Financed emissions are the investee's own emissions multiplied
+      // by a ratio of two amounts, so the file carries both amounts, the ratio they produce, the PCAF data
+      // quality of the investee figure, and whether the ratio was capped. Every number in the total is
+      // re-derivable from these rows.
+      const f = cat15Figure(c15)
+      if (f.basis === 'override') {
+        out.push(['Cat 15', 'Basis', 'Entered figure',
+          `${f.mt} mt CO2e of financed emissions entered directly. No emission factor and no attribution were applied. PCAF scores a figure reported to you but not independently assured at data quality 2.`])
+      } else if (f.basis === 'decomposed' && f.assessment) {
+        const a = f.assessment
+        out.push(['Cat 15', 'Basis', 'PCAF-aligned, per holding',
+          `${a.assetCount} ${a.assetCount === 1 ? 'holding' : 'holdings'} assessed, emissions-weighted PCAF data quality ${a.weightedDataQualityScore.toFixed(1)} of 5, on the ${a.gwpBasis} basis the investee figures are reported on.`])
+        const stored = c15.pcafAssets ?? []
+        a.perAsset.forEach((h, i) => {
+          const row = stored.find(r => r.id === h.assetId)
+          const cls = PCAF_ASSET_CLASSES.find(c => c.value === h.assetClass)
+          out.push(['Cat 15', `Holding ${i + 1}`, cls?.label ?? h.assetClass,
+            `Outstanding ${row?.outstandingAmount ?? ''} ${currency} over ${cls?.denominatorLabel.toLowerCase() ?? 'denominator'} ` +
+            `${row?.denominator ?? ''} ${currency} = attribution factor ${(h.attributionFactor * 100).toFixed(2)}%` +
+            `${h.capped ? ' (CAPPED at 100%: the outstanding amount exceeds the value it is divided by — check both figures)' : ''}. ` +
+            `Investee emissions ${row?.emissions.reportedEmissions ?? ''} tCO2e (${h.basis}), PCAF data quality ${h.dqScore}. ` +
+            `Financed emissions ${h.financedEmissions.toFixed(2)} tCO2e.`])
+        })
+      } else {
+        out.push(['Cat 15', 'Basis', 'Not calculated', f.reason])
+      }
+      // ⚠️ RECORDED AND NOT USED, SAID OUT LOUD. A record saved before 17 Sep 2026 can carry both, and a
+      // verifier reading the old figure needs to know they no longer price anything.
+      if (c15.portfolio_value || c15.portfolio_sector) {
+        out.push(['Cat 15', 'Portfolio value and sector on this record',
+          [c15.portfolio_value ? `${c15.portfolio_value} ${currency}` : '', sectorLabel(c15.portfolio_sector)].filter(Boolean).join(', '),
+          'Recorded, and NOT used to produce any figure. A portfolio balance multiplied by a spend intensity per year of activity is not a quantity, so ThemisIQ no longer estimates this category that way.'])
+      }
     }
     return out
   }
@@ -1325,7 +1778,10 @@ export default function Scope3Dashboard() {
       // ⚠️ NAME AND CODE, NOT EITHER ALONE. A verifier needs the name to read it and the code to find
       // the published row; the code alone means consulting the EXIOBASE classification. On a miss
       // industryName returns the code itself, and that is written once rather than as "i99 (i99)".
-      ['Sector', sectorLabel(sector)],
+      // ⚠️ "COMPANY SECTOR", NOT "SECTOR". The estimate-basis block below writes a "Sector used" row per
+      // priced category, and this one prices nothing — an unqualified "Sector" beside those reads as the
+      // sector the figures came from, which it has not been since the Cat 1 fallback was removed.
+      ['Company sector', sectorLabel(sector)],
       ['Reporting year', reportingYear],
       ['Total Scope 3', `${totalScope3.toFixed(2)} mt CO2e`],
       ...(unpricedCats.length > 0
@@ -1469,11 +1925,20 @@ export default function Scope3Dashboard() {
           {boundInventoryId && <div style={{ fontSize: 11, color: '#0F6E56', marginTop: 6 }}>🔗 Linked to your {company || 'GHG'} {reportingYear} GHG inventory — company and year are set there.</div>}
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
-          <label style={labelStyle}>Primary sector</label>
+          {/* ⚠️ THIS SECTOR PRICES NOTHING AND SUGGESTS NOTHING, AND THE LABEL SAYS ONLY WHAT IS TRUE.
+              It was Cat 1's fallback sector until that fallback was removed. I then labelled it as driving
+              the materiality suggestions — which was ALSO false: SECTOR_MATERIAL is keyed on the retired
+              thirteen-name vocabulary and this select emits EXIOBASE codes, so every lookup misses and
+              autoDetect suggests nothing (see the note it now shows). Recorded and printed is all that is
+              left, so recorded and printed is what it claims. */}
+          <label style={labelStyle}>Primary sector — what your company does</label>
           <select style={inputStyle} value={sector} onChange={e => setSector(e.target.value)}>
             <option value="">Select sector</option>
             <IndustryOptions />
           </select>
+          <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.5 }}>
+            Recorded with the inventory and printed in your export. It does not price any category — Categories 1, 2 and 4 each ask for their own sector where you enter their spend.
+          </div>
         </div>
         <div>
           <label style={labelStyle}>Reporting year</label>
@@ -1626,6 +2091,12 @@ export default function Scope3Dashboard() {
           <button onClick={autoDetect} style={{ fontSize: 12, fontWeight: 500, padding: '8px 16px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer', marginBottom: 20 }}>
             ⚡ Auto-detect material categories for {industryName(sector)}
           </button>
+          {/* role=status: the click's whole effect is this sentence, so a screen reader has to hear it. */}
+          {autoDetectNote && (
+            <div role="status" style={{ fontSize: 11, lineHeight: 1.5, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.6rem 0.7rem', marginTop: -12, marginBottom: 20 }}>
+              {autoDetectNote}
+            </div>
+          )}
 
           {['Upstream', 'Downstream'].map(stream => (
             <div key={stream} style={{ marginBottom: 24 }}>
@@ -1645,14 +2116,18 @@ export default function Scope3Dashboard() {
                           <span style={{ fontSize: 13, fontWeight: included ? 600 : 400, color: included ? 'var(--color-brand)' : '#0d0d0d' }}>{cat.name}</span>
                           {isMaterial && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: '#E1F5EE', color: '#0F6E56' }}>LIKELY MATERIAL</span>}
                           {cat.num === 15 && (() => {
-                            const c15 = catData['cat15']
-                            const dq = c15 ? cat15PcafResult(c15).weightedDataQualityScore : 5
-                            const reported = dq === 2
+                            // ⚠️ "Spend-based estimate" WAS THE OTHER ARM OF THIS, and there is no longer a
+                            // spend-based path to describe. The badge now names what the figure rests on, or
+                            // says there is none yet — never a method that cannot run.
+                            const f = cat15Result()
+                            const label = f.basis === 'override' ? 'Reported · unverified'
+                              : f.basis === 'decomposed' ? `Per asset · PCAF DQ ${f.dqScore?.toFixed(1)}`
+                              : 'No figure yet'
                             return (
                               <span
-                                title={reported ? 'PCAF-aligned · data quality 2 of 5' : 'PCAF-aligned · data quality 5 of 5 — weakest tier'}
-                                style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: '#FCEBEB', color: '#B91C1C' }}
-                              >{reported ? 'Reported · unverified' : 'Spend-based estimate'}</span>
+                                title={f.basis ? `PCAF-aligned · data quality ${f.dqScore?.toFixed(1)} of 5` : 'PCAF-aligned · itemise the holdings or enter a figure'}
+                                style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: f.basis ? '#E1F5EE' : '#FCEBEB', color: f.basis ? '#0F6E56' : '#B91C1C' }}
+                              >{label}</span>
                             )
                           })()}
                         </div>
@@ -1730,13 +2205,19 @@ export default function Scope3Dashboard() {
                     <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-ink-muted)', marginRight: 10 }}>Cat {cat.num}</span>
                     <span style={{ fontSize: 13, fontWeight: 600 }}>{cat.name}</span>
                   </div>
-                  {cat.id === 'cat1' && cat1SpendPending ? (
+                  {SPEND_PRICED_IDS.includes(cat.id) && spendPending(cat.id) ? (
                     // In flight or debouncing: no figure at all, rather than the last one.
                     <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)' }}>pricing…</span>
                   ) : unpricedCatIds.has(cat.id) ? (
-                    // Cat 1 can now be unpriced for reasons other than the sector (no country, no active
-                    // edition, a failed request), so its badge does not name one. The panel below does.
-                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-module-climate)' }}>{cat.id === 'cat1' ? 'not priced' : 'no factor yet'}</span>
+                    // ⚠️ ONE BADGE, AND IT NAMES NO CAUSE. Cat 1 was moved off "no factor yet" when its
+                    // spend path gained other ways to fail — no country, no active factor edition, a failed
+                    // request — and the ternary left every other category on the old wording. That wording
+                    // is a diagnosis the page has not made: a Cat 2 with no product chosen has nothing
+                    // wrong with its factor, and a Cat 15 with no sector selected has not been looked up at
+                    // all. What IS observed is that no figure was produced. unpricedReason, which the panel
+                    // and the amber box below both render, is where the cause belongs — it quotes what was
+                    // actually seen, per category.
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-module-climate)' }}>not priced</span>
                   ) : getCatEmissions(cat.id) > 0 && (
                     // The figure, and — where the customer has judged the category not relevant — why it is
                     // still here. Without the second half a number on a panel the total does not contain
@@ -1785,40 +2266,20 @@ export default function Scope3Dashboard() {
                       </div>
                       <div>
                         <label style={labelStyle}>Primary supplier sector</label>
-                        <select style={inputStyle} value={catData['cat1']?.supplier_sector || sector} onChange={e => updateCat('cat1', 'supplier_sector', e.target.value)}>
-                          <option value="">Select sector</option>
-                          <IndustryOptions />
+                        {/* ⚠️ NO DEFAULT, like Cat 2 and Cat 4. This read `supplier_sector || sector`, so
+                            an untouched Cat 1 priced from the company's own sector — a row the customer
+                            never chose, and one that describes what they SELL. See spendSectorOf. */}
+                        <select style={inputStyle} value={catData['cat1']?.supplier_sector || ''} onChange={e => updateCat('cat1', 'supplier_sector', e.target.value)}>
+                          <option value="">Select supplier sector</option>
+                          <ScopedOptions catId="cat1" factorType="industry" selected={catData['cat1']?.supplier_sector || ''} showAll={!!showAllSectors['cat1']} />
                         </select>
+                        <ShowAllToggle catId="cat1" on={!!showAllSectors['cat1']} onToggle={toggleShowAll} noun="sector" usualFor={CATEGORY_SCOPE_LABEL.cat1} />
+                        <ScopeNoteUnderPicker catId="cat1" code={catData['cat1']?.supplier_sector || ''} />
                       </div>
                       {/* FULL PANEL WIDTH, below both controls. This used to sit inside the sector
                           column, about 130px wide, where every sentence wrapped to three or four words. */}
                       <div style={{ gridColumn: '1 / -1' }}>
-                        {!cat1SpendInputsComplete ? (
-                          // Say which input is missing; that much is checkable. No notice about factors,
-                          // because nothing has been asked yet.
-                          <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 8 }}>
-                            To estimate from spend, enter: {cat1MissingInputs.join(', ')}.
-                          </div>
-                        ) : cat1SpendPending ? (
-                          <div role="status" style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 8 }}>Pricing this spend…</div>
-                        ) : cat1SpendCurrent?.kind === 'error' ? (
-                          <NoFactorNotice what="Purchased goods & services" title="⚠ This spend could not be priced" detail={cat1SpendCurrent.message} />
-                        ) : cat1SpendCurrent?.line.outcome === 'absent' ? (
-                          <NoFactorNotice what="Purchased goods & services" title="⚠ This spend cannot be estimated" detail={cat1SpendCurrent.line.explanation} />
-                        ) : cat1SpendCurrent?.line.outcome === 'no_factor' ? (
-                          <NoFactorNotice what="Purchased goods & services" title="⚠ This spend cannot be estimated" detail={cat1SpendCurrent.line.notice} />
-                        ) : cat1SpendPriced && cat1SpendCurrent?.kind === 'done' ? (
-                          <SpendFactorWorkings
-                            id="cat1-spend"
-                            figureMt={cat1SpendPriced.emissions_mt}
-                            // Figure and method only. Region by name, from regionNames.ts — the same words
-                            // the route's sentences below use.
-                            // A missing dataset or version is omitted, not replaced with a placeholder.
-                            summary={`spend-based estimate from the ${[cat1SpendPriced.source.dataset, cat1SpendPriced.source.version && `v${cat1SpendPriced.source.version}`].filter(Boolean).join(' ')} factor for ${regionName(cat1SpendPriced.used_region)}`.replace('from the  factor', 'from the factor')}
-                            // See cat1SpendSentences: shared with the CSV, verbatim, de-duplicated.
-                            sentences={cat1SpendSentences}
-                          />
-                        ) : null}
+                        {renderSpendEstimate(cat.id, cat.name)}
                       </div>
                     </>}
                     <div style={{ gridColumn: '1 / -1', background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
@@ -2027,55 +2488,47 @@ export default function Scope3Dashboard() {
 
                   {/* Cat 15 — Investments */}
                   {cat.id === 'cat15' && <>
-                    <div style={{ gridColumn: '1 / -1', background: '#E6F1FB', borderRadius: 8, padding: '0.75rem', fontSize: 11, color: '#0C447C', marginBottom: 8 }}>
-                      Cat 15 is estimated with a PCAF-aligned spend-based portfolio proxy (PCAF data-quality tier 5 — the weakest tier), not a full asset-class-decomposed PCAF assessment. Enter your total investment/loan portfolio value and primary sector exposure — or, for a stronger figure, enter known financed emissions directly below.
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Total portfolio value ({currency})</label>
-                      <input style={inputStyle} type="number" value={catData['cat15']?.portfolio_value || ''} onChange={e => updateCat('cat15', 'portfolio_value', Number(e.target.value))} placeholder="0" />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Primary portfolio sector</label>
-                      <select style={inputStyle} value={catData['cat15']?.portfolio_sector || 'Financial Services'} onChange={e => updateCat('cat15', 'portfolio_sector', e.target.value)}>
-                        <option value="">Select sector</option>
-                        <IndustryOptions />
-                      </select>
-                      {unpricedCatIds.has('cat15') && <NoFactorNotice what="Financed emissions" />}
+                    {/* ⚠️ THE PORTFOLIO VALUE AND SECTOR INPUTS ARE GONE, along with the proxy that read
+                        them. A balance at a date times an intensity per year of activity is not a quantity,
+                        and no factor repairs it. The two fields remain in CategoryData so a saved record
+                        still loads, and the export reports them as recorded and not used. */}
+                    <div style={{ gridColumn: '1 / -1', background: '#E6F1FB', borderRadius: 8, padding: '0.75rem', fontSize: 11, color: '#0C447C', marginBottom: 8, lineHeight: 1.6 }}>
+                      Financed emissions are worked out holding by holding: each investee&apos;s own emissions, multiplied by your share of that investee — the outstanding amount over the value its asset class attributes on. That is PCAF&apos;s method, and it is the only way this figure can be checked.<br />
+                      <strong>A total portfolio value on its own cannot produce a figure.</strong> It is a balance at a date, and a spend factor is an intensity per year of activity, so multiplying them prices a year of purchasing nobody made. ThemisIQ used to estimate Cat 15 that way and no longer does.<br />
+                      ThemisIQ is PCAF-aligned, not PCAF-certified and not a PCAF signatory.
                     </div>
                     <div style={{ gridColumn: '1 / -1' }}>
-                      <label style={labelStyle}>Or enter known financed emissions directly (mt CO₂e)</label>
-                      <input style={inputStyle} type="number" value={catData['cat15']?.emissions_override || ''} onChange={e => updateCat('cat15', 'emissions_override', Number(e.target.value))} placeholder="Override with primary data" />
+                      {/* Number.isFinite, not truthiness: 0 is an answer. A customer whose portfolio
+                          finances no emissions can now say so and be calculated at zero. */}
+                      <label style={labelStyle}>Known financed emissions (mt CO₂e) — enter this if you already hold the figure</label>
+                      <input style={inputStyle} type="number" value={Number.isFinite(catData['cat15']?.emissions_override) ? catData['cat15']?.emissions_override : ''} onChange={e => updateCat('cat15', 'emissions_override', e.target.value === '' ? undefined : Number(e.target.value))} placeholder="Leave blank to itemise the holdings below" />
+                      <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.5 }}>Enter 0 if this portfolio finances no emissions — that is an answer, and it is recorded as one. Leaving it blank is not.</div>
                     </div>
                     {(() => {
-                      const c15 = catData['cat15']
-                      const dq = c15 ? cat15PcafResult(c15).weightedDataQualityScore : 5
+                      // ⚠️ IT DESCRIBES THE FIGURE THAT EXISTS, and says so plainly when none does. It used
+                      // to read "PCAF data quality 5 of 5 (spend-based proxy)" whenever nothing had been
+                      // entered — a quality score for a figure that was never in the total.
+                      const f = cat15Result()
                       return (
                         <div style={{ gridColumn: '1 / -1', fontSize: 10, color: 'var(--color-ink-muted)', lineHeight: 1.5, marginTop: 2 }}>
-                          This estimate: PCAF data quality {dq} of 5 ({dq === 2 ? 'reported, unverified' : 'spend-based proxy'}).<br />
-                          PCAF-aligned methodology · not PCAF-certified · estimates use non-PCAF sector factors.<br />
-                          PCAF data quality: 1 = verified (best) … 5 = spend estimate (weakest).
+                          {f.basis === null
+                            ? 'No figure yet, so no data-quality score. '
+                            : `This figure: PCAF data quality ${f.dqScore?.toFixed(1)} of 5 (${f.basis === 'override' ? 'reported to you, not independently assured' : 'per holding, emissions-weighted across the portfolio'}). `}
+                          PCAF data quality: 1 = verified (best) … 5 = spend estimate (weakest). ThemisIQ produces no tier-4 or tier-5 estimate for this category.
                         </div>
                       )
                     })()}
 
-                    {/* Estimation-method toggle: proxy (default) vs detailed per-asset PCAF */}
-                    <div style={{ gridColumn: '1 / -1', marginTop: 4 }}>
-                      <label style={labelStyle}>Estimation method</label>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        {[{ mode: 'proxy' as const, label: 'Portfolio proxy (quick)' }, { mode: 'detailed' as const, label: 'Itemise by asset (PCAF)' }].map(opt => {
-                          const active = (catData['cat15']?.pcafMode ?? 'proxy') === opt.mode
-                          return (
-                            <button key={opt.mode} onClick={() => updateCat('cat15', 'pcafMode', opt.mode)} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 12, ...(active ? toggleOn : toggleOff), cursor: 'pointer' }}>{opt.label}</button>
-                          )
-                        })}
-                      </div>
-                      <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.5 }}>Itemise holdings to raise data quality above the tier-5 spend proxy.</div>
-                    </div>
-
-                    {/* Detailed mode — per-asset PCAF rows (Option-2 emissions paths: reported + economic) */}
-                    {catData['cat15']?.pcafMode === 'detailed' && <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {/* ⚠️ NO MODE TOGGLE. It offered "Portfolio proxy (quick)" against "Itemise by asset
+                        (PCAF)", and the quick one no longer computes anything, so the choice was between a
+                        method and nothing. Holdings are now simply the path: add them and they are assessed.
+                        `pcafMode` stays in CategoryData for records that stored it. */}
+                    <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <label style={labelStyle}>Holdings</label>
                       {cat15Assets().length === 0 && (
-                        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', background: '#f8f7f5', borderRadius: 8, padding: '0.75rem', lineHeight: 1.5 }}>No holdings yet — add your first to itemise the portfolio by asset class.</div>
+                        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', background: '#f8f7f5', borderRadius: 8, padding: '0.75rem', lineHeight: 1.5 }}>
+                          No holdings yet. Add one per investment or loan — or enter a known figure above. Until one or the other is there, Category 15 is reported as not calculated, and is not counted as zero.
+                        </div>
                       )}
                       {cat15Assets().map((row, idx) => {
                         const meta = PCAF_ASSET_CLASSES.find(c => c.value === row.assetClass) ?? PCAF_ASSET_CLASSES[0]
@@ -2100,40 +2553,38 @@ export default function Scope3Dashboard() {
                               <label style={labelStyle}>{meta.denominatorLabel} ({currency})</label>
                               <input style={inputStyle} type="number" value={row.denominator || ''} onChange={e => updatePcafAsset(row.id, { denominator: Number(e.target.value) })} placeholder="0" />
                             </div>
-                            <div style={{ gridColumn: '1 / -1', fontSize: 10, color: 'var(--color-ink-muted)', lineHeight: 1.5 }}>Enter the investee&apos;s reported emissions where available (best data quality). Otherwise provide revenue + sector for an estimate.</div>
-                            <div>
+                            {/* ⚠️ THE REVENUE AND SECTOR INPUTS ARE GONE, AND THAT CLOSED A REAL HOLE.
+                                PCAF's tier 4 estimates an investee from revenue × a sector factor, and
+                                lib/pcaf will do it for any sector string. Every sector this page can offer
+                                is an EXIOBASE code, none of which is in that factor table, so the estimate
+                                always came from the 0.12 fallback. The page HID the row's figure in that
+                                case and assessPortfolio estimated it anyway — a holding of 100m revenue
+                                contributed 1,200 tCO2e to the portfolio total that the row itself refused to
+                                show. The close is in the calculation now: lib/scope3/cat15.ts strips revenue
+                                and sector before anything is assessed, which also covers rows already
+                                saved with them. */}
+                            <div style={{ gridColumn: '1 / -1' }}>
                               <label style={labelStyle}>Investee emissions (tCO₂e)</label>
-                              <input style={inputStyle} type="number" value={row.emissions.reportedEmissions ?? ''} onChange={e => updatePcafEmissions(row.id, { reportedEmissions: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="Reported" />
+                              <input style={inputStyle} type="number" value={row.emissions.reportedEmissions ?? ''} onChange={e => updatePcafEmissions(row.id, { reportedEmissions: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="The investee's own total emissions" />
                               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#555553', marginTop: 6, cursor: 'pointer' }}>
                                 <input type="checkbox" checked={row.emissions.verified ?? false} onChange={e => updatePcafEmissions(row.id, { verified: e.target.checked })} />
                                 Third-party verified
                               </label>
-                            </div>
-                            <div>
-                              <label style={labelStyle}>or Investee revenue ({currency})</label>
-                              <input style={inputStyle} type="number" value={row.emissions.revenue ?? ''} onChange={e => updatePcafEmissions(row.id, { revenue: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="For estimate" />
-                              <select style={{ ...inputStyle, marginTop: 6 }} value={row.emissions.sector ?? ''} onChange={e => updatePcafEmissions(row.id, { sector: e.target.value === '' ? undefined : e.target.value })}>
-                                <option value="">Sector for estimate…</option>
-                                <IndustryOptions />
-                              </select>
+                              <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.5 }}>
+                                The investee&apos;s own reported figure — from their annual report, CDP response or a data provider. ThemisIQ does not estimate it from their revenue: that needs revenue-specific factors we do not hold, and the sector factors we do hold are not those.
+                              </div>
                             </div>
                             <div style={{ gridColumn: '1 / -1' }}>
                               {(() => {
-                                // ⚠️ GATED HERE RATHER THAN IN lib/pcaf. estimateEmissions falls back
-                                // to LEGACY_SPEND_FALLBACK (0.12) on an unknown sector key, so an
-                                // EXIOBASE code would produce a confident financed-emissions figure
-                                // from a constant nobody chose for this asset. The library is left
-                                // alone — it is tested and has other callers — and the page refuses
-                                // to ask it a question it cannot answer honestly.
-                                if (row.emissions.revenue != null && !sectorPriced(row.emissions.sector)) {
-                                  return <div style={{ fontSize: 11, color: '#92400e', lineHeight: 1.5 }}>No spend factor for this sector yet, so a revenue-based estimate is not shown. Enter known emissions for this holding instead. It is not counted as zero.</div>
+                                // ⚠️ ASKED OF THE SAME FUNCTION THE TOTAL USES. holdingComputes runs the
+                                // library's own assessAsset on the STRIPPED row, so a row that shows a
+                                // figure here is a row the portfolio total contains, and one that says
+                                // "complete this row" is one that withholds the whole figure.
+                                if (!holdingComputes(row)) {
+                                  return <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Complete this holding to compute — it needs an outstanding amount, the {meta.denominatorLabel.toLowerCase()}, and the investee&apos;s emissions.</div>
                                 }
-                                try {
-                                  const a = assessAsset(row)
-                                  return <div style={{ fontSize: 11, color: '#0F6E56', fontWeight: 600 }}>Financed: {a.financedEmissions.toFixed(1)} tCO₂e · PCAF DQ {a.dqScore}</div>
-                                } catch {
-                                  return <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Complete this row to compute</div>
-                                }
+                                const a = assessAsset({ ...row, emissions: assessableEmissions(row.emissions) })
+                                return <div style={{ fontSize: 11, color: '#0F6E56', fontWeight: 600 }}>Financed: {a.financedEmissions.toFixed(1)} tCO₂e · {(a.attributionFactor * 100).toFixed(1)}% of the investee · PCAF DQ {a.dqScore}</div>
                               })()}
                             </div>
                           </div>
@@ -2141,16 +2592,21 @@ export default function Scope3Dashboard() {
                       })}
                       <button onClick={addPcafAsset} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: 'none', border: '0.5px solid var(--color-brand)', color: 'var(--color-brand)', cursor: 'pointer', alignSelf: 'flex-start' }}>+ Add holding</button>
                       {(() => {
-                        const c15 = catData['cat15']
-                        if (!c15) return null
-                        const r = cat15PcafResult(c15) // single call — reused for the fallback line AND the decomposed summary
-                        // Proxy / fallback mode: keep the existing incomplete-rows note, nothing decomposed.
-                        if (r.mode === 'portfolio_proxy') {
-                          return cat15Assets().length >= 1
-                            ? <div style={{ fontSize: 10, color: '#92660A', lineHeight: 1.5 }}>Some holdings are incomplete — showing the spend proxy until every row computes.</div>
-                            : null
+                        const f = cat15Result()
+                        // ⚠️ NO PARTIAL TOTAL, AND THE ROWS ARE NAMED. This said "showing the spend proxy
+                        // until every row computes" — and it was doing exactly that: one unusable holding
+                        // silently replaced the whole decomposed assessment with a 0.12 lump. There is no
+                        // proxy to fall back to now, so an incomplete portfolio has NO figure and says
+                        // which holdings are holding it up.
+                        if (f.incomplete.length > 0) {
+                          return (
+                            <div role="status" style={{ fontSize: 11, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.6rem 0.7rem', lineHeight: 1.5 }}>
+                              {f.reason}
+                            </div>
+                          )
                         }
-                        // Decomposed mode: weighted DQ + coverage spread, by-asset-class breakdown, capped flag.
+                        const r = f.assessment
+                        if (!r) return null
                         const cappedCount = r.perAsset.filter(a => a.capped).length
                         const classRows = Object.entries(r.byAssetClass).sort((a, b) => (b[1] as number) - (a[1] as number))
                         const coverageTiers = ([1, 2, 3, 4, 5] as const).filter(t => r.coverageByScore[t] > 0)
@@ -2185,11 +2641,52 @@ export default function Scope3Dashboard() {
                           </div>
                         )
                       })()}
-                    </div>}
+                    </div>
                   </>}
 
-                  {/* Generic spend-based for other categories */}
-                  {!['cat1', 'cat6', 'cat7', 'cat5', 'cat15'].includes(cat.id) && <>
+                  {/* Cat 2 and Cat 4 — priced from EXIOBASE, each with its OWN sector */}
+                  {SPEND_PRICED_IDS.includes(cat.id) && cat.id !== 'cat1' && (() => {
+                    const cfg = SPEND_PRICED_CATEGORIES.find(c => c.id === cat.id)!
+                    const isProduct = cfg.factorType === 'product'
+                    return <>
+                      <div>
+                        <label style={labelStyle}>Annual spend ({currency})</label>
+                        <input style={inputStyle} type="number" value={catData[cat.id]?.annual_spend || ''} onChange={e => updateCat(cat.id, 'annual_spend', Number(e.target.value))} placeholder="0" />
+                      </div>
+                      <div>
+                        {/* ⚠️ NO DEFAULT, AND THAT IS THE POINT. Cat 1's select falls back to the company
+                            sector; this one starts empty. A law firm's capital goods are not legal
+                            services, and its inbound freight is not legal services either — defaulting
+                            here would price three categories off one row while appearing to price three.
+                            ⚠️ TWO DIFFERENT LISTS: Cat 2 offers EXIOBASE PRODUCTS (what was bought — a
+                            machine, a vehicle), Cat 4 offers INDUSTRIES (who provided the service). The
+                            route takes the table per line; see SPEND_PRICED_CATEGORIES. */}
+                        <label style={labelStyle}>{isProduct ? 'What was bought (EXIOBASE product)' : 'Service provider sector (EXIOBASE industry)'}</label>
+                        {/* ⚠️ SCOPED TO THIS CATEGORY, NOT FILTERED. The default list is the rows this
+                            category normally buys; "show all" returns the whole table, and a row outside
+                            the boundary can still be chosen — it is labelled in the list, disclosed under
+                            the select and carried into the export. See lib/scope3/categoryScope.ts, and
+                            the 17 Sep 2026 finding that put "Inert/metal waste for treatment" in Cat 2. */}
+                        <select style={inputStyle} value={catData[cat.id]?.spend_sector || ''} onChange={e => updateCat(cat.id, 'spend_sector', e.target.value)}>
+                          <option value="">{isProduct ? 'Select product' : 'Select sector'}</option>
+                          <ScopedOptions catId={cfg.id} factorType={cfg.factorType} selected={catData[cat.id]?.spend_sector || ''} showAll={!!showAllSectors[cat.id]} />
+                        </select>
+                        <ShowAllToggle catId={cat.id} on={!!showAllSectors[cat.id]} onToggle={toggleShowAll} noun={isProduct ? 'product' : 'sector'} usualFor={CATEGORY_SCOPE_LABEL[cfg.id]} />
+                        <ScopeNoteUnderPicker catId={cfg.id} code={catData[cat.id]?.spend_sector || ''} />
+                      </div>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        {renderSpendEstimate(cat.id, cat.name)}
+                      </div>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={labelStyle}>Known emissions (mt CO₂e) — optional override</label>
+                        <input style={inputStyle} type="number" value={catData[cat.id]?.emissions_override || ''} onChange={e => updateCat(cat.id, 'emissions_override', Number(e.target.value))} placeholder="Leave blank to use the spend-based estimate" />
+                      </div>
+                    </>
+                  })()}
+
+                  {/* Generic spend-based for the seven categories that keep the flat factor. See
+                      SPEND_PRICED_CATEGORIES for why those seven are not priced from EXIOBASE. */}
+                  {!['cat1', 'cat2', 'cat4', 'cat6', 'cat7', 'cat5', 'cat15'].includes(cat.id) && <>
                     <div>
                       <label style={labelStyle}>Annual spend / value ({currency})</label>
                       <input style={inputStyle} type="number" value={catData[cat.id]?.annual_spend || ''} onChange={e => updateCat(cat.id, 'annual_spend', Number(e.target.value))} placeholder="0" />
@@ -2451,8 +2948,13 @@ export default function Scope3Dashboard() {
               <span style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>I confirm that the data entered is accurate to the best of my knowledge. I understand that spend-based estimates carry inherent uncertainty and should be disclosed as such in external reports.</span>
             </label>
           </div>
-          <button onClick={() => dataConfirmed && !cat1SpendPending && saveScope3()} disabled={!dataConfirmed || !boundInventoryId || saving || cat1SpendPending} style={{ ...((dataConfirmed && boundInventoryId && !saving && !cat1SpendPending) ? btnStepPrimary : btnStepPrimaryDisabled), marginRight: 12 }}>
-            {saving ? 'Saving…' : cat1SpendPending ? 'Waiting for the Cat 1 estimate…' : showSaved ? '✓ Saved to your inventory' : 'Save Scope 3 to inventory'}
+          <button onClick={() => dataConfirmed && !anySpendPending && saveScope3()} disabled={!dataConfirmed || !boundInventoryId || saving || anySpendPending} style={{ ...((dataConfirmed && boundInventoryId && !saving && !anySpendPending) ? btnStepPrimary : btnStepPrimaryDisabled), marginRight: 12 }}>
+            {/* ⚠️ NAMES THE CATEGORIES, RATHER THAN COUNTING THEM. "Waiting for the Cat 1 estimate…" was
+                right while one category was priced; "Waiting for 2 estimates…" would tell a customer
+                staring at Cat 4 nothing about whether it is the one holding them up. */}
+            {saving ? 'Saving…'
+              : anySpendPending ? `Waiting for the ${spendPendingIds.map(id => `Cat ${CATEGORIES.find(c => c.id === id)?.num ?? id}`).join(' and ')} estimate${spendPendingIds.length > 1 ? 's' : ''}…`
+              : showSaved ? '✓ Saved to your inventory' : 'Save Scope 3 to inventory'}
           </button>
           <button onClick={() => dataConfirmed && generateExport()} style={{ ...(dataConfirmed ? btnStepPrimary : btnStepPrimaryDisabled) }}>
             ⬇ Download Scope 3 Inventory (CSV)
@@ -2568,7 +3070,7 @@ export default function Scope3Dashboard() {
                     { label: 'Company', val: company || '—' },
                     // EXIOBASE's published name, never the stored code: 'i17' is our vocabulary, not the
                     // customer's. industryName falls through to the code on a miss rather than blanking.
-                    { label: 'Sector', val: sector ? industryName(sector) : '—' },
+                    { label: 'Company sector', val: sector ? industryName(sector) : '—' },
                     // Same two labels, same two sets and same order as the Export tile, so a reader moving
                     // between steps is never comparing different counts under one word. Two rows rather
                     // than one because this sidebar also shows on Materiality and Calculate, where "in
