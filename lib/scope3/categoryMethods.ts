@@ -10,9 +10,11 @@
 // page. What is actually true differs by category, and a single sentence cannot say it:
 //   Cat 1                     EXIOBASE 3.8.2, through a named factor edition
 //   Cat 5                     (since 17 Sep 2026) DEFRA/DESNZ 2026 waste factors, per material and route
+//   Cat 12                    (since 18 Sep 2026) the same DEFRA factors, per material, on the customer's
+//                             split of end-of-life tonnes across routes
 //   Cat 6, 7                  fixed activity factors in EMISSION_FACTORS, with no recorded source
 //   Cat 15                    the PCAF-aligned path in lib/pcaf
-//   the other ten             one flat spend factor, with no source, no year and no region
+//   the other seven           one flat spend factor, with no source, no year and no region
 //
 // CLIENT-SAFE: imports spend.ts (types and the source catalogue) and lib/emissionFactors.ts, neither
 // of which pulls in a factor file, and defraWaste.ts, which pulls in the ~30 KB waste artefact the
@@ -30,6 +32,7 @@ export type Scope3Method =
   | 'travel_factors'
   | 'commuting_factors'
   | 'pcaf'
+  | 'end_of_life_factors'
 
 const METHOD_BY_CATEGORY: Readonly<Record<string, Scope3Method>> = {
   cat1: 'exiobase_spend',
@@ -37,14 +40,16 @@ const METHOD_BY_CATEGORY: Readonly<Record<string, Scope3Method>> = {
   // categories a customer BUYS — purchased goods and services, capital goods, inbound freight — so a
   // spend figure has something to multiply. Cats 9, 11, 13 and 14 price what the company SOLD or LEASED
   // OUT, where there is no purchase; Cat 3 is derived from energy already in Scopes 1 and 2; Cat 12 is
-  // tonnes by material; Cat 8's own guidance says spend is not appropriate. Those EIGHT — 3, 8, 9, 10, 11,
-  // 12, 13, 14 — keep flat_spend deliberately; see SPEND_PRICED_CATEGORIES in app/dashboard/scope3/page.tsx.
-  // flat_spend therefore still has eight members, and whether it survives is a later question.
+  // tonnes by material; Cat 8's own guidance says spend is not appropriate. Those eight kept flat_spend
+  // deliberately; see SPEND_PRICED_CATEGORIES in app/dashboard/scope3/page.tsx.
+  //   ⚠️ CAT 12 LEFT THE FLAT GROUP ON 18 SEP 2026 for end_of_life_factors, so flat_spend has SEVEN
+  // members: 3, 8, 9, 10, 11, 13 and 14. Whether it survives is a later question.
   cat2: 'exiobase_spend',
   cat4: 'exiobase_spend',
   cat5: 'waste_factors',
   cat6: 'travel_factors',
   cat7: 'commuting_factors',
+  cat12: 'end_of_life_factors',
   cat15: 'pcaf',
 }
 
@@ -78,6 +83,8 @@ export const METHOD_TAKES_ENTERED_FIGURE: Readonly<Record<Scope3Method, boolean>
   waste_factors: false,
   travel_factors: false,
   commuting_factors: false,
+  // Category 12 takes no entered total: its figure is the customer's materials and split, priced.
+  end_of_life_factors: false,
 }
 
 /** Does this category's calculator use a figure entered in place of its estimate? Read by the page's
@@ -138,6 +145,25 @@ export function scope3MethodDescription(method: Scope3Method): string {
         `per tonne published for that pair in ${w.source} (${w.factor_set.toLowerCase()} v${w.file_version}, ` +
         `${w.sheet} sheet, ${w.gwp_basis} GWPs). Only the routes published for a material are offered; ` +
         `re-use is not a disposal route and has no factor. ${w.attribution_required}`
+      )
+    }
+    case 'end_of_life_factors': {
+      // ⚠️ NO EM-DASHES, AND NOT CALLED FORMULA [12.1]. The GHG Protocol's Technical Guidance formula
+      // [12.1] applies one average factor per treatment method; this applies the sheet's factor for the
+      // material AND the route, per material, which is finer, and the sentence says so. The time boundary,
+      // the split as the customer's assumption and the UK scope of the factors are stated here because this
+      // line is the hierarchy's Category 12 line and the CSV's Method cell, and a reader may see nothing else.
+      const w = DEFRA_WASTE_META
+      return (
+        `Activity-based, per material: the tonnes of sold products and packaging reaching end of life, split ` +
+        `by the customer across the treatment routes the sheet publishes for that material, each route's ` +
+        `tonnes multiplied by the kg CO2e per tonne published for that material and route in ${w.source} ` +
+        `(${w.factor_set.toLowerCase()} v${w.file_version}, ${w.sheet} sheet, ${w.gwp_basis} GWPs). This is ` +
+        `finer than formula [12.1] of the GHG Protocol's Technical Guidance for Calculating Scope 3 ` +
+        `Emissions, which applies one average factor per treatment method. The split and its source are the ` +
+        `customer's assumption. The figure is the expected end-of-life emissions of all products sold in the ` +
+        `reporting year, most of which have not yet occurred. These are UK factors, applied wherever the products are ` +
+        `sold. Re-use is not a treatment route and has no factor. ${w.attribution_required}`
       )
     }
     case 'travel_factors':
