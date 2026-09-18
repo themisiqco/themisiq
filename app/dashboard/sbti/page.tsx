@@ -10,6 +10,8 @@ import { loadCompanySeries } from '../../../lib/ghg/loadSeries'
 import type { CompanySeries, SeriesYear } from '../../../lib/ghg/series'
 import { describeYearStatus } from '../../../lib/ghg/series'
 import { VERSION_DATES, NET_ZERO } from '../../../lib/sbti/params'
+import { scope3CoverageLabel } from '../../../lib/ghg/series'
+import type { BaselineScope3Coverage } from '../../../lib/ghg/series'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { sectionHead } from '@/app/components/headingStyles'
 import { btnPrimary, btnStep, btnStepDisabled } from '@/app/components/buttonStyles'
@@ -62,7 +64,15 @@ const SCOPE_ORDER: Scope[] = ['s1', 's2_location', 's3']
 // storedBaseEmissions: the FROZEN base_year_emissions_tco2e loaded from a committed target.
 // undefined/null for a brand-new (not-yet-saved) draft — such a draft grades against the live
 // series until it is committed. A committed target's baseline never re-anchors to the inventory.
-type Draft = { baseYear: number; targetYear: number; reductionPct: number; storedBaseEmissions?: number | null }
+type Draft = {
+  baseYear: number; targetYear: number; reductionPct: number; storedBaseEmissions?: number | null
+  /**
+   * The FROZEN baseline_scope3_coverage of a committed target: what its Scope 3 base year covered when it
+   * was committed. Undefined on a fresh draft (nothing committed yet → the live coverage is captured at
+   * save); null on a target committed before the column existed, where it cannot be recovered.
+   */
+  storedScope3Coverage?: BaselineScope3Coverage | null
+}
 const round1 = (n: number): number => Math.round(n * 10) / 10
 // ACA rate bucket: S1 and S2 both use 's1s2' (shared RATE only — never merges emissions); S3 uses 's3'.
 const bucketFor = (sc: Scope): 's1s2' | 's3' => (sc === 's3' ? 's3' : 's1s2')
@@ -267,7 +277,7 @@ export default function SbtiDashboard() {
       // Load existing NEAR-TERM targets → seed cards. Reset cleared prior state, so seed = replace.
       const { data: targetRows } = await supabase
         .from('sbti_targets')
-        .select('scope, base_year, target_year, reduction_pct, base_year_emissions_tco2e')
+        .select('scope, base_year, target_year, reduction_pct, base_year_emissions_tco2e, baseline_scope3_coverage')
         .eq('company_id', series.companyId)
         .eq('target_type', 'near_term')
       if (cancelled) return
@@ -281,6 +291,9 @@ export default function SbtiDashboard() {
             targetYear: row.target_year ?? 2035,
             reductionPct: row.reduction_pct ?? 0,
             storedBaseEmissions: row.base_year_emissions_tco2e ?? null, // FROZEN baseline; grading reads this, not the live series
+            // Frozen with it. `?? null` keeps "committed before the column existed" distinguishable from
+            // "committed, and the baseline's coverage was unknown at the time" — that one is a record.
+            storedScope3Coverage: (row.baseline_scope3_coverage as BaselineScope3Coverage | null) ?? null,
           }
           savedScopes.push(sc)
         }
@@ -293,7 +306,7 @@ export default function SbtiDashboard() {
       // defaults (the net-zero lazy-init effect only fills MISSING drafts, so these survive).
       const { data: nzRows } = await supabase
         .from('sbti_targets')
-        .select('scope, base_year, target_year, reduction_pct, base_year_emissions_tco2e')
+        .select('scope, base_year, target_year, reduction_pct, base_year_emissions_tco2e, baseline_scope3_coverage')
         .eq('company_id', series.companyId)
         .eq('target_type', 'net_zero')
       if (cancelled) return
@@ -305,6 +318,7 @@ export default function SbtiDashboard() {
             targetYear: row.target_year ?? NET_ZERO.latestNetZeroYear,
             reductionPct: row.reduction_pct ?? NET_ZERO.minAbsoluteReductionPct,
             storedBaseEmissions: row.base_year_emissions_tco2e ?? null, // FROZEN baseline (net-zero row's own frozen value)
+            storedScope3Coverage: (row.baseline_scope3_coverage as BaselineScope3Coverage | null) ?? null,
           }
         }
         setNetZeroDrafts(prev => ({ ...prev, ...seededNz }))
@@ -398,8 +412,55 @@ export default function SbtiDashboard() {
       case 's1s2_combined': return baselineByScope.scope1 + baselineByScope.scope2Location
     }
   }
+  /**
+   * THE BASELINE YEAR'S SCOPE 3 COVERAGE, AND WHAT IT ALLOWS.
+   *
+   * ⚠️ A BASELINE IS FIXED FOR THE LIFE OF A TARGET, which is why this is the one place in the product
+   * that WITHHOLDS rather than warns. The two cases are not the same thing:
+   *   · unpriced claimed categories — the customer entered what the method needs and ThemisIQ could not
+   *     price it (no active factor edition, or no factor for that sector). That is our failure, it is
+   *     invisible in the total, and a target anchored to it is wrong for every year after it. Withheld.
+   *   · categories not yet calculated — the customer's own turn, and their judgement whether to set a
+   *     target now. Warned, never blocked.
+   * A year whose Scope 3 counts no categories carries no figure at all (series nulls it), and a year
+   * whose coverage was never recorded is allowed with the gap named — it may well be a full inventory.
+   */
+  const baselineYearRow = series?.years.find(y => y.year === series.baselineYear) ?? null
+  const s3Basis = baselineYearRow?.scope3Basis ?? 'absent'
+  const s3Unpriced = baselineYearRow?.scope3Unpriced ?? 0
+  const s3CoverageLabel = baselineYearRow ? scope3CoverageLabel(baselineYearRow) : null
+  const s3BaselineBlocked = s3Basis === 'covers_nothing' || (s3Basis === 'measured' && (s3Unpriced ?? 0) > 0)
+  /** The sentence beside the figure: what this baseline covers. Null when there is nothing to state. */
+  const s3BaselineSentence = (base: number | null): string | null => {
+    if (base == null) return null
+    const mt = `${base.toLocaleString(undefined, { maximumFractionDigits: 1 })} tCO₂e`
+    if (s3Basis === 'not_recorded') return `Scope 3 baseline: ${mt}. What it covers was not recorded for ${series?.baselineYear ?? 'that year'}, so how much of your value chain it represents is unknown.`
+    return s3CoverageLabel ? `Scope 3 baseline: ${mt}, covering ${s3CoverageLabel}.` : null
+  }
+
   const baselineForCommitted = (sc: Scope, draft: Draft | undefined): number | null =>
     resolveCommittedBaseline(draft?.storedBaseEmissions, baselineForDrafting(sc))
+
+  /**
+   * What to WRITE into baseline_scope3_coverage: the coverage already frozen on a committed target, or the
+   * baseline's coverage as it is NOW for one being committed for the first time. Same freeze rule as
+   * base_year_emissions_tco2e above, and for the same reason — an inventory that grows afterwards must not
+   * restate what the target was set against.
+   *
+   * ⚠️ NULL COUNTS WITH AN EMPTY LIST IS A RECORD, NOT AN ABSENCE. A baseline year saved before coverage
+   * was tracked has nothing to freeze, and writing SQL NULL would make this target indistinguishable from
+   * one committed before the column existed. It writes "asked at commit, and the answer was unknown"
+   * instead, which is a different and true thing. Only Scope 3 targets carry any of this.
+   */
+  const scope3CoverageForCommit = (sc: Scope, draft: Draft | undefined): BaselineScope3Coverage | null => {
+    if (sc !== 's3') return null
+    if (draft?.storedScope3Coverage) return draft.storedScope3Coverage
+    if (series?.baselineScope3Coverage) return series.baselineScope3Coverage
+    if (s3Basis === 'not_recorded') {
+      return { relevant: null, inTotal: null, unpriced: null, exclusionsUnjustified: null, categories: [] }
+    }
+    return null
+  }
 
   // Drift is a LIKE-FOR-LIKE comparison: the target's frozen base-year figure vs what the live
   // inventory NOW reports for THAT SAME base year — never against a different year. Look up the
@@ -446,7 +507,7 @@ export default function SbtiDashboard() {
   // derived REACTIVELY from current state. Reflects in-session Step-3 saves/edits without a reload,
   // and the DB-load path too (the load seeds both selectedScopes and targetDrafts).
   const nearTermTargetScopes = useMemo(
-    () => selectedScopes.filter(sc => targetDrafts[sc] && !(sc === 's3' && baselineForCommitted(sc, targetDrafts[sc]) === null)),
+    () => selectedScopes.filter(sc => targetDrafts[sc] && !(sc === 's3' && (baselineForCommitted(sc, targetDrafts[sc]) === null || s3BaselineBlocked))),
     [selectedScopes, targetDrafts, baselineByScope],
   )
 
@@ -504,7 +565,7 @@ export default function SbtiDashboard() {
 
     // Cards to save: selected scopes WITH a draft, excluding the S3 routing card (no base data).
     const cards = selectedScopes
-      .filter(sc => targetDrafts[sc] && !(sc === 's3' && baselineForCommitted(sc, targetDrafts[sc]) === null))
+      .filter(sc => targetDrafts[sc] && !(sc === 's3' && (baselineForCommitted(sc, targetDrafts[sc]) === null || s3BaselineBlocked)))
       .map(sc => ({ sc, d: targetDrafts[sc]! }))
 
     // Gate: every card must pass validation — name the invalid scope(s) and block.
@@ -539,6 +600,8 @@ export default function SbtiDashboard() {
         // on first save (storedBaseEmissions still null then → falls back to live). An inventory
         // edit never restates a committed target here.
         base_year_emissions_tco2e: baselineForCommitted(sc, d),
+        // Frozen with the figure it describes: 6 of 12 categories stays 6 of 12 after the inventory grows.
+        baseline_scope3_coverage: scope3CoverageForCommit(sc, d),
         target_year: d.targetYear,
         reduction_pct: d.reductionPct,
         updated_at: now,
@@ -585,6 +648,7 @@ export default function SbtiDashboard() {
         method: 'absolute_aca',
         base_year: d.baseYear,
         base_year_emissions_tco2e: baselineForCommitted(sc, d), // freeze at commit (net-zero row's own frozen value)
+        baseline_scope3_coverage: scope3CoverageForCommit(sc, d),
         target_year: d.targetYear,
         reduction_pct: d.reductionPct,
         updated_at: now,
@@ -966,13 +1030,23 @@ export default function SbtiDashboard() {
                     {selectedScopes.map(sc => {
                       const base = baselineForDrafting(sc) // Step 3 drafting: the user is choosing a baseline → live series
 
-                      // S3 with no Scope 3 inventory → routing empty-state (no editable inputs).
-                      if (sc === 's3' && base === null) {
+                      // ⚠️ THREE ROUTES OUT OF A SCOPE 3 CARD, AND THEY ARE NOT THE SAME MESSAGE.
+                      //   base === null && basis 'covers_nothing' — the inventory EXISTS and counts nothing.
+                      //   base === null otherwise               — no Scope 3 inventory at all.
+                      //   base != null && s3BaselineBlocked     — a figure, but the platform failed to
+                      //     price categories the customer claimed. Withheld, because a baseline is fixed
+                      //     for the life of the target and this gap is ours, not theirs.
+                      if (sc === 's3' && (base === null || s3BaselineBlocked)) {
+                        const blockedForUnpriced = base !== null
                         return (
                           <div key={sc} style={cardStyle}>
                             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', fontWeight: 400, marginBottom: 8 }}>{SCOPE_LABEL[sc]}</div>
                             <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: 12 }}>
-                              To set a Scope 3 target, complete your Scope 3 inventory first. Your near-term submission can proceed on Scope 1 + 2 alone.
+                              {blockedForUnpriced
+                                ? `Your ${series?.baselineYear ?? 'baseline'} Scope 3 total leaves out ${s3Unpriced} categor${s3Unpriced === 1 ? 'y' : 'ies'} you marked relevant and filled in: ThemisIQ could not price ${s3Unpriced === 1 ? 'it' : 'them'}. A base year is fixed for the life of a target, so setting one against this figure would carry that gap into every year of the pathway. Fix the pricing in the Scope 3 module first — your near-term submission can proceed on Scope 1 + 2 meanwhile.`
+                                : s3Basis === 'covers_nothing'
+                                  ? `Your Scope 3 inventory for ${series?.baselineYear ?? 'the baseline year'} is saved but counts no categories yet — none has been answered relevant and calculated, so there is no baseline to set a target against. Answer the categories in the Scope 3 module. Your near-term submission can proceed on Scope 1 + 2 alone.`
+                                  : 'To set a Scope 3 target, complete your Scope 3 inventory first. Your near-term submission can proceed on Scope 1 + 2 alone.'}
                             </p>
                             <a href="/dashboard/scope3" onClick={() => { navIntentRef.current = true }} style={{ ...btnPrimary, padding: '9px 18px', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>Go to Scope 3 Calculator →</a>
                           </div>
@@ -995,6 +1069,23 @@ export default function SbtiDashboard() {
                           {base != null && (
                             <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, marginBottom: 14 }}>
                               Base: {base.toLocaleString(undefined, { maximumFractionDigits: 1 })} tCO₂e{baselineYear != null ? ` (${baselineYear})` : ''}
+                              {/* ⚠️ THE SENTENCE IS THE DECISION. A Scope 3 baseline covering 6 of 12 categories and
+                                  one covering 12 of 12 are the same number on this line and a different commitment. */}
+                              {sc === 's3' && s3BaselineSentence(base) && (
+                                <div style={{ marginTop: 4 }}>{s3BaselineSentence(base)}</div>
+                              )}
+                              {/* Their judgement, their call: warned, never blocked. */}
+                              {sc === 's3' && s3Basis === 'measured' && baselineYearRow?.scope3Relevant != null && baselineYearRow.scope3InTotal != null
+                                && baselineYearRow.scope3Relevant > baselineYearRow.scope3InTotal && (
+                                <div style={{ marginTop: 4, color: 'var(--color-module-climate)' }}>
+                                  {baselineYearRow.scope3Relevant - baselineYearRow.scope3InTotal} categor{baselineYearRow.scope3Relevant - baselineYearRow.scope3InTotal === 1 ? 'y you marked relevant has' : 'ies you marked relevant have'} no figure yet, so {baselineYearRow.scope3Relevant - baselineYearRow.scope3InTotal === 1 ? 'it is' : 'they are'} not in this baseline. You can set a target on it — the baseline is fixed once you do.
+                                </div>
+                              )}
+                              {sc === 's3' && s3Basis === 'not_recorded' && (
+                                <div style={{ marginTop: 4, color: 'var(--color-module-climate)' }}>
+                                  Coverage was not recorded for this year, so how many categories this figure counts is unknown. Re-saving the Scope 3 inventory records it.
+                                </div>
+                              )}
                             </div>
                           )}
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
@@ -1111,6 +1202,9 @@ export default function SbtiDashboard() {
                             {base != null && (
                               <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, marginBottom: 14 }}>
                                 Base: {base.toLocaleString(undefined, { maximumFractionDigits: 1 })} tCO₂e{baselineYear != null ? ` (${baselineYear})` : ''}
+                                {sc === 's3' && s3BaselineSentence(base) && (
+                                  <div style={{ marginTop: 4 }}>{s3BaselineSentence(base)}</div>
+                                )}
                               </div>
                             )}
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
