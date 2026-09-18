@@ -19,7 +19,7 @@ import { spendSector } from '../../../lib/scope3/spendSector'
 import {
   cat15Figure, holdingComputes, assessableEmissions, CAT15_ASSESSMENT_FAILED, type Cat15Figure,
   CAT15_GUIDANCE, CAT15_PANEL_METHOD, CAT15_PANEL_NO_PROXY, CAT15_RECORDED_NOT_USED,
-  cat15DecomposedBasisDetail,
+  cat15DecomposedBasisDetail, cat15GwpSentence,
 } from '../../../lib/scope3/cat15'
 import { matchCountries, countryByIso2 } from '../../../lib/emissionFactors/countryOptions'
 import { regionName, regionLabel, countryLabel } from '../../../lib/emissionFactors/regionNames'
@@ -1991,7 +1991,7 @@ export default function Scope3Dashboard() {
       } else if (f.basis === 'decomposed' && f.assessment) {
         const a = f.assessment
         out.push(['Cat 15', 'Basis', 'PCAF-aligned, per holding',
-          `${a.assetCount} ${a.assetCount === 1 ? 'holding' : 'holdings'} assessed, emissions-weighted PCAF data quality ${a.weightedDataQualityScore.toFixed(1)} of 5, on the ${a.gwpBasis} basis the investee figures are reported on.`])
+          `${a.assetCount} ${a.assetCount === 1 ? 'holding' : 'holdings'} assessed, emissions-weighted PCAF data quality ${a.weightedDataQualityScore.toFixed(1)} of 5.`])
         const stored = c15.pcafAssets ?? []
         a.perAsset.forEach((h, i) => {
           const row = stored.find(r => r.id === h.assetId)
@@ -2005,6 +2005,13 @@ export default function Scope3Dashboard() {
         })
       } else {
         out.push(['Cat 15', 'Basis', 'Not calculated', f.reason])
+      }
+      // ⚠️ THE GWP BASIS IS NOT RECORDED, AND THE FILE SAYS SO, for an entered total and for holdings alike.
+      // The decomposed row used to end "on the AR6 basis the investee figures are reported on", read from a
+      // value lib/pcaf stamped without asking anyone. The sentence is checked against the bound GHG
+      // inventory's basis the way the waste categories' is, with no branch that claims the two agree.
+      if (f.basis !== null) {
+        out.push(['Cat 15', 'GWP basis', 'Not recorded', cat15GwpSentence(!!boundInventoryId, ghgGwpVersion)])
       }
       // ⚠️ RECORDED AND NOT USED, SAID OUT LOUD. A record saved before 17 Sep 2026 can carry both, and a
       // verifier reading the old figure needs to know they no longer price anything.
@@ -2753,6 +2760,7 @@ export default function Scope3Dashboard() {
                             ? 'No figure yet, so no data-quality score. '
                             : `This figure: PCAF data quality ${f.dqScore?.toFixed(1)} of 5 (${f.basis === 'override' ? 'reported to you, not independently assured' : 'per holding, emissions-weighted across the portfolio'}). `}
                           PCAF data quality: 1 = verified (best) … 5 = spend estimate (weakest). ThemisIQ produces no tier-4 or tier-5 estimate for this category.
+                          {f.basis !== null && <><br />{cat15GwpSentence(!!boundInventoryId, ghgGwpVersion)}</>}
                         </div>
                       )
                     })()}

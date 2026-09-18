@@ -90,7 +90,8 @@ export function assessPortfolio(assets: PcafPortfolioAsset[]): PortfolioResult {
     perAsset,
     byAssetClass,
     coverageByScore,
-    gwpBasis: 'AR6',
+    // Not recorded: the holdings keep each investee's own basis. See PCAF_GWP_BASIS in attribution.ts.
+    gwpBasis: null,
   };
 }
 
@@ -111,7 +112,8 @@ export function portfolioFromProxy(input: {
     perAsset: [],
     byAssetClass: {},
     coverageByScore: coverage,
-    gwpBasis: 'AR6',
+    // The lumped proxy (no app caller since 17 Sep 2026) claimed AR6 too; it records nothing either.
+    gwpBasis: null,
   };
 }
 

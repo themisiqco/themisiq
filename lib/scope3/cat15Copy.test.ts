@@ -7,6 +7,7 @@ import {
   CAT15_FIGURE_SOURCE, CAT15_HOLDING_FIGURE, CAT15_SENTENCES, CAT15_NO_BASIS, CAT15_ASSESSMENT_FAILED,
   CAT15_GUIDANCE, CAT15_PANEL_METHOD, CAT15_PANEL_NO_PROXY, CAT15_RECORDED_NOT_USED,
   cat15MethodDescription, cat15MethodologyPassage, cat15DecomposedBasisDetail, cat15Figure,
+  CAT15_GWP_SENTENCE, CAT15_GWP_TAIL, cat15GwpSentence,
 } from './cat15'
 
 // ── GUARD: EVERY CATEGORY 15 CLAIM COMES FROM lib/scope3/cat15.ts, AND THE OLD WORDINGS STAY GONE ─────
@@ -59,6 +60,10 @@ const SUPERSEDED: readonly { was: string; re: RegExp }[] = [
   { was: '"prices a year of purchasing"', re: /prices a year of purchasing/i },
   { was: 'the old withholding list naming the outstanding amount', re: /missing its emissions, outstanding amount or attribution value/i },
   { was: 'the old known-total phrasing', re: /known financed emissions where entered, otherwise/i },
+  // 18 Sep 2026: the investee GWP basis is not recorded. lib/pcaf stamped 'AR6' and the CSV said the figures
+  // were "on the AR6 basis the investee figures are reported on"; nothing had asked anyone which basis.
+  { was: '"AR6 basis the investee"', re: /AR6 basis the investee/i },
+  { was: '"on the AR6 basis"', re: /on the AR6 basis/i },
 ]
 
 describe('Category 15 copy: one source, and the superseded wordings nowhere', () => {
@@ -74,10 +79,18 @@ describe('Category 15 copy: one source, and the superseded wordings nowhere', ()
   it('C15C2 the method description and the methodology passage are built from the shared sentences', () => {
     const s = CAT15_SENTENCES
     expect(scope3MethodDescription('pcaf')).toBe(cat15MethodDescription())
-    for (const part of [s.knownTotalShort, CAT15_HOLDING_FIGURE, s.withholdsShort, s.noPortfolioProxyShort]) {
+    // The GWP point is its own sentence after the formula, never spliced into it: the formula is verbatim.
+    expect(cat15MethodDescription()).toContain(`${CAT15_HOLDING_FIGURE}. ${CAT15_GWP_SENTENCE} `)
+    for (const part of [s.knownTotalShort, CAT15_HOLDING_FIGURE, s.withholdsShort, s.noPortfolioProxyShort, CAT15_GWP_SENTENCE]) {
       expect(cat15MethodDescription()).toContain(part)
     }
-    for (const part of [CAT15_FIGURE_SOURCE, s.withholdsLong, s.knownTotalLong, s.noPortfolioProxyLong]) {
+    expect(cat15MethodologyPassage()).toContain(`Attribution is capped at 100%. ${CAT15_GWP_SENTENCE} Each holding is scored`)
+    // Said once in each text, and once in the CSV row / panel line.
+    for (const text of [cat15MethodologyPassage(), cat15MethodDescription(), cat15GwpSentence(true, 'AR6')]) {
+      expect(text.split(CAT15_GWP_TAIL).length - 1).toBe(1)
+    }
+    expect(CAT15_SENTENCES.gwpAsReported).toBe(CAT15_GWP_SENTENCE)
+    for (const part of [CAT15_FIGURE_SOURCE, s.withholdsLong, s.knownTotalLong, s.noPortfolioProxyLong, CAT15_GWP_SENTENCE]) {
       expect(cat15MethodologyPassage()).toContain(part)
     }
     // The hierarchy line IS the description, so guarding the description guards the line.
@@ -121,9 +134,34 @@ describe('Category 15 copy: one source, and the superseded wordings nowhere', ()
       'cat15MethodologyPassage()': cat15MethodologyPassage(),
       'cat15DecomposedBasisDetail(1, 1)': cat15DecomposedBasisDetail(1, 1),
       'cat15DecomposedBasisDetail(3, 1.6)': cat15DecomposedBasisDetail(3, 1.6),
+      'cat15GwpSentence(unbound)': cat15GwpSentence(false, null),
+      'cat15GwpSentence(bound, AR6)': cat15GwpSentence(true, 'AR6'),
+      'cat15GwpSentence(bound, none)': cat15GwpSentence(true, null),
       'incomplete-holdings reason': cat15Figure({ pcafAssets: [{ id: 'x', assetClass: 'mortgages', outstandingAmount: 1, denominator: 0, emissions: {} }] }).reason,
     }
     const dashed = Object.entries(produced).filter(([, v]) => /[—–]/.test(v)).map(([k]) => k)
     expect(dashed).toEqual([])
+  })
+
+  it('C15C6 ⚠️ cat15GwpSentence never claims the investee figures share the inventory\'s basis', () => {
+    // The waste sentence can say "so the two share a GWP basis" because the DEFRA record states AR5. The
+    // investee basis is never recorded, so no inventory basis may be said to match it.
+    const MATCH = /as well|so the two share|share a GWP basis|the same (GWP )?basis|consistent|uniform|matches|on the (AR4|AR5|AR6) basis/i
+    for (const bound of [true, false]) {
+      for (const v of ['AR4', 'AR5', 'AR6', 'unknown', null]) {
+        const text = cat15GwpSentence(bound, v)
+        expect(text, `${bound} ${v}`).not.toMatch(MATCH)
+        expect(text).toContain(CAT15_SENTENCES.gwpAsReported)
+        if (bound && v) expect(text).toContain(`records ${v}. Whether the investee figures share that basis is not known.`)
+        if (bound && !v) expect(text).toContain('records no GWP basis either')
+        if (!bound) expect(text).toBe(CAT15_SENTENCES.gwpAsReported)
+      }
+    }
+  })
+
+  it('C15C7 the Scope 3 page and the CSV read the GWP sentence from cat15.ts', () => {
+    const page = stripComments(read('app/dashboard/scope3/page.tsx'))
+    expect(page.match(/cat15GwpSentence\(!!boundInventoryId, ghgGwpVersion\)/g)?.length ?? 0).toBe(2)
+    expect(page).not.toMatch(/a\.gwpBasis/)
   })
 })

@@ -29,7 +29,7 @@ describe('PCAF attribution — attributionFactor + financedEmissions', () => {
     expect(r.attributionFactor).toBe(0.1);
     expect(r.financedEmissions).toBe(5_000);
     expect(r.capped).toBe(false);
-    expect(r.gwpBasis).toBe('AR6');
+    expect(r.gwpBasis).toBeNull();
   });
 
   it('2. listed equity: 50M / 500M → factor 0.10, financed 20,000 tCO2e', () => {
@@ -42,7 +42,7 @@ describe('PCAF attribution — attributionFactor + financedEmissions', () => {
     expect(attributionFactor(a).factor).toBe(0.1);
     const r = financedEmissions(a);
     expect(r.financedEmissions).toBe(20_000);
-    expect(r.gwpBasis).toBe('AR6');
+    expect(r.gwpBasis).toBeNull();
   });
 
   it('3. mortgages: 300k / 400k → factor 0.75, financed 4.5 tCO2e', () => {
@@ -55,7 +55,7 @@ describe('PCAF attribution — attributionFactor + financedEmissions', () => {
     expect(attributionFactor(a).factor).toBe(0.75);
     const r = financedEmissions(a);
     expect(r.financedEmissions).toBe(4.5);
-    expect(r.gwpBasis).toBe('AR6');
+    expect(r.gwpBasis).toBeNull();
   });
 
   it('4. cap: 120 / 100 → factor 1, capped true', () => {
@@ -67,7 +67,7 @@ describe('PCAF attribution — attributionFactor + financedEmissions', () => {
     expect(r.attributionFactor).toBe(1);
     expect(r.capped).toBe(true);
     expect(r.financedEmissions).toBe(1_000); // capped factor 1 × 1,000
-    expect(r.gwpBasis).toBe('AR6');
+    expect(r.gwpBasis).toBeNull();
   });
 
   it('5. denominator 0 → throws', () => {
@@ -89,10 +89,13 @@ describe('PCAF attribution — attributionFactor + financedEmissions', () => {
     const r = financedEmissions(a);
     expect(r.financedEmissions).toBe(0);
     expect(r.capped).toBe(false);
-    expect(r.gwpBasis).toBe('AR6');
+    expect(r.gwpBasis).toBeNull();
   });
 
-  it('gwpBasis is AR6 on every result', () => {
+  // ⚠️ REWRITTEN 18 SEP 2026, NOT PRESERVED. This asserted 'AR6' on every result: a basis the library stamped
+  // and nobody had collected. The contract now is that the basis is NOT RECORDED (null) on every result,
+  // decomposed, per asset and proxy alike, until a holding carries one the customer supplied.
+  it('gwpBasis is not recorded (null) on every result', () => {
     const classes: PcafAsset['assetClass'][] = [
       'listed_equity_corp_bonds',
       'business_loans_unlisted_equity',
@@ -103,7 +106,7 @@ describe('PCAF attribution — attributionFactor + financedEmissions', () => {
     ];
     for (const c of classes) {
       const r = financedEmissions(asset({ assetClass: c, outstandingAmount: 1, denominator: 2, investeeEmissions: 10 }));
-      expect(r.gwpBasis).toBe('AR6');
+      expect(r.gwpBasis).toBeNull();
       expect(r.financedEmissions).toBe(5);
     }
   });
@@ -237,7 +240,7 @@ describe('PCAF engine — assessAsset / assessPortfolio (decomposed)', () => {
     expect(a.financedEmissions).toBe(5_000); // 0.10 × 50_000
     expect(a.dqScore).toBe(1);
     expect(a.attributionFactor).toBe(0.1);
-    expect(a.gwpBasis).toBe('AR6');
+    expect(a.gwpBasis).toBeNull();
     const b = assessAsset(B);
     expect(b.financedEmissions).toBe(1_200); // 0.10 × 12_000 (investee)
     expect(b.dqScore).toBe(4);
@@ -253,7 +256,7 @@ describe('PCAF engine — assessAsset / assessPortfolio (decomposed)', () => {
     expect(r.byAssetClass.business_loans_unlisted_equity).toBe(5_000);
     expect(r.byAssetClass.listed_equity_corp_bonds).toBe(1_200);
     expect(r.coverageByScore).toEqual({ 1: 1, 2: 0, 3: 0, 4: 1, 5: 0 });
-    expect(r.gwpBasis).toBe('AR6');
+    expect(r.gwpBasis).toBeNull();
   });
 
   it('all-zero emissions → outstanding-amount fallback, no NaN', () => {
@@ -303,7 +306,7 @@ describe('PCAF engine — portfolioFromProxy (score-5 regime, same shape)', () =
     expect(r.assetCount).toBe(1);
     expect(r.perAsset).toEqual([]);
     expect(r.coverageByScore).toEqual({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 1 });
-    expect(r.gwpBasis).toBe('AR6');
+    expect(r.gwpBasis).toBeNull();
   });
 
   it('manual override proxy → score 2', () => {
