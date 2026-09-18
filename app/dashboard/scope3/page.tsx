@@ -16,7 +16,11 @@ import { INDUSTRY_OPTION_GROUPS, industryName } from '../../../lib/emissionFacto
 import { PRODUCT_OPTION_GROUPS, productName } from '../../../lib/emissionFactors/productOptions'
 import { inScopeFor, scopeNote, outOfScopeDisclosure, CATEGORY_SCOPE_LABEL, type SpendCategoryId } from '../../../lib/scope3/categoryScope'
 import { spendSector } from '../../../lib/scope3/spendSector'
-import { cat15Figure, holdingComputes, assessableEmissions, CAT15_ASSESSMENT_FAILED, type Cat15Figure } from '../../../lib/scope3/cat15'
+import {
+  cat15Figure, holdingComputes, assessableEmissions, CAT15_ASSESSMENT_FAILED, type Cat15Figure,
+  CAT15_GUIDANCE, CAT15_PANEL_METHOD, CAT15_PANEL_NO_PROXY, CAT15_RECORDED_NOT_USED,
+  cat15DecomposedBasisDetail,
+} from '../../../lib/scope3/cat15'
 import { matchCountries, countryByIso2 } from '../../../lib/emissionFactors/countryOptions'
 import { regionName, regionLabel, countryLabel } from '../../../lib/emissionFactors/regionNames'
 import {
@@ -54,7 +58,7 @@ const CATEGORIES = [
   { id: 'cat12', num: 12, name: 'End-of-life treatment', stream: 'Downstream', desc: 'Emissions from disposal of your sold products at end of life', method: 'activity', unit: 'tonnes', typicalShare: 0.02 , guidance: 'Emissions from the end-of-life treatment of your sold products once customers dispose of them — landfill, incineration, recycling.', dataSource: 'Units / mass sold + end-of-life treatment assumptions by material. Activity-based; spend-based is not appropriate here.' },
   { id: 'cat13', num: 13, name: 'Downstream leased assets', stream: 'Downstream', desc: 'Emissions from assets owned and leased to others', method: 'activity', unit: 'kwh', typicalShare: 0.01 , guidance: 'Emissions from assets you OWN and LEASE OUT to others (as lessor) that aren\'t in your Scope 1 & 2 — e.g. property you rent to tenants.', dataSource: 'Your leased-out asset portfolio + tenants\' energy use (floor area or metered). Activity-based; spend-based is not appropriate here.' },
   { id: 'cat14', num: 14, name: 'Franchises', stream: 'Downstream', desc: 'Emissions from franchise operations', method: 'activity', unit: 'spend', typicalShare: 0.01 , guidance: 'Emissions from the operations of your FRANCHISEES — relevant if you\'re a franchisor.', dataSource: 'Franchisee energy/activity data, or estimates from number and type of franchise outlets. Activity-based; spend-based is not appropriate here.' },
-  { id: 'cat15', num: 15, name: 'Investments', stream: 'Downstream', desc: 'Emissions associated with investments and lending (financed emissions)', method: 'pcaf', unit: 'spend', typicalShare: 0.90 , guidance: 'Emissions associated with your investments and lending (financed emissions) — for investors, banks and asset owners. ThemisIQ assesses this holding by holding on PCAF\u2019s method: each investee\u2019s own reported emissions, multiplied by your share of that investee. A total portfolio value on its own produces no figure — it is a balance at a date, and a spend factor is an intensity per year of activity, so multiplying them prices a year of purchasing nobody made. ThemisIQ is not PCAF-certified or a PCAF signatory.', dataSource: 'Per holding: the asset class, the outstanding amount, the value that asset class attributes on (EVIC, equity plus debt, property value or vehicle value) and the investee\u2019s reported emissions. If you already hold a computed figure for the portfolio, enter known financed emissions directly instead.' },
+  { id: 'cat15', num: 15, name: 'Investments', stream: 'Downstream', desc: 'Emissions associated with investments and lending (financed emissions)', method: 'pcaf', unit: 'spend', typicalShare: 0.90 , guidance: CAT15_GUIDANCE, dataSource: 'Per holding: the asset class, the outstanding amount, the value that asset class attributes on (EVIC, equity plus debt, property value or vehicle value) and the investee\u2019s reported emissions. If you already hold a computed figure for the portfolio, enter known financed emissions directly instead.' },
 ]
 
 // ⚠️ NO SECTOR MATERIALITY TABLE, AND NO SUGGESTION FEATURE. SECTOR_MATERIAL mapped thirteen retired
@@ -1487,13 +1491,9 @@ export default function Scope3Dashboard() {
       }
       if (f.basis === 'decomposed' && f.assessment) {
         const a = f.assessment
-        return {
-          basis: 'PCAF-aligned, per asset',
-          detail: `Assessed asset by asset across ${a.assetCount} ${a.assetCount === 1 ? 'holding' : 'holdings'}, ` +
-            `each as the investee's own emissions multiplied by the outstanding amount over the value the ` +
-            `asset class attributes on, with an emissions-weighted PCAF data quality score of ` +
-            `${a.weightedDataQualityScore.toFixed(1)} of 5.`,
-        }
+        // The holding formula is the shared Category 15 sentence (lib/scope3/cat15.ts), not a local copy:
+        // this detail reaches the CSV methodology note and the saved factor_basis column.
+        return { basis: 'PCAF-aligned, per asset', detail: cat15DecomposedBasisDetail(a.assetCount, a.weightedDataQualityScore) }
       }
       return notPriced
     }
@@ -1721,7 +1721,7 @@ export default function Scope3Dashboard() {
       if (c15.portfolio_value || c15.portfolio_sector) {
         out.push(['Cat 15', 'Portfolio value and sector on this record',
           [c15.portfolio_value ? `${c15.portfolio_value} ${currency}` : '', sectorLabel(c15.portfolio_sector)].filter(Boolean).join(', '),
-          'Recorded, and NOT used to produce any figure. A portfolio balance multiplied by a spend intensity per year of activity is not a quantity, so ThemisIQ no longer estimates this category that way.'])
+          CAT15_RECORDED_NOT_USED])
       }
     }
     return out
@@ -2440,8 +2440,10 @@ export default function Scope3Dashboard() {
                         and no factor repairs it. The two fields remain in CategoryData so a saved record
                         still loads, and the export reports them as recorded and not used. */}
                     <div style={{ gridColumn: '1 / -1', background: '#E6F1FB', borderRadius: 8, padding: '0.75rem', fontSize: 11, color: '#0C447C', marginBottom: 8, lineHeight: 1.6 }}>
-                      Financed emissions are worked out holding by holding: each investee&apos;s own emissions, multiplied by your share of that investee — the outstanding amount over the value its asset class attributes on. That is PCAF&apos;s method, and it is the only way this figure can be checked.<br />
-                      <strong>A total portfolio value on its own cannot produce a figure.</strong> It is a balance at a date, and a spend factor is an intensity per year of activity, so multiplying them prices a year of purchasing nobody made. ThemisIQ used to estimate Cat 15 that way and no longer does.<br />
+                      {/* The Category 15 sentences, from lib/scope3/cat15.ts — the same ones the methodology page,
+                          the hierarchy line and the CSV use. Not typed here. */}
+                      {CAT15_PANEL_METHOD}<br />
+                      <strong>{CAT15_PANEL_NO_PROXY}</strong><br />
                       ThemisIQ is PCAF-aligned, not PCAF-certified and not a PCAF signatory.
                     </div>
                     <div style={{ gridColumn: '1 / -1' }}>
@@ -2528,7 +2530,11 @@ export default function Scope3Dashboard() {
                                 // figure here is a row the portfolio total contains, and one that says
                                 // "complete this row" is one that withholds the whole figure.
                                 if (!holdingComputes(row)) {
-                                  return <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Complete this holding to compute — it needs an outstanding amount, the {meta.denominatorLabel.toLowerCase()}, and the investee&apos;s emissions.</div>
+                                  // ⚠️ ONLY WHAT WITHHOLDS THE FIGURE. This said the holding "needs an outstanding
+                                  // amount", which it does not: a blank outstanding amount is read as zero and the
+                                  // holding computes (see the cat15-blank-outstanding-is-zero note). When that is
+                                  // fixed, the outstanding amount goes back into this sentence.
+                                  return <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Complete this holding to compute: it needs the investee&apos;s emissions and the attribution value.</div>
                                 }
                                 const a = assessAsset({ ...row, emissions: assessableEmissions(row.emissions) })
                                 return <div style={{ fontSize: 11, color: '#0F6E56', fontWeight: 600 }}>Financed: {a.financedEmissions.toFixed(1)} tCO₂e · {(a.attributionFactor * 100).toFixed(1)}% of the investee · PCAF DQ {a.dqScore}</div>
