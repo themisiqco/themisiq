@@ -57,10 +57,11 @@ export const SCOPE3_CATEGORY_NUMBERS: readonly number[] = Array.from({ length: 1
 const METHOD_RANK: Readonly<Record<Scope3Method, number>> = {
   exiobase_spend: 1,
   waste_factors: 2,
-  travel_factors: 3,
-  commuting_factors: 4,
-  pcaf: 5,
-  flat_spend: 6,
+  end_of_life_factors: 3,
+  travel_factors: 4,
+  commuting_factors: 5,
+  pcaf: 6,
+  flat_spend: 7,
 }
 
 export interface Scope3MethodGroup {
@@ -147,6 +148,8 @@ const ASSISTANT_METHOD_PHRASE: Readonly<Record<Scope3Method, (ns: readonly numbe
     (ns.includes(1) ? ', and for Category 1 also from supplier-specific figures where the customer enters them' : ''),
   waste_factors: () =>
     `priced from the UK DEFRA/DESNZ ${DEFRA_WASTE_META.year} waste factors, per material and treatment route`,
+  end_of_life_factors: () =>
+    `priced from the same UK DEFRA/DESNZ ${DEFRA_WASTE_META.year} waste factors, per material and treatment route, applied to the tonnes of sold products reaching end of life as the customer splits them across routes`,
   travel_factors: () => 'priced from fixed factors that carry no recorded source, year or region',
   commuting_factors: () => 'priced from fixed factors that carry no recorded source, year or region',
   pcaf: () => 'assessed through a PCAF-aligned path',

@@ -9,20 +9,21 @@ import { DEFRA_WASTE_META } from '../emissionFactors/defraWaste'
 import { methodologyHierarchyLines } from './methodSummary'
 
 const IDS = Array.from({ length: 15 }, (_, i) => `cat${i + 1}`)
-const METHODS: Scope3Method[] = ['exiobase_spend', 'flat_spend', 'waste_factors', 'travel_factors', 'commuting_factors', 'pcaf']
+const METHODS: Scope3Method[] = ['exiobase_spend', 'flat_spend', 'waste_factors', 'travel_factors', 'commuting_factors', 'pcaf', 'end_of_life_factors']
 
 describe('Scope 3 category methods', () => {
-  it('M1 the split is exactly: Cats 1/2/4 EXIOBASE, Cat 5/6/7 activity factors, Cat 15 PCAF, the other eight flat', () => {
+  it('M1 the split is exactly: Cats 1/2/4 EXIOBASE, Cat 5/6/7/12 activity factors, Cat 15 PCAF, the other seven flat', () => {
     // Cats 2 and 4 moved onto EXIOBASE on 17 Sep 2026: they are purchases, so a spend figure has something
     // to multiply. The seven left on flat_spend are a decision, not a backlog — see METHOD_BY_CATEGORY.
     expect(IDS.map(id => [id, scope3MethodFor(id)])).toEqual([
       ['cat1', 'exiobase_spend'], ['cat2', 'exiobase_spend'], ['cat3', 'flat_spend'], ['cat4', 'exiobase_spend'],
       ['cat5', 'waste_factors'], ['cat6', 'travel_factors'], ['cat7', 'commuting_factors'],
       ['cat8', 'flat_spend'], ['cat9', 'flat_spend'], ['cat10', 'flat_spend'], ['cat11', 'flat_spend'],
-      ['cat12', 'flat_spend'], ['cat13', 'flat_spend'], ['cat14', 'flat_spend'], ['cat15', 'pcaf'],
+      ['cat12', 'end_of_life_factors'], ['cat13', 'flat_spend'], ['cat14', 'flat_spend'], ['cat15', 'pcaf'],
     ])
-    // EIGHT, not seven: the generic ten were 2, 3, 4, 8, 9, 10, 11, 12, 13, 14, and two left.
-    expect(IDS.filter(id => scope3MethodFor(id) === 'flat_spend')).toHaveLength(8)
+    // SEVEN: the generic ten were 2, 3, 4, 8, 9, 10, 11, 12, 13, 14; Cats 2 and 4 left for EXIOBASE on
+    // 17 Sep 2026, and Cat 12 for the DEFRA end-of-life factors on 18 Sep 2026.
+    expect(IDS.filter(id => scope3MethodFor(id) === 'flat_spend')).toEqual(['cat3', 'cat8', 'cat9', 'cat10', 'cat11', 'cat13', 'cat14'])
     expect(IDS.filter(id => scope3MethodFor(id) === 'exiobase_spend')).toEqual(['cat1', 'cat2', 'cat4'])
   })
 
@@ -44,10 +45,12 @@ describe('Scope 3 category methods', () => {
     expect(provenanceGap({ source: 'X', year: 2024, region: 'GB' })).toBeNull()
   })
 
-  it('M4 only the waste description names DEFRA, and it names it by the engine\'s citation', () => {
-    // Cat 5 prices from DEFRA/DESNZ factors since 17 Sep 2026. Every other method still has none.
-    for (const m of METHODS.filter(x => x !== 'waste_factors')) expect(scope3MethodDescription(m), m).not.toMatch(/DEFRA/i)
-    expect(scope3MethodDescription('waste_factors')).toContain(defraCitation(2026))
+  it('M4 only the two waste descriptions name DEFRA, and each names it by the engine\'s citation', () => {
+    // Cat 5 prices from DEFRA/DESNZ factors since 17 Sep 2026, and Cat 12 from the same sheet since 18 Sep
+    // 2026. Every other method still has none.
+    const defra: Scope3Method[] = ['waste_factors', 'end_of_life_factors']
+    for (const m of METHODS.filter(x => !defra.includes(x))) expect(scope3MethodDescription(m), m).not.toMatch(/DEFRA/i)
+    for (const m of defra) expect(scope3MethodDescription(m), m).toContain(defraCitation(2026))
   })
 
   it('M5 ⚠️ no source file under app/ claims DEFRA and Exiobase together', () => {
@@ -105,12 +108,12 @@ describe('Scope 3 category methods', () => {
     // "Primary data" while their calculators ignored the figure. The page now asks takesEnteredFigure,
     // which reads the same record the methodology page publishes.
     const noEnteredFigure = METHODS.filter(m => !METHOD_TAKES_ENTERED_FIGURE[m])
-    expect(noEnteredFigure.sort()).toEqual(['commuting_factors', 'travel_factors', 'waste_factors'])
+    expect(noEnteredFigure.sort()).toEqual(['commuting_factors', 'end_of_life_factors', 'travel_factors', 'waste_factors'])
     for (const id of IDS) {
       expect(takesEnteredFigure(id), id).toBe(METHOD_TAKES_ENTERED_FIGURE[scope3MethodFor(id)])
       if (noEnteredFigure.includes(scope3MethodFor(id))) expect(takesEnteredFigure(id), id).toBe(false)
     }
-    expect(IDS.filter(id => !takesEnteredFigure(id))).toEqual(['cat5', 'cat6', 'cat7'])
+    expect(IDS.filter(id => !takesEnteredFigure(id))).toEqual(['cat5', 'cat6', 'cat7', 'cat12'])
     // Both of the page's override checks go through takesEnteredFigure, and none goes around it.
     const page = readFileSync(join(__dirname, '../../app/dashboard/scope3/page.tsx'), 'utf8')
     expect(page).toContain('if (d.emissions_override && takesEnteredFigure(id)) return true')

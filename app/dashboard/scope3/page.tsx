@@ -28,6 +28,8 @@ import {
   wasteMethodFor, withoutListMarker,
 } from '../../../lib/emissionFactors/defraWaste'
 import { evaluateWasteRows, wasteRowNotPricedReason, type WasteRow, type EvaluatedWasteRow } from '../../../lib/scope3/wasteRows'
+import { evaluateEolMaterials, eolMaterialNotPricedReason, formatShare, type EolMaterial, type EvaluatedEolMaterial } from '../../../lib/scope3/endOfLife'
+import { rowPricedResult } from '../../../lib/scope3/rowPriced'
 import type { PcafPortfolioAsset, PcafAssetClass, EmissionInputs } from '../../../lib/pcaf/types'
 import { editRows, type RowEdit } from '../../../lib/rowList'
 import { sectionHead } from '@/app/components/headingStyles'
@@ -56,7 +58,7 @@ const CATEGORIES = [
   { id: 'cat9', num: 9, name: 'Downstream transportation', stream: 'Downstream', desc: 'Emissions from transporting and distributing sold products', method: 'activity', unit: 'tonne_km', typicalShare: 0.03 , guidance: 'Emissions from transporting and distributing the products you SELL, after they leave you — outbound logistics, distribution centres, retail, paid for by others.', dataSource: 'Distribution/logistics records or modelled tonne-km of sold-product movement. Spend-based estimation is permitted for this category.' },
   { id: 'cat10', num: 10, name: 'Processing of sold products', stream: 'Downstream', desc: 'Emissions from processing your intermediate products by third parties', method: 'activity', unit: 'tonnes', typicalShare: 0.02 , guidance: 'Emissions from third parties further PROCESSING your sold intermediate products before final use (e.g. you sell a component that\'s then assembled or refined).', dataSource: 'Production volumes of intermediate goods + processing energy assumptions. Activity-based; spend-based is not appropriate here.' },
   { id: 'cat11', num: 11, name: 'Use of sold products', stream: 'Downstream', desc: 'Emissions from end-users using your sold products', method: 'activity', unit: 'units', typicalShare: 0.15 , guidance: 'Emissions from customers USING the products you sell over their lifetime — often the largest category for energy-using or fuel products.', dataSource: 'Units sold + expected lifetime energy/fuel use per unit. Activity-based; spend-based is not appropriate here.' },
-  { id: 'cat12', num: 12, name: 'End-of-life treatment', stream: 'Downstream', desc: 'Emissions from disposal of your sold products at end of life', method: 'activity', unit: 'tonnes', typicalShare: 0.02 , guidance: 'Emissions from the end-of-life treatment of your sold products once customers dispose of them — landfill, incineration, recycling.', dataSource: 'Units / mass sold + end-of-life treatment assumptions by material. Activity-based; spend-based is not appropriate here.' },
+  { id: 'cat12', num: 12, name: 'End-of-life treatment', stream: 'Downstream', desc: 'Emissions from disposal of your sold products at end of life', method: 'activity', unit: 'tonnes', typicalShare: 0.02 , guidance: 'Emissions from the waste treatment of the products you sold in the reporting year, and of their packaging, at the end of their life: landfill, combustion, recycling, composting or anaerobic digestion. The figure covers all of that year\u2019s sales, so most of these emissions have not happened yet.', dataSource: 'Per material: the tonnes of sold products and packaging that reach end of life, and how that mass splits across treatment routes. Enter the mass that reaches end of life, which can be less than the mass sold for products that are consumed, such as food and drink. For an intermediate product, enter the intermediate product you sold, not the final product it becomes part of. Include packaging, through to the point of retail.' },
   { id: 'cat13', num: 13, name: 'Downstream leased assets', stream: 'Downstream', desc: 'Emissions from assets owned and leased to others', method: 'activity', unit: 'kwh', typicalShare: 0.01 , guidance: 'Emissions from assets you OWN and LEASE OUT to others (as lessor) that aren\'t in your Scope 1 & 2 — e.g. property you rent to tenants.', dataSource: 'Your leased-out asset portfolio + tenants\' energy use (floor area or metered). Activity-based; spend-based is not appropriate here.' },
   { id: 'cat14', num: 14, name: 'Franchises', stream: 'Downstream', desc: 'Emissions from franchise operations', method: 'activity', unit: 'spend', typicalShare: 0.01 , guidance: 'Emissions from the operations of your FRANCHISEES — relevant if you\'re a franchisor.', dataSource: 'Franchisee energy/activity data, or estimates from number and type of franchise outlets. Activity-based; spend-based is not appropriate here.' },
   { id: 'cat15', num: 15, name: 'Investments', stream: 'Downstream', desc: 'Emissions associated with investments and lending (financed emissions)', method: 'pcaf', unit: 'spend', typicalShare: 0.90 , guidance: CAT15_GUIDANCE, dataSource: 'Per holding: the asset class, the outstanding amount, the value that asset class attributes on (EVIC, equity plus debt, property value or vehicle value) and the investee\u2019s reported emissions. If you already hold a computed figure for the portfolio, enter known financed emissions directly instead.' },
@@ -400,6 +402,97 @@ const WASTE_EDITOR_COPY: Readonly<Record<WasteRowsCategoryId, { empty: string; s
  * its own rows. The markup is Category 5's, moved verbatim; what differs by category is the words
  * (WASTE_EDITOR_COPY) and the id prefix, and the rows and handlers come in as props.
  */
+/**
+ * Category 12's materials: per material, the tonnes of sold products and packaging reaching end of life and
+ * a percentage share per treatment route the sheet publishes for it. The route tonnes are derived and priced
+ * by lib/scope3/endOfLife.ts; this only collects the inputs and shows each material's own result.
+ *
+ * ⚠️ NOT WasteRowsEditor, deliberately. That editor collects tonnes PER ROUTE, which is right for Category 5
+ * (a waste contractor invoices by route) and wrong here: the GHG Protocol asks for the mass and the
+ * PROPORTION treated by each method (Technical Guidance p. 126), and the proportion is an assumption the
+ * customer must be able to see and state. The material select and the route list are the same reader.
+ */
+function EolMaterialsEditor({ evaluated, onAdd, onRemove, onSetMaterial, onUpdate, onSetShare }: {
+  evaluated: readonly EvaluatedEolMaterial[]
+  onAdd: () => void
+  onRemove: (id: string) => void
+  onSetMaterial: (id: string, key: string) => void
+  onUpdate: (id: string, patch: Partial<EolMaterial>) => void
+  onSetShare: (id: string, route: string, value: number | undefined) => void
+}) {
+  return (
+    <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {evaluated.length === 0 && (
+        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', background: '#f8f7f5', borderRadius: 8, padding: '0.75rem', lineHeight: 1.5 }}>
+          No materials yet. Add one for each material your sold products and their packaging are made of.
+        </div>
+      )}
+      {evaluated.map(e => {
+        const m = e.material
+        const hasMaterial = !!m.activity && !!m.waste_type
+        const routes = hasMaterial ? wasteRoutesFor(m.activity, m.waste_type) : []
+        const materialKey = hasMaterial && WASTE_MATERIAL_GROUPS.some(g => g.activity === m.activity && g.materials.includes(m.waste_type))
+          ? wasteMaterialKey(m.activity, m.waste_type) : ''
+        const fieldId = (f: string) => `cat12-${m.id}-${f}`
+        const reason = eolMaterialNotPricedReason(e)
+        return (
+          <div key={m.id} style={{ border: '1px solid #e8e7e4', borderRadius: 10, padding: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#555553' }}>Material {e.n}</span>
+              <button type="button" aria-label={`Remove material ${e.n}`} onClick={() => onRemove(m.id)} style={{ fontSize: 11, color: '#B91C1C', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Remove</button>
+            </div>
+            <div>
+              <label htmlFor={fieldId('material')} style={labelStyle}>Material</label>
+              <select id={fieldId('material')} style={inputStyle} value={materialKey} onChange={ev => onSetMaterial(m.id, ev.target.value)}>
+                <option value="">Select material</option>
+                {WASTE_MATERIAL_GROUPS.map(g => (
+                  <optgroup key={g.activity} label={g.activity}>
+                    {g.materials.map(mat => <option key={mat} value={wasteMaterialKey(g.activity, mat)}>{mat}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor={fieldId('tonnes')} style={labelStyle}>Tonnes reaching end of life</label>
+              <input id={fieldId('tonnes')} style={inputStyle} type="number" min={0} value={m.tonnes || ''} onChange={ev => onUpdate(m.id, { tonnes: Number(ev.target.value) })} placeholder="0" />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <div style={labelStyle}>Share of this mass by treatment route (%)</div>
+              {!hasMaterial ? (
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Choose a material first: only the routes the sheet publishes for it are offered.</div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 8 }}>
+                  {routes.map(r => (
+                    <div key={r}>
+                      <label htmlFor={fieldId(`share-${r}`)} style={{ fontSize: 11, color: '#555553', display: 'block', marginBottom: 4 }}>{r}</label>
+                      <input id={fieldId(`share-${r}`)} style={inputStyle} type="number" min={0} max={100} value={m.shares[r] ?? ''} onChange={ev => onSetShare(m.id, r, ev.target.value === '' ? undefined : Number(ev.target.value))} placeholder="0" />
+                    </div>
+                  ))}
+                </div>
+              )}
+              {hasMaterial && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 6 }}>Shares entered: {formatShare(e.shareSum || 0)}% of 100%.</div>}
+            </div>
+            <div style={{ gridColumn: '1 / -1', fontSize: 11, lineHeight: 1.5 }}>
+              {e.outcome.status === 'priced' ? (
+                <span style={{ color: '#555553' }}>
+                  {e.routes.map(x => x.pricing.status === 'priced'
+                    ? `${formatShare(x.row.tonnes)} t to ${x.row.route} × ${x.pricing.factor_kg_per_tonne} kg CO₂e per t`
+                    : '').filter(Boolean).join('; ')} = <strong style={{ fontWeight: 600 }}>{e.kg.toLocaleString('en', { maximumFractionDigits: 2 })} kg CO₂e</strong>
+                </span>
+              ) : e.outcome.status === 'incomplete' ? (
+                <span style={{ color: 'var(--color-ink-muted)' }}>Not priced until entered: {reason?.replace(/ not entered$/, '')}.</span>
+              ) : (
+                <span style={{ color: '#92400e' }}>⚠ Not counted: {reason}.</span>
+              )}
+            </div>
+          </div>
+        )
+      })}
+      <button type="button" onClick={onAdd} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: 'none', border: '0.5px solid var(--color-brand)', color: 'var(--color-brand)', cursor: 'pointer', alignSelf: 'flex-start' }}>+ Add material</button>
+    </div>
+  )
+}
+
 function WasteRowsEditor({ catId, evaluated, onAdd, onRemove, onUpdate, onSetMaterial }: {
   catId: WasteRowsCategoryId
   evaluated: readonly EvaluatedWasteRow[]
@@ -520,6 +613,12 @@ interface CategoryData {
   wfh_days?: number
   // Cat 5 — one row per material and treatment route, priced from lib/emissionFactors/defraWaste2026.json.
   wasteRows?: WasteRow[]
+  // Cat 12 — one entry per material: tonnes reaching end of life and a percentage split across the routes
+  // the sheet publishes for it. Priced by lib/scope3/endOfLife.ts through the same waste evaluator as Cat 5.
+  eolMaterials?: EolMaterial[]
+  /** Where the Cat 12 split comes from, in the customer's words. Optional: a missing source is priced and
+   *  disclosed, as an exclusion without a justification is. */
+  eol_split_source?: string
   // ⚠️ THE PREVIOUS CAT 5 FORM. NEVER PRICED, NEVER WRITTEN, AND NEVER REMOVED. No input sets these any
   // more and no calculation reads them. They are typed only so that an inventory saved under the old form
   // can say what it holds (cat5LegacyNotice). Saves spread the stored cat5 object, so the values stay in
@@ -1070,6 +1169,32 @@ export default function Scope3Dashboard() {
   const updatePcafEmissions = (id: string, patch: Partial<EmissionInputs>) =>
     updatePcafAsset(id, row => ({ emissions: { ...row.emissions, ...patch } }))
 
+  // Cat 12 end-of-life materials, in catData['cat12'].eolMaterials.
+  const newEolMaterial = (): EolMaterial => ({ id: Math.random().toString(36).slice(2), activity: '', waste_type: '', tonnes: 0, shares: {} })
+  const editEolMaterials = (edit: RowEdit<EolMaterial>) =>
+    setCatData(prev => ({ ...prev, cat12: { ...prev.cat12, eolMaterials: editRows(prev.cat12?.eolMaterials, edit) } }))
+  const addEolMaterial = () => editEolMaterials({ kind: 'add', row: newEolMaterial() })
+  const removeEolMaterial = (id: string) => editEolMaterials({ kind: 'remove', id })
+  const updateEolMaterial = (id: string, patch: Partial<EolMaterial> | ((row: EolMaterial) => Partial<EolMaterial>)) =>
+    editEolMaterials({ kind: 'update', id, patch })
+  /** A material change keeps only the shares on routes the new material publishes, for the reason
+   *  setWasteMaterial keeps only a published route: a share with no factor could not be shown or priced. */
+  const setEolMaterialType = (id: string, key: string) => {
+    const m = parseWasteMaterialKey(key)
+    if (!m) { updateEolMaterial(id, { activity: '', waste_type: '', shares: {} }); return }
+    updateEolMaterial(id, row => {
+      const routes = wasteRoutesFor(m.activity, m.waste_type)
+      return { activity: m.activity, waste_type: m.waste_type, shares: Object.fromEntries(Object.entries(row.shares).filter(([r]) => routes.includes(r))) }
+    })
+  }
+  const setEolShare = (id: string, route: string, value: number | undefined) =>
+    updateEolMaterial(id, row => {
+      const shares = { ...row.shares }
+      if (value === undefined) delete shares[route]
+      else shares[route] = value
+      return { shares }
+    })
+
   // Waste rows, in catData[catId].wasteRows, for every row-priced category (Cat 5 today).
   const newWasteRow = (): WasteRow => ({
     id: Math.random().toString(36).slice(2),
@@ -1205,6 +1330,17 @@ export default function Scope3Dashboard() {
    * GHG inventory records its own basis in gwp_version, and the sentence says whether the two match,
    * differ, or cannot be compared because nothing is recorded.
    */
+  /** The GWP sentence both waste categories carry: the sheet's AR5 basis, and whether the bound GHG inventory
+   *  shares it. Cat 5's wording, unchanged, now built once so Cat 12 cannot word it differently. */
+  const wasteGwpSentence: string = (() => {
+    const m = DEFRA_WASTE_META
+    const mix = !boundInventoryId ? ''
+      : ghgGwpVersion === m.gwp_basis ? ` The linked GHG inventory records ${ghgGwpVersion} as well, so the two share a GWP basis.`
+      : ghgGwpVersion ? ` The linked GHG inventory records ${ghgGwpVersion}. These factors are not re-based to it, so the inventory combines ${ghgGwpVersion} and ${m.gwp_basis} figures.`
+      : ` The linked GHG inventory records no GWP basis, so whether it shares ${m.gwp_basis} with these factors is not known.`
+    return `GWP basis: ${m.gwp_basis}. ${m.gwp_basis_note}${mix}`
+  })()
+
   const cat5Sentences: string[] = (() => {
     const m = DEFRA_WASTE_META
     const out: string[] = []
@@ -1225,11 +1361,7 @@ export default function Scope3Dashboard() {
     if (methodParts.length > 0) {
       out.push(`Method, in the GHG Protocol Scope 3 Standard's terms for Category 5: ${methodParts.join('; ')}.`)
     }
-    const mix = !boundInventoryId ? ''
-      : ghgGwpVersion === m.gwp_basis ? ` The linked GHG inventory records ${ghgGwpVersion} as well, so the two share a GWP basis.`
-      : ghgGwpVersion ? ` The linked GHG inventory records ${ghgGwpVersion}. These factors are not re-based to it, so the inventory combines ${ghgGwpVersion} and ${m.gwp_basis} figures.`
-      : ` The linked GHG inventory records no GWP basis, so whether it shares ${m.gwp_basis} with these factors is not known.`
-    out.push(`GWP basis: ${m.gwp_basis}. ${m.gwp_basis_note}${mix}`)
+    out.push(wasteGwpSentence)
     out.push(withoutListMarker(m.scope_guidance))
     out.push(withoutListMarker(m.lifecycle_guidance))
     out.push('Each material is offered only the treatment routes the sheet publishes a factor for. A route it does not publish is not offered, and is not treated as zero.')
@@ -1238,6 +1370,42 @@ export default function Scope3Dashboard() {
     for (const e of cat5NotPriced) {
       out.push(`Row ${e.n} is not in this figure: ${wasteRowNotPricedReason(e.row, e.pricing)}.`)
     }
+    return out
+  })()
+
+  // ─── Cat 12: end-of-life treatment of sold products ─────────────────────────────────────────
+  // ONE evaluation read by the panel, the workings, the CSV and factor_basis, as for Cat 5. The figure and
+  // the calculated flag come from rowPricedResult, which reads this category's own data only.
+  const cat12Eol = evaluateEolMaterials(catData['cat12']?.eolMaterials)
+  const cat12SplitSource = (catData['cat12']?.eol_split_source ?? '').trim()
+  /**
+   * The Cat 12 workings and CSV disclosures: the same sentences in both. ⚠️ NO EM-DASHES, and the method is
+   * described as finer than the Technical Guidance's formula [12.1], never as that formula.
+   */
+  const cat12Sentences: string[] = (() => {
+    const m = DEFRA_WASTE_META
+    const out: string[] = []
+    out.push(
+      `Priced from ${m.source} (${m.factor_set.toLowerCase()} v${m.file_version}, ${m.sheet} sheet, factor edition ${m.edition}). ` +
+      `For each material, the tonnes of sold products and packaging reaching end of life are split across treatment routes by the customer's shares, ` +
+      `and each route's tonnes are multiplied by the kg CO2e per tonne the sheet publishes for that material and route; the results are summed.`,
+    )
+    out.push(m.attribution_required)
+    out.push(`Licence: ${m.licence}, ${m.licence_url}`)
+    out.push(
+      "This applies the sheet's factor for each material and each route, which is finer than formula [12.1] of the GHG Protocol's " +
+      'Technical Guidance for Calculating Scope 3 Emissions; that formula applies one average factor per treatment method.',
+    )
+    out.push(cat12SplitSource
+      ? `The split across treatment routes is the customer's assumption. Its stated source: ${cat12SplitSource}`
+      : "The split across treatment routes is the customer's assumption. No source for it was recorded.")
+    out.push('The figure is the expected end-of-life emissions of all products sold in the reporting year. Most of these emissions have not yet occurred.')
+    out.push(`These are UK factors, applied wherever the products were sold. End-of-life treatment where the products are used may differ.`)
+    out.push(wasteGwpSentence)
+    out.push(withoutListMarker(m.scope_guidance))
+    out.push(withoutListMarker(m.lifecycle_guidance))
+    out.push(`Re-use is not offered as a route: a re-used product still reaches end of life later. The workbook's FAQ, "${m.reuse_faq_question}": ${m.reuse_faq_answer}`)
+    for (const e of cat12Eol.notPriced) out.push(`Material ${e.n} is not in this figure: ${eolMaterialNotPricedReason(e)}.`)
     return out
   })()
 
@@ -1275,7 +1443,10 @@ export default function Scope3Dashboard() {
   const getCatEmissions = (id: string): number => {
     switch (scope3MethodFor(id)) {
       case 'exiobase_spend': return calcSpendPriced(id)
-      case 'waste_factors': return calcCat5()
+      // ⚠️ BY THE CATEGORY'S OWN ID. This read `calcCat5()`, which took no id: any second category on a
+      // row-priced method would have reported Category 5's figure. See lib/scope3/rowPriced.ts.
+      case 'waste_factors':
+      case 'end_of_life_factors': return rowPricedResult(catData, id)?.mt ?? 0
       case 'travel_factors': return calcCat6()
       case 'commuting_factors': return calcCat7()
       case 'pcaf': return calcCat15()
@@ -1314,7 +1485,8 @@ export default function Scope3Dashboard() {
     if (d.emissions_override && takesEnteredFigure(id)) return true
     switch (scope3MethodFor(id)) {
       case 'exiobase_spend': return !!(d.has_supplier_data && d.supplier_emissions) || !!spendPricedLine(id)
-      case 'waste_factors': return cat5Priced.length > 0
+      case 'waste_factors':
+      case 'end_of_life_factors': return rowPricedResult(catData, id)?.calculated ?? false
       case 'travel_factors': return !!(d.short_haul_flights || d.long_haul_flights || d.hotel_nights || d.rail_km)
       case 'commuting_factors': return !!d.employee_count
       // ⚠️ mt !== null, NOT > 0. An entered zero — a portfolio that finances no emissions — is a
@@ -1489,6 +1661,7 @@ export default function Scope3Dashboard() {
     if (id === 'cat6' && (d.short_haul_flights || d.long_haul_flights)) return 'medium'
     if (id === 'cat7' && d.employee_count) return 'medium'
     if (id === 'cat5' && cat5Priced.length > 0) return 'medium'
+    if (scope3MethodFor(id) === 'end_of_life_factors' && rowPricedResult(catData, id)?.calculated) return 'medium'
     // ⚠️ A PER-ASSET PCAF ASSESSMENT IS NOT A SPEND ESTIMATE, and it used to fall through to 'Flat spend'
     // — the weakest label in the product — for want of a branch. It rests on each investee's own reported
     // emissions, attributed by a balance-sheet ratio. 'Primary data' only while the score says so: the
@@ -1584,6 +1757,22 @@ export default function Scope3Dashboard() {
         }
       }
       return { basis: 'No data', detail: 'No spend or figure was entered, so nothing was calculated.' }
+    }
+
+    if (method === 'end_of_life_factors') {
+      const e = evaluateEolMaterials(d?.eolMaterials)
+      const skipped = e.notPriced.length > 0
+        ? ` ${e.notPriced.length} ${e.notPriced.length === 1 ? 'material was' : 'materials were'} not priced: ${e.notPriced.map(x => `material ${x.n}, ${eolMaterialNotPricedReason(x)}`).join('; ')}.`
+        : ''
+      if (e.priced.length === 0) {
+        return { basis: 'No data', detail: `No material with a complete treatment split was entered, so nothing was calculated.${skipped}` }
+      }
+      const source = (d?.eol_split_source ?? '').trim()
+      return {
+        basis: `${DEFRA_WASTE_META.source}, ${DEFRA_WASTE_META.sheet} sheet, per material and route, on the customer's split`,
+        detail: `${scope3MethodDescription('end_of_life_factors')} ${e.priced.length} ${e.priced.length === 1 ? 'material' : 'materials'} priced.` +
+          ` Source of the split: ${source || 'not recorded'}.${skipped}`,
+      }
     }
 
     if (method === 'waste_factors') {
@@ -1759,6 +1948,34 @@ export default function Scope3Dashboard() {
       for (const d of cat5Sentences) out.push(['Cat 5', 'Disclosure', d, ''])
     }
 
+    // ⚠️ PER MATERIAL, THEN PER DERIVED ROUTE, so a verifier can redo every step: the tonnes entered, each
+    // share, the tonnes each share gives, the factor the sheet publishes for that material and route, and
+    // the result. Then the split's source, stated or recorded as missing, and the disclosures.
+    const c12 = catData['cat12']
+    if (c12 && isReportable('cat12')) {
+      for (const e of cat12Eol.evaluated) {
+        const mt = e.material
+        const what = mt.waste_type ? `${mt.waste_type} (${mt.activity})` : ''
+        const shares = Object.entries(mt.shares).filter(([, v]) => v).map(([r, v]) => `${r} ${formatShare(v)}%`).join(', ')
+        if (e.outcome.status !== 'priced') {
+          out.push(['Cat 12', `Material ${e.n}`, what, `Not priced: ${eolMaterialNotPricedReason(e)}.`])
+          continue
+        }
+        out.push(['Cat 12', `Material ${e.n}`, what,
+          `${mt.tonnes} t reaching end of life; shares ${shares} (sum ${formatShare(e.shareSum)}%); ${e.kg.toFixed(2)} kg CO2e in total.`])
+        for (const x of e.routes) {
+          if (x.pricing.status !== 'priced') continue
+          out.push(['Cat 12', `Material ${e.n}, ${x.row.route}`, `${formatShare(mt.shares[x.row.route])}% of ${mt.tonnes} t = ${formatShare(x.row.tonnes)} t`,
+            `${formatShare(x.row.tonnes)} t × ${x.pricing.factor_kg_per_tonne} kg CO2e per t = ${x.pricing.kg_co2e.toFixed(2)} kg CO2e; ${WASTE_METHOD_LABEL[x.pricing.method]}.`])
+        }
+      }
+      if (cat12Eol.evaluated.length === 0) out.push(['Cat 12', 'Materials', '', 'None entered.'])
+      out.push(['Cat 12', 'Split source', cat12SplitSource || 'Not recorded',
+        cat12SplitSource ? "The customer's stated source for the treatment split."
+          : 'No source was recorded for the treatment split. The GHG Protocol asks for the assumptions behind end-of-life treatment to be reported.'])
+      for (const d of cat12Sentences) out.push(['Cat 12', 'Disclosure', d, ''])
+    }
+
     const c15 = catData['cat15']
     if (c15 && isReportable('cat15')) {
       // ⚠️ THE ATTRIBUTION INPUTS, PER HOLDING. This block used to write ONE row naming a portfolio
@@ -1823,6 +2040,11 @@ export default function Scope3Dashboard() {
       // problem that is not there.
       ...(unjustifiedExclusions.length > 0
         ? [['Exclusions without justification', `${unjustifiedExclusions.length} of ${CATEGORIES.filter(c => catData[c.id]?.relevant === false).length} excluded categories carry no justification: ${unjustifiedExclusions.map(c => `Cat ${c.num} ${c.name}`).join(', ')}. The GHG Protocol requires one for each.`]]
+        : []),
+      // ⚠️ PRICED AND DISCLOSED, NOT BLOCKED, as an exclusion without a justification is: the figure stands,
+      // and the file says where a reader meets it first that the assumption behind it has no stated source.
+      ...(statusOf('cat12').calculated && !cat12SplitSource
+        ? [['End-of-life split without a source', 'Category 12 is priced from a treatment split with no source recorded. The GHG Protocol asks for the assumptions behind end-of-life treatment to be reported.']]
         : []),
       ['Generated', new Date().toLocaleDateString()],
       [],
@@ -2457,6 +2679,50 @@ export default function Scope3Dashboard() {
                   </>}
 
                   {/* Cat 15 — Investments */}
+                  {/* Cat 12 — end-of-life treatment of sold products: per material, tonnes reaching end of life
+                      and a split across the routes the DEFRA/DESNZ sheet publishes, priced as Cat 5's rows. */}
+                  {cat.id === 'cat12' && <>
+                    <div style={{ gridColumn: '1 / -1', background: '#E6F1FB', borderRadius: 8, padding: '0.75rem', fontSize: 11, color: '#0C447C', lineHeight: 1.6 }}>
+                      <div style={{ fontWeight: 700, marginBottom: 4 }}>What this figure is</div>
+                      <p style={{ margin: '0 0 6px' }}>The expected end-of-life emissions of everything you sold in the reporting year. Most of them have not happened yet.</p>
+                      <p style={{ margin: '0 0 6px' }}>The split across treatment routes is your assumption, and the export says so. The factors are UK factors, applied wherever your products were sold.</p>
+                      <p style={{ margin: '6px 0 0', fontSize: 10 }}>
+                        {DEFRA_WASTE_META.attribution_required}{' '}
+                        <a href={DEFRA_WASTE_META.licence_url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>{DEFRA_WASTE_META.licence}</a>
+                      </p>
+                    </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label htmlFor="cat12-split-source" style={labelStyle}>Source of the treatment split</label>
+                      <textarea id="cat12-split-source" style={{ ...inputStyle, minHeight: 64, resize: 'vertical' }} value={catData['cat12']?.eol_split_source ?? ''} onChange={e => updateCat('cat12', 'eol_split_source', e.target.value)} placeholder="For example: national waste statistics for the markets we sell into, 2024" />
+                      <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.5 }}>
+                        Where the shares come from: national waste statistics for the markets you sell into, an industry study of how your products are disposed of, or your own take-back data. Note your product lifetime assumptions here too.
+                      </div>
+                      {!cat12SplitSource && cat12Eol.priced.length > 0 && (
+                        <div style={{ fontSize: 11, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.5rem 0.6rem', marginTop: 6, lineHeight: 1.5 }}>
+                          No source recorded. The figure is still calculated, and your export says the split has no stated source.
+                        </div>
+                      )}
+                    </div>
+                    <EolMaterialsEditor
+                      evaluated={cat12Eol.evaluated}
+                      onAdd={addEolMaterial}
+                      onRemove={removeEolMaterial}
+                      onSetMaterial={setEolMaterialType}
+                      onUpdate={updateEolMaterial}
+                      onSetShare={setEolShare}
+                    />
+                    {cat12Eol.priced.length > 0 && (
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <SpendFactorWorkings
+                          id="cat12-eol"
+                          figureMt={cat12Eol.mt}
+                          summary={`${cat12Eol.priced.length} ${cat12Eol.priced.length === 1 ? 'material' : 'materials'} priced from the DEFRA/DESNZ ${DEFRA_WASTE_META.year} waste disposal factors, on your split across routes`}
+                          sentences={cat12Sentences}
+                        />
+                      </div>
+                    )}
+                  </>}
+
                   {cat.id === 'cat15' && <>
                     {/* ⚠️ THE PORTFOLIO VALUE AND SECTOR INPUTS ARE GONE, along with the proxy that read
                         them. A balance at a date times an intensity per year of activity is not a quantity,
@@ -2660,9 +2926,9 @@ export default function Scope3Dashboard() {
                     </>
                   })()}
 
-                  {/* Generic spend-based for the seven categories that keep the flat factor. See
-                      SPEND_PRICED_CATEGORIES for why those seven are not priced from EXIOBASE. */}
-                  {!['cat1', 'cat2', 'cat4', 'cat6', 'cat7', 'cat5', 'cat15'].includes(cat.id) && <>
+                  {/* Generic spend-based for the seven categories that keep the flat factor (3, 8, 9, 10, 11, 13
+                      and 14). Cat 12 left on 18 Sep 2026 for its own panel above. */}
+                  {!['cat1', 'cat2', 'cat4', 'cat6', 'cat7', 'cat5', 'cat12', 'cat15'].includes(cat.id) && <>
                     <div>
                       <label style={labelStyle}>Annual spend / value ({currency})</label>
                       <input style={inputStyle} type="number" value={catData[cat.id]?.annual_spend || ''} onChange={e => updateCat(cat.id, 'annual_spend', Number(e.target.value))} placeholder="0" />
