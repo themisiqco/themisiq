@@ -61,6 +61,21 @@ describe('Scope 3 category status', () => {
     expect(scope3StatusLabel(true, false)).toBe('Relevant, not yet calculated')
   })
 
+  it('S9 ⚠️ a method\'s own data-quality score rides with the figure, and only with a figure', () => {
+    // PCAF's 1-5 scale for Cat 15. It is the METHOD's number, not ThemisIQ's confidence pill.
+    expect(coverageEntry(scope3Status(true, true), { mt: 10_000, unpriced: false, reason: null, dq: 1.58 }))
+      .toEqual({ status: 'relevant_calculated', mt: 10_000, in_total: true, unpriced: false, reason: null, dq: 1.58 })
+    // No figure, no score: a quality claim about something never calculated.
+    expect(coverageEntry(scope3Status(true, false), { mt: null, unpriced: false, reason: null, dq: 5 }))
+      .not.toHaveProperty('dq')
+    // An excluded category that WAS calculated keeps its score, because it still reports its figure.
+    expect(coverageEntry(scope3Status(false, true), { mt: 3, unpriced: false, reason: null, dq: 2 }).dq).toBe(2)
+    // ⚠️ OMITTED, NOT NULL, for the fourteen categories whose methods define no such scale — a column of
+    // nulls beside PCAF scores reads as a comparable number across methods, and it is not one.
+    expect(coverageEntry(scope3Status(true, true), { mt: 12, unpriced: false, reason: null })).not.toHaveProperty('dq')
+    expect(coverageEntry(scope3Status(true, true), { mt: 12, unpriced: false, reason: null, dq: null })).not.toHaveProperty('dq')
+  })
+
   it('S8 the invariants hold: a calculated entry is never unpriced, and only an unpriced one carries a reason', () => {
     const calculated = coverageEntry(scope3Status(true, true), { mt: 12.5, unpriced: true, reason: 'should not survive' })
     expect(calculated).toMatchObject({ unpriced: false, reason: null, mt: 12.5, in_total: true })

@@ -78,14 +78,20 @@ export function portfolioProxyEstimate(input: {
   sector?: string;
   emissionsOverride?: number;
 }): EmissionEstimate {
-  // Manual primary-data entry — mirrors legacy `if (d.emissions_override)` (truthy,
-  // so 0 falls through to the proxy). Manual entry can't be score 1 (no third-party
-  // verification) → score 2.
-  if (input.emissionsOverride) {
-    if (input.emissionsOverride < 0) {
-      throw new Error(`PCAF proxy: emissionsOverride must be >= 0 (got ${input.emissionsOverride})`);
+  // Manual primary-data entry. Manual entry can't be score 1 (no third-party verification) → score 2.
+  //
+  // ⚠️ Number.isFinite, NOT TRUTHINESS, SINCE 17 SEP 2026. This read `if (input.emissionsOverride)`, which
+  // mirrored the legacy calculator and could not tell an entered 0 from an unset field: both fell through
+  // to the lumped proxy, so a customer whose portfolio finances no emissions got a proxy figure instead of
+  // the zero they entered. 0 is an answer; blank is not. The test that asserted the old behaviour by name
+  // was rewritten rather than preserved. The negative check below still throws loud.
+  const entered = input.emissionsOverride;
+  if (Number.isFinite(entered)) {
+    const figure = entered as number;
+    if (figure < 0) {
+      throw new Error(`PCAF proxy: emissionsOverride must be >= 0 (got ${figure})`);
     }
-    return { emissions: input.emissionsOverride, dqScore: 2, basis: 'manual entry (tCO2e, unverified)' };
+    return { emissions: figure, dqScore: 2, basis: 'manual entry (tCO2e, unverified)' };
   }
 
   // portfolioValue may be undefined → 0 (matches legacy `|| 0`); if provided, no negatives.

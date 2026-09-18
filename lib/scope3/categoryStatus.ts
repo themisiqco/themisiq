@@ -130,6 +130,23 @@ export interface Scope3CoverageEntry {
   unpriced: boolean
   /** Verbatim, and only when unpriced — otherwise the absence of a figure explains itself. */
   reason: string | null
+  /**
+   * The method's own data-quality score for this figure, where the method has one. PCAF's 1-to-5 scale for
+   * Category 15 today: 1 is an investee's verified reported emissions, 5 a spend proxy. Fractional, because
+   * a portfolio's score is weighted by each holding's emissions.
+   *
+   * ⚠️ PRESENT ONLY WHERE A METHOD PRODUCES ONE, rather than null on the other fourteen categories. A
+   * scale is not shared across methods: a 2 on PCAF's scale says "reported to us, not assured", and there
+   * is no sense in which an EXIOBASE spend estimate or a DEFRA waste factor is a 2 or a 5 on it. A key
+   * that appears only beside a figure it describes cannot be read as a comparable number across
+   * categories, which a column of nulls and PCAF scores invites. The omission is the type's way of saying
+   * the question does not apply.
+   *
+   * ⚠️ AND IT IS NOT A CONFIDENCE LABEL. The page's own high/medium/low pill is ThemisIQ's, and it is
+   * derived. This is the score the METHOD defines, carried verbatim into the record so a CDP or verifier
+   * submission quotes PCAF's number rather than ours.
+   */
+  dq?: number
 }
 
 /**
@@ -138,14 +155,18 @@ export interface Scope3CoverageEntry {
  */
 export function coverageEntry(
   status: Scope3Status,
-  opts: { mt: number | null; unpriced: boolean; reason: string | null },
+  opts: { mt: number | null; unpriced: boolean; reason: string | null; dq?: number | null },
 ): Scope3CoverageEntry {
   const unpriced = opts.unpriced && !status.calculated
-  return {
+  const entry: Scope3CoverageEntry = {
     status: status.key,
     mt: status.calculated ? opts.mt : null,
     in_total: status.inTotal && !unpriced,
     unpriced,
     reason: unpriced ? opts.reason : null,
   }
+  // ⚠️ A THIRD INVARIANT: a data-quality score describes a figure, so it cannot outlive one. A dq on an
+  // entry with mt null would claim a quality for something that was never calculated.
+  if (entry.mt !== null && opts.dq != null) entry.dq = opts.dq
+  return entry
 }

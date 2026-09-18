@@ -190,8 +190,19 @@ describe('PCAF estimation — portfolioProxyEstimate (score 5, legacy calcCat15)
     expect(r.basis).toBe('manual entry (tCO2e, unverified)');
   });
 
-  it('emissionsOverride 0 (falsy) falls through to proxy → score 5, 1_200', () => {
+  // ⚠️ REWRITTEN 17 SEP 2026, NOT PRESERVED. This asserted that an entered 0 was FALSY and therefore fell
+  // through to the proxy at score 5 (1_200 for the inputs below). That was the behaviour, and the behaviour
+  // was wrong: a customer with no portfolio could not say so, and the proxy answered a question they had
+  // already answered. The check is now Number.isFinite.
+  it('emissionsOverride 0 → score 2, emissions 0 — an entered zero is an answer, not an absence', () => {
     const r = portfolioProxyEstimate({ emissionsOverride: 0, portfolioValue: 10_000_000, sector: 'Financial Services' });
+    expect(r.dqScore).toBe(2);
+    expect(r.emissions).toBe(0);
+    expect(r.basis).toBe('manual entry (tCO2e, unverified)');
+  });
+
+  it('emissionsOverride undefined → the proxy still answers (nothing was entered)', () => {
+    const r = portfolioProxyEstimate({ portfolioValue: 10_000_000, sector: 'Financial Services' });
     expect(r.dqScore).toBe(5);
     expect(r.emissions).toBe(1_200);
   });
