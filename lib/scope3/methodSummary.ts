@@ -15,7 +15,7 @@
 //
 // CLIENT-SAFE: imports categoryMethods.ts and the two factor records it already reads.
 
-import { scope3MethodFor, scope3MethodDescription, type Scope3Method } from './categoryMethods'
+import { scope3MethodFor, scope3MethodDescription, METHOD_TAKES_ENTERED_FIGURE, type Scope3Method } from './categoryMethods'
 import { SPEND_EF_SOURCES } from '../emissionFactors/spend'
 import { DEFRA_WASTE_META } from '../emissionFactors/defraWaste'
 import { GENERIC_SPEND_FACTOR } from '../emissionFactors'
@@ -102,10 +102,28 @@ const METHOD_SUFFIX: Partial<Record<Scope3Method, (ns: readonly number[]) => str
   exiobase_spend: ns => (ns.includes(1) ? ' For Category 1, supplier-specific figures, where entered, are used instead.' : ''),
 }
 
+/**
+ * Which categories accept a figure entered directly in place of their estimate, and which do not, read
+ * from METHOD_TAKES_ENTERED_FIGURE through the same method map the calculator dispatches on.
+ *
+ * ⚠️ IT REPLACED "WHERE A FIGURE IS ENTERED DIRECTLY, IT IS USED INSTEAD OF ANY ESTIMATE", which said it of
+ * every category. It stopped being true of Category 5 on 18 Sep 2026, when row-priced categories stopped
+ * taking an entered figure, and it had never been true of Categories 6 and 7, whose calculators ignore one.
+ */
+export function enteredFigureSentence(): string {
+  const takes = SCOPE3_CATEGORY_NUMBERS.filter(n => METHOD_TAKES_ENTERED_FIGURE[scope3MethodFor(`cat${n}`)])
+  const not = SCOPE3_CATEGORY_NUMBERS.filter(n => !METHOD_TAKES_ENTERED_FIGURE[scope3MethodFor(`cat${n}`)])
+  const word = (ns: readonly number[]) => (ns.length === 1 ? 'Category' : 'Categories')
+  return [
+    takes.length > 0 && `For ${word(takes)} ${listNumbers(takes)}, a figure entered directly is used instead of any estimate.`,
+    not.length > 0 && `${word(not)} ${listNumbers(not)} ${not.length === 1 ? 'takes' : 'take'} no entered figure: ${not.length === 1 ? 'it is' : 'they are'} calculated only from the data ${not.length === 1 ? 'its' : 'their'} method asks for.`,
+  ].filter(Boolean).join(' ')
+}
+
 /** The methodology page's "Calculation hierarchy": the opening sentence, then one line per method. */
 export function methodologyHierarchyLines(): string[] {
   return [
-    'Each Scope 3 category is calculated by one of the methods below, and every export names the method used for each category in that inventory. Where a figure is entered directly, it is used instead of any estimate.',
+    `Each Scope 3 category is calculated by one of the methods below, and every export names the method used for each category in that inventory. ${enteredFigureSentence()}`,
     ...scope3MethodGroups().map(g =>
       `${categoryHeading(g.categories)}: ${scope3MethodDescription(g.method)}${METHOD_SUFFIX[g.method]?.(g.categories) ?? ''}`,
     ),

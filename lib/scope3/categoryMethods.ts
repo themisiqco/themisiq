@@ -55,6 +55,37 @@ export function scope3MethodFor(categoryId: string): Scope3Method {
 }
 
 /**
+ * Whether a method uses a figure the customer enters directly IN PLACE OF its own estimate.
+ *
+ * ⚠️ WHAT THE CALCULATOR DOES, NOT WHAT THE STORED DATA HAPPENS TO HOLD. EXIOBASE-priced and flat-spend
+ * categories return an entered `emissions_override` (and Category 1 its supplier-specific figure), and PCAF
+ * returns an entered known total. The waste rows, business travel and commuting calculators never read an
+ * entered figure, and their panels offer none.
+ *
+ * ⚠️ ONE RECORD, THREE READERS, SO THEY CANNOT DISAGREE. The methodology page states which categories
+ * accept an entered figure from it; isCalculated and getConfidence honour a stored `emissions_override`
+ * only where it is true (takesEnteredFigure). Until 18 Sep 2026 those two honoured one for EVERY category,
+ * while the Cat 5, 6 and 7 calculators ignored it: a Cat 5 record with a stored override and no priced row
+ * was reported "Relevant, calculated", in the total at 0.00 and labelled "Primary data", while the same
+ * CSV's methodology note said nothing had been calculated. Cats 6 and 7 carried the same mismatch.
+ *
+ * A Record, so a new method fails tsc here until someone decides.
+ */
+export const METHOD_TAKES_ENTERED_FIGURE: Readonly<Record<Scope3Method, boolean>> = {
+  exiobase_spend: true,
+  flat_spend: true,
+  pcaf: true,
+  waste_factors: false,
+  travel_factors: false,
+  commuting_factors: false,
+}
+
+/** Does this category's calculator use a figure entered in place of its estimate? Read by the page's
+ *  isCalculated and getConfidence before they honour a stored `emissions_override`. */
+export const takesEnteredFigure = (categoryId: string): boolean =>
+  METHOD_TAKES_ENTERED_FIGURE[scope3MethodFor(categoryId)]
+
+/**
  * "no published source, no year and no region" — built from which provenance fields are null, so it
  * shrinks the moment a real source is recorded. null when nothing is missing.
  */

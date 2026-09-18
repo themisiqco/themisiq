@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { scope3MethodFor, scope3MethodDescription, provenanceGap, type Scope3Method } from './categoryMethods'
+import { scope3MethodFor, scope3MethodDescription, provenanceGap, METHOD_TAKES_ENTERED_FIGURE, takesEnteredFigure, type Scope3Method } from './categoryMethods'
+import { enteredFigureSentence } from './methodSummary'
 import { GENERIC_SPEND_FACTOR } from '../emissionFactors'
 import { defraCitation } from '../ghg/engine'
 import { DEFRA_WASTE_META } from '../emissionFactors/defraWaste'
@@ -97,5 +98,36 @@ describe('Scope 3 category methods', () => {
     }
     walk(join(__dirname, '../../app'))
     expect(typed).toEqual([])
+  })
+
+  it('M7 ⚠️ no category whose method takes no entered figure is ever calculated or labelled on a stored override', () => {
+    // The rule behind 18 Sep 2026: a stored emissions_override made Cat 5 (and 6, and 7) "calculated" and
+    // "Primary data" while their calculators ignored the figure. The page now asks takesEnteredFigure,
+    // which reads the same record the methodology page publishes.
+    const noEnteredFigure = METHODS.filter(m => !METHOD_TAKES_ENTERED_FIGURE[m])
+    expect(noEnteredFigure.sort()).toEqual(['commuting_factors', 'travel_factors', 'waste_factors'])
+    for (const id of IDS) {
+      expect(takesEnteredFigure(id), id).toBe(METHOD_TAKES_ENTERED_FIGURE[scope3MethodFor(id)])
+      if (noEnteredFigure.includes(scope3MethodFor(id))) expect(takesEnteredFigure(id), id).toBe(false)
+    }
+    expect(IDS.filter(id => !takesEnteredFigure(id))).toEqual(['cat5', 'cat6', 'cat7'])
+    // Both of the page's override checks go through takesEnteredFigure, and none goes around it.
+    const page = readFileSync(join(__dirname, '../../app/dashboard/scope3/page.tsx'), 'utf8')
+    expect(page).toContain('if (d.emissions_override && takesEnteredFigure(id)) return true')
+    expect(page).toContain("if ((d.emissions_override && takesEnteredFigure(id)) || d.has_supplier_data) return 'high'")
+    expect(page).not.toMatch(/if \(d\.emissions_override\) return true/)
+    expect(page).not.toMatch(/if \(d\.emissions_override \|\| d\.has_supplier_data\)/)
+  })
+
+  it('M8 the entered-figure sentence names every category exactly once, from the method map', () => {
+    const text = enteredFigureSentence()
+    const [takesPart, notPart] = text.split(/(?<=estimate\.) /)
+    const nums = (t: string) => (t.match(/\d+/g) ?? []).map(Number)
+    const takes = nums(takesPart), not = nums(notPart ?? '')
+    expect([...takes, ...not].sort((a, b) => a - b)).toEqual(IDS.map((_, i) => i + 1))
+    for (const n of takes) expect(METHOD_TAKES_ENTERED_FIGURE[scope3MethodFor(`cat${n}`)], `cat${n}`).toBe(true)
+    for (const n of not) expect(METHOD_TAKES_ENTERED_FIGURE[scope3MethodFor(`cat${n}`)], `cat${n}`).toBe(false)
+    expect(not).toContain(5)
+    expect(text).not.toMatch(/Where a figure is entered directly, it is used instead of any estimate/)
   })
 })
