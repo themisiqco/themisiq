@@ -176,8 +176,13 @@ describe('every module that offers a reporting year computes it', () => {
   for (const c of CALLERS) {
     describe(c.page, () => {
       const src = readFileSync(join(ROOT, c.page), 'utf8')
-      const linesWith = (re: RegExp) =>
-        src.split('\n').map((l, i) => `${i + 1}: ${l.trim()}`).filter((_, i) => re.test(src.split('\n')[i]))
+      // ⚠️ SPLIT ONCE. This split the whole file again inside the filter, once per line: quadratic in the
+      // line count. On the Scope 3 page (3,586 lines, 249 KB) that was ~630 ms per pattern and ~1.9 s for
+      // T8 locally, and a Vercel preview build timed out at 5 s on it (19 Sep 2026). The patterns themselves
+      // take ~0.2 ms a file and were not the cause; they are unchanged. None has the `g` flag, so .test() is
+      // stateless and the output is the same lines, in the same order, as before.
+      const lines = src.split('\n')
+      const linesWith = (re: RegExp) => lines.flatMap((l, i) => (re.test(l) ? [`${i + 1}: ${l.trim()}`] : []))
 
       it('T7 the year select maps the computed range, not a literal', () => {
         // The option list is the surface a customer actually sees. One `<select>` per page, and the
