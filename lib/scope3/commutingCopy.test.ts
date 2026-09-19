@@ -6,7 +6,7 @@ import { evaluateCommuting, withDistance } from './commuting'
 import {
   CAT7_SOURCE_SENTENCE, CAT7_FORMULA_SENTENCE, CAT7_DAYS_SENTENCE, CAT7_OCCUPANCY_SENTENCE, CAT7_STAND_IN_SENTENCE,
   CAT7_ELECTRIC_SENTENCE, CAT7_WTT_SENTENCE, CAT7_HOMEWORKING_SENTENCE, CAT7_HOMEWORKING_NOT_UK, CAT7_ASSISTANT_PHRASE,
-  cat7MethodDescription, cat7Sentences, cat7Basis, cat7LegacyNotice,
+  cat7MethodDescription, cat7Sentences, cat7Basis, cat7LegacyNotice, commuteDistanceText, commuteCsvRow,
 } from './commutingCopy'
 
 const ROOT = join(__dirname, '..', '..')
@@ -56,6 +56,20 @@ describe('Category 7 sentences', () => {
     expect(n.sentences.join(' ')).toMatch(/15 km.*petrol car.*235 working days/)
     expect(cat7LegacyNotice({})).toBeNull()
     expect(cat7LegacyNotice({ employee_count: 0 })!.summary).toBe('0 employees')
+  })
+
+  it('K6 the distance line shows passenger-km, then the occupancy division for per vehicle-km modes, on panel and CSV alike', () => {
+    const carRow = { id: 'c', mode: 'car' as const, car_size: 'average' as const, car_fuel: 'unknown' as const, country_iso2: 'GB', employees: 10, occupancy: 2, days_per_week: 5, weeks_per_year: 46, ...withDistance(20, 'km') }
+    const e = evaluateCommuting({ commute_rows: [carRow, { ...carRow, id: 'b', mode: 'bus', bus_type: 'average_local', occupancy: undefined }] })
+    const [c, b] = e.pricedCommutes
+    // 10 x 9,200 = 92,000 passenger-km; / 2 = 46,000 vehicle-km. A bus stops at passenger-km.
+    expect(commuteDistanceText(c.pricing)).toBe('92,000 passenger-km, divided by occupancy 2 = 46,000 vehicle-km')
+    expect(commuteDistanceText(b.pricing)).toBe('92,000 passenger-km')
+    // The CSV carries the same text, and the panel renders the same function.
+    expect(commuteCsvRow(c, iso => iso)[2]).toContain('92,000 passenger-km, divided by occupancy 2 = 46,000 vehicle-km.')
+    const page = readFileSync(join(ROOT, 'app/dashboard/scope3/page.tsx'), 'utf8')
+    expect(page).toContain("{' · '}{commuteDistanceText(pricing)}")
+    expect(page).not.toMatch(/vehicle-km after dividing by/)
   })
 
   it('K5 ⚠️ the previous calculation and its false guidance are gone from the page', () => {

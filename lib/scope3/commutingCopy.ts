@@ -159,6 +159,17 @@ export function commuteFlags(p: Extract<CommutePricing, { status: 'priced' }>): 
   ].filter((x): x is string => typeof x === 'string')
 }
 
+/**
+ * The group's distance, as the panel and the CSV both show it: passenger-km always, then, for the per
+ * vehicle-km modes, the division by occupancy and the vehicle-km that are priced. ONE builder, because the
+ * panel once skipped straight from km per commuter to vehicle-km and hid the passenger-km in between.
+ */
+export function commuteDistanceText(p: Extract<CommutePricing, { status: 'priced' }>): string {
+  return p.vehicle_km !== null
+    ? `${n0(p.passenger_km)} passenger-km, divided by occupancy ${p.occupancy} = ${n0(p.vehicle_km)} vehicle-km`
+    : `${n0(p.passenger_km)} passenger-km`
+}
+
 /** One CSV row per commuting group: [label, input as entered, note]. */
 export function commuteCsvRow(e: EvaluatedCommute, countryName: (iso2: string) => string): [string, string, string] {
   const r = e.row
@@ -176,9 +187,7 @@ export function commuteCsvRow(e: EvaluatedCommute, countryName: (iso2: string) =
   if (p.basis === 'none') {
     return [`Commuting group ${e.n}`, entered, `${n2(p.km)} km one way; ${n0(p.annual_km_per_commuter)} km a year per commuter; counted at zero.`]
   }
-  const distance = p.vehicle_km !== null
-    ? `${n0(p.passenger_km)} passenger-km, divided by occupancy ${p.occupancy} = ${n0(p.vehicle_km)} vehicle-km`
-    : `${n0(p.passenger_km)} passenger-km`
+  const distance = commuteDistanceText(p)
   const flags = commuteFlags(p)
   return [`Commuting group ${e.n}`, entered,
     `${n2(p.km)} km one way; ${n0(p.annual_km_per_commuter)} km a year per commuter; ${distance}. ` +

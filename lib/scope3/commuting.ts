@@ -111,6 +111,11 @@ export const LIMITS = {
   weeks_per_year: 53,
   hours_per_day: 24,
   car_occupancy_min: 1,
+  // ⚠️ 7, THE LARGEST STANDARD PASSENGER CAR. A 7-seat MPV or SUV is still a car (DEFRA's own market segments
+  // include MPV); an 8- or 9-seat vehicle is effectively a minibus, which the car factors do not describe.
+  // Commuting survey averages run around 1.1 to 1.6, so 7 leaves room for any real figure, decimals included,
+  // and catches the typo that priced 10 people per car in the click test (and a 1.8 typed as 18).
+  car_occupancy_max: 7,
   motorbike_occupancy_min: 1,
   motorbike_occupancy_max: 2,
 } as const
@@ -242,7 +247,9 @@ export function priceCommute(row: CommuteRow): CommutePricing {
   if (km === 'mismatch') return { status: 'distance_mismatch' }
   if (row.days_per_week! > LIMITS.days_per_week) return { status: 'invalid', field: 'days per week', limit: `at most ${LIMITS.days_per_week}` }
   if (row.weeks_per_year! > LIMITS.weeks_per_year) return { status: 'invalid', field: 'weeks per year', limit: `at most ${LIMITS.weeks_per_year}` }
-  if (row.mode === 'car' && row.occupancy! < LIMITS.car_occupancy_min) return { status: 'invalid', field: 'occupancy', limit: `at least ${LIMITS.car_occupancy_min}` }
+  if (row.mode === 'car' && (row.occupancy! < LIMITS.car_occupancy_min || row.occupancy! > LIMITS.car_occupancy_max)) {
+    return { status: 'invalid', field: 'occupancy', limit: `between ${LIMITS.car_occupancy_min} and ${LIMITS.car_occupancy_max}` }
+  }
   if (row.mode === 'motorbike' && (row.occupancy! < LIMITS.motorbike_occupancy_min || row.occupancy! > LIMITS.motorbike_occupancy_max)) {
     return { status: 'invalid', field: 'occupancy', limit: `between ${LIMITS.motorbike_occupancy_min} and ${LIMITS.motorbike_occupancy_max}` }
   }
@@ -293,6 +300,9 @@ export type HomeworkingPricing =
 const HOMEWORKING_COMBINED = HOMEWORKING_RECORDS.find(r => r.component === 'combined')!
 
 export function priceHomeworking(row: HomeworkingRow): HomeworkingPricing {
+  // ⚠️ THE COUNTRY FIRST. A row outside the UK can never be priced, whatever else is entered, so it says so
+  // the moment the country is chosen, rather than asking for employees, days and hours it will not use.
+  if (row.country_iso2 && !isUkIso2(row.country_iso2)) return { status: 'not_uk', country_iso2: row.country_iso2 }
   const missing: HomeworkingMissing[] = []
   if (!row.country_iso2) missing.push('country')
   if (!positive(row.employees)) missing.push('employees')
@@ -303,7 +313,6 @@ export function priceHomeworking(row: HomeworkingRow): HomeworkingPricing {
   if (row.days_per_week! > LIMITS.days_per_week) return { status: 'invalid', field: 'homeworking days per week', limit: `at most ${LIMITS.days_per_week}` }
   if (row.weeks_per_year! > LIMITS.weeks_per_year) return { status: 'invalid', field: 'weeks per year', limit: `at most ${LIMITS.weeks_per_year}` }
   if (row.hours_per_day! > LIMITS.hours_per_day) return { status: 'invalid', field: 'hours per day', limit: `at most ${LIMITS.hours_per_day}` }
-  if (!isUkIso2(row.country_iso2)) return { status: 'not_uk', country_iso2: row.country_iso2 }
   const factor = homeworkingFactor('combined')!
   const hours = row.employees! * row.days_per_week! * row.weeks_per_year! * row.hours_per_day!
   return { status: 'priced', hours, factor, kg: hours * factor, cell: `${HOMEWORKING_COMBINED.sheet}!${HOMEWORKING_COMBINED.cells.value}` }

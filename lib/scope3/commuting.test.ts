@@ -83,7 +83,12 @@ describe('Cat 7 commuting', () => {
   it('CC3b figures outside what their label can mean are not priced, and say which', () => {
     expect(priceCommute(car({ days_per_week: 8 }))).toEqual({ status: 'invalid', field: 'days per week', limit: 'at most 7' })
     expect(priceCommute(car({ weeks_per_year: 235 }))).toEqual({ status: 'invalid', field: 'weeks per year', limit: 'at most 53' })
-    expect(priceCommute(car({ occupancy: 0.5 }))).toEqual({ status: 'invalid', field: 'occupancy', limit: 'at least 1' })
+    expect(priceCommute(car({ occupancy: 0.5 }))).toEqual({ status: 'invalid', field: 'occupancy', limit: 'between 1 and 7' })
+    // The click test's typo: 10 people per car is not a car.
+    expect(priceCommute(car({ occupancy: 10 }))).toEqual({ status: 'invalid', field: 'occupancy', limit: 'between 1 and 7' })
+    expect(priceCommute(car({ occupancy: 7.1 }))).toEqual({ status: 'invalid', field: 'occupancy', limit: 'between 1 and 7' })
+    expect(priceCommute(car({ occupancy: 7 })).status).toBe('priced')
+    expect(priceCommute(car({ occupancy: 6.5 })).status).toBe('priced')
     expect(priceCommute(car({ mode: 'motorbike', motorbike_size: 'small', occupancy: 3 }))).toEqual({ status: 'invalid', field: 'occupancy', limit: 'between 1 and 2' })
     expect(priceCommute(car({ distance_km: 99 }))).toEqual({ status: 'distance_mismatch' })
   })
@@ -124,6 +129,13 @@ describe('Cat 7 commuting', () => {
     expect(uk).toMatchObject({ status: 'priced', hours: 6900, factor: 0.32393, cell: 'Homeworking!C24' })
     expect(uk.status === 'priced' && uk.kg).toBeCloseTo(2235.117, 6)
     expect(priceHomeworking({ ...row, country_iso2: 'US' })).toEqual({ status: 'not_uk', country_iso2: 'US' })
+    // The country reason comes first: a non-UK row says so before anything else is entered, and whatever
+    // else is missing or out of range.
+    const bareUs: HomeworkingRow = { id: 'b', country_iso2: 'US', employees: undefined, days_per_week: undefined, weeks_per_year: undefined, hours_per_day: undefined }
+    expect(priceHomeworking(bareUs)).toEqual({ status: 'not_uk', country_iso2: 'US' })
+    expect(priceHomeworking({ ...row, country_iso2: 'CA', hours_per_day: 30 })).toEqual({ status: 'not_uk', country_iso2: 'CA' })
+    // With no country yet, the row still lists what is missing, country first.
+    expect(priceHomeworking({ ...bareUs, country_iso2: '' })).toEqual({ status: 'incomplete', missing: ['country', 'employees', 'homeworking days per week', 'weeks per year', 'hours per day'] })
     expect(priceHomeworking({ ...row, hours_per_day: undefined })).toEqual({ status: 'incomplete', missing: ['hours per day'] })
     expect(priceHomeworking({ ...row, hours_per_day: 30 })).toMatchObject({ status: 'invalid', field: 'hours per day' })
     // Only a US homeworking row: nothing is priced, so the category is not calculated.

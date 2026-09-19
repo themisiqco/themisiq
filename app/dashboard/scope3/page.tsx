@@ -38,7 +38,7 @@ import {
 import {
   CAT7_STAND_IN_SENTENCE, CAT7_ELECTRIC_SENTENCE, CAT7_OCCUPANCY_SENTENCE, CAT7_DAYS_SENTENCE, CAT7_HOMEWORKING_SENTENCE,
   cat7Sentences, cat7WorkingsSummary, cat7Basis, cat7LegacyNotice, commuteCsvRow, homeworkingCsvRow,
-  commuteNotPricedReason, homeworkingNotPricedReason, commuteFlags, CAR_FUEL_LABEL, COMMUTE_BUS_LABEL, TAXI_LABEL,
+  commuteNotPricedReason, homeworkingNotPricedReason, commuteFlags, commuteDistanceText, CAR_FUEL_LABEL, COMMUTE_BUS_LABEL, TAXI_LABEL,
 } from '../../../lib/scope3/commutingCopy'
 import { CAR_SIZES, CAR_FUELS, MOTORBIKE_SIZES, TAXI_TYPES, BUS_TYPES, carFactor } from '../../../lib/emissionFactors/defraTravel'
 import { publisherGwpSentence } from '../../../lib/scope3/gwpSentence'
@@ -877,7 +877,7 @@ function CommuteRowsEditor({ evaluated, onAdd, onRemove, onUpdate }: {
               {pricing.status === 'priced' ? (
                 <span style={{ color: '#555553' }}>
                   {kgText(pricing.annual_km_per_commuter)} km a year per commuter
-                  {pricing.vehicle_km !== null ? ` · ${kgText(pricing.vehicle_km)} vehicle-km after dividing by ${pricing.occupancy}` : ` · ${kgText(pricing.passenger_km)} passenger-km`}
+                  {' · '}{commuteDistanceText(pricing)}
                   {' · '}combustion {kgText(pricing.kg.combustion)} + well-to-tank {kgText(pricing.kg.wtt)} = <strong style={{ fontWeight: 600 }}>{kgText(pricing.kg.total)} kg CO₂e</strong>
                   {commuteFlags(pricing).map(f => <span key={f}><br /><span style={{ color: '#92400e' }}>⚠ {f.charAt(0).toUpperCase() + f.slice(1)}.</span></span>)}
                 </span>
