@@ -20,6 +20,8 @@ import { SPEND_EF_SOURCES } from '../emissionFactors/spend'
 import { DEFRA_WASTE_META } from '../emissionFactors/defraWaste'
 import { GENERIC_SPEND_FACTOR } from '../emissionFactors'
 import { CAT15_GWP_TAIL } from './cat15'
+import { CAT6_ASSISTANT_PHRASE } from './businessTravelCopy'
+import { DEFRA_TRAVEL_META } from '../emissionFactors/defraTravel'
 
 /**
  * The fifteen categories by their GHG Protocol Scope 3 Standard titles, in prose case.
@@ -59,7 +61,7 @@ const METHOD_RANK: Readonly<Record<Scope3Method, number>> = {
   exiobase_spend: 1,
   waste_factors: 2,
   end_of_life_factors: 3,
-  travel_factors: 4,
+  business_travel_factors: 4,
   commuting_factors: 5,
   pcaf: 6,
   flat_spend: 7,
@@ -151,7 +153,7 @@ const ASSISTANT_METHOD_PHRASE: Readonly<Record<Scope3Method, (ns: readonly numbe
     `priced from the UK DEFRA/DESNZ ${DEFRA_WASTE_META.year} waste factors, per material and treatment route`,
   end_of_life_factors: () =>
     `priced from the same UK DEFRA/DESNZ ${DEFRA_WASTE_META.year} waste factors, per material and treatment route, applied to the tonnes of sold products reaching end of life as the customer splits them across routes`,
-  travel_factors: () => 'priced from fixed factors that carry no recorded source, year or region',
+  business_travel_factors: () => CAT6_ASSISTANT_PHRASE,
   commuting_factors: () => 'priced from fixed factors that carry no recorded source, year or region',
   pcaf: () => 'assessed through a PCAF-aligned path',
   flat_spend: () =>
@@ -165,8 +167,8 @@ const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'sev
  * group — with the flat group's size COUNTED, never typed. "The remaining ten" was right once and wrong
  * for as long as nobody re-read the prompt.
  *
- * Groups whose phrase is identical are merged into one clause, so Categories 6 and 7 read as the prompt
- * always read them — one clause, "from fixed factors…" — although they are two methods in the map.
+ * Groups whose phrase is identical are merged into one clause. Categories 6 and 7 were merged that way while
+ * both rested on fixed factors; since 19 Sep 2026 Category 6 has its own phrase, so each has its own clause.
  *
  * ⚠️ NO TRAILING FULL STOP. The bullet this completes has always ended "…for each category" with the next
  * bullet on the following line; the text around it is unchanged.
@@ -196,8 +198,9 @@ export function assistantScope3Basis(): string {
  * What each Scope 3 method's figures are on, as far as a RECORD states it.
  *
  * ⚠️ READ FROM THE RECORDS, NOT TYPED, WHERE A RECORD CARRIES A BASIS. Only the DEFRA/DESNZ waste record
- * does (DEFRA_WASTE_META.gwp_basis, 'AR5'). The EXIOBASE source record carries no GWP field, and the fixed
- * travel, commuting and flat-spend factors have no recorded source at all, so those methods are
+ * (DEFRA_WASTE_META.gwp_basis, 'AR5') and, since 19 Sep 2026, the business travel record
+ * (DEFRA_TRAVEL_META.gwp_basis, 'AR5') do. The EXIOBASE source record carries no GWP field, and the fixed
+ * commuting and flat-spend factors have no recorded source at all, so those methods are
  * 'not_recorded' and the assistant is told nothing about them rather than something invented. Category 15
  * is 'investee': each investee's own basis, which ThemisIQ neither re-bases nor records.
  *
@@ -218,7 +221,12 @@ const METHOD_GWP: Readonly<Record<Scope3Method, Scope3GwpSource>> = {
   exiobase_spend: { kind: 'not_recorded' },
   waste_factors: DEFRA_WASTE_GWP,
   end_of_life_factors: DEFRA_WASTE_GWP,
-  travel_factors: { kind: 'not_recorded' },
+  // The business travel record states its basis (DEFRA_TRAVEL_META.gwp_basis, 'AR5'), as the waste one does.
+  business_travel_factors: {
+    kind: 'publisher',
+    basis: DEFRA_TRAVEL_META.gwp_basis,
+    publisher: `UK DEFRA/DESNZ ${DEFRA_TRAVEL_META.year} business travel factors`,
+  },
   commuting_factors: { kind: 'not_recorded' },
   flat_spend: { kind: 'not_recorded' },
   pcaf: { kind: 'investee' },

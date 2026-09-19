@@ -97,8 +97,8 @@ describe('Scope 3 category scoping of the EXIOBASE lists', () => {
     // needs the phrase. A category added to SpendCategoryId without one fails tsc on the Record; this
     // checks the phrases read as the sentence the button composes.
     for (const cat of ['cat1', 'cat2', 'cat4'] as SpendCategoryId[]) {
-      expect(`Showing the products usual for ${CATEGORY_SCOPE_LABEL[cat]} — show every EXIOBASE product`)
-        .toMatch(/^Showing the products usual for \S.*— show every EXIOBASE product$/)
+      expect(`Showing the products usual for ${CATEGORY_SCOPE_LABEL[cat]}: show every EXIOBASE product`)
+        .toMatch(/^Showing the products usual for \S.*: show every EXIOBASE product$/)
     }
     expect(CATEGORY_SCOPE_LABEL.cat2).toBe('capital goods')
   })

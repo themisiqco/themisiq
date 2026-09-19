@@ -7,8 +7,9 @@ import {
   CAT15_FIGURE_SOURCE, CAT15_HOLDING_FIGURE, CAT15_SENTENCES, CAT15_NO_BASIS, CAT15_ASSESSMENT_FAILED,
   CAT15_GUIDANCE, CAT15_PANEL_METHOD, CAT15_PANEL_NO_PROXY, CAT15_RECORDED_NOT_USED,
   cat15MethodDescription, cat15MethodologyPassage, cat15DecomposedBasisDetail, cat15Figure,
-  CAT15_GWP_SENTENCE, CAT15_GWP_TAIL, cat15GwpSentence,
+  CAT15_GWP_SENTENCE, CAT15_GWP_TAIL, cat15GwpSentence, CAT15_NOT_ENTERED, cat15HasPortfolioFields,
 } from './cat15'
+import { notEnteredReason } from './notEntered'
 
 // ── GUARD: EVERY CATEGORY 15 CLAIM COMES FROM lib/scope3/cat15.ts, AND THE OLD WORDINGS STAY GONE ─────
 //
@@ -49,6 +50,9 @@ function customerFacingFiles(): string[] {
 const APOS = "(?:'|’|\\\\u2019|&apos;)"
 
 const SUPERSEDED: readonly { was: string; re: RegExp }[] = [
+  // 19 Sep 2026: a known total from an audited source can be checked as well, so the holdings are not the
+  // "only way" the figure can be checked.
+  { was: '"the only way this figure can be checked"', re: /only way this figure can be checked/i },
   { was: '"own reported emissions" (the figure is as entered by the customer)', re: /own reported emissions/i },
   // Not on the list originally agreed, and added deliberately: the panel box and the CSV methodology note
   // said "each investee's own emissions", the same claim one word shorter, which the line above cannot see.
@@ -119,7 +123,21 @@ describe('Category 15 copy: one source, and the superseded wordings nowhere', ()
   it('C15C4 the reasons shown when there is no figure use the shared sentences', () => {
     // CAT15_NO_BASIS: the amber box, the CSV "Excluded from total" line and the "Not calculated" basis row.
     expect(CAT15_NO_BASIS).toContain(CAT15_SENTENCES.noPortfolioProxyLong)
-    expect(cat15Figure({}).reason).toBe(CAT15_NO_BASIS)
+    // ⚠️ ONLY WHEN A PORTFOLIO VALUE OR SECTOR IS ON THE RECORD. With nothing entered, the reason names what
+    // is missing, in the same form Categories 1, 2 and 4 use: the same builder, not a copy of its wording.
+    expect(cat15Figure({}).reason).toBe(CAT15_NOT_ENTERED)
+    expect(cat15Figure({ pcafAssets: [] }).reason).toBe(CAT15_NOT_ENTERED)
+    expect(CAT15_NOT_ENTERED).toBe(notEnteredReason(['the holdings to assess, or a known total of financed emissions']))
+    expect(CAT15_NOT_ENTERED).toMatch(/^Not estimated, because this has not been entered: .+\.$/)
+    expect(CAT15_NOT_ENTERED).not.toMatch(/portfolio/i)
+    expect(cat15Figure({ portfolio_value: 10_000_000 }).reason).toBe(CAT15_NO_BASIS)
+    expect(cat15Figure({ portfolio_sector: 'i66' }).reason).toBe(CAT15_NO_BASIS)
+    // The CSV's recorded-and-not-used row asks the same question through the same function.
+    expect(read('app/dashboard/scope3/page.tsx')).toContain('if (cat15HasPortfolioFields(c15)) {')
+    expect(cat15HasPortfolioFields({})).toBe(false)
+    // And Categories 1, 2 and 4 use the builder rather than their own copy of the sentence.
+    expect(read('app/dashboard/scope3/page.tsx')).toContain('return notEnteredReason(missing)')
+    expect(read('app/dashboard/scope3/page.tsx')).not.toContain("'this has' : 'these have'")
     // The incomplete-holdings reason: the same surfaces, when a holding cannot compute.
     const bad = { id: 'x', assetClass: 'mortgages' as const, outstandingAmount: 1, denominator: 0, emissions: { reportedEmissions: 1 } }
     expect(cat15Figure({ pcafAssets: [bad] }).reason).toContain(CAT15_SENTENCES.withholdsShort)
