@@ -21,6 +21,7 @@ import { DEFRA_WASTE_META } from '../emissionFactors/defraWaste'
 import { GENERIC_SPEND_FACTOR } from '../emissionFactors'
 import { CAT15_GWP_TAIL } from './cat15'
 import { CAT6_ASSISTANT_PHRASE } from './businessTravelCopy'
+import { CAT7_ASSISTANT_PHRASE } from './commutingCopy'
 import { DEFRA_TRAVEL_META } from '../emissionFactors/defraTravel'
 
 /**
@@ -62,7 +63,7 @@ const METHOD_RANK: Readonly<Record<Scope3Method, number>> = {
   waste_factors: 2,
   end_of_life_factors: 3,
   business_travel_factors: 4,
-  commuting_factors: 5,
+  employee_commuting_factors: 5,
   pcaf: 6,
   flat_spend: 7,
 }
@@ -154,7 +155,7 @@ const ASSISTANT_METHOD_PHRASE: Readonly<Record<Scope3Method, (ns: readonly numbe
   end_of_life_factors: () =>
     `priced from the same UK DEFRA/DESNZ ${DEFRA_WASTE_META.year} waste factors, per material and treatment route, applied to the tonnes of sold products reaching end of life as the customer splits them across routes`,
   business_travel_factors: () => CAT6_ASSISTANT_PHRASE,
-  commuting_factors: () => 'priced from fixed factors that carry no recorded source, year or region',
+  employee_commuting_factors: () => CAT7_ASSISTANT_PHRASE,
   pcaf: () => 'assessed through a PCAF-aligned path',
   flat_spend: () =>
     `priced from ONE flat factor of ${GENERIC_SPEND_FACTOR.kg_co2e_per_currency_unit} kg CO2e per unit of the inventory's currency, the same whatever was bought, with no source, year or region recorded`,
@@ -199,8 +200,8 @@ export function assistantScope3Basis(): string {
  *
  * ⚠️ READ FROM THE RECORDS, NOT TYPED, WHERE A RECORD CARRIES A BASIS. Only the DEFRA/DESNZ waste record
  * (DEFRA_WASTE_META.gwp_basis, 'AR5') and, since 19 Sep 2026, the business travel record
- * (DEFRA_TRAVEL_META.gwp_basis, 'AR5') do. The EXIOBASE source record carries no GWP field, and the fixed
- * commuting and flat-spend factors have no recorded source at all, so those methods are
+ * (DEFRA_TRAVEL_META.gwp_basis, 'AR5') do, and Category 7 reads the same record. The EXIOBASE source record
+ * carries no GWP field, and the flat-spend factor has no recorded source at all, so those methods are
  * 'not_recorded' and the assistant is told nothing about them rather than something invented. Category 15
  * is 'investee': each investee's own basis, which ThemisIQ neither re-bases nor records.
  *
@@ -227,7 +228,13 @@ const METHOD_GWP: Readonly<Record<Scope3Method, Scope3GwpSource>> = {
     basis: DEFRA_TRAVEL_META.gwp_basis,
     publisher: `UK DEFRA/DESNZ ${DEFRA_TRAVEL_META.year} business travel factors`,
   },
-  commuting_factors: { kind: 'not_recorded' },
+  // The same DEFRA/DESNZ record as Category 6, named for the sheets Category 7 reads, so the two categories
+  // keep their own clauses in the assistant's GWP rule.
+  employee_commuting_factors: {
+    kind: 'publisher',
+    basis: DEFRA_TRAVEL_META.gwp_basis,
+    publisher: `UK DEFRA/DESNZ ${DEFRA_TRAVEL_META.year} land travel and homeworking factors`,
+  },
   flat_spend: { kind: 'not_recorded' },
   pcaf: { kind: 'investee' },
 }

@@ -68,7 +68,24 @@ describe('row-priced categories: each figure moves only with its own data', () =
     expect(rowPricedResult(off, 'cat6')!.mt).toBe(evaluateBusinessTravel({ flights: cat6Flights, include_rf: false }).mt)
   })
 
+  it('R6 ⚠️ ISOLATION: Cat 6 and Cat 7 each report only their own data', () => {
+    const cat7 = { commute_rows: [{ id: 'c', mode: 'car' as const, car_size: 'average' as const, car_fuel: 'unknown' as const, country_iso2: 'GB',
+      employees: 2, occupancy: 1, days_per_week: 5, weeks_per_year: 46, ...withDistance(20, 'km') }] }
+    const both: Record<string, RowPricedData> = { cat6: { flights: cat6Flights, rail_journeys: cat6Rail }, cat7 }
+    const only6: Record<string, RowPricedData> = { cat6: { flights: cat6Flights, rail_journeys: cat6Rail } }
+    const only7: Record<string, RowPricedData> = { cat7 }
+    expect(rowPricedResult(only6, 'cat6')).toEqual(rowPricedResult(both, 'cat6'))
+    expect(rowPricedResult(only7, 'cat7')).toEqual(rowPricedResult(both, 'cat7'))
+    expect(coverageOf(only6, 'cat6')).toEqual(coverageOf(both, 'cat6'))
+    expect(coverageOf(only7, 'cat7')).toEqual(coverageOf(both, 'cat7'))
+    expect(rowPricedResult(only6, 'cat7')).toEqual({ mt: 0, calculated: false })
+    expect(rowPricedResult(only7, 'cat6')).toEqual({ mt: 0, calculated: false })
+    // Each category's fields stored under the other price nothing there.
+    expect(rowPricedResult({ cat6: cat7, cat7: { flights: cat6Flights } } as Record<string, RowPricedData>, 'cat6')).toEqual({ mt: 0, calculated: false })
+    expect(rowPricedResult({ cat6: cat7, cat7: { flights: cat6Flights } } as Record<string, RowPricedData>, 'cat7')).toEqual({ mt: 0, calculated: false })
+  })
+
   it('R4 categories priced another way are not row-priced', () => {
-    for (const id of ['cat1', 'cat3', 'cat7', 'cat15']) expect(rowPricedResult({}, id), id).toBeNull()
+    for (const id of ['cat1', 'cat3', 'cat8', 'cat15']) expect(rowPricedResult({}, id), id).toBeNull()
   })
 })

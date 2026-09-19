@@ -101,7 +101,9 @@ describe('Scope 3 method summary: every category, under the method that prices i
     expect(clause).toContain(`Category ${pcaf.join(', ')} uses investee emissions ${CAT15_GWP_TAIL}`)
     // Never a basis for the investee figures, and nothing said of the methods whose records carry none.
     expect(clause).not.toMatch(/Category 15[^;]*\bAR[456]\b/)
-    expect(clause).not.toMatch(/EXIOBASE|Categor(y|ies) (1|2|4|7)\b/)
+    expect(clause).not.toMatch(/EXIOBASE|Categor(y|ies) (1|2|4)\b/)
+    // Cat 7 reads the same DEFRA/DESNZ record under its own name, so it keeps its own clause.
+    expect(clause).toContain(`Category 7 uses the UK DEFRA/DESNZ ${DEFRA_TRAVEL_META.year} land travel and homeworking factors, which their publisher combined on ${DEFRA_TRAVEL_META.gwp_basis}`)
     // Cat 6 is on the DEFRA/DESNZ business travel record, which states AR5 as the waste record does.
     expect(clause).toContain(`Category 6 uses the UK DEFRA/DESNZ ${DEFRA_TRAVEL_META.year} business travel factors, which their publisher combined on ${DEFRA_TRAVEL_META.gwp_basis}`)
     const route = readFileSync(join(ROOT, 'app/api/ghg-bot/route.ts'), 'utf8')

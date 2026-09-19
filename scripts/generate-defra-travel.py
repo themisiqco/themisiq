@@ -60,6 +60,9 @@ HAUL = "Haul definition"
 HOTEL = "Hotel stay"
 LAND = "Business travel- land"
 WTT_LAND = "WTT- pass vehs & travel- land"
+# Read for Category 7 (employee commuting), added 19 Sep 2026.
+HOMEWORK = "Homeworking"
+PASSENGER_VEHICLES = "Passenger vehicles"   # read for one guidance cell only (A8); no factor is taken from it
 
 # ── CLOSED LABEL DICTIONARIES. Anything the sheet prints that is not here aborts the run. ────────
 AIR_CATEGORY = {
@@ -211,7 +214,7 @@ if not any("Fifth Assessment Report (AR5)" in v for cells in intro.values() for 
 
 SHEETS = {}
 sheet_meta = {}
-for name in (AIR, WTT_AIR, HAUL, HOTEL, LAND, WTT_LAND):
+for name in (AIR, WTT_AIR, HAUL, HOTEL, LAND, WTT_LAND, HOMEWORK, PASSENGER_VEHICLES):
     rows = read_sheet(z, shared, sheets, name)
     if rows.get(1, {}).get(0) != TITLE_AS_PUBLISHED:
         die(f"{name!r} row 1 is not {TITLE_AS_PUBLISHED!r}")
@@ -226,7 +229,11 @@ for name in (AIR, WTT_AIR, HAUL, HOTEL, LAND, WTT_LAND):
 
 versions = {m["Version"] for m in sheet_meta.values()}
 factor_sets = {m["Factor set"] for m in sheet_meta.values()}
-scopes = {m["Scope"] for m in sheet_meta.values()}
+# The Passenger vehicles sheet is Scope 1 (company-controlled vehicles) and is read for one guidance cell
+# only, so it is left out of the Scope 3 check; its version and year are still checked above and below.
+scopes = {m["Scope"] for n, m in sheet_meta.items() if n != PASSENGER_VEHICLES}
+if sheet_meta[PASSENGER_VEHICLES]["Scope"] != "Scope 1":
+    die(f"{PASSENGER_VEHICLES!r} Scope cell reads {sheet_meta[PASSENGER_VEHICLES]['Scope']!r}; expected 'Scope 1'")
 if len(versions) != 1 or len(factor_sets) != 1 or scopes != {"Scope 3"}:
     die(f"sheets disagree on version/factor set, or are not all Scope 3: {sheet_meta}")
 
@@ -433,6 +440,222 @@ wtt_rail = [{"type": t, "unit": "kg CO2e per passenger.km", "kg_co2e": v[0], "sh
              "cells": {"type": tc, "value": ref}} for t, v, r, ref, tc in read_rail(WTT_LAND, "WTT- rail", ["kg CO2e"])]
 
 
+# ── CATEGORY 7: CARS, MOTORBIKES, TAXIS, BUSES, THEIR WTT ROWS, AND HOMEWORKING ────────────────────
+# Added 19 Sep 2026 (Cat 7 task A). The rail records above are untouched: Cat 7 reads the same ones.
+#
+# ⚠️ THE "Cars (by market segment)" ROWS ARE NOT READ, on either sheet. Their segments (Mini to MPV) are
+# the UK Society of Motor Manufacturers and Traders' (guidance.land_market_segments_smmt); a commuter can
+# say whether a car is small, medium or large, not which SMMT segment it falls in, and the by-size rows
+# carry every fuel the segment rows do. metadata.market_segment_note says so.
+#
+# ⚠️ ONLY THE km ROWS ARE STORED for cars and motorbikes. The sheet publishes each factor per km and per
+# mile; the app converts a distance once (lib/scope3/businessTravel.ts withDistance) and prices per km. The
+# generator checks every mile row against its km row x 1.609344, to within the rounding of the two printed
+# values, and aborts on a mismatch, so a dropped or shifted mile row cannot pass unseen.
+
+CAR_SIZE = {"Small car": "small", "Medium car": "medium", "Large car": "large", "Average car": "average"}
+CAR_FUEL = {
+    "Diesel": "diesel", "Petrol": "petrol", "Hybrid": "hybrid", "CNG": "cng", "LPG": "lpg", "Unknown": "unknown",
+    "Plug-in Hybrid Electric Vehicle": "plug_in_hybrid", "Battery Electric Vehicle": "battery_electric",
+}
+MOTORBIKE_SIZE = {"Small": "small", "Medium": "medium", "Large": "large", "Average": "average"}
+TAXI_TYPE = {"Regular taxi": "regular", "Black cab": "black_cab"}
+BUS_TYPE = {"Local bus (not London)": "local_not_london", "Local London bus": "local_london",
+            "Average local bus": "average_local", "Coach": "coach"}
+KM_PER_MILE = 1.609344
+UNIT_LABEL = {"km": "kg CO2e per km (vehicle)", "passenger.km": "kg CO2e per passenger.km"}
+
+
+# ⚠️ 5e-5 kg, NOT THE PURE ROUNDING BOUND, AND WHY. Two figures printed to 5 d.p. can differ from an exact
+# x 1.609344 by at most ~1.3e-5. On 19 Sep 2026, 21 of the 390 km/mile pairs on the two sheets differed by
+# a little more, up to 2.7e-5 (large hybrid car, Business travel- land L51/L52: 0.15846 per km, 0.25499 per
+# mile, where x 1.609344 gives 0.25502), about 0.01% of the value: the sheet evidently derives the two
+# from unrounded figures. The check exists to catch a mile row that is missing, shifted or paired with the
+# wrong km row, where the difference is of the order of 1e-3 or more; 5e-5 still catches every such case.
+# Only km rows are stored, so nothing priced reads a mile figure. metadata.miles_check_note records this.
+MILES_TOLERANCE_KG = 5e-5
+
+
+def miles_check(km_vals: list, mile_vals: list, where: str) -> None:
+    """A mile value is its km value x 1.609344, to within MILES_TOLERANCE_KG."""
+    for k, m in zip(km_vals, mile_vals):
+        if abs(m - k * KM_PER_MILE) > MILES_TOLERANCE_KG:
+            die(f"{where}: mile value {m} is not {k} per km x {KM_PER_MILE}")
+
+
+def find_table(sheet: str, activity: str) -> tuple:
+    rows = SHEETS[sheet]
+    hdrs = [(h, a) for h, a in header_rows(rows, sheet, ["Activity", "Type", "Unit"])
+            if rows.get(h + 1, {}).get(a, "").strip() == activity]
+    if len(hdrs) != 1:
+        die(f"{sheet!r}: expected one table whose first Activity is {activity!r}, found {hdrs}")
+    return hdrs[0]
+
+
+def read_car_matrix(sheet: str, activity: str, per_fuel: list) -> list:
+    """Cars by size x fuel. The fuel names sit on the row above the header, one per block of len(per_fuel)
+    value columns. A size and fuel the sheet leaves blank has no record: absent, never zero."""
+    rows = SHEETS[sheet]
+    h, a = find_table(sheet, activity)
+    header, above = rows[h], rows.get(h - 1, {})
+    width = len(per_fuel)
+    fuel_cols = sorted(above)
+    if [above[c].strip() for c in fuel_cols] != list(CAR_FUEL):
+        die(f"{sheet!r} row {h - 1}: fuels {[above[c] for c in fuel_cols]}, expected {list(CAR_FUEL)}")
+    if fuel_cols != [a + 3 + i * width for i in range(len(CAR_FUEL))]:
+        die(f"{sheet!r} row {h - 1}: fuel columns {fuel_cols} are not {width} apart from {col_letter(a + 3)}")
+    for c in fuel_cols:
+        got = [header.get(c + i, "").strip() for i in range(width)]
+        if got != per_fuel:
+            die(f"{sheet!r} row {h} under {above[c]!r}: headers {got}, expected {per_fuel}")
+    last = a + 3 + width * len(CAR_FUEL)
+    out, size, km_row = [], None, None
+    r = h + 1
+    while r in rows and rows[r].get(a + 2, "").strip():
+        cells = rows[r]
+        if set(cells) - set(range(a, last)):
+            die(f"{sheet!r} row {r}: cells outside the table {set(cells) - set(range(a, last))}")
+        if r > h + 1 and cells.get(a, "").strip():
+            die(f"{sheet!r} row {r}: a second Activity {cells[a]!r}")
+        unit = cells[a + 2].strip()
+        present = {}
+        for c in fuel_cols:
+            vals = [cells.get(c + i) for i in range(width)]
+            if all(v is None for v in vals):
+                continue
+            if any(v is None for v in vals):
+                die(f"{sheet!r} row {r} {above[c]!r}: some value cells empty and some not")
+            present[c] = [number(v, f"{sheet!r} {cell(c + i, r)}") for i, v in enumerate(vals)]
+        if unit == "km":
+            label = cells.get(a + 1, "").strip()
+            if label not in CAR_SIZE:
+                die(f"{sheet!r} row {r}: unknown car size {label!r}")
+            size, km_row = label, (r, present)
+            for c, vals in present.items():
+                out.append({"size": CAR_SIZE[label], "fuel": CAR_FUEL[above[c].strip()],
+                            "size_as_published": label, "fuel_as_published": above[c].strip(),
+                            "vals": vals, "row": r,
+                            "cells": {"size": cell(a + 1, r), "fuel": cell(c, h - 1),
+                                      "values": span(c, c + width - 1, r) if width > 1 else cell(c, r)}})
+        elif unit == "miles":
+            if cells.get(a + 1, "").strip() or km_row is None or km_row[0] != r - 1:
+                die(f"{sheet!r} row {r}: a miles row not directly under its km row")
+            if set(present) != set(km_row[1]):
+                die(f"{sheet!r} row {r}: fuels published per mile {sorted(present)} differ from per km {sorted(km_row[1])}")
+            for c, vals in present.items():
+                miles_check(km_row[1][c], vals, f"{sheet!r} {size} {above[c]!r} row {r}")
+        else:
+            die(f"{sheet!r} row {r}: Unit reads {unit!r}")
+        r += 1
+    sizes = [x["size_as_published"] for x in out]
+    if list(dict.fromkeys(sizes)) != list(CAR_SIZE):
+        die(f"{sheet!r}: car sizes {list(dict.fromkeys(sizes))}, expected {list(CAR_SIZE)}")
+    return out
+
+
+def read_typed_block(sheet: str, activity: str, value_headers: list, types: dict, units: set) -> list:
+    """A block of Activity | Type | Unit | values, with the Type carried down. Stores km and passenger.km
+    rows; checks miles rows against the km row above and does not store them."""
+    rows = SHEETS[sheet]
+    h, a = find_table(sheet, activity)
+    width = len(value_headers)
+    if [rows[h].get(a + 3 + i, "").strip() for i in range(width)] != value_headers or set(rows[h]) != set(range(a, a + 3 + width)):
+        die(f"{sheet!r} row {h}: header {rows[h]}, expected Activity | Type | Unit | {value_headers}")
+    out, label, prev = [], None, None
+    r = h + 1
+    while r in rows and rows[r].get(a + 2, "").strip():
+        cells = rows[r]
+        if set(cells) - set(range(a, a + 3 + width)):
+            die(f"{sheet!r} row {r}: cells outside the table {cells}")
+        if r > h + 1 and cells.get(a, "").strip():
+            die(f"{sheet!r} row {r}: a second Activity {cells[a]!r}")
+        if cells.get(a + 1, "").strip():
+            label = cells[a + 1].strip()
+            if label not in types:
+                die(f"{sheet!r} row {r}: unknown type {label!r}")
+        unit = cells[a + 2].strip()
+        vals = [number(cells.get(a + 3 + i), f"{sheet!r} {cell(a + 3 + i, r)}") for i in range(width)]
+        if unit == "miles":
+            if prev is None or prev[0] != r - 1 or prev[1] != "km" or cells.get(a + 1, "").strip():
+                die(f"{sheet!r} row {r}: a miles row not directly under its km row")
+            miles_check(prev[2], vals, f"{sheet!r} {label} row {r}")
+        elif unit in units:
+            out.append({"label": label, "unit": unit, "vals": vals, "row": r,
+                        "cells": {"type": cell(a + 1, r), "unit": cell(a + 2, r),
+                                  "values": span(a + 3, a + 2 + width, r) if width > 1 else cell(a + 3, r)}})
+        else:
+            die(f"{sheet!r} row {r}: Unit reads {unit!r}, expected one of {sorted(units | {'miles'})}")
+        prev = (r, unit, vals)
+        r += 1
+    keys = [(x["label"], x["unit"]) for x in out]
+    if len(keys) != len(set(keys)):
+        die(f"{sheet!r}: a type and unit appear twice")
+    if {x["label"] for x in out} != set(types):
+        die(f"{sheet!r}: types {sorted({x['label'] for x in out})}, expected {sorted(types)}")
+    return out
+
+
+BASIS = {"km": "vehicle_km", "passenger.km": "passenger_km"}
+
+cars = [{"size": x["size"], "fuel": x["fuel"], "size_as_published": x["size_as_published"], "fuel_as_published": x["fuel_as_published"],
+         "unit": UNIT_LABEL["km"], **gases(x["vals"]), "sheet": LAND, "row": x["row"], "cells": x["cells"]}
+        for x in read_car_matrix(LAND, "Cars (by size)", GAS_HEADERS)]
+wtt_cars = [{"size": x["size"], "fuel": x["fuel"], "size_as_published": x["size_as_published"], "fuel_as_published": x["fuel_as_published"],
+             "unit": UNIT_LABEL["km"], "kg_co2e": x["vals"][0], "sheet": WTT_LAND, "row": x["row"], "cells": x["cells"]}
+            for x in read_car_matrix(WTT_LAND, "WTT- cars (by size)", ["kg CO2e"])]
+if {(x["size"], x["fuel"]) for x in cars} != {(x["size"], x["fuel"]) for x in wtt_cars}:
+    only_c = sorted({(x["size"], x["fuel"]) for x in cars} - {(x["size"], x["fuel"]) for x in wtt_cars})
+    only_w = sorted({(x["size"], x["fuel"]) for x in wtt_cars} - {(x["size"], x["fuel"]) for x in cars})
+    die(f"car and WTT car rows do not match: only combustion {only_c}; only WTT {only_w}")
+
+
+def typed(sheet, activity, headers, types, units, key):
+    recs = []
+    for x in read_typed_block(sheet, activity, headers, types, units):
+        base = {key: types[x["label"]], f"{key}_as_published": x["label"], "basis": BASIS[x["unit"]], "unit": UNIT_LABEL[x["unit"]]}
+        vals = gases(x["vals"]) if len(headers) == 4 else {"kg_co2e": x["vals"][0]}
+        recs.append({**base, **vals, "sheet": sheet, "row": x["row"], "cells": x["cells"]})
+    return recs
+
+
+motorbikes = typed(LAND, "Motorbike", GAS_HEADERS, MOTORBIKE_SIZE, {"km"}, "size")
+wtt_motorbikes = typed(WTT_LAND, "WTT- motorbike", ["kg CO2e"], MOTORBIKE_SIZE, {"km"}, "size")
+taxis = typed(LAND, "Taxis", GAS_HEADERS, TAXI_TYPE, {"km", "passenger.km"}, "type")
+wtt_taxis = typed(WTT_LAND, "WTT- taxis", ["kg CO2e"], TAXI_TYPE, {"km", "passenger.km"}, "type")
+buses = typed(LAND, "Bus", GAS_HEADERS, BUS_TYPE, {"passenger.km"}, "type")
+wtt_buses = typed(WTT_LAND, "WTT- bus", ["kg CO2e"], BUS_TYPE, {"passenger.km"}, "type")
+for name, a_, b_, k in (("motorbike", motorbikes, wtt_motorbikes, "size"), ("taxi", taxis, wtt_taxis, "type"), ("bus", buses, wtt_buses, "type")):
+    if {(x[k], x["basis"]) for x in a_} != {(x[k], x["basis"]) for x in b_}:
+        die(f"{name}: the WTT rows do not match the combustion rows one for one")
+
+# Homeworking: Activity | Unit | kg CO2e, three rows.
+HOMEWORK_ACTIVITY = {"Office Equipment": "office_equipment", "Heating": "heating",
+                     "Homeworking (office equipment + heating)": "combined"}
+HOMEWORK_UNIT = "per FTE Working Hour"
+hw_rows = SHEETS[HOMEWORK]
+hdrs = header_rows(hw_rows, HOMEWORK, ["Activity", "Unit", "kg CO2e"])
+if len(hdrs) != 1:
+    die(f"{HOMEWORK!r}: expected one Activity | Unit | kg CO2e header, found {hdrs}")
+h, a = hdrs[0]
+homeworking = []
+r = h + 1
+while r in hw_rows and hw_rows[r].get(a, "").strip():
+    cells = hw_rows[r]
+    if set(cells) != {a, a + 1, a + 2}:
+        die(f"{HOMEWORK!r} row {r}: expected Activity, Unit and a value, found {cells}")
+    label = cells[a].strip()
+    if label not in HOMEWORK_ACTIVITY:
+        die(f"{HOMEWORK!r} row {r}: unknown activity {label!r}")
+    if cells[a + 1].strip() != HOMEWORK_UNIT:
+        die(f"{HOMEWORK!r} row {r}: Unit reads {cells[a + 1]!r}, not {HOMEWORK_UNIT!r}")
+    homeworking.append({"component": HOMEWORK_ACTIVITY[label], "activity_as_published": label,
+                        "unit": "kg CO2e per FTE working hour", "kg_co2e": number(cells[a + 2], f"{HOMEWORK!r} {cell(a + 2, r)}"),
+                        "sheet": HOMEWORK, "row": r, "cells": {"activity": cell(a, r), "value": cell(a + 2, r)}})
+    r += 1
+if [x["component"] for x in homeworking] != list(HOMEWORK_ACTIVITY.values()):
+    die(f"{HOMEWORK!r}: components {[x['component'] for x in homeworking]}, expected {list(HOMEWORK_ACTIVITY.values())}")
+
+
 # ── GUIDANCE, QUOTED VERBATIM, FOUND BY ITS OPENING WORDS ───────────────────────────────────────────
 
 def quote(sheet: str, opening: str) -> dict:
@@ -464,6 +687,16 @@ guidance = {
     "hotel_source": quote(HOTEL, "The hotel stay conversion factors are taken from the Hotel Footprinting Tool"),
     "hotel_missing_country": quote(HOTEL, "The provision of conversion factors is limited by the availability"),
     "land_vehicle_vs_passenger_km": quote(LAND, "●  Users should be mindful of the difference between vehicle km"),
+    # Category 7 (19 Sep 2026).
+    "land_electric_cars_include_electricity": quote(LAND, "●  The conversion factors for electric cars are the same"),
+    "land_market_segments_smmt": quote(LAND, "●  The market segment conversion factors"),
+    "passenger_vehicles_scope": quote(PASSENGER_VEHICLES, "Passenger vehicles conversion factors should be used"),
+    "passenger_vehicles_motorbikes_petrol": quote(PASSENGER_VEHICLES, "● All of the factors presented for motorbikes are for petrol"),
+    "homeworking_uk_average": quote(HOMEWORK, "●  Conversion factors provided are an average for the UK"),
+    "homeworking_example_records": quote(HOMEWORK, "For each year, Company R records information"),
+    "homeworking_example_multiply": quote(HOMEWORK, "For each year, the total number of FTE working hours is multiplied"),
+    "homeworking_heating_whole_year": quote(HOMEWORK, "●  Please note that the heating conversion factor"),
+    "homeworking_method": quote(HOMEWORK, "The homeworking conversion factors are calculated using the methodology"),
 }
 
 
@@ -492,6 +725,37 @@ def index_note(sheet_name: str) -> dict:
 
 guidance["index_air_last_updated"] = index_note(AIR)
 guidance["index_wtt_air_last_updated"] = index_note(WTT_AIR)
+
+# Category 7: both Index columns for the sheets it prices from. The "Factors Updated Annually" column says
+# what the current publication changed; "Periodically" says what was last changed in an earlier one. Found
+# by each column's own header, as above; "-" is what the sheet prints where nothing applies.
+annual = [(n, c) for n, cells in index_rows.items() for c, v in cells.items() if v.strip() == "Factors Updated Annually"]
+if not annual or len({c for _, c in annual}) != 1:
+    die(f"Index: expected every 'Factors Updated Annually' header in one column, found {annual}")
+acol = annual[0][1]
+
+
+def index_annual(sheet_name: str) -> dict:
+    found = [n for n, cells in index_rows.items() if cells.get(0, "").strip() == sheet_name]
+    if len(found) != 1:
+        die(f"Index: expected one row naming {sheet_name!r}, found {found}")
+    text = index_rows[found[0]].get(acol, "").strip()
+    if not (text.startswith("Factors updated in ") or text == "-"):
+        die(f"Index {cell(acol, found[0])}: {text!r} is neither an update note nor '-'")
+    return {"sheet": "Index", "cell": cell(acol, found[0]), "text": text}
+
+
+# What's new B22: the one place the workbook says which factors carry UK electricity beyond the electric
+# cars of Business travel- land A14: "Rail, xEVs and Homeworking". Category 7 cites it for rail.
+whats_new = read_sheet(z, shared, sheets, "What's new")
+wn = [(n, c, v.strip()) for n, cells in whats_new.items() for c, v in cells.items() if v.strip().startswith("Revision to the calculation method for UK electricity")]
+if len(wn) != 1:
+    die(f"What's new: expected one cell opening 'Revision to the calculation method for UK electricity', found {len(wn)}")
+guidance["whats_new_uk_electricity_knock_on"] = {"sheet": "What's new", "cell": cell(wn[0][1], wn[0][0]), "text": wn[0][2]}
+
+for key, name in (("homeworking", HOMEWORK), ("land", LAND), ("wtt_land", WTT_LAND)):
+    guidance[f"index_{key}_updated_annually"] = index_annual(name)
+    guidance[f"index_{key}_last_updated"] = index_note(name)
 
 
 # ── FINGERPRINT — rows only, as defraWaste2026.json ────────────────────────────────────────────────
@@ -531,6 +795,14 @@ def js_json(value) -> str:
 tables = {"air": air, "wtt_air": wtt_air, "haul_definition": hauls, "hotel_stay": hotels, "rail": rail, "wtt_rail": wtt_rail}
 payload_rows = js_json(tables)
 digest = hashlib.sha256(payload_rows.encode("utf-8")).hexdigest()
+
+# ⚠️ TWO FINGERPRINTS, BY DESIGN. fingerprint_sha256 covers exactly the six tables it covered before
+# Category 7 was added, whose rows did not change, so defraTravel2026.test.ts T1 and its pinned digest stand
+# as they were. The commuting tables have their own digest, pinned by defraTravel2026.commuting.test.ts.
+# Every row is under one pinned fingerprint or the other.
+commuting = {"cars": cars, "wtt_cars": wtt_cars, "motorbikes": motorbikes, "wtt_motorbikes": wtt_motorbikes,
+             "taxis": taxis, "wtt_taxis": wtt_taxis, "buses": buses, "wtt_buses": wtt_buses, "homeworking": homeworking}
+commuting_digest = hashlib.sha256(js_json(commuting).encode("utf-8")).hexdigest()
 input_digest = hashlib.sha256(INPUT.read_bytes()).hexdigest()
 
 haul_counts = {k: sum(1 for x in hauls if x["haul"] == k) for k in HAUL_DEFINITION.values()}
@@ -545,7 +817,7 @@ payload = {
         "factor_set": factor_sets.pop(),
         "file_version": versions.pop(),
         "year": str(YEAR),
-        "sheets": [AIR, WTT_AIR, HAUL, HOTEL, LAND, WTT_LAND],
+        "sheets": [AIR, WTT_AIR, HAUL, HOTEL, LAND, WTT_LAND, HOMEWORK, PASSENGER_VEHICLES],
         "scope": "Scope 3",
         "gwp_basis": "AR5",
         "gwp_basis_note": (
@@ -566,6 +838,43 @@ payload = {
             "A COUNTRY LISTED WITH AN EMPTY VALUE CELL HAS NO FACTOR, NOT A FACTOR OF ZERO. Its record carries "
             "kg_co2e_per_room_night: null. Reading it as 0 would report a hotel stay as emissions-free rather "
             "than as unpriceable. The sheet's own FAQ on missing countries is guidance.hotel_missing_country."
+        ),
+        "market_segment_note": (
+            "The 'Cars (by market segment)' rows (Mini to MPV) of 'Business travel- land' and 'WTT- pass vehs & "
+            "travel- land' are NOT read. The segments are the UK Society of Motor Manufacturers and Traders' "
+            "(guidance.land_market_segments_smmt): a commuter can say whether a car is small, medium or large, "
+            "not which SMMT segment it belongs to, and the by-size rows carry every fuel the segment rows do."
+        ),
+        "commuting_units_note": (
+            "Cars and motorbikes are per vehicle-km: a whole vehicle, so a car shared by several commuters is "
+            "divided by its occupancy by the caller (guidance.land_vehicle_vs_passenger_km). Taxis are stored "
+            "both per passenger-km and per vehicle-km, as published. Buses and the coach are per passenger-km. "
+            "Only km rows are stored: every mile row was checked against its km row x 1.609344 and not kept."
+        ),
+        "miles_check_note": (
+            "Every car and motorbike mile row was checked against its km row x 1.609344 to within 5e-5 kg. 21 of "
+            "the 390 pairs (19 Sep 2026) differ by slightly more than the rounding of two 5 d.p. figures allows, "
+            "at most 2.7e-5 kg (about 0.01%), which suggests the sheet derives both from unrounded values. Only "
+            "the km rows are stored."
+        ),
+        "absent_car_note": (
+            "A SIZE AND FUEL THE SHEET LEAVES BLANK HAS NO RECORD, NOT A FACTOR OF ZERO (for example small or "
+            "large CNG, and small LPG). The reader returns null for it."
+        ),
+        "electric_car_note": (
+            "The battery electric and plug-in hybrid car factors on 'Business travel- land' include the "
+            "electricity consumed, at the UK grid's intensity (guidance.land_electric_cars_include_electricity). "
+            "Outside the UK they stand in for a grid they do not describe."
+        ),
+        "homeworking_note": (
+            "Per FTE working hour, a UK average (guidance.homeworking_uk_average), from the EcoAct 2020 "
+            "methodology (guidance.homeworking_method). Heating is the larger component and was last updated in "
+            "an earlier publication than office equipment (guidance.index_homeworking_last_updated). There is no "
+            "cooling component."
+        ),
+        "fingerprint_scope_note": (
+            "fingerprint_sha256 covers air, wtt_air, haul_definition, hotel_stay, rail and wtt_rail, exactly as "
+            "before Category 7 was added. commuting_fingerprint_sha256 covers the commuting tables and homeworking."
         ),
         "rail_scope_note": (
             "Only the four Rail rows of 'Business travel- land' and the four WTT- rail rows are read. The rail "
@@ -594,11 +903,16 @@ payload = {
             "haul_territories": len(hauls), "haul_by_haul": haul_counts,
             "hotel_countries": len(hotels), "hotel_priced": len(hotel_priced), "hotel_absent": len(hotel_absent),
             "rail": len(rail), "wtt_rail": len(wtt_rail),
+            "cars": len(cars), "wtt_cars": len(wtt_cars), "motorbikes": len(motorbikes), "wtt_motorbikes": len(wtt_motorbikes),
+            "taxis": len(taxis), "wtt_taxis": len(wtt_taxis), "buses": len(buses), "wtt_buses": len(wtt_buses),
+            "homeworking": len(homeworking),
         },
         "hotel_countries_without_factor": hotel_absent,
         "fingerprint_sha256": digest,
+        "commuting_fingerprint_sha256": commuting_digest,
     },
     **tables,
+    **commuting,
 }
 
 OUT.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -617,4 +931,12 @@ print(f"  WTT rail: {[(x['type'], x['kg_co2e']) for x in wtt_rail]}")
 print("\n  guidance cells:")
 for k, g in guidance.items():
     print(f"    {k:<30} {g['sheet']}!{g['cell']}")
+print(f"\n  cars: {len(cars)}  WTT cars: {len(wtt_cars)}")
+for x in cars:
+    print(f"    {x['size']:<8} {x['fuel']:<17} {x['kg_co2e']:<9} {x['sheet']}!{x['cells']['values']}")
+print(f"  motorbikes {[(x['size'], x['kg_co2e']) for x in motorbikes]}")
+print(f"  taxis {[(x['type'], x['basis'], x['kg_co2e']) for x in taxis]}")
+print(f"  buses {[(x['type'], x['kg_co2e']) for x in buses]}")
+print(f"  homeworking {[(x['component'], x['kg_co2e'], x['cells']['value']) for x in homeworking]}")
 print(f"\n  rows sha256: {digest}")
+print(f"  commuting rows sha256: {commuting_digest}")

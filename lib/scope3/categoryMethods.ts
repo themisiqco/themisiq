@@ -14,7 +14,8 @@
 //                             split of end-of-life tonnes across routes
 //   Cat 6                     (since 19 Sep 2026) DEFRA/DESNZ 2026 business travel factors, per flight
 //                             leg and rail journey, with well-to-tank added (businessTravel.ts)
-//   Cat 7                     fixed activity factors in EMISSION_FACTORS, with no recorded source
+//   Cat 7                     (since 19 Sep 2026) DEFRA/DESNZ 2026 land travel factors per group of
+//                             commuters, with well-to-tank added, and UK homeworking (commuting.ts)
 //   Cat 15                    the PCAF-aligned path in lib/pcaf
 //   the other seven           one flat spend factor, with no source, no year and no region
 //
@@ -24,16 +25,17 @@
 
 import { SPEND_EF_SOURCES } from '../emissionFactors/spend'
 import { DEFRA_WASTE_META } from '../emissionFactors/defraWaste'
-import { EMISSION_FACTORS, EMISSION_FACTORS_PROVENANCE, GENERIC_SPEND_FACTOR } from '../emissionFactors'
+import { GENERIC_SPEND_FACTOR } from '../emissionFactors'
 import { cat15MethodDescription } from './cat15'
 import { cat6MethodDescription } from './businessTravelCopy'
+import { cat7MethodDescription } from './commutingCopy'
 
 export type Scope3Method =
   | 'exiobase_spend'
   | 'flat_spend'
   | 'waste_factors'
   | 'business_travel_factors'
-  | 'commuting_factors'
+  | 'employee_commuting_factors'
   | 'pcaf'
   | 'end_of_life_factors'
 
@@ -52,9 +54,12 @@ const METHOD_BY_CATEGORY: Readonly<Record<string, Scope3Method>> = {
   cat5: 'waste_factors',
   // ⚠️ 'travel_factors' IS GONE, NOT RENAMED. It priced flight COUNTS at an assumed 800 or 5,000 km from
   // EMISSION_FACTORS values with no recorded source; no category uses it now, and no saved Cat 6 data in
-  // its shape exists. Cat 7 never used it and still reads EMISSION_FACTORS through commuting_factors.
+  // its shape exists. Cat 7 never used it.
   cat6: 'business_travel_factors',
-  cat7: 'commuting_factors',
+  // ⚠️ 'commuting_factors' IS GONE, NOT RENAMED. It priced one mode for every employee from fixed values in
+  // EMISSION_FACTORS with no recorded source, a blank distance at 15 km, a missing mode as a petrol car and
+  // 235 working days. The one saved record in the old shape is shown as not priced (cat7LegacyNotice).
+  cat7: 'employee_commuting_factors',
   cat12: 'end_of_life_factors',
   cat15: 'pcaf',
 }
@@ -89,7 +94,8 @@ export const METHOD_TAKES_ENTERED_FIGURE: Readonly<Record<Scope3Method, boolean>
   waste_factors: false,
   // Category 6 takes no entered total: its figure is the customer's flight legs and rail journeys, priced.
   business_travel_factors: false,
-  commuting_factors: false,
+  // Category 7 takes no entered total: its figure is the customer's commuting and homeworking groups, priced.
+  employee_commuting_factors: false,
   // Category 12 takes no entered total: its figure is the customer's materials and split, priced.
   end_of_life_factors: false,
 }
@@ -124,7 +130,6 @@ const gapSentence = (p: Parameters<typeof provenanceGap>[0], subject: string): s
  * read from the factor tables and the source catalogue, not typed here.
  */
 export function scope3MethodDescription(method: Scope3Method): string {
-  const ef = EMISSION_FACTORS
   switch (method) {
     case 'exiobase_spend': {
       const src = SPEND_EF_SOURCES.exiobase_38
@@ -177,13 +182,9 @@ export function scope3MethodDescription(method: Scope3Method): string {
       // Built in lib/scope3/businessTravelCopy.ts, from the same sentences the Cat 6 panel, workings and CSV
       // read. No em-dashes.
       return cat6MethodDescription()
-    case 'commuting_factors':
-      return (
-        `Activity-based: employees, commute distance and working days, multiplied by a fixed factor for ` +
-        `the commute mode of ${ef.car_petrol} kg CO2e per km by petrol car, ${ef.car_electric} by electric ` +
-        `car, ${ef.bus} by bus or ${ef.rail} by rail.` +
-        gapSentence(EMISSION_FACTORS_PROVENANCE, 'These factors are')
-      )
+    case 'employee_commuting_factors':
+      // Built in lib/scope3/commutingCopy.ts, from the same sentences the Cat 7 panel, workings and CSV read.
+      return cat7MethodDescription()
     case 'pcaf':
       // ⚠️ BUILT IN lib/scope3/cat15.ts, WHERE EVERY CATEGORY 15 SENTENCE NOW LIVES ONCE. This was a literal
       // here until 18 Sep 2026, kept in step with the methodology passage by a test comparing the two. Both
