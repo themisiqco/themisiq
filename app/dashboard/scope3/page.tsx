@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Nav from '../../components/Nav'
 import { supabase } from '../../../lib/supabase'
 import { useEntitlementState } from '../../../lib/useEntitlement'
-import { EMISSION_FACTORS, GENERIC_SPEND_FACTOR } from '../../../lib/emissionFactors'
+import { GENERIC_SPEND_FACTOR } from '../../../lib/emissionFactors'
 import { SPEND_EF_SOURCES } from '../../../lib/emissionFactors/spend'
 import { scope3MethodFor, scope3MethodDescription, provenanceGap, takesEnteredFigure } from '../../../lib/scope3/categoryMethods'
 import { scope3Status, relevanceFromStored, coverageEntry, type Relevance, type Scope3Status, type Scope3CoverageEntry } from '../../../lib/scope3/categoryStatus'
@@ -31,6 +31,16 @@ import { evaluateWasteRows, wasteRowNotPricedReason, type WasteRow, type Evaluat
 import { evaluateEolMaterials, eolMaterialNotPricedReason, formatShare, type EolMaterial, type EvaluatedEolMaterial } from '../../../lib/scope3/endOfLife'
 import { rowPricedResult } from '../../../lib/scope3/rowPriced'
 import { notEnteredReason } from '../../../lib/scope3/notEntered'
+import {
+  evaluateCommuting, hasLegacyCommuting, COMMUTE_MODES, COMMUTE_RAIL_TYPES,
+  type CommuteRow, type HomeworkingRow, type EvaluatedCommute, type EvaluatedHomeworking,
+} from '../../../lib/scope3/commuting'
+import {
+  CAT7_STAND_IN_SENTENCE, CAT7_ELECTRIC_SENTENCE, CAT7_OCCUPANCY_SENTENCE, CAT7_DAYS_SENTENCE, CAT7_HOMEWORKING_SENTENCE,
+  cat7Sentences, cat7WorkingsSummary, cat7Basis, cat7LegacyNotice, commuteCsvRow, homeworkingCsvRow,
+  commuteNotPricedReason, homeworkingNotPricedReason, commuteFlags, CAR_FUEL_LABEL, COMMUTE_BUS_LABEL, TAXI_LABEL,
+} from '../../../lib/scope3/commutingCopy'
+import { CAR_SIZES, CAR_FUELS, MOTORBIKE_SIZES, TAXI_TYPES, BUS_TYPES, carFactor } from '../../../lib/emissionFactors/defraTravel'
 import { publisherGwpSentence } from '../../../lib/scope3/gwpSentence'
 import { DEFRA_TRAVEL_META, RAIL_TYPES } from '../../../lib/emissionFactors/defraTravel'
 import { COUNTRY_OPTIONS } from '../../../lib/emissionFactors/countryOptions'
@@ -65,7 +75,7 @@ const CATEGORIES = [
   { id: 'cat4', num: 4, name: 'Upstream transportation', stream: 'Upstream', desc: 'Emissions from transporting purchased goods to your facilities', method: 'activity', unit: 'tonne_km', typicalShare: 0.04 , guidance: 'Emissions from transporting and distributing the goods you BUY, between your suppliers and you, plus third-party logistics you pay for (inbound freight and warehousing).', dataSource: 'Logistics/freight invoices, shipment records (tonne-km or mode/distance). Spend-based estimation is permitted for this category.' },
   { id: 'cat5', num: 5, name: 'Waste generated in operations', stream: 'Upstream', desc: 'Emissions from disposal and treatment of waste generated', method: 'activity', unit: 'tonnes', typicalShare: 0.01 , guidance: 'Emissions from third parties treating the waste your operations generate: landfill, combustion, recycling, composting and anaerobic digestion. Wastewater is not covered: the waste factors used here publish none.', dataSource: 'Waste contractor invoices / facilities team: tonnes by material and treatment route. Activity data (tonnes) is needed; spend-based is not appropriate here.' },
   { id: 'cat6', num: 6, name: 'Business travel', stream: 'Upstream', desc: 'Emissions from employee travel for business purposes', method: 'activity', unit: 'mixed', typicalShare: 0.05 , guidance: 'Emissions from employees travelling for business (flights, rail, hotels, rental cars) in vehicles not owned by your company.', dataSource: 'Travel & expense system or travel agency reports: each flight leg (origin, destination, cabin class, distance, passengers) and each rail journey (country, type, distance, passengers). Hotel stays are not taken.' },
-  { id: 'cat7', num: 7, name: 'Employee commuting', stream: 'Upstream', desc: 'Emissions from employees travelling to and from work', method: 'activity', unit: 'mixed', typicalShare: 0.03 , guidance: 'Emissions from employees commuting between home and work, including remote-work energy use.', dataSource: 'HR headcount + a commuting survey or assumptions (distance, mode, WFH days). Activity-based; spend-based is not appropriate here.' },
+  { id: 'cat7', num: 7, name: 'Employee commuting', stream: 'Upstream', desc: 'Emissions from employees travelling to and from work', method: 'activity', unit: 'mixed', typicalShare: 0.03 , guidance: 'Emissions from employees travelling between home and work in vehicles your company does not own or operate. Working from home is optional under the GHG Protocol and is entered separately.', dataSource: 'A commuting survey or HR records: for each group of employees who commute the same way, the mode, the country, the one-way distance, the days actually commuted per week and the weeks worked per year, and how many people share each car. Optionally, homeworking days and hours.' },
   { id: 'cat8', num: 8, name: 'Upstream leased assets', stream: 'Upstream', desc: 'Emissions from assets leased by your organisation', method: 'activity', unit: 'kwh', typicalShare: 0.02 , guidance: 'Emissions from assets you LEASE FROM others (as lessee) that aren\'t already in your Scope 1 & 2, e.g. leased offices or equipment you don\'t operationally control.', dataSource: 'Lease agreements + energy use of leased assets (floor area or metered kWh). Activity-based; spend-based is not appropriate here.' },
   // Downstream
   { id: 'cat9', num: 9, name: 'Downstream transportation', stream: 'Downstream', desc: 'Emissions from transporting and distributing sold products', method: 'activity', unit: 'tonne_km', typicalShare: 0.03 , guidance: 'Emissions from transporting and distributing the products you SELL, after they leave you: outbound logistics, distribution centres, retail, paid for by others.', dataSource: 'Distribution/logistics records or modelled tonne-km of sold-product movement. Spend-based estimation is permitted for this category.' },
@@ -741,6 +751,207 @@ function RailJourneysEditor({ evaluated, onAdd, onRemove, onUpdate }: {
   )
 }
 
+/** A number input that writes undefined when cleared: blank is missing, never 0. */
+function NumberField({ id, value, onChange, placeholder }: { id: string; value: number | undefined; onChange: (v: number | undefined) => void; placeholder: string }) {
+  // step="any": a browser's default step of 1 would flag 1.3 (an average-occupancy survey figure) as invalid.
+  return <input id={id} style={inputStyle} type="number" min={0} step="any" value={value ?? ''} onChange={e => onChange(e.target.value === '' ? undefined : Number(e.target.value))} placeholder={placeholder} />
+}
+
+/**
+ * Cat 7 commuting groups: one row per group of employees who commute the same way, priced by
+ * lib/scope3/commuting.ts. No mode is preselected, and nothing is defaulted: a blank field is missing.
+ */
+function CommuteRowsEditor({ evaluated, onAdd, onRemove, onUpdate }: {
+  evaluated: readonly EvaluatedCommute[]
+  onAdd: () => void
+  onRemove: (id: string) => void
+  onUpdate: (id: string, patch: Partial<CommuteRow>) => void
+}) {
+  return (
+    <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#0d0d0d' }}>Commuting groups</div>
+      {evaluated.length === 0 && (
+        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', background: '#f8f7f5', borderRadius: 8, padding: '0.75rem', lineHeight: 1.5 }}>
+          No commuting groups yet. Add one row for each group of employees who commute the same way: the same mode, a similar distance and the same number of days.
+        </div>
+      )}
+      {evaluated.map(({ row, n, pricing }) => {
+        const fieldId = (f: string) => `cat7-commute-${row.id}-${f}`
+        const fuels = row.car_size ? CAR_FUELS.filter(f => carFactor(row.car_size!, f) !== null) : CAR_FUELS
+        const perVehicle = row.mode === 'car' || row.mode === 'motorbike'
+        return (
+          <div key={row.id} style={{ border: '1px solid #e8e7e4', borderRadius: 10, padding: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#555553' }}>Commuting group {n}</span>
+              <button type="button" aria-label={`Remove commuting group ${n}`} onClick={() => onRemove(row.id)} style={{ fontSize: 11, color: '#B91C1C', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Remove</button>
+            </div>
+            <div>
+              <label htmlFor={fieldId('mode')} style={labelStyle}>Mode</label>
+              <select id={fieldId('mode')} style={inputStyle} value={row.mode} onChange={e => onUpdate(row.id, { mode: e.target.value as CommuteRow['mode'] })}>
+                <option value="">Select mode</option>
+                {COMMUTE_MODES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor={fieldId('country')} style={labelStyle}>Country</label>
+              <CountrySelect id={fieldId('country')} value={row.country_iso2} onChange={v => onUpdate(row.id, { country_iso2: v })} placeholder="Where they commute" />
+            </div>
+            {row.mode === 'car' && <>
+              <div>
+                <label htmlFor={fieldId('car-size')} style={labelStyle}>Car size</label>
+                <select id={fieldId('car-size')} style={inputStyle} value={row.car_size ?? ''} onChange={e => {
+                  const size = e.target.value as CommuteRow['car_size']
+                  onUpdate(row.id, { car_size: size, car_fuel: size && row.car_fuel && carFactor(size, row.car_fuel) === null ? '' : row.car_fuel })
+                }}>
+                  <option value="">Select size</option>
+                  {CAR_SIZES.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+                </select>
+              </div>
+              <div>
+                <label htmlFor={fieldId('car-fuel')} style={labelStyle}>Fuel</label>
+                <select id={fieldId('car-fuel')} style={inputStyle} value={row.car_fuel ?? ''} onChange={e => onUpdate(row.id, { car_fuel: e.target.value as CommuteRow['car_fuel'] })}>
+                  <option value="">Select fuel</option>
+                  {fuels.map(f => <option key={f} value={f}>{CAR_FUEL_LABEL[f].charAt(0).toUpperCase() + CAR_FUEL_LABEL[f].slice(1)}</option>)}
+                </select>
+              </div>
+            </>}
+            {row.mode === 'motorbike' && (
+              <div>
+                <label htmlFor={fieldId('motorbike-size')} style={labelStyle}>Motorbike size</label>
+                <select id={fieldId('motorbike-size')} style={inputStyle} value={row.motorbike_size ?? ''} onChange={e => onUpdate(row.id, { motorbike_size: e.target.value as CommuteRow['motorbike_size'] })}>
+                  <option value="">Select size</option>
+                  {MOTORBIKE_SIZES.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+                </select>
+              </div>
+            )}
+            {row.mode === 'taxi' && (
+              <div>
+                <label htmlFor={fieldId('taxi')} style={labelStyle}>Taxi type</label>
+                <select id={fieldId('taxi')} style={inputStyle} value={row.taxi_type ?? ''} onChange={e => onUpdate(row.id, { taxi_type: e.target.value as CommuteRow['taxi_type'] })}>
+                  <option value="">Select type</option>
+                  {TAXI_TYPES.map(t => <option key={t} value={t}>{TAXI_LABEL[t].charAt(0).toUpperCase() + TAXI_LABEL[t].slice(1)}</option>)}
+                </select>
+              </div>
+            )}
+            {row.mode === 'bus' && (
+              <div>
+                <label htmlFor={fieldId('bus')} style={labelStyle}>Bus type</label>
+                <select id={fieldId('bus')} style={inputStyle} value={row.bus_type ?? ''} onChange={e => onUpdate(row.id, { bus_type: e.target.value as CommuteRow['bus_type'] })}>
+                  <option value="">Select type</option>
+                  {BUS_TYPES.filter(t => t !== 'coach').map(t => <option key={t} value={t}>{COMMUTE_BUS_LABEL[t].charAt(0).toUpperCase() + COMMUTE_BUS_LABEL[t].slice(1)}</option>)}
+                </select>
+              </div>
+            )}
+            {row.mode === 'rail' && (
+              <div>
+                <label htmlFor={fieldId('rail')} style={labelStyle}>Rail type</label>
+                <select id={fieldId('rail')} style={inputStyle} value={row.rail_type ?? ''} onChange={e => onUpdate(row.id, { rail_type: e.target.value as CommuteRow['rail_type'] })}>
+                  <option value="">Select type</option>
+                  {COMMUTE_RAIL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+            )}
+            {perVehicle && (
+              <div>
+                <label htmlFor={fieldId('occupancy')} style={labelStyle}>People per {row.mode === 'car' ? 'car' : 'motorbike'}</label>
+                <NumberField id={fieldId('occupancy')} value={row.occupancy} onChange={v => onUpdate(row.id, { occupancy: v })} placeholder={row.mode === 'car' ? 'e.g. 1 alone, or 1.3 as a survey average' : 'e.g. 1, up to 2 with a passenger'} />
+              </div>
+            )}
+            <div>
+              <label htmlFor={fieldId('employees')} style={labelStyle}>Employees in the group</label>
+              <NumberField id={fieldId('employees')} value={row.employees} onChange={v => onUpdate(row.id, { employees: v })} placeholder="e.g. 25" />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor={fieldId('distance')} style={labelStyle}>Distance, one way</label>
+              <DistanceField fieldId={fieldId('distance')} distance={row.distance} unit={row.distance_unit} onChange={next => onUpdate(row.id, next)} />
+            </div>
+            <div>
+              <label htmlFor={fieldId('days')} style={labelStyle}>Days commuted per week</label>
+              <NumberField id={fieldId('days')} value={row.days_per_week} onChange={v => onUpdate(row.id, { days_per_week: v })} placeholder="e.g. 3" />
+            </div>
+            <div>
+              <label htmlFor={fieldId('weeks')} style={labelStyle}>Weeks worked per year</label>
+              <NumberField id={fieldId('weeks')} value={row.weeks_per_year} onChange={v => onUpdate(row.id, { weeks_per_year: v })} placeholder="e.g. 46" />
+            </div>
+            <div style={{ gridColumn: '1 / -1', fontSize: 11, lineHeight: 1.5 }}>
+              {pricing.status === 'priced' ? (
+                <span style={{ color: '#555553' }}>
+                  {kgText(pricing.annual_km_per_commuter)} km a year per commuter
+                  {pricing.vehicle_km !== null ? ` · ${kgText(pricing.vehicle_km)} vehicle-km after dividing by ${pricing.occupancy}` : ` · ${kgText(pricing.passenger_km)} passenger-km`}
+                  {' · '}combustion {kgText(pricing.kg.combustion)} + well-to-tank {kgText(pricing.kg.wtt)} = <strong style={{ fontWeight: 600 }}>{kgText(pricing.kg.total)} kg CO₂e</strong>
+                  {commuteFlags(pricing).map(f => <span key={f}><br /><span style={{ color: '#92400e' }}>⚠ {f.charAt(0).toUpperCase() + f.slice(1)}.</span></span>)}
+                </span>
+              ) : pricing.status === 'incomplete' ? (
+                <span style={{ color: 'var(--color-ink-muted)' }}>Not priced until entered: {pricing.missing.join(', ')}.</span>
+              ) : (
+                <span style={{ color: '#92400e' }}>⚠ Not counted: {commuteNotPricedReason(pricing)}.</span>
+              )}
+            </div>
+          </div>
+        )
+      })}
+      <button type="button" onClick={onAdd} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: 'none', border: '0.5px solid var(--color-brand)', color: 'var(--color-brand)', cursor: 'pointer', alignSelf: 'flex-start' }}>+ Add commuting group</button>
+    </div>
+  )
+}
+
+/** Cat 7 homeworking groups: optional, priced for employees in the UK only. */
+function HomeworkingRowsEditor({ evaluated, onAdd, onRemove, onUpdate }: {
+  evaluated: readonly EvaluatedHomeworking[]
+  onAdd: () => void
+  onRemove: (id: string) => void
+  onUpdate: (id: string, patch: Partial<HomeworkingRow>) => void
+}) {
+  return (
+    <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#0d0d0d' }}>Homeworking (optional)</div>
+      {evaluated.map(({ row, n, pricing }) => {
+        const fieldId = (f: string) => `cat7-home-${row.id}-${f}`
+        return (
+          <div key={row.id} style={{ border: '1px solid #e8e7e4', borderRadius: 10, padding: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#555553' }}>Homeworking group {n}</span>
+              <button type="button" aria-label={`Remove homeworking group ${n}`} onClick={() => onRemove(row.id)} style={{ fontSize: 11, color: '#B91C1C', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Remove</button>
+            </div>
+            <div>
+              <label htmlFor={fieldId('country')} style={labelStyle}>Country</label>
+              <CountrySelect id={fieldId('country')} value={row.country_iso2} onChange={v => onUpdate(row.id, { country_iso2: v })} placeholder="Where they work from home" />
+            </div>
+            <div>
+              <label htmlFor={fieldId('employees')} style={labelStyle}>Employees in the group</label>
+              <NumberField id={fieldId('employees')} value={row.employees} onChange={v => onUpdate(row.id, { employees: v })} placeholder="e.g. 25" />
+            </div>
+            <div>
+              <label htmlFor={fieldId('days')} style={labelStyle}>Homeworking days per week</label>
+              <NumberField id={fieldId('days')} value={row.days_per_week} onChange={v => onUpdate(row.id, { days_per_week: v })} placeholder="e.g. 2" />
+            </div>
+            <div>
+              <label htmlFor={fieldId('weeks')} style={labelStyle}>Weeks worked per year</label>
+              <NumberField id={fieldId('weeks')} value={row.weeks_per_year} onChange={v => onUpdate(row.id, { weeks_per_year: v })} placeholder="e.g. 46" />
+            </div>
+            <div>
+              <label htmlFor={fieldId('hours')} style={labelStyle}>Hours per day</label>
+              <NumberField id={fieldId('hours')} value={row.hours_per_day} onChange={v => onUpdate(row.id, { hours_per_day: v })} placeholder="e.g. 7.5" />
+            </div>
+            <div style={{ gridColumn: '1 / -1', fontSize: 11, lineHeight: 1.5 }}>
+              {pricing.status === 'priced' ? (
+                <span style={{ color: '#555553' }}>
+                  {kgText(pricing.hours)} FTE working hours × {pricing.factor} kg CO₂e per hour = <strong style={{ fontWeight: 600 }}>{kgText(pricing.kg)} kg CO₂e</strong>
+                </span>
+              ) : pricing.status === 'incomplete' ? (
+                <span style={{ color: 'var(--color-ink-muted)' }}>Not priced until entered: {pricing.missing.join(', ')}.</span>
+              ) : (
+                <span style={{ color: '#92400e' }}>⚠ Not counted: {homeworkingNotPricedReason(pricing)}.</span>
+              )}
+            </div>
+          </div>
+        )
+      })}
+      <button type="button" onClick={onAdd} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: 'none', border: '0.5px solid var(--color-brand)', color: 'var(--color-brand)', cursor: 'pointer', alignSelf: 'flex-start' }}>+ Add homeworking group</button>
+    </div>
+  )
+}
+
 const STEP_NAMES = ['Setup', 'Relevance', 'Calculate', 'Results', 'Export']
 
 interface CategoryData {
@@ -783,7 +994,13 @@ interface CategoryData {
   flights?: FlightRow[]
   rail_journeys?: RailJourney[]
   include_rf?: boolean
-  // Cat 7
+  // Cat 7 — one row per group of employees who commute the same way, and optional homeworking rows, priced
+  // from lib/emissionFactors/defraTravel2026.json by lib/scope3/commuting.ts.
+  commute_rows?: CommuteRow[]
+  homeworking_rows?: HomeworkingRow[]
+  // ⚠️ THE PREVIOUS CAT 7 FORM. NEVER PRICED, NEVER WRITTEN, AND NEVER REMOVED. No input sets these any more
+  // and no calculation reads them; they are typed only so a record saved under the old form can say what it
+  // holds (cat7LegacyNotice). Saves spread the stored cat7 object, so the values stay in cat_data as they were.
   employee_count?: number
   avg_commute_km?: number
   commute_mode?: string
@@ -1386,6 +1603,20 @@ export default function Scope3Dashboard() {
   const removeRailJourney = (id: string) => editRailJourneys({ kind: 'remove', id })
   const updateRailJourney = (id: string, patch: Partial<RailJourney>) => editRailJourneys({ kind: 'update', id, patch })
 
+  // Cat 7 commuting and homeworking groups, in catData['cat7'].commute_rows and .homeworking_rows.
+  const newCommuteRow = (): CommuteRow => ({ id: Math.random().toString(36).slice(2), mode: '', country_iso2: '', employees: undefined, days_per_week: undefined, weeks_per_year: undefined, ...withDistance(undefined, 'km') })
+  const editCommuteRows = (edit: RowEdit<CommuteRow>) =>
+    setCatData(prev => ({ ...prev, cat7: { ...prev.cat7, commute_rows: editRows(prev.cat7?.commute_rows, edit) } }))
+  const addCommuteRow = () => editCommuteRows({ kind: 'add', row: newCommuteRow() })
+  const removeCommuteRow = (id: string) => editCommuteRows({ kind: 'remove', id })
+  const updateCommuteRow = (id: string, patch: Partial<CommuteRow>) => editCommuteRows({ kind: 'update', id, patch })
+  const newHomeworkingRow = (): HomeworkingRow => ({ id: Math.random().toString(36).slice(2), country_iso2: '', employees: undefined, days_per_week: undefined, weeks_per_year: undefined, hours_per_day: undefined })
+  const editHomeworkingRows = (edit: RowEdit<HomeworkingRow>) =>
+    setCatData(prev => ({ ...prev, cat7: { ...prev.cat7, homeworking_rows: editRows(prev.cat7?.homeworking_rows, edit) } }))
+  const addHomeworkingRow = () => editHomeworkingRows({ kind: 'add', row: newHomeworkingRow() })
+  const removeHomeworkingRow = (id: string) => editHomeworkingRows({ kind: 'remove', id })
+  const updateHomeworkingRow = (id: string, patch: Partial<HomeworkingRow>) => editHomeworkingRows({ kind: 'update', id, patch })
+
   // Waste rows, in catData[catId].wasteRows, for every row-priced category (Cat 5 today).
   const newWasteRow = (): WasteRow => ({
     id: Math.random().toString(36).slice(2),
@@ -1441,19 +1672,6 @@ export default function Scope3Dashboard() {
     // figure priced from a real factor. It is gone; a miss is a miss.
     const line = spendPricedLine(id)
     return line ? line.emissions_mt : 0
-  }
-
-  const calcCat7 = (): number => {
-    const d = catData['cat7'] ?? ({} as CategoryData)
-    const employees = d.employee_count || 0
-    const commuteKm = d.avg_commute_km || 15
-    const wfhDays = d.wfh_days || 0
-    const workingDays = 235 - wfhDays
-    const ef = d.commute_mode === 'car_electric' ? EMISSION_FACTORS.car_electric
-      : d.commute_mode === 'bus' ? EMISSION_FACTORS.bus
-      : d.commute_mode === 'rail' ? EMISSION_FACTORS.rail
-      : EMISSION_FACTORS.car_petrol
-    return (employees * commuteKm * 2 * workingDays * ef) / 1000
   }
 
   // Every Cat 5 row with its pricing, in entry order. ONE evaluation read by the figure, the panel, the
@@ -1589,6 +1807,14 @@ export default function Scope3Dashboard() {
   /** The Cat 6 workings and CSV disclosures: the same sentences in both, built in businessTravelCopy.ts. */
   const cat6SentenceList: string[] = cat6Sentences(cat6Travel, publisherGwpSentence(DEFRA_TRAVEL_META, !!boundInventoryId, ghgGwpVersion), countryLabel)
 
+  // ─── Cat 7: employee commuting ───────────────────────────────────────────────────────────────────
+  // ONE evaluation read by the panel, the workings, the CSV and factor_basis; the figure and the calculated
+  // flag come from rowPricedResult, which evaluates this category's own record the same way.
+  const cat7Commuting = evaluateCommuting(catData['cat7'])
+  const cat7SentenceList: string[] = cat7Sentences(cat7Commuting, publisherGwpSentence(DEFRA_TRAVEL_META, !!boundInventoryId, ghgGwpVersion))
+  /** A record saved under the previous form: shown, not priced. null when there is none. */
+  const cat7Legacy = hasLegacyCommuting(catData['cat7']) ? cat7LegacyNotice(catData['cat7']) : null
+
   const calcGenericSpend = (id: string): number => {
     const d = catData[id] ?? ({} as CategoryData)
     if (d.emissions_override) return d.emissions_override
@@ -1627,8 +1853,8 @@ export default function Scope3Dashboard() {
       // row-priced method would have reported Category 5's figure. See lib/scope3/rowPriced.ts.
       case 'waste_factors':
       case 'end_of_life_factors':
-      case 'business_travel_factors': return rowPricedResult(catData, id)?.mt ?? 0
-      case 'commuting_factors': return calcCat7()
+      case 'business_travel_factors':
+      case 'employee_commuting_factors': return rowPricedResult(catData, id)?.mt ?? 0
       case 'pcaf': return calcCat15()
       case 'flat_spend': return calcGenericSpend(id)
     }
@@ -1667,8 +1893,8 @@ export default function Scope3Dashboard() {
       case 'exiobase_spend': return !!(d.has_supplier_data && d.supplier_emissions) || !!spendPricedLine(id)
       case 'waste_factors':
       case 'end_of_life_factors':
-      case 'business_travel_factors': return rowPricedResult(catData, id)?.calculated ?? false
-      case 'commuting_factors': return !!d.employee_count
+      case 'business_travel_factors':
+      case 'employee_commuting_factors': return rowPricedResult(catData, id)?.calculated ?? false
       // ⚠️ mt !== null, NOT > 0. An entered zero — a portfolio that finances no emissions — is a
       // calculated answer, and the note above about a genuine zero reading as not-calculated no longer
       // applies to this path.
@@ -1841,7 +2067,9 @@ export default function Scope3Dashboard() {
     // ⚠️ ANY PRICED FLIGHT OR RAIL ROW, NOT FLIGHTS ALONE. This tested flight counts only, so a Cat 6 with
     // hotel nights or rail km and no flights was calculated but labelled "Flat spend", a method it never used.
     if (scope3MethodFor(id) === 'business_travel_factors' && rowPricedResult(catData, id)?.calculated) return 'medium'
-    if (id === 'cat7' && d.employee_count) return 'medium'
+    // ⚠️ A PRICED GROUP, NOT A HEADCOUNT. This returned 'medium' whenever employee_count was set, so a figure
+    // built on the 15 km and petrol-car defaults was labelled activity data.
+    if (scope3MethodFor(id) === 'employee_commuting_factors' && rowPricedResult(catData, id)?.calculated) return 'medium'
     if (id === 'cat5' && cat5Priced.length > 0) return 'medium'
     if (scope3MethodFor(id) === 'end_of_life_factors' && rowPricedResult(catData, id)?.calculated) return 'medium'
     // ⚠️ A PER-ASSET PCAF ASSESSMENT IS NOT A SPEND ESTIMATE, and it used to fall through to 'Flat spend'
@@ -1972,12 +2200,11 @@ export default function Scope3Dashboard() {
     }
 
     if (method === 'business_travel_factors') return cat6Basis(evaluateBusinessTravel(d), countryLabel)
+    if (method === 'employee_commuting_factors') return cat7Basis(evaluateCommuting(d))
 
-    // commuting: fixed activity factors
-    if (getCatEmissions(id) === 0) {
-      return { basis: 'No data', detail: 'No activity data was entered, so nothing was calculated.' }
-    }
-    return { basis: 'Fixed activity factors, unsourced', detail: scope3MethodDescription(method) }
+    // No method reaches here today: every one returns above. Kept so a method added to the map without a
+    // branch reports "no data" rather than a basis it does not have.
+    return { basis: 'No data', detail: 'No activity data was entered, so nothing was calculated.' }
   }
 
   // Persist the bound Scope 3 record. Upsert on inventory_id so re-saves update
@@ -2172,6 +2399,18 @@ export default function Scope3Dashboard() {
       if (cat6Travel.rail.length === 0) out.push(['Cat 6', 'Rail journeys', '', 'None entered.'])
       out.push(['Cat 6', 'Hotel stays', 'Not included', CAT6_HOTEL_SENTENCE])
       for (const d of cat6SentenceList) out.push(['Cat 6', 'Disclosure', d, ''])
+    }
+
+    // ⚠️ PER COMMUTING GROUP AND PER HOMEWORKING GROUP: the input as entered, km, the annual distance, the
+    // occupancy where used, combustion, well-to-tank, the total and the source cells. Then the disclosures.
+    const c7 = catData['cat7']
+    if (c7 && isReportable('cat7')) {
+      if (cat7Legacy) out.push(['Cat 7', 'Previous form, not priced', cat7Legacy.summary, cat7Legacy.sentences.join(' ')])
+      for (const e of cat7Commuting.commutes) out.push(['Cat 7', ...commuteCsvRow(e, countryLabel)])
+      if (cat7Commuting.commutes.length === 0) out.push(['Cat 7', 'Commuting groups', '', 'None entered.'])
+      for (const e of cat7Commuting.homeworking) out.push(['Cat 7', ...homeworkingCsvRow(e, countryLabel)])
+      if (cat7Commuting.homeworking.length === 0) out.push(['Cat 7', 'Homeworking', 'Not included', 'No homeworking was entered. It is optional under the GHG Protocol Scope 3 Standard.'])
+      for (const d of cat7SentenceList) out.push(['Cat 7', 'Disclosure', d, ''])
     }
 
     const c15 = catData['cat15']
@@ -2838,31 +3077,49 @@ export default function Scope3Dashboard() {
                     )}
                   </>}
 
-                  {/* Cat 7 — Employee commuting */}
+                  {/* Cat 7 — Employee commuting: one row per group of commuters and optional homeworking rows, priced
+                      by lib/scope3/commuting.ts. Every sentence is built in lib/scope3/commutingCopy.ts. */}
                   {cat.id === 'cat7' && <>
-                    <div>
-                      <label style={labelStyle}>Number of employees</label>
-                      <input style={inputStyle} type="number" value={catData['cat7']?.employee_count || ''} onChange={e => updateCat('cat7', 'employee_count', Number(e.target.value))} placeholder="e.g. 120" />
+                    {/* Old saved data, first: it is the customer's own entry, and it is not in the figure. */}
+                    {cat7Legacy && (
+                      <div style={{ gridColumn: '1 / -1', background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem' }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>⚠ Saved commuting figures not priced: {cat7Legacy.summary}</div>
+                        <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>{cat7Legacy.sentences.join(' ')}</div>
+                      </div>
+                    )}
+                    <div style={{ gridColumn: '1 / -1', background: '#E6F1FB', borderRadius: 8, padding: '0.75rem', fontSize: 11, color: '#0C447C', lineHeight: 1.6 }}>
+                      <div style={{ fontWeight: 700, marginBottom: 4 }}>How this is priced</div>
+                      <p style={{ margin: '0 0 6px' }}>{CAT7_DAYS_SENTENCE}</p>
+                      <p style={{ margin: '0 0 6px' }}>{CAT7_OCCUPANCY_SENTENCE}</p>
+                      <p style={{ margin: '0 0 6px' }}>{CAT7_STAND_IN_SENTENCE} {CAT7_ELECTRIC_SENTENCE}</p>
+                      <p style={{ margin: '6px 0 0', fontSize: 10 }}>
+                        {DEFRA_TRAVEL_META.attribution_required}{' '}
+                        <a href={DEFRA_TRAVEL_META.licence_url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>{DEFRA_TRAVEL_META.licence}</a>
+                      </p>
                     </div>
-                    <div>
-                      <label style={labelStyle}>Average commute distance (km one way)</label>
-                      <input style={inputStyle} type="number" value={catData['cat7']?.avg_commute_km || ''} onChange={e => updateCat('cat7', 'avg_commute_km', Number(e.target.value))} placeholder="15 km if left blank" />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Primary commute mode</label>
-                      <select style={inputStyle} value={catData['cat7']?.commute_mode || 'car_petrol'} onChange={e => updateCat('cat7', 'commute_mode', e.target.value)}>
-                        <option value="car_petrol">Car (petrol/diesel)</option>
-                        <option value="car_electric">Car (electric)</option>
-                        <option value="bus">Bus</option>
-                        <option value="rail">Rail / metro</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Average WFH days per week</label>
-                      <select style={inputStyle} value={catData['cat7']?.wfh_days || 0} onChange={e => updateCat('cat7', 'wfh_days', Number(e.target.value))}>
-                        {[0, 1, 2, 3, 4, 5].map(d => <option key={d} value={d * 47}>{d} days/week</option>)}
-                      </select>
-                    </div>
+                    <CommuteRowsEditor
+                      evaluated={cat7Commuting.commutes}
+                      onAdd={addCommuteRow}
+                      onRemove={removeCommuteRow}
+                      onUpdate={updateCommuteRow}
+                    />
+                    <div style={{ gridColumn: '1 / -1', fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6 }}>{CAT7_HOMEWORKING_SENTENCE}</div>
+                    <HomeworkingRowsEditor
+                      evaluated={cat7Commuting.homeworking}
+                      onAdd={addHomeworkingRow}
+                      onRemove={removeHomeworkingRow}
+                      onUpdate={updateHomeworkingRow}
+                    />
+                    {cat7Commuting.calculated && (
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <SpendFactorWorkings
+                          id="cat7-commuting"
+                          figureMt={cat7Commuting.mt}
+                          summary={cat7WorkingsSummary(cat7Commuting)}
+                          sentences={cat7SentenceList}
+                        />
+                      </div>
+                    )}
                   </>}
 
                   {/* Cat 5 — Waste: one row per material and treatment route, priced from the DEFRA/DESNZ 2026

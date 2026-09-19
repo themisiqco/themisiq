@@ -4,7 +4,8 @@ import { join } from 'node:path'
 import { EF_SOURCES, FRAMEWORKS, buildWorkings, emptyLocation } from './ghg/engine'
 import { SPEND_EF_SOURCES } from './emissionFactors/spend'
 import { DEFRA_WASTE_META } from './emissionFactors/defraWaste'
-import { EMISSION_FACTORS_PROVENANCE, GENERIC_SPEND_FACTOR } from './emissionFactors'
+import { GENERIC_SPEND_FACTOR } from './emissionFactors'
+import { DEFRA_TRAVEL_META } from './emissionFactors/defraTravel'
 
 // ── NO SURFACE MAY CLAIM A PUBLISHER'S FACTORS THAT NO FACTOR RECORD HOLDS ─────────────────────────
 //
@@ -97,6 +98,7 @@ const exio = SPEND_EF_SOURCES.exiobase_38
 const HELD_CITATIONS: string[] = [
   ...Object.values(EF_SOURCES),
   DEFRA_WASTE_META.source,
+  DEFRA_TRAVEL_META.source, // Cats 6 and 7; the same citation string as the waste artefact
   `${exio.dataset} ${exio.version} ${exio.published}`,
 ]
 const HELD_YEAR_CLAIMS = new Set(HELD_CITATIONS.flatMap(yearClaims))
@@ -104,11 +106,18 @@ const HELD_YEAR_CLAIMS = new Set(HELD_CITATIONS.flatMap(yearClaims))
 // factors" would therefore pass R2, though no ecoinvent factor is applied directly.
 const HELD_PUBLISHERS = new Set(HELD_CITATIONS.flatMap(c => mentions(c).map(m => m.publisher)))
 
-// Activities whose factors carry no recorded source, keyed to the provenance record that would source
-// them. travel_factors and commuting_factors read EMISSION_FACTORS_PROVENANCE; the transport categories
-// (Cat 4 and Cat 9) take the flat spend factor, GENERIC_SPEND_FACTOR.
+// Activities with no sourced factor behind them, so a publisher named beside one claims factors nobody holds.
+//   ⚠️ "travel", "flight" and "commut" LEFT THE LIST ON 19 SEP 2026. They were keyed to
+// EMISSION_FACTORS_PROVENANCE, which described the fixed travel and commuting values; those values are gone,
+// and Cats 6 and 7 now price from the DEFRA/DESNZ 2026 artefact, which HELD_CITATIONS carries.
+//   "hotel" STAYS, AND ON ITS OWN TERMS: no hotel factor is applied anywhere (Cat 6 excludes hotel stays while
+// the licence of the published hotel factors is unconfirmed), so "DEFRA hotel factors" would be a false
+// claim. It is not keyed to any provenance record because there is no factor to record one for; if hotels
+// are ever priced, remove it here in the same change.
+//   The transport words stay keyed to GENERIC_SPEND_FACTOR, which still prices Cat 9 with no source.
+const UNPRICED_ACTIVITY_WORDS: RegExp[] = [/\bhotel/i]
 const UNSOURCED_ACTIVITY_WORDS: RegExp[] = [
-  ...(EMISSION_FACTORS_PROVENANCE.source === null ? [/\btravel/i, /\bflight/i, /\bhotel/i, /\bcommut/i] : []),
+  ...UNPRICED_ACTIVITY_WORDS,
   ...(GENERIC_SPEND_FACTOR.source === null ? [/\bfreight/i, /\blogistic/i, /\bshipping/i] : []),
 ]
 

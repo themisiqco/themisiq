@@ -170,6 +170,11 @@
         "cell": "H41",
         "text": "Factors last updated in 2023 publication: \nAll factors."
       },
+      "whats_new_uk_electricity_knock_on": {
+        "sheet": "What's new",
+        "cell": "B22",
+        "text": "Revision to the calculation method for UK electricity\n(affected tabs: UK electricity; Transmission and distribution; indirect knock-on effects on other factors that include electricity including Rail, xEVs and Homeworking)"
+      },
       "index_homeworking_updated_annually": {
         "sheet": "Index",
         "cell": "G51",

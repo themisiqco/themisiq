@@ -26,14 +26,10 @@ export const EMISSION_FACTORS = {
     'Professional Services': 0.10,
     'Other': 0.50,
   } as Record<string, number>,
-  // Activity-based
-  flight_short: 0.255,    // kg CO2e per km per passenger (< 3hrs)
-  flight_long: 0.195,     // kg CO2e per km per passenger (> 3hrs)
-  hotel: 31.0,            // kg CO2e per night
-  rail: 0.041,            // kg CO2e per km
-  car_petrol: 0.170,      // kg CO2e per km
-  car_electric: 0.053,    // kg CO2e per km
-  bus: 0.089,             // kg CO2e per km
+  // flight_short, flight_long, hotel, rail, car_petrol, car_electric and bus, activity factors with no
+  // recorded source, were removed on 19 Sep 2026 once nothing read them. Cats 6 and 7 price from
+  // lib/emissionFactors/defraTravel2026.json, generated from the DEFRA/DESNZ 2026 workbook; hotel stays are
+  // not priced at all.
   // waste_landfill (0.467) and waste_recycled (0.021), "kg CO2e per tonne", were removed on 17 Sep 2026.
   // They were about 1,000 times too small for that unit and had no recorded source. Cat 5 now prices
   // from lib/emissionFactors/defraWaste2026.json, generated from the DEFRA/DESNZ 2026 workbook.

@@ -9,7 +9,7 @@ import { DEFRA_WASTE_META } from '../emissionFactors/defraWaste'
 import { methodologyHierarchyLines } from './methodSummary'
 
 const IDS = Array.from({ length: 15 }, (_, i) => `cat${i + 1}`)
-const METHODS: Scope3Method[] = ['exiobase_spend', 'flat_spend', 'waste_factors', 'business_travel_factors', 'commuting_factors', 'pcaf', 'end_of_life_factors']
+const METHODS: Scope3Method[] = ['exiobase_spend', 'flat_spend', 'waste_factors', 'business_travel_factors', 'employee_commuting_factors', 'pcaf', 'end_of_life_factors']
 
 describe('Scope 3 category methods', () => {
   it('M1 the split is exactly: Cats 1/2/4 EXIOBASE, Cat 5/6/7/12 activity factors, Cat 15 PCAF, the other seven flat', () => {
@@ -17,7 +17,7 @@ describe('Scope 3 category methods', () => {
     // to multiply. The seven left on flat_spend are a decision, not a backlog — see METHOD_BY_CATEGORY.
     expect(IDS.map(id => [id, scope3MethodFor(id)])).toEqual([
       ['cat1', 'exiobase_spend'], ['cat2', 'exiobase_spend'], ['cat3', 'flat_spend'], ['cat4', 'exiobase_spend'],
-      ['cat5', 'waste_factors'], ['cat6', 'business_travel_factors'], ['cat7', 'commuting_factors'],
+      ['cat5', 'waste_factors'], ['cat6', 'business_travel_factors'], ['cat7', 'employee_commuting_factors'],
       ['cat8', 'flat_spend'], ['cat9', 'flat_spend'], ['cat10', 'flat_spend'], ['cat11', 'flat_spend'],
       ['cat12', 'end_of_life_factors'], ['cat13', 'flat_spend'], ['cat14', 'flat_spend'], ['cat15', 'pcaf'],
     ])
@@ -48,7 +48,8 @@ describe('Scope 3 category methods', () => {
   it('M4 only the two waste descriptions and business travel name DEFRA, each by the engine\'s citation', () => {
     // Cat 5 prices from DEFRA/DESNZ factors since 17 Sep 2026, Cat 12 from the same sheet since 18 Sep
     // 2026, and Cat 6 from the business travel sheets since 19 Sep 2026. Every other method still has none.
-    const defra: Scope3Method[] = ['waste_factors', 'end_of_life_factors', 'business_travel_factors']
+    // Cat 7 from the land travel and homeworking sheets since 19 Sep 2026.
+    const defra: Scope3Method[] = ['waste_factors', 'end_of_life_factors', 'business_travel_factors', 'employee_commuting_factors']
     for (const m of METHODS.filter(x => !defra.includes(x))) expect(scope3MethodDescription(m), m).not.toMatch(/DEFRA/i)
     for (const m of defra) expect(scope3MethodDescription(m), m).toContain(defraCitation(2026))
   })
@@ -108,7 +109,7 @@ describe('Scope 3 category methods', () => {
     // "Primary data" while their calculators ignored the figure. The page now asks takesEnteredFigure,
     // which reads the same record the methodology page publishes.
     const noEnteredFigure = METHODS.filter(m => !METHOD_TAKES_ENTERED_FIGURE[m])
-    expect(noEnteredFigure.sort()).toEqual(['business_travel_factors', 'commuting_factors', 'end_of_life_factors', 'waste_factors'])
+    expect(noEnteredFigure.sort()).toEqual(['business_travel_factors', 'employee_commuting_factors', 'end_of_life_factors', 'waste_factors'])
     for (const id of IDS) {
       expect(takesEnteredFigure(id), id).toBe(METHOD_TAKES_ENTERED_FIGURE[scope3MethodFor(id)])
       if (noEnteredFigure.includes(scope3MethodFor(id))) expect(takesEnteredFigure(id), id).toBe(false)

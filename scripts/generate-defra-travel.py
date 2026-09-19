@@ -745,6 +745,14 @@ def index_annual(sheet_name: str) -> dict:
     return {"sheet": "Index", "cell": cell(acol, found[0]), "text": text}
 
 
+# What's new B22: the one place the workbook says which factors carry UK electricity beyond the electric
+# cars of Business travel- land A14: "Rail, xEVs and Homeworking". Category 7 cites it for rail.
+whats_new = read_sheet(z, shared, sheets, "What's new")
+wn = [(n, c, v.strip()) for n, cells in whats_new.items() for c, v in cells.items() if v.strip().startswith("Revision to the calculation method for UK electricity")]
+if len(wn) != 1:
+    die(f"What's new: expected one cell opening 'Revision to the calculation method for UK electricity', found {len(wn)}")
+guidance["whats_new_uk_electricity_knock_on"] = {"sheet": "What's new", "cell": cell(wn[0][1], wn[0][0]), "text": wn[0][2]}
+
 for key, name in (("homeworking", HOMEWORK), ("land", LAND), ("wtt_land", WTT_LAND)):
     guidance[f"index_{key}_updated_annually"] = index_annual(name)
     guidance[f"index_{key}_last_updated"] = index_note(name)

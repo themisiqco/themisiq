@@ -83,7 +83,7 @@ describe('Scope 3 customer text', () => {
   })
 
   it('SC3 ⚠️ no em-dash in any Scope 3 method description or hierarchy line', () => {
-    const methods: Scope3Method[] = ['exiobase_spend', 'flat_spend', 'waste_factors', 'end_of_life_factors', 'business_travel_factors', 'commuting_factors', 'pcaf']
+    const methods: Scope3Method[] = ['exiobase_spend', 'flat_spend', 'waste_factors', 'end_of_life_factors', 'business_travel_factors', 'employee_commuting_factors', 'pcaf']
     for (const m of methods) expect(scope3MethodDescription(m), m).not.toContain('—')
     for (const line of methodologyHierarchyLines()) expect(line.slice(0, 60)).toBe(line.slice(0, 60)) // readable failure below
     expect(methodologyHierarchyLines().filter(l => l.includes('—'))).toEqual([])
@@ -105,7 +105,10 @@ describe('Scope 3 customer text', () => {
         const attrs = n.attributes.properties.filter(ts.isJsxAttribute)
         const get = (name: string) => attrs.find(a => a.name.getText(sf) === name)?.initializer
         const type = get('type')
-        if (type && ts.isStringLiteral(type) && type.text === 'number') {
+        // NumberField (the Cat 7 rows) renders a number input and takes its placeholder as a prop, so its
+        // call sites are numeric inputs for this check too.
+        const tag = n.tagName.getText(sf)
+        if ((type && ts.isStringLiteral(type) && type.text === 'number') || tag === 'NumberField') {
           const ph = get('placeholder')
           numeric.push({
             where: `${rel}:${sf.getLineAndCharacterOfPosition(n.getStart()).line + 1}`,
@@ -116,7 +119,7 @@ describe('Scope 3 customer text', () => {
       ts.forEachChild(n, visit)
     }
     visit(sf)
-    expect(numeric.length).toBe(19)
+    expect(numeric.length).toBe(26)
     const bare = numeric.filter(x => x.placeholder !== null && /^\s*[\d.,\s]+\s*$/.test(x.placeholder))
     expect(bare).toEqual([])
   })
