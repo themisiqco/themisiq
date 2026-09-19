@@ -88,7 +88,7 @@ const METHODOLOGIES = [
     ],
   },
   {
-    module: 'Scope 3 — Full Value Chain',
+    module: 'Scope 3: Full Value Chain',
     color: '#0F6E56',
     bg: '#E1F5EE',
     standard: 'GHG Protocol Corporate Value Chain (Scope 3) Standard',
@@ -102,7 +102,7 @@ const METHODOLOGIES = [
         content: methodologyHierarchyLines(),
       },
       {
-        title: 'Category 15 — Financed emissions',
+        title: 'Category 15: Financed emissions',
         // ⚠️ REWRITTEN 17 SEP 2026, AND THE OLD TEXT WAS TRUE WHEN IT WAS WRITTEN. It said "current
         // estimates are spend-based (PCAF data-quality tier 5)", which described the lumped proxy this
         // platform no longer runs: a portfolio balance multiplied by an intensity per year of activity is

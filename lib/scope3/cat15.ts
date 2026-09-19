@@ -41,6 +41,7 @@
 
 import { assessAsset, assessPortfolio } from '../pcaf/engine'
 import type { PcafPortfolioAsset, PortfolioResult, EmissionInputs } from '../pcaf/types'
+import { notEnteredReason } from './notEntered'
 
 export interface Cat15Data {
   emissions_override?: number
@@ -189,9 +190,10 @@ export const CAT15_GUIDANCE =
   `${CAT15_SENTENCES.noPortfolioProxyShort} ThemisIQ is not PCAF-certified or a PCAF signatory.`
 
 /** The Category 15 panel's opening box: the method in one line, then why a portfolio value is not used. */
+// ⚠️ NO "ONLY WAY THIS FIGURE CAN BE CHECKED". It said so until 19 Sep 2026; a known total from an audited
+// source can be checked too, and the panel offers one directly above the holdings.
 export const CAT15_PANEL_METHOD =
-  `Financed emissions are worked out holding by holding: ${CAT15_HOLDING_FIGURE}. That is PCAF's method, ` +
-  'and it is the only way this figure can be checked.'
+  `Financed emissions are worked out holding by holding: ${CAT15_HOLDING_FIGURE}. That is PCAF's method.`
 export const CAT15_PANEL_NO_PROXY = CAT15_SENTENCES.noPortfolioProxyShort
 
 /** The CSV note on a record that still carries a portfolio value or sector from before 17 Sep 2026. */
@@ -204,9 +206,26 @@ export function cat15DecomposedBasisDetail(holdings: number, weightedDq: number)
     `emissions-weighted PCAF data quality score of ${weightedDq.toFixed(1)} of 5. ${first}.`
 }
 
+/**
+ * Whether a record still carries a portfolio value or sector, which nothing has used since 17 Sep 2026. The
+ * CSV's recorded-and-not-used row and the choice of reason below ask the same question, so they cannot
+ * disagree about what is "on the record".
+ */
+export const cat15HasPortfolioFields = (d: Cat15Data | undefined): boolean => !!(d?.portfolio_value || d?.portfolio_sector)
+
+/**
+ * The reason when a relevant Category 15 has nothing entered: no holdings, no known total, and no portfolio
+ * value or sector on the record. The same form Categories 1, 2 and 4 use (notEntered.ts), naming what is
+ * missing rather than explaining a method the customer never tried.
+ */
+export const CAT15_NOT_ENTERED = notEnteredReason(['the holdings to assess, or a known total of financed emissions'])
+
 /** The sentence a customer reads where the withdrawn proxy used to put a number: the amber box, the CSV's
  *  "Excluded from total" line and its Category 15 "Not calculated" row. The long form, because here the
- *  sentence stands alone as the reason there is no figure. */
+ *  sentence stands alone as the reason there is no figure.
+ *  ⚠️ ONLY WHEN A PORTFOLIO VALUE OR SECTOR IS ON THE RECORD (cat15HasPortfolioFields). Until 19 Sep 2026 it
+ *  was the reason for every empty Category 15, which explained a method to a customer who had entered
+ *  nothing at all. */
 export const CAT15_NO_BASIS =
   `${CAT15_SENTENCES.noPortfolioProxyLong} Itemise the holdings, or enter a figure you already hold.`
 
@@ -275,7 +294,7 @@ export function cat15Figure(d: Cat15Data | undefined): Cat15Figure {
   }
 
   const assets = assessableAssets(d)
-  if (assets.length === 0) return none(CAT15_NO_BASIS)
+  if (assets.length === 0) return none(cat15HasPortfolioFields(d) ? CAT15_NO_BASIS : CAT15_NOT_ENTERED)
 
   const incomplete = assets.map((a, i) => (holdingComputes(a) ? 0 : i + 1)).filter(n => n > 0)
   if (incomplete.length > 0) {

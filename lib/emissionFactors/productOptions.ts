@@ -50,7 +50,7 @@ export interface ProductOption {
 /** One short clause per non-commodity type, so a customer can see what they are choosing before they
  *  choose it. Nothing is hidden and nothing is reworded: the type is EXIOBASE's. */
 const TYPE_NOTE: Readonly<Record<string, string>> = {
-  Waste: 'secondary material — EXIOBASE publishes no spend intensity for these, so this cannot be priced',
+  Waste: 'secondary material: EXIOBASE publishes no spend intensity for these, so this cannot be priced',
   TransportMargin: 'transport service / margin sector',
   TradeMargin: 'trade service / margin sector',
 }

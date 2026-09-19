@@ -134,8 +134,8 @@ export function scope3MethodDescription(method: Scope3Method): string {
       // rather than one category's vocabulary.
       return (
         `Spend-based, priced from ${src.dataset} version ${src.version} (${src.publisher}, licensed ` +
-        `${src.licence}) through the active factor edition, using the factor recorded for that category — ` +
-        `an EXIOBASE industry or product, whichever the category is priced against — in the EXIOBASE ` +
+        `${src.licence}) through the active factor edition, using the factor recorded for that category (` +
+        `an EXIOBASE industry or product, whichever the category is priced against) in the EXIOBASE ` +
         `region the inventory's country of supply belongs to.`
       )
     }

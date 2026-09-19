@@ -17,7 +17,7 @@ import { PRODUCT_OPTION_GROUPS, productName } from '../../../lib/emissionFactors
 import { inScopeFor, scopeNote, outOfScopeDisclosure, CATEGORY_SCOPE_LABEL, type SpendCategoryId } from '../../../lib/scope3/categoryScope'
 import { spendSector } from '../../../lib/scope3/spendSector'
 import {
-  cat15Figure, holdingComputes, assessableEmissions, CAT15_ASSESSMENT_FAILED, type Cat15Figure,
+  cat15Figure, holdingComputes, assessableEmissions, CAT15_ASSESSMENT_FAILED, cat15HasPortfolioFields, type Cat15Figure,
   CAT15_GUIDANCE, CAT15_PANEL_METHOD, CAT15_PANEL_NO_PROXY, CAT15_RECORDED_NOT_USED,
   cat15DecomposedBasisDetail, cat15GwpSentence,
 } from '../../../lib/scope3/cat15'
@@ -30,6 +30,7 @@ import {
 import { evaluateWasteRows, wasteRowNotPricedReason, type WasteRow, type EvaluatedWasteRow } from '../../../lib/scope3/wasteRows'
 import { evaluateEolMaterials, eolMaterialNotPricedReason, formatShare, type EolMaterial, type EvaluatedEolMaterial } from '../../../lib/scope3/endOfLife'
 import { rowPricedResult } from '../../../lib/scope3/rowPriced'
+import { notEnteredReason } from '../../../lib/scope3/notEntered'
 import { publisherGwpSentence } from '../../../lib/scope3/gwpSentence'
 import { DEFRA_TRAVEL_META, RAIL_TYPES } from '../../../lib/emissionFactors/defraTravel'
 import { COUNTRY_OPTIONS } from '../../../lib/emissionFactors/countryOptions'
@@ -58,21 +59,21 @@ const YEAR_FLOOR = 2023
 
 const CATEGORIES = [
   // Upstream
-  { id: 'cat1', num: 1, name: 'Purchased goods & services', stream: 'Upstream', desc: 'Emissions from producing goods and services you purchase', method: 'spend', unit: 'spend', typicalShare: 0.60 , guidance: 'Emissions from producing everything you buy — raw materials, components, products and services — up to the point they reach you (cradle-to-gate). Usually the single largest Scope 3 category.', dataSource: 'Procurement / AP ledger: annual spend by supplier or category. Best: supplier-specific emissions via the Supplier Portal. Spend-based estimation is permitted for this category.' },
-  { id: 'cat2', num: 2, name: 'Capital goods', stream: 'Upstream', desc: 'Emissions from producing capital equipment and assets you buy', method: 'spend', unit: 'spend', typicalShare: 0.05 , guidance: 'Emissions from producing long-life assets you purchase — buildings, machinery, vehicles, IT equipment, infrastructure. Count the full cradle-to-gate footprint in the year acquired (not depreciated over time).', dataSource: 'Fixed-asset register / capital expenditure records for the reporting year. Spend-based estimation is permitted for this category.' },
-  { id: 'cat3', num: 3, name: 'Fuel & energy related', stream: 'Upstream', desc: 'Upstream emissions from extraction and production of fuels and energy you use', method: 'activity', unit: 'kwh', typicalShare: 0.03 , guidance: 'Upstream emissions of the fuel and electricity you use that AREN\'T already in Scope 1 or 2 — i.e. extracting, producing and transporting those fuels, plus grid transmission & distribution (T&D) losses.', dataSource: 'Your Scope 1 & 2 energy consumption data (kWh, fuel volumes) — apply well-to-tank and T&D-loss factors. Source the consumption from utility bills / the GHG module.' },
-  { id: 'cat4', num: 4, name: 'Upstream transportation', stream: 'Upstream', desc: 'Emissions from transporting purchased goods to your facilities', method: 'activity', unit: 'tonne_km', typicalShare: 0.04 , guidance: 'Emissions from transporting and distributing the goods you BUY, between your suppliers and you — plus third-party logistics you pay for (inbound freight and warehousing).', dataSource: 'Logistics/freight invoices, shipment records (tonne-km or mode/distance). Spend-based estimation is permitted for this category.' },
-  { id: 'cat5', num: 5, name: 'Waste generated in operations', stream: 'Upstream', desc: 'Emissions from disposal and treatment of waste generated', method: 'activity', unit: 'tonnes', typicalShare: 0.01 , guidance: 'Emissions from third parties treating the waste your operations generate — landfill, combustion, recycling, composting and anaerobic digestion. Wastewater is not covered: the waste factors used here publish none.', dataSource: 'Waste contractor invoices / facilities team: tonnes by material and treatment route. Activity data (tonnes) is needed — spend-based is not appropriate here.' },
-  { id: 'cat6', num: 6, name: 'Business travel', stream: 'Upstream', desc: 'Emissions from employee travel for business purposes', method: 'activity', unit: 'mixed', typicalShare: 0.05 , guidance: 'Emissions from employees travelling for business — flights, rail, hotels, rental cars — in vehicles not owned by your company.', dataSource: 'Travel & expense system or travel agency reports: each flight leg (origin, destination, cabin class, distance, passengers) and each rail journey (country, type, distance, passengers). Hotel stays are not taken.' },
+  { id: 'cat1', num: 1, name: 'Purchased goods & services', stream: 'Upstream', desc: 'Emissions from producing goods and services you purchase', method: 'spend', unit: 'spend', typicalShare: 0.60 , guidance: 'Emissions from producing everything you buy (raw materials, components, products and services) up to the point they reach you, cradle-to-gate. Usually the single largest Scope 3 category.', dataSource: 'Procurement / AP ledger: annual spend by supplier or category. Best: supplier-specific emissions via the Supplier Portal. Spend-based estimation is permitted for this category.' },
+  { id: 'cat2', num: 2, name: 'Capital goods', stream: 'Upstream', desc: 'Emissions from producing capital equipment and assets you buy', method: 'spend', unit: 'spend', typicalShare: 0.05 , guidance: 'Emissions from producing long-life assets you purchase, such as buildings, machinery, vehicles, IT equipment and infrastructure. Count the full cradle-to-gate footprint in the year acquired (not depreciated over time).', dataSource: 'Fixed-asset register / capital expenditure records for the reporting year. Spend-based estimation is permitted for this category.' },
+  { id: 'cat3', num: 3, name: 'Fuel & energy related', stream: 'Upstream', desc: 'Upstream emissions from extraction and production of fuels and energy you use', method: 'activity', unit: 'kwh', typicalShare: 0.03 , guidance: 'Upstream emissions of the fuel and electricity you use that AREN\'T already in Scope 1 or 2: extracting, producing and transporting those fuels, plus grid transmission & distribution (T&D) losses.', dataSource: 'Your Scope 1 & 2 energy consumption data (kWh, fuel volumes), with well-to-tank and T&D-loss factors applied. Source the consumption from utility bills / the GHG module.' },
+  { id: 'cat4', num: 4, name: 'Upstream transportation', stream: 'Upstream', desc: 'Emissions from transporting purchased goods to your facilities', method: 'activity', unit: 'tonne_km', typicalShare: 0.04 , guidance: 'Emissions from transporting and distributing the goods you BUY, between your suppliers and you, plus third-party logistics you pay for (inbound freight and warehousing).', dataSource: 'Logistics/freight invoices, shipment records (tonne-km or mode/distance). Spend-based estimation is permitted for this category.' },
+  { id: 'cat5', num: 5, name: 'Waste generated in operations', stream: 'Upstream', desc: 'Emissions from disposal and treatment of waste generated', method: 'activity', unit: 'tonnes', typicalShare: 0.01 , guidance: 'Emissions from third parties treating the waste your operations generate: landfill, combustion, recycling, composting and anaerobic digestion. Wastewater is not covered: the waste factors used here publish none.', dataSource: 'Waste contractor invoices / facilities team: tonnes by material and treatment route. Activity data (tonnes) is needed; spend-based is not appropriate here.' },
+  { id: 'cat6', num: 6, name: 'Business travel', stream: 'Upstream', desc: 'Emissions from employee travel for business purposes', method: 'activity', unit: 'mixed', typicalShare: 0.05 , guidance: 'Emissions from employees travelling for business (flights, rail, hotels, rental cars) in vehicles not owned by your company.', dataSource: 'Travel & expense system or travel agency reports: each flight leg (origin, destination, cabin class, distance, passengers) and each rail journey (country, type, distance, passengers). Hotel stays are not taken.' },
   { id: 'cat7', num: 7, name: 'Employee commuting', stream: 'Upstream', desc: 'Emissions from employees travelling to and from work', method: 'activity', unit: 'mixed', typicalShare: 0.03 , guidance: 'Emissions from employees commuting between home and work, including remote-work energy use.', dataSource: 'HR headcount + a commuting survey or assumptions (distance, mode, WFH days). Activity-based; spend-based is not appropriate here.' },
-  { id: 'cat8', num: 8, name: 'Upstream leased assets', stream: 'Upstream', desc: 'Emissions from assets leased by your organisation', method: 'activity', unit: 'kwh', typicalShare: 0.02 , guidance: 'Emissions from assets you LEASE FROM others (as lessee) that aren\'t already in your Scope 1 & 2 — e.g. leased offices or equipment you don\'t operationally control.', dataSource: 'Lease agreements + energy use of leased assets (floor area or metered kWh). Activity-based; spend-based is not appropriate here.' },
+  { id: 'cat8', num: 8, name: 'Upstream leased assets', stream: 'Upstream', desc: 'Emissions from assets leased by your organisation', method: 'activity', unit: 'kwh', typicalShare: 0.02 , guidance: 'Emissions from assets you LEASE FROM others (as lessee) that aren\'t already in your Scope 1 & 2, e.g. leased offices or equipment you don\'t operationally control.', dataSource: 'Lease agreements + energy use of leased assets (floor area or metered kWh). Activity-based; spend-based is not appropriate here.' },
   // Downstream
-  { id: 'cat9', num: 9, name: 'Downstream transportation', stream: 'Downstream', desc: 'Emissions from transporting and distributing sold products', method: 'activity', unit: 'tonne_km', typicalShare: 0.03 , guidance: 'Emissions from transporting and distributing the products you SELL, after they leave you — outbound logistics, distribution centres, retail, paid for by others.', dataSource: 'Distribution/logistics records or modelled tonne-km of sold-product movement. Spend-based estimation is permitted for this category.' },
+  { id: 'cat9', num: 9, name: 'Downstream transportation', stream: 'Downstream', desc: 'Emissions from transporting and distributing sold products', method: 'activity', unit: 'tonne_km', typicalShare: 0.03 , guidance: 'Emissions from transporting and distributing the products you SELL, after they leave you: outbound logistics, distribution centres, retail, paid for by others.', dataSource: 'Distribution/logistics records or modelled tonne-km of sold-product movement. Spend-based estimation is permitted for this category.' },
   { id: 'cat10', num: 10, name: 'Processing of sold products', stream: 'Downstream', desc: 'Emissions from processing your intermediate products by third parties', method: 'activity', unit: 'tonnes', typicalShare: 0.02 , guidance: 'Emissions from third parties further PROCESSING your sold intermediate products before final use (e.g. you sell a component that\'s then assembled or refined).', dataSource: 'Production volumes of intermediate goods + processing energy assumptions. Activity-based; spend-based is not appropriate here.' },
-  { id: 'cat11', num: 11, name: 'Use of sold products', stream: 'Downstream', desc: 'Emissions from end-users using your sold products', method: 'activity', unit: 'units', typicalShare: 0.15 , guidance: 'Emissions from customers USING the products you sell over their lifetime — often the largest category for energy-using or fuel products.', dataSource: 'Units sold + expected lifetime energy/fuel use per unit. Activity-based; spend-based is not appropriate here.' },
+  { id: 'cat11', num: 11, name: 'Use of sold products', stream: 'Downstream', desc: 'Emissions from end-users using your sold products', method: 'activity', unit: 'units', typicalShare: 0.15 , guidance: 'Emissions from customers USING the products you sell over their lifetime. This is often the largest category for energy-using or fuel products.', dataSource: 'Units sold + expected lifetime energy/fuel use per unit. Activity-based; spend-based is not appropriate here.' },
   { id: 'cat12', num: 12, name: 'End-of-life treatment', stream: 'Downstream', desc: 'Emissions from disposal of your sold products at end of life', method: 'activity', unit: 'tonnes', typicalShare: 0.02 , guidance: 'Emissions from the waste treatment of the products you sold in the reporting year, and of their packaging, at the end of their life: landfill, combustion, recycling, composting or anaerobic digestion. The figure covers all of that year\u2019s sales, so most of these emissions have not happened yet.', dataSource: 'Per material: the tonnes of sold products and packaging that reach end of life, and how that mass splits across treatment routes. Enter the mass that reaches end of life, which can be less than the mass sold for products that are consumed, such as food and drink. For an intermediate product, enter the intermediate product you sold, not the final product it becomes part of. Include packaging, through to the point of retail.' },
-  { id: 'cat13', num: 13, name: 'Downstream leased assets', stream: 'Downstream', desc: 'Emissions from assets owned and leased to others', method: 'activity', unit: 'kwh', typicalShare: 0.01 , guidance: 'Emissions from assets you OWN and LEASE OUT to others (as lessor) that aren\'t in your Scope 1 & 2 — e.g. property you rent to tenants.', dataSource: 'Your leased-out asset portfolio + tenants\' energy use (floor area or metered). Activity-based; spend-based is not appropriate here.' },
-  { id: 'cat14', num: 14, name: 'Franchises', stream: 'Downstream', desc: 'Emissions from franchise operations', method: 'activity', unit: 'spend', typicalShare: 0.01 , guidance: 'Emissions from the operations of your FRANCHISEES — relevant if you\'re a franchisor.', dataSource: 'Franchisee energy/activity data, or estimates from number and type of franchise outlets. Activity-based; spend-based is not appropriate here.' },
+  { id: 'cat13', num: 13, name: 'Downstream leased assets', stream: 'Downstream', desc: 'Emissions from assets owned and leased to others', method: 'activity', unit: 'kwh', typicalShare: 0.01 , guidance: 'Emissions from assets you OWN and LEASE OUT to others (as lessor) that aren\'t in your Scope 1 & 2, e.g. property you rent to tenants.', dataSource: 'Your leased-out asset portfolio + tenants\' energy use (floor area or metered). Activity-based; spend-based is not appropriate here.' },
+  { id: 'cat14', num: 14, name: 'Franchises', stream: 'Downstream', desc: 'Emissions from franchise operations', method: 'activity', unit: 'spend', typicalShare: 0.01 , guidance: 'Emissions from the operations of your FRANCHISEES. Relevant if you\'re a franchisor.', dataSource: 'Franchisee energy/activity data, or estimates from number and type of franchise outlets. Activity-based; spend-based is not appropriate here.' },
   { id: 'cat15', num: 15, name: 'Investments', stream: 'Downstream', desc: 'Emissions associated with investments and lending (financed emissions)', method: 'pcaf', unit: 'spend', typicalShare: 0.90 , guidance: CAT15_GUIDANCE, dataSource: 'Per holding: the asset class, the outstanding amount, the value that asset class attributes on (EVIC, equity plus debt, property value or vehicle value) and the investee\u2019s reported emissions. If you already hold a computed figure for the portfolio, enter known financed emissions directly instead.' },
 ]
 
@@ -296,7 +297,7 @@ function ScopedOptions({ catId, factorType, selected, showAll }: {
           <optgroup key={g.heading} label={g.heading}>
             {options.map(o => {
               const inScope = inScopeFor(catId, o.code)
-              const text = [o.name, o.note, scopeNote(catId, o.code)].filter(Boolean).join(' — ')
+              const text = [o.name, o.note, scopeNote(catId, o.code)].filter(Boolean).join(' · ')
               return <option key={o.code} value={o.code}>{inScope ? text : `⚠ ${text}`}</option>
             })}
           </optgroup>
@@ -337,8 +338,8 @@ function ShowAllToggle({ catId, on, onToggle, noun, usualFor }: {
       }}
     >
       {on
-        ? `Showing every EXIOBASE ${noun} — show only the ${noun}s usual for ${usualFor}`
-        : `Showing the ${noun}s usual for ${usualFor} — show every EXIOBASE ${noun}`}
+        ? `Showing every EXIOBASE ${noun}: show only the ${noun}s usual for ${usualFor}`
+        : `Showing the ${noun}s usual for ${usualFor}: show every EXIOBASE ${noun}`}
     </button>
   )
 }
@@ -466,7 +467,7 @@ function EolMaterialsEditor({ evaluated, onAdd, onRemove, onSetMaterial, onUpdat
             </div>
             <div>
               <label htmlFor={fieldId('tonnes')} style={labelStyle}>Tonnes reaching end of life</label>
-              <input id={fieldId('tonnes')} style={inputStyle} type="number" min={0} value={m.tonnes || ''} onChange={ev => onUpdate(m.id, { tonnes: Number(ev.target.value) })} placeholder="0" />
+              <input id={fieldId('tonnes')} style={inputStyle} type="number" min={0} value={m.tonnes || ''} onChange={ev => onUpdate(m.id, { tonnes: Number(ev.target.value) })} placeholder="e.g. 12" />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <div style={labelStyle}>Share of this mass by treatment route (%)</div>
@@ -477,7 +478,7 @@ function EolMaterialsEditor({ evaluated, onAdd, onRemove, onSetMaterial, onUpdat
                   {routes.map(r => (
                     <div key={r}>
                       <label htmlFor={fieldId(`share-${r}`)} style={{ fontSize: 11, color: '#555553', display: 'block', marginBottom: 4 }}>{r}</label>
-                      <input id={fieldId(`share-${r}`)} style={inputStyle} type="number" min={0} max={100} value={m.shares[r] ?? ''} onChange={ev => onSetShare(m.id, r, ev.target.value === '' ? undefined : Number(ev.target.value))} placeholder="0" />
+                      <input id={fieldId(`share-${r}`)} style={inputStyle} type="number" min={0} max={100} value={m.shares[r] ?? ''} onChange={ev => onSetShare(m.id, r, ev.target.value === '' ? undefined : Number(ev.target.value))} placeholder="e.g. 40" />
                     </div>
                   ))}
                 </div>
@@ -555,7 +556,7 @@ function WasteRowsEditor({ catId, evaluated, onAdd, onRemove, onUpdate, onSetMat
           </div>
           <div>
             <label htmlFor={fieldId('tonnes')} style={labelStyle}>Tonnes</label>
-            <input id={fieldId('tonnes')} style={inputStyle} type="number" min={0} value={row.tonnes || ''} onChange={e => onUpdate(row.id, { tonnes: Number(e.target.value) })} placeholder="0" />
+            <input id={fieldId('tonnes')} style={inputStyle} type="number" min={0} value={row.tonnes || ''} onChange={e => onUpdate(row.id, { tonnes: Number(e.target.value) })} placeholder="e.g. 3.5" />
           </div>
           <div style={{ gridColumn: '1 / -1', fontSize: 11, lineHeight: 1.5 }}>
             {pricing.status === 'priced' ? (
@@ -585,7 +586,7 @@ function DistanceField({ fieldId, distance, unit, onChange }: {
 }) {
   return (
     <div style={{ display: 'flex', gap: 6 }}>
-      <input id={fieldId} style={{ ...inputStyle, flex: 1 }} type="number" min={0} value={distance ?? ''} onChange={e => onChange(withDistance(e.target.value === '' ? undefined : Number(e.target.value), unit))} placeholder="0" />
+      <input id={fieldId} style={{ ...inputStyle, flex: 1 }} type="number" min={0} value={distance ?? ''} onChange={e => onChange(withDistance(e.target.value === '' ? undefined : Number(e.target.value), unit))} placeholder="e.g. 850" />
       <select aria-label="Distance unit" style={{ ...inputStyle, width: 88 }} value={unit} onChange={e => onChange(withDistance(distance, e.target.value as DistanceUnit))}>
         <option value="km">km</option>
         <option value="mi">miles</option>
@@ -650,7 +651,7 @@ function FlightsEditor({ evaluated, includeRf, onAdd, onRemove, onUpdate }: {
             </div>
             <div>
               <label htmlFor={fieldId('count')} style={labelStyle}>Passengers or trips</label>
-              <input id={fieldId('count')} style={inputStyle} type="number" min={0} value={row.count ?? ''} onChange={e => onUpdate(row.id, { count: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="1" />
+              <input id={fieldId('count')} style={inputStyle} type="number" min={0} value={row.count ?? ''} onChange={e => onUpdate(row.id, { count: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="e.g. 2" />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label htmlFor={fieldId('distance')} style={labelStyle}>Distance, one way</label>
@@ -718,7 +719,7 @@ function RailJourneysEditor({ evaluated, onAdd, onRemove, onUpdate }: {
             </div>
             <div>
               <label htmlFor={fieldId('passengers')} style={labelStyle}>Passengers</label>
-              <input id={fieldId('passengers')} style={inputStyle} type="number" min={0} value={row.passengers ?? ''} onChange={e => onUpdate(row.id, { passengers: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="1" />
+              <input id={fieldId('passengers')} style={inputStyle} type="number" min={0} value={row.passengers ?? ''} onChange={e => onUpdate(row.id, { passengers: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="e.g. 2" />
             </div>
             <div style={{ gridColumn: '1 / -1', fontSize: 11, lineHeight: 1.5 }}>
               {pricing.status === 'priced' ? (
@@ -1517,7 +1518,7 @@ export default function Scope3Dashboard() {
     const m = DEFRA_WASTE_META
     const out: string[] = []
     out.push(
-      `Priced from ${m.source} — ${m.factor_set.toLowerCase()} v${m.file_version}, ${m.sheet} sheet, factor edition ${m.edition}. ` +
+      `Priced from ${m.source} (${m.factor_set.toLowerCase()} v${m.file_version}, ${m.sheet} sheet, factor edition ${m.edition}). ` +
       `Each row is its tonnes multiplied by the kg CO2e per tonne the sheet publishes for that material and treatment route, and the rows are summed.`,
     )
     // ⚠️ VERBATIM FROM THE ARTEFACT: the attribution OGL v3.0 requires, then the licence and its link, which
@@ -1756,7 +1757,7 @@ export default function Scope3Dashboard() {
     if (SPEND_PRICED_IDS.includes(id)) {
       const missing = spendMissingInputs(id)
       if (missing.length > 0) {
-        return `Not estimated, because ${missing.length === 1 ? 'this has' : 'these have'} not been entered: ${missing.join(', ')}.`
+        return notEnteredReason(missing)
       }
       if (spendPending(id)) return 'Its estimate had not finished calculating.'
       const cur = spendCurrent(id)
@@ -2083,7 +2084,7 @@ export default function Scope3Dashboard() {
           ? (d.supplier_sector === sector
             ? 'The primary supplier sector chosen for Cat 1, which is the same as the company sector.'
             : `The primary supplier sector chosen for Cat 1. The company sector is ${sectorLabel(sector) || 'not set'}, and is not used to price any category.`)
-          : `The ${cfg.factorType} chosen for this category. It is not defaulted from the company sector — capital goods and freight are different purchases.`
+          : `The ${cfg.factorType} chosen for this category. It is not defaulted from the company sector: capital goods and freight are different purchases.`
       out.push([label, cfg.factorType === 'product' ? 'Product used' : 'Sector used', spendSectorLabel(cfg.id), sectorNote])
       // ⚠️ THE CHOICE IS ALLOWED, SO THE EXPORT CARRIES IT. A row outside this category's boundary — waste
       // treatment priced as a capital good, freight priced as Category 1 — is a judgement the customer is
@@ -2196,7 +2197,7 @@ export default function Scope3Dashboard() {
           out.push(['Cat 15', `Holding ${i + 1}`, cls?.label ?? h.assetClass,
             `Outstanding ${row?.outstandingAmount ?? ''} ${currency} over ${cls?.denominatorLabel.toLowerCase() ?? 'denominator'} ` +
             `${row?.denominator ?? ''} ${currency} = attribution factor ${(h.attributionFactor * 100).toFixed(2)}%` +
-            `${h.capped ? ' (CAPPED at 100%: the outstanding amount exceeds the value it is divided by — check both figures)' : ''}. ` +
+            `${h.capped ? ' (CAPPED at 100%: the outstanding amount exceeds the value it is divided by, so check both figures)' : ''}. ` +
             `Investee emissions ${row?.emissions.reportedEmissions ?? ''} tCO2e (${h.basis}), PCAF data quality ${h.dqScore}. ` +
             `Financed emissions ${h.financedEmissions.toFixed(2)} tCO2e.`])
         })
@@ -2212,7 +2213,7 @@ export default function Scope3Dashboard() {
       }
       // ⚠️ RECORDED AND NOT USED, SAID OUT LOUD. A record saved before 17 Sep 2026 can carry both, and a
       // verifier reading the old figure needs to know they no longer price anything.
-      if (c15.portfolio_value || c15.portfolio_sector) {
+      if (cat15HasPortfolioFields(c15)) {
         out.push(['Cat 15', 'Portfolio value and sector on this record',
           [c15.portfolio_value ? `${c15.portfolio_value} ${currency}` : '', sectorLabel(c15.portfolio_sector)].filter(Boolean).join(', '),
           CAT15_RECORDED_NOT_USED])
@@ -2223,7 +2224,7 @@ export default function Scope3Dashboard() {
 
   const generateExport = () => {
     const rows = [
-      ['ThemisIQ — Scope 3 GHG Inventory'],
+      ['ThemisIQ Scope 3 GHG Inventory'],
       ['Company', company],
       // ⚠️ NAME AND CODE, NOT EITHER ALONE. A verifier needs the name to read it and the code to find
       // the published row; the code alone means consulting the EXIOBASE classification. On a miss
@@ -2379,7 +2380,7 @@ export default function Scope3Dashboard() {
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={labelStyle}>Company name</label>
           <input style={boundInventoryId ? { ...inputStyle, background: '#f8f7f5', color: 'var(--color-ink-muted)', cursor: 'not-allowed' } : inputStyle} value={company} onChange={e => setCompany(e.target.value)} placeholder="Acme Corporation" readOnly={!!boundInventoryId} />
-          {boundInventoryId && <div style={{ fontSize: 11, color: '#0F6E56', marginTop: 6 }}>🔗 Linked to your {company || 'GHG'} {reportingYear} GHG inventory — company and year are set there.</div>}
+          {boundInventoryId && <div style={{ fontSize: 11, color: '#0F6E56', marginTop: 6 }}>🔗 Linked to your {company || 'GHG'} {reportingYear} GHG inventory. Company and year are set there.</div>}
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
           {/* ⚠️ THIS SECTOR PRICES NOTHING AND SUGGESTS NOTHING, AND THE LABEL SAYS ONLY WHAT IS TRUE.
@@ -2388,13 +2389,13 @@ export default function Scope3Dashboard() {
               retired thirteen-name vocabulary and this select emits EXIOBASE codes, so every lookup missed.
               That feature was removed on 18 Sep 2026. Recorded and printed is all that is left, so recorded
               and printed is what it claims. */}
-          <label style={labelStyle}>Primary sector — what your company does</label>
+          <label style={labelStyle}>Primary sector: what your company does</label>
           <select style={inputStyle} value={sector} onChange={e => setSector(e.target.value)}>
             <option value="">Select sector</option>
             <IndustryOptions />
           </select>
           <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.5 }}>
-            Recorded with the inventory and printed in your export. It does not price any category — Categories 1, 2 and 4 each ask for their own sector where you enter their spend.
+            Recorded with the inventory and printed in your export. It does not price any category. Categories 1, 2 and 4 each ask for their own sector where you enter their spend.
           </div>
         </div>
         <div>
@@ -2433,7 +2434,7 @@ export default function Scope3Dashboard() {
             aria-controls="s3-country-results"
           />
           <div id="s3-country-hint" style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 6 }}>
-            The country whose production the estimate should represent — usually where your main suppliers are, not where your company is.
+            The country whose production the estimate should represent, usually where your main suppliers are, not where your company is.
           </div>
 
           {/* Announced on every change. Sighted users read the count off the list; a screen reader
@@ -2449,7 +2450,7 @@ export default function Scope3Dashboard() {
               style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, marginTop: 4, background: '#fff', border: '1px solid #e8e7e4', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.08)', overflow: 'hidden' }}
             >
               {countryResults.length === 0 ? (
-                <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>No countries match “{countryQuery}” — try a different spelling</div>
+                <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>No countries match “{countryQuery}”. Try a different spelling.</div>
               ) : countryResults.map((c, i) => {
                 const lit = countryFocusIdx === i || countryHoverIdx === i
                 return (
@@ -2494,7 +2495,7 @@ export default function Scope3Dashboard() {
               // A stored code the concordance no longer carries. Say so; do not guess a region.
               return (
                 <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: 'var(--color-module-climate)' }}>
-                  <span>⚠ {countryIso2} — not in the country list; no region resolved</span>
+                  <span>⚠ {countryIso2}: not in the country list; no region resolved</span>
                   <button type="button" onClick={clearCountry} style={{ border: 'none', background: 'none', padding: 0, font: 'inherit', color: 'var(--color-brand)', textDecoration: 'underline', cursor: 'pointer' }}>Clear</button>
                 </div>
               )
@@ -2511,8 +2512,8 @@ export default function Scope3Dashboard() {
               <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: '#555553' }}>
                 <span>
                   ✓ {named
-                    ? `${picked.display_name} — country-specific factor`
-                    : `${picked.display_name} — ${bucket} (regional average)`}
+                    ? `${picked.display_name}: country-specific factor`
+                    : `${picked.display_name}: ${bucket} (regional average)`}
                 </span>
                 <button type="button" onClick={clearCountry} style={{ border: 'none', background: 'none', padding: 0, font: 'inherit', color: 'var(--color-brand)', textDecoration: 'underline', cursor: 'pointer' }}>Clear</button>
               </div>
@@ -2521,7 +2522,7 @@ export default function Scope3Dashboard() {
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={labelStyle}>Annual revenue ({currency})</label>
-          <input style={inputStyle} type="number" value={revenue || ''} onChange={e => setRevenue(Number(e.target.value))} placeholder="0" />
+          <input style={inputStyle} type="number" value={revenue || ''} onChange={e => setRevenue(Number(e.target.value))} placeholder="e.g. 25,000,000" />
         </div>
       </div>
       <div style={{ marginTop: 20, background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 20%, transparent)', borderRadius: 10, padding: '1rem' }}>
@@ -2643,7 +2644,7 @@ export default function Scope3Dashboard() {
         <p style={sectionSub}>Enter data for each category you marked relevant. ThemisIQ will calculate emissions using the best available method.</p>
 
         {activeCats.length === 0 ? (
-          <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>No categories selected — go back to Step 2 to mark the relevant categories.</div>
+          <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>No categories selected. Go back to Step 2 to mark the relevant categories.</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {activeCats.map(cat => (
@@ -2697,7 +2698,7 @@ export default function Scope3Dashboard() {
                     <div style={{ gridColumn: '1 / -1' }}>
                       <label style={labelStyle}>Do you have supplier-specific emissions data?</label>
                       <div style={{ display: 'flex', gap: 8 }}>
-                        {[{ label: 'Yes — I have actual data', val: true }, { label: 'No — use spend-based estimate', val: false }].map(opt => (
+                        {[{ label: 'Yes, I have actual data', val: true }, { label: 'No, use the spend-based estimate', val: false }].map(opt => (
                           <button key={String(opt.val)} onClick={() => updateCat('cat1', 'has_supplier_data', opt.val)} style={{ flex: 1, padding: '8px', borderRadius: 8, fontSize: 12, ...(catData['cat1']?.has_supplier_data === opt.val ? toggleOn : toggleOff), cursor: 'pointer' }}>{opt.label}</button>
                         ))}
                       </div>
@@ -2705,12 +2706,12 @@ export default function Scope3Dashboard() {
                     {catData['cat1']?.has_supplier_data ? (
                       <div style={{ gridColumn: '1 / -1' }}>
                         <label style={labelStyle}>Total supplier emissions (mt CO₂e)</label>
-                        <input style={inputStyle} type="number" value={catData['cat1']?.supplier_emissions || ''} onChange={e => updateCat('cat1', 'supplier_emissions', Number(e.target.value))} placeholder="0" />
+                        <input style={inputStyle} type="number" value={catData['cat1']?.supplier_emissions || ''} onChange={e => updateCat('cat1', 'supplier_emissions', Number(e.target.value))} placeholder="e.g. 1,200" />
                       </div>
                     ) : <>
                       <div>
                         <label style={labelStyle}>Total annual spend ({currency})</label>
-                        <input style={inputStyle} type="number" value={catData['cat1']?.total_spend || ''} onChange={e => updateCat('cat1', 'total_spend', Number(e.target.value))} placeholder="0" />
+                        <input style={inputStyle} type="number" value={catData['cat1']?.total_spend || ''} onChange={e => updateCat('cat1', 'total_spend', Number(e.target.value))} placeholder="e.g. 2,500,000" />
                       </div>
                       <div>
                         <label style={labelStyle}>Primary supplier sector</label>
@@ -2776,7 +2777,7 @@ export default function Scope3Dashboard() {
                           )}
                           {catOneResult.currency_flags.length > 0 && (
                             <div style={{ fontSize: 10, color: '#B91C1C', marginBottom: 8, lineHeight: 1.5 }}>
-                              ⚠ Currency: {catOneResult.currency_flags.map(c => `${c.supplier_name}: ${c.spend} ${c.currency} — convert to USD before including`).join('; ')}
+                              ⚠ Currency: {catOneResult.currency_flags.map(c => `${c.supplier_name}: ${c.spend} ${c.currency}: convert to USD before including`).join('; ')}
                             </div>
                           )}
                           <div style={{ fontSize: 9, color: 'var(--color-ink-muted)', marginBottom: 10, lineHeight: 1.5, fontStyle: 'italic' }}>{catOneResult.method_note}</div>
@@ -2841,11 +2842,11 @@ export default function Scope3Dashboard() {
                   {cat.id === 'cat7' && <>
                     <div>
                       <label style={labelStyle}>Number of employees</label>
-                      <input style={inputStyle} type="number" value={catData['cat7']?.employee_count || ''} onChange={e => updateCat('cat7', 'employee_count', Number(e.target.value))} placeholder="0" />
+                      <input style={inputStyle} type="number" value={catData['cat7']?.employee_count || ''} onChange={e => updateCat('cat7', 'employee_count', Number(e.target.value))} placeholder="e.g. 120" />
                     </div>
                     <div>
                       <label style={labelStyle}>Average commute distance (km one way)</label>
-                      <input style={inputStyle} type="number" value={catData['cat7']?.avg_commute_km || ''} onChange={e => updateCat('cat7', 'avg_commute_km', Number(e.target.value))} placeholder="15" />
+                      <input style={inputStyle} type="number" value={catData['cat7']?.avg_commute_km || ''} onChange={e => updateCat('cat7', 'avg_commute_km', Number(e.target.value))} placeholder="15 km if left blank" />
                     </div>
                     <div>
                       <label style={labelStyle}>Primary commute mode</label>
@@ -2927,7 +2928,7 @@ export default function Scope3Dashboard() {
                     </div>
                     <div style={{ gridColumn: '1 / -1' }}>
                       <label htmlFor="cat12-split-source" style={labelStyle}>Source of the treatment split</label>
-                      <textarea id="cat12-split-source" style={{ ...inputStyle, minHeight: 64, resize: 'vertical' }} value={catData['cat12']?.eol_split_source ?? ''} onChange={e => updateCat('cat12', 'eol_split_source', e.target.value)} placeholder="For example: national waste statistics for the markets we sell into, 2024" />
+                      <textarea id="cat12-split-source" style={{ ...inputStyle, minHeight: 64, resize: 'vertical' }} value={catData['cat12']?.eol_split_source ?? ''} onChange={e => updateCat('cat12', 'eol_split_source', e.target.value)} placeholder="e.g. Eurostat packaging waste statistics, 2024" />
                       <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.5 }}>
                         Where the shares come from: national waste statistics for the markets you sell into, an industry study of how your products are disposed of, or your own take-back data. Note your product lifetime assumptions here too.
                       </div>
@@ -2972,9 +2973,9 @@ export default function Scope3Dashboard() {
                     <div style={{ gridColumn: '1 / -1' }}>
                       {/* Number.isFinite, not truthiness: 0 is an answer. A customer whose portfolio
                           finances no emissions can now say so and be calculated at zero. */}
-                      <label style={labelStyle}>Known financed emissions (mt CO₂e) — enter this if you already hold the figure</label>
+                      <label style={labelStyle}>Known financed emissions (mt CO₂e), if you already hold the figure</label>
                       <input style={inputStyle} type="number" value={Number.isFinite(catData['cat15']?.emissions_override) ? catData['cat15']?.emissions_override : ''} onChange={e => updateCat('cat15', 'emissions_override', e.target.value === '' ? undefined : Number(e.target.value))} placeholder="Leave blank to itemise the holdings below" />
-                      <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.5 }}>Enter 0 if this portfolio finances no emissions — that is an answer, and it is recorded as one. Leaving it blank is not.</div>
+                      <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.5 }}>Enter 0 if this portfolio finances no emissions: that is an answer, and it is recorded as one. Leaving it blank is not.</div>
                     </div>
                     {(() => {
                       // ⚠️ IT DESCRIBES THE FIGURE THAT EXISTS, and says so plainly when none does. It used
@@ -3000,7 +3001,7 @@ export default function Scope3Dashboard() {
                       <label style={labelStyle}>Holdings</label>
                       {cat15Assets().length === 0 && (
                         <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', background: '#f8f7f5', borderRadius: 8, padding: '0.75rem', lineHeight: 1.5 }}>
-                          No holdings yet. Add one per investment or loan — or enter a known figure above. Until one or the other is there, Category 15 is reported as not calculated, and is not counted as zero.
+                          No holdings yet. Add one per investment or loan, or enter a known figure above. Until one or the other is there, Category 15 is reported as not calculated, and is not counted as zero.
                         </div>
                       )}
                       {cat15Assets().map((row, idx) => {
@@ -3019,12 +3020,12 @@ export default function Scope3Dashboard() {
                             </div>
                             <div>
                               <label style={labelStyle}>Outstanding amount ({currency})</label>
-                              <input style={inputStyle} type="number" value={row.outstandingAmount || ''} onChange={e => updatePcafAsset(row.id, { outstandingAmount: Number(e.target.value) })} placeholder="0" />
+                              <input style={inputStyle} type="number" value={row.outstandingAmount || ''} onChange={e => updatePcafAsset(row.id, { outstandingAmount: Number(e.target.value) })} placeholder="e.g. 5,000,000" />
                             </div>
                             <div>
                               {/* Correctness-critical: denominator label tracks the selected asset class */}
                               <label style={labelStyle}>{meta.denominatorLabel} ({currency})</label>
-                              <input style={inputStyle} type="number" value={row.denominator || ''} onChange={e => updatePcafAsset(row.id, { denominator: Number(e.target.value) })} placeholder="0" />
+                              <input style={inputStyle} type="number" value={row.denominator || ''} onChange={e => updatePcafAsset(row.id, { denominator: Number(e.target.value) })} placeholder="e.g. 50,000,000" />
                             </div>
                             {/* ⚠️ THE REVENUE AND SECTOR INPUTS ARE GONE, AND THAT CLOSED A REAL HOLE.
                                 PCAF's tier 4 estimates an investee from revenue × a sector factor, and
@@ -3044,7 +3045,7 @@ export default function Scope3Dashboard() {
                                 Third-party verified
                               </label>
                               <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.5 }}>
-                                The investee&apos;s own reported figure — from their annual report, CDP response or a data provider. ThemisIQ does not estimate it from their revenue: that needs revenue-specific factors we do not hold, and the sector factors we do hold are not those.
+                                The investee&apos;s own reported figure, from their annual report, CDP response or a data provider. ThemisIQ does not estimate it from their revenue: that needs revenue-specific factors we do not hold, and the sector factors we do hold are not those.
                               </div>
                             </div>
                             <div style={{ gridColumn: '1 / -1' }}>
@@ -3097,7 +3098,7 @@ export default function Scope3Dashboard() {
                                   <span key={t} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#555553', fontWeight: 600 }}>DQ{t} · {r.coverageByScore[t]}</span>
                                 ))}
                               </div>
-                              <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.5 }}>Distribution across holdings — a low weighted score can hide high-tier outliers, so the spread is shown alongside.</div>
+                              <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.5 }}>Distribution across holdings. A low weighted score can hide high-tier outliers, so the spread is shown alongside.</div>
                             </div>
                             {/* 2. Financed emissions by asset class (descending) */}
                             <div style={{ border: '0.5px solid #e8e7e4', borderRadius: 10, overflow: 'hidden' }}>
@@ -3113,7 +3114,7 @@ export default function Scope3Dashboard() {
                             </div>
                             {/* 3. Capped-holdings data-error flag (derived — no lib field) */}
                             {cappedCount > 0 && (
-                              <div style={{ fontSize: 11, color: '#B91C1C', lineHeight: 1.5 }}>{cappedCount} holding(s) have exposure exceeding the asset value — attribution capped at 100%. Check outstanding amount vs denominator.</div>
+                              <div style={{ fontSize: 11, color: '#B91C1C', lineHeight: 1.5 }}>{cappedCount} holding(s) have exposure exceeding the asset value, so attribution is capped at 100%. Check outstanding amount vs denominator.</div>
                             )}
                           </div>
                         )
@@ -3128,7 +3129,7 @@ export default function Scope3Dashboard() {
                     return <>
                       <div>
                         <label style={labelStyle}>Annual spend ({currency})</label>
-                        <input style={inputStyle} type="number" value={catData[cat.id]?.annual_spend || ''} onChange={e => updateCat(cat.id, 'annual_spend', Number(e.target.value))} placeholder="0" />
+                        <input style={inputStyle} type="number" value={catData[cat.id]?.annual_spend || ''} onChange={e => updateCat(cat.id, 'annual_spend', Number(e.target.value))} placeholder="e.g. 400,000" />
                       </div>
                       <div>
                         {/* ⚠️ NO DEFAULT, AND THAT IS THE POINT. Cat 1's select falls back to the company
@@ -3155,7 +3156,7 @@ export default function Scope3Dashboard() {
                         {renderSpendEstimate(cat.id, cat.name)}
                       </div>
                       <div style={{ gridColumn: '1 / -1' }}>
-                        <label style={labelStyle}>Known emissions (mt CO₂e) — optional override</label>
+                        <label style={labelStyle}>Known emissions (mt CO₂e), optional override</label>
                         <input style={inputStyle} type="number" value={catData[cat.id]?.emissions_override || ''} onChange={e => updateCat(cat.id, 'emissions_override', Number(e.target.value))} placeholder="Leave blank to use the spend-based estimate" />
                       </div>
                     </>
@@ -3166,10 +3167,10 @@ export default function Scope3Dashboard() {
                   {!['cat1', 'cat2', 'cat4', 'cat6', 'cat7', 'cat5', 'cat12', 'cat15'].includes(cat.id) && <>
                     <div>
                       <label style={labelStyle}>Annual spend / value ({currency})</label>
-                      <input style={inputStyle} type="number" value={catData[cat.id]?.annual_spend || ''} onChange={e => updateCat(cat.id, 'annual_spend', Number(e.target.value))} placeholder="0" />
+                      <input style={inputStyle} type="number" value={catData[cat.id]?.annual_spend || ''} onChange={e => updateCat(cat.id, 'annual_spend', Number(e.target.value))} placeholder="e.g. 400,000" />
                     </div>
                     <div>
-                      <label style={labelStyle}>Known emissions (mt CO₂e) — optional override</label>
+                      <label style={labelStyle}>Known emissions (mt CO₂e), optional override</label>
                       <input style={inputStyle} type="number" value={catData[cat.id]?.emissions_override || ''} onChange={e => updateCat(cat.id, 'emissions_override', Number(e.target.value))} placeholder="Leave blank to use spend-based" />
                     </div>
                   </>}
@@ -3193,7 +3194,7 @@ export default function Scope3Dashboard() {
     if (entLoading) return (
       <div>
         <h2 style={sectionHead}>Scope 3 results</h2>
-        <p style={sectionSub}>Your Scope 3 total across the categories marked relevant and calculated — GHG Protocol aligned.</p>
+        <p style={sectionSub}>Your Scope 3 total across the categories marked relevant and calculated, aligned with the GHG Protocol.</p>
         <div className="tq-band" style={{ borderRadius: 16, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-2)', fontSize: 13 }}>
           Scope 3 results...
         </div>
@@ -3203,7 +3204,7 @@ export default function Scope3Dashboard() {
     return (
       <div>
         <h2 style={sectionHead}>Scope 3 results</h2>
-        <p style={sectionSub}>Your Scope 3 total across the categories marked relevant and calculated — GHG Protocol aligned.</p>
+        <p style={sectionSub}>Your Scope 3 total across the categories marked relevant and calculated, aligned with the GHG Protocol.</p>
 
         <div style={{ position: 'relative' }}>
           <div style={!isPaid ? { filter: 'blur(7px)', pointerEvents: 'none', userSelect: 'none' } : undefined}>
@@ -3288,7 +3289,7 @@ export default function Scope3Dashboard() {
                   <div style={{ fontSize: 10, color: 'var(--color-ink-muted)' }}>{cat.stream}</div>
                   {!st.inTotal && st.calculated && (
                     <div style={{ fontSize: 10, color: 'var(--color-module-climate)', lineHeight: 1.4, marginTop: 2 }}>
-                      {st.label} — reported, not in the total
+                      {st.label} (reported, not in the total)
                     </div>
                   )}
                 </div>
@@ -3310,7 +3311,7 @@ export default function Scope3Dashboard() {
             )
           })}
           {activeCats.length === 0 && (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>No data entered yet — go back to Step 3 to enter your data.</div>
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>No data entered yet. Go back to Step 3 to enter your data.</div>
           )}
         </div>
 
@@ -3318,7 +3319,7 @@ export default function Scope3Dashboard() {
         {activeCats.some(c => { const st = statusOf(c.id); return !st.inTotal && st.calculated }) && (
           <div style={{ marginTop: 12, fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, maxWidth: '72ch' }}>
             A category you judged not relevant keeps the figure you calculated for it. The figure is shown because it
-            is what justifies the exclusion — a category is easier to exclude when you can say how small it is — and it
+            is what justifies the exclusion (a category is easier to exclude when you can say how small it is), and it
             is left out of the total, because the total is what you are claiming as your inventory. Both appear in the
             export, under the category&apos;s status.
           </div>
@@ -3331,7 +3332,7 @@ export default function Scope3Dashboard() {
             plainly that none is recorded yet. */}
         {CATEGORIES.filter(c => catData[c.id]?.relevant === false).length > 0 && (
           <div style={{ marginTop: 16, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', marginBottom: 8 }}>EXCLUDED — JUDGED NOT RELEVANT</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', marginBottom: 8 }}>EXCLUDED: JUDGED NOT RELEVANT</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {CATEGORIES.filter(c => catData[c.id]?.relevant === false).map(c => {
                 const reason = (catData[c.id]?.excluded_reason || '').trim()
@@ -3340,7 +3341,7 @@ export default function Scope3Dashboard() {
                     <strong style={{ fontWeight: 600, color: '#0d0d0d' }}>Cat {c.num} {c.name}:</strong>{' '}
                     {reason
                       ? reason
-                      : <span style={{ color: 'var(--color-module-climate)' }}>No justification recorded. The GHG Protocol requires one for every excluded category — add it in the Relevance step.</span>}
+                      : <span style={{ color: 'var(--color-module-climate)' }}>No justification recorded. The GHG Protocol requires one for every excluded category. Add it in the Relevance step.</span>}
                     {statusOf(c.id).calculated && <span style={{ color: 'var(--color-ink-muted)' }}> · calculated at {getCatEmissions(c.id).toFixed(2)} mt CO₂e, reported but not in the total.</span>}
                   </div>
                 )
@@ -3355,9 +3356,9 @@ export default function Scope3Dashboard() {
               <div className="tq-band" style={{ borderRadius: 16, padding: '2rem', maxWidth: 420, textAlign: 'center' }}>
                 <div style={{ fontSize: 26, marginBottom: 10 }}>🔒</div>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, marginBottom: 8 }}>Unlock your full Scope 3 results</div>
-                <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.6, marginBottom: 18 }}>Your complete inventory is ready — the total, the category-by-category breakdown, and the data-quality flags for every line. Unlock the GHG module to view and download it.</div>
+                <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.6, marginBottom: 18 }}>Your complete inventory is ready: the total, the category-by-category breakdown, and the data-quality flags for every line. Unlock the GHG module to view and download it.</div>
                 <a href="/pricing" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>See pricing &amp; unlock →</a>
-                <div style={{ fontSize: 11, color: 'var(--color-ink-2)', marginTop: 12 }}>The calculator stays free — you only pay to unlock results &amp; export.</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-2)', marginTop: 12 }}>The calculator stays free. You only pay to unlock results &amp; export.</div>
               </div>
             </div>
           )}
@@ -3382,15 +3383,15 @@ export default function Scope3Dashboard() {
           </div>
           <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
             {unjustifiedExclusions.map(c => `Cat ${c.num} ${c.name}`).join(' · ')}. The GHG Protocol requires a
-            justification for every category you exclude. You can export without one — the file records the exclusion
-            as unjustified — but a reader of the report will be missing the reason.
+            justification for every category you exclude. You can export without one (the file records the exclusion
+            as unjustified), but a reader of the report will be missing the reason.
           </div>
         </div>
       )}
 
       <div className="tq-summary" data-module="ghg" style={{ marginBottom: 20 }}>
         <div style={{ flex: 1, padding: '20px 24px' }}>
-        <div className="tq-summary-label" style={{ marginBottom: 12 }}>Inventory summary — {company || 'Your company'}</div>
+        <div className="tq-summary-label" style={{ marginBottom: 12 }}>Inventory summary: {company || 'Your company'}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           {/* Read left to right as an explanation: how many categories the inventory covers, how many
               of those made it into the figure, then the figure — so "3 / 1 / 13.9 mt (partial)" says
@@ -3457,7 +3458,7 @@ export default function Scope3Dashboard() {
           // Arrived from an UNSAVED GHG wizard — there's nothing to bind to yet.
           <>
             <h2 style={sectionHead}>Save your GHG inventory first</h2>
-            <p style={sectionSub}>Your Scope 3 links to a saved GHG inventory so company and year stay aligned. Go back and save your inventory, then click Complete Scope 3 — or create a new inventory.</p>
+            <p style={sectionSub}>Your Scope 3 links to a saved GHG inventory so company and year stay aligned. Go back and save your inventory, then click Complete Scope 3, or create a new inventory.</p>
             <a href="/dashboard/ghg" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Go to your GHG inventory →</a>
           </>
         ) : (
@@ -3467,7 +3468,7 @@ export default function Scope3Dashboard() {
               <>
                 {cameFromGhg && (
                   <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 20%, transparent)', borderRadius: 10, padding: '0.75rem', marginBottom: 16 }}>
-                    <div style={{ fontSize: 12, color: 'var(--color-module-climate)', lineHeight: 1.6 }}>Came from a GHG inventory? If you don&apos;t see it below, it isn&apos;t saved yet — <a href="/dashboard/ghg" style={{ color: 'var(--color-module-climate)', fontWeight: 600 }}>go back and save it first</a>.</div>
+                    <div style={{ fontSize: 12, color: 'var(--color-module-climate)', lineHeight: 1.6 }}>Came from a GHG inventory? If you don&apos;t see it below, it isn&apos;t saved yet: <a href="/dashboard/ghg" style={{ color: 'var(--color-module-climate)', fontWeight: 600 }}>go back and save it first</a>.</div>
                   </div>
                 )}
                 <p style={sectionSub}>Your Scope 3 inventory links to one of your GHG inventories so the company and reporting year stay aligned across both records. Pick which one this is for.</p>
@@ -3475,7 +3476,7 @@ export default function Scope3Dashboard() {
                 <select style={inputStyle} defaultValue="" onChange={e => { if (e.target.value) bindToInventory(e.target.value) }}>
                   <option value="" disabled>Select an inventory…</option>
                   {inventoryList.map(inv => (
-                    <option key={inv.id} value={inv.id}>{(inv.company_name || 'Untitled')} — {inv.reporting_year}</option>
+                    <option key={inv.id} value={inv.id}>{(inv.company_name || 'Untitled')}, {inv.reporting_year}</option>
                   ))}
                 </select>
               </>
@@ -3503,7 +3504,7 @@ export default function Scope3Dashboard() {
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 4 }}>Climate — GHG Inventory</div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 4 }}>Climate: GHG Inventory</div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d' }}>Scope 3 Complete Calculator</div>
           </div>
           {totalScope3 > 0 && (

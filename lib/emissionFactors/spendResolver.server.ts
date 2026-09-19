@@ -110,7 +110,7 @@ const SECONDARY_MATERIAL_EXPLANATION =
   'EXIOBASE models secondary materials as waste treatment flows rather than as priced commodities, ' +
   'so it publishes no spend intensity for this category in any region. That is a fact about the ' +
   'model rather than a gap in this extract: every one of these categories is zero in all 49 ' +
-  'regions. Supplier-specific data is the route for recycled content — ask the supplier for the ' +
+  'regions. Supplier-specific data is the route for recycled content: ask the supplier for the ' +
   'emissions attributable to what you bought.'
 
 /** Built once per process, on first call. Two files of 7,987 and 9,800 rows; see the load-time

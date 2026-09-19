@@ -62,42 +62,42 @@ export const SCOPE_FAMILIES: readonly ScopeFamily[] = [
     // prefix, and the one family matched that way — p45.w must not fall into the construction family.
     prefixes: ['.w'],
     categories: [],
-    reason: 'secondary material — EXIOBASE publishes no spend intensity for these in any region, so this cannot be priced. Ask the supplier for the emissions attributable to what you bought.',
+    reason: 'EXIOBASE publishes no spend intensity for these in any region, so this cannot be priced. Ask the supplier for the emissions attributable to what you bought.',
   },
   {
     id: 'waste_treatment',
     label: 'Waste treatment services',
     prefixes: ['90'],
     categories: [],
-    reason: 'waste treatment — Category 5 covers the waste your operations generate, and prices it per tonne from the DEFRA/DESNZ factors rather than from spend.',
+    reason: 'Category 5 covers the waste your operations generate, and prices it per tonne from the DEFRA/DESNZ factors rather than from spend.',
   },
   {
     id: 'electricity',
     label: 'Electricity generation, transmission and distribution',
     prefixes: ['40.11', '40.12', '40.13'],
     categories: [],
-    reason: 'electricity — purchased power is Scope 2, and its upstream and grid losses are Category 3. Pricing it here would count it twice.',
+    reason: 'purchased power is Scope 2, and its upstream and grid losses are Category 3. Pricing it here would count it twice.',
   },
   {
     id: 'fuels',
     label: 'Refined fuels and coke',
     prefixes: ['23'],
     categories: [],
-    reason: 'fuel — fuel you buy and burn is Scope 1, and its upstream is Category 3. Pricing it here would count it twice.',
+    reason: 'fuel you buy and burn is Scope 1, and its upstream is Category 3. Pricing it here would count it twice.',
   },
   {
     id: 'renting',
     label: 'Renting of machinery and equipment',
     prefixes: ['71'],
     categories: [],
-    reason: 'renting — an asset you rent or lease rather than own is Category 8 (upstream leased assets), not a capital purchase.',
+    reason: 'an asset you rent or lease rather than own is Category 8 (upstream leased assets), not a capital purchase.',
   },
   {
     id: 'transport_services',
     label: 'Transport and warehousing services',
     prefixes: ['60.1', '60.2', '60.3', '61.1', '61.2', '62', '63'],
     categories: ['cat4'],
-    reason: 'transport service — freight you pay for between your suppliers and you is Category 4.',
+    reason: 'freight you pay for between your suppliers and you is Category 4.',
     jointNote: 'EXIOBASE does not separate freight from passenger transport: this one row covers both, so use it for freight here and keep business travel in Category 6.',
   },
   {
@@ -107,7 +107,7 @@ export const SCOPE_FAMILIES: readonly ScopeFamily[] = [
     categories: ['cat1', 'cat2'],
     // ⚠️ A SERVICE THAT IS A CAPITAL GOOD. "No services in Cat 2" would have excluded the largest
     // capital purchase most companies ever make, because a building arrives as construction work.
-    reason: 'construction work — capitalised as a building or structure, so it belongs in Category 2 as well as in Category 1.',
+    reason: 'construction work capitalised as a building or structure belongs in Category 2 as well as in Category 1.',
   },
   {
     id: 'capital_equipment',
@@ -117,14 +117,14 @@ export const SCOPE_FAMILIES: readonly ScopeFamily[] = [
     // ⚠️ IN BOTH, DELIBERATELY. The Cat 1 / Cat 2 split is by ACCOUNTING TREATMENT, not product type: the
     // same laptop is Cat 1 expensed and Cat 2 capitalised. Offering these in Cat 1 too is what keeps the
     // customer's books, rather than this file, deciding which category a purchase lands in.
-    reason: 'capital equipment — Category 2 when you capitalise it, Category 1 when you expense it. Your accounting treatment decides, not the product.',
+    reason: 'equipment is Category 2 when you capitalise it and Category 1 when you expense it. Your accounting treatment decides, not the product.',
   },
   {
     id: 'hotels_restaurants',
     label: 'Hotel and restaurant services',
     prefixes: ['55'],
     categories: ['cat1'],
-    reason: 'hotels and restaurants — catering and hospitality you buy are Category 1.',
+    reason: 'catering and hospitality you buy are Category 1.',
     jointNote: 'EXIOBASE puts hotels and restaurants in one row. Restaurant and catering spend belongs here; accommodation for business travel belongs in Category 6.',
   },
   {
@@ -132,7 +132,7 @@ export const SCOPE_FAMILIES: readonly ScopeFamily[] = [
     label: 'Post and telecommunication services',
     prefixes: ['64'],
     categories: ['cat1', 'cat4'],
-    reason: 'post and telecommunications — telecoms is an ordinary Category 1 purchase; courier and parcel carriage of goods you bought is Category 4.',
+    reason: 'telecoms is an ordinary Category 1 purchase; courier and parcel carriage of goods you bought is Category 4.',
     jointNote: 'EXIOBASE puts post and telecommunications in one row, so the same row serves a phone bill and a courier invoice. Put it where the spend actually went.',
   },
 ] as const
