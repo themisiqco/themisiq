@@ -73,6 +73,10 @@ describe('defraTravel2026.json', () => {
       international_and_non_stop: 'Business travel- air!A53',
       international_is_average: 'Business travel- air!A56',
     })
+    // Read from the Index sheet by the sheet's name, not by row: which publication last updated each air sheet.
+    expect(cells).toMatchObject({ index_air_last_updated: 'Index!H40', index_wtt_air_last_updated: 'Index!H41' })
+    expect(guidance.index_air_last_updated.text).toMatch(/^Factors last updated in 2025 publication/)
+    expect(guidance.index_wtt_air_last_updated.text).toMatch(/^Factors last updated in 2023 publication/)
     expect(guidance.distance_uplift.text).toMatch(/distance uplift of 8%/)
     expect(guidance.international_and_non_stop.text).toMatch(/All factors presented are for direct \(non-stop\) flights only\./)
     expect(guidance.international_is_average.text).toMatch(/an average of short and long-haul flights to\/from UK/)

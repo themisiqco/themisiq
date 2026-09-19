@@ -3,6 +3,7 @@ import { rowPricedResult, type RowPricedData } from './rowPriced'
 import { evaluateWasteRows } from './wasteRows'
 import { evaluateEolMaterials } from './endOfLife'
 import { coverageEntry, scope3Status } from './categoryStatus'
+import { evaluateBusinessTravel, withDistance } from './businessTravel'
 
 const cat5Rows = [
   { id: 'r1', activity: 'Metal', waste_type: 'Metal: scrap metal', route: 'Closed-loop', tonnes: 5 },
@@ -11,6 +12,10 @@ const cat5Rows = [
 const cat12Materials = [
   { id: 'm1', activity: 'Paper', waste_type: 'Paper and board: paper', tonnes: 10, shares: { Landfill: 70, 'Closed-loop': 30 } },
 ]
+const cat6Flights = [
+  { id: 'f1', origin_iso2: 'GB', destination_iso2: 'US', cabin_class: 'economy' as const, count: 2, ...withDistance(5570, 'km') },
+]
+const cat6Rail = [{ id: 'r1', country_iso2: 'FR', rail_type: 'International rail', passengers: 1, ...withDistance(300, 'km') }]
 const coverageOf = (data: Record<string, RowPricedData>, id: string) => {
   const r = rowPricedResult(data, id)!
   return coverageEntry(scope3Status(true, r.calculated), { mt: r.calculated ? Number(r.mt.toFixed(4)) : null, unpriced: false, reason: null })
@@ -44,7 +49,26 @@ describe('row-priced categories: each figure moves only with its own data', () =
     expect(rowPricedResult(crossed, 'cat12')).toEqual({ mt: 0, calculated: false })
   })
 
+  it('R5 ⚠️ ISOLATION: Cat 6 reports only its own flights and rail, beside Cat 5 and Cat 12 data', () => {
+    const all: Record<string, RowPricedData> = {
+      cat5: { wasteRows: cat5Rows }, cat6: { flights: cat6Flights, rail_journeys: cat6Rail }, cat12: { eolMaterials: cat12Materials },
+    }
+    const only6: Record<string, RowPricedData> = { cat6: { flights: cat6Flights, rail_journeys: cat6Rail } }
+    expect(rowPricedResult(all, 'cat6')!.mt).toBe(evaluateBusinessTravel({ flights: cat6Flights, rail_journeys: cat6Rail }).mt)
+    expect(rowPricedResult(only6, 'cat6')).toEqual(rowPricedResult(all, 'cat6'))
+    expect(coverageOf(only6, 'cat6')).toEqual(coverageOf(all, 'cat6'))
+    // Cat 6's rows do not make Cat 5 or Cat 12 calculated, and theirs do not make Cat 6 calculated.
+    expect(rowPricedResult(only6, 'cat5')).toEqual({ mt: 0, calculated: false })
+    expect(rowPricedResult(only6, 'cat12')).toEqual({ mt: 0, calculated: false })
+    expect(rowPricedResult({ cat5: { wasteRows: cat5Rows }, cat12: { eolMaterials: cat12Materials } }, 'cat6')).toEqual({ mt: 0, calculated: false })
+    // Cat 6's fields stored under another category price nothing there.
+    expect(rowPricedResult({ cat5: { flights: cat6Flights } }, 'cat5')).toEqual({ mt: 0, calculated: false })
+    // The radiative forcing setting is Cat 6's own.
+    const off: Record<string, RowPricedData> = { cat6: { flights: cat6Flights, include_rf: false }, cat5: { include_rf: true } }
+    expect(rowPricedResult(off, 'cat6')!.mt).toBe(evaluateBusinessTravel({ flights: cat6Flights, include_rf: false }).mt)
+  })
+
   it('R4 categories priced another way are not row-priced', () => {
-    for (const id of ['cat1', 'cat3', 'cat6', 'cat15']) expect(rowPricedResult({}, id), id).toBeNull()
+    for (const id of ['cat1', 'cat3', 'cat7', 'cat15']) expect(rowPricedResult({}, id), id).toBeNull()
   })
 })

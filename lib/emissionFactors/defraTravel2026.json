@@ -105,9 +105,19 @@
         "sheet": "Business travel- land",
         "cell": "A12",
         "text": "●  Users should be mindful of the difference between vehicle km conversion factors and passenger km conversion factors. Vehicle km conversion factors should be applied to a whole vehicle (such as a car or taxi) being used for business purposes. Passenger km factors should be used when single passengers are travelling by means of mass transport (such as by train) and the aim is to report emissions on a single-person basis, not account for the whole vehicle."
+      },
+      "index_air_last_updated": {
+        "sheet": "Index",
+        "cell": "H40",
+        "text": "Factors last updated in 2025 publication: \n- CO2 and CO2e factors of Flights\nFactors last updated in 2021 publication:\n- CH4 and N2O (aligned with AR5 GWPs)"
+      },
+      "index_wtt_air_last_updated": {
+        "sheet": "Index",
+        "cell": "H41",
+        "text": "Factors last updated in 2023 publication: \nAll factors."
       }
     },
-    "generated_on": "2026-09-18",
+    "generated_on": "2026-09-19",
     "generated_from": "defra-desnz-ghg-conversion-factors-2026-full-set-v1.xlsx",
     "generated_from_sha256": "b5c4f2f86cdc74707337b2fb013b44ded189a1b528f5e29ea99856ba65ae0205",
     "generated_by": "scripts/generate-defra-travel.py",

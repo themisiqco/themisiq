@@ -30,6 +30,18 @@ import {
 import { evaluateWasteRows, wasteRowNotPricedReason, type WasteRow, type EvaluatedWasteRow } from '../../../lib/scope3/wasteRows'
 import { evaluateEolMaterials, eolMaterialNotPricedReason, formatShare, type EolMaterial, type EvaluatedEolMaterial } from '../../../lib/scope3/endOfLife'
 import { rowPricedResult } from '../../../lib/scope3/rowPriced'
+import { publisherGwpSentence } from '../../../lib/scope3/gwpSentence'
+import { DEFRA_TRAVEL_META, RAIL_TYPES } from '../../../lib/emissionFactors/defraTravel'
+import { COUNTRY_OPTIONS } from '../../../lib/emissionFactors/countryOptions'
+import {
+  evaluateBusinessTravel, withDistance, CABIN_CHOICES,
+  type FlightRow, type RailJourney, type DistanceUnit, type EvaluatedFlight, type EvaluatedRail,
+} from '../../../lib/scope3/businessTravel'
+import {
+  CAT6_HOTEL_SENTENCE, CAT6_UPLIFT_SENTENCE, CAT6_DISTANCE_HELP, CAT6_RAIL_SENTENCE,
+  cat6Sentences, cat6WorkingsSummary, cat6Basis, cat6RfHeader, cat6RfSentence, flightCsvRow, railCsvRow,
+  flightRuleText, flightClassText, flightNotPricedReason, railNotPricedReason, AIR_CATEGORY_LABEL,
+} from '../../../lib/scope3/businessTravelCopy'
 import type { PcafPortfolioAsset, PcafAssetClass, EmissionInputs } from '../../../lib/pcaf/types'
 import { editRows, type RowEdit } from '../../../lib/rowList'
 import { sectionHead } from '@/app/components/headingStyles'
@@ -51,7 +63,7 @@ const CATEGORIES = [
   { id: 'cat3', num: 3, name: 'Fuel & energy related', stream: 'Upstream', desc: 'Upstream emissions from extraction and production of fuels and energy you use', method: 'activity', unit: 'kwh', typicalShare: 0.03 , guidance: 'Upstream emissions of the fuel and electricity you use that AREN\'T already in Scope 1 or 2 — i.e. extracting, producing and transporting those fuels, plus grid transmission & distribution (T&D) losses.', dataSource: 'Your Scope 1 & 2 energy consumption data (kWh, fuel volumes) — apply well-to-tank and T&D-loss factors. Source the consumption from utility bills / the GHG module.' },
   { id: 'cat4', num: 4, name: 'Upstream transportation', stream: 'Upstream', desc: 'Emissions from transporting purchased goods to your facilities', method: 'activity', unit: 'tonne_km', typicalShare: 0.04 , guidance: 'Emissions from transporting and distributing the goods you BUY, between your suppliers and you — plus third-party logistics you pay for (inbound freight and warehousing).', dataSource: 'Logistics/freight invoices, shipment records (tonne-km or mode/distance). Spend-based estimation is permitted for this category.' },
   { id: 'cat5', num: 5, name: 'Waste generated in operations', stream: 'Upstream', desc: 'Emissions from disposal and treatment of waste generated', method: 'activity', unit: 'tonnes', typicalShare: 0.01 , guidance: 'Emissions from third parties treating the waste your operations generate — landfill, combustion, recycling, composting and anaerobic digestion. Wastewater is not covered: the waste factors used here publish none.', dataSource: 'Waste contractor invoices / facilities team: tonnes by material and treatment route. Activity data (tonnes) is needed — spend-based is not appropriate here.' },
-  { id: 'cat6', num: 6, name: 'Business travel', stream: 'Upstream', desc: 'Emissions from employee travel for business purposes', method: 'activity', unit: 'mixed', typicalShare: 0.05 , guidance: 'Emissions from employees travelling for business — flights, rail, hotels, rental cars — in vehicles not owned by your company.', dataSource: 'Travel & expense system or travel agency reports: flights (distance/class), hotel nights, rail. Spend-based estimation is permitted for this category.' },
+  { id: 'cat6', num: 6, name: 'Business travel', stream: 'Upstream', desc: 'Emissions from employee travel for business purposes', method: 'activity', unit: 'mixed', typicalShare: 0.05 , guidance: 'Emissions from employees travelling for business — flights, rail, hotels, rental cars — in vehicles not owned by your company.', dataSource: 'Travel & expense system or travel agency reports: each flight leg (origin, destination, cabin class, distance, passengers) and each rail journey (country, type, distance, passengers). Hotel stays are not taken.' },
   { id: 'cat7', num: 7, name: 'Employee commuting', stream: 'Upstream', desc: 'Emissions from employees travelling to and from work', method: 'activity', unit: 'mixed', typicalShare: 0.03 , guidance: 'Emissions from employees commuting between home and work, including remote-work energy use.', dataSource: 'HR headcount + a commuting survey or assumptions (distance, mode, WFH days). Activity-based; spend-based is not appropriate here.' },
   { id: 'cat8', num: 8, name: 'Upstream leased assets', stream: 'Upstream', desc: 'Emissions from assets leased by your organisation', method: 'activity', unit: 'kwh', typicalShare: 0.02 , guidance: 'Emissions from assets you LEASE FROM others (as lessee) that aren\'t already in your Scope 1 & 2 — e.g. leased offices or equipment you don\'t operationally control.', dataSource: 'Lease agreements + energy use of leased assets (floor area or metered kWh). Activity-based; spend-based is not appropriate here.' },
   // Downstream
@@ -564,6 +576,170 @@ function WasteRowsEditor({ catId, evaluated, onAdd, onRemove, onUpdate, onSetMat
   )
 }
 
+/** A distance input with its unit beside it. The one conversion to km happens in withDistance. */
+function DistanceField({ fieldId, distance, unit, onChange }: {
+  fieldId: string
+  distance: number | undefined
+  unit: DistanceUnit
+  onChange: (next: ReturnType<typeof withDistance>) => void
+}) {
+  return (
+    <div style={{ display: 'flex', gap: 6 }}>
+      <input id={fieldId} style={{ ...inputStyle, flex: 1 }} type="number" min={0} value={distance ?? ''} onChange={e => onChange(withDistance(e.target.value === '' ? undefined : Number(e.target.value), unit))} placeholder="0" />
+      <select aria-label="Distance unit" style={{ ...inputStyle, width: 88 }} value={unit} onChange={e => onChange(withDistance(distance, e.target.value as DistanceUnit))}>
+        <option value="km">km</option>
+        <option value="mi">miles</option>
+      </select>
+    </div>
+  )
+}
+
+/** Every country the product offers, by the ISO2 code it stores. */
+function CountrySelect({ id, value, onChange, placeholder }: { id: string; value: string; onChange: (iso2: string) => void; placeholder: string }) {
+  return (
+    <select id={id} style={inputStyle} value={value} onChange={e => onChange(e.target.value)}>
+      <option value="">{placeholder}</option>
+      {COUNTRY_OPTIONS.map(o => <option key={o.iso2} value={o.iso2}>{o.display_name}</option>)}
+    </select>
+  )
+}
+
+const kgText = (n: number) => n.toLocaleString('en', { maximumFractionDigits: 2 })
+
+/**
+ * Cat 6 flight legs: one row per leg, priced from lib/scope3/businessTravel.ts. Every figure shown here is
+ * the evaluation's, and every sentence is built in businessTravelCopy.ts.
+ */
+function FlightsEditor({ evaluated, includeRf, onAdd, onRemove, onUpdate }: {
+  evaluated: readonly EvaluatedFlight[]
+  includeRf: boolean
+  onAdd: () => void
+  onRemove: (id: string) => void
+  onUpdate: (id: string, patch: Partial<FlightRow>) => void
+}) {
+  return (
+    <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#0d0d0d' }}>Flight legs</div>
+      {evaluated.length === 0 && (
+        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', background: '#f8f7f5', borderRadius: 8, padding: '0.75rem', lineHeight: 1.5 }}>
+          No flight legs yet. Add one row per leg flown: a return trip is two legs, and a journey with a stop is one leg per flight.
+        </div>
+      )}
+      {evaluated.map(({ row, n, pricing }) => {
+        const fieldId = (f: string) => `cat6-flight-${row.id}-${f}`
+        return (
+          <div key={row.id} style={{ border: '1px solid #e8e7e4', borderRadius: 10, padding: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#555553' }}>Flight leg {n}</span>
+              <button type="button" aria-label={`Remove flight leg ${n}`} onClick={() => onRemove(row.id)} style={{ fontSize: 11, color: '#B91C1C', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Remove</button>
+            </div>
+            <div>
+              <label htmlFor={fieldId('origin')} style={labelStyle}>From</label>
+              <CountrySelect id={fieldId('origin')} value={row.origin_iso2} onChange={v => onUpdate(row.id, { origin_iso2: v })} placeholder="Origin country" />
+            </div>
+            <div>
+              <label htmlFor={fieldId('destination')} style={labelStyle}>To</label>
+              <CountrySelect id={fieldId('destination')} value={row.destination_iso2} onChange={v => onUpdate(row.id, { destination_iso2: v })} placeholder="Destination country" />
+            </div>
+            <div>
+              <label htmlFor={fieldId('class')} style={labelStyle}>Cabin class</label>
+              <select id={fieldId('class')} style={inputStyle} value={row.cabin_class} onChange={e => onUpdate(row.id, { cabin_class: e.target.value as FlightRow['cabin_class'] })}>
+                <option value="">Select class</option>
+                {CABIN_CHOICES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor={fieldId('count')} style={labelStyle}>Passengers or trips</label>
+              <input id={fieldId('count')} style={inputStyle} type="number" min={0} value={row.count ?? ''} onChange={e => onUpdate(row.id, { count: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="1" />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor={fieldId('distance')} style={labelStyle}>Distance, one way</label>
+              <DistanceField fieldId={fieldId('distance')} distance={row.distance} unit={row.distance_unit} onChange={next => onUpdate(row.id, next)} />
+              <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.5 }}>{CAT6_DISTANCE_HELP}</div>
+            </div>
+            <div style={{ gridColumn: '1 / -1', fontSize: 11, lineHeight: 1.5 }}>
+              {pricing.status === 'priced' ? (
+                <span style={{ color: '#555553' }}>
+                  {kgText(pricing.km)} km · {AIR_CATEGORY_LABEL[pricing.category]} ({flightRuleText(pricing)}) · class: {flightClassText(pricing, row.cabin_class.replace('_', ' '))}
+                  <br />
+                  Combustion {kgText(includeRf ? pricing.kg.with_rf.kg_co2e : pricing.kg.without_rf.kg_co2e)} kg CO₂e ({includeRf ? `without radiative forcing ${kgText(pricing.kg.without_rf.kg_co2e)}` : `with radiative forcing ${kgText(pricing.kg.with_rf.kg_co2e)}`}) + well-to-tank {kgText(pricing.kg.wtt)} = <strong style={{ fontWeight: 600 }}>{kgText(pricing.kg.total)} kg CO₂e</strong>
+                </span>
+              ) : pricing.status === 'no_haul' || pricing.status === 'distance_mismatch' ? (
+                <span style={{ color: '#92400e' }}>⚠ Not counted: {flightNotPricedReason(pricing, countryLabel)}.</span>
+              ) : (
+                <span style={{ color: 'var(--color-ink-muted)' }}>Not priced until entered: {pricing.missing.join(', ')}.</span>
+              )}
+            </div>
+          </div>
+        )
+      })}
+      <button type="button" onClick={onAdd} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: 'none', border: '0.5px solid var(--color-brand)', color: 'var(--color-brand)', cursor: 'pointer', alignSelf: 'flex-start' }}>+ Add flight leg</button>
+    </div>
+  )
+}
+
+/** Cat 6 rail journeys: one row per journey type, priced from the sheet's UK rail factors. */
+function RailJourneysEditor({ evaluated, onAdd, onRemove, onUpdate }: {
+  evaluated: readonly EvaluatedRail[]
+  onAdd: () => void
+  onRemove: (id: string) => void
+  onUpdate: (id: string, patch: Partial<RailJourney>) => void
+}) {
+  return (
+    <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#0d0d0d' }}>Rail journeys</div>
+      {evaluated.length === 0 && (
+        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', background: '#f8f7f5', borderRadius: 8, padding: '0.75rem', lineHeight: 1.5 }}>
+          No rail journeys yet. Add one row per journey type: the country, the kind of rail, the distance and the passengers.
+        </div>
+      )}
+      {evaluated.map(({ row, n, pricing }) => {
+        const fieldId = (f: string) => `cat6-rail-${row.id}-${f}`
+        return (
+          <div key={row.id} style={{ border: '1px solid #e8e7e4', borderRadius: 10, padding: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#555553' }}>Rail journey {n}</span>
+              <button type="button" aria-label={`Remove rail journey ${n}`} onClick={() => onRemove(row.id)} style={{ fontSize: 11, color: '#B91C1C', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Remove</button>
+            </div>
+            <div>
+              <label htmlFor={fieldId('country')} style={labelStyle}>Country</label>
+              <CountrySelect id={fieldId('country')} value={row.country_iso2} onChange={v => onUpdate(row.id, { country_iso2: v })} placeholder="Country" />
+            </div>
+            <div>
+              <label htmlFor={fieldId('type')} style={labelStyle}>Rail type</label>
+              <select id={fieldId('type')} style={inputStyle} value={row.rail_type} onChange={e => onUpdate(row.id, { rail_type: e.target.value })}>
+                <option value="">Select rail type</option>
+                {RAIL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor={fieldId('distance')} style={labelStyle}>Distance</label>
+              <DistanceField fieldId={fieldId('distance')} distance={row.distance} unit={row.distance_unit} onChange={next => onUpdate(row.id, next)} />
+            </div>
+            <div>
+              <label htmlFor={fieldId('passengers')} style={labelStyle}>Passengers</label>
+              <input id={fieldId('passengers')} style={inputStyle} type="number" min={0} value={row.passengers ?? ''} onChange={e => onUpdate(row.id, { passengers: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="1" />
+            </div>
+            <div style={{ gridColumn: '1 / -1', fontSize: 11, lineHeight: 1.5 }}>
+              {pricing.status === 'priced' ? (
+                <span style={{ color: '#555553' }}>
+                  {kgText(pricing.km)} km · combustion {kgText(pricing.kg.combustion)} kg CO₂e + well-to-tank {kgText(pricing.kg.wtt)} = <strong style={{ fontWeight: 600 }}>{kgText(pricing.kg.total)} kg CO₂e</strong>
+                  {pricing.uk_stand_in && <><br /><span style={{ color: '#92400e' }}>⚠ UK rail factor used as a stand-in outside the UK.</span></>}
+                </span>
+              ) : pricing.status === 'no_factor' || pricing.status === 'distance_mismatch' ? (
+                <span style={{ color: '#92400e' }}>⚠ Not counted: {railNotPricedReason(pricing)}.</span>
+              ) : (
+                <span style={{ color: 'var(--color-ink-muted)' }}>Not priced until entered: {pricing.missing.join(', ')}.</span>
+              )}
+            </div>
+          </div>
+        )
+      })}
+      <button type="button" onClick={onAdd} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: 'none', border: '0.5px solid var(--color-brand)', color: 'var(--color-brand)', cursor: 'pointer', alignSelf: 'flex-start' }}>+ Add rail journey</button>
+    </div>
+  )
+}
+
 const STEP_NAMES = ['Setup', 'Relevance', 'Calculate', 'Results', 'Export']
 
 interface CategoryData {
@@ -600,12 +776,12 @@ interface CategoryData {
   spend_sector?: string
   has_supplier_data?: boolean
   supplier_emissions?: number
-  // Cat 6
-  short_haul_flights?: number
-  long_haul_flights?: number
-  avg_flight_km?: number
-  hotel_nights?: number
-  rail_km?: number
+  // Cat 6 — one row per flight leg and per rail journey, priced from lib/emissionFactors/defraTravel2026.json
+  // by lib/scope3/businessTravel.ts. include_rf is the inventory's radiative forcing setting; absent means
+  // included. The previous fields (flight counts, hotel nights, rail km) are gone: no saved data used them.
+  flights?: FlightRow[]
+  rail_journeys?: RailJourney[]
+  include_rf?: boolean
   // Cat 7
   employee_count?: number
   avg_commute_km?: number
@@ -1195,6 +1371,20 @@ export default function Scope3Dashboard() {
       return { shares }
     })
 
+  // Cat 6 flight legs and rail journeys, in catData['cat6'].flights and .rail_journeys.
+  const newFlight = (): FlightRow => ({ id: Math.random().toString(36).slice(2), origin_iso2: '', destination_iso2: '', cabin_class: '', count: undefined, ...withDistance(undefined, 'km') })
+  const editFlights = (edit: RowEdit<FlightRow>) =>
+    setCatData(prev => ({ ...prev, cat6: { ...prev.cat6, flights: editRows(prev.cat6?.flights, edit) } }))
+  const newRailJourney = (): RailJourney => ({ id: Math.random().toString(36).slice(2), country_iso2: '', rail_type: '', passengers: undefined, ...withDistance(undefined, 'km') })
+  const editRailJourneys = (edit: RowEdit<RailJourney>) =>
+    setCatData(prev => ({ ...prev, cat6: { ...prev.cat6, rail_journeys: editRows(prev.cat6?.rail_journeys, edit) } }))
+  const addFlight = () => editFlights({ kind: 'add', row: newFlight() })
+  const removeFlight = (id: string) => editFlights({ kind: 'remove', id })
+  const updateFlight = (id: string, patch: Partial<FlightRow>) => editFlights({ kind: 'update', id, patch })
+  const addRailJourney = () => editRailJourneys({ kind: 'add', row: newRailJourney() })
+  const removeRailJourney = (id: string) => editRailJourneys({ kind: 'remove', id })
+  const updateRailJourney = (id: string, patch: Partial<RailJourney>) => editRailJourneys({ kind: 'update', id, patch })
+
   // Waste rows, in catData[catId].wasteRows, for every row-priced category (Cat 5 today).
   const newWasteRow = (): WasteRow => ({
     id: Math.random().toString(36).slice(2),
@@ -1250,17 +1440,6 @@ export default function Scope3Dashboard() {
     // figure priced from a real factor. It is gone; a miss is a miss.
     const line = spendPricedLine(id)
     return line ? line.emissions_mt : 0
-  }
-
-  const calcCat6 = (): number => {
-    // `?? {}`: the relevance gate that guaranteed a record is gone, and a category with no entry has no
-    // inputs, so every field below falls back to its own default and the figure is 0.
-    const d = catData['cat6'] ?? ({} as CategoryData)
-    const shortHaul = (d.short_haul_flights || 0) * (d.avg_flight_km || 800) * EMISSION_FACTORS.flight_short
-    const longHaul = (d.long_haul_flights || 0) * (d.avg_flight_km || 5000) * EMISSION_FACTORS.flight_long
-    const hotels = (d.hotel_nights || 0) * EMISSION_FACTORS.hotel
-    const rail = (d.rail_km || 0) * EMISSION_FACTORS.rail
-    return (shortHaul + longHaul + hotels + rail) / 1000
   }
 
   const calcCat7 = (): number => {
@@ -1332,14 +1511,7 @@ export default function Scope3Dashboard() {
    */
   /** The GWP sentence both waste categories carry: the sheet's AR5 basis, and whether the bound GHG inventory
    *  shares it. Cat 5's wording, unchanged, now built once so Cat 12 cannot word it differently. */
-  const wasteGwpSentence: string = (() => {
-    const m = DEFRA_WASTE_META
-    const mix = !boundInventoryId ? ''
-      : ghgGwpVersion === m.gwp_basis ? ` The linked GHG inventory records ${ghgGwpVersion} as well, so the two share a GWP basis.`
-      : ghgGwpVersion ? ` The linked GHG inventory records ${ghgGwpVersion}. These factors are not re-based to it, so the inventory combines ${ghgGwpVersion} and ${m.gwp_basis} figures.`
-      : ` The linked GHG inventory records no GWP basis, so whether it shares ${m.gwp_basis} with these factors is not known.`
-    return `GWP basis: ${m.gwp_basis}. ${m.gwp_basis_note}${mix}`
-  })()
+  const wasteGwpSentence: string = publisherGwpSentence(DEFRA_WASTE_META, !!boundInventoryId, ghgGwpVersion)
 
   const cat5Sentences: string[] = (() => {
     const m = DEFRA_WASTE_META
@@ -1409,6 +1581,13 @@ export default function Scope3Dashboard() {
     return out
   })()
 
+  // ─── Cat 6: business travel ─────────────────────────────────────────────────────────────────────
+  // ONE evaluation read by the panel, the workings, the CSV and factor_basis. The figure and the calculated
+  // flag come from rowPricedResult, which evaluates this category's own record the same way.
+  const cat6Travel = evaluateBusinessTravel(catData['cat6'])
+  /** The Cat 6 workings and CSV disclosures: the same sentences in both, built in businessTravelCopy.ts. */
+  const cat6SentenceList: string[] = cat6Sentences(cat6Travel, publisherGwpSentence(DEFRA_TRAVEL_META, !!boundInventoryId, ghgGwpVersion), countryLabel)
+
   const calcGenericSpend = (id: string): number => {
     const d = catData[id] ?? ({} as CategoryData)
     if (d.emissions_override) return d.emissions_override
@@ -1446,8 +1625,8 @@ export default function Scope3Dashboard() {
       // ⚠️ BY THE CATEGORY'S OWN ID. This read `calcCat5()`, which took no id: any second category on a
       // row-priced method would have reported Category 5's figure. See lib/scope3/rowPriced.ts.
       case 'waste_factors':
-      case 'end_of_life_factors': return rowPricedResult(catData, id)?.mt ?? 0
-      case 'travel_factors': return calcCat6()
+      case 'end_of_life_factors':
+      case 'business_travel_factors': return rowPricedResult(catData, id)?.mt ?? 0
       case 'commuting_factors': return calcCat7()
       case 'pcaf': return calcCat15()
       case 'flat_spend': return calcGenericSpend(id)
@@ -1486,8 +1665,8 @@ export default function Scope3Dashboard() {
     switch (scope3MethodFor(id)) {
       case 'exiobase_spend': return !!(d.has_supplier_data && d.supplier_emissions) || !!spendPricedLine(id)
       case 'waste_factors':
-      case 'end_of_life_factors': return rowPricedResult(catData, id)?.calculated ?? false
-      case 'travel_factors': return !!(d.short_haul_flights || d.long_haul_flights || d.hotel_nights || d.rail_km)
+      case 'end_of_life_factors':
+      case 'business_travel_factors': return rowPricedResult(catData, id)?.calculated ?? false
       case 'commuting_factors': return !!d.employee_count
       // ⚠️ mt !== null, NOT > 0. An entered zero — a portfolio that finances no emissions — is a
       // calculated answer, and the note above about a genuine zero reading as not-calculated no longer
@@ -1658,7 +1837,9 @@ export default function Scope3Dashboard() {
     // still reports its figure with the quality that figure has.
     // An entered figure is primary data — but only on a category whose calculator uses one.
     if ((d.emissions_override && takesEnteredFigure(id)) || d.has_supplier_data) return 'high'
-    if (id === 'cat6' && (d.short_haul_flights || d.long_haul_flights)) return 'medium'
+    // ⚠️ ANY PRICED FLIGHT OR RAIL ROW, NOT FLIGHTS ALONE. This tested flight counts only, so a Cat 6 with
+    // hotel nights or rail km and no flights was calculated but labelled "Flat spend", a method it never used.
+    if (scope3MethodFor(id) === 'business_travel_factors' && rowPricedResult(catData, id)?.calculated) return 'medium'
     if (id === 'cat7' && d.employee_count) return 'medium'
     if (id === 'cat5' && cat5Priced.length > 0) return 'medium'
     if (scope3MethodFor(id) === 'end_of_life_factors' && rowPricedResult(catData, id)?.calculated) return 'medium'
@@ -1789,7 +1970,9 @@ export default function Scope3Dashboard() {
       }
     }
 
-    // travel, commuting: fixed activity factors
+    if (method === 'business_travel_factors') return cat6Basis(evaluateBusinessTravel(d), countryLabel)
+
+    // commuting: fixed activity factors
     if (getCatEmissions(id) === 0) {
       return { basis: 'No data', detail: 'No activity data was entered, so nothing was calculated.' }
     }
@@ -1976,6 +2159,20 @@ export default function Scope3Dashboard() {
       for (const d of cat12Sentences) out.push(['Cat 12', 'Disclosure', d, ''])
     }
 
+    // ⚠️ PER FLIGHT LEG AND RAIL JOURNEY: the input as entered with its unit, the km figure, the category and
+    // how it was reached, the class used, both combustion figures, well-to-tank, what entered the figure,
+    // and the cells each factor was read from. Then the hotel exclusion and the disclosures.
+    const c6 = catData['cat6']
+    if (c6 && isReportable('cat6')) {
+      out.push(['Cat 6', 'Radiative forcing', cat6Travel.includeRf ? 'Included' : 'Not included', cat6RfSentence(cat6Travel.includeRf)])
+      for (const f of cat6Travel.flights) out.push(['Cat 6', ...flightCsvRow(f, countryLabel, cat6Travel.includeRf)])
+      if (cat6Travel.flights.length === 0) out.push(['Cat 6', 'Flight legs', '', 'None entered.'])
+      for (const r of cat6Travel.rail) out.push(['Cat 6', ...railCsvRow(r, countryLabel)])
+      if (cat6Travel.rail.length === 0) out.push(['Cat 6', 'Rail journeys', '', 'None entered.'])
+      out.push(['Cat 6', 'Hotel stays', 'Not included', CAT6_HOTEL_SENTENCE])
+      for (const d of cat6SentenceList) out.push(['Cat 6', 'Disclosure', d, ''])
+    }
+
     const c15 = catData['cat15']
     if (c15 && isReportable('cat15')) {
       // ⚠️ THE ATTRIBUTION INPUTS, PER HOLDING. This block used to write ONE row naming a portfolio
@@ -2053,6 +2250,8 @@ export default function Scope3Dashboard() {
       ...(statusOf('cat12').calculated && !cat12SplitSource
         ? [['End-of-life split without a source', 'Category 12 is priced from a treatment split with no source recorded. The GHG Protocol asks for the assumptions behind end-of-life treatment to be reported.']]
         : []),
+      // ⚠️ THE CAT 6 RADIATIVE FORCING SETTING, WHERE A READER MEETS THE FILE: it changes every flight figure.
+      ...(isReportable('cat6') ? [['Cat 6 radiative forcing', cat6RfHeader(cat6Travel.includeRf)]] : []),
       ['Generated', new Date().toLocaleDateString()],
       [],
       ['SCOPE 3 BY CATEGORY'],
@@ -2590,24 +2789,52 @@ export default function Scope3Dashboard() {
                     </div>
                   </>}
 
-                  {/* Cat 6 — Business travel */}
+                  {/* Cat 6 — Business travel: one row per flight leg and per rail journey, priced by
+                      lib/scope3/businessTravel.ts from defraTravel2026.json. Every sentence here is built in
+                      lib/scope3/businessTravelCopy.ts, which is also why no publisher is named in this file. */}
                   {cat.id === 'cat6' && <>
-                    <div>
-                      <label style={labelStyle}>Short-haul flights (under 3hrs)</label>
-                      <input style={inputStyle} type="number" value={catData['cat6']?.short_haul_flights || ''} onChange={e => updateCat('cat6', 'short_haul_flights', Number(e.target.value))} placeholder="Number of flights" />
+                    <div style={{ gridColumn: '1 / -1', background: '#E6F1FB', borderRadius: 8, padding: '0.75rem', fontSize: 11, color: '#0C447C', lineHeight: 1.6 }}>
+                      <div style={{ fontWeight: 700, marginBottom: 4 }}>How this is priced</div>
+                      <p style={{ margin: '0 0 6px' }}>{CAT6_UPLIFT_SENTENCE}</p>
+                      <p style={{ margin: '0 0 6px' }}>{CAT6_RAIL_SENTENCE}</p>
+                      <p style={{ margin: '0 0 6px' }}>{CAT6_HOTEL_SENTENCE}</p>
+                      <p style={{ margin: '6px 0 0', fontSize: 10 }}>
+                        {DEFRA_TRAVEL_META.attribution_required}{' '}
+                        <a href={DEFRA_TRAVEL_META.licence_url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>{DEFRA_TRAVEL_META.licence}</a>
+                      </p>
                     </div>
-                    <div>
-                      <label style={labelStyle}>Long-haul flights (over 3hrs)</label>
-                      <input style={inputStyle} type="number" value={catData['cat6']?.long_haul_flights || ''} onChange={e => updateCat('cat6', 'long_haul_flights', Number(e.target.value))} placeholder="Number of flights" />
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <span style={labelStyle}>Radiative forcing</span>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {[{ val: true, label: 'Included' }, { val: false, label: 'Not included' }].map(opt => (
+                          <button key={String(opt.val)} type="button" aria-pressed={cat6Travel.includeRf === opt.val} onClick={() => updateCat('cat6', 'include_rf', opt.val)} style={{ flex: 1, padding: '8px', borderRadius: 8, fontSize: 12, ...(cat6Travel.includeRf === opt.val ? toggleOn : toggleOff), cursor: 'pointer' }}>{opt.label}</button>
+                        ))}
+                      </div>
+                      <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.5 }}>{cat6RfSentence(cat6Travel.includeRf)}</div>
                     </div>
-                    <div>
-                      <label style={labelStyle}>Hotel nights</label>
-                      <input style={inputStyle} type="number" value={catData['cat6']?.hotel_nights || ''} onChange={e => updateCat('cat6', 'hotel_nights', Number(e.target.value))} placeholder="Total nights" />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Rail travel (km)</label>
-                      <input style={inputStyle} type="number" value={catData['cat6']?.rail_km || ''} onChange={e => updateCat('cat6', 'rail_km', Number(e.target.value))} placeholder="Total km" />
-                    </div>
+                    <FlightsEditor
+                      evaluated={cat6Travel.flights}
+                      includeRf={cat6Travel.includeRf}
+                      onAdd={addFlight}
+                      onRemove={removeFlight}
+                      onUpdate={updateFlight}
+                    />
+                    <RailJourneysEditor
+                      evaluated={cat6Travel.rail}
+                      onAdd={addRailJourney}
+                      onRemove={removeRailJourney}
+                      onUpdate={updateRailJourney}
+                    />
+                    {cat6Travel.calculated && (
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <SpendFactorWorkings
+                          id="cat6-travel"
+                          figureMt={cat6Travel.mt}
+                          summary={cat6WorkingsSummary(cat6Travel)}
+                          sentences={cat6SentenceList}
+                        />
+                      </div>
+                    )}
                   </>}
 
                   {/* Cat 7 — Employee commuting */}

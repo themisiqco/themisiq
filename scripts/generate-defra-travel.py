@@ -467,6 +467,33 @@ guidance = {
 }
 
 
+# ── WHEN EACH AIR SHEET WAS LAST UPDATED, FROM THE INDEX SHEET ─────────────────────────────────────
+# The Index sheet's "Factors Updated Periodically" column says which publication last changed each sheet.
+# The flight factors and the WTT flight factors come from different publications (2025 and 2023), and the
+# two imply different fuel use per passenger-km, so a Cat 6 disclosure cites these two cells. Found by the
+# sheet name in column A and the column's own header, not by row number.
+index_rows = read_sheet(z, shared, sheets, "Index")
+periodic = [(n, c) for n, cells in index_rows.items() for c, v in cells.items() if v.strip() == "Factors Updated Periodically"]
+# One header per scope section; all in the same column, or the layout has changed.
+if not periodic or len({c for _, c in periodic}) != 1:
+    die(f"Index: expected every 'Factors Updated Periodically' header in one column, found {periodic}")
+pcol = periodic[0][1]
+
+
+def index_note(sheet_name: str) -> dict:
+    found = [n for n, cells in index_rows.items() if cells.get(0, "").strip() == sheet_name]
+    if len(found) != 1:
+        die(f"Index: expected one row naming {sheet_name!r}, found {found}")
+    text = index_rows[found[0]].get(pcol, "").strip()
+    if not text.startswith("Factors last updated in "):
+        die(f"Index {cell(pcol, found[0])}: {text!r} does not state when {sheet_name!r} was last updated")
+    return {"sheet": "Index", "cell": cell(pcol, found[0]), "text": text}
+
+
+guidance["index_air_last_updated"] = index_note(AIR)
+guidance["index_wtt_air_last_updated"] = index_note(WTT_AIR)
+
+
 # ── FINGERPRINT — rows only, as defraWaste2026.json ────────────────────────────────────────────────
 # ⚠️ SERIALISED THE WAY JAVASCRIPT PRINTS NUMBERS, because the test recomputes the digest with
 # JSON.stringify. Python's json writes 8e-05 and 35.0 where JavaScript writes 0.00008 and 35; the waste

@@ -12,7 +12,9 @@
 //   Cat 5                     (since 17 Sep 2026) DEFRA/DESNZ 2026 waste factors, per material and route
 //   Cat 12                    (since 18 Sep 2026) the same DEFRA factors, per material, on the customer's
 //                             split of end-of-life tonnes across routes
-//   Cat 6, 7                  fixed activity factors in EMISSION_FACTORS, with no recorded source
+//   Cat 6                     (since 19 Sep 2026) DEFRA/DESNZ 2026 business travel factors, per flight
+//                             leg and rail journey, with well-to-tank added (businessTravel.ts)
+//   Cat 7                     fixed activity factors in EMISSION_FACTORS, with no recorded source
 //   Cat 15                    the PCAF-aligned path in lib/pcaf
 //   the other seven           one flat spend factor, with no source, no year and no region
 //
@@ -24,12 +26,13 @@ import { SPEND_EF_SOURCES } from '../emissionFactors/spend'
 import { DEFRA_WASTE_META } from '../emissionFactors/defraWaste'
 import { EMISSION_FACTORS, EMISSION_FACTORS_PROVENANCE, GENERIC_SPEND_FACTOR } from '../emissionFactors'
 import { cat15MethodDescription } from './cat15'
+import { cat6MethodDescription } from './businessTravelCopy'
 
 export type Scope3Method =
   | 'exiobase_spend'
   | 'flat_spend'
   | 'waste_factors'
-  | 'travel_factors'
+  | 'business_travel_factors'
   | 'commuting_factors'
   | 'pcaf'
   | 'end_of_life_factors'
@@ -47,7 +50,10 @@ const METHOD_BY_CATEGORY: Readonly<Record<string, Scope3Method>> = {
   cat2: 'exiobase_spend',
   cat4: 'exiobase_spend',
   cat5: 'waste_factors',
-  cat6: 'travel_factors',
+  // ⚠️ 'travel_factors' IS GONE, NOT RENAMED. It priced flight COUNTS at an assumed 800 or 5,000 km from
+  // EMISSION_FACTORS values with no recorded source; no category uses it now, and no saved Cat 6 data in
+  // its shape exists. Cat 7 never used it and still reads EMISSION_FACTORS through commuting_factors.
+  cat6: 'business_travel_factors',
   cat7: 'commuting_factors',
   cat12: 'end_of_life_factors',
   cat15: 'pcaf',
@@ -81,7 +87,8 @@ export const METHOD_TAKES_ENTERED_FIGURE: Readonly<Record<Scope3Method, boolean>
   flat_spend: true,
   pcaf: true,
   waste_factors: false,
-  travel_factors: false,
+  // Category 6 takes no entered total: its figure is the customer's flight legs and rail journeys, priced.
+  business_travel_factors: false,
   commuting_factors: false,
   // Category 12 takes no entered total: its figure is the customer's materials and split, priced.
   end_of_life_factors: false,
@@ -166,13 +173,10 @@ export function scope3MethodDescription(method: Scope3Method): string {
         `sold. Re-use is not a treatment route and has no factor. ${w.attribution_required}`
       )
     }
-    case 'travel_factors':
-      return (
-        `Activity-based: flights, hotel nights and rail distance, multiplied by fixed factors of ` +
-        `${ef.flight_short} and ${ef.flight_long} kg CO2e per passenger-km for short- and long-haul flights, ` +
-        `${ef.hotel} kg CO2e per hotel night and ${ef.rail} kg CO2e per rail km.` +
-        gapSentence(EMISSION_FACTORS_PROVENANCE, 'These factors are')
-      )
+    case 'business_travel_factors':
+      // Built in lib/scope3/businessTravelCopy.ts, from the same sentences the Cat 6 panel, workings and CSV
+      // read. No em-dashes.
+      return cat6MethodDescription()
     case 'commuting_factors':
       return (
         `Activity-based: employees, commute distance and working days, multiplied by a fixed factor for ` +
