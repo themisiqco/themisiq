@@ -1,0 +1,1232 @@
+{
+ "shared": {
+  "methodology_lines": [
+   "Each Scope 3 category is calculated by one of the methods below, and every export names the method used for each category in that inventory. For Categories 1, 2, 3, 4, 8, 9, 10, 11, 13, 14 and 15, a figure entered directly is used instead of any estimate. Categories 5, 6, 7 and 12 take no entered figure: they are calculated only from the data their method asks for.",
+   "Categories 1, 2 and 4 (purchased goods and services; capital goods; upstream transportation and distribution): Spend-based, priced from EXIOBASE 3 version 3.8.2 (EXIOBASE consortium, licensed CC BY-SA 4.0) through the active factor edition, using the factor recorded for that category (an EXIOBASE industry or product, whichever the category is priced against) in the EXIOBASE region the inventory's country of supply belongs to. For Category 1, supplier-specific figures, where entered, are used instead.",
+   "Category 5 (waste generated in operations): Activity-based: tonnes of waste by material and treatment route, each multiplied by the kg CO2e per tonne published for that pair in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Waste disposal sheet, AR5 GWPs). Only the routes published for a material are offered; re-use is not a disposal route and has no factor. Contains public sector information licensed under the Open Government Licence v3.0.",
+   "Category 12 (end-of-life treatment of sold products): Activity-based, per material: the tonnes of sold products and packaging reaching end of life, split by the customer across the treatment routes the sheet publishes for that material, each route's tonnes multiplied by the kg CO2e per tonne published for that material and route in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Waste disposal sheet, AR5 GWPs). This is finer than formula [12.1] of the GHG Protocol's Technical Guidance for Calculating Scope 3 Emissions, which applies one average factor per treatment method. The split and its source are the customer's assumption. The figure is the expected end-of-life emissions of all products sold in the reporting year, most of which have not yet occurred. These are UK factors, applied wherever the products are sold. Re-use is not a treatment route and has no factor. Contains public sector information licensed under the Open Government Licence v3.0.",
+   "Category 6 (business travel): Activity-based, per flight leg and rail journey: passenger-km (the direct one-way distance times the passengers or trips) multiplied by the kg CO2e per passenger-km published in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Business travel- air and Business travel- land sheets, AR5 GWPs), with well-to-tank emissions from the matching well-to-tank sheets added. Each flight leg takes one of the sheet's categories: domestic when both ends are in the UK; the haul the Haul definition sheet gives the other end when one end is; and, when neither end is, domestic under 482.8032 km, short-haul from 482.8032 km to under 3,701.4912 km and long-haul from 3,701.4912 km, which departs from the sheet's guidance to use its international average for flights between non-UK countries (Business travel- air A56) and follows the distance bands of the US EPA GHG Emission Factors Hub (2025), cited as the precedent for banding only, with no EPA figure used. Radiative forcing is included unless the inventory turns it off, using DEFRA's With RF flight factors, which increase the CO2 component by 70% to account for radiative forcing (Business travel- air A11), and the setting is recorded with each inventory. The sheet's flight factors include a distance uplift of 8% for indirect routing (Business travel- air A49), so each leg's distance is the direct distance with no uplift added. They are for direct (non-stop) flights (Business travel- air A53), so a journey with a stop is entered as one leg per flight. Rail journeys are priced from the sheet's rail factors and their well-to-tank factors, which are UK figures; for a journey outside the UK they are used as a stand-in, and the journey is flagged. Hotel stays are not included: they are optional under the GHG Protocol Scope 3 Standard, and the licence for the published hotel factors has not been confirmed. Contains public sector information licensed under the Open Government Licence v3.0.",
+   "Category 7 (employee commuting): Activity-based, per group of employees who commute the same way: employees times the one-way distance times 2, times the days commuted per week, times the weeks per year, multiplied by the kg CO2e published in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Business travel- land sheet, AR5 GWPs) with well-to-tank emissions from the matching sheet added. Car and motorbike factors are per vehicle-km and are divided by the occupancy the customer enters; walking and cycling count as zero. These are UK factors. For a group commuting outside the UK they are used as a stand-in, and the row is flagged. Homeworking is optional under the GHG Protocol Scope 3 Standard (p. 46). Where entered, it is priced from the Homeworking sheet’s combined office equipment and heating factor per FTE working hour (Homeworking C24), for employees in the UK only: the factor is a UK average (Homeworking A11), mostly heating, with no cooling component. The workbook does not state whether it counts only the additional energy of working from home, which the GHG Protocol’s Technical Guidance asks for (p. 90). Contains public sector information licensed under the Open Government Licence v3.0.",
+   "Category 15 (investments): PCAF-aligned financed emissions. A known total, where entered, replaces the holding-level figures. Otherwise each holding's figure is the investee's emissions as entered by the customer, multiplied by the outstanding amount over the value its PCAF asset class attributes on, capped at 100%. Investee emissions are used on whatever GWP basis each investee reported, not re-based, and ThemisIQ does not record which basis that was. A holding missing its emissions, outstanding amount or attribution value withholds the category figure. A portfolio value multiplied by a spend factor does not measure emissions, so ThemisIQ does not estimate this category that way.",
+   "Categories 3, 8, 9, 10, 11, 13 and 14 (fuel- and energy-related activities; upstream leased assets; downstream transportation and distribution; processing of sold products; use of sold products; downstream leased assets; franchises): A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+  ],
+  "assistant_scope3": "Categories 1, 2 and 4 (purchased goods and services; capital goods; upstream transportation and distribution) are priced from EXIOBASE 3.8.2 through a named factor edition, by sector or product and country, and for Category 1 also from supplier-specific figures where the customer enters them; Category 5 (waste generated in operations) is priced from the UK DEFRA/DESNZ 2026 waste factors, per material and treatment route; Category 12 (end-of-life treatment of sold products) is priced from the same UK DEFRA/DESNZ 2026 waste factors, per material and treatment route, applied to the tonnes of sold products reaching end of life as the customer splits them across routes; Category 6 (business travel) is priced from the UK DEFRA/DESNZ 2026 business travel factors, per flight leg (by origin, destination, cabin class and distance) and per rail journey, with well-to-tank emissions added, radiative forcing included unless the inventory turns it off, and hotel stays not included; Category 7 (employee commuting) is priced from the UK DEFRA/DESNZ 2026 land travel factors, per group of employees by mode, distance, days commuted and, for cars and motorbikes, occupancy, with well-to-tank emissions added, and homeworking priced only for employees in the UK; Category 15 (investments) is assessed through a PCAF-aligned path; and Categories 3, 8, 9, 10, 11, 13 and 14 (fuel- and energy-related activities; upstream leased assets; downstream transportation and distribution; processing of sold products; use of sold products; downstream leased assets; franchises) are priced from ONE flat factor of 0.5 kg CO2e per unit of the inventory's currency, the same for every category priced this way, whatever the figure represents, with no source, year or region recorded. Those seven are a rough order-of-magnitude estimate, not a sourced figure, and every export names the method used for each category",
+  "assistant_gwp": "In the Scope 3 module, Categories 5 and 12 use the UK DEFRA/DESNZ 2026 waste factors, which their publisher combined on AR5; Category 6 uses the UK DEFRA/DESNZ 2026 business travel factors, which their publisher combined on AR5; Category 7 uses the UK DEFRA/DESNZ 2026 land travel and homeworking factors, which their publisher combined on AR5; Category 15 uses investee emissions on whatever GWP basis each investee reported, not re-based, and ThemisIQ does not record which basis that was.",
+  "method_descriptions": {
+   "cat1": "Spend-based, priced from EXIOBASE 3 version 3.8.2 (EXIOBASE consortium, licensed CC BY-SA 4.0) through the active factor edition, using the factor recorded for that category (an EXIOBASE industry or product, whichever the category is priced against) in the EXIOBASE region the inventory's country of supply belongs to.",
+   "cat2": "Spend-based, priced from EXIOBASE 3 version 3.8.2 (EXIOBASE consortium, licensed CC BY-SA 4.0) through the active factor edition, using the factor recorded for that category (an EXIOBASE industry or product, whichever the category is priced against) in the EXIOBASE region the inventory's country of supply belongs to.",
+   "cat3": "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
+   "cat4": "Spend-based, priced from EXIOBASE 3 version 3.8.2 (EXIOBASE consortium, licensed CC BY-SA 4.0) through the active factor edition, using the factor recorded for that category (an EXIOBASE industry or product, whichever the category is priced against) in the EXIOBASE region the inventory's country of supply belongs to.",
+   "cat5": "Activity-based: tonnes of waste by material and treatment route, each multiplied by the kg CO2e per tonne published for that pair in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Waste disposal sheet, AR5 GWPs). Only the routes published for a material are offered; re-use is not a disposal route and has no factor. Contains public sector information licensed under the Open Government Licence v3.0.",
+   "cat6": "Activity-based, per flight leg and rail journey: passenger-km (the direct one-way distance times the passengers or trips) multiplied by the kg CO2e per passenger-km published in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Business travel- air and Business travel- land sheets, AR5 GWPs), with well-to-tank emissions from the matching well-to-tank sheets added. Each flight leg takes one of the sheet's categories: domestic when both ends are in the UK; the haul the Haul definition sheet gives the other end when one end is; and, when neither end is, domestic under 482.8032 km, short-haul from 482.8032 km to under 3,701.4912 km and long-haul from 3,701.4912 km, which departs from the sheet's guidance to use its international average for flights between non-UK countries (Business travel- air A56) and follows the distance bands of the US EPA GHG Emission Factors Hub (2025), cited as the precedent for banding only, with no EPA figure used. Radiative forcing is included unless the inventory turns it off, using DEFRA's With RF flight factors, which increase the CO2 component by 70% to account for radiative forcing (Business travel- air A11), and the setting is recorded with each inventory. The sheet's flight factors include a distance uplift of 8% for indirect routing (Business travel- air A49), so each leg's distance is the direct distance with no uplift added. They are for direct (non-stop) flights (Business travel- air A53), so a journey with a stop is entered as one leg per flight. Rail journeys are priced from the sheet's rail factors and their well-to-tank factors, which are UK figures; for a journey outside the UK they are used as a stand-in, and the journey is flagged. Hotel stays are not included: they are optional under the GHG Protocol Scope 3 Standard, and the licence for the published hotel factors has not been confirmed. Contains public sector information licensed under the Open Government Licence v3.0.",
+   "cat7": "Activity-based, per group of employees who commute the same way: employees times the one-way distance times 2, times the days commuted per week, times the weeks per year, multiplied by the kg CO2e published in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Business travel- land sheet, AR5 GWPs) with well-to-tank emissions from the matching sheet added. Car and motorbike factors are per vehicle-km and are divided by the occupancy the customer enters; walking and cycling count as zero. These are UK factors. For a group commuting outside the UK they are used as a stand-in, and the row is flagged. Homeworking is optional under the GHG Protocol Scope 3 Standard (p. 46). Where entered, it is priced from the Homeworking sheet’s combined office equipment and heating factor per FTE working hour (Homeworking C24), for employees in the UK only: the factor is a UK average (Homeworking A11), mostly heating, with no cooling component. The workbook does not state whether it counts only the additional energy of working from home, which the GHG Protocol’s Technical Guidance asks for (p. 90). Contains public sector information licensed under the Open Government Licence v3.0.",
+   "cat8": "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
+   "cat9": "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
+   "cat10": "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
+   "cat11": "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
+   "cat12": "Activity-based, per material: the tonnes of sold products and packaging reaching end of life, split by the customer across the treatment routes the sheet publishes for that material, each route's tonnes multiplied by the kg CO2e per tonne published for that material and route in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Waste disposal sheet, AR5 GWPs). This is finer than formula [12.1] of the GHG Protocol's Technical Guidance for Calculating Scope 3 Emissions, which applies one average factor per treatment method. The split and its source are the customer's assumption. The figure is the expected end-of-life emissions of all products sold in the reporting year, most of which have not yet occurred. These are UK factors, applied wherever the products are sold. Re-use is not a treatment route and has no factor. Contains public sector information licensed under the Open Government Licence v3.0.",
+   "cat13": "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
+   "cat14": "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
+   "cat15": "PCAF-aligned financed emissions. A known total, where entered, replaces the holding-level figures. Otherwise each holding's figure is the investee's emissions as entered by the customer, multiplied by the outstanding amount over the value its PCAF asset class attributes on, capped at 100%. Investee emissions are used on whatever GWP basis each investee reported, not re-based, and ThemisIQ does not record which basis that was. A holding missing its emissions, outstanding amount or attribution value withholds the category figure. A portfolio value multiplied by a spend factor does not measure emissions, so ThemisIQ does not estimate this category that way."
+  },
+  "entered_figure_sentence": "For Categories 1, 2, 3, 4, 8, 9, 10, 11, 13, 14 and 15, a figure entered directly is used instead of any estimate. Categories 5, 6, 7 and 12 take no entered figure: they are calculated only from the data their method asks for.",
+  "known_emissions_placeholder": "Leave blank to use the estimate",
+  "total_scope3_mt": 7967.864589,
+  "csv_other_rows": [
+   [
+    "ThemisIQ Scope 3 GHG Inventory"
+   ],
+   [
+    "Company",
+    "Harness Manufacturing Ltd"
+   ],
+   [
+    "Company sector",
+    "Industrials & Manufacturing"
+   ],
+   [
+    "Reporting year",
+    "2026"
+   ],
+   [
+    "Total Scope 3",
+    "7967.86 mt CO2e"
+   ],
+   [
+    "Excluded from total",
+    "Cat 4 Upstream transportation: Not estimated, because this has not been entered: the service provider sector (the EXIOBASE industry for this category). Left out of the total rather than counted as zero."
+   ],
+   [
+    "End-of-life split without a source",
+    "Category 12 is priced from a treatment split with no source recorded. The GHG Protocol asks for the assumptions behind end-of-life treatment to be reported."
+   ],
+   [
+    "Cat 6 radiative forcing",
+    "Included: DEFRA's With RF flight factors, which increase the CO2 component by 70% to account for radiative forcing (Business travel- air A11). Figures without it are in the Cat 6 rows."
+   ],
+   [
+    ""
+   ],
+   [
+    "SCOPE 3 BY CATEGORY"
+   ],
+   [
+    "Category",
+    "Name",
+    "mt CO2e",
+    "Method",
+    "Confidence",
+    "Status",
+    "In total",
+    "Exclusion justification"
+   ],
+   [
+    ""
+   ],
+   [
+    "ESTIMATE BASIS"
+   ],
+   [
+    "Category",
+    "Item",
+    "Value",
+    "Note"
+   ],
+   [
+    ""
+   ],
+   [
+    "METHODOLOGY NOTE"
+   ],
+   [
+    "Category",
+    "Name",
+    "Basis",
+    "Detail"
+   ],
+   [
+    ""
+   ],
+   [
+    "Generated by ThemisIQ · www.themisiq.co · GHG Protocol Scope 3 Standard"
+   ]
+  ],
+  "saved_counts": {
+   "relevant": 14,
+   "in_total": 13,
+   "unpriced": 0,
+   "exclusions_unjustified": 0
+  }
+ },
+ "cat3": {
+  "figure_mt": 200,
+  "is_calculated": true,
+  "confidence_label": "Flat factor",
+  "status": {
+   "key": "relevant_calculated",
+   "label": "Relevant, calculated",
+   "relevant": true,
+   "calculated": true,
+   "inTotal": true,
+   "reportFigure": true,
+   "requiresExplanation": false
+  },
+  "coverage_entry": {
+   "status": "relevant_calculated",
+   "mt": 200,
+   "in_total": true,
+   "unpriced": false,
+   "reason": null
+  },
+  "basis": {
+   "basis": "Flat factor, unsourced",
+   "detail": "Figure entered: 400,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+  },
+  "data_source": "Accounts payable or your utility invoices: the annual spend on fuel and energy you purchased in the reporting year, in the inventory's currency. Leave out any spend already entered under Category 1, or it will be counted twice. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region. If you already hold a figure for this category, enter it as known emissions and that figure is used instead of the estimate.",
+  "guidance": "Upstream emissions of the fuel and electricity you use that aren't already in Scope 1 or 2: extracting, producing and transporting those fuels, plus grid transmission and distribution (T&D) losses.",
+  "csv_rows": [
+   [
+    "Cat 3",
+    "Fuel & energy related",
+    "200.00",
+    "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
+    "Flat factor",
+    "Relevant, calculated",
+    "Yes",
+    ""
+   ],
+   [
+    "Cat 3",
+    "Fuel & energy related",
+    "Flat factor, unsourced",
+    "Figure entered: 400,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+   ]
+  ],
+  "factor_basis_line": "Cat 3 Fuel & energy related: Flat factor, unsourced. Figure entered: 400,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+ },
+ "others": {
+  "cat1": {
+   "figure_mt": 1234,
+   "is_calculated": true,
+   "confidence_label": "Primary data",
+   "status": {
+    "key": "relevant_calculated",
+    "label": "Relevant, calculated",
+    "relevant": true,
+    "calculated": true,
+    "inTotal": true,
+    "reportFigure": true,
+    "requiresExplanation": false
+   },
+   "coverage_entry": {
+    "status": "relevant_calculated",
+    "mt": 1234,
+    "in_total": true,
+    "unpriced": false,
+    "reason": null
+   },
+   "basis": {
+    "basis": "Supplier-specific",
+    "detail": "1234 mt CO2e entered from supplier data; no emission factor was applied."
+   },
+   "data_source": "Procurement / AP ledger: annual spend by supplier or category. Best: supplier-specific emissions via the Supplier Portal. Spend-based estimation is permitted for this category.",
+   "guidance": "Emissions from producing everything you buy (raw materials, components, products and services) up to the point they reach you, cradle-to-gate. Usually the single largest Scope 3 category.",
+   "csv_rows": [
+    [
+     "Cat 1",
+     "Purchased goods & services",
+     "1234.00",
+     "Spend-based, priced from EXIOBASE 3 version 3.8.2 (EXIOBASE consortium, licensed CC BY-SA 4.0) through the active factor edition, using the factor recorded for that category (an EXIOBASE industry or product, whichever the category is priced against) in the EXIOBASE region the inventory's country of supply belongs to.",
+     "Primary data",
+     "Relevant, calculated",
+     "Yes",
+     ""
+    ],
+    [
+     "Cat 1",
+     "Basis",
+     "Supplier-specific emissions",
+     "Entered as a figure; no spend-based estimate was made, so no sector, region or factor edition applies."
+    ],
+    [
+     "Cat 1",
+     "Purchased goods & services",
+     "Supplier-specific",
+     "1234 mt CO2e entered from supplier data; no emission factor was applied."
+    ]
+   ],
+   "factor_basis_line": "Cat 1 Purchased goods & services: Supplier-specific. 1234 mt CO2e entered from supplier data; no emission factor was applied."
+  },
+  "cat2": {
+   "figure_mt": 88,
+   "is_calculated": true,
+   "confidence_label": "Primary data",
+   "status": {
+    "key": "relevant_calculated",
+    "label": "Relevant, calculated",
+    "relevant": true,
+    "calculated": true,
+    "inTotal": true,
+    "reportFigure": true,
+    "requiresExplanation": false
+   },
+   "coverage_entry": {
+    "status": "relevant_calculated",
+    "mt": 88,
+    "in_total": true,
+    "unpriced": false,
+    "reason": null
+   },
+   "basis": {
+    "basis": "Not priced",
+    "detail": "It was not priced, and no reason was recorded."
+   },
+   "data_source": "Fixed-asset register / capital expenditure records for the reporting year. Spend-based estimation is permitted for this category.",
+   "guidance": "Emissions from producing long-life assets you purchase, such as buildings, machinery, vehicles, IT equipment and infrastructure. Count the full cradle-to-gate footprint in the year acquired (not depreciated over time).",
+   "csv_rows": [
+    [
+     "Cat 2",
+     "Capital goods",
+     "88.00",
+     "Spend-based, priced from EXIOBASE 3 version 3.8.2 (EXIOBASE consortium, licensed CC BY-SA 4.0) through the active factor edition, using the factor recorded for that category (an EXIOBASE industry or product, whichever the category is priced against) in the EXIOBASE region the inventory's country of supply belongs to.",
+     "Primary data",
+     "Relevant, calculated",
+     "Yes",
+     ""
+    ],
+    [
+     "Cat 2",
+     "Basis",
+     "Entered figure",
+     "A known figure was entered for this category, so no spend-based estimate was made."
+    ],
+    [
+     "Cat 2",
+     "Capital goods",
+     "Not priced",
+     "It was not priced, and no reason was recorded."
+    ]
+   ],
+   "factor_basis_line": "Cat 2 Capital goods: Not priced. It was not priced, and no reason was recorded."
+  },
+  "cat4": {
+   "figure_mt": 0,
+   "is_calculated": false,
+   "confidence_label": "Flat factor",
+   "status": {
+    "key": "relevant_not_calculated",
+    "label": "Relevant, not yet calculated",
+    "relevant": true,
+    "calculated": false,
+    "inTotal": false,
+    "reportFigure": false,
+    "requiresExplanation": false
+   },
+   "coverage_entry": {
+    "status": "relevant_not_calculated",
+    "mt": null,
+    "in_total": false,
+    "unpriced": false,
+    "reason": null
+   },
+   "basis": {
+    "basis": "Not priced",
+    "detail": "Not estimated, because this has not been entered: the service provider sector (the EXIOBASE industry for this category)."
+   },
+   "data_source": "Freight and logistics invoices: the annual spend on inbound transport, distribution and warehousing you paid for in the reporting year, and the EXIOBASE industry of the provider you paid. Spend-based, priced from EXIOBASE 3 version 3.8.2 (EXIOBASE consortium, licensed CC BY-SA 4.0) through the active factor edition, using the factor recorded for that category (an EXIOBASE industry or product, whichever the category is priced against) in the EXIOBASE region the inventory's country of supply belongs to. If you already hold a figure for this category, enter it as known emissions and that figure is used instead of the estimate.",
+   "guidance": "Emissions from transporting and distributing the goods you buy, between your suppliers and you, plus third-party logistics you pay for (inbound freight and warehousing).",
+   "csv_rows": [
+    [
+     "Cat 4",
+     "Upstream transportation",
+     "not priced",
+     "—",
+     "—",
+     "Relevant, not yet calculated",
+     "No",
+     ""
+    ],
+    [
+     "Cat 4",
+     "Sector used",
+     "",
+     "No sector was selected for this category, so nothing was estimated. It is not defaulted from the company sector."
+    ],
+    [
+     "Cat 4",
+     "Country of supply",
+     "United States (US)",
+     "The inventory's country of supply, used for every spend-priced category."
+    ],
+    [
+     "Cat 4",
+     "EXIOBASE region",
+     "United States (US)",
+     "The region this country resolves to. No estimate was priced."
+    ],
+    [
+     "Cat 4",
+     "Factor edition",
+     "",
+     "Not priced. Not estimated, because this has not been entered: the service provider sector (the EXIOBASE industry for this category)."
+    ],
+    [
+     "Cat 4",
+     "Upstream transportation",
+     "Not priced",
+     "Not estimated, because this has not been entered: the service provider sector (the EXIOBASE industry for this category)."
+    ]
+   ],
+   "factor_basis_line": "Cat 4 Upstream transportation: Not priced. Not estimated, because this has not been entered: the service provider sector (the EXIOBASE industry for this category)."
+  },
+  "cat5": {
+   "figure_mt": 2.542293,
+   "is_calculated": true,
+   "confidence_label": "Activity data",
+   "status": {
+    "key": "relevant_calculated",
+    "label": "Relevant, calculated",
+    "relevant": true,
+    "calculated": true,
+    "inTotal": true,
+    "reportFigure": true,
+    "requiresExplanation": false
+   },
+   "coverage_entry": {
+    "status": "relevant_calculated",
+    "mt": 2.5423,
+    "in_total": true,
+    "unpriced": false,
+    "reason": null
+   },
+   "basis": {
+    "basis": "UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting, Waste disposal sheet, waste-type-specific and average-data",
+    "detail": "Activity-based: tonnes of waste by material and treatment route, each multiplied by the kg CO2e per tonne published for that pair in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Waste disposal sheet, AR5 GWPs). Only the routes published for a material are offered; re-use is not a disposal route and has no factor. Contains public sector information licensed under the Open Government Licence v3.0. 2 rows priced."
+   },
+   "data_source": "Waste contractor invoices / facilities team: tonnes by material and treatment route. Activity data (tonnes) is needed; spend-based is not appropriate here.",
+   "guidance": "Emissions from third parties treating the waste your operations generate: landfill, combustion, recycling, composting and anaerobic digestion. Wastewater is not covered: the waste factors used here publish none.",
+   "csv_rows": [
+    [
+     "Cat 5",
+     "Waste generated in operations",
+     "2.54",
+     "Activity-based: tonnes of waste by material and treatment route, each multiplied by the kg CO2e per tonne published for that pair in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Waste disposal sheet, AR5 GWPs). Only the routes published for a material are offered; re-use is not a disposal route and has no factor. Contains public sector information licensed under the Open Government Licence v3.0.",
+     "Activity data",
+     "Relevant, calculated",
+     "Yes",
+     ""
+    ],
+    [
+     "Cat 5",
+     "Waste row 1",
+     "Paper and board: board (Paper), Closed-loop",
+     "12 t × 4.65358 kg CO2e per t = 55.84 kg CO2e; waste-type-specific."
+    ],
+    [
+     "Cat 5",
+     "Waste row 2",
+     "Household residual waste (Refuse), Landfill",
+     "5 t × 497.28993 kg CO2e per t = 2486.45 kg CO2e; average-data."
+    ],
+    [
+     "Cat 5",
+     "Disclosure",
+     "Priced from UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Waste disposal sheet, factor edition DEFRA 2026). Each row is its tonnes multiplied by the kg CO2e per tonne the sheet publishes for that material and treatment route, and the rows are summed.",
+     ""
+    ],
+    [
+     "Cat 5",
+     "Disclosure",
+     "Contains public sector information licensed under the Open Government Licence v3.0.",
+     ""
+    ],
+    [
+     "Cat 5",
+     "Disclosure",
+     "Licence: Open Government Licence v3.0 (OGL v3.0), http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/",
+     ""
+    ],
+    [
+     "Cat 5",
+     "Disclosure",
+     "Method, in the GHG Protocol Scope 3 Standard's terms for Category 5: waste-type-specific for row 1, where a specific material was chosen; average-data for row 2, because Household residual waste is an unsorted residual stream of unknown composition.",
+     ""
+    ],
+    [
+     "Cat 5",
+     "Disclosure",
+     "GWP basis: AR5. Stated by the workbook's Introduction sheet: the CO2e figures use IPCC Fifth Assessment Report (AR5) 100-year GWPs. The values are combined CO2e as published and are not re-based. The linked GHG inventory records AR6. These factors are not re-based to it, so the inventory combines AR6 and AR5 figures.",
+     ""
+    ],
+    [
+     "Cat 5",
+     "Disclosure",
+     "For landfill, the factors in the tables include collection, transportation and landfill emissions (‘gate to grave’). For combustion and recycling, the factors consider transport to an energy recovery or materials reclamation facility only. This is in line with GHG Protocol Guidelines, with subsequent emissions attributed to electricity generation or recycled material production respectively.",
+     ""
+    ],
+    [
+     "Cat 5",
+     "Disclosure",
+     "These factors cannot be used to determine the relative lifecycle merit of different waste management options. This is because the emissions from energy recovery, recycling, composting and anaerobic digestion are attributed to the user of the recycled materials, not the producer of the waste, in line with GHG Protocol Guidelines.",
+     ""
+    ],
+    [
+     "Cat 5",
+     "Disclosure",
+     "Each material is offered only the treatment routes the sheet publishes a factor for. A route it does not publish is not offered, and is not treated as zero.",
+     ""
+    ],
+    [
+     "Cat 5",
+     "Disclosure",
+     "Re-use is not offered. The workbook's FAQ, \"Why there are no conversion factors for the disposal method \"Re-use\"?\": \"Re-use\" is not within the scope of the GHG conversion factors because it is not a waste disposal method. Only the disposal of waste at the end of its life is within scope.",
+     ""
+    ],
+    [
+     "Cat 5",
+     "Disclosure",
+     "The sheet publishes no wastewater factors, so wastewater treatment is not in this figure.",
+     ""
+    ],
+    [
+     "Cat 5",
+     "Waste generated in operations",
+     "UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting, Waste disposal sheet, waste-type-specific and average-data",
+     "Activity-based: tonnes of waste by material and treatment route, each multiplied by the kg CO2e per tonne published for that pair in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Waste disposal sheet, AR5 GWPs). Only the routes published for a material are offered; re-use is not a disposal route and has no factor. Contains public sector information licensed under the Open Government Licence v3.0. 2 rows priced."
+    ]
+   ],
+   "factor_basis_line": "Cat 5 Waste generated in operations: UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting, Waste disposal sheet, waste-type-specific and average-data. Activity-based: tonnes of waste by material and treatment route, each multiplied by the kg CO2e per tonne published for that pair in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Waste disposal sheet, AR5 GWPs). Only the routes published for a material are offered; re-use is not a disposal route and has no factor. Contains public sector information licensed under the Open Government Licence v3.0. 2 rows priced."
+  },
+  "cat6": {
+   "figure_mt": 1.6216,
+   "is_calculated": true,
+   "confidence_label": "Activity data",
+   "status": {
+    "key": "relevant_calculated",
+    "label": "Relevant, calculated",
+    "relevant": true,
+    "calculated": true,
+    "inTotal": true,
+    "reportFigure": true,
+    "requiresExplanation": false
+   },
+   "coverage_entry": {
+    "status": "relevant_calculated",
+    "mt": 1.6216,
+    "in_total": true,
+    "unpriced": false,
+    "reason": null
+   },
+   "basis": {
+    "basis": "UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting, business travel factors per passenger-km, radiative forcing included, well-to-tank added",
+    "detail": "Activity-based, per flight leg and rail journey: passenger-km (the direct one-way distance times the passengers or trips) multiplied by the kg CO2e per passenger-km published in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Business travel- air and Business travel- land sheets, AR5 GWPs), with well-to-tank emissions from the matching well-to-tank sheets added. Each flight leg takes one of the sheet's categories: domestic when both ends are in the UK; the haul the Haul definition sheet gives the other end when one end is; and, when neither end is, domestic under 482.8032 km, short-haul from 482.8032 km to under 3,701.4912 km and long-haul from 3,701.4912 km, which departs from the sheet's guidance to use its international average for flights between non-UK countries (Business travel- air A56) and follows the distance bands of the US EPA GHG Emission Factors Hub (2025), cited as the precedent for banding only, with no EPA figure used. Radiative forcing is included unless the inventory turns it off, using DEFRA's With RF flight factors, which increase the CO2 component by 70% to account for radiative forcing (Business travel- air A11), and the setting is recorded with each inventory. The sheet's flight factors include a distance uplift of 8% for indirect routing (Business travel- air A49), so each leg's distance is the direct distance with no uplift added. They are for direct (non-stop) flights (Business travel- air A53), so a journey with a stop is entered as one leg per flight. Rail journeys are priced from the sheet's rail factors and their well-to-tank factors, which are UK figures; for a journey outside the UK they are used as a stand-in, and the journey is flagged. Hotel stays are not included: they are optional under the GHG Protocol Scope 3 Standard, and the licence for the published hotel factors has not been confirmed. Contains public sector information licensed under the Open Government Licence v3.0. 1 flight leg and 1 rail journey priced. Radiative forcing is included for this inventory: the figure uses DEFRA's With RF flight factors, which increase the CO2 component by 70% to account for radiative forcing (Business travel- air A11). The figure without it is shown for every flight as well. The setting applies to the whole inventory; DEFRA advises against including it in one year and not another (Business travel- air A13)."
+   },
+   "data_source": "Travel & expense system or travel agency reports: each flight leg (origin, destination, cabin class, distance, passengers) and each rail journey (country, type, distance, passengers). Hotel stays are not taken.",
+   "guidance": "Emissions from employees travelling for business (flights, rail, hotels, rental cars) in vehicles not owned by your company.",
+   "csv_rows": [
+    [
+     "Cat 6",
+     "Business travel",
+     "1.62",
+     "Activity-based, per flight leg and rail journey: passenger-km (the direct one-way distance times the passengers or trips) multiplied by the kg CO2e per passenger-km published in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Business travel- air and Business travel- land sheets, AR5 GWPs), with well-to-tank emissions from the matching well-to-tank sheets added. Each flight leg takes one of the sheet's categories: domestic when both ends are in the UK; the haul the Haul definition sheet gives the other end when one end is; and, when neither end is, domestic under 482.8032 km, short-haul from 482.8032 km to under 3,701.4912 km and long-haul from 3,701.4912 km, which departs from the sheet's guidance to use its international average for flights between non-UK countries (Business travel- air A56) and follows the distance bands of the US EPA GHG Emission Factors Hub (2025), cited as the precedent for banding only, with no EPA figure used. Radiative forcing is included unless the inventory turns it off, using DEFRA's With RF flight factors, which increase the CO2 component by 70% to account for radiative forcing (Business travel- air A11), and the setting is recorded with each inventory. The sheet's flight factors include a distance uplift of 8% for indirect routing (Business travel- air A49), so each leg's distance is the direct distance with no uplift added. They are for direct (non-stop) flights (Business travel- air A53), so a journey with a stop is entered as one leg per flight. Rail journeys are priced from the sheet's rail factors and their well-to-tank factors, which are UK figures; for a journey outside the UK they are used as a stand-in, and the journey is flagged. Hotel stays are not included: they are optional under the GHG Protocol Scope 3 Standard, and the licence for the published hotel factors has not been confirmed. Contains public sector information licensed under the Open Government Licence v3.0.",
+     "Activity data",
+     "Relevant, calculated",
+     "Yes",
+     ""
+    ],
+    [
+     "Cat 6",
+     "Radiative forcing",
+     "Included",
+     "Radiative forcing is included for this inventory: the figure uses DEFRA's With RF flight factors, which increase the CO2 component by 70% to account for radiative forcing (Business travel- air A11). The figure without it is shown for every flight as well. The setting applies to the whole inventory; DEFRA advises against including it in one year and not another (Business travel- air A13)."
+    ],
+    [
+     "Cat 6",
+     "Flight leg 1",
+     "United Kingdom (GB) to United States (US), 5555 km, 2 passengers or trips, class economy",
+     "5,555.00 km; UK end, so the haul the Haul definition sheet gives United States: long-haul; class used: Economy. Combustion with RF 1,300.31 kg CO2e (CO2 1,289.20), without RF 769.48 kg CO2e (CO2 758.37); well-to-tank 273.42 kg CO2e; in the figure (RF included): 1,573.73 kg CO2e. Source cells: Business travel- air!E28:H28, Business travel- air!I28:L28, WTT- business travel- air!F25, Haul definition!A163:C163."
+    ],
+    [
+     "Cat 6",
+     "Rail journey 1",
+     "United Kingdom (GB), National rail, 400 km, 3 passengers",
+     "400.00 km; combustion 37.10 kg CO2e; well-to-tank 10.76 kg CO2e; 47.87 kg CO2e in the figure. Source cells: Business travel- land!D87:G87, WTT- pass vehs & travel- land!D84."
+    ],
+    [
+     "Cat 6",
+     "Hotel stays",
+     "Not included",
+     "Hotel stays are not included: they are optional under the GHG Protocol Scope 3 Standard, and the licence for the published hotel factors has not been confirmed."
+    ],
+    [
+     "Cat 6",
+     "Disclosure",
+     "Priced from UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, factor edition DEFRA 2026): the Business travel- air, WTT- business travel- air, Business travel- land and WTT- pass vehs & travel- land sheets, per passenger-km, with each flight's category read from the Haul definition sheet.",
+     ""
+    ],
+    [
+     "Cat 6",
+     "Disclosure",
+     "Contains public sector information licensed under the Open Government Licence v3.0.",
+     ""
+    ],
+    [
+     "Cat 6",
+     "Disclosure",
+     "Licence: Open Government Licence v3.0 (OGL v3.0), http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/",
+     ""
+    ],
+    [
+     "Cat 6",
+     "Disclosure",
+     "Each flight leg takes one of the sheet's categories: domestic when both ends are in the UK; the haul the Haul definition sheet gives the other end when one end is; and, when neither end is, domestic under 482.8032 km, short-haul from 482.8032 km to under 3,701.4912 km and long-haul from 3,701.4912 km, which departs from the sheet's guidance to use its international average for flights between non-UK countries (Business travel- air A56) and follows the distance bands of the US EPA GHG Emission Factors Hub (2025), cited as the precedent for banding only, with no EPA figure used.",
+     ""
+    ],
+    [
+     "Cat 6",
+     "Disclosure",
+     "Cabin class is applied where the sheet publishes a factor for it in the flight's category. Where the class is unknown, the average passenger factor is used, as the sheet's own example does (Business travel- air A18); where the sheet publishes no factor for the entered class in that category, the average passenger factor is used as well, and the row says so.",
+     ""
+    ],
+    [
+     "Cat 6",
+     "Disclosure",
+     "Radiative forcing is included for this inventory: the figure uses DEFRA's With RF flight factors, which increase the CO2 component by 70% to account for radiative forcing (Business travel- air A11). The figure without it is shown for every flight as well. The setting applies to the whole inventory; DEFRA advises against including it in one year and not another (Business travel- air A13).",
+     ""
+    ],
+    [
+     "Cat 6",
+     "Disclosure",
+     "The sheet's flight factors include a distance uplift of 8% for indirect routing (Business travel- air A49), so each leg's distance is the direct distance with no uplift added. They are for direct (non-stop) flights (Business travel- air A53), so a journey with a stop is entered as one leg per flight.",
+     ""
+    ],
+    [
+     "Cat 6",
+     "Disclosure",
+     "Well-to-tank emissions, from extracting, refining and transporting the fuel, are added to every priced flight and rail journey and shown separately from combustion. The sheet's well-to-tank flight factors were last updated in its 2023 publication and its flight factors in its 2025 publication (Index H41 and Index H40), and the two imply different fuel use per passenger-km.",
+     ""
+    ],
+    [
+     "Cat 6",
+     "Disclosure",
+     "Rail journeys are priced from the sheet's rail factors and their well-to-tank factors, which are UK figures; for a journey outside the UK they are used as a stand-in, and the journey is flagged.",
+     ""
+    ],
+    [
+     "Cat 6",
+     "Disclosure",
+     "Hotel stays are not included: they are optional under the GHG Protocol Scope 3 Standard, and the licence for the published hotel factors has not been confirmed.",
+     ""
+    ],
+    [
+     "Cat 6",
+     "Disclosure",
+     "GWP basis: AR5. Stated by the workbook's Introduction sheet: the CO2e figures use IPCC Fifth Assessment Report (AR5) 100-year GWPs. The CO2, CH4 and N2O components are published already in kg CO2e (the sheet's headers read 'kg CO2e of CH4 per unit' and so on) and are stored as published, not re-based. The linked GHG inventory records AR6. These factors are not re-based to it, so the inventory combines AR6 and AR5 figures.",
+     ""
+    ],
+    [
+     "Cat 6",
+     "Disclosure",
+     "Combustion 1,337.42 kg CO2e and well-to-tank 284.18 kg CO2e, 1,621.60 kg CO2e in all. Flights with radiative forcing 1,300.31 kg CO2e, without 769.48 kg CO2e (combustion only).",
+     ""
+    ],
+    [
+     "Cat 6",
+     "Business travel",
+     "UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting, business travel factors per passenger-km, radiative forcing included, well-to-tank added",
+     "Activity-based, per flight leg and rail journey: passenger-km (the direct one-way distance times the passengers or trips) multiplied by the kg CO2e per passenger-km published in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Business travel- air and Business travel- land sheets, AR5 GWPs), with well-to-tank emissions from the matching well-to-tank sheets added. Each flight leg takes one of the sheet's categories: domestic when both ends are in the UK; the haul the Haul definition sheet gives the other end when one end is; and, when neither end is, domestic under 482.8032 km, short-haul from 482.8032 km to under 3,701.4912 km and long-haul from 3,701.4912 km, which departs from the sheet's guidance to use its international average for flights between non-UK countries (Business travel- air A56) and follows the distance bands of the US EPA GHG Emission Factors Hub (2025), cited as the precedent for banding only, with no EPA figure used. Radiative forcing is included unless the inventory turns it off, using DEFRA's With RF flight factors, which increase the CO2 component by 70% to account for radiative forcing (Business travel- air A11), and the setting is recorded with each inventory. The sheet's flight factors include a distance uplift of 8% for indirect routing (Business travel- air A49), so each leg's distance is the direct distance with no uplift added. They are for direct (non-stop) flights (Business travel- air A53), so a journey with a stop is entered as one leg per flight. Rail journeys are priced from the sheet's rail factors and their well-to-tank factors, which are UK figures; for a journey outside the UK they are used as a stand-in, and the journey is flagged. Hotel stays are not included: they are optional under the GHG Protocol Scope 3 Standard, and the licence for the published hotel factors has not been confirmed. Contains public sector information licensed under the Open Government Licence v3.0. 1 flight leg and 1 rail journey priced. Radiative forcing is included for this inventory: the figure uses DEFRA's With RF flight factors, which increase the CO2 component by 70% to account for radiative forcing (Business travel- air A11). The figure without it is shown for every flight as well. The setting applies to the whole inventory; DEFRA advises against including it in one year and not another (Business travel- air A13)."
+    ]
+   ],
+   "factor_basis_line": "Cat 6 Business travel: UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting, business travel factors per passenger-km, radiative forcing included, well-to-tank added. Activity-based, per flight leg and rail journey: passenger-km (the direct one-way distance times the passengers or trips) multiplied by the kg CO2e per passenger-km published in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Business travel- air and Business travel- land sheets, AR5 GWPs), with well-to-tank emissions from the matching well-to-tank sheets added. Each flight leg takes one of the sheet's categories: domestic when both ends are in the UK; the haul the Haul definition sheet gives the other end when one end is; and, when neither end is, domestic under 482.8032 km, short-haul from 482.8032 km to under 3,701.4912 km and long-haul from 3,701.4912 km, which departs from the sheet's guidance to use its international average for flights between non-UK countries (Business travel- air A56) and follows the distance bands of the US EPA GHG Emission Factors Hub (2025), cited as the precedent for banding only, with no EPA figure used. Radiative forcing is included unless the inventory turns it off, using DEFRA's With RF flight factors, which increase the CO2 component by 70% to account for radiative forcing (Business travel- air A11), and the setting is recorded with each inventory. The sheet's flight factors include a distance uplift of 8% for indirect routing (Business travel- air A49), so each leg's distance is the direct distance with no uplift added. They are for direct (non-stop) flights (Business travel- air A53), so a journey with a stop is entered as one leg per flight. Rail journeys are priced from the sheet's rail factors and their well-to-tank factors, which are UK figures; for a journey outside the UK they are used as a stand-in, and the journey is flagged. Hotel stays are not included: they are optional under the GHG Protocol Scope 3 Standard, and the licence for the published hotel factors has not been confirmed. Contains public sector information licensed under the Open Government Licence v3.0. 1 flight leg and 1 rail journey priced. Radiative forcing is included for this inventory: the figure uses DEFRA's With RF flight factors, which increase the CO2 component by 70% to account for radiative forcing (Business travel- air A11). The figure without it is shown for every flight as well. The setting applies to the whole inventory; DEFRA advises against including it in one year and not another (Business travel- air A13)."
+  },
+  "cat7": {
+   "figure_mt": 21.077527,
+   "is_calculated": true,
+   "confidence_label": "Activity data",
+   "status": {
+    "key": "relevant_calculated",
+    "label": "Relevant, calculated",
+    "relevant": true,
+    "calculated": true,
+    "inTotal": true,
+    "reportFigure": true,
+    "requiresExplanation": false
+   },
+   "coverage_entry": {
+    "status": "relevant_calculated",
+    "mt": 21.0775,
+    "in_total": true,
+    "unpriced": false,
+    "reason": null
+   },
+   "basis": {
+    "basis": "UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting, land travel factors per km with well-to-tank added, and homeworking per FTE working hour",
+    "detail": "Activity-based, per group of employees who commute the same way: employees times the one-way distance times 2, times the days commuted per week, times the weeks per year, multiplied by the kg CO2e published in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Business travel- land sheet, AR5 GWPs) with well-to-tank emissions from the matching sheet added. Car and motorbike factors are per vehicle-km and are divided by the occupancy the customer enters; walking and cycling count as zero. These are UK factors. For a group commuting outside the UK they are used as a stand-in, and the row is flagged. Homeworking is optional under the GHG Protocol Scope 3 Standard (p. 46). Where entered, it is priced from the Homeworking sheet’s combined office equipment and heating factor per FTE working hour (Homeworking C24), for employees in the UK only: the factor is a UK average (Homeworking A11), mostly heating, with no cooling component. The workbook does not state whether it counts only the additional energy of working from home, which the GHG Protocol’s Technical Guidance asks for (p. 90). Contains public sector information licensed under the Open Government Licence v3.0. 1 commuting group and 1 homeworking group priced."
+   },
+   "data_source": "A commuting survey or HR records: for each group of employees who commute the same way, the mode, the country, the one-way distance, the days actually commuted per week and the weeks worked per year, and how many people share each car. Optionally, homeworking days and hours.",
+   "guidance": "Emissions from employees travelling between home and work in vehicles your company does not own or operate. Working from home is optional under the GHG Protocol and is entered separately.",
+   "csv_rows": [
+    [
+     "Cat 7",
+     "Employee commuting",
+     "21.08",
+     "Activity-based, per group of employees who commute the same way: employees times the one-way distance times 2, times the days commuted per week, times the weeks per year, multiplied by the kg CO2e published in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Business travel- land sheet, AR5 GWPs) with well-to-tank emissions from the matching sheet added. Car and motorbike factors are per vehicle-km and are divided by the occupancy the customer enters; walking and cycling count as zero. These are UK factors. For a group commuting outside the UK they are used as a stand-in, and the row is flagged. Homeworking is optional under the GHG Protocol Scope 3 Standard (p. 46). Where entered, it is priced from the Homeworking sheet’s combined office equipment and heating factor per FTE working hour (Homeworking C24), for employees in the UK only: the factor is a UK average (Homeworking A11), mostly heating, with no cooling component. The workbook does not state whether it counts only the additional energy of working from home, which the GHG Protocol’s Technical Guidance asks for (p. 90). Contains public sector information licensed under the Open Government Licence v3.0.",
+     "Activity data",
+     "Relevant, calculated",
+     "Yes",
+     ""
+    ],
+    [
+     "Cat 7",
+     "Commuting group 1",
+     "average car, unknown fuel, United Kingdom (GB), 20 employees, 15 km one way, 4 days a week, 45 weeks a year, occupancy 1.2",
+     "15.00 km one way; 5,400 km a year per commuter; 108,000 passenger-km, divided by occupancy 1.2 = 90,000 vehicle-km. Combustion 14,931.90 kg CO2e; well-to-tank 3,959.10 kg CO2e; 18,891.00 kg CO2e in the figure. Source cells: Business travel- land!X53:AA53, WTT- pass vehs & travel- land!I50."
+    ],
+    [
+     "Cat 7",
+     "Homeworking group 1",
+     "United Kingdom (GB), 10 employees, 2 homeworking days a week, 45 weeks a year, 7.5 hours a day",
+     "6,750 FTE working hours x 0.32393 kg CO2e per hour = 2,186.53 kg CO2e. Source cell: Homeworking!C24."
+    ],
+    [
+     "Cat 7",
+     "Disclosure",
+     "Priced from UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, factor edition DEFRA 2026): the Business travel- land and WTT- pass vehs & travel- land sheets for the journey, and the Homeworking sheet.",
+     ""
+    ],
+    [
+     "Cat 7",
+     "Disclosure",
+     "Contains public sector information licensed under the Open Government Licence v3.0.",
+     ""
+    ],
+    [
+     "Cat 7",
+     "Disclosure",
+     "Licence: Open Government Licence v3.0 (OGL v3.0), http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/",
+     ""
+    ],
+    [
+     "Cat 7",
+     "Disclosure",
+     "For each group of employees who commute the same way, the distance is the one-way distance times 2 for the return trip, times the days commuted per week, times the weeks per year, times the employees in the group; each mode’s factor is applied to that distance, and walking and cycling are counted at zero.",
+     ""
+    ],
+    [
+     "Cat 7",
+     "Disclosure",
+     "Commuting days are as entered by the customer: the days per week actually commuted, times the weeks per year, excluding homeworking, holiday and business-travel days, as the GHG Protocol’s Technical Guidance describes (p. 92).",
+     ""
+    ],
+    [
+     "Cat 7",
+     "Disclosure",
+     "Car and motorbike factors are per vehicle-km, the whole vehicle (Business travel- land A12), so each group’s distance is divided by the occupancy the customer entered for it, which may be an average such as 1.3 from an occupancy survey. Taxi, bus, coach and rail factors are per passenger-km and need none.",
+     ""
+    ],
+    [
+     "Cat 7",
+     "Disclosure",
+     "These are UK factors. For a group commuting outside the UK they are used as a stand-in, and the row is flagged.",
+     ""
+    ],
+    [
+     "Cat 7",
+     "Disclosure",
+     "The battery electric and plug-in hybrid car factors include the electricity used, at the UK grid’s intensity (Business travel- land A14), and so do the rail factors (What's new B22). Outside the UK they do not describe the local grid.",
+     ""
+    ],
+    [
+     "Cat 7",
+     "Disclosure",
+     "Well-to-tank emissions, from extracting, refining and transporting the fuel, are added to every priced commuting row and shown separately. The sheet’s factors for cars, buses and rail were updated in its 2026 publication and those for motorbikes and taxis last in its 2021 publication (Index G44 and Index H44); its well-to-tank factors were last updated in its 2024 publication (Index H45).",
+     ""
+    ],
+    [
+     "Cat 7",
+     "Disclosure",
+     "Homeworking is optional under the GHG Protocol Scope 3 Standard (p. 46). Where entered, it is priced from the Homeworking sheet’s combined office equipment and heating factor per FTE working hour (Homeworking C24), for employees in the UK only: the factor is a UK average (Homeworking A11), mostly heating, with no cooling component. The workbook does not state whether it counts only the additional energy of working from home, which the GHG Protocol’s Technical Guidance asks for (p. 90).",
+     ""
+    ],
+    [
+     "Cat 7",
+     "Disclosure",
+     "GWP basis: AR5. Stated by the workbook's Introduction sheet: the CO2e figures use IPCC Fifth Assessment Report (AR5) 100-year GWPs. The CO2, CH4 and N2O components are published already in kg CO2e (the sheet's headers read 'kg CO2e of CH4 per unit' and so on) and are stored as published, not re-based. The linked GHG inventory records AR6. These factors are not re-based to it, so the inventory combines AR6 and AR5 figures.",
+     ""
+    ],
+    [
+     "Cat 7",
+     "Disclosure",
+     "Combustion 14,931.90 kg CO2e, well-to-tank 3,959.10 kg CO2e and homeworking 2,186.53 kg CO2e: 21,077.53 kg CO2e in all.",
+     ""
+    ],
+    [
+     "Cat 7",
+     "Employee commuting",
+     "UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting, land travel factors per km with well-to-tank added, and homeworking per FTE working hour",
+     "Activity-based, per group of employees who commute the same way: employees times the one-way distance times 2, times the days commuted per week, times the weeks per year, multiplied by the kg CO2e published in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Business travel- land sheet, AR5 GWPs) with well-to-tank emissions from the matching sheet added. Car and motorbike factors are per vehicle-km and are divided by the occupancy the customer enters; walking and cycling count as zero. These are UK factors. For a group commuting outside the UK they are used as a stand-in, and the row is flagged. Homeworking is optional under the GHG Protocol Scope 3 Standard (p. 46). Where entered, it is priced from the Homeworking sheet’s combined office equipment and heating factor per FTE working hour (Homeworking C24), for employees in the UK only: the factor is a UK average (Homeworking A11), mostly heating, with no cooling component. The workbook does not state whether it counts only the additional energy of working from home, which the GHG Protocol’s Technical Guidance asks for (p. 90). Contains public sector information licensed under the Open Government Licence v3.0. 1 commuting group and 1 homeworking group priced."
+    ]
+   ],
+   "factor_basis_line": "Cat 7 Employee commuting: UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting, land travel factors per km with well-to-tank added, and homeworking per FTE working hour. Activity-based, per group of employees who commute the same way: employees times the one-way distance times 2, times the days commuted per week, times the weeks per year, multiplied by the kg CO2e published in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Business travel- land sheet, AR5 GWPs) with well-to-tank emissions from the matching sheet added. Car and motorbike factors are per vehicle-km and are divided by the occupancy the customer enters; walking and cycling count as zero. These are UK factors. For a group commuting outside the UK they are used as a stand-in, and the row is flagged. Homeworking is optional under the GHG Protocol Scope 3 Standard (p. 46). Where entered, it is priced from the Homeworking sheet’s combined office equipment and heating factor per FTE working hour (Homeworking C24), for employees in the UK only: the factor is a UK average (Homeworking A11), mostly heating, with no cooling component. The workbook does not state whether it counts only the additional energy of working from home, which the GHG Protocol’s Technical Guidance asks for (p. 90). Contains public sector information licensed under the Open Government Licence v3.0. 1 commuting group and 1 homeworking group priced."
+  },
+  "cat8": {
+   "figure_mt": 60,
+   "is_calculated": true,
+   "confidence_label": "Flat factor",
+   "status": {
+    "key": "relevant_calculated",
+    "label": "Relevant, calculated",
+    "relevant": true,
+    "calculated": true,
+    "inTotal": true,
+    "reportFigure": true,
+    "requiresExplanation": false
+   },
+   "coverage_entry": {
+    "status": "relevant_calculated",
+    "mt": 60,
+    "in_total": true,
+    "unpriced": false,
+    "reason": null
+   },
+   "basis": {
+    "basis": "Flat factor, unsourced",
+    "detail": "Figure entered: 120,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+   },
+   "data_source": "The estimate uses one field: Annual spend / value, in the inventory's currency. For leased assets that is what you paid under those leases in the reporting year, from your lease schedule or accounts payable. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region. If you already hold an emissions figure for these assets, from the landlord or from your own metering, enter it as known emissions and that figure is used instead of the estimate.",
+   "guidance": "Emissions from assets you lease from others (as lessee) that aren't already in your Scope 1 and 2, e.g. leased offices or equipment you don't operationally control.",
+   "csv_rows": [
+    [
+     "Cat 8",
+     "Upstream leased assets",
+     "60.00",
+     "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
+     "Flat factor",
+     "Relevant, calculated",
+     "Yes",
+     ""
+    ],
+    [
+     "Cat 8",
+     "Upstream leased assets",
+     "Flat factor, unsourced",
+     "Figure entered: 120,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+    ]
+   ],
+   "factor_basis_line": "Cat 8 Upstream leased assets: Flat factor, unsourced. Figure entered: 120,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+  },
+  "cat9": {
+   "figure_mt": 45,
+   "is_calculated": true,
+   "confidence_label": "Flat factor",
+   "status": {
+    "key": "relevant_calculated",
+    "label": "Relevant, calculated",
+    "relevant": true,
+    "calculated": true,
+    "inTotal": true,
+    "reportFigure": true,
+    "requiresExplanation": false
+   },
+   "coverage_entry": {
+    "status": "relevant_calculated",
+    "mt": 45,
+    "in_total": true,
+    "unpriced": false,
+    "reason": null
+   },
+   "basis": {
+    "basis": "Flat factor, unsourced",
+    "detail": "Figure entered: 90,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+   },
+   "data_source": "The estimate uses one field: Annual spend / value, in the inventory's currency. The transport this category covers is paid for by your customers or distributors, so there is no invoice of yours behind the figure, and ThemisIQ does not define what it should represent. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region. If a carrier or distributor has given you an emissions figure for moving your sold products, enter it as known emissions and that figure is used instead of the estimate.",
+   "guidance": "Emissions from transporting and distributing the products you sell, after they leave you: outbound logistics, distribution centres, retail, paid for by others.",
+   "csv_rows": [
+    [
+     "Cat 9",
+     "Downstream transportation",
+     "45.00",
+     "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
+     "Flat factor",
+     "Relevant, calculated",
+     "Yes",
+     ""
+    ],
+    [
+     "Cat 9",
+     "Downstream transportation",
+     "Flat factor, unsourced",
+     "Figure entered: 90,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+    ]
+   ],
+   "factor_basis_line": "Cat 9 Downstream transportation: Flat factor, unsourced. Figure entered: 90,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+  },
+  "cat10": {
+   "figure_mt": 30,
+   "is_calculated": true,
+   "confidence_label": "Flat factor",
+   "status": {
+    "key": "not_relevant_calculated",
+    "label": "Not relevant, calculated",
+    "relevant": false,
+    "calculated": true,
+    "inTotal": false,
+    "reportFigure": true,
+    "requiresExplanation": true
+   },
+   "coverage_entry": {
+    "status": "not_relevant_calculated",
+    "mt": 30,
+    "in_total": false,
+    "unpriced": false,
+    "reason": null
+   },
+   "basis": {
+    "basis": "Flat factor, unsourced",
+    "detail": "Figure entered: 60,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+   },
+   "data_source": "The estimate uses one field: Annual spend / value, in the inventory's currency. The processing this category covers is done and paid for by your customers, so there is no invoice of yours behind the figure, and ThemisIQ does not define what it should represent. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region. If a customer who processes your intermediate products has given you an emissions figure, enter it as known emissions and that figure is used instead of the estimate.",
+   "guidance": "Emissions from third parties further processing your sold intermediate products before final use (e.g. you sell a component that's then assembled or refined).",
+   "csv_rows": [
+    [
+     "Cat 10",
+     "Processing of sold products",
+     "30.00",
+     "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
+     "Flat factor",
+     "Not relevant, calculated",
+     "No",
+     "Sold products are not processed further by any customer."
+    ],
+    [
+     "Cat 10",
+     "Processing of sold products",
+     "Flat factor, unsourced",
+     "Figure entered: 60,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+    ]
+   ],
+   "factor_basis_line": "Cat 10 Processing of sold products: Flat factor, unsourced. Figure entered: 60,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+  },
+  "cat11": {
+   "figure_mt": 250,
+   "is_calculated": true,
+   "confidence_label": "Flat factor",
+   "status": {
+    "key": "relevant_calculated",
+    "label": "Relevant, calculated",
+    "relevant": true,
+    "calculated": true,
+    "inTotal": true,
+    "reportFigure": true,
+    "requiresExplanation": false
+   },
+   "coverage_entry": {
+    "status": "relevant_calculated",
+    "mt": 250,
+    "in_total": true,
+    "unpriced": false,
+    "reason": null
+   },
+   "basis": {
+    "basis": "Flat factor, unsourced",
+    "detail": "Figure entered: 500,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+   },
+   "data_source": "The estimate uses one field: Annual spend / value, in the inventory's currency. The emissions this category covers happen when your customers use what you sold, so there is no invoice of yours behind the figure, and ThemisIQ does not define what it should represent. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region. If you have modelled the emissions of your products in use, or hold a figure from a product footprint study, enter it as known emissions and that figure is used instead of the estimate.",
+   "guidance": "Emissions from customers using the products you sell over their lifetime. This is often the largest category for energy-using or fuel products.",
+   "csv_rows": [
+    [
+     "Cat 11",
+     "Use of sold products",
+     "250.00",
+     "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
+     "Flat factor",
+     "Relevant, calculated",
+     "Yes",
+     ""
+    ],
+    [
+     "Cat 11",
+     "Use of sold products",
+     "Flat factor, unsourced",
+     "Figure entered: 500,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+    ]
+   ],
+   "factor_basis_line": "Cat 11 Use of sold products: Flat factor, unsourced. Figure entered: 500,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+  },
+  "cat12": {
+   "figure_mt": 5.623169,
+   "is_calculated": true,
+   "confidence_label": "Activity data",
+   "status": {
+    "key": "relevant_calculated",
+    "label": "Relevant, calculated",
+    "relevant": true,
+    "calculated": true,
+    "inTotal": true,
+    "reportFigure": true,
+    "requiresExplanation": false
+   },
+   "coverage_entry": {
+    "status": "relevant_calculated",
+    "mt": 5.6232,
+    "in_total": true,
+    "unpriced": false,
+    "reason": null
+   },
+   "basis": {
+    "basis": "UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting, Waste disposal sheet, per material and route, on the customer's split",
+    "detail": "Activity-based, per material: the tonnes of sold products and packaging reaching end of life, split by the customer across the treatment routes the sheet publishes for that material, each route's tonnes multiplied by the kg CO2e per tonne published for that material and route in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Waste disposal sheet, AR5 GWPs). This is finer than formula [12.1] of the GHG Protocol's Technical Guidance for Calculating Scope 3 Emissions, which applies one average factor per treatment method. The split and its source are the customer's assumption. The figure is the expected end-of-life emissions of all products sold in the reporting year, most of which have not yet occurred. These are UK factors, applied wherever the products are sold. Re-use is not a treatment route and has no factor. Contains public sector information licensed under the Open Government Licence v3.0. 2 materials priced. Source of the split: not recorded."
+   },
+   "data_source": "Per material: the tonnes of sold products and packaging that reach end of life, and how that mass splits across treatment routes. Enter the mass that reaches end of life, which can be less than the mass sold for products that are consumed, such as food and drink. For an intermediate product, enter the intermediate product you sold, not the final product it becomes part of. Include packaging, through to the point of retail.",
+   "guidance": "Emissions from the waste treatment of the products you sold in the reporting year, and of their packaging, at the end of their life: landfill, combustion, recycling, composting or anaerobic digestion. The figure covers all of that year’s sales, so most of these emissions have not happened yet.",
+   "csv_rows": [
+    [
+     "Cat 12",
+     "End-of-life treatment",
+     "5.62",
+     "Activity-based, per material: the tonnes of sold products and packaging reaching end of life, split by the customer across the treatment routes the sheet publishes for that material, each route's tonnes multiplied by the kg CO2e per tonne published for that material and route in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Waste disposal sheet, AR5 GWPs). This is finer than formula [12.1] of the GHG Protocol's Technical Guidance for Calculating Scope 3 Emissions, which applies one average factor per treatment method. The split and its source are the customer's assumption. The figure is the expected end-of-life emissions of all products sold in the reporting year, most of which have not yet occurred. These are UK factors, applied wherever the products are sold. Re-use is not a treatment route and has no factor. Contains public sector information licensed under the Open Government Licence v3.0.",
+     "Activity data",
+     "Relevant, calculated",
+     "Yes",
+     ""
+    ],
+    [
+     "Cat 12",
+     "Material 1",
+     "Paper and board: board (Paper)",
+     "8 t reaching end of life; shares Landfill 60%, Closed-loop 40% (sum 100%); 5604.55 kg CO2e in total."
+    ],
+    [
+     "Cat 12",
+     "Material 1, Closed-loop",
+     "40% of 8 t = 3.2 t",
+     "3.2 t × 4.65358 kg CO2e per t = 14.89 kg CO2e; waste-type-specific."
+    ],
+    [
+     "Cat 12",
+     "Material 1, Landfill",
+     "60% of 8 t = 4.8 t",
+     "4.8 t × 1164.51317 kg CO2e per t = 5589.66 kg CO2e; waste-type-specific."
+    ],
+    [
+     "Cat 12",
+     "Material 2",
+     "Household residual waste (Refuse)",
+     "4 t reaching end of life; shares Combustion 100% (sum 100%); 18.61 kg CO2e in total."
+    ],
+    [
+     "Cat 12",
+     "Material 2, Combustion",
+     "100% of 4 t = 4 t",
+     "4 t × 4.65358 kg CO2e per t = 18.61 kg CO2e; average-data."
+    ],
+    [
+     "Cat 12",
+     "Split source",
+     "Not recorded",
+     "No source was recorded for the treatment split. The GHG Protocol asks for the assumptions behind end-of-life treatment to be reported."
+    ],
+    [
+     "Cat 12",
+     "Disclosure",
+     "Priced from UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Waste disposal sheet, factor edition DEFRA 2026). For each material, the tonnes of sold products and packaging reaching end of life are split across treatment routes by the customer's shares, and each route's tonnes are multiplied by the kg CO2e per tonne the sheet publishes for that material and route; the results are summed.",
+     ""
+    ],
+    [
+     "Cat 12",
+     "Disclosure",
+     "Contains public sector information licensed under the Open Government Licence v3.0.",
+     ""
+    ],
+    [
+     "Cat 12",
+     "Disclosure",
+     "Licence: Open Government Licence v3.0 (OGL v3.0), http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/",
+     ""
+    ],
+    [
+     "Cat 12",
+     "Disclosure",
+     "This applies the sheet's factor for each material and each route, which is finer than formula [12.1] of the GHG Protocol's Technical Guidance for Calculating Scope 3 Emissions; that formula applies one average factor per treatment method.",
+     ""
+    ],
+    [
+     "Cat 12",
+     "Disclosure",
+     "The split across treatment routes is the customer's assumption. No source for it was recorded.",
+     ""
+    ],
+    [
+     "Cat 12",
+     "Disclosure",
+     "The figure is the expected end-of-life emissions of all products sold in the reporting year. Most of these emissions have not yet occurred.",
+     ""
+    ],
+    [
+     "Cat 12",
+     "Disclosure",
+     "These are UK factors, applied wherever the products were sold. End-of-life treatment where the products are used may differ.",
+     ""
+    ],
+    [
+     "Cat 12",
+     "Disclosure",
+     "GWP basis: AR5. Stated by the workbook's Introduction sheet: the CO2e figures use IPCC Fifth Assessment Report (AR5) 100-year GWPs. The values are combined CO2e as published and are not re-based. The linked GHG inventory records AR6. These factors are not re-based to it, so the inventory combines AR6 and AR5 figures.",
+     ""
+    ],
+    [
+     "Cat 12",
+     "Disclosure",
+     "For landfill, the factors in the tables include collection, transportation and landfill emissions (‘gate to grave’). For combustion and recycling, the factors consider transport to an energy recovery or materials reclamation facility only. This is in line with GHG Protocol Guidelines, with subsequent emissions attributed to electricity generation or recycled material production respectively.",
+     ""
+    ],
+    [
+     "Cat 12",
+     "Disclosure",
+     "These factors cannot be used to determine the relative lifecycle merit of different waste management options. This is because the emissions from energy recovery, recycling, composting and anaerobic digestion are attributed to the user of the recycled materials, not the producer of the waste, in line with GHG Protocol Guidelines.",
+     ""
+    ],
+    [
+     "Cat 12",
+     "Disclosure",
+     "Re-use is not offered as a route: a re-used product still reaches end of life later. The workbook's FAQ, \"Why there are no conversion factors for the disposal method \"Re-use\"?\": \"Re-use\" is not within the scope of the GHG conversion factors because it is not a waste disposal method. Only the disposal of waste at the end of its life is within scope.",
+     ""
+    ],
+    [
+     "Cat 12",
+     "End-of-life treatment",
+     "UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting, Waste disposal sheet, per material and route, on the customer's split",
+     "Activity-based, per material: the tonnes of sold products and packaging reaching end of life, split by the customer across the treatment routes the sheet publishes for that material, each route's tonnes multiplied by the kg CO2e per tonne published for that material and route in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Waste disposal sheet, AR5 GWPs). This is finer than formula [12.1] of the GHG Protocol's Technical Guidance for Calculating Scope 3 Emissions, which applies one average factor per treatment method. The split and its source are the customer's assumption. The figure is the expected end-of-life emissions of all products sold in the reporting year, most of which have not yet occurred. These are UK factors, applied wherever the products are sold. Re-use is not a treatment route and has no factor. Contains public sector information licensed under the Open Government Licence v3.0. 2 materials priced. Source of the split: not recorded."
+    ]
+   ],
+   "factor_basis_line": "Cat 12 End-of-life treatment: UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting, Waste disposal sheet, per material and route, on the customer's split. Activity-based, per material: the tonnes of sold products and packaging reaching end of life, split by the customer across the treatment routes the sheet publishes for that material, each route's tonnes multiplied by the kg CO2e per tonne published for that material and route in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Waste disposal sheet, AR5 GWPs). This is finer than formula [12.1] of the GHG Protocol's Technical Guidance for Calculating Scope 3 Emissions, which applies one average factor per treatment method. The split and its source are the customer's assumption. The figure is the expected end-of-life emissions of all products sold in the reporting year, most of which have not yet occurred. These are UK factors, applied wherever the products are sold. Re-use is not a treatment route and has no factor. Contains public sector information licensed under the Open Government Licence v3.0. 2 materials priced. Source of the split: not recorded."
+  },
+  "cat13": {
+   "figure_mt": 40,
+   "is_calculated": true,
+   "confidence_label": "Flat factor",
+   "status": {
+    "key": "relevant_calculated",
+    "label": "Relevant, calculated",
+    "relevant": true,
+    "calculated": true,
+    "inTotal": true,
+    "reportFigure": true,
+    "requiresExplanation": false
+   },
+   "coverage_entry": {
+    "status": "relevant_calculated",
+    "mt": 40,
+    "in_total": true,
+    "unpriced": false,
+    "reason": null
+   },
+   "basis": {
+    "basis": "Flat factor, unsourced",
+    "detail": "Figure entered: 80,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+   },
+   "data_source": "The estimate uses one field: Annual spend / value, in the inventory's currency. The energy use this category covers is your tenants', so there is no invoice of yours behind the figure, and ThemisIQ does not define what it should represent. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region. If a tenant has given you an emissions figure for what they lease from you, enter it as known emissions and that figure is used instead of the estimate.",
+   "guidance": "Emissions from assets you own and lease out to others (as lessor) that aren't in your Scope 1 and 2, e.g. property you rent to tenants.",
+   "csv_rows": [
+    [
+     "Cat 13",
+     "Downstream leased assets",
+     "40.00",
+     "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
+     "Flat factor",
+     "Relevant, calculated",
+     "Yes",
+     ""
+    ],
+    [
+     "Cat 13",
+     "Downstream leased assets",
+     "Flat factor, unsourced",
+     "Figure entered: 80,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+    ]
+   ],
+   "factor_basis_line": "Cat 13 Downstream leased assets: Flat factor, unsourced. Figure entered: 80,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+  },
+  "cat14": {
+   "figure_mt": 20,
+   "is_calculated": true,
+   "confidence_label": "Flat factor",
+   "status": {
+    "key": "relevant_calculated",
+    "label": "Relevant, calculated",
+    "relevant": true,
+    "calculated": true,
+    "inTotal": true,
+    "reportFigure": true,
+    "requiresExplanation": false
+   },
+   "coverage_entry": {
+    "status": "relevant_calculated",
+    "mt": 20,
+    "in_total": true,
+    "unpriced": false,
+    "reason": null
+   },
+   "basis": {
+    "basis": "Flat factor, unsourced",
+    "detail": "Figure entered: 40,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+   },
+   "data_source": "The estimate uses one field: Annual spend / value, in the inventory's currency. The operations this category covers are your franchisees', so there is no invoice of yours behind the figure, and ThemisIQ does not define what it should represent. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region. If your franchisees report emissions to you, enter that figure as known emissions and it is used instead of the estimate.",
+   "guidance": "Emissions from the operations of your franchisees. Relevant if you're a franchisor.",
+   "csv_rows": [
+    [
+     "Cat 14",
+     "Franchises",
+     "20.00",
+     "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
+     "Flat factor",
+     "Relevant, calculated",
+     "Yes",
+     ""
+    ],
+    [
+     "Cat 14",
+     "Franchises",
+     "Flat factor, unsourced",
+     "Figure entered: 40,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+    ]
+   ],
+   "factor_basis_line": "Cat 14 Franchises: Flat factor, unsourced. Figure entered: 40,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+  },
+  "cat15": {
+   "figure_mt": 6000,
+   "is_calculated": true,
+   "confidence_label": "Primary data",
+   "status": {
+    "key": "relevant_calculated",
+    "label": "Relevant, calculated",
+    "relevant": true,
+    "calculated": true,
+    "inTotal": true,
+    "reportFigure": true,
+    "requiresExplanation": false
+   },
+   "coverage_entry": {
+    "status": "relevant_calculated",
+    "mt": 6000,
+    "in_total": true,
+    "unpriced": false,
+    "reason": null,
+    "dq": 1.1666666666666667
+   },
+   "basis": {
+    "basis": "PCAF-aligned, per asset",
+    "detail": "Assessed asset by asset across 2 holdings, with an emissions-weighted PCAF data quality score of 1.2 of 5. Each holding's figure is the investee's emissions as entered by the customer, multiplied by the outstanding amount over the value its PCAF asset class attributes on, capped at 100%."
+   },
+   "data_source": "Per holding: the asset class, the outstanding amount, the value that asset class attributes on (EVIC, equity plus debt, property value or vehicle value) and the investee’s reported emissions. If you already hold a computed figure for the portfolio, enter known financed emissions directly instead.",
+   "guidance": "Emissions associated with your investments and lending (financed emissions), for investors, banks and asset owners. ThemisIQ assesses this holding by holding on PCAF’s method: each investee’s emissions as entered by the customer, multiplied by your share of that investee. A portfolio value multiplied by a spend factor does not measure emissions, so ThemisIQ does not estimate this category that way. ThemisIQ is not PCAF-certified or a PCAF signatory.",
+   "csv_rows": [
+    [
+     "Cat 15",
+     "Investments",
+     "6000.00",
+     "PCAF-aligned financed emissions. A known total, where entered, replaces the holding-level figures. Otherwise each holding's figure is the investee's emissions as entered by the customer, multiplied by the outstanding amount over the value its PCAF asset class attributes on, capped at 100%. Investee emissions are used on whatever GWP basis each investee reported, not re-based, and ThemisIQ does not record which basis that was. A holding missing its emissions, outstanding amount or attribution value withholds the category figure. A portfolio value multiplied by a spend factor does not measure emissions, so ThemisIQ does not estimate this category that way.",
+     "Primary data",
+     "Relevant, calculated",
+     "Yes",
+     ""
+    ],
+    [
+     "Cat 15",
+     "Basis",
+     "PCAF-aligned, per holding",
+     "2 holdings assessed, emissions-weighted PCAF data quality 1.2 of 5."
+    ],
+    [
+     "Cat 15",
+     "Holding 1",
+     "Listed equity & corporate bonds",
+     "Outstanding 1000000 USD over enterprise value incl. cash (evic) 10000000 USD = attribution factor 10.00%. Investee emissions 50000 tCO2e (reported, verified), PCAF data quality 1. Financed emissions 5000.00 tCO2e."
+    ],
+    [
+     "Cat 15",
+     "Holding 2",
+     "Business loans & unlisted equity",
+     "Outstanding 2000000 USD over total equity + debt 40000000 USD = attribution factor 5.00%. Investee emissions 20000 tCO2e (reported, unverified), PCAF data quality 2. Financed emissions 1000.00 tCO2e."
+    ],
+    [
+     "Cat 15",
+     "GWP basis",
+     "Not recorded",
+     "Investee emissions are used on whatever GWP basis each investee reported, not re-based, and ThemisIQ does not record which basis that was. The linked GHG inventory records AR6. Whether the investee figures share that basis is not known."
+    ],
+    [
+     "Cat 15",
+     "Investments",
+     "PCAF-aligned, per asset",
+     "Assessed asset by asset across 2 holdings, with an emissions-weighted PCAF data quality score of 1.2 of 5. Each holding's figure is the investee's emissions as entered by the customer, multiplied by the outstanding amount over the value its PCAF asset class attributes on, capped at 100%."
+    ]
+   ],
+   "factor_basis_line": "Cat 15 Investments: PCAF-aligned, per asset. Assessed asset by asset across 2 holdings, with an emissions-weighted PCAF data quality score of 1.2 of 5. Each holding's figure is the investee's emissions as entered by the customer, multiplied by the outstanding amount over the value its PCAF asset class attributes on, capped at 100%."
+  }
+ },
+ "meta": {
+  "generated_by": "lib/scope3/scope3Surfaces.test.ts",
+  "fixture_sha256": "44fac0629c5e7147f8a1df7b411f5ad3b061941f08dea9b910921edcddf06176"
+ }
+}
