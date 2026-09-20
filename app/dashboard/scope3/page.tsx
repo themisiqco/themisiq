@@ -1863,6 +1863,14 @@ export default function Scope3Dashboard() {
       case 'employee_commuting_factors': return rowPricedResult(catData, id)?.mt ?? 0
       case 'pcaf': return calcCat15()
       case 'flat_spend': return calcGenericSpend(id)
+      // ⚠️ NO SPEND FALLBACK HERE, AND THAT IS THE WHOLE POINT OF THE MOVE. Category 3's method is now
+      // fuel_and_energy_upstream, so calcGenericSpend would price it by a method the map no longer
+      // claims, under copy that names DEFRA: the one thing categoryMethods.ts exists to prevent.
+      // Task 5 of the Category 3 design replaces this line with the priced result of
+      // lib/scope3/cat3Inputs.ts and lib/scope3/cat3Energy.ts, read from the bound GHG inventory. Until
+      // then the only Category 3 figure is one the customer entered as known emissions, which
+      // METHOD_TAKES_ENTERED_FIGURE says this method accepts.
+      case 'fuel_and_energy_upstream': return catData[id]?.emissions_override || 0
     }
   }
 
@@ -1906,6 +1914,11 @@ export default function Scope3Dashboard() {
       // applies to this path.
       case 'pcaf': return cat15Result().mt !== null
       case 'flat_spend': return !!d.annual_spend
+      // An entered figure is handled above (takesEnteredFigure is true for this method). Nothing else on
+      // this panel produces a Category 3 figure until Task 5 reads the bound inventory, and a saved
+      // annual_spend must NOT make it calculated: that spend is no longer what the category is priced
+      // from, and saying "calculated" of it would put a flat-factor number under a DEFRA description.
+      case 'fuel_and_energy_upstream': return false
     }
   }
 
@@ -2076,6 +2089,15 @@ export default function Scope3Dashboard() {
     // ⚠️ A PRICED GROUP, NOT A HEADCOUNT. This returned 'medium' whenever employee_count was set, so a figure
     // built on the 15 km and petrol-car defaults was labelled activity data.
     if (scope3MethodFor(id) === 'employee_commuting_factors' && rowPricedResult(catData, id)?.calculated) return 'medium'
+    // ⚠️ 'medium' (Activity data), THE SAME LABEL CATS 5, 6, 7 AND 12 CARRY WHEN THEY PRICE, because
+    // Category 3's figure is activity data of the same kind: metered consumption from the bound GHG
+    // inventory times a published factor. Without this branch a DEFRA-priced Category 3 would fall
+    // through to 'low' and be labelled "Flat factor" on the pill and in the CSV, which is Q8 of the
+    // Category 3 design.
+    //   ⚠️ IT CANNOT FIRE YET, DELIBERATELY. isCalculated is false for this method until Task 5 wires
+    // the calculator, and an entered figure returns 'high' above. The branch is placed now so the
+    // figure cannot arrive without its label.
+    if (scope3MethodFor(id) === 'fuel_and_energy_upstream' && isCalculated(id)) return 'medium'
     if (id === 'cat5' && cat5Priced.length > 0) return 'medium'
     if (scope3MethodFor(id) === 'end_of_life_factors' && rowPricedResult(catData, id)?.calculated) return 'medium'
     // ⚠️ A PER-ASSET PCAF ASSESSMENT IS NOT A SPEND ESTIMATE, and it used to fall through to 'Flat spend'
